@@ -1,0 +1,67 @@
+export interface NavItem {
+  label: string;
+  href: string;
+  group: string;
+  icon: string;
+  perm?: string;   // permesso richiesto (chiave in users.ts). Assente = sempre visibile.
+  module?: string; // modulo richiesto (chiave in Abbonamento). Assente o "pms" = sempre attivo.
+}
+
+export const NAV: NavItem[] = [
+  { label: "Dashboard", href: "/", group: "", icon: "grid" },
+
+  // Operatività: la gestione quotidiana della struttura (incl. la guida ospiti).
+  { label: "Prenotazioni", href: "/prenotazioni", group: "Operatività", icon: "clipboard", perm: "prenotazioni", module: "pms" },
+  { label: "Calendario", href: "/calendario", group: "Operatività", icon: "calendar", perm: "calendario", module: "pms" },
+  { label: "Pulizie", href: "/pulizie", group: "Operatività", icon: "sparkles", perm: "pulizie", module: "housekeeping" },
+  { label: "Guida ospiti", href: "/guida-ospiti", group: "Operatività", icon: "share", perm: "webconcierge", module: "concierge" },
+
+  // Comunicazione: tutti i canali con gli ospiti.
+  { label: "Centro messaggi", href: "/messaggi", group: "Comunicazione", icon: "chat", perm: "webconcierge", module: "messaging" },
+  { label: "Concierge AI", href: "/concierge", group: "Comunicazione", icon: "chat", perm: "webconcierge", module: "concierge" },
+  { label: "Conversazioni", href: "/conversazioni", group: "Comunicazione", icon: "chat", perm: "webconcierge", module: "messaging" },
+
+  // Vendita: cosa vendi e come lo proponi.
+  { label: "Preventivi", href: "/preventivi", group: "Vendita", icon: "fileText", perm: "webconcierge", module: "concierge" },
+  { label: "Promozioni", href: "/promozioni", group: "Vendita", icon: "mail", perm: "webconcierge", module: "concierge" },
+  { label: "Upselling & extra", href: "/upselling", group: "Vendita", icon: "tag", perm: "webconcierge", module: "concierge" },
+
+  // Distribuzione: dove sei prenotabile e a quali prezzi.
+  { label: "Tariffe", href: "/tariffe", group: "Distribuzione", icon: "tag", perm: "tariffe", module: "pms" },
+  { label: "Canali", href: "/canali", group: "Distribuzione", icon: "share", perm: "canali", module: "cm" },
+  { label: "Meta Search", href: "/metasearch", group: "Distribuzione", icon: "share", perm: "canali", module: "meta" },
+  { label: "Widget sito", href: "/widget", group: "Distribuzione", icon: "share", perm: "sito", module: "booking" },
+  { label: "Sito web", href: "/sito", group: "Distribuzione", icon: "grid", perm: "sito", module: "site" },
+
+  { label: "Assistente ricavi", href: "/assistente-ricavi", group: "Report", icon: "chart", perm: "webconcierge", module: "concierge" },
+  { label: "Recensioni", href: "/recensioni", group: "Report", icon: "chart", perm: "webconcierge", module: "concierge" },
+  { label: "Statistiche", href: "/statistiche", group: "Report", icon: "chart", perm: "statistiche", module: "pms" },
+  { label: "Revenue", href: "/revenue", group: "Report", icon: "chart", perm: "revenue", module: "rms" },
+  { label: "Rate checker", href: "/rate-checker", group: "Report", icon: "tag", perm: "ratechecker", module: "ratecheck" },
+
+  { label: "Cassa · Prima Nota", href: "/cassa", group: "Amministrazione", icon: "card", perm: "cassa", module: "cassa" },
+  { label: "Incassi", href: "/pagamenti", group: "Amministrazione", icon: "card", perm: "pagamenti", module: "pms" },
+
+  { label: "Ospiti", href: "/ospiti", group: "Anagrafiche", icon: "users", perm: "prenotazioni", module: "pms" },
+  { label: "Alloggiati", href: "/alloggiati", group: "Anagrafiche", icon: "id", perm: "alloggiati", module: "pms" },
+  { label: "Tassa soggiorno", href: "/tassa-soggiorno", group: "Anagrafiche", icon: "receipt", perm: "tassa", module: "pms" },
+
+  { label: "Strutture", href: "/strutture", group: "Configurazione", icon: "building", perm: "impostazioni", module: "pms" },
+  { label: "Camere", href: "/camere", group: "Configurazione", icon: "bed", perm: "camere", module: "pms" },
+  { label: "Modelli & automazioni", href: "/modelli", group: "Configurazione", icon: "chat", perm: "webconcierge", module: "messaging" },
+  { label: "Utenti", href: "/utenti", group: "Configurazione", icon: "users", perm: "utenti", module: "team" },
+  { label: "Impostazioni", href: "/impostazioni", group: "Configurazione", icon: "settings", perm: "impostazioni", module: "pms" },
+  { label: "Abbonamento", href: "/abbonamento", group: "Configurazione", icon: "card", perm: "abbonamento", module: "pms" },
+];
+
+// Colore accento per categoria (palette terra: terracotta, oliva, ocra, tortora).
+export const GROUP_COLOR: Record<string, string> = {
+  "Operatività": "#BE5D38",
+  "Comunicazione": "#A65A7A",
+  "Vendita": "#7A8450",
+  "Distribuzione": "#5E7C8B",
+  "Report": "#2C8A8A",
+  "Amministrazione": "#4F46E5",
+  "Anagrafiche": "#C08A3A",
+  "Configurazione": "#957A66",
+};

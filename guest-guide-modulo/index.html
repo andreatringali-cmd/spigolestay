@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>B&amp;B Spigolehouse &amp; Spigolerooms · Guest Guide</title>
+  <meta name="description" content="Guida per gli ospiti del B&B Spigolehouse & Spigolerooms — Siracusa">
+  <meta name="theme-color" content="#14424F">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,400;0,500;0,600;0,700;1,500&family=Raleway:wght@300;400;500;600;700&family=Mrs+Saint+Delafield&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=20260717c">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+</head>
+<body>
+
+  <!-- ===== SCHERMATA DI BENVENUTO / SCELTA LINGUA ===== -->
+  <div id="welcome" class="welcome hidden" aria-hidden="true">
+    <div class="welcome-inner">
+      <img class="welcome-logo" src="assets/logo-trasparente.png" onerror="this.onerror=null;this.src='assets/logo.svg'" alt="Logo Spigolehouse">
+      <h1 class="welcome-name">Spigolehouse<span class="sep">|</span>Rooms</h1>
+      <p class="welcome-sub">Bed &amp; Breakfast Siracusa</p>
+      <div class="lang-buttons" role="group" aria-label="Scegli la lingua / Choose your language">
+        <button class="lang-btn" data-lang="it">
+          <svg class="flag" viewBox="0 0 24 18" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="8" height="18" fill="#009246"/><rect x="8" width="8" height="18" fill="#fff"/><rect x="16" width="8" height="18" fill="#ce2b37"/></svg>
+          <span>Italiano</span></button>
+        <button class="lang-btn" data-lang="en">
+          <svg class="flag" viewBox="0 0 24 18" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="24" height="18" fill="#012169"/><path d="M0,0 24,18 M24,0 0,18" stroke="#fff" stroke-width="3.6"/><path d="M0,0 24,18 M24,0 0,18" stroke="#C8102E" stroke-width="2.2"/><rect x="9.6" width="4.8" height="18" fill="#fff"/><rect y="6.6" width="24" height="4.8" fill="#fff"/><rect x="10.8" width="2.4" height="18" fill="#C8102E"/><rect y="7.8" width="24" height="2.4" fill="#C8102E"/></svg>
+          <span>English</span></button>
+        <button class="lang-btn" data-lang="fr">
+          <svg class="flag" viewBox="0 0 24 18" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="8" height="18" fill="#0055A4"/><rect x="8" width="8" height="18" fill="#fff"/><rect x="16" width="8" height="18" fill="#EF4135"/></svg>
+          <span>Français</span></button>
+        <button class="lang-btn" data-lang="de">
+          <svg class="flag" viewBox="0 0 24 18" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="24" height="6" fill="#000"/><rect y="6" width="24" height="6" fill="#DD0000"/><rect y="12" width="24" height="6" fill="#FFCE00"/></svg>
+          <span>Deutsch</span></button>
+        <button class="lang-btn" data-lang="es">
+          <svg class="flag" viewBox="0 0 24 18" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="24" height="18" fill="#AA151B"/><rect y="4.5" width="24" height="9" fill="#F1BF00"/></svg>
+          <span>Español</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== APP PRINCIPALE ===== -->
+  <div id="app" class="app hidden">
+    <header class="topbar">
+      <button class="brand" id="brandHome" aria-label="Home">
+        <img src="assets/logo-trasparente.png" onerror="this.onerror=null;this.src='assets/logo.svg'" alt="Spigolehouse &amp; Rooms" class="brand-logo">
+      </button>
+      <div class="topbar-right">
+        <div class="lang-switch" id="langSwitch" role="group" aria-label="Language"></div>
+        <button class="topbar-back" id="topbarBack" data-go="" aria-label="Indietro" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          <span id="topbarBackLabel">Indietro</span>
+        </button>
+      </div>
+    </header>
+
+    <main id="main"></main>
+
+    <div id="socialBar" class="social-bar"></div>
+
+    <footer class="footer">
+      <p id="footerText"></p>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/content/config.js?v=20260717c"></script>
+  <script src="js/content/it.js?v=20260717c"></script>
+  <script src="js/content/en.js?v=20260717c"></script>
+  <script src="js/content/fr.js?v=20260717c"></script>
+  <script src="js/content/de.js?v=20260717c"></script>
+  <script src="js/content/es.js?v=20260717c"></script>
+  <script src="js/app.js?v=20260717c"></script>
+</body>
+</html>

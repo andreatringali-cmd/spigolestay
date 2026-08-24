@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guida ospiti · TV</title>
+  <meta name="theme-color" content="#0b0f12">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="tv.css">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+</head>
+<body>
+  <div id="fit">
+    <div class="tv" id="tv">
+      <div class="photo" id="photo"></div>
+      <div class="scrim"></div>
+      <div class="sheen"></div>
+
+      <header>
+        <div class="brand">
+          <div class="medal" id="medal"></div>
+          <div>
+            <div class="bname" id="bname"></div>
+            <div class="bsub" id="roomline"></div>
+          </div>
+        </div>
+        <div class="wxrow" id="wxrow"></div>
+        <div class="timebox">
+          <div class="date" id="date">—</div>
+          <div class="clock" id="clock">--:--</div>
+        </div>
+      </header>
+
+      <div class="hero">
+        <div class="kicker" id="kicker"></div>
+        <h1 id="welcome"></h1>
+        <p id="welcomesub"></p>
+        <div class="heronote" id="heronote"></div>
+      </div>
+
+      <div class="langs" id="langs"></div>
+
+      <div class="bottom">
+        <div class="wifi">
+          <div class="wifihead">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9c5-5 13-5 18 0M6.5 12.5c3.2-3.2 7.8-3.2 11 0M10 16a3.5 3.5 0 0 1 4 0"/><path d="M12 19.5h.01"/></svg>
+            <span id="wifiLabel">Wi-Fi</span>
+          </div>
+          <div class="wifigrid">
+            <div style="flex:1;min-width:0">
+              <div class="wl" id="wlNet">Rete</div><div class="wv" id="wvNet">—</div>
+              <div class="wl" id="wlPw" style="margin-top:8px">Password</div><div class="wv pw" id="wvPw">—</div>
+            </div>
+            <div class="qrcol"><div class="qrbox" id="qrwifi"></div><span id="wifiScan">Scan Wi-Fi</span></div>
+          </div>
+        </div>
+        <div class="dock" id="dock"></div>
+      </div>
+
+      <div class="veil"></div>
+      <aside class="panel">
+        <div class="pk" id="pk"></div>
+        <h2 id="ptitle"></h2>
+        <div class="pphoto" id="pphoto"></div>
+        <p class="plede" id="plede"></p>
+        <div class="rows" id="prows"></div>
+        <div class="phint" id="phint"></div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/content/it.js"></script>
+  <script src="js/content/en.js"></script>
+  <script src="js/content/fr.js"></script>
+  <script src="js/content/de.js"></script>
+  <script src="js/content/es.js"></script>
+  <script src="js/content.js"></script>
+  <script src="tv.js"></script>
+</body>
+</html>

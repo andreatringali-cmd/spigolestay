@@ -1,0 +1,218 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useData } from "@/lib/store";
+import type { RoomType, Unit } from "@/lib/types";
+import { VIEW_OPTIONS } from "@/lib/types";
+import { AV_COLORS } from "@/lib/users";
+import { eur } from "@/lib/format";
+import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { useLang } from "@/lib/i18n";
+
+const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+const lbl = "block text-xs font-medium text-dim";
+const typeColor = (rt: RoomType, i: number) => rt.color ?? AV_COLORS[i % AV_COLORS.length];
+
+function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
+  return <button type="button" onClick={onClick} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? color : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} /></button>;
+}
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const { t } = useLang();
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6vh]">
+      <button aria-label={t("Chiudi")} onClick={onClose} className="absolute inset-0 bg-black/40" />
+      <div className="relative w-full max-w-lg rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+        <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{title}</h2><button onClick={onClose} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export default function CamerePage() {
+  const router = useRouter();
+  const { t } = useLang();
+  const { structures, roomTypes, units, activeStructureId } = useData();
+  const [localS, setLocalS] = useState("all");
+  const [highlight, setHighlight] = useState<string | null>(null);
+  const [roomModal, setRoomModal] = useState<{ structureId: string; unit?: Unit } | null>(null);
+
+  useEffect(() => {
+    const u = new URLSearchParams(window.location.search).get("u");
+    if (!u) return;
+    const unit = units.find((x) => x.id === u);
+    if (!unit) return;
+    if (activeStructureId === "all") setLocalS(unit.structureId);
+    setHighlight(u);
+    const t1 = window.setTimeout(() => document.getElementById(`unit-${u}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+    const t2 = window.setTimeout(() => setHighlight(null), 2800);
+    return () => { window.clearTimeout(t1); window.clearTimeout(t2); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const scoped = structures.filter((s) => (activeStructureId === "all" ? localS === "all" || s.id === localS : s.id === activeStructureId));
+
+  return (
+    <div>
+      <PageHeader
+        title={t("Camere")}
+        subtitle={t("Tipologie e singole camere di ogni struttura")}
+        actions={activeStructureId === "all" ? (
+          <select value={localS} onChange={(e) => setLocalS(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+            <option value="all">{t("Tutte le strutture")}</option>
+            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        ) : null}
+      />
+
+      {scoped.length === 0 && <Card><div className="py-8 text-center text-sm text-faint">{t("Nessuna struttura. Creane una in")} <Link href="/strutture" className="text-focus underline">{t("Strutture")}</Link>.</div></Card>}
+
+      <div className="flex flex-col gap-5">
+        {scoped.map((s) => {
+          const types = roomTypes.filter((rt) => rt.structureId === s.id);
+          const sUnits = units.filter((u) => u.structureId === s.id);
+          const beds = sUnits.reduce((a, u) => a + (types.find((t) => t.id === u.roomTypeId)?.beds ?? 0), 0);
+          const oos = sUnits.filter((u) => u.outOfService).length;
+          return (
+            <div key={s.id}>
+              <div className="mb-2 flex items-center justify-between">
+                <div className="font-display text-lg font-bold text-txt">{s.name}</div>
+                <div className="flex gap-2">
+                  <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
+                  <button onClick={() => setRoomModal({ structureId: s.id })} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
+                </div>
+              </div>
+
+              {/* Statistiche */}
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[["Camere", sUnits.length], ["Tipologie", types.length], ["Posti letto", beds], ["Fuori servizio", oos]].map(([k, v]) => (
+                  <div key={k} className="rounded-xl border border-line bg-surface p-3"><div className="text-xs text-dim">{t(k as string)}</div><div className="mt-0.5 font-mono text-xl font-bold text-txt">{v}</div></div>
+                ))}
+              </div>
+
+              {/* Tipologie */}
+              <SectionTitle>{t("Tipologie")}</SectionTitle>
+              <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {types.map((rt, i) => {
+                  const color = typeColor(rt, i);
+                  const n = sUnits.filter((u) => u.roomTypeId === rt.id).length;
+                  return (
+                    <button key={rt.id} onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="group overflow-hidden rounded-xl border border-line bg-surface text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                      <div className="h-1.5 w-full" style={{ backgroundColor: color }} />
+                      <div className="p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="font-semibold text-txt">{rt.name}</div>
+                          <div className="font-mono text-sm font-bold text-txt">{eur(rt.basePrice)}<span className="text-[10px] font-normal text-faint">{t("/notte")}</span></div>
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{rt.beds} {t("letti")}</span>
+                          {rt.maxOccupancy ? <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{t("max")} {rt.maxOccupancy} {t("ospiti")}</span> : null}
+                          {rt.size ? <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{rt.size} m²</span> : null}
+                          <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{n} {t("camere")}</span>
+                        </div>
+                        {rt.bedConfig && <div className="mt-1.5 text-[11px] text-faint">{rt.bedConfig}</div>}
+                        {(rt.amenities ?? []).length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{(rt.amenities ?? []).slice(0, 4).map((a) => <span key={a} className="rounded border border-line px-1.5 py-0.5 text-[10px] text-dim">{t(a)}</span>)}{(rt.amenities ?? []).length > 4 && <span className="text-[10px] text-faint">+{(rt.amenities ?? []).length - 4}</span>}</div>}
+                        <div className="mt-2 text-[11px] font-medium text-focus opacity-0 transition group-hover:opacity-100">{t("Apri scheda")} →</div>
+                      </div>
+                    </button>
+                  );
+                })}
+                {types.length === 0 && <div className="rounded-xl border border-dashed border-line p-4 text-sm text-faint">{t("Nessuna tipologia. Aggiungine una col pulsante “+ Tipologia”.")}</div>}
+              </div>
+
+              {/* Camere */}
+              <SectionTitle>{t("Camere")}</SectionTitle>
+              <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead>
+                    <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                      <th className="px-3 py-2 font-semibold">{t("Camera")}</th>
+                      <th className="px-3 py-2 font-semibold">{t("Tipologia")}</th>
+                      <th className="px-3 py-2 font-semibold">{t("Piano")}</th>
+                      <th className="px-3 py-2 font-semibold">{t("Vista")}</th>
+                      <th className="px-3 py-2 font-semibold">{t("Posti")}</th>
+                      <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
+                      <th className="px-3 py-2 font-semibold"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sUnits.map((u) => {
+                      const i = types.findIndex((t) => t.id === u.roomTypeId);
+                      const rt = types[i];
+                      const color = rt ? typeColor(rt, i) : "var(--line)";
+                      return (
+                        <tr key={u.id} id={`unit-${u.id}`} onClick={() => setRoomModal({ structureId: s.id, unit: u })} className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${highlight === u.id ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : ""}`}>
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="h-6 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+                              <span className={`font-medium ${u.outOfService ? "text-faint line-through" : "text-txt"}`}>{u.name}</span>
+                              {u.code && <span className="font-mono text-[11px] text-faint">#{u.code}</span>}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-dim">{rt?.name ?? "—"}</td>
+                          <td className="px-3 py-2.5 text-dim">{u.floor || "—"}</td>
+                          <td className="px-3 py-2.5 text-dim">{u.view || "—"}</td>
+                          <td className="px-3 py-2.5 text-dim">{rt?.beds ?? "—"}</td>
+                          <td className="px-3 py-2.5">
+                            {u.outOfService ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("Fuori servizio")}</span> : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("In servizio")}</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-faint">›</td>
+                        </tr>
+                      );
+                    })}
+                    {sUnits.length === 0 && <tr><td colSpan={7} className="px-3 py-4 text-center text-sm text-faint">{t("Nessuna camera. Aggiungine una col pulsante “+ Camera”.")}</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {roomModal && <RoomModal structureId={roomModal.structureId} unit={roomModal.unit} onClose={() => setRoomModal(null)} />}
+    </div>
+  );
+}
+
+function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?: Unit; onClose: () => void }) {
+  const { roomTypes, addUnit, updateUnit, deleteUnit } = useData();
+  const { t } = useLang();
+  const ask = useConfirm();
+  const types = roomTypes.filter((rt) => rt.structureId === structureId);
+  const [f, setF] = useState<Partial<Unit>>(() => unit ?? { name: "", roomTypeId: types[0]?.id ?? "", floor: "", view: "", code: "", outOfService: false });
+  const set = <K extends keyof Unit>(k: K, v: Unit[K]) => setF((p) => ({ ...p, [k]: v }));
+
+  const save = () => {
+    if (!f.name?.trim() || !f.roomTypeId) return;
+    const patch: Partial<Unit> = { name: f.name.trim(), roomTypeId: f.roomTypeId, code: f.code, floor: f.floor, view: f.view, accessInfo: f.accessInfo, notes: f.notes, outOfService: f.outOfService, oosReason: f.outOfService ? f.oosReason : undefined };
+    if (unit) updateUnit(unit.id, patch);
+    else { const id = addUnit({ structureId, roomTypeId: f.roomTypeId, name: patch.name! }); updateUnit(id, patch); }
+    onClose();
+  };
+
+  return (
+    <Modal title={unit ? t("Scheda camera") : t("Nuova camera")} onClose={onClose}>
+      <div className="grid grid-cols-2 gap-3">
+        <label className={`${lbl} col-span-2`}>{t("Nome camera")} *<input value={f.name ?? ""} onChange={(e) => set("name", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. Camera Ortigia")} /></label>
+        <label className={lbl}>{t("Codice / numero")}<input value={f.code ?? ""} onChange={(e) => set("code", e.target.value)} className={`${inp} mt-1`} placeholder="101" /></label>
+        <label className={lbl}>{t("Tipologia")}<select value={f.roomTypeId ?? ""} onChange={(e) => set("roomTypeId", e.target.value)} className={`${inp} mt-1`}>{types.length === 0 && <option value="">{t("Crea prima una tipologia")}</option>}{types.map((rt) => <option key={rt.id} value={rt.id}>{rt.name}</option>)}</select></label>
+        <label className={lbl}>{t("Piano")}<input value={f.floor ?? ""} onChange={(e) => set("floor", e.target.value)} className={`${inp} mt-1`} placeholder={t("Terra / 1° / 2°")} /></label>
+        <label className={lbl}>{t("Vista")}<select value={f.view ?? ""} onChange={(e) => set("view", e.target.value)} className={`${inp} mt-1`}><option value="">—</option>{VIEW_OPTIONS.map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
+      </div>
+      <label className={`${lbl} mt-3`}>{t("Codice/istruzioni di accesso")}<input value={f.accessInfo ?? ""} onChange={(e) => set("accessInfo", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. keybox 4471, porta a sinistra")} /></label>
+      <label className={`${lbl} mt-3`}>{t("Note interne")}<textarea value={f.notes ?? ""} onChange={(e) => set("notes", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={t("Manutenzioni, particolarità…")} /></label>
+      <div className="mt-3 rounded-lg border border-line p-3">
+        <div className="flex items-center justify-between"><span className="text-sm font-medium text-txt">{t("Fuori servizio")}</span><Toggle on={!!f.outOfService} onClick={() => set("outOfService", !f.outOfService)} color="var(--warn)" /></div>
+        {f.outOfService && <input value={f.oosReason ?? ""} onChange={(e) => set("oosReason", e.target.value)} className={`${inp} mt-2`} placeholder={t("Motivo (es. ristrutturazione)")} />}
+      </div>
+      <div className="mt-4 flex items-center gap-2">
+        {unit && <button onClick={async () => { if (await ask({ title: t("Elimina camera"), message: `${t("Eliminare")} "${unit.name}"?`, danger: true, confirmLabel: t("Elimina") })) { deleteUnit(unit.id); onClose(); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
+        <button onClick={onClose} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
+        <button onClick={save} disabled={!f.name?.trim() || !f.roomTypeId} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{unit ? t("Salva") : t("Crea")}</button>
+      </div>
+    </Modal>
+  );
+}

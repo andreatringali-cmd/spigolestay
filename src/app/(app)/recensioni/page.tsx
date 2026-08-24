@@ -1,0 +1,101 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useData } from "@/lib/store";
+import { toISO, parseISO } from "@/lib/dates";
+import { CHANNELS } from "@/lib/types";
+import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import Icon from "@/components/Icon";
+
+const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" });
+const REV = {
+  pos: ["Soggiorno perfetto, posizione ottima e host gentilissimi.", "Camera pulita e colazione ottima, torneremo di sicuro!", "Vista stupenda su Ortigia, consigliatissimo.", "Tutto impeccabile, accoglienza top e consigli utili.", "Bellissima esperienza, ci siamo sentiti a casa."],
+  neu: ["Bene nel complesso, ma il parcheggio è un po' scomodo.", "Camera carina, colazione migliorabile.", "Posizione comoda, wi-fi a tratti lento."],
+  neg: ["Pulizia non all'altezza e check-in complicato.", "Ci aspettavamo di più per il prezzo."],
+};
+const CHS = ["booking", "airbnb", "direct", "expedia"] as const;
+
+export default function RecensioniPage() {
+  const { bookings, guests, activeStructureId } = useData();
+  const today = toISO(new Date());
+  const guestName = (id: string) => guests.find((g) => g.id === id)?.fullName ?? "Ospite";
+  const [replies, setReplies] = useState<Record<string, string>>({});
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  useEffect(() => { try { const r = localStorage.getItem("spigolestay:reviews"); if (r) setReplies(JSON.parse(r)); } catch {} }, []);
+  const persist = (n: Record<string, string>) => { setReplies(n); try { localStorage.setItem("spigolestay:reviews", JSON.stringify(n)); } catch {} };
+
+  // Recensioni simulate a partire dai soggiorni passati (deterministiche).
+  const reviews = useMemo(() => {
+    const past = bookings.filter((b) => b.checkOut < today && b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId)).sort((a, b) => b.checkOut.localeCompare(a.checkOut)).slice(0, 24);
+    const ratings = [10, 9, 8, 10, 9, 7, 10, 8, 9, 6, 10, 9, 8, 10, 7, 9, 10, 8, 9, 10, 5, 9, 8, 10];
+    return past.map((b, i) => {
+      const rating = ratings[i % ratings.length];
+      const bucket = rating >= 8 ? "pos" : rating >= 6 ? "neu" : "neg";
+      const text = REV[bucket][i % REV[bucket].length];
+      const channel = CHS[i % CHS.length];
+      return { id: b.id, guest: guestName(b.guestId), date: b.checkOut, rating, text, bucket: bucket as "pos" | "neu" | "neg", channel };
+    });
+  }, [bookings, activeStructureId]);
+
+  const avg = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : 0;
+  const unanswered = reviews.filter((r) => !replies[r.id]).length;
+  const byChannel = CHS.map((c) => { const rs = reviews.filter((r) => r.channel === c); return { c, n: rs.length, avg: rs.length ? rs.reduce((a, r) => a + r.rating, 0) / rs.length : 0 }; }).filter((x) => x.n);
+  const dist = [10, 9, 8, 7, 6, 5].map((v) => ({ v, n: reviews.filter((r) => r.rating === v).length }));
+
+  const suggest = (r: { guest: string; bucket: string; channel: string }) => {
+    const first = r.guest.split(" ")[0];
+    if (r.bucket === "pos") return `Grazie di cuore ${first}! Siamo felicissimi che il soggiorno sia stato all'altezza. Ti aspettiamo di nuovo a Siracusa — alla prossima con una sorpresa riservata a chi torna. 🌊`;
+    if (r.bucket === "neu") return `Grazie ${first} per il feedback prezioso. Abbiamo preso nota dei punti da migliorare e ci stiamo già lavorando. Ci farebbe piacere riaverti per mostrarti i progressi!`;
+    return `Ci dispiace ${first}, non è lo standard che vogliamo offrire. Grazie per la segnalazione: interverremo subito. Se vorrai darci un'altra occasione, ti riserveremo un'attenzione speciale.`;
+  };
+  const star = (rating: number) => "★".repeat(Math.round(rating / 2)) + "☆".repeat(5 - Math.round(rating / 2));
+  const color = (b: string) => (b === "pos" ? "var(--ok)" : b === "neu" ? "var(--warn)" : "var(--err)");
+
+  return (
+    <div>
+      <PageHeader title="Recensioni & reputazione" subtitle="Tutte le recensioni in un posto, con risposte suggerite dall'AI" />
+
+      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Media</div><div className="font-mono text-lg font-bold text-txt">{avg.toFixed(1)}<span className="text-xs text-faint">/10</span></div></div>
+        <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Recensioni</div><div className="font-mono text-lg font-bold text-txt">{reviews.length}</div></div>
+        <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Da rispondere</div><div className="font-mono text-lg font-bold" style={{ color: unanswered ? "var(--warn)" : "var(--ok)" }}>{unanswered}</div></div>
+        <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Positive</div><div className="font-mono text-lg font-bold text-[color:var(--ok)]">{reviews.length ? Math.round(reviews.filter((r) => r.bucket === "pos").length / reviews.length * 100) : 0}%</div></div>
+      </div>
+
+      <div className="mb-4 grid gap-4 sm:grid-cols-2">
+        <Card><SectionTitle>Media per canale</SectionTitle><div className="space-y-2">{byChannel.map((x) => (<div key={x.c} className="flex items-center gap-2"><span className="w-24 text-sm text-txt">{CHANNELS[x.c].label}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${x.avg * 10}%`, backgroundColor: `var(${CHANNELS[x.c].cssVar})` }} /></div><span className="w-16 text-right font-mono text-sm font-semibold text-txt">{x.avg.toFixed(1)} <span className="text-[10px] text-faint">({x.n})</span></span></div>))}</div></Card>
+        <Card><SectionTitle>Distribuzione voti</SectionTitle><div className="space-y-1.5">{dist.map((d) => (<div key={d.v} className="flex items-center gap-2"><span className="w-6 text-right font-mono text-sm text-dim">{d.v}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full bg-focus" style={{ width: `${reviews.length ? (d.n / reviews.length) * 100 : 0}%` }} /></div><span className="w-8 text-right font-mono text-sm text-dim">{d.n}</span></div>))}</div></Card>
+      </div>
+
+      <SectionTitle>Recensioni</SectionTitle>
+      <div className="space-y-3">
+        {reviews.map((r) => (
+          <Card key={r.id}>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color(r.bucket) }} />
+              <span className="font-semibold text-txt">{r.guest}</span>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ backgroundColor: `var(${CHANNELS[r.channel].cssVar})` }}>{CHANNELS[r.channel].label}</span>
+              <span className="text-sm" style={{ color: color(r.bucket) }}>{star(r.rating)}</span>
+              <span className="font-mono text-sm text-dim">{r.rating}/10</span>
+              <span className="ml-auto text-xs text-faint">{fmt(r.date)}</span>
+            </div>
+            <p className="mt-2 text-sm text-txt">{r.text}</p>
+            {replies[r.id] ? (
+              <div className="mt-2 rounded-lg border border-line bg-wash p-2.5 text-sm text-dim"><span className="text-[10px] font-semibold uppercase tracking-wide text-faint">La tua risposta</span><div className="mt-0.5 text-txt">{replies[r.id]}</div><button onClick={() => { const n = { ...replies }; delete n[r.id]; persist(n); }} className="mt-1 text-[11px] text-faint hover:text-[color:var(--err)]">Rimuovi</button></div>
+            ) : (
+              <div className="mt-2">
+                <textarea value={draft[r.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [r.id]: e.target.value }))} rows={2} placeholder="Scrivi una risposta…" className="w-full resize-y rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+                <div className="mt-1.5 flex gap-2">
+                  <button onClick={() => setDraft((d) => ({ ...d, [r.id]: suggest(r) }))} className="flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash"><Icon name="sparkles" size={13} /> Suggerisci risposta AI</button>
+                  <button onClick={() => { if ((draft[r.id] ?? "").trim()) persist({ ...replies, [r.id]: draft[r.id].trim() }); }} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">Pubblica risposta</button>
+                </div>
+              </div>
+            )}
+          </Card>
+        ))}
+        {reviews.length === 0 && <Card className="py-8 text-center text-sm text-faint">Nessuna recensione nel periodo. Compariranno dai soggiorni conclusi.</Card>}
+      </div>
+      <p className="mt-3 text-[11px] text-faint">Demo: le recensioni sono generate dai soggiorni passati. In produzione si collegano le API di Booking/Airbnb/Google per importarle e rispondere direttamente.</p>
+    </div>
+  );
+}

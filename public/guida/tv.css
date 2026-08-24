@@ -1,0 +1,100 @@
+/* ============================================================
+   Vista TV — fedele al design originale Spigolehouse, ma multi-tenant
+   (legge window.PROPERTY / window.I18N). Canvas fisso 1280×720 scalato.
+   ============================================================ */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#0b0f12;overflow:hidden}
+body{font-family:'Instrument Sans',sans-serif;color:#F3ECDE}
+a{color:#E7A47B}a:hover{color:#CBA662}
+#fit{position:absolute;inset:0}
+.tv{position:absolute;left:50%;top:50%;width:1280px;height:720px;overflow:hidden;background:#101418;transform-origin:center center}
+
+/* ---------- background ---------- */
+.photo{position:absolute;inset:0;overflow:hidden;background:#101418}
+.photo img,.photo video{width:100%;height:100%;object-fit:cover;animation:kb 42s ease-in-out infinite alternate;will-change:transform}
+@keyframes kb{0%{transform:scale(1.0)}100%{transform:scale(1.035) translate(-0.5%,-0.3%)}}
+.sheen{position:absolute;top:-15%;bottom:-15%;left:0;width:38%;pointer-events:none;mix-blend-mode:screen;
+  background:linear-gradient(115deg,transparent 34%,rgba(255,246,224,.16) 47%,rgba(255,246,224,.34) 50%,rgba(255,246,224,.16) 53%,transparent 66%);
+  transform:translateX(-160%) skewX(-9deg);animation:sheen 9s ease-in-out infinite}
+@keyframes sheen{0%,38%{transform:translateX(-160%) skewX(-9deg)}62%,100%{transform:translateX(360%) skewX(-9deg)}}
+.scrim{position:absolute;inset:0;background:
+  linear-gradient(105deg,rgba(16,22,20,.5) 0%,rgba(16,22,20,.28) 40%,rgba(16,22,20,.04) 72%),
+  linear-gradient(0deg,rgba(11,16,13,.46) 0%,rgba(11,16,13,.06) 42%,rgba(11,16,13,.1) 100%)}
+
+/* ---------- header ---------- */
+header{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;padding:30px 46px 0;gap:34px;z-index:2}
+.brand{display:flex;align-items:center;gap:16px;margin-right:auto}
+.medal{width:64px;height:64px;border-radius:50%;overflow:hidden;background:#F3ECDE;border:2px solid rgba(203,166,98,.85);flex:none;box-shadow:0 6px 18px rgba(0,0,0,.35);display:grid;place-items:center}
+.medal img{width:100%;height:100%;object-fit:cover}
+.bname{font-family:'Fraunces',serif;font-size:25px;font-weight:600;color:#F3ECDE}
+.bname span{color:#CBA662;font-weight:400;margin-left:4px}
+.bsub{font-size:14px;color:rgba(243,236,222,.72);margin-top:1px}
+.wxrow{display:flex;gap:10px}
+.wx{width:82px;height:96px;background:rgba(10,18,25,.5);backdrop-filter:blur(10px);border:1px solid rgba(243,236,222,.14);border-radius:13px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.wx .d{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:rgba(243,236,222,.7);font-weight:600}
+.wx .t{font-family:'Fraunces',serif;font-size:19px;color:#F3ECDE}
+.wx svg{color:#CBA662}
+.timebox{background:rgba(10,18,25,.5);backdrop-filter:blur(10px);border:1px solid rgba(243,236,222,.14);border-radius:13px;height:96px;padding:0 22px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:2px}
+.date{color:rgba(243,236,222,.78);font-size:16px}
+.clock{font-family:'Fraunces',serif;font-weight:500;font-size:52px;line-height:1.05;color:#F3ECDE;font-variant-numeric:tabular-nums}
+
+/* ---------- hero ---------- */
+.hero{position:absolute;left:46px;top:170px;max-width:760px;z-index:2}
+.kicker{text-transform:uppercase;letter-spacing:.28em;font-size:13px;color:#E7A47B;font-weight:600}
+.hero h1{font-family:'Fraunces',serif;font-weight:500;font-size:54px;line-height:1.02;color:#F3ECDE;margin-top:10px;letter-spacing:-.01em}
+.hero p{margin-top:16px;font-size:19px;line-height:1.5;color:rgba(243,236,222,.85);max-width:560px;white-space:normal}
+.heronote{margin-top:34px;display:flex;align-items:center;gap:10px;font-size:15px;color:rgba(243,236,222,.7)}
+.heronote svg{color:#CBA662;flex:none}
+.heronote b{color:#F3ECDE;font-weight:600}
+
+/* ---------- bottom ---------- */
+.bottom{position:absolute;left:46px;right:46px;bottom:32px;display:flex;align-items:stretch;gap:14px;z-index:2}
+.wifi{position:relative;background:rgba(10,18,25,.55);backdrop-filter:blur(12px);border:1px solid rgba(243,236,222,.16);border-radius:16px;padding:16px 20px;width:328px;flex:none;display:flex;flex-direction:column;justify-content:center}
+.wifihead{display:flex;align-items:center;gap:8px;color:#CBA662;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.16em;margin-bottom:10px}
+.wifigrid{display:flex;gap:16px;align-items:center;padding-right:104px}
+.wl{text-transform:uppercase;letter-spacing:.14em;font-size:11px;color:rgba(243,236,222,.6);font-weight:600}
+.wv{font-size:18px;color:#F3ECDE;font-weight:400;margin-top:1px;word-break:break-word}
+.wv.pw{font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:18px;color:#E7A47B;letter-spacing:.02em;white-space:nowrap}
+.qrbox{background:#fff;border-radius:10px;padding:6px;flex:none;display:grid;place-items:center}
+.qrbox img{display:block;width:78px;height:78px}
+.qrcol{position:absolute;right:18px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
+.qrcol span{font-size:12.5px;color:rgba(243,236,222,.85);text-align:center}
+
+.dock{flex:1;display:grid;grid-template-columns:repeat(4,1fr) 118px;grid-template-rows:1fr 1fr;gap:10px}
+.chip{background:rgba(10,18,25,.5);backdrop-filter:blur(8px);border:1px solid rgba(243,236,222,.14);border-radius:13px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:rgba(243,236,222,.9);cursor:pointer;outline:none;text-align:center;padding:6px}
+.chip span{font-size:14px;letter-spacing:.02em}
+.chip.foc{border-color:#D0754C;background:rgba(208,117,76,.24);box-shadow:0 0 0 2px rgba(208,117,76,.6),0 8px 26px rgba(208,117,76,.28);color:#fff}
+.chip.foc span{color:#fff!important}
+.guidecard{grid-column:5;grid-row:1 / span 2;background:rgba(10,18,25,.5);backdrop-filter:blur(8px);border:1px solid rgba(243,236,222,.14);border-radius:13px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px;cursor:pointer;outline:none}
+.guidecard .qrbox{padding:5px}
+.guidecard span{font-size:13px;text-align:center;line-height:1.25;color:rgba(243,236,222,.85)}
+.guidecard.foc{border-color:#D0754C;background:rgba(208,117,76,.24);box-shadow:0 0 0 2px rgba(208,117,76,.6),0 8px 26px rgba(208,117,76,.28)}
+
+/* ---------- detail panel ---------- */
+.veil{position:absolute;inset:0;background:rgba(8,12,15,.45);opacity:0;pointer-events:none;transition:opacity .3s;z-index:3}
+.tv.open .veil{opacity:1}
+.panel{position:absolute;top:0;right:0;bottom:0;width:478px;background:rgba(12,18,23,.82);backdrop-filter:blur(22px);
+  border-left:1px solid rgba(203,166,98,.35);padding:44px 44px 28px;transform:translateX(102%);transition:transform .38s cubic-bezier(.3,.8,.3,1);
+  display:flex;flex-direction:column;z-index:4}
+.tv.open .panel{transform:translateX(0)}
+.panel .pk{display:flex;align-items:center;gap:10px;color:#E7A47B;text-transform:uppercase;letter-spacing:.24em;font-size:12.5px;font-weight:600}
+.panel h2{font-family:'Fraunces',serif;font-weight:500;font-size:42px;color:#F3ECDE;margin:10px 0 6px;letter-spacing:-.01em}
+.panel .plede{font-size:16px;line-height:1.5;color:rgba(243,236,222,.75)}
+.pphoto{margin-top:8px;border-radius:12px;overflow:hidden;height:116px;display:none;border:1px solid rgba(203,166,98,.3)}
+.pphoto img{width:100%;height:100%;object-fit:cover;display:block}
+.rows{margin-top:18px;display:flex;flex-direction:column;gap:14px;overflow:hidden}
+.row{display:flex;gap:14px;align-items:flex-start}
+.row .dot{width:7px;height:7px;border-radius:50%;background:#CBA662;margin-top:8px;flex:none}
+.row b{display:block;font-size:16.5px;font-weight:600;color:#F3ECDE}
+.row p{font-size:15px;line-height:1.45;color:rgba(243,236,222,.75);margin-top:2px}
+.row .code{display:inline-block;margin-top:4px;font-family:'IBM Plex Mono',monospace;font-size:16px;color:#E7A47B;background:rgba(231,164,123,.12);border:1px solid rgba(231,164,123,.3);border-radius:8px;padding:2px 10px}
+.phint{margin-top:auto;padding-top:18px;border-top:1px solid rgba(243,236,222,.14);font-size:13px;color:rgba(243,236,222,.55);display:flex;gap:16px}
+.phint b{color:rgba(243,236,222,.8);font-weight:600}
+
+/* ---------- selettore lingua ---------- */
+.langs{position:absolute;right:46px;bottom:calc(32px + 96px + 14px);display:flex;gap:6px;z-index:2}
+.langbtn{width:34px;height:26px;border-radius:7px;border:1px solid rgba(243,236,222,.18);background:rgba(10,18,25,.5);backdrop-filter:blur(8px);font-size:15px;cursor:pointer;display:grid;place-items:center;outline:none;opacity:.7}
+.langbtn.on{opacity:1;border-color:#CBA662;box-shadow:0 0 0 1px rgba(203,166,98,.5)}
