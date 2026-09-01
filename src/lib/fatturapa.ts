@@ -101,7 +101,7 @@ export function buildFatturaPA(booking: Booking, structure: Structure | undefine
     <CedentePrestatore>
       <DatiAnagrafici>
 ${sellerVat ? `        <IdFiscaleIVA>\n          <IdPaese>IT</IdPaese>\n          <IdCodice>${esc(sellerVat)}</IdCodice>\n        </IdFiscaleIVA>\n` : ""}${sellerCf ? `        <CodiceFiscale>${esc(sellerCf)}</CodiceFiscale>\n` : ""}        <Anagrafica>
-          <Denominazione>${esc(structure?.businessName || structure?.name || "SpigoleStay")}</Denominazione>
+          <Denominazione>${esc(structure?.businessName || structure?.name || "Xenora")}</Denominazione>
         </Anagrafica>
         <RegimeFiscale>${regime}</RegimeFiscale>
       </DatiAnagrafici>

@@ -79,7 +79,7 @@ function Engine() {
     <div className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3">
         <div className="grid h-9 w-9 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{(structure?.name ?? "SS").slice(0, 2).toUpperCase()}</div>
-        <div className="leading-tight"><div className="text-sm font-bold text-txt">{structure?.name ?? "SpigoleStay"}</div><div className="text-[11px] text-faint">Check-in online</div></div>
+        <div className="leading-tight"><div className="text-sm font-bold text-txt">{structure?.name ?? "Xenora"}</div><div className="text-[11px] text-faint">Check-in online</div></div>
       </div>
     </div>
   );

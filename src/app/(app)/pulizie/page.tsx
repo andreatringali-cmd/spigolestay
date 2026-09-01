@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel, type Booking } from "@/lib/types";
-import { toISO, parseISO, nights } from "@/lib/dates";
+import { toISO, parseISO, addDays, nights } from "@/lib/dates";
 import { playSound } from "@/lib/sound";
 import { PageHeader } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
 import PageHelp from "@/components/PageHelp";
 import Icon from "@/components/Icon";
+import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
@@ -27,7 +28,7 @@ const ACT: Record<ActionKey, { label: string; color: string }> = {
   niente: { label: "Niente", color: "var(--faint)" },
 };
 
-interface Issue { id: string; unitId: string; unitName: string; structureName: string; date: string; type: string; note: string; photo?: string; createdAt: string; resolved?: boolean }
+interface Issue { id: string; unitId: string; unitName: string; structureName: string; date: string; type: string; note: string; photo?: string; createdAt: string; resolved?: boolean; resolvedAt?: string }
 const ISSUE_TYPES: { key: string; label: string; icon: string; color: string }[] = [
   { key: "guasto", label: "Guasto / manutenzione", icon: "settings", color: "var(--err)" },
   { key: "danno", label: "Danno / macchia", icon: "logout", color: "var(--warn)" },
@@ -71,11 +72,14 @@ export default function PuliziePage() {
   useEffect(() => { try { const d = localStorage.getItem("spigolestay:pulizie:done"); if (d) setDone(JSON.parse(d)); const n = localStorage.getItem("spigolestay:pulizie:notes"); if (n) setNotes(JSON.parse(n)); const s = localStorage.getItem("spigolestay:pulizie:issues"); if (s) setIssues(JSON.parse(s)); } catch {} }, []);
   const persistIssues = (next: Issue[]) => { setIssues(next); try { localStorage.setItem("spigolestay:pulizie:issues", JSON.stringify(next)); } catch {} };
   const [issueDraft, setIssueDraft] = useState<null | { unitId: string; unitName: string; structureName: string; type: string; note: string; photo?: string }>(null);
+  const [showResolved, setShowResolved] = useState(false);
   const saveIssue = () => { if (!issueDraft || !issueDraft.note.trim()) return; const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()); persistIssues([{ id, unitId: issueDraft.unitId, unitName: issueDraft.unitName, structureName: issueDraft.structureName, date, type: issueDraft.type, note: issueDraft.note.trim(), photo: issueDraft.photo, createdAt: new Date().toISOString(), resolved: false }, ...issues]); playSound("done"); notify(`⚠ Segnalazione · ${issueDraft.unitName}`, `${issueMeta(issueDraft.type).label}: ${issueDraft.note.trim()}`); setIssueDraft(null); };
-  const resolveIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, resolved: true } : i)));
+  const resolveIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, resolved: true, resolvedAt: new Date().toISOString() } : i)));
+  const reopenIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, resolved: false, resolvedAt: undefined } : i)));
   const deleteIssue = (id: string) => persistIssues(issues.filter((i) => i.id !== id));
   const onIssuePhoto = (file: File | undefined) => { if (!file) return; const reader = new FileReader(); reader.onload = () => setIssueDraft((d) => (d ? { ...d, photo: reader.result as string } : d)); reader.readAsDataURL(file); };
   const openIssues = issues.filter((i) => !i.resolved);
+  const resolvedIssues = issues.filter((i) => i.resolved).sort((a, b) => (b.resolvedAt ?? b.createdAt).localeCompare(a.resolvedAt ?? a.createdAt));
   const roomHasIssue = (unitId: string) => openIssues.some((i) => i.unitId === unitId && i.date === date);
 
   // Scorte / lista della spesa (prodotti ricorrenti).
@@ -138,10 +142,11 @@ export default function PuliziePage() {
   const stockCounts = { all: stockScoped.length, ok: stockScoped.filter((p) => statusOf(p) === "ok").length, low: stockScoped.filter((p) => statusOf(p) === "low").length, out: stockScoped.filter((p) => statusOf(p) === "out").length };
   const shopLine = (p: Prod) => `• ${p.name}${statusOf(p) === "low" ? ` (${t("in esaurimento")})` : ""}${p.supplier ? ` — ${p.supplier}` : ""}`;
   const buildShopText = () => {
-    const lines = [`🛒 ${t("Lista della spesa")}`];
-    if (shopList.length === 0) { lines.push(t("Tutto a posto.")); return lines.join("\n"); }
+    const struct = activeStructureId === "all" ? "" : (scopeStructures[0]?.name ?? "");
+    const lines = [`🛒 ${t("Lista della spesa")}`, `📅 ${fmtLong(date)}${struct ? ` · ${struct}` : ""}`];
+    if (shopList.length === 0) { lines.push("", t("Tutto a posto.")); return lines.join("\n"); }
     if (activeStructureId === "all") { for (const s of scopeStructures) { const its = shopList.filter((p) => p.structureId === s.id); if (its.length) lines.push("", `*${s.name}*`, ...its.map(shopLine)); } }
-    else lines.push(...shopList.map(shopLine));
+    else lines.push("", ...shopList.map(shopLine));
     return lines.join("\n");
   };
   const shareShop = () => window.open(`https://wa.me/?text=${encodeURIComponent(buildShopText())}`, "_blank", "noopener,noreferrer");
@@ -210,13 +215,9 @@ export default function PuliziePage() {
   })();
 
   // Notifiche: avvisa quando la signora segnala un problema o completa tutte le pulizie.
-  const [notifyOn, setNotifyOn] = useState(false);
-  useEffect(() => { try { setNotifyOn(localStorage.getItem("spigolestay:pulizie:notify") === "1"); } catch {} }, []);
-  const notify = (title: string, body: string) => { try { if (notifyOn && typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(title, { body }); } catch {} };
-  const toggleNotify = async () => {
-    if (notifyOn) { setNotifyOn(false); try { localStorage.setItem("spigolestay:pulizie:notify", "0"); } catch {} return; }
-    try { if (typeof Notification !== "undefined") { const p = Notification.permission === "granted" ? "granted" : await Notification.requestPermission(); if (p === "granted") { setNotifyOn(true); localStorage.setItem("spigolestay:pulizie:notify", "1"); new Notification("Notifiche attive", { body: "Ti avviso su segnalazioni e pulizie completate." }); } } } catch {}
-  };
+  // Notifiche sempre attive: chiedo il permesso una volta all'avvio (nessun interruttore da gestire).
+  useEffect(() => { try { if (typeof Notification !== "undefined" && Notification.permission === "default") Notification.requestPermission().catch(() => {}); } catch {} }, []);
+  const notify = (title: string, body: string) => { try { if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(title, { body }); } catch {} };
 
   // Testo del programma da condividere con la signora delle pulizie.
   const buildPlanText = () => {
@@ -346,16 +347,8 @@ export default function PuliziePage() {
             <div className="order-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm lg:order-2">
               <div className="ml-auto flex items-center gap-2">
                 <button disabled={empty} onClick={() => persistStock(stock.map((p) => (scopeIds.includes(p.structureId) && statusOf(p) !== "ok" ? { ...p, qty: p.min + 2 } : p)))} className="whitespace-nowrap rounded-lg border border-line px-3 py-2 text-sm font-semibold text-[color:var(--ok)] hover:bg-wash disabled:opacity-40 disabled:hover:bg-transparent">{t("Tutto riassortito")}</button>
-                <div ref={shareRef} className="relative">
-                  <button disabled={empty} onClick={() => setShareOpen((o) => !o)} className="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}><Icon name="share" size={14} /> {t("Condividi")} <span className="text-[10px]">▾</span></button>
-                  {shareOpen && !empty && (
-                    <div className="absolute right-0 top-full z-40 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
-                      <button onClick={() => { shareShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-txt hover:bg-wash"><span style={{ color: "#25D366" }}><Icon name="chat" size={15} /></span> WhatsApp</button>
-                      <button onClick={() => { emailShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-txt hover:bg-wash"><span className="text-dim"><Icon name="mail" size={15} /></span> Email</button>
-                      <button onClick={() => { copyShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-txt hover:bg-wash"><span className="text-dim"><Icon name="copy" size={15} /></span> {t("Copia")}</button>
-                    </div>
-                  )}
-                </div>
+                <button disabled={empty} onClick={copyShop} className="whitespace-nowrap rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash disabled:opacity-40">{t("Copia")}</button>
+                <button disabled={empty} onClick={shareShop} className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>{t("Condividi")}</button>
               </div>
             </div>
           ); })()}
@@ -400,7 +393,7 @@ export default function PuliziePage() {
                 <button key={k} onClick={() => setProdFilter(k)} className={`px-3 py-1.5 text-xs font-semibold transition ${i > 0 ? "border-l border-line" : ""} ${prodFilter === k ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{t(lab)} <span className={prodFilter === k ? "opacity-90" : "text-faint"}>{n}</span></button>
               ))}
             </div>
-            <button onClick={() => setProdDraft({ name: "", structureId: activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""), supplier: "", qty: 3, min: 1 })} className="ml-auto flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90"><Icon name="plus" size={14} /> {t("Aggiungi prodotto")}</button>
+            <button onClick={() => setProdDraft({ name: "", structureId: activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""), supplier: "", qty: 3, min: 1 })} className="ml-auto flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90"><Icon name="plus" size={14} /> {t("Aggiungi")}</button>
           </div>
 
           {/* Inventario prodotti — riga 2 col sinistra (order 2 mobile / 3 desktop) */}
@@ -452,43 +445,51 @@ export default function PuliziePage() {
         })}
       </div>
 
-      {/* Riga filtri */}
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        <span className="text-sm font-semibold capitalize text-txt">{fmtLong(date)}</span>
-        <span className="rounded-full bg-wash px-3 py-1 text-xs font-semibold text-txt">{toClean.length} {t("da fare")} · {remaining} {t("rimaste")}</span>
+      {/* Carico biancheria del giorno + data e riepilogo a destra */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
+        {toClean.length > 0 && (
+          <>
+            <span className="flex items-center gap-1.5 text-sm font-bold text-txt"><Icon name="bed" size={16} /> {t("Carico biancheria")}</span>
+            {/* Totale cambi completi */}
+            <span className="flex items-baseline gap-1.5"><span className="font-mono text-lg font-bold tabular-nums text-txt">{linen.changeRooms}</span><span className="text-xs text-dim">{t("Cambi completi")}</span></span>
+            {/* Separatore: a destra il dettaglio di cosa serve per i cambi */}
+            <span className="hidden self-stretch border-l border-line sm:block" />
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">{t("di cui")}</span>
+            {([["Matrimoniali", linen.matr], ["Singole", linen.sing], ["Federe", linen.federe], ["Asciugamani · set", linen.towels], ["Tappetini bagno", linen.mats]] as [string, number][]).map(([lab, v]) => (
+              <span key={lab} className="flex items-baseline gap-1.5"><span className="font-mono text-lg font-bold tabular-nums text-txt">{v}</span><span className="text-xs text-dim">{t(lab)}</span></span>
+            ))}
+          </>
+        )}
+        {/* Data del giorno + contatore pulizie (spostati qui dalla riga filtri) */}
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {activeStructureId === "all" && (
-            <select value={structFilter} onChange={(e) => setStructFilter(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-txt outline-none focus:border-focus">
-              <option value="all">{t("Tutte le strutture")}</option>
-              {structures.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
-            </select>
-          )}
-          <div className="flex items-center rounded-lg border border-line p-0.5">
-            <Seg v="cards" icon="grid" title={t("Vista card")} />
-            <Seg v="rows" icon="menu" title={t("Vista righe")} />
-          </div>
-          <button onClick={() => setDate(todayISO)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt">{t("Oggi")}</button>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-txt outline-none focus:border-focus" />
-          <button onClick={toggleNotify} title={t("Avvisami su segnalazioni e pulizie completate")} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${notifyOn ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}><Icon name="bell" size={15} /> {notifyOn ? t("Notifiche attive") : t("Notifiche")}</button>
+          <span className="text-sm font-semibold capitalize text-txt">{fmtLong(date)}</span>
+          <span className="rounded-full bg-wash px-3 py-1 text-xs font-semibold text-txt">{toClean.length} {t("da fare")} · {remaining} {t("rimaste")}</span>
+        </div>
+      </div>
+
+      {/* Riga filtri — sinistra: struttura, calendario (frecce ±1g), Oggi, vista · destra: Copia/Condividi */}
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
+        {activeStructureId === "all" && (
+          <select value={structFilter} onChange={(e) => setStructFilter(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-txt outline-none focus:border-focus">
+            <option value="all">{t("Tutte le strutture")}</option>
+            {structures.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+          </select>
+        )}
+        <div className="flex items-center gap-1">
+          <button onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} aria-label={t("Giorno precedente")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">‹</button>
+          <DateField value={date} onChange={setDate} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-focus" />
+          <button onClick={() => setDate(toISO(addDays(parseISO(date), 1)))} title={t("Giorno successivo")} aria-label={t("Giorno successivo")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">›</button>
+        </div>
+        <button onClick={() => setDate(todayISO)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt">{t("Oggi")}</button>
+        <div className="flex items-center rounded-lg border border-line p-0.5">
+          <Seg v="cards" icon="grid" title={t("Vista card")} />
+          <Seg v="rows" icon="menu" title={t("Vista righe")} />
+        </div>
+        <div className="ml-auto flex items-center gap-2">
           <button onClick={copyPlan} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-dim hover:bg-wash">{copied ? t("Copiato ✓") : t("Copia")}</button>
           <button onClick={shareWhatsApp} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>{t("Condividi")}</button>
         </div>
       </div>
-
-      {/* Carico biancheria del giorno */}
-      {toClean.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
-          <span className="flex items-center gap-1.5 text-sm font-bold text-txt"><Icon name="bed" size={16} /> {t("Carico biancheria")}</span>
-          {/* Totale cambi completi */}
-          <span className="flex items-baseline gap-1.5"><span className="font-mono text-lg font-bold tabular-nums text-txt">{linen.changeRooms}</span><span className="text-xs text-dim">{t("Cambi completi")}</span></span>
-          {/* Separatore: a destra il dettaglio di cosa serve per i cambi */}
-          <span className="hidden self-stretch border-l border-line sm:block" />
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">{t("di cui")}</span>
-          {([["Matrimoniali", linen.matr], ["Singole", linen.sing], ["Federe", linen.federe], ["Asciugamani · set", linen.towels], ["Tappetini bagno", linen.mats]] as [string, number][]).map(([lab, v]) => (
-            <span key={lab} className="flex items-baseline gap-1.5"><span className="font-mono text-lg font-bold tabular-nums text-txt">{v}</span><span className="text-xs text-dim">{t(lab)}</span></span>
-          ))}
-        </div>
-      )}
 
       {/* Segnalazioni aperte dalla signora */}
       {openIssues.length > 0 && (
@@ -511,6 +512,36 @@ export default function PuliziePage() {
               </div>
             ); })}
           </div>
+        </div>
+      )}
+
+      {/* Storico segnalazioni risolte */}
+      {resolvedIssues.length > 0 && (
+        <div className="mb-4 rounded-xl border border-line bg-surface p-3 shadow-sm">
+          <button onClick={() => setShowResolved((s) => !s)} className="flex w-full items-center gap-2 text-sm font-bold text-txt">
+            <span className="grid h-4 w-4 place-items-center rounded-full bg-[color:var(--ok)] text-[10px] font-bold text-white">✓</span>
+            <span>{t("Storico segnalazioni risolte")} · {resolvedIssues.length}</span>
+            <span className="ml-auto text-xs font-medium text-dim">{showResolved ? t("nascondi") : t("mostra")} {showResolved ? "▲" : "▼"}</span>
+          </button>
+          {showResolved && (
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {resolvedIssues.map((iss) => { const m = issueMeta(iss.type); return (
+                <div key={iss.id} className="flex items-start gap-2 rounded-lg border border-line bg-paper p-2">
+                  {iss.photo ? <img src={iss.photo} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" /> : <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md" style={{ backgroundColor: `color-mix(in srgb, ${m.color} 12%, transparent)`, color: m.color }}><Icon name={m.icon} size={18} /></span>}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs"><span className="font-bold text-txt">{iss.unitName}</span><span className="text-faint">· {iss.structureName}</span><span className="rounded-full px-1.5 text-[10px] font-bold text-[color:var(--ok)]" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)" }}>✓ {t("risolta")}</span></div>
+                    <div className="text-[11px] font-semibold" style={{ color: m.color }}>{t(m.label)}</div>
+                    <div className="break-words text-xs text-dim">{iss.note}</div>
+                    <div className="mt-0.5 text-[10px] text-faint">{t("segnalata")} {fmtShort(iss.date)}{iss.resolvedAt ? ` · ${t("risolta")} ${(() => { try { const d = new Date(iss.resolvedAt); return d.toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) + " " + d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } })()}` : ""}</div>
+                  </div>
+                  <div className="flex shrink-0 flex-col gap-1">
+                    <button onClick={() => reopenIssue(iss.id)} title={t("Riapri")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↺</button>
+                    <button onClick={() => deleteIssue(iss.id)} title={t("Elimina dallo storico")} className="grid h-7 w-7 place-items-center rounded-md border border-line text-faint hover:text-[color:var(--err)]">✕</button>
+                  </div>
+                </div>
+              ); })}
+            </div>
+          )}
         </div>
       )}
 

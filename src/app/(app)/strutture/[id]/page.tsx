@@ -76,11 +76,46 @@ export default function StrutturaSchedaPage() {
   const mapEmbed = f.lat && f.lng
     ? `https://maps.google.com/maps?q=${f.lat},${f.lng}&z=15&output=embed`
     : (f.address ? `https://maps.google.com/maps?q=${encodeURIComponent(`${f.address} ${f.city ?? ""} ${f.province ?? ""}`)}&z=14&output=embed` : null);
-  // Incolla un link di Google Maps → estrae latitudine/longitudine.
+  // Geocoding gratuito via OpenStreetMap/Nominatim (CORS abilitato, nessuna API key).
+  const [geoBusy, setGeoBusy] = useState(false);
+  // Indirizzo inserito → latitudine/longitudine (+ link Maps automatico dai coordinati).
+  const geocode = async () => {
+    const query = [f.address, f.streetNumber, f.postalCode, f.city, f.province, f.country || "Italia"].filter(Boolean).join(", ");
+    if (!query.trim()) { alert(t("Inserisci prima l'indirizzo.")); return; }
+    setGeoBusy(true);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`, { headers: { Accept: "application/json" } });
+      const data = await res.json();
+      if (Array.isArray(data) && data[0]) setF((p) => ({ ...p, lat: Number(Number(data[0].lat).toFixed(6)), lng: Number(Number(data[0].lon).toFixed(6)) }));
+      else alert(t("Indirizzo non trovato. Controlla i campi o incolla un link di Maps."));
+    } catch { alert(t("Ricerca posizione non riuscita. Riprova tra poco.")); }
+    setGeoBusy(false);
+  };
+  // Coordinate → indirizzo (compila i campi mancanti dal punto sulla mappa).
+  const reverseGeocode = async (lat: number, lng: number) => {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`, { headers: { Accept: "application/json" } });
+      const d = await res.json(); const a = d?.address; if (!a) return;
+      setF((p) => ({
+        ...p,
+        address: [a.road, a.pedestrian, a.suburb].find(Boolean) ?? p.address,
+        streetNumber: a.house_number ?? p.streetNumber,
+        postalCode: a.postcode ?? p.postalCode,
+        city: [a.city, a.town, a.village, a.municipality].find(Boolean) ?? p.city,
+        region: a.state ?? p.region,
+        country: a.country ?? p.country,
+      }));
+    } catch { /* i coordinati restano comunque impostati */ }
+  };
+  // Incolla un link di Google Maps (o coppia di coordinate) → estrae lat/lng e compila l'indirizzo.
   const parseMapsLink = (url: string) => {
     const m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/) || url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || url.match(/(-?\d{1,2}\.\d{3,}),\s*(-?\d{1,3}\.\d{3,})/);
-    if (m) setF((p) => ({ ...p, lat: Number(m[1]), lng: Number(m[2]) }));
+    if (m) { const lat = Number(m[1]), lng = Number(m[2]); setF((p) => ({ ...p, lat, lng })); reverseGeocode(lat, lng); }
   };
+
+  // Servizi personalizzati: si aggiungono alla lista e restano selezionati.
+  const [newSvc, setNewSvc] = useState("");
+  const addSvc = () => { const v = newSvc.trim(); if (!v) return; if (!(f.services ?? []).includes(v)) set("services", [...(f.services ?? []), v]); setNewSvc(""); };
 
   // Logo struttura (ridimensionato a dataURL, salvato sulla struttura).
   const logoRef = useRef<HTMLInputElement>(null);
@@ -157,6 +192,8 @@ export default function StrutturaSchedaPage() {
             <div className="grid grid-cols-2 gap-3">
               <label className={lbl}>{t("Email")}<input value={f.email ?? ""} onChange={(e) => set("email", e.target.value)} className={`${inp} mt-1`} placeholder="info@…" /></label>
               <label className={lbl}>{t("Telefono")}<input value={f.phone ?? ""} onChange={(e) => set("phone", e.target.value)} className={`${inp} mt-1`} placeholder="+39…" /></label>
+              <label className={lbl}>WhatsApp<input value={f.whatsapp ?? ""} onChange={(e) => set("whatsapp", e.target.value)} className={`${inp} mt-1`} placeholder="+39…" /></label>
+              <label className={lbl}>{t("Telefono 2")}<input value={f.phone2 ?? ""} onChange={(e) => set("phone2", e.target.value)} className={`${inp} mt-1`} placeholder="+39…" /></label>
               <label className={lbl}>{t("Sito web")}<input value={f.website ?? ""} onChange={(e) => set("website", e.target.value)} className={`${inp} mt-1`} placeholder="www.…" /></label>
               <label className={lbl}>{t("Referente")}<input value={f.contactName ?? ""} onChange={(e) => set("contactName", e.target.value)} className={`${inp} mt-1`} placeholder={t("Nome e cognome")} /></label>
             </div>
@@ -170,9 +207,8 @@ export default function StrutturaSchedaPage() {
 
           {/* Indirizzo */}
           <Card>
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3">
               <SectionTitle>{t("Indirizzo & posizione")}</SectionTitle>
-              {mapsUrl && <a href={mapsUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-focus hover:underline">{t("Apri su Maps")} ↗</a>}
             </div>
             <div className="grid grid-cols-3 gap-3">
               <label className={`${lbl} col-span-2`}>{t("Indirizzo")}<input value={f.address ?? ""} onChange={(e) => set("address", e.target.value)} className={`${inp} mt-1`} placeholder={t("Via / Piazza")} /></label>
@@ -185,10 +221,21 @@ export default function StrutturaSchedaPage() {
               <label className={lbl}>{t("Zona")}<input value={f.zone ?? ""} onChange={(e) => set("zone", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. Ortigia")} /></label>
               <label className={lbl}>{t("Latitudine")}<input value={f.lat ?? ""} onChange={(e) => set("lat", num(e.target.value))} className={`${inp} mt-1`} placeholder="37.06" /></label>
               <label className={lbl}>{t("Longitudine")}<input value={f.lng ?? ""} onChange={(e) => set("lng", num(e.target.value))} className={`${inp} mt-1`} placeholder="15.29" /></label>
+              <div className="flex items-end">
+                <button type="button" onClick={geocode} disabled={geoBusy} title={t("Ricava latitudine e longitudine dall'indirizzo")} className="w-full rounded-lg border border-line px-2 py-2 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-50">{geoBusy ? `📍 ${t("Cerco…")}` : `📍 ${t("Ricava coordinate")}`}</button>
+              </div>
             </div>
-            <label className={`${lbl} mt-3`}>{t("Incolla un link di Google Maps")} <span className="font-normal text-faint">{t("(imposta la posizione automaticamente)")}</span>
+            <label className={`${lbl} mt-3`}>{t("Incolla un link di Google Maps")} <span className="font-normal text-faint">{t("(imposta posizione e indirizzo automaticamente)")}</span>
               <input onChange={(e) => parseMapsLink(e.target.value)} className={`${inp} mt-1`} placeholder={`https://maps.google.com/…  ${t("oppure")}  37.0601, 15.2934`} />
             </label>
+            {mapsUrl && (
+              <label className={`${lbl} mt-3`}>{t("Link Google Maps")} <span className="font-normal text-faint">{t("(generato automaticamente)")}</span>
+                <div className="mt-1 flex gap-2">
+                  <input value={mapsUrl} readOnly className={`${inp} font-mono text-xs`} />
+                  <button type="button" onClick={() => navigator.clipboard?.writeText(mapsUrl)} className="shrink-0 rounded-lg border border-line px-3 text-xs font-medium text-dim hover:bg-wash">{t("Copia")}</button>
+                </div>
+              </label>
+            )}
             {/* Anteprima mappa */}
             <div className="mt-3 overflow-hidden rounded-lg border border-line" style={{ height: 220 }}>
               {mapEmbed
@@ -201,7 +248,13 @@ export default function StrutturaSchedaPage() {
           <Card>
             <SectionTitle>{t("Servizi & dotazioni")}</SectionTitle>
             <div className="flex flex-wrap gap-1.5">
-              {AMENITIES.map((a) => <button key={a} onClick={() => toggleArr("services", a)} className={`rounded-full border px-2.5 py-1 text-xs transition ${(f.services ?? []).includes(a) ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(a)}</button>)}
+              {Array.from(new Set([...AMENITIES, ...(f.services ?? [])])).map((a) => { const on = (f.services ?? []).includes(a); const custom = !AMENITIES.includes(a); return (
+                <button key={a} onClick={() => toggleArr("services", a)} title={custom ? t("Servizio personalizzato · clicca per rimuoverlo") : undefined} className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(a)}{custom && on ? " ✕" : ""}</button>
+              ); })}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <input value={newSvc} onChange={(e) => setNewSvc(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSvc(); } }} placeholder={t("Aggiungi un servizio…")} className={inp} />
+              <button type="button" onClick={addSvc} disabled={!newSvc.trim()} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Aggiungi")}</button>
             </div>
           </Card>
         </div>

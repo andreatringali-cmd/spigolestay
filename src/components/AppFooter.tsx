@@ -21,20 +21,21 @@ export default function AppFooter() {
     for (const s of scoped) { const u = get(s); if (u && u.trim()) return href(u); }
     return null;
   };
+  // Sempre visibili, ordine LinkedIn · Facebook · Instagram (con fallback alla home della piattaforma).
   const socials = [
-    { k: "facebook", u: pick((s) => s.facebook) },
-    { k: "instagram", u: pick((s) => s.instagram) },
-    { k: "linkedin", u: pick((s) => s.linkedin) },
-  ].filter((x) => x.u) as { k: string; u: string }[];
+    { k: "linkedin", u: pick((s) => s.linkedin) || "https://www.linkedin.com", c: "#0A66C2" },
+    { k: "facebook", u: pick((s) => s.facebook) || "https://www.facebook.com", c: "#1877F2" },
+    { k: "instagram", u: pick((s) => s.instagram) || "https://www.instagram.com", c: "#E4405F" },
+  ] as { k: string; u: string; c: string }[];
 
   return (
-    <footer className="no-print flex flex-col items-center gap-2 border-t border-line px-4 py-4 text-center text-xs text-faint md:flex-row md:justify-between md:px-6">
-      <span>© {new Date().getFullYear()} SpigoleStay · Channel Manager — {t("Tutti i diritti riservati")}</span>
+    <footer className="no-print flex flex-col items-center gap-2 border-t bg-surface px-4 py-3 text-center text-xs text-faint md:flex-row md:justify-between md:px-6" style={{ borderTopColor: "color-mix(in srgb, var(--txt) 14%, var(--line))" }}>
+      <span>© {new Date().getFullYear()} Xenora · Channel Manager — {t("Tutti i diritti riservati")}</span>
       {socials.length > 0 && (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {socials.map((s) => (
-            <a key={s.k} href={s.u} target="_blank" rel="noreferrer" title={s.k} aria-label={s.k} className="grid h-7 w-7 place-items-center rounded-full text-dim transition hover:bg-wash hover:text-focus">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d={PATHS[s.k]} /></svg>
+            <a key={s.k} href={s.u} target="_blank" rel="noreferrer" title={s.k} aria-label={s.k} style={{ color: s.c }} className="grid h-9 w-9 place-items-center rounded-full transition hover:bg-wash hover:opacity-80">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d={PATHS[s.k]} /></svg>
             </a>
           ))}
         </div>

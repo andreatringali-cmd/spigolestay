@@ -1,16 +1,19 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel } from "@/lib/types";
-import { toISO, addDays, nights } from "@/lib/dates";
+import { toISO, addDays, nights, parseISO } from "@/lib/dates";
 import { eur, num } from "@/lib/format";
 import { PageHeader } from "@/components/ui";
 import Donut from "@/components/Donut";
 import Bars from "@/components/Bars";
 import ColumnChart from "@/components/ColumnChart";
+import DensityChart from "@/components/DensityChart";
+import Gauge from "@/components/Gauge";
 import { flagColor, flagGradient } from "@/lib/flags";
-import ChartGallery from "@/components/ChartGallery";
+import ScrollStrip from "@/components/ScrollStrip";
+import Icon from "@/components/Icon";
 import { useLang } from "@/lib/i18n";
 
 const PALETTE = ["#BE5D38", "#7A8450", "#C08A3A", "#957A66", "#4F8A5B", "#5B74E6", "#B3453A"];
@@ -21,6 +24,14 @@ const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { day:
 export default function StatistichePage() {
   const { bookings, structures, units, guests, activeStructureId } = useData();
   const { t } = useLang();
+  // Ordine dei grafici (riposizionabile col doppio clic), persistito.
+  const [chartOrder, setChartOrder] = useState<string[]>([]);
+  useEffect(() => { try { const r = localStorage.getItem("spigolestay:statscharts"); if (r) setChartOrder(JSON.parse(r)); } catch {} }, []);
+  const persistChartOrder = (keys: string[]) => { setChartOrder(keys); try { localStorage.setItem("spigolestay:statscharts", JSON.stringify(keys)); } catch {} };
+  // Mostra/nascondi grafici (un click, tutti o nessuno)
+  const [chartsOn, setChartsOn] = useState(true);
+  useEffect(() => { try { const r = localStorage.getItem("spigolestay:statscharts:on"); if (r !== null) setChartsOn(r === "1"); } catch {} }, []);
+  const toggleCharts = () => setChartsOn((v) => { const n = !v; try { localStorage.setItem("spigolestay:statscharts:on", n ? "1" : "0"); } catch {} return n; });
 
   const active = bookings.filter((b) => b.status !== "cancelled" && (activeStructureId === "all" || b.structureId === activeStructureId));
   const scopedStructures = activeStructureId === "all" ? structures : structures.filter((s) => s.id === activeStructureId);
@@ -144,16 +155,35 @@ export default function StatistichePage() {
   const totAll = repSum(() => true);
   const repDayLabel = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
 
+  // Prezzo a notte (ADR) per canale → density plot
+  const priceByChannel = channels.map((c) => ({
+    label: CHANNELS[c].label,
+    color: chColor(c),
+    values: active
+      .filter((b) => b.channel === c && b.total && nights(b.checkIn, b.checkOut) > 0)
+      .map((b) => Math.round((b.total ?? 0) / nights(b.checkIn, b.checkOut))),
+  })).filter((s) => s.values.length > 0);
+
   // Galleria grafici (4 per pagina, frecce per scorrere)
   // Con una sola struttura selezionata i grafici "per struttura" non hanno senso: si nascondono.
   const singleStruct = activeStructureId !== "all" || structures.length <= 1;
   const charts = [
-    { key: "rev-ch", title: t("Ricavi per canale (mese)"), node: <Donut data={revenueByChannel} center={`€ ${num(monthRevenue)}`} format={(n) => eur(n)} /> },
+    { key: "occ-gauge", title: t("Occupazione del mese"), node: <Gauge value={Math.round(cur.occ * 100)} unit="%" color="var(--ok)" /> },
+    { key: "price-ch", title: t("Prezzo a notte per canale"), wide: true, node: <DensityChart series={priceByChannel} xLabel={t("Prezzo a notte (€)")} unit="€" /> },
+    { key: "rev-ch", title: t("Ricavi per canale (mese)"), wide: true, node: <Donut data={revenueByChannel} center={`€ ${num(monthRevenue)}`} format={(n) => eur(n)} /> },
     { key: "weekday", title: t("Occupazione per giorno settimana"), node: <ColumnChart bars={weekday} format={(n) => `${n}%`} /> },
-    { key: "country", title: t("Provenienza ospiti per paese"), node: <ColumnChart bars={byCountry} barWidth={44} labelColor="var(--txt)" /> },
+    { key: "country", title: t("Provenienza ospiti per paese"), node: <ColumnChart bars={byCountry} labelColor="var(--txt)" allLabels /> },
     { key: "stay", title: t("Durata del soggiorno"), node: <Bars items={stayDist} /> },
     { key: "rev-str", title: t("Ricavi per struttura"), perStructure: true, node: <Bars items={revByStructure} /> },
   ].filter((c) => !(singleStruct && c.perStructure));
+  // Applica l'ordine scelto dall'utente (doppio clic per riposizionare).
+  const orderedCharts = [...charts].sort((a, b) => {
+    const ia = chartOrder.indexOf(a.key), ib = chartOrder.indexOf(b.key);
+    if (ia < 0 && ib < 0) return 0;
+    if (ia < 0) return 1;
+    if (ib < 0) return -1;
+    return ia - ib;
+  });
 
   return (
     <div>
@@ -171,17 +201,26 @@ export default function StatistichePage() {
 
       <div className="mt-6">
         <div className="mb-3 flex items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
+          <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
           <span className="text-xs font-semibold uppercase tracking-wide text-faint">Grafici</span>
-          <span className="ml-auto text-[11px] text-faint">Scorri per vederli tutti →</span>
+          {chartsOn && <span className="ml-auto text-[11px] text-faint">Rotella o manina per scorrere · doppio clic per riposizionare</span>}
         </div>
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          {charts.map((c) => (
-            <div key={c.key} className="flex min-w-[260px] shrink-0 grow basis-[calc(20%-13px)] flex-col rounded-xl border border-line bg-surface p-4 shadow-sm">
-              <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{c.title}</div>
-              <div className="flex-1">{c.node}</div>
-            </div>
-          ))}
-        </div>
+        {chartsOn && (
+        <ScrollStrip
+          gap="gap-3"
+          onReorder={(keys) => { const rest = charts.map((c) => c.key).filter((k) => !keys.includes(k)); persistChartOrder([...keys, ...rest]); }}
+          items={orderedCharts.map((c) => { const wide = (c as { wide?: boolean }).wide; return {
+            key: c.key,
+            className: `flex flex-none snap-start flex-col ${wide ? "w-[520px] max-w-[92vw] lg:w-[calc((100%-3rem)*2/5+0.75rem)]" : "w-[260px] lg:w-[calc((100%-3rem)/5)]"}`,
+            node: (
+              <div className="flex h-full flex-col rounded-xl border border-line bg-surface p-4 shadow-sm">
+                <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{c.title}</div>
+                <div className="flex-1">{c.node}</div>
+              </div>
+            ),
+          }; })}
+        />
+        )}
       </div>
 
       {/* Riga filtro: mese unico che guida KPI e report */}

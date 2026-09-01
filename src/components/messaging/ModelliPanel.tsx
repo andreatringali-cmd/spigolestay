@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
+import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
 
 type Lang = "it" | "en" | "fr" | "de" | "es";
 type Trigger = "manual" | "before_arrival" | "on_arrival" | "after_arrival" | "on_checkout" | "after_checkout";
@@ -12,7 +12,7 @@ const LANGS: [Lang, string][] = [["it", "Italiano"], ["en", "English"], ["fr", "
 const TRIGGERS: [Trigger, string][] = [["manual", "Manuale"], ["before_arrival", "Giorni prima dell'arrivo"], ["on_arrival", "Il giorno del check-in"], ["after_arrival", "Giorni dopo l'arrivo"], ["on_checkout", "Il giorno del check-out"], ["after_checkout", "Giorni dopo il check-out"]];
 // I trigger "il giorno di…" non usano il conteggio giorni (sono ancorati esattamente a check-in/check-out).
 const needsDays = (t: Trigger) => t === "before_arrival" || t === "after_arrival" || t === "after_checkout";
-const VARS = ["{ospite}", "{struttura}", "{camera}", "{checkin}", "{checkout}", "{codice_accesso}", "{saldo}", "{notti}", "{link_guida}"];
+const VARS = ["{ospite}", "{struttura}", "{camera}", "{checkin}", "{checkout}", "{codice_accesso}", "{saldo}", "{notti}", "{link_guida}", "{link_checkin}"];
 const LINKABLE: [string, string][] = [["", "Nessuna"], ["selfcheckin", "Self check-in"], ["guida", "Guida ospiti"], ["info", "Info e codici d'ingresso"], ["checkout", "Messaggio di check-out"], ["recensione", "Richiesta recensione"]];
 
 interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; trigger: Trigger; days: number; time: string; active: boolean; srcId?: string }
@@ -25,12 +25,21 @@ const triggerDesc = (tpl: MsgTemplate, tr: (s: string) => string) => {
   return `${tpl.days} ${tr("gg")} ${w} · ${tpl.time}`;
 };
 
-export default function ModelliPage() {
+// Modelli & automazioni: crea i messaggi riutilizzabili (tab di /messaggi).
+export default function ModelliPanel() {
   const ask = useConfirm();
   const { t } = useLang();
   const [templates, setTemplates] = useState<MsgTemplate[]>([]);
   const [ready, setReady] = useState(false);
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:msgtemplates"); if (r) setTemplates(JSON.parse(r)); } catch {} setReady(true); }, []);
+  useEffect(() => {
+    try {
+      const r = localStorage.getItem("spigolestay:msgtemplates"); const parsed = r ? JSON.parse(r) : null;
+      const base: MsgTemplate[] = Array.isArray(parsed) ? parsed : [];
+      const haveIds = new Set(base.map((x) => x.id));
+      setTemplates([...base, ...(DEFAULT_TEMPLATES as unknown as MsgTemplate[]).filter((d) => !haveIds.has(d.id))]);
+    } catch {}
+    setReady(true);
+  }, []);
   useEffect(() => { if (!ready) return; try { localStorage.setItem("spigolestay:msgtemplates", JSON.stringify(templates)); } catch {} }, [templates, ready]);
 
   const [editing, setEditing] = useState<MsgTemplate | null>(null);
@@ -42,16 +51,15 @@ export default function ModelliPage() {
 
   return (
     <div>
-      <PageHeader
-        title={t("Modelli & automazioni")}
-        subtitle={t("Crea i messaggi riutilizzabili e decidi se e quando inviarli in automatico")}
-        actions={<button onClick={() => { setEditing(emptyTpl()); setEditLang("it"); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("+ Nuovo modello")}</button>}
-      />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[13px]" style={{ color: "var(--dim)" }}>{t("Crea i messaggi riutilizzabili e decidi se e quando inviarli in automatico.")}</p>
+        <button onClick={() => { setEditing(emptyTpl()); setEditLang("it"); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("+ Nuovo modello")}</button>
+      </div>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <Card className="!p-4"><div className="text-xs text-dim">{t("Modelli")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{templates.length}</div></Card>
         <Card className="!p-4"><div className="text-xs text-dim">{t("Automatici attivi")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{activeAuto}</div></Card>
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Coda invii")}</div><div className="mt-1 text-sm font-semibold text-txt">{t("nel")} <Link href="/messaggi" className="text-focus hover:underline">{t("Centro messaggi →")}</Link></div><div className="mt-0.5 text-[11px] text-faint">{t("lì invii e vedi lo storico")}</div></Card>
+        <Card className="!p-4"><div className="text-xs text-dim">{t("Coda invii")}</div><div className="mt-1 text-sm font-semibold text-txt">{t("nel tab Conversazioni")}</div><div className="mt-0.5 text-[11px] text-faint">{t("lì invii e vedi lo storico")}</div></Card>
       </div>
 
       <SectionTitle>{t("I tuoi modelli")}</SectionTitle>

@@ -14,6 +14,10 @@ import Donut from "@/components/Donut";
 import LineChart from "@/components/LineChart";
 import ColumnChart from "@/components/ColumnChart";
 import Bars from "@/components/Bars";
+import ChannelBars from "@/components/ChannelBars";
+import Gauge from "@/components/Gauge";
+import DensityChart from "@/components/DensityChart";
+import DateField from "@/components/DateField";
 import Icon from "@/components/Icon";
 import ExportMenu from "@/components/ExportMenu";
 import WeatherWidget from "@/components/WeatherWidget";
@@ -42,7 +46,7 @@ const INHOUSE_TASKS = [
   { id: "upsell", label: "Proposta servizi extra / esperienze" },
 ];
 // Grafici mostrati di default (in ordine). Gli altri sono opzionali (dal selettore).
-const DEFAULT_CHART_KEYS = ["book-ch", "rev-ch", "occ-trend", "rev-day"];
+const DEFAULT_CHART_KEYS = ["rooms", "ch-mix", "prov-day", "occ-gauge", "occ-trend", "rev-day"];
 
 // Azioni pulizia del giorno (stessa semantica della pagina Pulizie).
 const CLEAN_ACT: Record<string, { label: string; color: string }> = {
@@ -62,10 +66,10 @@ export default function Dashboard() {
   // Personalizzazione grafici Dashboard: quali nascondere (persistito nel browser). Minimo 4 visibili.
   const MIN_CHARTS = 4;
   const [hiddenCharts, setHiddenCharts] = useState<Set<string> | null>(null); // null = non ancora inizializzato
-  const persistHidden = (next: Set<string>) => { setHiddenCharts(next); try { localStorage.setItem("spigolestay:dashcharts:v3", JSON.stringify([...next])); } catch {} };
+  const persistHidden = (next: Set<string>) => { setHiddenCharts(next); try { localStorage.setItem("spigolestay:dashcharts:v5", JSON.stringify([...next])); } catch {} };
   // Ordine dei grafici (riordino via drag&drop), persistito.
   const [chartOrder, setChartOrder] = useState<string[]>([]);
-  const persistChartOrder = (o: string[]) => { setChartOrder(o); try { localStorage.setItem("spigolestay:dashchartorder", JSON.stringify(o)); } catch {} };
+  const persistChartOrder = (o: string[]) => { setChartOrder(o); try { localStorage.setItem("spigolestay:dashchartorder:v2", JSON.stringify(o)); } catch {} };
   const [chartWarn, setChartWarn] = useState("");
   const [chartMenuOpen, setChartMenuOpen] = useState(false);
   const chartMenuRef = useRef<HTMLDivElement>(null);
@@ -149,6 +153,10 @@ export default function Dashboard() {
   const daySet = scoped.filter((b) => b.checkIn <= date && date < b.checkOut);
   const bookingsDonut = channels.map((c) => ({ label: CHANNELS[c].label, value: daySet.filter((b) => b.channel === c).length, color: chColor(c) })).filter((x) => x.value > 0);
   const revenueDonut = channels.map((c) => ({ label: CHANNELS[c].label, value: Math.round(daySet.filter((b) => b.channel === c).reduce((a, b) => a + nightly(b), 0)), color: chColor(c) })).filter((x) => x.value > 0);
+  // Dati unici per canale: prenotazioni + ricavi insieme (un solo grafico a barre)
+  const channelRows = channels.map((c) => ({ label: CHANNELS[c].label, color: chColor(c), count: daySet.filter((b) => b.channel === c).length, revenue: Math.round(daySet.filter((b) => b.channel === c).reduce((a, b) => a + nightly(b), 0)) })).filter((r) => r.count > 0 || r.revenue > 0);
+  // Prezzo a notte (ADR) per canale → density plot
+  const priceByChannel = channels.map((c) => ({ label: CHANNELS[c].label, color: chColor(c), values: scoped.filter((b) => b.channel === c && b.total && nights(b.checkIn, b.checkOut) > 0).map((b) => Math.round((b.total ?? 0) / nights(b.checkIn, b.checkOut))) })).filter((s) => s.values.length > 0);
   const dayRevTotal = Math.round(daySet.reduce((a, b) => a + nightly(b), 0));
 
   // Occupazione per struttura (giorno selezionato) — a torta
@@ -186,25 +194,27 @@ export default function Dashboard() {
   const revByStructDay = structuresToShow.map((s) => ({ label: s.name, value: Math.round(bsOfStruct(s).reduce((a, b) => a + nightly(b), 0)), color: "var(--ok)", fmt: eur })).filter((x) => x.value > 0);
   const countryDay: Record<string, number> = {};
   daySet.forEach((b) => { const c = guests.find((g) => g.id === b.guestId)?.country ?? "—"; countryDay[c] = (countryDay[c] || 0) + 1; });
-  const provDay = Object.entries(countryDay).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v, color: flagColor(k), fill: flagGradient(k), flag: k === "—" ? "🏳️" : flagEmoji(k) }));
+  const provDay = Object.entries(countryDay).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v, color: flagColor(k), fill: flagGradient(k) }));
 
   const dashCharts = [
     // Predefiniti (ordine da sinistra):
-    { key: "book-ch", title: t("Prenotazioni per canale (giorno)"), node: <Donut data={bookingsDonut} showPercent={false} /> },
-    { key: "rev-ch", title: t("Ricavi del giorno per canale"), node: <Donut data={revenueDonut} center={`€ ${num(dayRevTotal)}`} format={(n) => eur(n)} showPercent={false} /> },
+    { key: "occ-gauge", title: t("Occupazione del giorno"), node: <Gauge value={scopedUnits.length ? Math.round((occRooms / scopedUnits.length) * 100) : 0} unit="%" color="var(--ok)" /> },
+    { key: "ch-mix", title: t("Prenotazioni e ricavi per canale (giorno)"), wide: true, node: <ChannelBars rows={channelRows} fmtEur={eur} /> },
+    { key: "price-ch", title: t("Prezzo a notte per canale"), wide: true, extra: (<span className="flex flex-wrap items-center justify-end gap-x-2 gap-y-0.5">{priceByChannel.map((s) => (<span key={s.label} className="flex items-center gap-1 text-[10px] text-dim"><span className="h-2 w-2 rounded-sm" style={{ backgroundColor: s.color }} />{s.label}</span>))}</span>), node: <DensityChart series={priceByChannel} unit="€" legend={false} /> },
     { key: "rev-str", title: t("Ricavi per struttura (giorno)"), perStructure: true, node: <Bars items={revByStructDay} /> },
     { key: "occ-trend", title: t("Occupazione attesa · 7 giorni"), node: <LineChart points={occTrend} color="var(--focus)" format={(n) => `${n}%`} everyLabel={1} /> },
     // Opzionali (dal selettore):
     { key: "occ-str", title: t("Occupazione per struttura (giorno)"), perStructure: true, node: <Donut data={occByStructureDay} showPercent={false} /> },
     { key: "rooms", title: t("Camere occupate vs libere (giorno)"), node: <Donut data={roomsDonut} center={`${occRooms}/${scopedUnits.length}`} showPercent={false} /> },
     { key: "guests-str", title: t("Ospiti per struttura (giorno)"), perStructure: true, node: <Bars items={guestsByStruct} /> },
-    { key: "prov-day", title: t("Provenienza ospiti (giorno)"), node: <ColumnChart bars={provDay} /> },
+    { key: "prov-day", title: t("Provenienza ospiti (giorno)"), node: <ColumnChart bars={provDay} allLabels /> },
     { key: "rev-day", title: t("Incassi attesi · prossimi 7 giorni"), node: <ColumnChart bars={revDaily} format={(n) => eur(n)} />, extra: <span className="shrink-0 rounded-md bg-wash px-2 py-0.5 font-mono text-xs font-bold text-txt" title={t("Totale atteso sui 7 giorni")}>{eur(revTotal7)}</span> },
   ];
-  const defaultHidden = () => new Set(dashCharts.map((c) => c.key)); // all'apertura tutti i grafici nascosti
+  // Di default sono VISIBILI i grafici principali; restano nascosti solo gli opzionali.
+  const defaultHidden = () => new Set(dashCharts.map((c) => c.key).filter((k) => !DEFAULT_CHART_KEYS.includes(k)));
   useEffect(() => {
-    try { const r = localStorage.getItem("spigolestay:dashcharts:v3"); if (r) setHiddenCharts(new Set(JSON.parse(r))); else setHiddenCharts(defaultHidden()); } catch { setHiddenCharts(defaultHidden()); }
-    try { const o = localStorage.getItem("spigolestay:dashchartorder"); if (o) setChartOrder(JSON.parse(o)); } catch {}
+    try { const r = localStorage.getItem("spigolestay:dashcharts:v5"); if (r) setHiddenCharts(new Set(JSON.parse(r))); else setHiddenCharts(defaultHidden()); } catch { setHiddenCharts(defaultHidden()); }
+    try { const o = localStorage.getItem("spigolestay:dashchartorder:v2"); if (o) setChartOrder(JSON.parse(o)); } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const hidden = hiddenCharts ?? defaultHidden();
@@ -364,14 +374,16 @@ export default function Dashboard() {
         <Kpi label={t("Incassi del giorno")} value={eur(dayRevenue)} color="var(--txt)" small />
       </div>
 
+
       {/* Grafici: una riga scorrevole con frecce ‹ › · mostra/nascondi dal selettore */}
       {shownCharts.length > 0 && (
         <div className="mt-5">
           <ScrollStrip
+            gap="gap-3"
             onReorder={(keys) => { const rest = dashCharts.map((c) => c.key).filter((k) => !keys.includes(k)); persistChartOrder([...keys, ...rest]); }}
             items={shownCharts.map((c) => ({
               key: c.key,
-              className: "flex-none snap-start w-[280px] lg:w-[calc((100%-3rem)/4)]",
+              className: `flex-none snap-start ${(c as { wide?: boolean }).wide ? "w-[520px] max-w-[92vw] lg:w-[calc((100%-2.25rem)/2+0.75rem)]" : "w-[280px] lg:w-[calc((100%-2.25rem)/4)]"}`,
               node: (
                 <Card className="flex h-full flex-col">
                   <div className="mb-3 flex items-center justify-between gap-2">
@@ -389,10 +401,10 @@ export default function Dashboard() {
       {/* Sezione giorno */}
       <div className="mt-6 mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <div className="no-print flex flex-wrap items-center gap-2">
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca ospite…")} className="w-56 max-w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca ospite…")} className="w-full max-w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus sm:w-72 lg:w-80 xl:w-[22rem] 2xl:w-96" />
           <div className="flex items-center gap-1">
             <button onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash hover:text-txt">‹</button>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+            <DateField value={date} onChange={setDate} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-focus" />
             <button onClick={() => setDate(toISO(addDays(parseISO(date), 1)))} title={t("Giorno successivo")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash hover:text-txt">›</button>
           </div>
           {focus && <span className="rounded-full bg-wash px-2.5 py-0.5 text-[11px] font-semibold text-focus">{t("Filtro")}: {focus === "attive" ? t("attive") : focus === "inhouse" ? t("in struttura") : focus === "arrivi" ? t("arrivi") : t("partenze")}</span>}
@@ -400,34 +412,10 @@ export default function Dashboard() {
         </div>
         <div className="no-print ml-auto flex items-center gap-2">
           {/* Selettore grafici da mostrare */}
-          <div ref={chartMenuRef} className="relative">
-            <button onClick={() => setChartMenuOpen((o) => !o)} title={t("Scegli i grafici da mostrare")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${chartMenuOpen ? "border-focus text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}>
-              <Icon name="chart" size={16} />
-            </button>
-            {chartMenuOpen && (
-              <div className="absolute right-0 top-full z-40 mt-1 w-[340px] max-w-[92vw] overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
-                <div className="flex items-center justify-between px-2.5 py-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Grafici")} · {shownCharts.length}/{availCharts.length}</span>
-                  <div className="flex items-center gap-1">
-                    <button onClick={showAllCharts} className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-focus hover:bg-wash">{t("Mostra tutti")}</button>
-                    <button onClick={hideAllCharts} className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-dim hover:bg-wash">{t("Nascondi tutti")}</button>
-                  </div>
-                </div>
-                <div className="max-h-[46vh] overflow-y-auto">
-                  {availCharts.map((c) => {
-                    const on = !hidden.has(c.key);
-                    return (
-                      <button key={c.key} onClick={() => toggleChart(c.key)} className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-txt hover:bg-wash">
-                        <span className="min-w-0 flex-1">{c.title}</span>
-                        <span className={`relative h-4 w-7 shrink-0 rounded-full transition ${on ? "bg-focus" : "bg-line"}`}><span className="absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all" style={{ left: on ? "14px" : "2px" }} /></span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="px-2.5 py-1.5 text-[11px] text-faint">{t("Mostra o nascondi i grafici. Scorri con le frecce ‹ ›.")}</div>
-              </div>
-            )}
-          </div>
+          {/* Toggle grafici: un click mostra tutti / nasconde tutti (neutro) */}
+          <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border border-line transition ${shownCharts.length > 0 ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
+            <Icon name="chart" size={16} />
+          </button>
           <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
         </div>
       </div>
@@ -475,7 +463,7 @@ export default function Dashboard() {
               <div className="ml-1 h-1.5 w-40 overflow-hidden rounded-full bg-wash">
                 <div className="h-full rounded-full transition-all" style={{ width: `${keys.length ? (doneCount / keys.length) * 100 : 0}%`, backgroundColor: "var(--ok)" }} />
               </div>
-              <Link href="/modelli" className="ml-auto flex items-center gap-1.5 rounded-lg border border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)] px-3 py-1.5 text-xs font-semibold text-focus transition hover:bg-[color:color-mix(in_srgb,var(--focus)_18%,transparent)]">{t("Gestisci automazioni")} →</Link>
+              <Link href="/messaggi?tab=modelli" className="ml-auto flex items-center gap-1.5 rounded-lg border border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)] px-3 py-1.5 text-xs font-semibold text-focus transition hover:bg-[color:color-mix(in_srgb,var(--focus)_18%,transparent)]">{t("Gestisci automazioni")} →</Link>
             </div>
 
             <label className="mb-4 flex items-center gap-2.5 rounded-xl border border-line bg-surface p-3 text-sm shadow-sm">

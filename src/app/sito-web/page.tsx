@@ -31,7 +31,7 @@ function Site() {
   const cfg = useMemo<Cfg>(() => { try { const r = localStorage.getItem("spigolestay:sito"); if (r) return { ...DEFCFG, ...JSON.parse(r) }; } catch {} return DEFCFG; }, []);
   const [sid, setSid] = useState(() => { try { return new URLSearchParams(window.location.search).get("s") || structures[0]?.id || ""; } catch { return structures[0]?.id ?? ""; } });
   const structure = getStructure(sid);
-  const name = cfg.nome || structure?.name || "SpigoleStay";
+  const name = cfg.nome || structure?.name || "Xenora";
   const accent = cfg.accent;
 
   const today = toISO(new Date());
@@ -156,7 +156,7 @@ function Site() {
         </div>
       </div>
 
-      <div className="mx-auto mt-10 max-w-5xl px-4 text-center text-[11px] text-faint">{name} · Prenotazione online sicura powered by SpigoleStay</div>
+      <div className="mx-auto mt-10 max-w-5xl px-4 text-center text-[11px] text-faint">{name} · Prenotazione online sicura powered by Xenora</div>
     </div>
   );
 }

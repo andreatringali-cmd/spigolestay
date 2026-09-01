@@ -28,6 +28,21 @@ interface GAmenity { icon: string; label: string }
 interface GSection {
   id: string; icon: string; title: string; sub: string; intro: string; photos: string[]; items: GItem[];
   steps?: GStep[]; amenities?: GAmenity[]; amenitiesTitle?: string; amenitiesIntro?: string;
+  hidden?: boolean; // nascosta manualmente dall'host (non appare nella guida ospiti)
+}
+// Ordine fisso delle sezioni nell'editor: identico a come la guida ospiti le mostra
+// (vedi public/guida/js/content.js). Le sezioni non in elenco (personalizzate) vanno in fondo.
+const SECTION_ORDER = ["checkin", "breakfast", "wifi", "attractions", "restaurants", "excursions", "taxi", "info", "faq", "extras", "contacts", "review"];
+// Operative "pure": i contenuti arrivano dai dati struttura, quindi non contano come "vuote".
+const FUNC_IDS = new Set(["wifi", "contacts", "review"]);
+// Una sezione è "compilata" se ha almeno un contenuto reale (altrimenti la guida la nasconde da sola).
+function sectionFilled(s: GSection): boolean {
+  if (s.intro && s.intro.trim()) return true;
+  if (s.photos && s.photos.length) return true;
+  if (s.amenities && s.amenities.length) return true;
+  if (s.steps && s.steps.some((st) => (st.h && st.h.trim()) || (st.p && st.p.trim()))) return true;
+  if (s.items && s.items.some((it) => (it.h && it.h.trim()) || (it.p && it.p.trim()) || (it.list && it.list.length))) return true;
+  return false;
 }
 const ACT_KINDS: { k: string; label: string; type: string; icon: string }[] = [
   { k: "link", label: "Link", type: "", icon: "info" },
@@ -137,6 +152,11 @@ const DEFAULT_CONTENT: GContent = {
         { h: "Aria condizionata", p: "Come funziona e le buone pratiche." },
         { h: "Orari di quiete", p: "Rispetto degli altri ospiti dopo una certa ora." },
       ] },
+    { id: "extras", icon: "sparkle", title: "Servizi ed extra", sub: "Comodità in più su richiesta", intro: "", photos: [],
+      items: [
+        { h: "Culla / lettino", p: "Su richiesta, in base alla disponibilità." },
+        { h: "Check-in anticipato / late check-out", p: "Scriveteci: cercheremo di venirvi incontro.", actions: [{ label: "Richiedi", href: "{whatsapp}", type: "wa", icon: "chat" }] },
+      ] },
     { id: "contacts", icon: "phone", title: "Contatti", sub: "Siamo a disposizione", intro: "", photos: [], items: [] },
     { id: "review", icon: "star", title: "Lasciate una recensione", sub: "Il vostro supporto è prezioso", intro: "", photos: [], items: [] },
   ],
@@ -221,9 +241,50 @@ const DEMO_CONTENT: GContent = {
         { h: "Aria condizionata", p: "Accendetela col telecomando; tenete porte e finestre chiuse mentre è in funzione." },
         { h: "Orari di quiete", p: "Dopo le 22:00 abbassate i toni: ci sono altri ospiti e i vicini. Grazie!" },
       ] },
+    { id: "extras", icon: "sparkle", title: "Servizi ed extra", sub: "Comodità in più su richiesta", intro: "", photos: [],
+      items: [
+        { h: "Culla / lettino", p: "Su richiesta, in base alla disponibilità." },
+        { h: "Check-in anticipato / late check-out", p: "Scriveteci: cercheremo di venirvi incontro.", actions: [{ label: "Richiedi", href: "{whatsapp}", type: "wa", icon: "chat" }] },
+      ] },
     { id: "contacts", icon: "phone", title: "Contatti", sub: "Siamo a disposizione", intro: "", photos: [], items: [] },
     { id: "review", icon: "star", title: "Lasciate una recensione", sub: "Il vostro supporto è prezioso", intro: "", photos: [], items: [] },
   ],
+};
+
+// Scaffold VUOTO per una guida nuova: le sezioni ci sono (id, icona, titolo) ma senza contenuti,
+// così la guida ospiti parte vuota e si popola man mano che l'host compila. I testi pronti restano
+// nell'esempio (telefono "Esempio" e tasto "Carica esempio").
+// Titoli e sottotitoli presi dall'esempio (public/guida/js/content/it.js): così una guida nuova
+// parte con le intestazioni giuste già pronte; l'host compila solo i contenuti interni.
+const EXAMPLE_META: Record<string, { title: string; sub: string }> = {
+  checkin: { title: "Arrivo e Self Check-in", sub: "Come raggiungerci ed entrare nella vostra camera" },
+  breakfast: { title: "La vostra colazione", sub: "Nei migliori bar qui vicino, con i voucher" },
+  wifi: { title: "WiFi gratuito", sub: "Rete e password" },
+  attractions: { title: "Esplorare la città", sub: "La storia a portata di mano" },
+  restaurants: { title: "Dove mangiare e bere", sub: "I migliori locali, tutti a piedi da qui" },
+  excursions: { title: "Mare ed escursioni", sub: "Dalle calette cittadine alle riserve naturali" },
+  taxi: { title: "Taxi e trasporti", sub: "Spostarsi senza auto" },
+  info: { title: "Informazioni utili", sub: "Servizi ed emergenze" },
+  faq: { title: "Domande frequenti", sub: "Le risposte pratiche, a portata di mano" },
+  extras: { title: "Servizi ed extra", sub: "Chiedeteci pure, pensiamo a tutto noi" },
+  contacts: { title: "Contatti", sub: "Siamo sempre a disposizione" },
+  review: { title: "Lasciate una recensione", sub: "Il vostro supporto per noi è prezioso" },
+};
+const EMPTY_CONTENT: GContent = {
+  home: DEFAULT_CONTENT.home,
+  sections: DEFAULT_CONTENT.sections.map((s) => {
+    const meta = EXAMPLE_META[s.id];
+    const base = { id: s.id, icon: s.icon, title: meta?.title ?? s.title, sub: meta?.sub ?? s.sub, intro: "", photos: [] as string[] };
+    // Operative (wifi/contatti/recensione): niente blocchi, i dati arrivano dalla struttura.
+    if (FUNC_IDS.has(s.id)) return { ...base, items: [] as GItem[] };
+    // Sezioni a passaggi (arrivo/colazione): una riga passaggio già pronta + eventuali servizi camera.
+    if (s.steps) return {
+      ...base, items: [] as GItem[], steps: [{ h: "", p: "" }] as GStep[],
+      ...(s.amenities ? { amenities: [] as GAmenity[], amenitiesTitle: s.amenitiesTitle, amenitiesIntro: s.amenitiesIntro } : {}),
+    };
+    // Sezioni a contenuti (città, ristoranti, faq…): un blocco già pronto da compilare.
+    return { ...base, items: [{ h: "", p: "" }] as GItem[] };
+  }),
 };
 const fileToDataUrl = (file: File): Promise<string> => new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsDataURL(file); });
 // Definiti a livello di modulo: se stessero dentro il componente verrebbero ricreati a ogni
@@ -289,6 +350,8 @@ async function translateContent(content: GContent, to: string): Promise<GContent
 export default function GuidaOspitiPage() {
   const { structures, units, roomTypes, activeStructureId, updateStructure, bookings, getUnit, getGuest } = useData();
   const [sid, setSid] = useState(activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""));
+  // La struttura si sceglie dal selettore globale in alto (StructureSwitcher): qui la seguiamo.
+  useEffect(() => { if (activeStructureId !== "all") setSid(activeStructureId); }, [activeStructureId]);
   const [all, setAll] = useState<Record<string, Guide>>({});
   const [previewKey, setPreviewKey] = useState(0);
 
@@ -313,7 +376,7 @@ export default function GuidaOspitiPage() {
       : (addrFull ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addrFull)}` : "");
     const out: Partial<Guide> = {
       name: s?.name ?? "", city: s?.city ?? "", guideLogo: s?.logo ?? "", address: addrFull, mapsUrl: maps,
-      phone: s?.phone ?? "", email: s?.email ?? "",
+      phone: s?.phone ?? "", email: s?.email ?? "", whatsapp: s?.whatsapp ?? "", phoneGreta: s?.phone2 ?? "",
       social: { instagram: s?.instagram ?? "", facebook: s?.facebook ?? "", website: s?.website ?? "" },
     };
     return out;
@@ -336,7 +399,7 @@ export default function GuidaOspitiPage() {
 
   const [tab, setTab] = useState<"setup" | "content">("setup");
   const [openSec, setOpenSec] = useState<string | null>(null);
-  const content: GContent = guide.content ?? DEFAULT_CONTENT;
+  const content: GContent = guide.content ?? EMPTY_CONTENT;
   const setContent = (c: GContent) => set({ content: c });
   const loadDemo = () => { if (guide.content && !confirm("Sostituire i contenuti attuali con l'esempio di Siracusa?")) return; updateStructure(sid, DEMO_STRUCT); set({ ...DEMO_GUIDE, content: DEMO_CONTENT, i18n: {} }); refresh(); };
 
@@ -363,6 +426,21 @@ export default function GuidaOspitiPage() {
   const removeSection = (i: number) => setContent({ ...content, sections: content.sections.filter((_, j) => j !== i) });
   const moveSection = (i: number, dir: -1 | 1) => { const j = i + dir; if (j < 0 || j >= content.sections.length) return; const arr = [...content.sections]; [arr[i], arr[j]] = [arr[j], arr[i]]; setContent({ ...content, sections: arr }); };
   const addSection = () => { const id = "extra" + Date.now().toString().slice(-4); setContent({ ...content, sections: [...content.sections, { id, icon: "sparkle", title: "Nuova sezione", sub: "", intro: "", photos: [], items: [{ h: "", p: "" }] }] }); setOpenSec(id); };
+  const toggleHidden = (i: number) => updSection(i, { hidden: !content.sections[i].hidden });
+  // Sezioni in ordine FISSO (come le mostra la guida), con l'indice reale per le modifiche.
+  // Le personalizzate (id non standard) restano in fondo.
+  const orderedSections = useMemo(() => {
+    const idx = (id: string) => { const p = SECTION_ORDER.indexOf(id); return p === -1 ? 999 : p; };
+    return content.sections.map((s, si) => ({ s, si })).sort((a, b) => idx(a.s.id) - idx(b.s.id));
+  }, [content.sections]);
+  // Guide già salvate prima dell'aggiunta di "extras": la aggiungo una volta (solo append, nessun riordino distruttivo).
+  useEffect(() => {
+    if (!guide.content) return; // le guide nuove partono già dai default completi
+    const have = new Set(content.sections.map((s) => s.id));
+    const missing = EMPTY_CONTENT.sections.filter((s) => !have.has(s.id));
+    if (missing.length) setContent({ ...content, sections: [...content.sections, ...missing] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sid]);
   const updItem = (si: number, ii: number, patch: Partial<GItem>) => updSection(si, { items: content.sections[si].items.map((it, j) => (j === ii ? { ...it, ...patch } : it)) });
   const addItem = (si: number) => updSection(si, { items: [...content.sections[si].items, { h: "", p: "" }] });
   const removeItem = (si: number, ii: number) => updSection(si, { items: content.sections[si].items.filter((_, j) => j !== ii) });
@@ -466,7 +544,7 @@ export default function GuidaOspitiPage() {
       @media print{body{padding:0}.card{border:none}}</style></head>
       <body><div class="card">
       ${guide.guideLogo ? `<img class="logo" src="${guide.guideLogo}" onerror="this.style.display='none'">` : ""}
-      <h1>${(guide.guideName || guide.name || "").replace(/</g, "")}</h1>
+      <h1>${`Guida - ${guide.name || ""}`.replace(/</g, "")}</h1>
       <p class="city">${(guide.city || "").replace(/</g, "")}${rooms ? " · Camera " + rooms.replace(/</g, "") : ""}</p>
       <img class="qr" src="${qr}">
       <h2>Inquadra per la guida</h2>
@@ -478,12 +556,16 @@ export default function GuidaOspitiPage() {
   const tvUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/guida/tv.html?p=${encodeURIComponent(sid)}`;
   // Anteprima: telefono (guida mobile) o TV, in una delle 5 lingue.
   const [pvMode, setPvMode] = useState<"phone" | "tv">("phone");
+  const [mainTab, setMainTab] = useState<"app" | "tv">("app"); // 📱 App cellulare · 📺 TV
   const [pvLang, setPvLang] = useState("it");
   useEffect(() => { try { localStorage.setItem("spigole_lang", pvLang); } catch {} }, [pvLang]);
   useEffect(() => { setPreviewKey((k) => k + 1); }, [pvMode, pvLang]);
   const previewUrl = pvMode === "tv"
     ? `/guida/tv.html?p=${encodeURIComponent(sid)}&lang=${pvLang}&_=${previewKey}`
     : `/guida/index.html?p=${encodeURIComponent(sid)}&_=${previewKey}`;
+  // Anteprima di ESEMPIO (Siracusa pronta): un id struttura inesistente fa cadere il motore
+  // sull'esempio incluso nel pacchetto, senza toccare i dati reali dell'host.
+  const exampleUrl = `/guida/index.html?p=__esempio__&_=${previewKey}`;
   const previewRef = useRef<HTMLIFrameElement>(null);
   // Ricarica l'anteprima conservando lingua (spigole_lang) e sezione corrente (hash), così vedi
   // la modifica sul punto in cui stai lavorando senza tornare alla welcome.
@@ -505,21 +587,9 @@ export default function GuidaOspitiPage() {
       <PageHeader
         title="Guida ospiti"
         subtitle="Una guida multilingua per struttura · personalizza e genera il link da inviare"
-        actions={
-          <div className="flex items-center gap-2">
-            <button onClick={loadDemo} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-focus hover:bg-wash" title="Riempi con un esempio pronto (Siracusa)">✨ Carica esempio</button>
-            <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-txt outline-none focus:border-focus">
-              {structures.map((s) => (<option key={s.id} value={s.id}>{s.name}{all[s.id] ? " ✓" : ""}</option>))}
-            </select>
-          </div>
-        }
       />
 
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <div className="inline-flex rounded-xl border border-line bg-surface p-0.5 shadow-sm">
-          <button onClick={() => setTab("setup")} className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${tab === "setup" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>Impostazioni & link</button>
-          <button onClick={() => setTab("content")} className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${tab === "content" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>Contenuti · città, testi, foto</button>
-        </div>
         {/* Completezza della guida: colpo d'occhio su cosa manca prima di inviarla */}
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <span className="font-semibold text-faint">Pronta:</span>
@@ -529,204 +599,68 @@ export default function GuidaOspitiPage() {
         </div>
       </div>
 
+      <div className="mb-3 inline-flex rounded-xl border border-line bg-surface p-0.5 shadow-sm">
+        <button onClick={() => setMainTab("app")} className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${mainTab === "app" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>📱 App · cellulare</button>
+        <button onClick={() => setMainTab("tv")} className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${mainTab === "tv" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>📺 TV</button>
+      </div>
+
+      {mainTab === "app" && (<>
       <div className="grid gap-5 lg:grid-cols-[1.05fr_minmax(340px,0.92fr)]">
         {/* Pannello personalizzazione */}
         <div className="space-y-4">
-        {tab === "setup" && (<>
+        {(<>
           <div className="grid gap-4">
           <Card>
             <div className="flex items-center justify-between">
-              <SectionTitle>Struttura</SectionTitle>
+              <SectionTitle>Struttura e contatti</SectionTitle>
               <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-faint">🔒 dalle Impostazioni struttura</span>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <F label="Nome guida"><input value={guide.guideName} maxLength={LIM.guideName} onChange={(e) => set({ guideName: e.target.value })} className={fld} placeholder="es. Guida di Spigole House" /></F>
+              <F label="Nome guida"><input value={`Guida - ${guide.name}`} disabled readOnly className={fldRO} /></F>
               <F label="Nome struttura"><input value={guide.name} disabled readOnly className={fldRO} /></F>
               <F label="Città"><input value={guide.city} disabled readOnly className={fldRO} /></F>
-              <F label="Logo struttura"><div className="flex items-center gap-2">
-                {guide.guideLogo && <img src={guide.guideLogo} alt="" className="h-10 w-10 shrink-0 rounded border border-line bg-white object-contain" />}
-                <input value={guide.guideLogo || "— nessun logo nelle impostazioni —"} disabled readOnly className={fldRO} />
-              </div></F>
+              <F label="Logo struttura"><input value={guide.guideLogo || "— nessun logo nelle impostazioni —"} disabled readOnly className={fldRO} /></F>
               <F label="Indirizzo"><input value={guide.address} disabled readOnly className={fldRO} /></F>
               <F label="Link Google Maps"><input value={guide.mapsUrl} disabled readOnly className={fldRO} /></F>
-            </div>
-          </Card>
-
-          <Card>
-            <SectionTitle>Contatti</SectionTitle>
-            <div className="grid grid-cols-2 gap-3">
-              <F label="Telefono 🔒"><input value={guide.phone} disabled readOnly className={fldRO} /></F>
-              <F label="Email 🔒"><input value={guide.email} disabled readOnly className={fldRO} /></F>
-              <F label="WhatsApp"><input value={guide.whatsapp} onChange={(e) => set({ whatsapp: e.target.value })} className={fld} placeholder="+39…" /></F>
-              <F label="Telefono 2 (Greta)"><input value={guide.phoneGreta} onChange={(e) => set({ phoneGreta: e.target.value })} className={fld} placeholder="+39…" /></F>
-              <F label="Taxi"><input value={guide.taxiPhone} onChange={(e) => set({ taxiPhone: e.target.value })} className={fld} /></F>
-            </div>
-            <p className="mt-2 text-[11px] text-faint">🔒 Telefono ed email arrivano dalle Impostazioni struttura. WhatsApp, secondo numero e taxi sono specifici della guida.</p>
-          </Card>
-
-          <Card>
-            <SectionTitle>WiFi · Check-in · Recensioni</SectionTitle>
-            <div className="grid grid-cols-2 gap-3">
-              <F label="Rete WiFi"><input value={guide.wifiNetwork} onChange={(e) => set({ wifiNetwork: e.target.value })} className={fld} /></F>
-              <F label="Password WiFi"><input value={guide.wifiPassword} onChange={(e) => set({ wifiPassword: e.target.value })} className={fld} /></F>
-              <F label="Check-in — dalle / alle">
-                <div className="flex items-center gap-2">
-                  <input type="time" value={ciFrom} onChange={(e) => setCheckin(e.target.value, ciTo)} className={fld} />
-                  <span className="text-dim">–</span>
-                  <input type="time" value={ciTo} onChange={(e) => setCheckin(ciFrom, e.target.value)} className={fld} />
-                </div>
-              </F>
-              <F label="Check-out — entro le"><input type="time" value={coBy} onChange={(e) => setCheckout(e.target.value)} className={fld} /></F>
-              <F label="Link recensioni (Google)"><input value={guide.reviewUrl} onChange={(e) => set({ reviewUrl: e.target.value })} className={fld} /></F>
-              <F label="Link prenotazione diretta"><input value={guide.bookingUrl} onChange={(e) => set({ bookingUrl: e.target.value })} className={fld} /></F>
-            </div>
-            <p className="mt-2 text-[11px] text-faint">Gli orari si scelgono con l&apos;orologio: nessun errore di digitazione.</p>
-          </Card>
-
-          <Card>
-            <div className="flex items-center justify-between">
-              <SectionTitle>Social</SectionTitle>
-              <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-faint">🔒 dalle Impostazioni struttura</span>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
+              <F label="Telefono"><input value={guide.phone} disabled readOnly className={fldRO} /></F>
+              <F label="Email"><input value={guide.email} disabled readOnly className={fldRO} /></F>
+              <F label="WhatsApp"><input value={guide.whatsapp} disabled readOnly className={fldRO} /></F>
+              <F label="Telefono 2 (secondo contatto)"><input value={guide.phoneGreta} disabled readOnly className={fldRO} /></F>
               <F label="Instagram"><input value={guide.social.instagram} disabled readOnly className={fldRO} /></F>
               <F label="Facebook"><input value={guide.social.facebook} disabled readOnly className={fldRO} /></F>
               <F label="Sito web"><input value={guide.social.website} disabled readOnly className={fldRO} /></F>
             </div>
-            <p className="mt-2 text-[11px] text-faint">I contenuti città (ristoranti, attrazioni, trasporti) e le traduzioni sono inclusi come esempio Siracusa.</p>
           </Card>
+
+
           </div>
 
-          {/* Generatore link ospite */}
-          <Card>
-            <SectionTitle>Genera e invia il link ospite</SectionTitle>
-            {/* Collega alla prenotazione: camera, nome e date già pronti */}
-            <div className="mb-3 rounded-lg border border-line bg-paper p-2.5">
-              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Da una prenotazione</div>
-              {upcoming.length > 0 ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <select value={bkId} onChange={(e) => pickBooking(e.target.value)} className={`${fld} flex-1`}>
-                    <option value="">— scegli l&apos;ospite in arrivo —</option>
-                    {upcoming.map((b) => <option key={b.id} value={b.id}>{bkLabel(b)}</option>)}
-                  </select>
-                  {bkId && <button onClick={() => { setBkId(""); setGuestName(""); setRooms(""); }} className="rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-dim hover:bg-wash">Azzera</button>}
-                </div>
-              ) : <p className="text-xs text-faint">Nessuna prenotazione in arrivo per questa struttura: compila i campi manualmente qui sotto.</p>}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <F label="Nome ospite (saluto in guida)"><input value={guestName} onChange={(e) => setGuestName(e.target.value)} className={fld} placeholder="es. Mario Rossi" /></F>
-              <F label="Camera/e (es. 4 o 2,3)"><input value={rooms} onChange={(e) => setRooms(e.target.value)} className={fld} placeholder="numero camera" /></F>
-              <F label="Codice cancello"><input value={gate} onChange={(e) => setGate(e.target.value)} className={fld} /></F>
-              <F label="Codice porta/cassetta"><input value={door} onChange={(e) => setDoor(e.target.value)} className={fld} /></F>
-              <F label="Codice 2 (facolt.)"><input value={door2} onChange={(e) => setDoor2(e.target.value)} className={fld} /></F>
-              <F label="Portale documenti (URL)"><input value={docs} onChange={(e) => setDocs(e.target.value)} className={fld} placeholder="https://…" /></F>
-            </div>
-            <div className="mt-2 flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={parking} onChange={(e) => setParking(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Parcheggio</label>
-              <label className="flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={taxFixed} onChange={(e) => setTaxFixed(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Tassa fissa</label>
-            </div>
-            {structUnits.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {structUnits.map((u) => (<button key={u.id} onClick={() => setRooms((r) => { const set2 = new Set(r.split(",").map((x) => x.trim()).filter(Boolean)); const n = (u.code || u.name); set2.has(n) ? set2.delete(n) : set2.add(n); return [...set2].join(","); })} className="rounded-full border border-line px-2.5 py-1 text-xs text-dim hover:bg-wash">{u.name}</button>))}
-              </div>
-            )}
-            <div className="mt-3 flex gap-3">
-              <div className="min-w-0 flex-1 rounded-lg border border-line bg-paper p-2.5">
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-faint">Link (i codici viaggiano nel link, non nel DB pubblico)</div>
-                <div className="break-all font-mono text-xs text-txt">{guestLink}</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button onClick={() => navigator.clipboard?.writeText(guestLink)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash"><Icon name="copy" size={14} /> Copia link</button>
-                  <a href={`https://wa.me/?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={14} /> Invia su WhatsApp</a>
-                  <a href={guestLink} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">Apri ↗</a>
-                </div>
-              </div>
-              <div className="flex w-28 shrink-0 flex-col items-center gap-1.5">
-                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(guestLink)}`} alt="QR link ospite" className="h-24 w-24 rounded-lg border border-line bg-white p-1" />
-                <button onClick={printCard} className="w-full rounded-lg border border-line px-2 py-1.5 text-xs font-semibold text-dim hover:bg-wash">🖨️ Stampa QR</button>
-              </div>
-            </div>
-          </Card>
-
-          {/* Vista TV */}
-          <Card>
-            <div className="flex items-center justify-between">
-              <SectionTitle>Vista TV · Smart TV in camera</SectionTitle>
-              <button onClick={() => setTv({ enabled: !tv.enabled })} title={tv.enabled ? "Disattiva" : "Attiva"} className={`relative h-6 w-11 shrink-0 rounded-full transition ${tv.enabled ? "bg-focus" : "bg-line"}`}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: tv.enabled ? "22px" : "2px" }} /></button>
-            </div>
-            {tv.enabled ? (
-              <>
-                <div className="grid grid-cols-1 gap-3">
-                  <F label="Immagine di sfondo della welcome (URL)"><input value={tv.bg} onChange={(e) => setTv({ bg: e.target.value })} className={fld} placeholder="https://…/hero.jpg (vuoto = usa una foto della guida)" /></F>
-                  <F label="Messaggio di benvenuto in TV"><input value={tv.welcome} onChange={(e) => setTv({ welcome: e.target.value })} className={fld} placeholder="Benvenuti! Vi auguriamo un ottimo soggiorno." /></F>
-                </div>
-                <div className="mt-3">
-                  <div className="mb-1 text-xs font-medium text-dim">Sezioni da mostrare in TV <span className="text-faint">(vuoto = tutte)</span></div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {TV_SECTIONS.map(([id, label]) => { const on = tv.sections.includes(id); return (<button key={id} onClick={() => toggleTvSection(id)} className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{label}</button>); })}
-                  </div>
-                </div>
-                <label className="mt-3 flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={tv.showGuest} onChange={(e) => setTv({ showGuest: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /> Mostra il numero camera dell&apos;ospite sulla welcome (dal link)</label>
-                <div className="mt-3 rounded-lg border border-line bg-paper p-2.5">
-                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-faint">URL da impostare sulla TV</div>
-                  <div className="flex items-start gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="break-all font-mono text-xs text-txt">{tvUrl}</div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <button onClick={() => navigator.clipboard?.writeText(tvUrl)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash"><Icon name="copy" size={14} /> Copia URL TV</button>
-                        <a href={tvUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">Apri anteprima TV ↗</a>
-                      </div>
-                      <p className="mt-2 text-[11px] text-faint">Su <b className="text-dim">Chromecast/Fire TV</b>: apri il browser della TV e vai a questo indirizzo (o inquadra il QR). Si naviga col telecomando (frecce + OK). L&apos;ospite può continuare sul telefono col QR mostrato in TV.</p>
-                    </div>
-                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(tvUrl)}`} alt="QR TV" className="h-24 w-24 shrink-0 rounded bg-white p-1" />
-                  </div>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-faint">Attiva la vista TV per usare la stessa guida su una Smart TV in camera (10-foot UI, telecomando, QR per il telefono).</p>
-            )}
-          </Card>
         </>)}
 
-        {tab === "content" && (<>
+        {(<>
           <Card>
             <SectionTitle>Home · benvenuto</SectionTitle>
             <F label="Titolo di benvenuto"><input value={content.home.welcomeTitle} maxLength={LIM.wtitle} onChange={(e) => setHome({ welcomeTitle: e.target.value })} className={fld} /></F>
             <div className="mt-3"><F label="Messaggio (una riga per paragrafo)"><textarea value={content.home.welcome.join("\n")} maxLength={LIM.welcome} onChange={(e) => setHome({ welcome: e.target.value.split("\n") })} rows={3} className={`${fld} resize-y`} /></F></div>
           </Card>
 
-          {/* Traduzione automatica multilingua */}
-          <Card>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0">
-                <SectionTitle>Traduzione automatica</SectionTitle>
-                <p className="mt-0.5 text-[11px] text-faint">Scrivi in italiano: genero EN · FR · DE · ES per gli ospiti. Segnaposto, codici e link restano intatti; nomi e indirizzi degli elenchi non vengono tradotti.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {tr.running && <span className="text-xs font-medium text-dim">Traduco {tr.lang.toUpperCase()}… ({tr.done}/{tr.total})</span>}
-                {!tr.running && tr.ok && <span className="flex items-center gap-1 text-xs font-semibold text-[color:var(--ok)]">✓ Tradotto</span>}
-                {!tr.running && hasTranslations && !tr.ok && <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-faint">traduzioni presenti</span>}
-                <button onClick={runTranslate} disabled={tr.running} className="rounded-lg px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60" style={{ backgroundColor: "var(--focus)" }}>{tr.running ? "Traduzione…" : hasTranslations ? "Ritraduci tutto" : "Traduci in 4 lingue"}</button>
-              </div>
-            </div>
-            {tr.err && <p className="mt-2 text-xs font-medium text-[color:var(--err)]">{tr.err}</p>}
-            {hasTranslations && !tr.running && <p className="mt-2 text-[11px] text-faint">Hai modificato dei testi dopo l&apos;ultima traduzione? Premi <b className="text-dim">Ritraduci tutto</b> per aggiornare le lingue. Le traduzioni automatiche sono un buon punto di partenza: rivedile per i dettagli.</p>}
-          </Card>
 
           <div className="flex items-center justify-between">
             <SectionTitle>Sezioni della guida ({content.sections.length})</SectionTitle>
             <button onClick={addSection} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash">+ Sezione</button>
           </div>
-          {content.sections.map((s, si) => { const open = openSec === s.id; const func = FUNC_SECTIONS.includes(s.id); return (
+          {orderedSections.map(({ s, si }) => { const open = openSec === s.id; const func = FUNC_SECTIONS.includes(s.id); const custom = !SECTION_ORDER.includes(s.id); const opFilled = (s.id === "wifi" && !!(guide.wifiNetwork || guide.wifiPassword)) || (s.id === "contacts" && !!(guide.phone || guide.whatsapp || guide.phoneGreta)) || (s.id === "review" && !!guide.reviewUrl); const autoHidden = !s.hidden && !sectionFilled(s) && !opFilled; return (
             <Card key={s.id}>
               <div className="flex items-center gap-2">
                 <button onClick={() => setOpenSec(open ? null : s.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
                   <span className="text-faint">{open ? "▾" : "▸"}</span>
-                  <span className="truncate font-semibold text-txt">{s.title || s.id}</span>
-                  {func && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">operativa</span>}
+                  <span className={`truncate font-semibold ${s.hidden ? "text-faint line-through" : "text-txt"}`}>{s.title || s.id}</span>
+                  {func && !autoHidden && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>operativa</span>}
+                  {s.hidden && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">nascosta</span>}
+                  {autoHidden && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>vuota · nascosta</span>}
                 </button>
-                <button onClick={() => moveSection(si, -1)} title="Su" className="px-1 text-faint hover:text-txt">↑</button>
-                <button onClick={() => moveSection(si, 1)} title="Giù" className="px-1 text-faint hover:text-txt">↓</button>
-                {!func && <button onClick={() => removeSection(si)} title="Elimina" className="px-1 text-faint hover:text-[color:var(--err)]">✕</button>}
+                <button onClick={() => toggleHidden(si)} title={s.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">{s.hidden ? "Mostra" : "Nascondi"}</button>
+                {custom && <button onClick={() => removeSection(si)} title="Elimina sezione personalizzata" className="shrink-0 px-1 text-faint hover:text-[color:var(--err)]">✕</button>}
               </div>
               {open && (() => {
                 // L'ordine dei campi rispecchia l'ordine con cui la guida mostra la sezione.
@@ -744,10 +678,39 @@ export default function GuidaOspitiPage() {
                 ) : null;
                 return (
                 <div className="mt-3 space-y-3 border-t border-line pt-3">
+                  {autoHidden && <p className="rounded-lg bg-wash px-2.5 py-1.5 text-[11px] text-dim">✍️ Compila i campi qui sotto (passaggi, blocchi, foto, pulsanti…): la sezione comparirà nella guida ospiti solo quando ha un contenuto.</p>}
                   <div className="grid grid-cols-2 gap-3">
                     <F label="Titolo"><input value={s.title} maxLength={LIM.title} onChange={(e) => updSection(si, { title: e.target.value })} className={fld} /></F>
                     <F label="Sottotitolo"><input value={s.sub} maxLength={LIM.sub} onChange={(e) => updSection(si, { sub: e.target.value })} className={fld} /></F>
                   </div>
+                  {/* Credenziali WiFi: qui, così stanno con la loro sezione (niente doppioni). */}
+                  {s.id === "wifi" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <F label="Rete WiFi"><input value={guide.wifiNetwork} onChange={(e) => set({ wifiNetwork: e.target.value })} placeholder="Nome rete" className={fld} /></F>
+                      <F label="Password WiFi"><input value={guide.wifiPassword} onChange={(e) => set({ wifiPassword: e.target.value })} placeholder="Password" className={fld} /></F>
+                    </div>
+                  )}
+                  {/* Orari check-in / check-out: qui, nella sezione Arrivo (si scelgono con l'orologio). */}
+                  {s.id === "checkin" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <F label="Check-in — dalle / alle">
+                        <div className="flex items-center gap-2">
+                          <input type="time" value={ciFrom} onChange={(e) => setCheckin(e.target.value, ciTo)} className={fld} />
+                          <span className="text-dim">–</span>
+                          <input type="time" value={ciTo} onChange={(e) => setCheckin(ciFrom, e.target.value)} className={fld} />
+                        </div>
+                      </F>
+                      <F label="Check-out — entro le"><input type="time" value={coBy} onChange={(e) => setCheckout(e.target.value)} className={fld} /></F>
+                    </div>
+                  )}
+                  {/* Link recensione: qui, nella sezione Recensioni. */}
+                  {s.id === "review" && (
+                    <F label="Link recensioni (Google)"><input value={guide.reviewUrl} onChange={(e) => set({ reviewUrl: e.target.value })} placeholder="https://…" className={fld} /></F>
+                  )}
+                  {/* Link prenotazione diretta: qui, nella sezione Contatti. */}
+                  {s.id === "contacts" && (
+                    <F label="Link prenotazione diretta"><input value={guide.bookingUrl} onChange={(e) => set({ bookingUrl: e.target.value })} placeholder="https://…" className={fld} /></F>
+                  )}
                   {/* Galleria in alto: sezioni città (nell'app le foto stanno sopra l'introduzione) */}
                   {!isCheckin && !STEP_SECTIONS.has(s.id) && galleryUI}
                   <F label={`Introduzione (${s.intro.length}/${LIM.intro})`}><textarea value={s.intro} maxLength={LIM.intro} onChange={(e) => updSection(si, { intro: e.target.value })} rows={2} className={`${fld} resize-y`} /></F>
@@ -808,7 +771,8 @@ export default function GuidaOspitiPage() {
                       </div>
                     </div>
                   )}
-                  {!func ? (() => { const isList = LIST_SECTIONS.has(s.id); return (
+                  {func && <p className="text-[11px] text-faint">{s.id === "wifi" ? "Rete e password qui sopra: appaiono in automatico nella guida." : s.id === "contacts" ? "Telefono e WhatsApp arrivano in automatico dai dati struttura." : "Il link recensione qui sopra apre da solo la pagina Google."} Puoi comunque aggiungere blocchi di contenuto personalizzati qui sotto.</p>}
+                  {(() => { const isList = LIST_SECTIONS.has(s.id); return (
                     <div>
                       <div className="mb-0.5 flex items-center justify-between"><span className="text-xs font-medium text-dim">{SEC_BLOCKS[s.id]?.label || "Contenuti"}</span><button onClick={() => addItem(si)} className="text-xs font-semibold text-focus hover:underline">{SEC_BLOCKS[s.id]?.add || "+ Blocco"}</button></div>
                       {SEC_BLOCKS[s.id]?.hint && <p className="mb-1.5 text-[11px] text-faint">{SEC_BLOCKS[s.id]?.hint}</p>}
@@ -851,9 +815,7 @@ export default function GuidaOspitiPage() {
                         ); })}
                       </div>
                     </div>
-                  ); })() : (
-                    <p className="text-[11px] text-faint">Sezione operativa: qui modifichi titolo, sottotitolo, intro e foto. Codici, credenziali WiFi e pulsanti (WhatsApp, prenota, tassa) restano automatici dai dati struttura e dal link ospite.</p>
-                  )}
+                  ); })()}
                 </div>
                 ); })()}
             </Card>
@@ -890,14 +852,22 @@ export default function GuidaOspitiPage() {
           {pvMode === "phone" ? (
             // Mockup telefono: la guida è resa alla larghezza REALE di un telefono (390px) e poi
             // scalata, così tasti e proporzioni sono identici a uno smartphone vero (non "stirati").
-            <div className="mx-auto w-full" style={{ maxWidth: 384 }}>
-              <div className="relative mx-auto rounded-[2.6rem] border border-line bg-[#111318] px-2.5 pb-2.5 pt-6 shadow-xl">
-                <div className="absolute left-1/2 top-2.5 z-10 h-1.5 w-16 -translate-x-1/2 rounded-full bg-white/25" />
-                <div className="overflow-hidden rounded-[2rem] bg-black" style={{ aspectRatio: "390 / 844", maxHeight: "84vh" }}>
-                  <iframe ref={previewRef} key={previewKey} src={previewUrl} title="Anteprima guida" style={{ border: 0 }} className="h-full w-full" />
+            // Due telefoni affiancati: a sinistra l'esempio pronto (riferimento), a destra la TUA guida in tempo reale.
+            <div className="flex items-start justify-center gap-3">
+              {[
+                { url: exampleUrl, lab: "Esempio", live: false },
+                { url: previewUrl, lab: "Le tue modifiche", live: true },
+              ].map((ph) => (
+                <div key={ph.lab} className="min-w-0 flex-1">
+                  <div className="relative mx-auto rounded-[2rem] border border-line bg-[#111318] px-1.5 pb-1.5 pt-4 shadow-xl">
+                    <div className="absolute left-1/2 top-1.5 z-10 h-1 w-10 -translate-x-1/2 rounded-full bg-white/25" />
+                    <div className="overflow-hidden rounded-[1.6rem] bg-black" style={{ aspectRatio: "390 / 844", maxHeight: "80vh" }}>
+                      <iframe ref={ph.live ? previewRef : undefined} key={ph.lab + previewKey} src={ph.url} title={"Anteprima · " + ph.lab} style={{ border: 0 }} className="h-full w-full" />
+                    </div>
+                  </div>
+                  <p className="mt-1.5 text-center text-[11px] font-semibold text-faint">{ph.lab}{ph.live && savedThis ? " · live" : ""}</p>
                 </div>
-              </div>
-              <p className="mt-2 text-center text-[11px] font-medium text-faint">Guida sul telefono dell&apos;ospite · dimensioni reali</p>
+              ))}
             </div>
           ) : (
             // Mockup TV: schermo 16:9 con cornice e piedini.
@@ -913,6 +883,123 @@ export default function GuidaOspitiPage() {
           <p className="mt-2 text-[11px] text-faint">{pvMode === "tv" ? "Anteprima della vista TV (Smart TV in camera): si naviga col telecomando. " : "Anteprima della guida sul telefono dell'ospite. "}Si aggiorna in tempo reale mentre compili. Cambia lingua qui sopra per vedere le traduzioni; “Schermo intero” apre la vista completa per la demo.</p>
         </div>
       </div>
+        {/* In fondo alla pagina: generatore link e vista TV */}
+          {/* Generatore link ospite */}
+          <Card>
+            <SectionTitle>Genera e invia il link ospite</SectionTitle>
+            {/* Collega alla prenotazione: camera, nome e date già pronti */}
+            <div className="mb-3 rounded-lg border border-line bg-paper p-2.5">
+              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Da una prenotazione</div>
+              {upcoming.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <select value={bkId} onChange={(e) => pickBooking(e.target.value)} className={`${fld} flex-1`}>
+                    <option value="">— scegli l&apos;ospite in arrivo —</option>
+                    {upcoming.map((b) => <option key={b.id} value={b.id}>{bkLabel(b)}</option>)}
+                  </select>
+                  {bkId && <button onClick={() => { setBkId(""); setGuestName(""); setRooms(""); }} className="rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-dim hover:bg-wash">Azzera</button>}
+                </div>
+              ) : <p className="text-xs text-faint">Nessuna prenotazione in arrivo per questa struttura: compila i campi manualmente qui sotto.</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <F label="Nome ospite (saluto in guida)"><input value={guestName} onChange={(e) => setGuestName(e.target.value)} className={fld} placeholder="es. Mario Rossi" /></F>
+              <F label="Camera/e (es. 4 o 2,3)"><input value={rooms} onChange={(e) => setRooms(e.target.value)} className={fld} placeholder="numero camera" /></F>
+              <F label="Codice cancello"><input value={gate} onChange={(e) => setGate(e.target.value)} className={fld} /></F>
+              <F label="Codice porta/cassetta"><input value={door} onChange={(e) => setDoor(e.target.value)} className={fld} /></F>
+              <F label="Codice 2 (facolt.)"><input value={door2} onChange={(e) => setDoor2(e.target.value)} className={fld} /></F>
+              <F label="Portale documenti (URL)"><input value={docs} onChange={(e) => setDocs(e.target.value)} className={fld} placeholder="https://…" /></F>
+            </div>
+            <div className="mt-2 flex items-center gap-4">
+              <label className="flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={parking} onChange={(e) => setParking(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Parcheggio</label>
+              <label className="flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={taxFixed} onChange={(e) => setTaxFixed(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Tassa fissa</label>
+            </div>
+            {structUnits.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {structUnits.map((u) => (<button key={u.id} onClick={() => setRooms((r) => { const set2 = new Set(r.split(",").map((x) => x.trim()).filter(Boolean)); const n = (u.code || u.name); set2.has(n) ? set2.delete(n) : set2.add(n); return [...set2].join(","); })} className="rounded-full border border-line px-2.5 py-1 text-xs text-dim hover:bg-wash">{u.name}</button>))}
+              </div>
+            )}
+            <div className="mt-3 flex gap-3">
+              <div className="min-w-0 flex-1 rounded-lg border border-line bg-paper p-2.5">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-faint">Link (i codici viaggiano nel link, non nel DB pubblico)</div>
+                <div className="break-all font-mono text-xs text-txt">{guestLink}</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button onClick={() => navigator.clipboard?.writeText(guestLink)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash"><Icon name="copy" size={14} /> Copia link</button>
+                  <a href={`https://wa.me/?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={14} /> Invia su WhatsApp</a>
+                  <a href={guestLink} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">Apri ↗</a>
+                </div>
+              </div>
+              <div className="flex w-28 shrink-0 flex-col items-center gap-1.5">
+                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(guestLink)}`} alt="QR link ospite" className="h-24 w-24 rounded-lg border border-line bg-white p-1" />
+                <button onClick={printCard} className="w-full rounded-lg border border-line px-2 py-1.5 text-xs font-semibold text-dim hover:bg-wash">🖨️ Stampa QR</button>
+              </div>
+            </div>
+          </Card>
+
+          {/* Traduzione automatica multilingua */}
+          <Card>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <SectionTitle>Traduzione automatica</SectionTitle>
+                <p className="mt-0.5 text-[11px] text-faint">Scrivi in italiano: genero EN · FR · DE · ES per gli ospiti. Segnaposto, codici e link restano intatti; nomi e indirizzi degli elenchi non vengono tradotti.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {tr.running && <span className="text-xs font-medium text-dim">Traduco {tr.lang.toUpperCase()}… ({tr.done}/{tr.total})</span>}
+                {!tr.running && tr.ok && <span className="flex items-center gap-1 text-xs font-semibold text-[color:var(--ok)]">✓ Tradotto</span>}
+                {!tr.running && hasTranslations && !tr.ok && <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-faint">traduzioni presenti</span>}
+                <button onClick={runTranslate} disabled={tr.running} className="rounded-lg px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60" style={{ backgroundColor: "var(--focus)" }}>{tr.running ? "Traduzione…" : hasTranslations ? "Ritraduci tutto" : "Traduci in 4 lingue"}</button>
+              </div>
+            </div>
+            {tr.err && <p className="mt-2 text-xs font-medium text-[color:var(--err)]">{tr.err}</p>}
+            {hasTranslations && !tr.running && <p className="mt-2 text-[11px] text-faint">Hai modificato dei testi dopo l&apos;ultima traduzione? Premi <b className="text-dim">Ritraduci tutto</b> per aggiornare le lingue. Le traduzioni automatiche sono un buon punto di partenza: rivedile per i dettagli.</p>}
+          </Card>
+      </>)}
+
+      {mainTab === "tv" && (<>
+          {/* Vista TV */}
+          <Card>
+            <div className="flex items-center justify-between">
+              <SectionTitle>Vista TV · Smart TV in camera</SectionTitle>
+              <button onClick={() => setTv({ enabled: !tv.enabled })} title={tv.enabled ? "Disattiva" : "Attiva"} className={`relative h-6 w-11 shrink-0 rounded-full transition ${tv.enabled ? "bg-focus" : "bg-line"}`}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: tv.enabled ? "22px" : "2px" }} /></button>
+            </div>
+            {tv.enabled ? (
+              <>
+                <div className="grid grid-cols-1 gap-3">
+                  <F label="Immagine di sfondo della welcome (URL)"><input value={tv.bg} onChange={(e) => setTv({ bg: e.target.value })} className={fld} placeholder="https://…/hero.jpg (vuoto = usa una foto della guida)" /></F>
+                  <F label="Messaggio di benvenuto in TV"><input value={tv.welcome} onChange={(e) => setTv({ welcome: e.target.value })} className={fld} placeholder="Benvenuti! Vi auguriamo un ottimo soggiorno." /></F>
+                </div>
+                <div className="mt-3">
+                  <div className="mb-1 text-xs font-medium text-dim">Sezioni da mostrare in TV <span className="text-faint">(vuoto = tutte)</span></div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TV_SECTIONS.map(([id, label]) => { const on = tv.sections.includes(id); return (<button key={id} onClick={() => toggleTvSection(id)} className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{label}</button>); })}
+                  </div>
+                </div>
+                <label className="mt-3 flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={tv.showGuest} onChange={(e) => setTv({ showGuest: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /> Mostra il numero camera dell&apos;ospite sulla welcome (dal link)</label>
+                <div className="mt-3 rounded-lg border border-line bg-paper p-2.5">
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-faint">URL da impostare sulla TV</div>
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="break-all font-mono text-xs text-txt">{tvUrl}</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button onClick={() => navigator.clipboard?.writeText(tvUrl)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash"><Icon name="copy" size={14} /> Copia URL TV</button>
+                        <a href={tvUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">Apri anteprima TV ↗</a>
+                      </div>
+                      <p className="mt-2 text-[11px] text-faint">Su <b className="text-dim">Chromecast/Fire TV</b>: apri il browser della TV e vai a questo indirizzo (o inquadra il QR). Si naviga col telecomando (frecce + OK). L&apos;ospite può continuare sul telefono col QR mostrato in TV.</p>
+                    </div>
+                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(tvUrl)}`} alt="QR TV" className="h-24 w-24 shrink-0 rounded bg-white p-1" />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-faint">Attiva la vista TV per usare la stessa guida su una Smart TV in camera (10-foot UI, telecomando, QR per il telefono).</p>
+            )}
+          </Card>
+
+          <div className="mt-4">
+            <SectionTitle>Anteprima TV</SectionTitle>
+            <div className="mt-2 overflow-hidden rounded-xl border-[7px] border-[#111318] bg-black shadow-xl" style={{ aspectRatio: "16 / 9", maxWidth: 760 }}>
+              <iframe key={"tvtab" + previewKey} src={`/guida/tv.html?p=${encodeURIComponent(sid)}&_=${previewKey}`} className="h-full w-full" title="Anteprima TV" />
+            </div>
+          </div>
+      </>)}
     </div>
   );
 }

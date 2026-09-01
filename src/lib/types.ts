@@ -1,4 +1,4 @@
-// Modello dati del prototipo SpigoleStay (front-end, dati finti).
+// Modello dati del prototipo Xenora (front-end, dati finti).
 // Rispecchia lo schema DB reale: strutture → tipologie → unità; prenotazioni; folio.
 
 export type Channel = "booking" | "airbnb" | "expedia" | "direct" | "blocked";
@@ -38,6 +38,8 @@ export interface Structure {
   logo?: string;           // logo della struttura (dataURL) — usato su preventivi/PDF
   // Contatti
   email?: string;
+  whatsapp?: string;       // numero WhatsApp (usato dalla guida ospiti)
+  phone2?: string;         // secondo contatto / telefono alternativo
   website?: string;
   contactName?: string;    // referente
   facebook?: string;       // URL profilo Facebook

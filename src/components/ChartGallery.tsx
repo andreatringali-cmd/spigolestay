@@ -8,6 +8,7 @@ export interface ChartItem {
   key: string;
   title: string;
   node: ReactNode;
+  wide?: boolean; // occupa la larghezza di 2 card (es. i grafici a torta)
 }
 
 // Galleria grafici: mostra `perPage` grafici alla volta, con frecce per scorrere.
@@ -33,7 +34,7 @@ export default function ChartGallery({ charts, perPage = 4 }: { charts: ChartIte
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         {shown.map((c) => (
-          <Card key={c.key}>
+          <Card key={c.key} className={c.wide ? "md:col-span-2" : ""}>
             <SectionTitle>{c.title}</SectionTitle>
             {c.node}
           </Card>

@@ -30,6 +30,7 @@ export default function ColumnChart({
   height = 132,
   barWidth = 14,
   labelColor = "var(--faint)",
+  allLabels = false,
 }: {
   bars: ColumnBar[];
   color?: string;
@@ -37,12 +38,13 @@ export default function ColumnChart({
   height?: number;
   barWidth?: number;
   labelColor?: string;
+  allLabels?: boolean; // mostra sempre tutte le etichette X (es. sigle paese)
 }) {
   const rawMax = Math.max(1, ...bars.map((b) => b.value));
   const top = niceCeil(rawMax);
   const ticks = [1, 0.75, 0.5, 0.25, 0].map((f) => f * top); // dall'alto in basso
   // Mostra un'etichetta X ogni N per non affollare (ma sempre il giorno evidenziato).
-  const everyX = bars.length > 10 ? 2 : 1;
+  const everyX = allLabels ? 1 : bars.length > 10 ? 2 : 1;
 
   return (
     <div className="pt-1">

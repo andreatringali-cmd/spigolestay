@@ -20,6 +20,9 @@ import LanguageSwitcher from "./LanguageSwitcher";
 import AccessGate from "./AccessGate";
 import AppFooter from "./AppFooter";
 import AssistantBar from "./AssistantBar";
+import WheelScroll from "./WheelScroll";
+import StyleLoader from "./StyleLoader";
+import OnboardingWizard from "./OnboardingWizard";
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -32,6 +35,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <DataProvider>
         <AccessProvider>
         <ConfirmProvider>
+        <WheelScroll />
+        <StyleLoader />
         <div className="relative min-h-screen bg-paper text-txt">
           <div className="relative z-10 flex min-h-screen">
           <Sidebar
@@ -65,6 +70,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <BookingDrawer />
           <NewBookingModal />
           <SupportWidget />
+          <OnboardingWizard />
         </div>
         </ConfirmProvider>
         </AccessProvider>

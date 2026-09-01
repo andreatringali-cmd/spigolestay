@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import Logo from "./Logo";
 import Icon from "./Icon";
@@ -45,8 +45,8 @@ export default function Sidebar({
             <>
               <Logo />
               <div className="min-w-0">
-                <div className="truncate font-display text-base font-extrabold tracking-tight text-txt">SpigoleStay</div>
-                <div className="text-[10px] text-dim">Channel Manager</div>
+                <div className="truncate font-display text-base font-extrabold tracking-tight text-txt">Xenora</div>
+                <div className="text-[10px] text-dim">Digital Solution</div>
               </div>
             </>
           )}
@@ -71,8 +71,8 @@ export default function Sidebar({
                   key={n.href}
                   href={n.href}
                   title={t(n.label)}
-                  className="flex items-center justify-center rounded-lg p-2.5"
-                  style={active ? { backgroundColor: mix(color, 16), color } : { color: "var(--dim)" }}
+                  className={`flex items-center justify-center rounded-lg p-2.5 transition ${active ? "" : "text-dim hover:bg-wash hover:text-[color:var(--hovc)]"}`}
+                  style={active ? { backgroundColor: mix(color, 16), color } : ({ "--hovc": color } as CSSProperties)}
                 >
                   <Icon name={n.icon} size={20} />
                 </Link>
@@ -145,7 +145,7 @@ export default function Sidebar({
         </nav>
 
         {/* Footer: utente collegato */}
-        <div className="border-t border-line p-2">
+        <div className="border-t p-2" style={{ borderTopColor: "color-mix(in srgb, var(--txt) 14%, var(--line))" }}>
           <UserSwitcher sidebar collapsed={collapsed} />
         </div>
       </aside>

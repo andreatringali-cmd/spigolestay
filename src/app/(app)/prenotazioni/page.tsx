@@ -10,8 +10,11 @@ import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import ScrollStrip from "@/components/ScrollStrip";
 import Donut from "@/components/Donut";
+import ChannelBars from "@/components/ChannelBars";
 import Bars from "@/components/Bars";
 import ColumnChart from "@/components/ColumnChart";
+import LineChart from "@/components/LineChart";
+import DateField from "@/components/DateField";
 import { flagColor, flagGradient } from "@/lib/flags";
 import Icon from "@/components/Icon";
 import ExportMenu from "@/components/ExportMenu";
@@ -141,21 +144,28 @@ export default function PrenotazioniPage() {
   const byChannel = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => ({ label: CHANNELS[c].label, value: filtered.filter((b) => b.channel === c).length, color: chColor(c) })).filter((x) => x.value > 0);
   const byStructure = structures.map((s, i) => ({ label: s.name, value: filtered.filter((b) => b.structureId === s.id).length, color: PALETTE[i % PALETTE.length] })).filter((x) => x.value > 0);
   const revByChannel = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => ({ label: CHANNELS[c].label, value: filtered.filter((b) => b.channel === c).reduce((a, b) => a + (b.total ?? 0), 0), color: chColor(c) })).filter((x) => x.value > 0);
+  // Dati unici per canale: prenotazioni + ricavi insieme (un solo grafico)
+  const channelRows = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => ({ label: CHANNELS[c].label, color: chColor(c), count: filtered.filter((b) => b.channel === c).length, revenue: Math.round(filtered.filter((b) => b.channel === c).reduce((a, b) => a + (b.total ?? 0), 0)) })).filter((r) => r.count > 0 || r.revenue > 0);
   const revByStructure = structures.map((s) => ({ label: s.name, value: filtered.filter((b) => b.structureId === s.id).reduce((a, b) => a + (b.total ?? 0), 0), color: "var(--ok)", fmt: eur })).filter((x) => x.value > 0);
+  // Dati unici per struttura: prenotazioni + ricavi insieme (un solo grafico)
+  const structureRows = structures.map((s, i) => ({ label: s.name, color: PALETTE[i % PALETTE.length], count: filtered.filter((b) => b.structureId === s.id).length, revenue: Math.round(filtered.filter((b) => b.structureId === s.id).reduce((a, b) => a + (b.total ?? 0), 0)) })).filter((r) => r.count > 0 || r.revenue > 0);
   const stayBuckets: Record<string, number> = { "1 notte": 0, "2 notti": 0, "3 notti": 0, "4+ notti": 0 };
   filtered.forEach((b) => { const n = nights(b.checkIn, b.checkOut); if (n <= 1) stayBuckets["1 notte"]++; else if (n === 2) stayBuckets["2 notti"]++; else if (n === 3) stayBuckets["3 notti"]++; else stayBuckets["4+ notti"]++; });
-  const stayDist = Object.entries(stayBuckets).map(([k, v]) => ({ label: k, value: v, color: "var(--focus)" }));
+  const STAY_GREENS = ["#2F9E6F", "#57B98A", "#8DD3B0", "#C3E8D6"];
+  const stayDist = Object.entries(stayBuckets).map(([k, v], i) => ({ label: k, value: v, color: STAY_GREENS[i % STAY_GREENS.length] }));
   const MONTHS = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
   const monthAgg: Record<number, number> = {};
   const revMonthAgg: Record<number, number> = {};
   filtered.forEach((b) => { const mo = parseISO(b.checkIn).getMonth(); monthAgg[mo] = (monthAgg[mo] || 0) + 1; revMonthAgg[mo] = (revMonthAgg[mo] || 0) + (b.total ?? 0); });
-  const byMonth = Object.keys(monthAgg).map(Number).sort((a, b) => a - b).map((mo) => ({ label: MONTHS[mo], value: monthAgg[mo], color: "var(--focus)" }));
+  const byMonth = Object.keys(monthAgg).map(Number).sort((a, b) => a - b).map((mo) => ({ label: MONTHS[mo], value: monthAgg[mo], color: "#C2683C" }));
   const revByMonth = Object.keys(revMonthAgg).map(Number).sort((a, b) => a - b).map((mo) => ({ label: MONTHS[mo], value: Math.round(revMonthAgg[mo]), color: "var(--ok)", fmt: eur }));
   // Per tipologia (somma le camere con lo stesso nome tipologia) e per paese di provenienza.
   const rtAgg: Record<string, { n: number; rev: number }> = {};
   filtered.forEach((b) => { const u = getUnit(b.unitId); const name = u ? roomTypes.find((r) => r.id === u.roomTypeId)?.name : null; if (!name) return; if (!rtAgg[name]) rtAgg[name] = { n: 0, rev: 0 }; rtAgg[name].n++; rtAgg[name].rev += b.total ?? 0; });
   const byRoomType = Object.entries(rtAgg).map(([k, v], i) => ({ label: k, value: v.n, color: PALETTE[i % PALETTE.length] }));
   const revByRoomType = Object.entries(rtAgg).map(([k, v]) => ({ label: k, value: Math.round(v.rev), color: "var(--ok)", fmt: eur }));
+  // Dati unici per tipologia: prenotazioni + ricavi insieme (un solo grafico)
+  const roomTypeRows = Object.entries(rtAgg).map(([k, v], i) => ({ label: k, color: PALETTE[i % PALETTE.length], count: v.n, revenue: Math.round(v.rev) })).filter((r) => r.count > 0 || r.revenue > 0);
   const countryAgg: Record<string, number> = {};
   filtered.forEach((b) => { const c = guests.find((g) => g.id === b.guestId)?.country ?? "—"; countryAgg[c] = (countryAgg[c] || 0) + 1; });
   const byCountry = Object.entries(countryAgg).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v, color: flagColor(k), fill: flagGradient(k) }));
@@ -163,19 +173,16 @@ export default function PrenotazioniPage() {
   // Con una sola struttura selezionata i grafici "per struttura" non hanno senso: si nascondono.
   const singleStruct = activeStructureId !== "all" || structures.length <= 1;
   const charts = [
-    { key: "ch", title: "Prenotazioni per canale", wide: true, node: <Donut data={byChannel} /> },
-    { key: "str", title: "Prenotazioni per struttura", perStructure: true, wide: true, node: <Donut data={byStructure} /> },
-    { key: "rev-ch", title: "Ricavi per canale", wide: true, node: <Donut data={revByChannel} format={(n) => eur(n)} /> },
-    { key: "rev-str", title: "Ricavi per struttura", perStructure: true, node: <Bars items={revByStructure} /> },
-    { key: "stay", title: "Durata soggiorno", node: <Bars items={stayDist} /> },
-    { key: "month", title: "Prenotazioni per mese", node: <Bars items={byMonth} /> },
-    { key: "rev-month", title: "Ricavi per mese", node: <Bars items={revByMonth} /> },
-    { key: "rt", title: "Prenotazioni per tipologia", node: <Bars items={byRoomType} /> },
-    { key: "rev-rt", title: "Ricavi per tipologia", node: <Bars items={revByRoomType} /> },
-    { key: "country", title: "Provenienza per paese", wide: true, node: <ColumnChart bars={byCountry} barWidth={44} labelColor="var(--txt)" /> },
+    { key: "ch-mix", title: "Prenotazioni e ricavi per canale", wide: true, node: <ChannelBars rows={channelRows} fmtEur={eur} /> },
+    { key: "str-mix", title: "Prenotazioni e ricavi per struttura", perStructure: true, wide: true, node: <ChannelBars rows={structureRows} fmtEur={eur} /> },
+    { key: "stay", title: "Durata soggiorno", node: <Donut data={stayDist} showPercent={false} /> },
+    { key: "month", title: "Prenotazioni per mese", node: <ColumnChart bars={byMonth} barWidth={26} /> },
+    { key: "rev-month", title: "Ricavi per mese", wide: true, node: <LineChart points={revByMonth} format={(n) => eur(n)} color="var(--ok)" everyLabel={1} /> },
+    { key: "rt-mix", title: "Prenotazioni e ricavi per tipologia", wide: true, node: <ChannelBars rows={roomTypeRows} fmtEur={eur} /> },
+    { key: "country", title: "Provenienza per paese", wide: true, node: <ColumnChart bars={byCountry} labelColor="var(--txt)" allLabels /> },
   ].filter((c) => !(singleStruct && c.perStructure));
   // I primi 4 (PREN_DEFAULTS) sono l'ordine e la vista iniziale; tutti restano nascondibili (mostra/nascondi tutti).
-  const PREN_DEFAULTS = ["ch", "rev-ch", "month", "rev-month"];
+  const PREN_DEFAULTS = ["ch-mix", "month", "rev-month"];
   const defaultHidden = () => new Set(charts.map((c) => c.key)); // all'apertura tutti i grafici nascosti
   const hidden = hiddenPren ?? defaultHidden();
   const chartRank = (c: { key: string }) => { const i = PREN_DEFAULTS.indexOf(c.key); return i < 0 ? 100 + charts.findIndex((x) => x.key === c.key) : i; };
@@ -227,10 +234,11 @@ export default function PrenotazioniPage() {
       {shownCharts.length > 0 && (
         <div className="mb-4">
           <ScrollStrip
+            gap="gap-3"
             onReorder={(keys) => { const rest = charts.map((c) => c.key).filter((k) => !keys.includes(k)); persistChartOrder([...keys, ...rest]); }}
             items={shownCharts.map((c) => ({
               key: c.key,
-              className: `flex-none snap-start ${c.wide ? "w-1/2 min-w-[360px]" : "w-1/4 min-w-[220px]"}`,
+              className: `flex-none snap-start ${c.wide ? "w-[520px] max-w-[92vw] lg:w-[calc((100%-2.25rem)/2+0.75rem)]" : "w-[280px] lg:w-[calc((100%-2.25rem)/4)]"}`,
               node: (
                 <Card className="flex h-full flex-col">
                   <SectionTitle>{t(c.title)}</SectionTitle>
@@ -244,15 +252,15 @@ export default function PrenotazioniPage() {
 
       {/* Filtri */}
       <div className="no-print mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca nome o codice…")} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus sm:w-56" />
-        <div className="flex items-center gap-1 rounded-lg border border-line bg-paper px-1 py-1">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca nome o codice…")} className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus sm:w-72 lg:w-80 xl:w-[22rem] 2xl:w-96" />
+        <div className="flex items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
           <Select value={dateField} onChange={(v) => setDateField(v as "arrivo" | "prenotazione")} label={t("Tipo data")}>
             <option value="arrivo">{t("Arrivo / check-in")}</option>
             <option value="prenotazione">{t("Data prenotazione")}</option>
           </Select>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} title={t("Dal")} className="rounded-md border border-line bg-paper px-2 py-1.5 text-xs text-txt outline-none focus:border-focus" />
+          <DateField value={from} onChange={setFrom} title={t("Dal")} placeholder={t("Dal")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
           <span className="text-xs text-faint">→</span>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} title={t("Al")} className="rounded-md border border-line bg-paper px-2 py-1.5 text-xs text-txt outline-none focus:border-focus" />
+          <DateField value={to} onChange={setTo} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
         </div>
         <StructureFilter value={loc} onChange={setLoc} structures={structuresToShow} units={units} roomTypes={roomTypes} single={activeStructureId !== "all"} />
         <Select value={channel} onChange={setChannel} label={t("Canale")}>
@@ -263,33 +271,9 @@ export default function PrenotazioniPage() {
           <button onClick={clearFilters} className="rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-wash" style={{ borderColor: "var(--err)", color: "var(--err)" }}>{t("Rimuovi filtri")}</button>
         )}
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <div ref={chartRef} className="relative">
-            <button onClick={() => setChartMenu((o) => !o)} title={t("Scegli i grafici da mostrare")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${chartMenu ? "border-focus text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
-            {chartMenu && (
-              <div className="absolute right-0 top-full z-40 mt-1 w-[320px] max-w-[92vw] overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
-                <div className="flex items-center justify-between px-2.5 py-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Grafici")} · {shownCharts.length}/{charts.length}</span>
-                  <div className="flex items-center gap-1">
-                    <button onClick={showAllCharts} className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-focus hover:bg-wash">{t("Mostra tutti")}</button>
-                    <button onClick={hideAllCharts} className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-dim hover:bg-wash">{t("Nascondi tutti")}</button>
-                  </div>
-                </div>
-                <div className="max-h-[46vh] overflow-y-auto">
-                  {orderedCharts.map((c) => {
-                    const on = !hidden.has(c.key);
-                    return (
-                      <button key={c.key} onClick={() => toggleChart(c.key)} className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-txt hover:bg-wash">
-                        <span className="min-w-0 flex-1">{t(c.title)}</span>
-                        <span className={`relative h-4 w-7 shrink-0 rounded-full transition ${on ? "bg-focus" : "bg-line"}`}><span className="absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all" style={{ left: on ? "14px" : "2px" }} /></span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="px-2.5 py-1.5 text-[11px] text-faint">{t("Mostra o nascondi i grafici. Scorri con le frecce ‹ ›.")}</div>
-              </div>
-            )}
-          </div>
-          <Link href="/prenotazioni/nuova" className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ {t("Nuova")}</Link>
+          {/* Toggle grafici: un click mostra tutti / nasconde tutti */}
+          <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${shownCharts.length > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
+          <Link href="/prenotazioni/nuova" className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-txt transition hover:bg-wash">+ {t("Nuova")}</Link>
           <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
         </div>
       </div>
@@ -345,13 +329,13 @@ export default function PrenotazioniPage() {
               );
             })}
             {!filtered.length && (
-              <tr><td colSpan={13} className="px-3 py-8 text-center text-sm text-faint">{t("Nessuna prenotazione con questi filtri")}</td></tr>
+              <tr><td colSpan={activeStructureId === "all" ? 14 : 13} className="px-3 py-8 text-center text-sm text-faint">{t("Nessuna prenotazione con questi filtri")}</td></tr>
             )}
           </tbody>
           {filtered.length > 0 && (
             <tfoot className="sticky bottom-0 z-20">
               <tr className="border-t-2 border-line bg-wash text-sm font-semibold text-txt">
-                <td className="px-3 py-2.5" colSpan={5}>{t("Totali")} · {filtered.length} {t("prenotazioni")}</td>
+                <td className="px-3 py-2.5" colSpan={activeStructureId === "all" ? 6 : 5}>{t("Totali")} · {filtered.length} {t("prenotazioni")}</td>
                 <td className="px-3 py-2.5 font-mono">{guestsTot}</td>
                 <td className="px-3 py-2.5" colSpan={2}></td>
                 <td className="px-3 py-2.5 font-mono">{nightsTot}</td>
@@ -427,7 +411,7 @@ function StructureFilter({ value, onChange, structures, units, roomTypes, single
   };
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt hover:bg-wash">
+      <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt hover:bg-wash">
         <span className="max-w-[190px] truncate">{label}</span>
         <Icon name="chevron" size={14} />
       </button>
@@ -470,7 +454,7 @@ function Opt({ active, onClick, children }: { active: boolean; onClick: () => vo
 }
 function Select({ value, onChange, label, children }: { value: string; onChange: (v: string) => void; label: string; children: React.ReactNode }) {
   return (
-    <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">
+    <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className="rounded-lg border border-line bg-surface px-2 py-2 text-sm text-txt outline-none focus:border-focus">
       {children}
     </select>
   );

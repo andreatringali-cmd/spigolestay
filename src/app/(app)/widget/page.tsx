@@ -85,8 +85,8 @@ export default function WidgetPage() {
   };
 
   const sitekey = `${structureId}-${c.accent.replace("#", "")}`;
-  const script = `<div id="spigole-book" data-sitekey="${sitekey}"></div>\n<script type="text/javascript" src="https://book.spigolestay.com/widget/js/form.js" data-sitekey="${sitekey}" async></script>`;
-  const iframe = `<iframe src="https://book.spigolestay.com/w/${sitekey}?lang=${c.lang}" width="100%" height="560" style="border:0;max-width:440px" title="Prenota — ${structure?.name ?? ""}"></iframe>`;
+  const script = `<div id="spigole-book" data-sitekey="${sitekey}"></div>\n<script type="text/javascript" src="https://book.xenora.com/widget/js/form.js" data-sitekey="${sitekey}" async></script>`;
+  const iframe = `<iframe src="https://book.xenora.com/w/${sitekey}?lang=${c.lang}" width="100%" height="560" style="border:0;max-width:440px" title="Prenota — ${structure?.name ?? ""}"></iframe>`;
   const copy = (k: string, t: string) => { navigator.clipboard?.writeText(t); setCopied(k); window.setTimeout(() => setCopied(""), 1500); };
   const radius = c.theme === "rounded" ? 16 : 4;
 

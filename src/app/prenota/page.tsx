@@ -108,7 +108,7 @@ function Engine() {
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="grid h-9 w-9 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{(structure?.name ?? "SS").slice(0, 2).toUpperCase()}</div>
-          <div className="leading-tight"><div className="text-sm font-bold text-txt">{structure?.name ?? "SpigoleStay"}</div><div className="text-[11px] text-faint">Sito ufficiale · Prenotazione diretta</div></div>
+          <div className="leading-tight"><div className="text-sm font-bold text-txt">{structure?.name ?? "Xenora"}</div><div className="text-[11px] text-faint">Sito ufficiale · Prenotazione diretta</div></div>
         </div>
         {structures.length > 1 && step === "rooms" && (
           <select value={structureId} onChange={(e) => { setStructureId(e.target.value); setSel(null); }} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
@@ -292,7 +292,7 @@ function Engine() {
           </div>
         )}
       </div>
-      <div className="mx-auto max-w-5xl px-4 text-center text-[11px] text-faint">{structure?.name ?? "SpigoleStay"} · Prenotazione online sicura powered by <b>SpigoleStay</b></div>
+      <div className="mx-auto max-w-5xl px-4 text-center text-[11px] text-faint">{structure?.name ?? "Xenora"} · Prenotazione online sicura powered by <b>Xenora</b></div>
     </div>
   );
 }

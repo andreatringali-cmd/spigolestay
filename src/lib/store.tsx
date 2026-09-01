@@ -122,7 +122,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         // Auto-riparazione dati demo: Spigole House camera 2 → Tripla (idempotente).
         if (Array.isArray(d.roomTypes)) {
           let rts = d.roomTypes as typeof ROOM_TYPES;
-          if (!rts.some((r) => r.id === "rt_house_tri")) rts = [...rts, ROOM_TYPES.find((r) => r.id === "rt_house_tri")!];
+          // Auto-riparazione SOLO sui dati demo (Spigole House): se l'utente ha resettato/creato
+          // le proprie tipologie, non reintroduco quelle d'esempio.
+          const isDemo = rts.some((r) => r.id === "rt_house" || r.structureId === "st_house");
+          if (isDemo && !rts.some((r) => r.id === "rt_house_tri")) rts = [...rts, ROOM_TYPES.find((r) => r.id === "rt_house_tri")!];
           rts = rts.map((r) => (r.id === "rt_house" && r.name === "Matrimoniale" ? { ...r, name: "Deluxe" } : r));
           setRoomTypes(rts);
         }

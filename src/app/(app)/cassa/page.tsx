@@ -8,6 +8,7 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import ExportMenu from "@/components/ExportMenu";
 import { exportExcel, exportPdf } from "@/lib/export";
 import CatIcon, { ICON_KEYS } from "@/components/CatIcon";
+import Icon from "@/components/Icon";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 
@@ -226,6 +227,9 @@ export default function CassaPage() {
   // Selettore mese.
   const months = useMemo(() => { const s = new Set(all.map((m) => monthKey(m.date))); s.add(monthKey(today)); return Array.from(s).sort().reverse(); }, [all, today]);
   const [month, setMonth] = useState<string>("all");
+  const [chartsOn, setChartsOn] = useState(true);
+  useEffect(() => { try { const r = localStorage.getItem("spigolestay:cassacharts:on"); if (r !== null) setChartsOn(r === "1"); } catch {} }, []);
+  const toggleCharts = () => setChartsOn((v) => { const n = !v; try { localStorage.setItem("spigolestay:cassacharts:on", n ? "1" : "0"); } catch {} return n; });
 
   const rows = all.filter((m) => month === "all" || monthKey(m.date) === month);
   const entrate = rows.filter((m) => m.kind === "in").reduce((a, m) => a + m.amount, 0);
@@ -319,6 +323,11 @@ export default function CassaPage() {
       </div>
 
       {/* Grafici separati */}
+      <div className="mb-2 flex items-center gap-2">
+        <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
+        <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Grafici")}</span>
+      </div>
+      {chartsOn && (
       <div className="mb-4 grid gap-4 lg:grid-cols-4">
         <Card className="lg:col-span-1">
           <SectionTitle>{t("Composizione uscite")}</SectionTitle>
@@ -350,6 +359,7 @@ export default function CassaPage() {
           <div className="mt-2 flex items-center gap-4 text-xs text-dim"><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--ok)" }} />{t("Entrate")}</span><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--err)" }} />{t("Uscite")}</span></div>
         </Card>
       </div>
+      )}
 
       {/* Riga filtri + Esporta */}
       <div className="mb-4 flex flex-wrap items-center gap-2">

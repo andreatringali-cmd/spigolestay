@@ -9,7 +9,7 @@ export default function SupportWidget() {
   const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([
-    { from: "bot", text: t("Ciao! Sono l'assistente SpigoleStay. Come posso aiutarti?") },
+    { from: "bot", text: t("Ciao! Sono l'assistente Xenora. Come posso aiutarti?") },
   ]);
   const [text, setText] = useState("");
 
@@ -47,12 +47,14 @@ export default function SupportWidget() {
           </div>
         </div>
       )}
+      {/* Pulsante assistente: linguetta laterale colorata sul bordo destro (in basso), icona chat */}
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label={t("Assistenza")}
-        className="no-print fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-focus text-white shadow-xl transition hover:scale-105"
+        title={t("Assistenza")}
+        className="no-print fixed bottom-24 right-0 z-50 flex h-14 w-9 items-center justify-center rounded-l-xl bg-focus text-white shadow-lg transition hover:w-11"
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
       </button>

@@ -101,7 +101,7 @@ export default function BookingDrawer() {
 
   // ── Contatti (dai dati salvati) ──
   const phoneDigits = (guest?.phone ?? "").replace(/[^\d]/g, "");
-  const waText = encodeURIComponent(`Buongiorno${guest?.fullName ? " " + guest.fullName : ""}, le scriviamo da ${structure?.name ?? "SpigoleStay"} riguardo al soggiorno del ${fmtDate(booking.checkIn)}.`);
+  const waText = encodeURIComponent(`Buongiorno${guest?.fullName ? " " + guest.fullName : ""}, le scriviamo da ${structure?.name ?? "Xenora"} riguardo al soggiorno del ${fmtDate(booking.checkIn)}.`);
 
   // ── Conto in sola lettura (dai dati salvati) ──
   const nView = nights(booking.checkIn, booking.checkOut);
@@ -145,7 +145,7 @@ export default function BookingDrawer() {
     </style></head><body>
       <div class="head">
         <div>
-          <div class="brand">${structure?.name ?? "SpigoleStay"}</div>
+          <div class="brand">${structure?.name ?? "Xenora"}</div>
           <div style="font-size:12px;color:#5c6479;margin-top:4px">${structure?.address ?? "Siracusa"}${structure?.phone ? " · " + structure.phone : ""}</div>
           ${structure?.cin ? `<div style="font-size:11px;color:#9aa2b6;margin-top:2px">CIN ${structure.cin}</div>` : ""}
         </div>
@@ -159,7 +159,7 @@ export default function BookingDrawer() {
         ${rows.map((r) => `<tr><td>${r[0]}</td><td class="amt">${r[1]}</td></tr>`).join("")}
         <tr class="tot"><td>Totale</td><td class="amt">${money(totalV)}</td></tr>
       </table>
-      <div class="note">Documento non fiscale, rilasciato a titolo di ricevuta. La tassa di soggiorno è versata al Comune di Siracusa. ${structure?.name ?? "SpigoleStay"}.</div>
+      <div class="note">Documento non fiscale, rilasciato a titolo di ricevuta. La tassa di soggiorno è versata al Comune di Siracusa. ${structure?.name ?? "Xenora"}.</div>
       <script>window.onload=function(){window.print()}<\/script>
     </body></html>`);
     w.document.close();
@@ -190,7 +190,7 @@ export default function BookingDrawer() {
     const forfettario = !structure?.vat;
     const imponibile = forfettario ? accV + cleanV : Math.round((accV + cleanV) / 1.1);
     const ivaAmt = forfettario ? 0 : (accV + cleanV) - imponibile;
-    const seller = structure?.businessName || structure?.name || "SpigoleStay";
+    const seller = structure?.businessName || structure?.name || "Xenora";
     const fiscal = [structure?.vat ? `P. IVA ${structure.vat}` : "", structure?.taxCode ? `C.F. ${structure.taxCode}` : "", structure?.sdi ? `SDI ${structure.sdi}` : "", structure?.pec ? `PEC ${structure.pec}` : ""].filter(Boolean).join(" · ");
     const rows: [string, string][] = [
       [`Soggiorno · ${nView} ${nView === 1 ? "notte" : "notti"} (${fmtDate(booking.checkIn)} → ${fmtDate(booking.checkOut)})`, money(forfettario ? accV : Math.round(accV / 1.1))],
@@ -305,7 +305,7 @@ export default function BookingDrawer() {
         {(() => {
           const origin = typeof window !== "undefined" ? window.location.origin : "";
           const link = `${origin}/checkin?b=${booking.id}`;
-          const waText = encodeURIComponent(`Buongiorno${guest?.fullName ? " " + guest.fullName.split(" ")[0] : ""}, per velocizzare l'arrivo a ${structure?.name ?? "SpigoleStay"} completa il check-in online qui: ${link}`);
+          const waText = encodeURIComponent(`Buongiorno${guest?.fullName ? " " + guest.fullName.split(" ")[0] : ""}, per velocizzare l'arrivo a ${structure?.name ?? "Xenora"} completa il check-in online qui: ${link}`);
           return (
             <div className="flex flex-wrap gap-2 pt-0.5">
               {phoneDigits && <a href={`https://wa.me/${phoneDigits}?text=${waText}`} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-white" style={{ backgroundColor: "#25D366" }}>{t("Invia link WhatsApp")}</a>}
@@ -395,7 +395,7 @@ export default function BookingDrawer() {
         </div>
         <Field label={t("Email")}><input className={inputCls} value={form.email} onChange={(e) => set({ email: e.target.value })} placeholder="nome@email.it" /></Field>
         <div className="flex gap-2 pt-0.5">
-          <ContactBtn href={form.phone.replace(/[^\d]/g, "") ? `https://wa.me/${form.phone.replace(/[^\d]/g, "")}?text=${encodeURIComponent(`Buongiorno${form.firstName ? " " + form.firstName : ""}, le scriviamo da ${structure?.name ?? "SpigoleStay"} riguardo al soggiorno del ${fmtDate(form.checkIn)}.`)}` : undefined} label="WhatsApp" color="#25D366" missingTitle={t("Dato mancante")} />
+          <ContactBtn href={form.phone.replace(/[^\d]/g, "") ? `https://wa.me/${form.phone.replace(/[^\d]/g, "")}?text=${encodeURIComponent(`Buongiorno${form.firstName ? " " + form.firstName : ""}, le scriviamo da ${structure?.name ?? "Xenora"} riguardo al soggiorno del ${fmtDate(form.checkIn)}.`)}` : undefined} label="WhatsApp" color="#25D366" missingTitle={t("Dato mancante")} />
           <ContactBtn href={form.phone ? `tel:${form.phone}` : undefined} label={t("Chiama")} color="var(--focus)" missingTitle={t("Dato mancante")} />
           <ContactBtn href={form.email ? `mailto:${form.email}` : undefined} label={t("Email")} color="var(--dim)" missingTitle={t("Dato mancante")} />
         </div>

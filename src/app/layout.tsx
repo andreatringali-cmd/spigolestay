@@ -7,7 +7,7 @@ const archivo = Archivo({ subsets: ["latin"], variable: "--font-archivo" });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains" });
 
 export const metadata: Metadata = {
-  title: "SpigoleStay — Channel Manager",
+  title: "Xenora — Channel Manager",
   description: "Channel manager multi-struttura per i B&B Spigole",
 };
 

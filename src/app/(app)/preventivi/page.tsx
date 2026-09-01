@@ -318,7 +318,7 @@ td.r{text-align:right;white-space:nowrap}
 .social{display:flex;gap:6px;flex:none}
 .social a{width:24px;height:24px;border-radius:99px;background:${accent};display:flex;align-items:center;justify-content:center;text-decoration:none}
 </style></head><body><div class="sheet"><div class="bar"></div>
-<div class="head">${logoHtml}<div style="min-width:0"><div class="brand">${esc(structureName || "SpigoleStay")}</div>${stAddress ? `<div class="sub">${esc(stAddress)}</div>` : ""}${stContacts ? `<div class="sub" style="margin-top:1px">${esc(stContacts)}</div>` : ""}</div>
+<div class="head">${logoHtml}<div style="min-width:0"><div class="brand">${esc(structureName || "Xenora")}</div>${stAddress ? `<div class="sub">${esc(stAddress)}</div>` : ""}${stContacts ? `<div class="sub" style="margin-top:1px">${esc(stContacts)}</div>` : ""}</div>
 <div class="qbadge"><div class="qlabel">${esc(L.quoteNo)}</div><div class="qno">${quoteRef}</div><div class="qdate">${todayStr}</div></div></div>
 <p class="hi">${esc(L.hi)} <b>${esc(name || L.guest)}</b>,</p>
 <p class="lead">${esc(L.avail)}.</p>
@@ -334,7 +334,7 @@ ${payHtml}
 ${note ? `<p class="note">${esc(note)}</p>` : ""}
 <p class="closing">${esc(L.closing)}</p>
 <p class="sign">${esc(structureName)}</p>
-<div class="foot"><span>${[esc(structureName || "SpigoleStay"), esc(stAddress), esc(stContacts), esc(stLegal)].filter(Boolean).join("  ·  ")}</span><span class="social">${stSocials.map((s) => `<a href="${esc(s.url)}"><svg viewBox="0 0 24 24" width="15" height="15" fill="#fff"><path d="${SOCIAL_PATH[s.k]}"/></svg></a>`).join("")}${stSocials.length ? "" : todayStr}</span></div>
+<div class="foot"><span>${[esc(structureName || "Xenora"), esc(stAddress), esc(stContacts), esc(stLegal)].filter(Boolean).join("  ·  ")}</span><span class="social">${stSocials.map((s) => `<a href="${esc(s.url)}"><svg viewBox="0 0 24 24" width="15" height="15" fill="#fff"><path d="${SOCIAL_PATH[s.k]}"/></svg></a>`).join("")}${stSocials.length ? "" : todayStr}</span></div>
 </div></body></html>`;
     w.document.write(html);
     w.document.close();

@@ -11,9 +11,9 @@ export default function Topbar({ pathname, controls }: { pathname: string; contr
           <Logo />
           <div>
             <div className="font-display text-lg font-extrabold leading-none tracking-tight text-txt">
-              SpigoleStay
+              Xenora
             </div>
-            <div className="text-[11px] text-dim">Channel Manager</div>
+            <div className="text-[11px] text-dim">Digital Solution</div>
           </div>
         </div>
         <nav className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-2 text-sm lg:flex [scrollbar-width:none]">

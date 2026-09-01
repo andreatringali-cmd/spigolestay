@@ -2,14 +2,14 @@
 
 /* ─────────── Token di design (Chiaro) — neutro freddo + indaco ─────────── */
 :root {
-  --paper: #F6F6F7;   /* sfondo app (grigio neutro, niente blu) */
-  --surface: #FFFFFF; /* superfici (card) */
-  --wash: #EFEFF1;    /* intestazioni, zone secondarie */
-  --line: #E5E5E8;    /* bordi */
-  --txt: #1F2127;     /* testo primario (carbone neutro) */
-  --dim: #5F6067;     /* testo secondario */
-  --faint: #9A9BA2;   /* testo terziario */
-  --focus: #4F46E5;   /* accento indaco (solo accento) */
+  --paper: #EEECE8;   /* sfondo app (greige — grigio-tortora caldo) */
+  --surface: #FAF9F7; /* superfici (card) */
+  --wash: #E6E2DB;    /* intestazioni, zone secondarie */
+  --line: #E1DDD6;    /* bordi */
+  --txt: #26241F;     /* testo primario (bruno neutro) */
+  --dim: #726D64;     /* testo secondario */
+  --faint: #A69E90;   /* testo terziario */
+  --focus: #4E6E6A;   /* accento verde-salvia (solo accento) */
 
   /* Canali OTA — tinte vicine ai brand nativi */
   --ch-booking: #003B95;  /* blu Booking.com */
@@ -33,7 +33,7 @@
   --txt: #EAEAEC;
   --dim: #9C9DA3;
   --faint: #6B6C73;
-  --focus: #7C7BF5;   /* indaco più chiaro per lo scuro (solo accento) */
+  --focus: #7FA8A1;   /* verde-salvia più chiaro per lo scuro (solo accento) */
 
   --ch-booking: #2E6FD6;  /* blu Booking più chiaro per lo scuro */
   --ch-airbnb: #FF5A75;

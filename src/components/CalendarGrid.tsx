@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type DragEvent as RDragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent as RDragEvent, type MouseEvent as RMouseEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
@@ -18,6 +18,7 @@ import {
 } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import Icon from "@/components/Icon";
+import DateField from "@/components/DateField";
 
 // Card "Insights" del calendario (selettore mostra/nascondi).
 const INSIGHT_CARDS = [
@@ -70,9 +71,9 @@ export default function CalendarGrid() {
   // Configurazione "Visualizza" (persistita): finestra giorni + righe mostrate + densità.
   type Span = 3 | 7 | 14 | 30 | "month";
   interface ViewCfg { span: Span; rate: boolean; avail: boolean; occ: boolean; emptyRow: boolean; dense: boolean; fromYesterday: boolean; group: "struct" | "type" }
-  const [vw, setVw] = useState<ViewCfg>({ span: 7, rate: true, avail: true, occ: true, emptyRow: false, dense: true, fromYesterday: false, group: "struct" });
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:calview"); if (r) { const p = JSON.parse(r); if (p.span !== 7 && p.span !== "month") p.span = 7; setVw((v) => ({ ...v, ...p })); } } catch {} }, []);
-  const patchView = (p: Partial<ViewCfg>) => setVw((v) => { const n = { ...v, ...p }; try { localStorage.setItem("spigolestay:calview", JSON.stringify(n)); } catch {} return n; });
+  const [vw, setVw] = useState<ViewCfg>({ span: "month", rate: true, avail: true, occ: true, emptyRow: false, dense: true, fromYesterday: false, group: "struct" });
+  useEffect(() => { try { const r = localStorage.getItem("spigolestay:calview:v2"); if (r) { const p = JSON.parse(r); if (p.span !== 7 && p.span !== "month") p.span = "month"; setVw((v) => ({ ...v, ...p })); } } catch {} }, []);
+  const patchView = (p: Partial<ViewCfg>) => setVw((v) => { const n = { ...v, ...p }; try { localStorage.setItem("spigolestay:calview:v2", JSON.stringify(n)); } catch {} return n; });
   const [vizOpen, setVizOpen] = useState(false);
   const vizRef = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (vizRef.current && !vizRef.current.contains(e.target as Node)) setVizOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
@@ -133,11 +134,15 @@ export default function CalendarGrid() {
   const [dragCard, setDragCard] = useState<string | null>(null);
   const onCardsDragStart = (e: RDragEvent) => { const el = e.target as HTMLElement; if (el.closest("input,button,a,select,textarea")) { e.preventDefault(); return; } const k = el.closest<HTMLElement>("[data-cardkey]")?.dataset.cardkey; if (k) { setDragCard(k); e.dataTransfer.effectAllowed = "move"; } };
   const onCardDrop = (targetKey: string) => { if (!dragCard || dragCard === targetKey) { setDragCard(null); return; } const o = cardOrder.filter((k) => k !== dragCard); const ti = o.indexOf(targetKey); o.splice(ti < 0 ? o.length : ti, 0, dragCard); persistOrder(o); setDragCard(null); };
+  // Riposizionamento card: doppio clic per attivare, poi ◀ ▶ per spostare (come le altre sezioni). Niente manina: lo scroll è a rotella.
+  const [activeCard, setActiveCard] = useState<string | null>(null);
+  const onCardsDblClick = (e: RMouseEvent) => { const k = (e.target as HTMLElement).closest<HTMLElement>("[data-cardkey]")?.dataset.cardkey; if (k) setActiveCard((p) => (p === k ? null : k)); };
+  const moveActiveCard = (dir: -1 | 1) => { if (!activeCard) return; const order = INSIGHT_CARDS.map((c) => c.key).filter(showCard).sort((a, b) => orderOf(a) - orderOf(b)); const i = order.indexOf(activeCard), j = i + dir; if (j < 0 || j >= order.length) return; [order[i], order[j]] = [order[j], order[i]]; const rest = cardOrder.filter((k) => !order.includes(k)); persistOrder([...order, ...rest]); };
   const cardsRef = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (cardsRef.current && !cardsRef.current.contains(e.target as Node)) setCardsMenuOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
   const [start, setStart] = useState<Date>(() => {
     const t = new Date();
-    return new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    return new Date(t.getFullYear(), t.getMonth(), 1); // vista mensile: parte dal 1° del mese
   });
   const [dragView, setDragView] = useState<DragView | null>(null);
   const [toast, setToast] = useState<{ id: string; prev: { unitId: string | null; checkIn: string; checkOut: string } } | null>(null);
@@ -489,7 +494,8 @@ export default function CalendarGrid() {
   const applyPctRange = (typeId: string, fromIso: string, toIso: string, pct: number) => { const map: Record<string, number> = {}; let dd = parseISO(fromIso); const end = parseISO(toIso); while (dd < end) { const iso = toISO(dd); map[`${typeId}|${iso}`] = Math.round(rateFor(typeId, iso) * (1 + pct / 100)); dd = addDays(dd, 1); } setDayRates(map); };
   // Suggerimenti Copilota (priorità: alta occupazione → alza; buchi → riempi; bassa → apri).
   const futureDemand = occByDay.filter((x) => x.iso >= todayISO);
-  const hotDay = futureDemand.filter((x) => x.occ >= 80).sort((a, b) => b.occ - a.occ)[0];
+  // Alta occupazione MA non piena: a camere esaurite (100%) non ha senso alzare il prezzo (niente da vendere).
+  const hotDay = futureDemand.filter((x) => x.occ >= 80 && x.occ < 100).sort((a, b) => b.occ - a.occ)[0];
   const coldDay = futureDemand.filter((x) => x.occ <= 25).sort((a, b) => a.occ - b.occ)[0];
   const firstType = roomTypes.find((rt) => visibleStructures.some((s) => s.id === rt.structureId) && units.some((u) => u.roomTypeId === rt.id));
   type Sugg = { icon: string; color: string; text: string; apply?: () => void; cta: string; dir?: "up" | "down"; subject?: string; detail?: string; from?: number; to?: number };
@@ -772,8 +778,8 @@ export default function CalendarGrid() {
     <div ref={wrapRef} className="flex flex-col gap-3 select-none">
       {/* Riga filtri — data (jump), navigazione, menu Visualizza */}
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        {/* Menu Visualizza — primo pulsante della riga */}
-        <div ref={vizRef} className="relative">
+        {/* Menu Visualizza — spostato dopo i mesi (order) */}
+        <div ref={vizRef} className="relative order-3">
           <button onClick={() => setVizOpen((o) => !o)} title="Visualizza" className={`grid h-9 w-9 place-items-center rounded-lg border transition ${vizOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
           </button>
@@ -808,7 +814,7 @@ export default function CalendarGrid() {
           )}
         </div>
         {/* Selettore mese (tendina) */}
-        <div ref={monthRef} className="relative">
+        <div ref={monthRef} className="relative order-1">
           <button onClick={() => setMonthOpen((o) => !o)} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${monthOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
             <Icon name="calendar" size={15} /> <span className="capitalize">{monthLabel(start)}</span> <span className="text-xs">▾</span>
           </button>
@@ -823,39 +829,24 @@ export default function CalendarGrid() {
             </div>
           )}
         </div>
-        {/* Salta a una data (le frecce di navigazione sono nel calendario) */}
-        <input type="date" value={toISO(start)} onChange={(e) => { if (e.target.value) setStart(parseISO(e.target.value)); }} title="Salta a una data" className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
-        <div className="ml-auto flex items-center gap-2">
-          {/* Selettore card Insights (mostra/nascondi) — prima di Visualizza */}
-          <div ref={cardsRef} className="relative">
-            <button onClick={() => setCardsMenuOpen((o) => !o)} title="Mostra/nascondi le card" className={`grid h-9 w-9 place-items-center rounded-lg border transition ${cardsMenuOpen ? "border-focus text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}>
-              <Icon name="chart" size={16} />
-            </button>
-            {cardsMenuOpen && (
-              <div className="absolute right-0 top-full z-40 mt-1 w-56 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
-                <div className="flex items-center justify-between px-2.5 py-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-faint">Card · {INSIGHT_CARDS.filter((c) => showCard(c.key)).length}/{INSIGHT_CARDS.length}</span>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => persistCards(new Set())} className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-focus hover:bg-wash">Tutte</button>
-                    <button onClick={() => persistCards(new Set(INSIGHT_CARDS.map((c) => c.key)))} className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-dim hover:bg-wash">Nessuna</button>
-                  </div>
-                </div>
-                {INSIGHT_CARDS.map((c) => { const on = showCard(c.key); return (
-                  <button key={c.key} onClick={() => toggleCard(c.key)} className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-txt hover:bg-wash">
-                    <span className="min-w-0 flex-1">{c.label}</span>
-                    <span className={`relative h-4 w-7 shrink-0 rounded-full transition ${on ? "bg-focus" : "bg-line"}`}><span className="absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all" style={{ left: on ? "14px" : "2px" }} /></span>
-                  </button>
-                ); })}
-                <div className="mt-1 border-t border-line px-2.5 py-1.5 text-[10px] text-faint">Trascina le card per riordinarle ⇄</div>
-              </div>
-            )}
-          </div>
-          <Link href="/prenotazioni/nuova" className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuova prenotazione</Link>
+        {/* Salta a una data + frecce ±1 giorno (come nella dashboard) */}
+        <div className="order-2 flex items-center gap-1">
+          <button onClick={() => setStart((d) => addDays(d, -1))} title="Giorno precedente" aria-label="Giorno precedente" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">‹</button>
+          <DateField value={toISO(start)} onChange={(v) => { if (v) setStart(parseISO(v)); }} title="Salta a una data" className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm transition hover:border-focus" />
+          <button onClick={() => setStart((d) => addDays(d, 1))} title="Giorno successivo" aria-label="Giorno successivo" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">›</button>
+        </div>
+        <div className="order-4 ml-auto flex items-center gap-2">
+          {/* Selettore card Insights (mostra/nascondi) */}
+          {/* Toggle card: un click mostra tutte / nasconde tutte (come le altre sezioni) */}
+          <button onClick={() => (INSIGHT_CARDS.some((c) => showCard(c.key)) ? persistCards(new Set(INSIGHT_CARDS.map((c) => c.key))) : persistCards(new Set()))} title={INSIGHT_CARDS.some((c) => showCard(c.key)) ? "Nascondi le card" : "Mostra le card"} className={`grid h-9 w-9 place-items-center rounded-lg border border-line transition ${INSIGHT_CARDS.some((c) => showCard(c.key)) ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
+            <Icon name="chart" size={16} />
+          </button>
+          <Link href="/prenotazioni/nuova" className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-txt transition hover:bg-wash">+ Nuova</Link>
         </div>
       </div>
 
-      {/* Legenda OTA (stesso box della barra filtri) · ✓ = collegato, sfumato = non collegato */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
+      {/* Legenda OTA — sopra la riga filtri (invertita) · ✓ = collegato, sfumato = non collegato */}
+      <div className="order-[-1] flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         {(Object.keys(CHANNELS) as (keyof typeof CHANNELS)[]).filter((c) => c !== "blocked").map((c) => {
           const conn = chConnected(c);
           return (
@@ -876,9 +867,19 @@ export default function CalendarGrid() {
       </div>
 
       {/* INSIGHTS — card innovative sul periodo visibile (in alto, una riga, mostra/nascondi dal selettore) */}
-      <div className="order-first flex gap-3 overflow-x-auto pb-1" onDragStart={onCardsDragStart} onDragEnd={() => setDragCard(null)}>
+      {activeCard && (
+        <div className="order-first flex justify-center pb-1">
+          <div className="flex items-center gap-1 rounded-full border border-line bg-surface px-1.5 py-1 shadow-md">
+            <button type="button" onClick={() => moveActiveCard(-1)} aria-label="Sposta a sinistra" className="grid h-6 w-6 place-items-center rounded-full text-sm text-dim hover:text-txt">◀</button>
+            <span className="px-1 text-[10px] font-semibold uppercase tracking-wide text-faint">Sposta · {INSIGHT_CARDS.find((c) => c.key === activeCard)?.label}</span>
+            <button type="button" onClick={() => moveActiveCard(1)} aria-label="Sposta a destra" className="grid h-6 w-6 place-items-center rounded-full text-sm text-dim hover:text-txt">▶</button>
+            <button type="button" onClick={() => setActiveCard(null)} aria-label="Fine" className="grid h-6 w-6 place-items-center rounded-full text-[color:var(--ok)] hover:opacity-80">✓</button>
+          </div>
+        </div>
+      )}
+      <div className="order-first flex gap-3 overflow-x-auto pb-1" onDoubleClick={onCardsDblClick}>
         {showCard("copilot") && (
-        <div data-cardkey="copilot" draggable onDragOver={(e) => dragCard && e.preventDefault()} onDrop={() => onCardDrop("copilot")} style={{ order: orderOf("copilot") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-grab transition ${dragCard === "copilot" ? "opacity-40" : ""} ${dragCard && dragCard !== "copilot" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="copilot" onDrop={() => onCardDrop("copilot")} style={{ order: orderOf("copilot") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "copilot" ? "opacity-40" : ""} ${dragCard && dragCard !== "copilot" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🤖</span> Copilota revenue</div>
           <div className="flex flex-col gap-2">
             {suggestions.slice(0, 3).map((s, i) => (
@@ -892,7 +893,7 @@ export default function CalendarGrid() {
         </div>
         )}
         {showCard("pickup") && (
-        <div data-cardkey="pickup" draggable onDragOver={(e) => dragCard && e.preventDefault()} onDrop={() => onCardDrop("pickup")} style={{ order: orderOf("pickup") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-grab transition ${dragCard === "pickup" ? "opacity-40" : ""} ${dragCard && dragCard !== "pickup" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="pickup" onDrop={() => onCardDrop("pickup")} style={{ order: orderOf("pickup") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "pickup" ? "opacity-40" : ""} ${dragCard && dragCard !== "pickup" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>📈</span> Ritmo prenotazioni</div>
             <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: `color-mix(in srgb, ${pickVerdict.c} 15%, transparent)`, color: pickVerdict.c }}>{pickDelta >= 0 ? "▲ +" : "▼ "}{pickDelta} vs 7gg</span>
@@ -925,7 +926,7 @@ export default function CalendarGrid() {
         </div>
         )}
         {showCard("gaps") && (
-        <div data-cardkey="gaps" draggable onDragOver={(e) => dragCard && e.preventDefault()} onDrop={() => onCardDrop("gaps")} style={{ order: orderOf("gaps") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-grab transition ${dragCard === "gaps" ? "opacity-40" : ""} ${dragCard && dragCard !== "gaps" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="gaps" onDrop={() => onCardDrop("gaps")} style={{ order: orderOf("gaps") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "gaps" ? "opacity-40" : ""} ${dragCard && dragCard !== "gaps" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🕳️</span> Buchi da riempire</div>
           {gaps.length === 0 ? (
             <div className="flex items-center gap-2 py-1 text-xs text-dim"><span className="font-bold text-[color:var(--ok)]">✓</span> Nessun buco di 1–2 notti nel periodo.</div>
@@ -960,7 +961,7 @@ export default function CalendarGrid() {
         </div>
         )}
         {showCard("sim") && (
-        <div data-cardkey="sim" draggable onDragOver={(e) => dragCard && e.preventDefault()} onDrop={() => onCardDrop("sim")} style={{ order: orderOf("sim") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-grab transition ${dragCard === "sim" ? "opacity-40" : ""} ${dragCard && dragCard !== "sim" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="sim" onDrop={() => onCardDrop("sim")} style={{ order: orderOf("sim") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "sim" ? "opacity-40" : ""} ${dragCard && dragCard !== "sim" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🎚️</span> Simulatore prezzi</div>
           <div className="flex items-baseline justify-between">
             <span className="text-[11px] text-faint">Ricavi previsti periodo</span>
@@ -987,7 +988,7 @@ export default function CalendarGrid() {
         </div>
         )}
         {showCard("alerts") && (
-        <div data-cardkey="alerts" draggable onDragOver={(e) => dragCard && e.preventDefault()} onDrop={() => onCardDrop("alerts")} style={{ order: orderOf("alerts") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-grab transition ${dragCard === "alerts" ? "opacity-40" : ""} ${dragCard && dragCard !== "alerts" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="alerts" onDrop={() => onCardDrop("alerts")} style={{ order: orderOf("alerts") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "alerts" ? "opacity-40" : ""} ${dragCard && dragCard !== "alerts" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>⚠️</span> Da controllare</div>
           {calAlerts.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 rounded-lg py-5 text-center" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 8%, transparent)" }}>
@@ -1017,7 +1018,7 @@ export default function CalendarGrid() {
         </div>
         )}
         {showCard("moves") && (
-        <div data-cardkey="moves" draggable onDragOver={(e) => dragCard && e.preventDefault()} onDrop={() => onCardDrop("moves")} style={{ order: orderOf("moves") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-grab transition ${dragCard === "moves" ? "opacity-40" : ""} ${dragCard && dragCard !== "moves" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="moves" onDrop={() => onCardDrop("moves")} style={{ order: orderOf("moves") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "moves" ? "opacity-40" : ""} ${dragCard && dragCard !== "moves" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🔑</span> Prossimi movimenti</div>
           {moves.length === 0 ? (
             <div className="flex items-center gap-2 py-1 text-xs text-dim">Nessun arrivo o partenza nei prossimi 7 giorni.</div>
@@ -1054,7 +1055,7 @@ export default function CalendarGrid() {
         </div>
         )}
         {showCard("channels") && (
-        <div data-cardkey="channels" draggable onDragOver={(e) => dragCard && e.preventDefault()} onDrop={() => onCardDrop("channels")} style={{ order: orderOf("channels") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-grab transition ${dragCard === "channels" ? "opacity-40" : ""} ${dragCard && dragCard !== "channels" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="channels" onDrop={() => onCardDrop("channels")} style={{ order: orderOf("channels") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "channels" ? "opacity-40" : ""} ${dragCard && dragCard !== "channels" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🔀</span> Mix canali</div>
           {chTotalN === 0 ? (
             <div className="flex items-center gap-2 py-1 text-xs text-faint">Nessuna prenotazione nel periodo.</div>
@@ -1088,7 +1089,7 @@ export default function CalendarGrid() {
         </div>
         )}
         {showCard("kpi") && (
-        <div data-cardkey="kpi" draggable onDragOver={(e) => dragCard && e.preventDefault()} onDrop={() => onCardDrop("kpi")} style={{ order: orderOf("kpi") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-grab transition ${dragCard === "kpi" ? "opacity-40" : ""} ${dragCard && dragCard !== "kpi" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="kpi" onDrop={() => onCardDrop("kpi")} style={{ order: orderOf("kpi") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "kpi" ? "opacity-40" : ""} ${dragCard && dragCard !== "kpi" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>📊</span> ADR &amp; RevPAR</div>
           <div className="flex flex-col gap-2">
             <div className="rounded-lg border border-line p-2">
@@ -1126,7 +1127,7 @@ export default function CalendarGrid() {
             <div className="sticky left-0 z-20 shrink-0 border-r border-line bg-wash" style={{ width: LABEL_W }} />
             <div className="flex" style={{ width: gridW }}>
               {monthSegments.map((seg) => (
-                <div key={seg.key} className="flex items-center justify-center border-r border-line py-1 text-[11px] font-bold uppercase tracking-wide capitalize text-dim" style={{ width: seg.count * cellW }}>{seg.label}</div>
+                <div key={seg.key} className="flex items-center justify-center overflow-hidden whitespace-nowrap border-r border-line py-1 text-[11px] font-bold uppercase tracking-wide capitalize text-dim" style={{ width: seg.count * cellW }}>{seg.label}</div>
               ))}
             </div>
             <button onClick={goPrev} title={vw.span === "month" ? "Mese precedente" : "Periodo precedente"} className="absolute inset-y-0 z-30 grid w-7 place-items-center text-lg font-bold leading-none text-[color:var(--ok)] transition hover:bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)]" style={{ left: LABEL_W }}>‹</button>
@@ -1209,7 +1210,7 @@ export default function CalendarGrid() {
             <div className="sticky left-0 z-20 shrink-0 border-r border-line bg-wash" style={{ width: LABEL_W }} />
             <div className="flex" style={{ width: gridW }}>
               {monthSegments.map((seg) => (
-                <div key={seg.key} className="flex items-center justify-center border-r border-line py-1 text-[11px] font-bold uppercase tracking-wide capitalize text-dim" style={{ width: seg.count * cellW }}>
+                <div key={seg.key} className="flex items-center justify-center overflow-hidden whitespace-nowrap border-r border-line py-1 text-[11px] font-bold uppercase tracking-wide capitalize text-dim" style={{ width: seg.count * cellW }}>
                   {seg.label}
                 </div>
               ))}

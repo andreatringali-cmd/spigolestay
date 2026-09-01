@@ -124,7 +124,7 @@ export default function AssistantBar() {
             </div>
 
             <div className="flex items-center justify-between border-t border-line bg-wash px-4 py-2 text-[11px] text-faint">
-              <span>Assistente SpigoleStay · risponde sui tuoi dati</span>
+              <span>Assistente Xenora · risponde sui tuoi dati</span>
               <span className="flex items-center gap-1"><kbd className="rounded border border-line bg-surface px-1 py-0.5 font-semibold text-dim">Esc</kbd> chiudi</span>
             </div>
           </div>

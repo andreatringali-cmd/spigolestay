@@ -104,7 +104,7 @@ export default function TassaSoggiornoPage() {
       tr.tot td{border-top:2px solid #1f2127;font-weight:700;font-size:16px}
       .meta{color:#5f6067;font-size:13px;margin:2px 0}
     </style></head><body>
-      <div class="head"><div class="brand">SpigoleStay</div><div class="meta">${struttura} · Siracusa</div></div>
+      <div class="head"><div class="brand">Xenora</div><div class="meta">${struttura} · Siracusa</div></div>
       <h1>Dichiarazione imposta di soggiorno</h1>
       <div class="meta">Periodo: <b>${label}</b> — Comune di Siracusa</div>
       <table>
@@ -114,7 +114,7 @@ export default function TassaSoggiornoPage() {
         <tr><td>Tariffa applicata</td><td class="n">${taxMode === "percentuale" ? `${pct}% del pernottamento · max ${money(cap)}/persona/notte` : `${money(amount)} / persona / notte`}</td></tr>
         <tr class="tot"><td>Totale imposta da versare</td><td class="n">${money(total)}</td></tr>
       </table>
-      <p class="meta" style="margin-top:28px">Regole applicate: max ${maxNights} notti per soggiorno${childrenExempt ? ", minori esenti" : ""}. Documento riepilogativo non ufficiale generato da SpigoleStay.</p>
+      <p class="meta" style="margin-top:28px">Regole applicate: max ${maxNights} notti per soggiorno${childrenExempt ? ", minori esenti" : ""}. Documento riepilogativo non ufficiale generato da Xenora.</p>
       <script>window.onload=function(){window.print()}<\/script>
     </body></html>`);
     w.document.close();

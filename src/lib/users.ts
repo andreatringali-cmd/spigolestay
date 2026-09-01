@@ -1,4 +1,4 @@
-// Modello Utenti + permessi granulari per SpigoleStay (prototipo, persistito in localStorage).
+// Modello Utenti + permessi granulari per Xenora (prototipo, persistito in localStorage).
 // Ispirato alla scheda utente di Octorate ma mappato sulle sezioni reali del nostro gestionale.
 
 export type PermLevel = "none" | "view" | "edit";

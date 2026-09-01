@@ -3,9 +3,11 @@
 import { useRef, useState } from "react";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { resetAll } from "@/lib/onboarding";
 import { useTheme } from "@/lib/theme";
 import { useLang } from "@/lib/i18n";
 import Icon from "@/components/Icon";
+import StyleChooser from "@/components/StyleChooser";
 
 export default function ImpostazioniPage() {
   const { theme, setTheme } = useTheme();
@@ -25,7 +27,7 @@ export default function ImpostazioniPage() {
   const doExport = () => {
     const dump: Record<string, string> = {};
     keysOf().forEach((k) => { dump[k] = localStorage.getItem(k)!; });
-    const blob = new Blob([JSON.stringify({ app: "SpigoleStay", exportedAt: new Date().toISOString(), data: dump }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ app: "Xenora", exportedAt: new Date().toISOString(), data: dump }, null, 2)], { type: "application/json" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `spigolestay-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(a.href);
   };
   const doImport = (file?: File) => {
@@ -43,6 +45,7 @@ export default function ImpostazioniPage() {
     r.readAsText(file);
   };
   const doReset = async () => { if (!(await ask({ title: t("Reset dati"), message: t("Cancellare tutti i dati e tornare ai dati di esempio? Operazione irreversibile."), danger: true, confirmLabel: t("Reset") }))) return; keysOf().forEach((k) => localStorage.removeItem(k)); location.reload(); };
+  const doFirstAccess = async () => { if (!(await ask({ title: t("Ricomincia da zero"), message: t("Cancella tutti i dati e riparte dalla configurazione iniziale (primo accesso), con struttura e camere da impostare. Operazione irreversibile."), danger: true, confirmLabel: t("Ricomincia") }))) return; resetAll(); };
 
   return (
     <div>
@@ -81,6 +84,12 @@ export default function ImpostazioniPage() {
       </div>
 
       <Card className="mt-4">
+        <SectionTitle>{t("Stile dell'interfaccia")}</SectionTitle>
+        <p className="mb-3 text-xs text-dim">{t("Scegli la palette di colori e la forma dei box. Si applica subito a tutto il gestionale e resta salvata.")}</p>
+        <StyleChooser />
+      </Card>
+
+      <Card className="mt-4">
         <SectionTitle>{t("Backup & dati")}</SectionTitle>
         <p className="mb-3 text-xs text-dim">{t("Esporta tutti i dati del gestionale (prenotazioni, cassa, tariffe, utenti, immagini…) in un file, o ripristinali da un backup. Utile per spostare i dati o metterli al sicuro.")}</p>
         <div className="flex flex-wrap gap-2">
@@ -90,6 +99,13 @@ export default function ImpostazioniPage() {
           <button onClick={doReset} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Reset ai dati di esempio")}</button>
         </div>
         {msg && <p className="mt-2 text-xs font-medium text-focus">{msg}</p>}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3" style={{ borderColor: "color-mix(in srgb, var(--err) 30%, var(--line))" }}>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-txt">🔄 {t("Ricomincia da zero (primo accesso)")}</div>
+            <div className="text-[11px] text-faint">{t("Svuota tutto e riparte dalla configurazione guidata: profilo, struttura, camere, piano.")}</div>
+          </div>
+          <button onClick={doFirstAccess} className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--err)" }}>{t("Ricomincia")}</button>
+        </div>
       </Card>
 
       <p className="mt-3 text-xs text-faint">{t("Dimostrativo. Le preferenze saranno salvate per utente sul backend; il backup include tutti i dati locali dell'app.")}</p>

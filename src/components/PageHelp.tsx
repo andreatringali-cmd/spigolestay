@@ -6,41 +6,155 @@ import { usePathname } from "next/navigation";
 interface Guide {
   title: string;
   intro?: string;
-  sections: { h: string; items: string[] }[];
+  sections: { h: string; items: string[]; icon?: string }[];
 }
 
 // Guida per pagina: "cosa puoi fare e come".
 const HELP: Record<string, Guide> = {
   "/": {
     title: "Dashboard",
-    intro: "Il colpo d'occhio sulla giornata scelta. Cambia la data per vedere qualsiasi giorno.",
+    intro: "Il colpo d'occhio sulla giornata scelta: prenotazioni, occupazione, incassi e cose da fare. Cambia la data in alto per vedere qualsiasi giorno (di default è oggi). Tutto segue anche la struttura selezionata in alto a destra.",
     sections: [
-      { h: "Cosa vedi", items: ["Le card in alto (Prenotazioni attive, In struttura, Arrivi, Partenze) e i dati del giorno (camere occupate, ADR, RevPAR, incassi).", "I grafici del giorno: canali, ricavi, occupazione per struttura, andamento 30 giorni."] },
-      { h: "Cosa puoi fare", items: ["Clicca una card in alto per filtrare i movimenti sotto (es. solo gli arrivi).", "Usa il selettore struttura in alto a destra per restringere a una sola struttura.", "In fondo, la checklist \"Da fare oggi\": spunta i messaggi di check-in/out, la tassa, la recensione e l'invio del planning pulizie."] },
+      { h: "Card di stato (in alto)", icon: "📌", items: [
+        "Quattro card cliccabili: Prenotazioni attive, In struttura, Arrivi e Partenze del giorno.",
+        "Clicca una card per filtrare l'elenco dei movimenti qui sotto (es. mostra solo gli arrivi). Ri-clicca la stessa card per togliere il filtro.",
+        "Il numero cambia con la data e con la struttura scelta.",
+      ] },
+      { h: "I numeri del giorno", icon: "🔢", items: [
+        "Camere occupate (occupate su totali), ADR = prezzo medio a notte, RevPAR = ricavo per camera disponibile, Incassi del giorno.",
+        "Sono la fotografia economica della giornata: utili per capire a colpo d'occhio se stai riempiendo e a che prezzo.",
+      ] },
+      { h: "Tachimetro occupazione", icon: "🎯", items: [
+        "Il gauge \"Occupazione del giorno\" mostra la percentuale di camere occupate con lancetta e arco colorato.",
+        "Cambia giorno per vedere la lancetta muoversi.",
+      ] },
+      { h: "I grafici", icon: "📈", items: [
+        "Disponibili: Camere occupate vs libere, Prenotazioni e ricavi per canale (una barra per canale con numero prenotazioni e ricavi), Provenienza ospiti, Occupazione attesa 7 giorni, Incassi attesi 7 giorni, Prezzo a notte per canale (curve di densità).",
+        "L'icona grafici (in alto a destra della barra filtri) mostra o nasconde tutti i grafici con un solo click.",
+        "Scorri i grafici con la rotella del mouse oppure trascinandoli (manina).",
+        "Doppio clic su un grafico per attivarlo e spostarlo con le frecce: così riordini la fila come preferisci (l'ordine resta salvato).",
+      ] },
+      { h: "Cambiare giorno", icon: "📅", items: [
+        "Frecce ‹ › per andare avanti o indietro di un giorno.",
+        "Oppure scegli una data qualsiasi dal calendario; usa \"Oggi\"/Rimuovi filtri per tornare al presente.",
+      ] },
+      { h: "Cercare e filtrare", icon: "🔎", items: [
+        "Il campo \"Cerca ospite\" filtra i movimenti del giorno per nome.",
+        "Il selettore struttura (in alto a destra) restringe KPI, grafici e movimenti a una sola struttura.",
+        "\"Rimuovi filtri\" azzera ricerca, data e filtro delle card.",
+      ] },
+      { h: "Da fare oggi (checklist)", icon: "✅", items: [
+        "In fondo alla pagina c'è la checklist della giornata: messaggi di check-in e check-out, incasso della tassa di soggiorno, richiesta recensione, invio del planning pulizie.",
+        "Spunta le voci man mano che le completi: le spunte restano salvate.",
+      ] },
+      { h: "Aiuto e assistente", icon: "💬", items: [
+        "Questo pulsante \"?\" apre la guida della pagina in cui ti trovi (contenuti diversi per ogni sezione).",
+        "La linguetta colorata sul bordo destro apre l'assistente per domande rapide.",
+      ] },
     ],
   },
   "/prenotazioni": {
     title: "Prenotazioni",
-    intro: "L'elenco di tutte le prenotazioni in corso e future.",
+    intro: "L'elenco di tutte le prenotazioni: di default vedi quelle in corso e future; attiva un filtro data per vedere anche lo storico. Card, grafici e registro seguono sempre i filtri attivi e la struttura selezionata in alto a destra.",
     sections: [
-      { h: "Filtra e ordina", items: ["Cerca per nome o codice; filtra per struttura/camera, canale e data (arrivo o data prenotazione).", "Clicca l'intestazione di una colonna (con la freccia) per ordinare; ri-clicca per invertire."] },
-      { h: "Azioni", items: ["Clicca una riga per aprire la scheda della prenotazione (e da lì Modifica).", "\"+ Nuova\" crea una prenotazione diretta; \"Esporta\" salva in Excel o PDF.", "Le colonne Commissioni e Netto mostrano la quota OTA (modificabile per singola prenotazione nella scheda)."] },
+      { h: "I numeri in alto", icon: "🔢", items: [
+        "Quattro riepiloghi sui risultati filtrati: Prenotazioni (quante), Notti totali, ADR (prezzo medio a notte) e Ricavi.",
+        "Cambiano insieme ai filtri: così vedi subito il peso di un canale, di un periodo o di una struttura.",
+      ] },
+      { h: "I grafici", icon: "📈", items: [
+        "Grafici combinati Prenotazioni + ricavi per canale, per struttura e per tipologia (una barra con numero prenotazioni e ricavi).",
+        "Poi: Durata del soggiorno, Prenotazioni per mese, Ricavi per mese e Provenienza per paese.",
+        "L'icona grafici mostra o nasconde tutti i grafici; scorri con la rotella o trascinando; doppio clic su un grafico per riordinarlo.",
+      ] },
+      { h: "Filtrare", icon: "🔎", items: [
+        "Cerca per nome ospite o codice prenotazione.",
+        "Filtra per struttura/camera, per canale e per intervallo di date — scegliendo se la data si riferisce all'arrivo (check-in) o alla data di prenotazione.",
+        "\"Rimuovi filtri\" azzera tutto e torna a in corso e futuri.",
+      ] },
+      { h: "Ordinare il registro", icon: "↕️", items: [
+        "Clicca l'intestazione di una colonna (quelle con la freccia) per ordinare; ri-clicca per invertire l'ordine.",
+        "Le intestazioni restano fisse in alto mentre scorri l'elenco.",
+      ] },
+      { h: "Leggere le colonne", icon: "📄", items: [
+        "Codice, prenotata il, struttura, camera (tipologia · numero), canale, ospite, n. ospiti, check-in, check-out, notti, totale, commissioni, netto e stato.",
+        "Lo Stato mostra a colpo d'occhio schedina alloggiati e pagamento (pagato / acconto / da pagare).",
+      ] },
+      { h: "Azioni", icon: "✏️", items: [
+        "Clicca una riga per aprire la scheda della prenotazione (e da lì Modifica).",
+        "\"+ Nuova\" crea una prenotazione diretta; \"Esporta\" salva l'elenco in Excel o PDF.",
+      ] },
+      { h: "Commissioni e netto", icon: "💶", items: [
+        "Le colonne Commissioni e Netto calcolano la quota OTA sul totale.",
+        "La percentuale è quella del canale, ma è modificabile per la singola prenotazione dalla sua scheda.",
+      ] },
+      { h: "Aiuto e assistente", icon: "💬", items: [
+        "Il pulsante \"?\" apre questa guida (contenuti diversi per ogni pagina).",
+        "La linguetta colorata sul bordo destro apre l'assistente per domande rapide.",
+      ] },
     ],
   },
   "/calendario": {
     title: "Calendario",
-    intro: "Il planning visivo per camera. Scegli \"Oggi\" (30 giorni) o \"Mese\" con le frecce.",
+    intro: "Il planning visivo camera per camera: prenotazioni, tariffe, disponibilità ed eventi in un colpo d'occhio.",
     sections: [
-      { h: "Inserire", items: ["1 click su una cella per iniziare, poi 1 click sul giorno finale: scegli Preventivo, Prenotazione o Fuori servizio.", "Stesso giorno due volte = un solo giorno.", "Doppio-click su un giorno (intestazione) per creare un evento (sagra, ponte…) e ricordarti di alzare i prezzi."] },
-      { h: "Tariffe e disponibilità", items: ["Ogni tipologia ha la sua riga Tariffa e Disponibilità.", "Click sul giorno iniziale della Tariffa → click sul finale → imposti importo fisso o ±% per quella tipologia.", "Trascina una prenotazione in verticale per spostarla di camera (le date non cambiano)."] },
+      { h: "Viste e navigazione", icon: "📅", items: [
+        "Il menu \"Visualizza\" (primo pulsante) sceglie la vista — Oggi (30 giorni) o Mese — e cosa mostrare (tariffe, disponibilità, occupazione, densità).",
+        "Frecce ‹ › per andare avanti/indietro di un giorno; il campo data (si apre cliccandolo, sempre verso il basso) per saltare a una data.",
+      ] },
+      { h: "Inserire una prenotazione", icon: "➕", items: [
+        "1 click sulla cella del giorno d'inizio, poi 1 click sul giorno finale: scegli Preventivo, Prenotazione o Fuori servizio.",
+        "Stesso giorno cliccato due volte = una sola notte.",
+        "\"+ Nuova\" apre invece il form completo di una prenotazione diretta.",
+      ] },
+      { h: "Tariffe e disponibilità", icon: "💶", items: [
+        "Ogni tipologia ha la sua riga Tariffa e Disponibilità.",
+        "Click sul giorno iniziale della Tariffa → click sul finale → imposti un importo fisso o una variazione ±% per quella tipologia in quel periodo.",
+      ] },
+      { h: "Spostare ed eventi", icon: "🔀", items: [
+        "Trascina una prenotazione in verticale per spostarla di camera (le date non cambiano).",
+        "Doppio clic sull'intestazione di un giorno per creare un evento (sagra, ponte…) e ricordarti di alzare i prezzi.",
+      ] },
+      { h: "Card insights e canali OTA", icon: "📊", items: [
+        "L'icona a grafico mostra o nasconde tutte le card insights (Copilota revenue, Ritmo prenotazioni, Buchi da riempire…).",
+        "Il Copilota suggerisce di alzare i prezzi nei giorni ad alta occupazione (ma non se sono già pieni) e di abbassarli per riempire buchi e giorni scarichi.",
+        "In alto la legenda dei canali OTA con lo stato di collegamento e il pulsante \"Sincronizza ora\".",
+      ] },
+      { h: "Aiuto e assistente", icon: "💬", items: [
+        "Il pulsante \"?\" apre questa guida.",
+        "La linguetta colorata sul bordo destro apre l'assistente per domande rapide.",
+      ] },
     ],
   },
   "/pulizie": {
     title: "Planning pulizie",
-    intro: "Cosa fare in ogni camera oggi, pronto da inviare a chi pulisce.",
+    intro: "Cosa fare in ogni camera nel giorno scelto, pronto da inviare a chi pulisce. In alto puoi passare tra Pulizie e Scorte & spesa.",
     sections: [
-      { h: "Leggere", items: ["Le card in alto (Da fare, Riassetti, Partenze, Arrivi) filtrano il planning al clic.", "Ogni camera mostra l'azione: partenza, arrivo, riassetto o \"partenza + arrivo\" (turnover, con chi parte e chi arriva)."] },
-      { h: "Condividere", items: ["Aggiungi note per camera e spunta \"Segna fatta\".", "\"Condividi\" apre WhatsApp col programma già scritto; \"Copia\" lo mette negli appunti."] },
+      { h: "Cosa vedi", icon: "📋", items: [
+        "Le card in alto (Da fare, Riassetti, Partenze, Arrivi) filtrano il planning al clic.",
+        "Ogni camera mostra l'azione: partenza, arrivo, riassetto o \"partenza + arrivo\" (turnover, con chi parte e chi arriva).",
+      ] },
+      { h: "Carico biancheria", icon: "🛏️", items: [
+        "La riga in alto riassume i cambi completi e il dettaglio (matrimoniali, singole, federe, asciugamani, tappetini) da preparare per il giorno.",
+        "A destra trovi la data e il contatore \"da fare · rimaste\".",
+      ] },
+      { h: "Giorno e viste", icon: "📅", items: [
+        "Cambia giorno con le frecce ‹ › (±1 giorno) o dal calendario (si apre cliccandolo, sempre verso il basso); \"Oggi\" torna a oggi.",
+        "Scegli la vista a Card o a Lista.",
+      ] },
+      { h: "Segnare e segnalare", icon: "✅", items: [
+        "Spunta \"fatta\" man mano che completi le camere.",
+        "Aggiungi note per camera e apri segnalazioni (anche con foto) per la proprietà.",
+      ] },
+      { h: "Condividere", icon: "📤", items: [
+        "\"Copia\" mette il programma negli appunti.",
+        "\"Condividi\" apre WhatsApp col programma già scritto, pronto da inviare.",
+      ] },
+      { h: "Scorte & spesa", icon: "📦", items: [
+        "Dalla tab \"Scorte & spesa\" gestisci i prodotti (biancheria, detersivi…) e la lista della spesa.",
+      ] },
+      { h: "Aiuto e assistente", icon: "💬", items: [
+        "Il pulsante \"?\" apre questa guida; la linguetta laterale a destra apre l'assistente.",
+      ] },
     ],
   },
   "/messaggi": {
@@ -193,7 +307,7 @@ export default function PageHelp() {
   if (!guide) return null;
   return (
     <>
-      <button onClick={() => setOpen(true)} title="Guida della pagina" aria-label="Guida della pagina" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)] text-sm font-bold text-focus transition hover:bg-[color:color-mix(in_srgb,var(--focus)_18%,transparent)]">?</button>
+      <button onClick={() => setOpen(true)} title="Guida della pagina" aria-label="Guida della pagina" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-sm font-bold text-dim transition hover:bg-wash hover:text-txt">?</button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh]">
           <button aria-label="Chiudi" onClick={() => setOpen(false)} className="absolute inset-0 bg-black/40" />
@@ -209,7 +323,7 @@ export default function PageHelp() {
             <div className="flex flex-col gap-4">
               {guide.sections.map((sec, i) => (
                 <div key={i}>
-                  <div className="mb-1.5 text-sm font-semibold text-txt">{sec.h}</div>
+                  <div className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-txt">{sec.icon && <span className="text-base leading-none">{sec.icon}</span>}{sec.h}</div>
                   <ul className="flex flex-col gap-1.5">
                     {sec.items.map((it, j) => (
                       <li key={j} className="flex gap-2 text-sm text-dim"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-focus" />{it}</li>
