@@ -59,6 +59,8 @@ export default function AbbonamentoPage() {
   const [selectedTier, setSelectedTier] = useState<string>("basic");
   const [annual, setAnnual] = useState(false);
   const [active, setActive] = useState<Record<string, boolean>>({});
+  const [pendingTier, setPendingTier] = useState<string | null>(null);
+  const [pendingAddon, setPendingAddon] = useState<string | null>(null);
   useEffect(() => {
     try {
       const r = localStorage.getItem("spigolestay:plan") || localStorage.getItem("spigolestay:tier");
@@ -71,12 +73,12 @@ export default function AbbonamentoPage() {
   }, []);
   const tier = TIERS.find((x) => x.key === selectedTier) ?? TIERS[0];
 
-  const persistModules = (next: Record<string, boolean>) => { try { localStorage.setItem("spigolestay:modules", JSON.stringify(next)); } catch {} };
+  const persistModules = (next: Record<string, boolean>) => { try { localStorage.setItem("spigolestay:modules", JSON.stringify(next)); window.dispatchEvent(new Event("spigolestay:modules")); } catch {} };
   const choose = (k: string) => {
     setSelectedTier(k);
     const tr = TIERS.find((x) => x.key === k); if (!tr) return;
-    // Nuovo piano: moduli inclusi + eventuali add-on già attivi che restano fuori dal piano.
-    const next: Record<string, boolean> = {}; MODULES.forEach((m) => { next[m.key] = !!m.core || tr.includes.includes(m.key) || !!active[m.key]; });
+    // Scegliere un piano azzera ai soli moduli inclusi (gli add-on si aggiungono dopo, esplicitamente).
+    const next: Record<string, boolean> = {}; MODULES.forEach((m) => { next[m.key] = !!m.core || tr.includes.includes(m.key); });
     setActive(next); persistModules(next);
     try { localStorage.setItem("spigolestay:plan", k); localStorage.setItem("spigolestay:tier", k); } catch {}
   };
@@ -131,7 +133,7 @@ export default function AbbonamentoPage() {
                   <li key={m.key} className="flex items-start gap-1.5"><span className="text-[color:var(--ok)]">✓</span>{t(m.name)}</li>
                 ))}
               </ul>
-              <button onClick={() => choose(tr.key)} disabled={on} className={`mt-4 rounded-lg py-2 text-sm font-semibold transition ${on ? "cursor-default border border-line text-dim" : "bg-focus text-white hover:opacity-90"}`}>{on ? t("Piano attivo") : t("Scegli")} {tr.name}</button>
+              <button onClick={() => setPendingTier(tr.key)} disabled={on} className={`mt-4 rounded-lg py-2 text-sm font-semibold transition ${on ? "cursor-default border border-line text-dim" : "bg-focus text-white hover:opacity-90"}`}>{on ? t("Piano attivo") : t("Scegli")} {tr.name}</button>
             </div>
           );
         })}
@@ -201,7 +203,7 @@ export default function AbbonamentoPage() {
                   <div className="shrink-0 text-right">
                     <div className="font-mono text-sm font-semibold text-txt">+{eur(ADDON_PRICE[m.key] || 0)}<span className="text-[10px] font-normal text-faint">{t("/mese")}</span></div>
                   </div>
-                  <button onClick={() => toggleAddon(m.key)} className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${on ? "bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] text-[color:var(--ok)]" : "border border-line text-txt hover:bg-wash"}`}>{on ? `${t("Attivo")} ✓` : t("Aggiungi")}</button>
+                  <button onClick={() => setPendingAddon(m.key)} className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${on ? "bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] text-[color:var(--ok)]" : "border border-line text-txt hover:bg-wash"}`}>{on ? `${t("Attivo")} ✓` : t("Aggiungi")}</button>
                 </div>
               );
             })}
@@ -280,6 +282,53 @@ export default function AbbonamentoPage() {
       </div>
 
       <p className="mt-4 text-xs text-faint">{t("Ogni piano include 6 camere per struttura; le camere in più costano")} {eur(ROOM_OVERAGE)}{t("/camera/mese. I prezzi si intendono per mese; con la fatturazione annuale risparmi il 20%.")}</p>
+
+      {/* Conferma cambio piano */}
+      {pendingTier && (() => {
+        const pt = TIERS.find((x) => x.key === pendingTier)!;
+        const up = TIERS.findIndex((x) => x.key === pendingTier) > TIERS.findIndex((x) => x.key === tier.key);
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setPendingTier(null)}>
+            <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="font-display text-lg font-bold text-txt">{up ? t("Passa al piano") : t("Cambia nel piano")} {pt.name}</div>
+              <p className="mt-1 text-sm text-dim">{t("Vuoi confermare il cambio di piano?")}</p>
+              <div className="mt-3 space-y-1 rounded-lg border border-line bg-wash p-3 text-sm">
+                <div className="flex justify-between"><span className="text-dim">{t("Da")}</span><span className="font-semibold text-txt">{tier.name} · {eur(tier.price)}{t("/mese")}</span></div>
+                <div className="flex justify-between"><span className="text-dim">{t("A")}</span><span className="font-semibold text-txt">{pt.name} · {eur(annual ? Math.round(pt.price * (1 - ANNUAL_OFF)) : pt.price)}{t("/mese")}</span></div>
+                <div className="flex justify-between"><span className="text-dim">{t("Strutture")}</span><span className="text-txt">{pt.structures === 1 ? t("1 struttura") : `${t("fino a")} ${pt.structures}`}</span></div>
+              </div>
+              <p className="mt-2 text-[11px] text-faint">{t("I moduli attivi verranno riportati a quelli inclusi nel piano; gli eventuali add-on li riaggiungi dopo.")}</p>
+              <div className="mt-4 flex gap-2">
+                <button onClick={() => setPendingTier(null)} className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
+                <button onClick={() => { choose(pendingTier!); setPendingTier(null); }} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{t("Conferma")}</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Conferma attivazione/rimozione add-on */}
+      {pendingAddon && (() => {
+        const m = MODULES.find((x) => x.key === pendingAddon)!;
+        const on = !!active[pendingAddon];
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setPendingAddon(null)}>
+            <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="font-display text-lg font-bold text-txt">{on ? t("Rimuovere il modulo?") : t("Attivare il modulo?")}</div>
+              <div className="mt-3 rounded-lg border border-line bg-wash p-3">
+                <div className="text-sm font-semibold text-txt">{t(m.name)}</div>
+                <div className="text-[11px] text-faint">{t(m.desc)}</div>
+                {!on && <div className="mt-2 font-mono text-sm font-semibold text-txt">+{eur(ADDON_PRICE[pendingAddon] || 0)}<span className="text-[10px] font-normal text-faint">{t("/mese")}</span></div>}
+              </div>
+              <p className="mt-2 text-[11px] text-faint">{on ? t("Il modulo verrà disattivato e tolto dal totale mensile.") : t("Il modulo verrà aggiunto al tuo piano e al totale mensile.")}</p>
+              <div className="mt-4 flex gap-2">
+                <button onClick={() => setPendingAddon(null)} className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
+                <button onClick={() => { toggleAddon(pendingAddon!); setPendingAddon(null); }} className={`flex-1 rounded-lg py-2 text-sm font-semibold text-white hover:opacity-90`} style={{ backgroundColor: on ? "var(--err)" : "var(--focus)" }}>{on ? t("Rimuovi") : t("Attiva")}</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

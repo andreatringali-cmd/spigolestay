@@ -39,6 +39,14 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   };
   // Ricarica al cambio pagina (così le modifiche fatte in Abbonamento/Utenti si riflettono).
   useEffect(() => { reload(); }, [pathname]);
+  // Ricarica anche quando moduli/utenti cambiano nella stessa pagina (es. add-on in Abbonamento).
+  useEffect(() => {
+    const h = () => reload();
+    window.addEventListener("spigolestay:modules", h);
+    window.addEventListener("spigolestay:users", h);
+    window.addEventListener("storage", h);
+    return () => { window.removeEventListener("spigolestay:modules", h); window.removeEventListener("spigolestay:users", h); window.removeEventListener("storage", h); };
+  }, []);
 
   const setUserId = (id: string) => { setUid(id); try { localStorage.setItem(CUR_KEY, id); } catch {} };
   const user = users.find((u) => u.id === userId) ?? users[0] ?? null;
