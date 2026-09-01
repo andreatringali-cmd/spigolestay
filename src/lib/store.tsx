@@ -115,7 +115,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(KEY);
+      // Prima di configurare (onboarding non completato) NON si caricano i dati demo.
+      const onboarded = localStorage.getItem("spigolestay:onboarded") === "1";
+      const raw = onboarded ? localStorage.getItem(KEY) : null;
       if (raw) {
         const d = JSON.parse(raw);
         if (Array.isArray(d.structures)) setStructures(d.structures.map((s: Structure) => s.photoColor ? s : { ...s, photoColor: STRUCTURES.find((x) => x.id === s.id)?.photoColor }));
@@ -136,6 +138,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (Array.isArray(d.bookings)) setBookings(d.bookings);
         if (Array.isArray(d.events)) setEvents(d.events);
         if (d.rateOverrides && typeof d.rateOverrides === "object") setRateOverrides(d.rateOverrides);
+      } else if (!onboarded) {
+        // Primo accesso / reset: si parte vuoti, sarà l'onboarding a creare struttura e camere.
+        setStructures([]); setRoomTypes([]); setUnits([]); setGuests([]); setBookings([]); setEvents([]); setRateOverrides({});
       }
       const savedStruct = localStorage.getItem("spigolestay:activestruct");
       if (savedStruct) setActiveStructureId(savedStruct);

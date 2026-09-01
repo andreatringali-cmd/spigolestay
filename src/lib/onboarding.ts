@@ -3,10 +3,10 @@
 
 export const ONBOARDED_KEY = "spigolestay:onboarded";
 
-// Il wizard si mostra SOLO dopo un reset esplicito (onboarded === "0"),
-// così i visitatori del demo continuano a vedere i dati d'esempio.
+// Il wizard si mostra finché la configurazione non è completata: al PRIMO ACCESSO
+// (nessun flag) e dopo un reset esplicito ("0"). Solo "1" = configurato → niente wizard.
 export function isOnboardingActive(): boolean {
-  try { return localStorage.getItem(ONBOARDED_KEY) === "0"; } catch { return false; }
+  try { return localStorage.getItem(ONBOARDED_KEY) !== "1"; } catch { return false; }
 }
 export function markOnboarded(): void {
   try { localStorage.setItem(ONBOARDED_KEY, "1"); } catch {}
