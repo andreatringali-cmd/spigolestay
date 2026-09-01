@@ -26,7 +26,10 @@ export default function Sidebar({
 }) {
   const { can, moduleOn } = useAccess();
   const { t } = useLang();
-  const visible = NAV.filter((n) => can(n.perm) && moduleOn(n.module));
+  // Mostra TUTTE le voci per cui hai i permessi (anche dei piani superiori): quelle non incluse
+  // nel piano appaiono col lucchetto e, cliccandole, portano all'attivazione dall'Abbonamento.
+  const visible = NAV.filter((n) => can(n.perm));
+  const locked = (n: (typeof NAV)[number]) => !moduleOn(n.module);
   const TOP = visible.filter((n) => !n.group);
   const GROUPS = Array.from(new Set(visible.filter((n) => n.group).map((n) => n.group)));
   const activeGroup = NAV.find((n) => isActive(n.href, pathname))?.group ?? GROUPS[0];
@@ -65,16 +68,18 @@ export default function Sidebar({
             // Modalità compatta: solo icone
             visible.map((n) => {
               const active = isActive(n.href, pathname);
+              const isLk = locked(n);
               const color = GROUP_COLOR[n.group] ?? "var(--focus)";
               return (
                 <Link
                   key={n.href}
                   href={n.href}
-                  title={t(n.label)}
-                  className={`flex items-center justify-center rounded-lg p-2.5 transition ${active ? "" : "text-dim hover:bg-wash hover:text-[color:var(--hovc)]"}`}
+                  title={isLk ? `${t(n.label)} · 🔒 ${t("attiva nel piano")}` : t(n.label)}
+                  className={`relative flex items-center justify-center rounded-lg p-2.5 transition ${active ? "" : "text-dim hover:bg-wash hover:text-[color:var(--hovc)]"} ${isLk && !active ? "opacity-55" : ""}`}
                   style={active ? { backgroundColor: mix(color, 16), color } : ({ "--hovc": color } as CSSProperties)}
                 >
                   <Icon name={n.icon} size={20} />
+                  {isLk && <span className="absolute right-0.5 top-0.5 text-[9px] leading-none">🔒</span>}
                 </Link>
               );
             })
@@ -118,12 +123,13 @@ export default function Sidebar({
                     <div className="mb-1 mt-0.5 flex flex-col gap-0.5">
                       {visible.filter((n) => n.group === group).map((n) => {
                         const active = isActive(n.href, pathname);
+                        const isLk = locked(n);
                         return (
                           <Link
                             key={n.href}
                             href={n.href}
                             onClick={onCloseMobile}
-                            className="flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition"
+                            className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition ${isLk && !active ? "opacity-60 hover:opacity-100" : ""}`}
                             style={
                               active
                                 ? { backgroundColor: mix(color, 14), color, borderLeft: `3px solid ${color}`, paddingLeft: 9 }
@@ -132,6 +138,7 @@ export default function Sidebar({
                           >
                             <span style={active ? { color } : { color: "var(--faint)" }}><Icon name={n.icon} size={18} /></span>
                             <span className={active ? "font-semibold" : ""}>{t(n.label)}</span>
+                            {isLk && <span className="ml-auto text-[11px] text-faint" title={t("Non incluso nel piano — attiva dall'Abbonamento")}>🔒</span>}
                           </Link>
                         );
                       })}

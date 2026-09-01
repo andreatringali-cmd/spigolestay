@@ -9,10 +9,9 @@ const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? cry
 const emailOk = (s: string) => /\S+@\S+\.\S+/.test(s);
 
 const TIERS = [
-  { key: "basic", name: "Basic", price: 29, max: 5, desc: "1 struttura · strumenti base", includes: ["pms", "cm", "cassa"] },
-  { key: "pro", name: "Pro", price: 49, max: 15, desc: "Multi-struttura · marketing e messaggi", includes: ["pms", "cm", "cassa", "booking", "site", "concierge", "housekeeping", "messaging"] },
-  { key: "enterprise", name: "Enterprise", price: 89, max: 30, desc: "Funzioni avanzate e multi-utente", includes: ["pms", "cm", "cassa", "booking", "site", "concierge", "housekeeping", "messaging", "team", "bi", "rms", "ratecheck"] },
-  { key: "premium", name: "Premium", price: 149, max: Infinity, desc: "Tutto incluso · camere illimitate", includes: ["pms", "cm", "cassa", "booking", "site", "concierge", "housekeeping", "messaging", "team", "bi", "rms", "ratecheck", "meta"] },
+  { key: "basic", name: "Basic", price: 29, structures: 1, desc: "1 struttura · l'essenziale per iniziare", includes: ["pms", "cm", "booking", "cassa"] },
+  { key: "pro", name: "Pro", price: 59, structures: 3, desc: "fino a 3 strutture · marketing e automazioni", includes: ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi"] },
+  { key: "ultimate", name: "Ultimate", price: 99, structures: 8, desc: "fino a 8 strutture · tutto incluso", includes: ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi", "site", "rms", "ratecheck", "team"] },
 ];
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-txt outline-none transition focus:border-focus";
@@ -49,7 +48,7 @@ export default function OnboardingWizard() {
   const [plan, setPlan] = useState("");
 
   const totalRooms = useMemo(() => camere.reduce((a, c) => a + (Number(c.count) || 0), 0), [camere]);
-  const autoTier = useMemo(() => TIERS.find((t) => totalRooms <= t.max) ?? TIERS[TIERS.length - 1], [totalRooms]);
+  const autoTier = TIERS[0]; // onboarding crea 1 struttura → consigliato Basic
   useEffect(() => { if (step === 5 && !plan) setPlan(autoTier.key); }, [step, plan, autoTier]);
 
   const setCam = (i: number, patch: Partial<Cam>) => setCamere((cs) => cs.map((c, j) => (j === i ? { ...c, ...patch } : c)));
@@ -194,7 +193,7 @@ export default function OnboardingWizard() {
 
           {step === 5 && (
             <div className="space-y-2.5">
-              <p className="text-xs text-faint">Consigliato per {totalRooms} camere: <b className="text-focus">{autoTier.name}</b>.</p>
+              <p className="text-xs text-faint">Per iniziare consigliamo <b className="text-focus">{autoTier.name}</b> (1 struttura, 6 camere incluse). Lo cambi quando vuoi da Abbonamento.</p>
               {TIERS.map((tps) => {
                 const on = plan === tps.key;
                 return (
@@ -202,7 +201,7 @@ export default function OnboardingWizard() {
                     <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${on ? "border-focus" : "border-line"}`}>{on && <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "var(--focus)" }} />}</span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2"><span className="text-sm font-bold text-txt">{tps.name}</span>{tps.key === autoTier.key && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-focus">consigliato</span>}</span>
-                      <span className="block text-[11px] text-dim">{tps.desc} · fino a {tps.max === Infinity ? "∞" : tps.max} camere</span>
+                      <span className="block text-[11px] text-dim">{tps.desc}</span>
                     </span>
                     <span className="shrink-0 font-mono text-sm font-bold text-txt">€{tps.price}<span className="text-[10px] font-normal text-faint">/mese</span></span>
                   </button>
