@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { STRUCTURE_TYPES } from "@/lib/types";
+import { STRUCTURE_TYPES, ROOM_TYPE_OPTIONS } from "@/lib/types";
 import { blankUser, fullPerms, USER_LANGS } from "@/lib/users";
 import { isOnboardingActive, markOnboarded } from "@/lib/onboarding";
 
@@ -190,13 +190,28 @@ export default function OnboardingWizard() {
 
           {step === 4 && (
             <div className="space-y-2">
-              {camere.map((c, i) => (
-                <div key={i} className="flex items-end gap-2">
-                  <label className="flex-1"><span className={lbl}>Tipologia</span><input value={c.name} onChange={(e) => setCam(i, { name: e.target.value })} className={inp} placeholder="Es. Deluxe, Suite, Family…" /></label>
-                  <label className="w-24"><span className={lbl}>N° camere</span><input value={c.count} onChange={(e) => setCam(i, { count: e.target.value.replace(/\D/g, "") })} inputMode="numeric" className={inp} placeholder="1" /></label>
-                  <button onClick={() => delCam(i)} disabled={camere.length <= 1} className="mb-0.5 grid h-[42px] w-10 shrink-0 place-items-center rounded-lg border border-line text-faint transition hover:text-[color:var(--err)] disabled:opacity-30" title="Rimuovi">✕</button>
-                </div>
-              ))}
+              {camere.map((c, i) => {
+                const isCustom = !!c.name && !ROOM_TYPE_OPTIONS.includes(c.name);
+                const selVal = isCustom ? "__other__" : c.name;
+                return (
+                  <div key={i} className="space-y-2 rounded-lg border border-line p-2">
+                    <div className="flex items-end gap-2">
+                      <label className="flex-1"><span className={lbl}>Tipologia</span>
+                        <select value={selVal} onChange={(e) => setCam(i, { name: e.target.value === "__other__" ? " " : e.target.value })} className={inp}>
+                          <option value="">Seleziona…</option>
+                          {ROOM_TYPE_OPTIONS.map((rt) => <option key={rt} value={rt}>{rt}</option>)}
+                          <option value="__other__">Altro (personalizzata)…</option>
+                        </select>
+                      </label>
+                      <label className="w-24"><span className={lbl}>N° camere</span><input value={c.count} onChange={(e) => setCam(i, { count: e.target.value.replace(/\D/g, "") })} inputMode="numeric" className={inp} placeholder="1" /></label>
+                      <button onClick={() => delCam(i)} disabled={camere.length <= 1} className="mb-0.5 grid h-[42px] w-10 shrink-0 place-items-center rounded-lg border border-line text-faint transition hover:text-[color:var(--err)] disabled:opacity-30" title="Rimuovi">✕</button>
+                    </div>
+                    {selVal === "__other__" && (
+                      <input value={c.name.trimStart()} onChange={(e) => setCam(i, { name: e.target.value })} className={inp} placeholder="Nome tipologia personalizzata (es. Camera con jacuzzi)" autoFocus />
+                    )}
+                  </div>
+                );
+              })}
               <button onClick={addCam} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-focus hover:bg-wash">+ Aggiungi tipologia</button>
               <p className="pt-1 text-[11px] text-faint">Totale camere: <b className="text-dim">{totalRooms}</b>. Creeremo le singole camere numerate automaticamente (le rinomini poi da «Camere»).</p>
             </div>

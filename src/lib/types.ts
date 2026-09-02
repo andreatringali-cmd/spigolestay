@@ -119,10 +119,12 @@ export const CANCEL_POLICIES: { key: "flessibile" | "moderata" | "rigida"; label
 
 // Tipologie di camera comuni (suggerimenti; si può comunque scrivere una custom).
 export const ROOM_TYPE_OPTIONS = [
-  "Standard", "Premium", "Deluxe", "Superior", "Economy",
-  "Singola", "Matrimoniale", "Doppia", "DUS (Doppia uso singola)", "Tripla", "Quadrupla", "Familiare",
-  "Suite", "Junior Suite", "Mini appartamento", "Monolocale", "Bilocale", "Trilocale", "Appartamento",
-  "Dormitorio", "Camera vista mare",
+  "Standard", "Comfort", "Premium", "Superior", "Deluxe", "Economy",
+  "Singola", "Doppia", "Matrimoniale", "Matrimoniale con balcone", "Matrimoniale vista mare",
+  "DUS (Doppia uso singola)", "Tripla", "Quadrupla", "Familiare",
+  "Junior Suite", "Suite", "Suite vista mare", "Attico",
+  "Monolocale", "Bilocale", "Trilocale", "Mini appartamento", "Appartamento",
+  "Camera con balcone", "Camera vista mare", "Camera con vista giardino", "Dormitorio",
 ];
 
 export interface RoomType {
