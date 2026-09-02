@@ -154,6 +154,7 @@ export default function OnboardingWizard() {
               <label className="col-span-2"><span className={lbl}>Email *</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" className={inp} placeholder="mario@esempio.it" /></label>
               <label><span className={lbl}>Telefono *</span><input value={phone} onChange={(e) => setPhone(e.target.value)} className={inp} placeholder="+39 333 …" /></label>
               <label><span className={lbl}>Lingua</span><select value={language} onChange={(e) => setLanguage(e.target.value)} className={inp}>{USER_LANGS.map((l) => <option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}</select></label>
+              <p className="col-span-2 text-[11px] text-faint">Useremo questi dati per l&apos;intestazione dell&apos;account e le comunicazioni. I dati fiscali (P.IVA/CF) li aggiungerai dopo, nell&apos;area Abbonamento.</p>
             </div>
           )}
 
