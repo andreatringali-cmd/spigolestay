@@ -17,7 +17,7 @@ const ALL = ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "mess
 
 interface Tier { key: string; name: string; price: number; structures: number; includes: string[]; tagline: string }
 const TIERS: Tier[] = [
-  { key: "basic", name: "Basic", price: 29, structures: 1, includes: ["pms", "cm", "booking", "cassa"], tagline: "Per iniziare" },
+  { key: "basic", name: "Basic", price: 39, structures: 1, includes: ["pms", "cm", "booking", "cassa"], tagline: "Per iniziare" },
   { key: "pro", name: "Pro", price: 59, structures: 3, includes: ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi"], tagline: "In crescita" },
   { key: "ultimate", name: "Ultimate", price: 99, structures: 8, includes: ALL, tagline: "Tutto incluso" },
 ];
@@ -44,8 +44,8 @@ const MODULES: Module[] = [
 const ADDON_PRICE: Record<string, number> = { cm: 0, booking: 0, cassa: 0, concierge: 8, housekeeping: 8, messaging: 7, meta: 6, bi: 9, site: 9, rms: 10, ratecheck: 12, team: 6 };
 
 const INVOICES = [
-  { id: "2026-08", date: "01/08/2026", amount: 29, status: "Pagata" },
-  { id: "2026-07", date: "01/07/2026", amount: 29, status: "Pagata" },
+  { id: "2026-08", date: "01/08/2026", amount: 39, status: "Pagata" },
+  { id: "2026-07", date: "01/07/2026", amount: 39, status: "Pagata" },
 ];
 
 export default function AbbonamentoPage() {

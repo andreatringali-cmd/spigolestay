@@ -18,8 +18,24 @@ const guessBeds = (name: string): string => {
   return "2"; // doppia, matrimoniale, standard, suite, ecc.
 };
 
+const MODULE_LABELS: Record<string, string> = {
+  pms: "PMS · prenotazioni, calendario, ospiti",
+  cm: "Channel Manager · sincro OTA",
+  booking: "Booking Engine · prenotazioni dal tuo sito",
+  cassa: "Cassa · prima nota",
+  concierge: "Web Concierge · check-in online, upsell",
+  housekeeping: "Housekeeping · planning pulizie",
+  messaging: "Messaggi & automazioni ospiti",
+  meta: "Meta Search · Google, Trivago…",
+  bi: "Statistiche & BI",
+  site: "Sito web integrato",
+  rms: "Revenue · prezzi dinamici",
+  ratecheck: "Rate checker · confronto tariffe",
+  team: "Utenti & permessi · multi-utente",
+};
+
 const TIERS = [
-  { key: "basic", name: "Basic", price: 29, structures: 1, desc: "1 struttura · l'essenziale per iniziare", includes: ["pms", "cm", "booking", "cassa"] },
+  { key: "basic", name: "Basic", price: 39, structures: 1, desc: "1 struttura · l'essenziale per iniziare", includes: ["pms", "cm", "booking", "cassa"] },
   { key: "pro", name: "Pro", price: 59, structures: 3, desc: "fino a 3 strutture · marketing e automazioni", includes: ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi"] },
   { key: "ultimate", name: "Ultimate", price: 99, structures: 8, desc: "fino a 8 strutture · tutto incluso", includes: ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi", "site", "rms", "ratecheck", "team"] },
 ];
@@ -231,19 +247,28 @@ export default function OnboardingWizard() {
           {step === 5 && (
             <div className="space-y-2.5">
               <p className="text-xs text-faint">Per iniziare consigliamo <b className="text-focus">{autoTier.name}</b> (1 struttura, 6 camere incluse). Lo cambi quando vuoi da Abbonamento.</p>
-              {TIERS.map((tps) => {
+              {TIERS.map((tps, idx) => {
                 const on = plan === tps.key;
+                const prev = idx > 0 ? TIERS[idx - 1] : null;
+                const feats = tps.includes.filter((k) => k !== "pms" && (!prev || !prev.includes.includes(k)));
                 return (
-                  <button key={tps.key} onClick={() => setPlan(tps.key)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : "border-line bg-surface hover:bg-wash"}`}>
-                    <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${on ? "border-focus" : "border-line"}`}>{on && <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "var(--focus)" }} />}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2"><span className="text-sm font-bold text-txt">{tps.name}</span>{tps.key === autoTier.key && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-focus">consigliato</span>}</span>
-                      <span className="block text-[11px] text-dim">{tps.desc}</span>
-                    </span>
-                    <span className="shrink-0 font-mono text-sm font-bold text-txt">€{tps.price}<span className="text-[10px] font-normal text-faint">/mese</span></span>
+                  <button key={tps.key} onClick={() => setPlan(tps.key)} className={`block w-full rounded-xl border p-3 text-left transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : "border-line bg-surface hover:bg-wash"}`}>
+                    <div className="flex items-center gap-3">
+                      <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${on ? "border-focus" : "border-line"}`}>{on && <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "var(--focus)" }} />}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2"><span className="text-sm font-bold text-txt">{tps.name}</span>{tps.key === autoTier.key && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-focus">consigliato</span>}</span>
+                        <span className="block text-[11px] text-dim">{tps.structures === 1 ? "1 struttura" : `fino a ${tps.structures} strutture`} · 6 camere incluse/struttura</span>
+                      </span>
+                      <span className="shrink-0 font-mono text-sm font-bold text-txt">€{tps.price}<span className="text-[10px] font-normal text-faint">/mese</span></span>
+                    </div>
+                    <ul className="mt-2 space-y-0.5 pl-8 text-[11px] text-dim">
+                      {prev && <li className="font-semibold text-txt">Tutto {prev.name}, più:</li>}
+                      {feats.map((k) => <li key={k} className="flex items-start gap-1.5"><span className="text-[color:var(--ok)]">✓</span>{MODULE_LABELS[k] ?? k}</li>)}
+                    </ul>
                   </button>
                 );
               })}
+              <p className="pl-8 text-[11px] text-faint">Ogni piano include il <b className="text-dim">PMS</b> (prenotazioni, calendario, ospiti). Potrai aggiungere singoli moduli extra in qualsiasi momento dall&apos;area Abbonamento.</p>
             </div>
           )}
 
