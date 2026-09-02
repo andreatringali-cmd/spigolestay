@@ -68,7 +68,7 @@ export default function OnboardingWizard() {
   const canNext = (() => {
     switch (step) {
       case 1: return !!(firstName.trim() && lastName.trim() && emailOk(email) && phone.trim());
-      case 2: return !!(username.trim().length >= 3 && pw.length >= 4 && pw === pw2);
+      case 2: return !!(username.trim().length >= 3 && pw.length >= 6 && pw === pw2);
       case 3: return !!(sName.trim() && sType && sCity.trim());
       case 4: return camere.some((c) => c.name.trim() && Number(c.count) > 0);
       case 5: return !!plan;
@@ -162,11 +162,12 @@ export default function OnboardingWizard() {
             <div className="space-y-3">
               <label className="block"><span className={lbl}>Nome utente *</span><input value={username} onChange={(e) => setUsername(e.target.value)} className={inp} placeholder="mario.rossi" autoCapitalize="none" /></label>
               <div className="grid grid-cols-2 gap-3">
-                <label><span className={lbl}>Password *</span><input value={pw} onChange={(e) => setPw(e.target.value)} type={showPw ? "text" : "password"} className={inp} placeholder="min 4 caratteri" /></label>
+                <label><span className={lbl}>Password *</span><input value={pw} onChange={(e) => setPw(e.target.value)} type={showPw ? "text" : "password"} className={inp} placeholder="min 6 caratteri" /></label>
                 <label><span className={lbl}>Conferma password *</span><input value={pw2} onChange={(e) => setPw2(e.target.value)} type={showPw ? "text" : "password"} className={inp} placeholder="ripeti" /></label>
               </div>
               <label className="flex items-center gap-2 text-xs text-dim"><input type="checkbox" checked={showPw} onChange={(e) => setShowPw(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Mostra password</label>
               {pw && pw2 && pw !== pw2 && <p className="text-xs font-medium text-[color:var(--err)]">Le password non coincidono.</p>}
+              <p className="text-[11px] text-faint">Per recuperare l&apos;accesso useremo l&apos;email inserita al passo precedente.</p>
               <p className="rounded-lg bg-wash px-3 py-2 text-[11px] text-faint">Prototipo: le credenziali restano salvate solo su questo dispositivo, non è un'autenticazione reale.</p>
             </div>
           )}
