@@ -748,17 +748,22 @@ export default function CalendarGrid() {
           <div className="flex" style={{ width: gridW, height: 26 }}>
             {gStrip.map((c) => {
               const inSel = editableAvail && sel?.kind === "avail" && sel.typeId === keyId && !!(selLo && selHi && c.iso >= selLo && c.iso <= selHi);
+              const noRate = c.rate <= 0; // tariffa mancante → chiusa alla vendita (automatico)
               const scarceCol = c.avail <= 0 ? "var(--err)" : c.avail <= 1 && cap > 1 ? "var(--warn)" : null;
               return (
                 <div key={c.iso}
                   onClick={editableAvail ? () => clickAvail(keyId, c.iso) : undefined}
                   onMouseEnter={() => { if (editableAvail && sel?.kind === "avail" && sel.typeId === keyId) setSelHover(c.iso); }}
-                  title={editableAvail ? (sel?.kind === "avail" ? "Clicca il giorno finale" : `${c.avail} disponibili${c.closed ? ` · ${c.closed} chiuse alla vendita` : ""}. Clicca per chiudere/riaprire le vendite (poi clicca il giorno finale).`) : `${c.avail} disponibili (somma tipologie). Modifica nella vista Esplosa.`}
+                  title={noRate ? "Tariffa mancante (€0): camera chiusa alla vendita. Imposta un prezzo per riaprirla." : editableAvail ? (sel?.kind === "avail" ? "Clicca il giorno finale" : `${c.avail} disponibili${c.closed ? ` · ${c.closed} chiuse alla vendita` : ""}. Clicca per chiudere/riaprire le vendite (poi clicca il giorno finale).`) : `${c.avail} disponibili (somma tipologie). Modifica nella vista Esplosa.`}
                   className={`flex items-center justify-center border-r border-line ${editableAvail ? "cursor-pointer hover:bg-wash" : "cursor-default"}`}
-                  style={{ width: cellW, ...(inSel ? { backgroundColor: "color-mix(in srgb, var(--focus) 20%, transparent)" } : c.closed ? { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" } : {}) }}>
-                  <span className="inline-flex min-w-[22px] items-center justify-center gap-0.5 rounded px-1 font-mono text-xs font-bold tabular-nums" style={scarceCol ? { backgroundColor: `color-mix(in srgb, ${scarceCol} 18%, transparent)`, color: scarceCol } : { color: "var(--dim)" }}>
-                    {c.closed ? <span title={`${c.closed} chiuse`} className="text-[9px] text-[color:var(--err)]">✕</span> : null}{c.avail}
-                  </span>
+                  style={{ width: cellW, ...(inSel ? { backgroundColor: "color-mix(in srgb, var(--focus) 20%, transparent)" } : noRate ? { backgroundColor: "color-mix(in srgb, var(--err) 22%, transparent)" } : c.closed ? { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" } : {}) }}>
+                  {noRate ? (
+                    <span title="Chiusa · tariffa mancante" className="font-mono text-[11px] font-bold text-[color:var(--err)]">✕</span>
+                  ) : (
+                    <span className="inline-flex min-w-[22px] items-center justify-center gap-0.5 rounded px-1 font-mono text-xs font-bold tabular-nums" style={scarceCol ? { backgroundColor: `color-mix(in srgb, ${scarceCol} 18%, transparent)`, color: scarceCol } : { color: "var(--dim)" }}>
+                      {c.closed ? <span title={`${c.closed} chiuse`} className="text-[9px] text-[color:var(--err)]">✕</span> : null}{c.avail}
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -1344,6 +1349,7 @@ export default function CalendarGrid() {
         const u = units.find((x) => x.id === pick.unitId);
         const nn = nights(pick.from, pick.to) + 1;
         const pretty = `${parseISO(pick.from).toLocaleDateString("it-IT", { day: "numeric", month: "short" })} → ${parseISO(pick.to).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}`;
+        const noRate = rangeIsos(pick.from, pick.to).some((iso) => rateFor(pick.roomTypeId, iso) <= 0); // tariffa mancante → vendita bloccata
         return (
           <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]">
             <button aria-label="Chiudi" onClick={() => setPick(null)} className="absolute inset-0 bg-black/40" />
@@ -1362,13 +1368,15 @@ export default function CalendarGrid() {
                   </span>
                 </button>
                 <button
-                  onClick={() => { openNewBooking({ unitId: pick.unitId, structureId: pick.structureId, checkIn: pick.from, checkOut: shiftISO(pick.to, 1) }); setPick(null); }}
-                  className="flex items-center gap-3 rounded-xl border border-line bg-paper px-4 py-3 text-left transition hover:border-focus hover:bg-wash"
+                  disabled={noRate}
+                  onClick={noRate ? undefined : () => { openNewBooking({ unitId: pick.unitId, structureId: pick.structureId, checkIn: pick.from, checkOut: shiftISO(pick.to, 1) }); setPick(null); }}
+                  title={noRate ? "Tariffa a €0: imposta un prezzo per poter vendere queste date" : undefined}
+                  className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${noRate ? "cursor-not-allowed border-line opacity-55" : "border-line bg-paper hover:border-focus hover:bg-wash"}`}
                 >
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: "var(--focus)" }}>+</span>
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: noRate ? "var(--faint)" : "var(--focus)" }}>+</span>
                   <span>
                     <span className="block text-sm font-semibold text-txt">Nuova prenotazione</span>
-                    <span className="block text-[11px] text-dim">Ospite, canale, date e prezzo</span>
+                    <span className="block text-[11px] text-dim">{noRate ? "Tariffa a €0 — imposta un prezzo per vendere" : "Ospite, canale, date e prezzo"}</span>
                   </span>
                 </button>
                 <button

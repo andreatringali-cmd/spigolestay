@@ -171,6 +171,7 @@ function Engine() {
                 const free = availUnits(rt).length;
                 const cheapest = plans.reduce((min, p) => Math.min(min, stayPrice(rt, p)), Infinity);
                 const tooSmall = (rt.maxOccupancy ?? rt.beds) < adults + children;
+                const noRate = !Number.isFinite(cheapest) || cheapest <= 0; // tariffa non impostata → non vendibile
                 return (
                   <div key={rt.id} className={`${box} overflow-hidden`}>
                     <div className="flex flex-col gap-3 p-4 sm:flex-row">
@@ -190,13 +191,13 @@ function Engine() {
                           </div>
                           <div className="text-right">
                             <div className="text-[11px] text-faint">da</div>
-                            <div className="font-mono text-xl font-bold text-txt">{eur(cheapest)}</div>
+                            <div className="font-mono text-xl font-bold text-txt">{noRate ? "—" : eur(cheapest)}</div>
                             <div className="text-[11px] text-faint">{nights} {nights === 1 ? "notte" : "notti"}</div>
                           </div>
                         </div>
                         {(rt.amenities ?? []).length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{(rt.amenities ?? []).slice(0, 6).map((a) => <span key={a} className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{a}</span>)}</div>}
                         {/* Piani */}
-                        {free > 0 && !tooSmall ? (
+                        {free > 0 && !tooSmall && !noRate ? (
                           <div className="mt-3 flex flex-col gap-1.5">
                             {plans.map((p) => (
                               <div key={p.id} className="flex items-center justify-between rounded-lg border border-line px-3 py-2">
@@ -209,7 +210,7 @@ function Engine() {
                             ))}
                           </div>
                         ) : (
-                          <div className="mt-3 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-dim">{tooSmall ? "Capienza insufficiente per il numero di ospiti." : "Non disponibile per le date scelte."}</div>
+                          <div className="mt-3 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-dim">{tooSmall ? "Capienza insufficiente per il numero di ospiti." : noRate ? "Tariffa non ancora disponibile per queste date." : "Non disponibile per le date scelte."}</div>
                         )}
                       </div>
                     </div>
