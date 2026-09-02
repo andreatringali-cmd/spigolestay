@@ -233,8 +233,8 @@ export default function OnboardingWizard() {
                           <option value="__other__">Altro (personalizzata)…</option>
                         </select>
                       </label>
-                      <label className="w-20"><span className={lbl}>N° camere</span><input value={c.count} onChange={(e) => setCam(i, { count: e.target.value.replace(/\D/g, "") })} inputMode="numeric" className={inp} placeholder="1" /></label>
-                      <label className="w-20"><span className={lbl}>Posti letto</span><input value={c.beds} onChange={(e) => setCam(i, { beds: e.target.value.replace(/\D/g, "").slice(0, 2) })} inputMode="numeric" className={inp} placeholder="2" /></label>
+                      <label className="w-20"><span className={lbl}>N° camere</span><Stepper value={c.count} onChange={(v) => setCam(i, { count: v })} min={1} /></label>
+                      <label className="w-20"><span className={lbl}>Posti letto</span><Stepper value={c.beds} onChange={(v) => setCam(i, { beds: v })} min={1} /></label>
                       <button onClick={() => delCam(i)} disabled={camere.length <= 1} className="mb-0.5 grid h-[42px] w-10 shrink-0 place-items-center rounded-lg border border-line text-faint transition hover:text-[color:var(--err)] disabled:opacity-30" title="Rimuovi">✕</button>
                     </div>
                     {selVal === "__other__" && (
@@ -331,6 +331,21 @@ export default function OnboardingWizard() {
           )}
         </div>
         {!canNext && step > 0 && <p className="mt-2 text-right text-[11px] text-faint">Completa i campi obbligatori (*) per continuare.</p>}
+      </div>
+    </div>
+  );
+}
+
+// Campo numerico con freccette +/− a destra.
+function Stepper({ value, onChange, min = 0, max = 99 }: { value: string; onChange: (v: string) => void; min?: number; max?: number }) {
+  const n = Number(value) || 0;
+  const set = (x: number) => onChange(String(Math.max(min, Math.min(max, x))));
+  return (
+    <div className="relative">
+      <input value={value} onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 2))} inputMode="numeric" className={`${inp} pr-6 text-center`} />
+      <div className="absolute inset-y-1 right-1 flex w-4 flex-col">
+        <button type="button" tabIndex={-1} onClick={() => set(n + 1)} className="flex h-1/2 items-center justify-center rounded-sm text-[8px] leading-none text-faint transition hover:bg-wash hover:text-txt" aria-label="Aumenta">▲</button>
+        <button type="button" tabIndex={-1} onClick={() => set(n - 1)} className="flex h-1/2 items-center justify-center rounded-sm text-[8px] leading-none text-faint transition hover:bg-wash hover:text-txt" aria-label="Diminuisci">▼</button>
       </div>
     </div>
   );
