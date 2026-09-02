@@ -118,7 +118,7 @@ export default function OnboardingWizard() {
       const name = c.name.trim(); const n = Number(c.count) || 0;
       if (!name || n <= 0) return;
       const rtId = uid(); const beds = Number(c.beds) || 2;
-      roomTypes.push({ id: rtId, structureId: sid, name, beds, basePrice: 80, maxOccupancy: beds });
+      roomTypes.push({ id: rtId, structureId: sid, name, beds, basePrice: 0, maxOccupancy: beds });
       for (let i = 1; i <= n; i++) units.push({ id: uid(), structureId: sid, roomTypeId: rtId, name: `${name} ${i}`, code: `${name.slice(0, 3).toUpperCase()}${i}` });
     });
     try {
