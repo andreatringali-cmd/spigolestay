@@ -136,10 +136,14 @@ export default function OnboardingWizard() {
             <div className="rounded-xl border border-line bg-surface p-5 text-sm text-dim">
               <p>Imposteremo, uno alla volta:</p>
               <ul className="mt-3 space-y-2">
-                {[["👤", "Il tuo profilo e le credenziali di accesso"], ["🏠", "La tua struttura e le camere"], ["💳", "Il piano di abbonamento"], ["📅", "Alla fine potrai importare le prenotazioni da Octorate (CSV/iCal)"]].map(([i, tx]) => (
+                {[["👤", "Profilo e credenziali di accesso"], ["🏠", "Struttura e camere"], ["💳", "Piano di abbonamento"], ["📅", "A breve: import prenotazioni da Octorate (CSV/iCal)"]].map(([i, tx]) => (
                   <li key={tx} className="flex items-start gap-2.5"><span className="text-base">{i}</span><span className="text-txt">{tx}</span></li>
                 ))}
               </ul>
+              <div className="mt-4 rounded-lg bg-wash px-3 py-2.5 text-[12px] text-dim">
+                <span className="font-semibold text-txt">Ti servono:</span> nome struttura, indirizzo e numero camere.
+              </div>
+              <p className="mt-2 text-[11px] text-faint">Potrai modificare tutto in seguito dalle Impostazioni. I dati restano su questo dispositivo (prototipo).</p>
             </div>
           )}
 
