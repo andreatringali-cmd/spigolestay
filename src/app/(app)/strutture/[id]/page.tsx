@@ -37,7 +37,7 @@ export default function StrutturaSchedaPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const isNew = params.id === "nuovo";
-  const { structures, roomTypes, units, addStructure, updateStructure, deleteStructure } = useData();
+  const { structures, roomTypes, units, addStructure, updateStructure } = useData();
   const ask = useConfirm();
   const { t } = useLang();
 
@@ -69,7 +69,15 @@ export default function StrutturaSchedaPage() {
     else updateStructure(params.id, patch);
     router.push("/strutture");
   };
-  const remove = async () => { if (!(await ask({ title: t("Elimina struttura"), message: `${t("Eliminare")} "${f.name}" ${t("e tutte le sue camere? L'operazione non è reversibile.")}`, danger: true, confirmLabel: t("Elimina") }))) return; deleteStructure(params.id); router.push("/strutture"); };
+  const remove = async () => {
+    const go = await ask({
+      title: t("Serve l'assistenza"),
+      message: t("Eliminare una struttura è irreversibile e cancella tutti i dati collegati (camere, prenotazioni, ospiti, tariffe). Per sicurezza l'operazione la esegue solo l'assistenza. Vuoi scrivere ora?"),
+      confirmLabel: t("Scrivi all'assistenza"),
+      cancelLabel: t("Annulla"),
+    });
+    if (go) window.location.href = `mailto:assistenza@xenora.app?subject=${encodeURIComponent(`Richiesta eliminazione struttura: ${f.name ?? ""}`)}`;
+  };
 
   const mapsUrl = f.lat && f.lng ? `https://www.google.com/maps?q=${f.lat},${f.lng}` : f.address ? `https://www.google.com/maps/search/${encodeURIComponent(`${f.address} ${f.city ?? ""}`)}` : null;
   // Anteprima mappa (embed Google Maps, senza API key).
@@ -129,7 +137,7 @@ export default function StrutturaSchedaPage() {
         actions={
           <div className="flex items-center gap-2">
             {!isNew && <Link href="/camere" className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">{t("Camere")} ({nCamere})</Link>}
-            {!isNew && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
+            {!isNew && <button onClick={remove} title={t("L'eliminazione è gestita dall'assistenza")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Elimina struttura")}</button>}
             <button onClick={() => router.push("/strutture")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
             <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea struttura") : t("Salva")}</button>
           </div>

@@ -5,7 +5,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Structure, RoomType, Unit, Guest, Booking, Channel, CalEvent } from "./types";
-import { STRUCTURES, ROOM_TYPES, UNITS, GUESTS, BOOKINGS } from "./mock-data";
+import { STRUCTURES, ROOM_TYPES, UNITS } from "./mock-data";
 import { playSound } from "./sound";
 
 export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "quote" | "payment";
@@ -94,11 +94,13 @@ const uid = () =>
     : `id-${Math.floor(performance.now() * 1000)}`;
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [structures, setStructures] = useState<Structure[]>(STRUCTURES);
-  const [roomTypes, setRoomTypes] = useState<RoomType[]>(ROOM_TYPES);
-  const [units, setUnits] = useState<Unit[]>(UNITS);
-  const [guests, setGuests] = useState<Guest[]>(GUESTS);
-  const [bookings, setBookings] = useState<Booking[]>(BOOKINGS);
+  // Si parte a VUOTO: i dati reali arrivano dal caricamento (localStorage) nell'effetto di mount.
+  // Così al refresh non c'è il "flash" dei vecchi dati demo prima del caricamento.
+  const [structures, setStructures] = useState<Structure[]>([]);
+  const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [guests, setGuests] = useState<Guest[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [rateOverrides, setRateOverrides] = useState<Record<string, number>>({});
   const [activities, setActivities] = useState<Activity[]>([]);
