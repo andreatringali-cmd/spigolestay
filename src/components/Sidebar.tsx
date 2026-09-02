@@ -73,13 +73,13 @@ export default function Sidebar({
               return (
                 <Link
                   key={n.href}
-                  href={n.href}
-                  title={isLk ? `${t(n.label)} · 🔒 ${t("attiva nel piano")}` : t(n.label)}
+                  href={isLk ? "/abbonamento" : n.href}
+                  title={isLk ? `${t(n.label)} · ${t("attiva nel piano")}` : t(n.label)}
                   className={`relative flex items-center justify-center rounded-lg p-2.5 transition ${active ? "" : "text-dim hover:bg-wash hover:text-[color:var(--hovc)]"} ${isLk && !active ? "opacity-55" : ""}`}
                   style={active ? { backgroundColor: mix(color, 16), color } : ({ "--hovc": color } as CSSProperties)}
                 >
                   <Icon name={n.icon} size={20} />
-                  {isLk && <span className="absolute right-0.5 top-0.5 text-[9px] leading-none">🔒</span>}
+                  {isLk && <span className="absolute right-0 top-0" style={{ color: "var(--txt)" }}><Icon name="lock" size={10} /></span>}
                 </Link>
               );
             })
@@ -127,7 +127,7 @@ export default function Sidebar({
                         return (
                           <Link
                             key={n.href}
-                            href={n.href}
+                            href={isLk ? "/abbonamento" : n.href}
                             onClick={onCloseMobile}
                             className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition ${isLk && !active ? "opacity-60 hover:opacity-100" : ""}`}
                             style={
@@ -138,7 +138,7 @@ export default function Sidebar({
                           >
                             <span style={active ? { color } : { color: "var(--faint)" }}><Icon name={n.icon} size={18} /></span>
                             <span className={active ? "font-semibold" : ""}>{t(n.label)}</span>
-                            {isLk && <span className="ml-auto text-[11px] text-faint" title={t("Non incluso nel piano — attiva dall'Abbonamento")}>🔒</span>}
+                            {isLk && <span className="ml-auto" style={{ color: "var(--txt)" }} title={t("Non incluso nel piano — attiva dall'Abbonamento")}><Icon name="lock" size={12} /></span>}
                           </Link>
                         );
                       })}

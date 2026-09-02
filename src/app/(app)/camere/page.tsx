@@ -10,6 +10,7 @@ import { AV_COLORS } from "@/lib/users";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { ROOMS_PER_STRUCT, ROOM_OVERAGE } from "@/lib/plan";
 import { useLang } from "@/lib/i18n";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
@@ -36,9 +37,24 @@ export default function CamerePage() {
   const router = useRouter();
   const { t } = useLang();
   const { structures, roomTypes, units, activeStructureId } = useData();
+  const ask = useConfirm();
   const [localS, setLocalS] = useState("all");
   const [highlight, setHighlight] = useState<string | null>(null);
   const [roomModal, setRoomModal] = useState<{ structureId: string; unit?: Unit } | null>(null);
+
+  // Avvisa quando si supera il numero di camere incluse nel piano (6 per struttura).
+  const addRoom = async (structureId: string, currentCount: number) => {
+    if (currentCount >= ROOMS_PER_STRUCT) {
+      const ok = await ask({
+        title: t("Camera aggiuntiva"),
+        message: `${t("Il piano include")} ${ROOMS_PER_STRUCT} ${t("camere per struttura")}. ${t("Questa camera in più costa")} ${ROOM_OVERAGE}€ ${t("al mese (fatturata a fine mese). Vuoi aggiungerla?")}`,
+        confirmLabel: t("Aggiungi camera"),
+        cancelLabel: t("Annulla"),
+      });
+      if (!ok) return;
+    }
+    setRoomModal({ structureId });
+  };
 
   useEffect(() => {
     const u = new URLSearchParams(window.location.search).get("u");
@@ -82,7 +98,7 @@ export default function CamerePage() {
                 <div className="font-display text-lg font-bold text-txt">{s.name}</div>
                 <div className="flex gap-2">
                   <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
-                  <button onClick={() => setRoomModal({ structureId: s.id })} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
+                  <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
                 </div>
               </div>
 
