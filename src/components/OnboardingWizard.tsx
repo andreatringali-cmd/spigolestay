@@ -7,6 +7,16 @@ import { isOnboardingActive, markOnboarded } from "@/lib/onboarding";
 
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `id-${Math.random().toString(36).slice(2)}`);
 const emailOk = (s: string) => /\S+@\S+\.\S+/.test(s);
+// Posti letto suggeriti dalla tipologia (modificabili).
+const guessBeds = (name: string): string => {
+  const s = name.toLowerCase();
+  if (s.includes("singola") || s.includes("uso singola") || s.includes("dus")) return "1";
+  if (s.includes("tripla")) return "3";
+  if (s.includes("quadrupla") || s.includes("familiare") || s.includes("family")) return "4";
+  if (s.includes("dormitorio")) return "6";
+  if (s.includes("appartamento") || s.includes("bilocale") || s.includes("trilocale") || s.includes("attico")) return "4";
+  return "2"; // doppia, matrimoniale, standard, suite, ecc.
+};
 
 const TIERS = [
   { key: "basic", name: "Basic", price: 29, structures: 1, desc: "1 struttura · l'essenziale per iniziare", includes: ["pms", "cm", "booking", "cassa"] },
@@ -17,7 +27,7 @@ const TIERS = [
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-txt outline-none transition focus:border-focus";
 const lbl = "mb-1 block text-xs font-medium text-dim";
 
-type Cam = { name: string; count: string };
+type Cam = { name: string; count: string; beds: string };
 
 export default function OnboardingWizard() {
   const [active, setActive] = useState(false);
@@ -45,7 +55,7 @@ export default function OnboardingWizard() {
   const [sProvince, setSProvince] = useState("");
   const [sCin, setSCin] = useState("");
   // Camere
-  const [camere, setCamere] = useState<Cam[]>([{ name: "Camera Standard", count: "1" }]);
+  const [camere, setCamere] = useState<Cam[]>([{ name: "Standard", count: "1", beds: "2" }]);
   // Piano
   const [plan, setPlan] = useState("");
 
@@ -54,7 +64,7 @@ export default function OnboardingWizard() {
   useEffect(() => { if (step === 5 && !plan) setPlan(autoTier.key); }, [step, plan, autoTier]);
 
   const setCam = (i: number, patch: Partial<Cam>) => setCamere((cs) => cs.map((c, j) => (j === i ? { ...c, ...patch } : c)));
-  const addCam = () => setCamere((cs) => [...cs, { name: "", count: "1" }]);
+  const addCam = () => setCamere((cs) => [...cs, { name: "", count: "1", beds: "2" }]);
   const delCam = (i: number) => setCamere((cs) => (cs.length > 1 ? cs.filter((_, j) => j !== i) : cs));
 
   const STEPS = [
@@ -87,8 +97,8 @@ export default function OnboardingWizard() {
     camere.forEach((c) => {
       const name = c.name.trim(); const n = Number(c.count) || 0;
       if (!name || n <= 0) return;
-      const rtId = uid();
-      roomTypes.push({ id: rtId, structureId: sid, name, beds: 2, basePrice: 80, maxOccupancy: 2 });
+      const rtId = uid(); const beds = Number(c.beds) || 2;
+      roomTypes.push({ id: rtId, structureId: sid, name, beds, basePrice: 80, maxOccupancy: beds });
       for (let i = 1; i <= n; i++) units.push({ id: uid(), structureId: sid, roomTypeId: rtId, name: `${name} ${i}`, code: `${name.slice(0, 3).toUpperCase()}${i}` });
     });
     try {
@@ -197,13 +207,14 @@ export default function OnboardingWizard() {
                   <div key={i} className="space-y-2 rounded-lg border border-line p-2">
                     <div className="flex items-end gap-2">
                       <label className="flex-1"><span className={lbl}>Tipologia</span>
-                        <select value={selVal} onChange={(e) => setCam(i, { name: e.target.value === "__other__" ? " " : e.target.value })} className={inp}>
+                        <select value={selVal} onChange={(e) => { const v = e.target.value; setCam(i, v === "__other__" ? { name: " " } : { name: v, ...(v ? { beds: guessBeds(v) } : {}) }); }} className={inp}>
                           <option value="">Seleziona…</option>
                           {ROOM_TYPE_OPTIONS.map((rt) => <option key={rt} value={rt}>{rt}</option>)}
                           <option value="__other__">Altro (personalizzata)…</option>
                         </select>
                       </label>
-                      <label className="w-24"><span className={lbl}>N° camere</span><input value={c.count} onChange={(e) => setCam(i, { count: e.target.value.replace(/\D/g, "") })} inputMode="numeric" className={inp} placeholder="1" /></label>
+                      <label className="w-20"><span className={lbl}>N° camere</span><input value={c.count} onChange={(e) => setCam(i, { count: e.target.value.replace(/\D/g, "") })} inputMode="numeric" className={inp} placeholder="1" /></label>
+                      <label className="w-20"><span className={lbl}>Posti letto</span><input value={c.beds} onChange={(e) => setCam(i, { beds: e.target.value.replace(/\D/g, "").slice(0, 2) })} inputMode="numeric" className={inp} placeholder="2" /></label>
                       <button onClick={() => delCam(i)} disabled={camere.length <= 1} className="mb-0.5 grid h-[42px] w-10 shrink-0 place-items-center rounded-lg border border-line text-faint transition hover:text-[color:var(--err)] disabled:opacity-30" title="Rimuovi">✕</button>
                     </div>
                     {selVal === "__other__" && (
