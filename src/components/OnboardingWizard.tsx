@@ -40,6 +40,8 @@ export default function OnboardingWizard() {
   const [sType, setSType] = useState(STRUCTURE_TYPES[0]);
   const [sCity, setSCity] = useState("");
   const [sAddress, setSAddress] = useState("");
+  const [sStreetNo, setSStreetNo] = useState("");
+  const [sCap, setSCap] = useState("");
   const [sProvince, setSProvince] = useState("");
   const [sCin, setSCin] = useState("");
   // Camere
@@ -79,7 +81,7 @@ export default function OnboardingWizard() {
   const finish = () => {
     // Struttura
     const sid = uid();
-    const structure = { id: sid, name: sName.trim(), groupName: sName.trim(), type: sType, city: sCity.trim(), address: sAddress.trim(), province: sProvince.trim(), cin: sCin.trim(), active: true };
+    const structure = { id: sid, name: sName.trim(), groupName: sName.trim(), type: sType, city: sCity.trim(), address: sAddress.trim(), streetNumber: sStreetNo.trim(), postalCode: sCap.trim(), province: sProvince.trim(), cin: sCin.trim(), active: true };
     // Tipologie + unità
     const roomTypes: object[] = []; const units: object[] = [];
     camere.forEach((c) => {
@@ -177,9 +179,12 @@ export default function OnboardingWizard() {
               <label className="col-span-2"><span className={lbl}>Nome struttura *</span><input value={sName} onChange={(e) => setSName(e.target.value)} className={inp} placeholder="Es. Spigole House" /></label>
               <label><span className={lbl}>Tipologia *</span><select value={sType} onChange={(e) => setSType(e.target.value)} className={inp}>{STRUCTURE_TYPES.map((tp) => <option key={tp} value={tp}>{tp}</option>)}</select></label>
               <label><span className={lbl}>Città *</span><input value={sCity} onChange={(e) => setSCity(e.target.value)} className={inp} placeholder="Siracusa" /></label>
-              <label className="col-span-2"><span className={lbl}>Indirizzo</span><input value={sAddress} onChange={(e) => setSAddress(e.target.value)} className={inp} placeholder="Via / Piazza e civico" /></label>
-              <label><span className={lbl}>Provincia</span><input value={sProvince} onChange={(e) => setSProvince(e.target.value)} className={inp} placeholder="SR" /></label>
+              <label className="col-span-2"><span className={lbl}>Indirizzo</span><input value={sAddress} onChange={(e) => setSAddress(e.target.value)} className={inp} placeholder="Via / Piazza" /></label>
+              <label><span className={lbl}>Civico</span><input value={sStreetNo} onChange={(e) => setSStreetNo(e.target.value)} className={inp} placeholder="12" /></label>
+              <label><span className={lbl}>CAP</span><input value={sCap} onChange={(e) => setSCap(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" className={inp} placeholder="96100" /></label>
+              <label><span className={lbl}>Provincia</span><input value={sProvince} onChange={(e) => setSProvince(e.target.value.toUpperCase().slice(0, 2))} className={inp} placeholder="SR" /></label>
               <label><span className={lbl}>CIN <span className="font-normal text-faint">(facolt.)</span></span><input value={sCin} onChange={(e) => setSCin(e.target.value)} className={inp} placeholder="IT…" /></label>
+              <p className="col-span-2 text-[11px] text-faint">Indirizzo, CAP e provincia servono per ISTAT e tassa di soggiorno — puoi completarli anche dopo dalla scheda struttura.</p>
             </div>
           )}
 
