@@ -725,12 +725,13 @@ export default function CalendarGrid() {
               const trend = c.rate > prevRate ? "up" : c.rate < prevRate ? "down" : null;
               const trendCol = trend === "up" ? "var(--ok)" : trend === "down" ? "var(--err)" : null;
               const diff = Math.abs(c.rate - prevRate);
+              const zero = c.rate <= 0; // prezzo mancante: la camera non è vendibile
               return (
                 <div key={c.iso} onClick={() => clickRate(keyId, c.iso, typeIds)} onMouseEnter={() => { if (sel?.kind === "rate" && sel.typeId === keyId) setSelHover(c.iso); }}
-                  title={sel?.kind === "rate" ? "Clicca il giorno finale" : `Tariffa €${c.rate}${trend ? ` · ${trend === "up" ? "+" : "−"}€${diff} vs giorno prima` : ""}. Clicca per modificare (poi clicca il giorno finale).`}
-                  className="flex cursor-pointer items-center justify-center gap-0.5 border-r border-line font-mono text-[11px] font-semibold tabular-nums hover:bg-wash"
-                  style={{ width: cellW, color: c.overridden ? "var(--focus)" : "var(--dim)", ...(inSel ? { backgroundColor: "color-mix(in srgb, var(--focus) 20%, transparent)" } : trendCol ? { backgroundColor: `color-mix(in srgb, ${trendCol} 12%, transparent)` } : {}) }}>
-                  {trendCol && <span className="text-[8px] leading-none" style={{ color: trendCol }}>{trend === "up" ? "▲" : "▼"}</span>}
+                  title={sel?.kind === "rate" ? "Clicca il giorno finale" : zero ? "Tariffa a €0 — imposta un prezzo, la camera non è vendibile. Clicca per modificare." : `Tariffa €${c.rate}${trend ? ` · ${trend === "up" ? "+" : "−"}€${diff} vs giorno prima` : ""}. Clicca per modificare (poi clicca il giorno finale).`}
+                  className={`flex cursor-pointer items-center justify-center gap-0.5 border-r border-line font-mono text-[11px] tabular-nums hover:bg-wash ${zero ? "font-bold" : "font-semibold"}`}
+                  style={{ width: cellW, color: zero ? "var(--err)" : c.overridden ? "var(--focus)" : "var(--dim)", ...(inSel ? { backgroundColor: "color-mix(in srgb, var(--focus) 20%, transparent)" } : zero ? { backgroundColor: "color-mix(in srgb, var(--err) 16%, transparent)" } : trendCol ? { backgroundColor: `color-mix(in srgb, ${trendCol} 12%, transparent)` } : {}) }}>
+                  {zero ? <span className="text-[8px] leading-none">⚠</span> : trendCol && <span className="text-[8px] leading-none" style={{ color: trendCol }}>{trend === "up" ? "▲" : "▼"}</span>}
                   <span style={{ opacity: 0.65 }}>€</span>{c.rate}
                 </div>
               );
