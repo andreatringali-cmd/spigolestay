@@ -30,7 +30,7 @@ export default function StructureSwitcher() {
         {current ? (
           <span className="flex items-baseline gap-1.5">
             <span className="max-w-[180px] truncate font-medium text-txt">{current.name}</span>
-            <span className="font-mono text-[11px] text-faint">{current.id}</span>
+            {current.city && <span className="text-[11px] text-faint">{current.city}</span>}
           </span>
         ) : (
           <span className="font-medium text-txt">{t("Tutte le strutture")}</span>
@@ -43,7 +43,7 @@ export default function StructureSwitcher() {
           <Item active={activeStructureId === "all"} onClick={() => pick("all")} name={t("Tutte le strutture")} />
           <div className="my-1 border-t border-line" />
           {structures.map((s) => (
-            <Item key={s.id} active={activeStructureId === s.id} onClick={() => pick(s.id)} name={s.name} id={s.id} />
+            <Item key={s.id} active={activeStructureId === s.id} onClick={() => pick(s.id)} name={s.name} sub={s.city} />
           ))}
         </div>
       )}
@@ -51,7 +51,7 @@ export default function StructureSwitcher() {
   );
 }
 
-function Item({ active, onClick, name, id }: { active: boolean; onClick: () => void; name: string; id?: string }) {
+function Item({ active, onClick, name, sub }: { active: boolean; onClick: () => void; name: string; sub?: string }) {
   return (
     <button
       onClick={onClick}
@@ -60,7 +60,7 @@ function Item({ active, onClick, name, id }: { active: boolean; onClick: () => v
     >
       <span style={{ color: active ? "var(--focus)" : "var(--faint)" }}><Icon name="building" size={16} /></span>
       <span className="min-w-0 flex-1 truncate font-medium text-txt">{name}</span>
-      {id && <span className="font-mono text-[11px] text-faint">{id}</span>}
+      {sub && <span className="text-[11px] text-faint">{sub}</span>}
       {active && <span style={{ color: "var(--focus)" }}>✓</span>}
     </button>
   );

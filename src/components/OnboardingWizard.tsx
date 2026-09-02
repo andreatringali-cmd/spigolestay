@@ -74,6 +74,8 @@ export default function OnboardingWizard() {
   const [camere, setCamere] = useState<Cam[]>([{ name: "Standard", count: "1", beds: "2" }]);
   // Piano
   const [plan, setPlan] = useState("");
+  // Pagamento (demo): la carta va aggiunta comunque, così a fine prova è già salvata.
+  const [cardAdded, setCardAdded] = useState(false);
 
   const totalRooms = useMemo(() => camere.reduce((a, c) => a + (Number(c.count) || 0), 0), [camere]);
   const autoTier = TIERS[0]; // onboarding crea 1 struttura → consigliato Basic
@@ -90,6 +92,7 @@ export default function OnboardingWizard() {
     { title: "La tua struttura", sub: "La prima struttura da gestire (potrai aggiungerne altre)." },
     { title: "Le camere", sub: "Le tipologie di camera e quante ne hai per ciascuna." },
     { title: "Scegli il piano", sub: "Puoi cambiarlo quando vuoi da Abbonamento." },
+    { title: "Metodo di pagamento", sub: "7 giorni di prova gratuita: oggi non paghi nulla." },
     { title: "Tutto pronto!", sub: "Controlla il riepilogo e inizia. Poi potrai importare il calendario da Octorate." },
   ];
 
@@ -100,6 +103,7 @@ export default function OnboardingWizard() {
       case 3: return !!(sName.trim() && sType && sCity.trim());
       case 4: return camere.some((c) => c.name.trim() && Number(c.count) > 0);
       case 5: return !!plan;
+      case 6: return cardAdded; // la carta va aggiunta per continuare
       default: return true;
     }
   })();
@@ -272,9 +276,41 @@ export default function OnboardingWizard() {
             </div>
           )}
 
-          {step === 6 && (
+          {step === 6 && (() => {
+            const pt = TIERS.find((t) => t.key === plan) ?? TIERS[0];
+            return (
+              <div className="space-y-3">
+                <div className="rounded-xl border p-4" style={{ borderColor: "color-mix(in srgb, var(--ok) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 8%, transparent)" }}>
+                  <div className="text-sm font-bold text-txt">🎁 7 giorni di prova gratuita</div>
+                  <p className="mt-1 text-[12px] text-dim">Oggi non paghi nulla. Il primo addebito di <b className="text-txt">€{pt.price}/mese</b> partirà al termine dei 7 giorni, salvo disdetta. Aggiungi ora la carta così a fine prova è già collegata.</p>
+                </div>
+
+                <div className="rounded-xl border border-line bg-surface p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-faint">Carta di credito *</div>
+                  {!cardAdded ? (
+                    <>
+                      <p className="mt-2 text-[12px] text-dim">Nessuna carta collegata.</p>
+                      <button onClick={() => setCardAdded(true)} className="mt-2 w-full rounded-lg border border-focus py-2.5 text-sm font-semibold text-focus transition hover:bg-wash">+ Aggiungi carta di credito</button>
+                    </>
+                  ) : (
+                    <div className="mt-2 flex items-center gap-3 rounded-lg border border-line bg-paper p-3">
+                      <span className="grid h-8 w-11 shrink-0 place-items-center rounded bg-wash text-[9px] font-bold text-dim">VISA</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-mono text-sm text-txt">•••• •••• •••• 4242</div>
+                        <div className="text-[10px] text-faint">Carta dimostrativa · scad. 12/29</div>
+                      </div>
+                      <button onClick={() => setCardAdded(false)} className="shrink-0 text-xs font-medium text-[color:var(--err)] hover:underline">Rimuovi</button>
+                    </div>
+                  )}
+                  <p className="mt-2 text-[11px] text-faint">Prototipo: non viene raccolto alcun dato reale. In produzione il collegamento avviene tramite un provider sicuro (Stripe) e i dati della carta non passano da questa app.</p>
+                </div>
+              </div>
+            );
+          })()}
+
+          {step === 7 && (
             <div className="rounded-xl border border-line bg-surface p-5 text-sm">
-              {[["Profilo", `${firstName} ${lastName} · ${email}`], ["Accesso", username], ["Struttura", `${sName} · ${sType} · ${sCity}`], ["Camere", `${totalRooms} camere · ${camere.filter((c) => c.name.trim()).length} tipologie`], ["Piano", TIERS.find((t) => t.key === plan)?.name ?? "—"]].map(([k, v]) => (
+              {[["Profilo", `${firstName} ${lastName} · ${email}`], ["Accesso", username], ["Struttura", `${sName} · ${sType} · ${sCity}`], ["Camere", `${totalRooms} camere · ${camere.filter((c) => c.name.trim()).length} tipologie`], ["Piano", `${TIERS.find((t) => t.key === plan)?.name ?? "—"} · prova 7 giorni`], ["Pagamento", cardAdded ? "Carta •••• 4242 (demo)" : "—"]].map(([k, v]) => (
                 <div key={k} className="flex items-start justify-between gap-3 border-b border-line py-2 last:border-0">
                   <span className="text-xs font-semibold uppercase tracking-wide text-faint">{k}</span>
                   <span className="min-w-0 flex-1 text-right text-txt">{v}</span>
