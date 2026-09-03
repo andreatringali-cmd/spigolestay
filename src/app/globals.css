@@ -9,7 +9,7 @@
   --txt: #26241F;     /* testo primario (bruno neutro) */
   --dim: #726D64;     /* testo secondario */
   --faint: #A69E90;   /* testo terziario */
-  --focus: #4E6E6A;   /* accento verde-salvia (solo accento) */
+  --focus: #2F6BB0;   /* accento blu (solo accento) */
 
   /* Canali OTA — tinte vicine ai brand nativi */
   --ch-booking: #003B95;  /* blu Booking.com */
@@ -33,7 +33,7 @@
   --txt: #EAEAEC;
   --dim: #9C9DA3;
   --faint: #6B6C73;
-  --focus: #7FA8A1;   /* verde-salvia più chiaro per lo scuro (solo accento) */
+  --focus: #6FA3DC;   /* blu più chiaro per lo scuro (solo accento) */
 
   --ch-booking: #2E6FD6;  /* blu Booking più chiaro per lo scuro */
   --ch-airbnb: #FF5A75;
