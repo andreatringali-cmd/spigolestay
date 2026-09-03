@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import Logo from "./Logo";
 import Icon from "./Icon";
-import { NAV, GROUP_COLOR } from "./nav";
+import { NAV } from "./nav";
 import { useAccess } from "@/lib/access";
 import { useLang } from "@/lib/i18n";
 import UserSwitcher from "./UserSwitcher";
@@ -70,7 +70,7 @@ export default function Sidebar({
             visible.map((n) => {
               const active = isActive(n.href, pathname);
               const isLk = locked(n);
-              const color = GROUP_COLOR[n.group] ?? "var(--focus)";
+              const color = "var(--focus)";
               return (
                 <Link
                   key={n.href}
@@ -107,14 +107,14 @@ export default function Sidebar({
               </div>
               <div className="my-1.5 border-t border-line" />
               {GROUPS.map((group) => {
-              const color = GROUP_COLOR[group];
+              const color = "var(--focus)";
               const isOpen = open[group];
               return (
                 <div key={group}>
                   <button
                     onClick={() => toggleGroup(group)}
                     className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wider hover:bg-wash"
-                    style={{ color, backgroundColor: isOpen ? mix(color, 12) : undefined }}
+                    style={{ color: isOpen ? "var(--focus)" : "var(--dim)", backgroundColor: isOpen ? mix(color, 12) : undefined }}
                   >
                     <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
                     <span className="flex-1 text-left">{t(group)}</span>
