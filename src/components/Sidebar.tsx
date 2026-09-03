@@ -34,7 +34,8 @@ export default function Sidebar({
   const GROUPS = Array.from(new Set(visible.filter((n) => n.group).map((n) => n.group)));
   const activeGroup = NAV.find((n) => isActive(n.href, pathname))?.group ?? GROUPS[0];
   const [open, setOpen] = useState<Record<string, boolean>>({ [activeGroup]: true });
-  const toggleGroup = (g: string) => setOpen((o) => ({ ...o, [g]: !o[g] }));
+  // Accordion: aprendo un gruppo si chiude quello precedente (uno solo aperto per volta).
+  const toggleGroup = (g: string) => setOpen((o) => (o[g] ? {} : { [g]: true }));
 
   return (
     <>
