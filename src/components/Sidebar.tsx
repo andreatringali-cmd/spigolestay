@@ -113,14 +113,14 @@ export default function Sidebar({
                   <button
                     onClick={() => toggleGroup(group)}
                     className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wider hover:bg-wash"
-                    style={{ color }}
+                    style={{ color, backgroundColor: isOpen ? mix(color, 12) : undefined }}
                   >
                     <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
                     <span className="flex-1 text-left">{t(group)}</span>
                     <span className={`transition-transform ${isOpen ? "rotate-90" : ""}`}><Icon name="chevron" size={14} /></span>
                   </button>
                   {isOpen && (
-                    <div className="mb-1 mt-0.5 flex flex-col gap-0.5">
+                    <div className="mb-1.5 mt-1 flex flex-col gap-0.5 rounded-lg py-1.5 pl-1.5 pr-1" style={{ backgroundColor: mix(color, 7), boxShadow: `inset 2px 0 0 ${mix(color, 45)}` }}>
                       {visible.filter((n) => n.group === group).map((n) => {
                         const active = isActive(n.href, pathname);
                         const isLk = locked(n);
