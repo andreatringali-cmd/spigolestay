@@ -6,7 +6,7 @@ export type Pal = { name: string; vars: Record<string, string>; swatch: string[]
 export const VAR_KEYS = ["--paper", "--surface", "--wash", "--line", "--txt", "--dim", "--faint", "--focus"];
 
 export const PALETTES: Pal[] = [
-  { name: "Greige (predefinito)", swatch: ["#EEECE8", "#FAF9F7", "#4E6E6A"], vars: { "--paper": "#EEECE8", "--surface": "#FAF9F7", "--wash": "#E6E2DB", "--line": "#E1DDD6", "--txt": "#26241F", "--dim": "#726D64", "--faint": "#A69E90", "--focus": "#4E6E6A" } },
+  { name: "Greige (predefinito)", swatch: ["#EEECE8", "#FAF9F7", "#2F6BB0"], vars: { "--paper": "#EEECE8", "--surface": "#FAF9F7", "--wash": "#E6E2DB", "--line": "#E1DDD6", "--txt": "#26241F", "--dim": "#726D64", "--faint": "#A69E90", "--focus": "#2F6BB0" } },
   { name: "Grigio caldo", swatch: ["#F6F6F7", "#FFFFFF", "#4F46E5"], vars: { "--paper": "#F6F6F7", "--surface": "#FFFFFF", "--wash": "#EFEFF1", "--line": "#E5E5E8", "--txt": "#1F2127", "--dim": "#5F6067", "--faint": "#9A9BA2", "--focus": "#4F46E5" } },
   { name: "Sabbia", swatch: ["#F1ECE3", "#FBF9F4", "#A6763B"], vars: { "--paper": "#F1ECE3", "--surface": "#FBF9F4", "--wash": "#EFE7D8", "--line": "#E5DDCE", "--txt": "#2A2620", "--dim": "#7A7160", "--faint": "#B3A992", "--focus": "#A6763B" } },
   { name: "Ardesia fredda", swatch: ["#EEF1F4", "#FFFFFF", "#3E6B8B"], vars: { "--paper": "#EEF1F4", "--surface": "#FFFFFF", "--wash": "#E6EBF1", "--line": "#DCE2E8", "--txt": "#1B222B", "--dim": "#64707E", "--faint": "#97A3B0", "--focus": "#3E6B8B" } },
