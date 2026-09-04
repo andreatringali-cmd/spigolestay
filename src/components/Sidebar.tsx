@@ -116,7 +116,6 @@ export default function Sidebar({
                     className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wider hover:bg-wash"
                     style={{ color: isOpen ? "var(--focus)" : "var(--dim)", backgroundColor: isOpen ? mix(color, 12) : undefined }}
                   >
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
                     <span className="flex-1 text-left">{t(group)}</span>
                     <span className={`transition-transform ${isOpen ? "rotate-90" : ""}`}><Icon name="chevron" size={14} /></span>
                   </button>
