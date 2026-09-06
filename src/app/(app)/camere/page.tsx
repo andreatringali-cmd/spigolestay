@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
@@ -41,6 +41,33 @@ export default function CamerePage() {
   const [localS, setLocalS] = useState("all");
   const [highlight, setHighlight] = useState<string | null>(null);
   const [roomModal, setRoomModal] = useState<{ structureId: string; unit?: Unit } | null>(null);
+  const [sortKey, setSortKey] = useState<string>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [groupByType, setGroupByType] = useState(false);
+  const toggleSort = (k: string) => { if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc")); else { setSortKey(k); setSortDir("asc"); } };
+  const sortUnits = (list: Unit[], tps: typeof roomTypes) => {
+    const rtOf = (u: Unit) => tps.find((x) => x.id === u.roomTypeId);
+    const kv = (u: Unit): string | number => {
+      const rt = rtOf(u);
+      if (sortKey === "type") return (rt?.name ?? "").toLowerCase();
+      if (sortKey === "floor") return (u.floor ?? "").toLowerCase();
+      if (sortKey === "view") return (u.view ?? "").toLowerCase();
+      if (sortKey === "beds") return rt?.beds ?? 0;
+      if (sortKey === "status") return u.outOfService ? 1 : 0;
+      return (u.name ?? "").toLowerCase();
+    };
+    return [...list].sort((a, b) => {
+      const va = kv(a), vb = kv(b);
+      let c = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), undefined, { numeric: true });
+      if (c === 0) c = (a.name ?? "").localeCompare(b.name ?? "", undefined, { numeric: true });
+      return sortDir === "asc" ? c : -c;
+    });
+  };
+  const SortTh = ({ k, label }: { k: string; label: string }) => (
+    <th className="cursor-pointer select-none px-3 py-2 font-semibold hover:text-txt" onClick={() => toggleSort(k)}>
+      {label}{sortKey === k ? <span className="ml-1 text-[color:var(--focus)]">{sortDir === "asc" ? "▲" : "▼"}</span> : ""}
+    </th>
+  );
 
   // Avvisa quando si supera il numero di camere incluse nel piano (6 per struttura).
   const addRoom = async (structureId: string, currentCount: number) => {
@@ -92,6 +119,22 @@ export default function CamerePage() {
           const sUnits = units.filter((u) => u.structureId === s.id);
           const beds = sUnits.reduce((a, u) => a + (types.find((t) => t.id === u.roomTypeId)?.beds ?? 0), 0);
           const oos = sUnits.filter((u) => u.outOfService).length;
+          const rowOf = (u: Unit) => {
+            const i = types.findIndex((tt) => tt.id === u.roomTypeId);
+            const rt = types[i];
+            const color = rt ? typeColor(rt, i) : "var(--line)";
+            return (
+              <tr key={u.id} id={`unit-${u.id}`} onClick={() => setRoomModal({ structureId: s.id, unit: u })} className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${highlight === u.id ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : ""}`}>
+                <td className="px-3 py-2.5"><div className="flex items-center gap-2"><span className="h-6 w-1.5 rounded-full" style={{ backgroundColor: color }} /><span className={`font-medium ${u.outOfService ? "text-faint line-through" : "text-txt"}`}>{u.name}</span>{u.code && <span className="font-mono text-[11px] text-faint">#{u.code}</span>}</div></td>
+                <td className="px-3 py-2.5 text-dim">{rt?.name ?? "—"}</td>
+                <td className="px-3 py-2.5 text-dim">{u.floor || "—"}</td>
+                <td className="px-3 py-2.5 text-dim">{u.view || "—"}</td>
+                <td className="px-3 py-2.5 text-dim">{rt?.beds ?? "—"}</td>
+                <td className="px-3 py-2.5">{u.outOfService ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("Fuori servizio")}</span> : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("In servizio")}</span>}</td>
+                <td className="px-3 py-2.5 text-right text-faint">›</td>
+              </tr>
+            );
+          };
           return (
             <div key={s.id}>
               <div className="mb-2 flex items-center justify-between">
@@ -140,46 +183,33 @@ export default function CamerePage() {
               </div>
 
               {/* Camere */}
-              <SectionTitle>{t("Camere")}</SectionTitle>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <SectionTitle>{t("Camere")}</SectionTitle>
+                <label className="flex items-center gap-2 text-xs font-medium text-dim"><input type="checkbox" checked={groupByType} onChange={(e) => setGroupByType(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Raggruppa per tipologia")}</label>
+              </div>
               <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
                 <table className="w-full min-w-[640px] text-sm">
                   <thead>
                     <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
-                      <th className="px-3 py-2 font-semibold">{t("Camera")}</th>
-                      <th className="px-3 py-2 font-semibold">{t("Tipologia")}</th>
-                      <th className="px-3 py-2 font-semibold">{t("Piano")}</th>
-                      <th className="px-3 py-2 font-semibold">{t("Vista")}</th>
-                      <th className="px-3 py-2 font-semibold">{t("Posti")}</th>
-                      <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
+                      <SortTh k="name" label={t("Camera")} />
+                      <SortTh k="type" label={t("Tipologia")} />
+                      <SortTh k="floor" label={t("Piano")} />
+                      <SortTh k="view" label={t("Vista")} />
+                      <SortTh k="beds" label={t("Posti")} />
+                      <SortTh k="status" label={t("Stato")} />
                       <th className="px-3 py-2 font-semibold"></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sUnits.map((u) => {
-                      const i = types.findIndex((t) => t.id === u.roomTypeId);
-                      const rt = types[i];
-                      const color = rt ? typeColor(rt, i) : "var(--line)";
-                      return (
-                        <tr key={u.id} id={`unit-${u.id}`} onClick={() => setRoomModal({ structureId: s.id, unit: u })} className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${highlight === u.id ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : ""}`}>
-                          <td className="px-3 py-2.5">
-                            <div className="flex items-center gap-2">
-                              <span className="h-6 w-1.5 rounded-full" style={{ backgroundColor: color }} />
-                              <span className={`font-medium ${u.outOfService ? "text-faint line-through" : "text-txt"}`}>{u.name}</span>
-                              {u.code && <span className="font-mono text-[11px] text-faint">#{u.code}</span>}
-                            </div>
-                          </td>
-                          <td className="px-3 py-2.5 text-dim">{rt?.name ?? "—"}</td>
-                          <td className="px-3 py-2.5 text-dim">{u.floor || "—"}</td>
-                          <td className="px-3 py-2.5 text-dim">{u.view || "—"}</td>
-                          <td className="px-3 py-2.5 text-dim">{rt?.beds ?? "—"}</td>
-                          <td className="px-3 py-2.5">
-                            {u.outOfService ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("Fuori servizio")}</span> : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("In servizio")}</span>}
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-faint">›</td>
-                        </tr>
-                      );
-                    })}
                     {sUnits.length === 0 && <tr><td colSpan={7} className="px-3 py-4 text-center text-sm text-faint">{t("Nessuna camera. Aggiungine una col pulsante “+ Camera”.")}</td></tr>}
+                    {groupByType
+                      ? types.map((rt, i) => { const g = sortUnits(sUnits.filter((u) => u.roomTypeId === rt.id), types); if (!g.length) return null; return (
+                          <Fragment key={rt.id}>
+                            <tr className="bg-[color:var(--wash)]"><td colSpan={7} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim"><span className="mr-2 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: typeColor(rt, i) }} />{rt.name} · {g.length}</td></tr>
+                            {g.map(rowOf)}
+                          </Fragment>); })
+                      : sortUnits(sUnits, types).map(rowOf)}
+                    {groupByType && (() => { const orphans = sUnits.filter((u) => !types.some((rt) => rt.id === u.roomTypeId)); return orphans.length ? (<Fragment><tr className="bg-[color:var(--wash)]"><td colSpan={7} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Altre")}</td></tr>{sortUnits(orphans, types).map(rowOf)}</Fragment>) : null; })()}
                   </tbody>
                 </table>
               </div>
