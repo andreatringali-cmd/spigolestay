@@ -1,7 +1,7 @@
 // Modello dati del prototipo Xenora (front-end, dati finti).
 // Rispecchia lo schema DB reale: strutture → tipologie → unità; prenotazioni; folio.
 
-export type Channel = "booking" | "airbnb" | "expedia" | "direct" | "blocked";
+export type Channel = "booking" | "airbnb" | "expedia" | "other" | "direct" | "blocked";
 
 export interface ChannelMeta {
   label: string;
@@ -14,6 +14,7 @@ export const CHANNELS: Record<Channel, ChannelMeta> = {
   booking: { label: "Booking.com", cssVar: "--ch-booking", text: "#ffffff", commission: 0.15 },
   airbnb: { label: "Airbnb", cssVar: "--ch-airbnb", text: "#ffffff", commission: 0.15 },
   expedia: { label: "Expedia / Vrbo", cssVar: "--ch-expedia", text: "#241a05", commission: 0.18 },
+  other: { label: "Altro / OTA", cssVar: "--ch-other", text: "#ffffff", commission: 0.15 },
   direct: { label: "Diretta", cssVar: "--ch-direct", text: "#ffffff", commission: 0 },
   blocked: { label: "Bloccato", cssVar: "--ch-blocked", text: "#ffffff", commission: 0 },
 };

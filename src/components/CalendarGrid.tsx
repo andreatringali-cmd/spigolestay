@@ -552,7 +552,7 @@ export default function CalendarGrid() {
   const unitNameOf = (id: string | null) => (id ? units.find((u) => u.id === id)?.name ?? "—" : "da assegnare");
 
   // Mix canali & commissioni sul periodo.
-  const chAgg = (["booking", "airbnb", "expedia", "direct"] as const).map((ch) => { const list = bkPeriod.filter((b) => b.channel === ch); const revenue = list.reduce((a, b) => a + (b.total ?? 0), 0); const commission = list.reduce((a, b) => { const pct = b.commissionPct ?? CHANNELS[ch].commission * 100; return a + (b.total ?? 0) * pct / 100; }, 0); return { ch, meta: CHANNELS[ch], n: list.length, revenue, commission }; }).filter((x) => x.n > 0);
+  const chAgg = (["booking", "airbnb", "expedia", "other", "direct"] as const).map((ch) => { const list = bkPeriod.filter((b) => b.channel === ch); const revenue = list.reduce((a, b) => a + (b.total ?? 0), 0); const commission = list.reduce((a, b) => { const pct = b.commissionPct ?? CHANNELS[ch].commission * 100; return a + (b.total ?? 0) * pct / 100; }, 0); return { ch, meta: CHANNELS[ch], n: list.length, revenue, commission }; }).filter((x) => x.n > 0);
   const chTotalN = chAgg.reduce((a, x) => a + x.n, 0);
   const chCommission = Math.round(chAgg.reduce((a, x) => a + x.commission, 0));
   const directShare = chTotalN ? Math.round(((chAgg.find((x) => x.ch === "direct")?.n ?? 0) / chTotalN) * 100) : 0;
@@ -627,13 +627,13 @@ export default function CalendarGrid() {
             const barColor = blocked
               ? { backgroundColor: "#242424", color: "#f5c000", boxShadow: "inset 3px 0 0 #f5c000, 0 1px 1px rgba(0,0,0,.2)" }
               : { backgroundColor: `var(${meta.cssVar})`, color: meta.text, boxShadow: "inset 3px 0 0 rgba(0,0,0,.28), 0 1px 1px rgba(0,0,0,.14)" };
-            const label = blocked ? (b.note ?? "Fuori servizio") : guestName(b.guestId);
+            const label = blocked ? "Fuori servizio" : guestName(b.guestId);
             const pay = payStatusOf(b);
             const bday = !blocked && bdayInStay(b.guestId, b.checkIn, b.checkOut);
             const noSched = !blocked && !schedinaOk(b.guestId);
             const turn = !blocked && isTurnover(b);
             const grp = !blocked && !!b.groupId;
-            const chLetter = ({ booking: "B", airbnb: "A", expedia: "E", direct: "D", blocked: "" } as Record<string, string>)[b.channel] ?? "";
+            const chLetter = ({ booking: "B", airbnb: "A", expedia: "E", other: "O", direct: "D", blocked: "" } as Record<string, string>)[b.channel] ?? "";
             const chChip = !blocked && chLetter ? (
               <span className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[3px] bg-white text-[8px] font-extrabold leading-none" style={{ color: `var(${meta.cssVar})` }} title={meta.label}>{chLetter}</span>
             ) : null;

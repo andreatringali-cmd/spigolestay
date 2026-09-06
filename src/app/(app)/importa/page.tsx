@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
-import { CHANNELS, type Channel } from "@/lib/types";
+import { CHANNELS } from "@/lib/types";
+import { parseICS, importIcsEvents, toChannel, toISO, toNum, normName, type IcsEvent } from "@/lib/ics";
 
 // ── Parsing CSV robusto (virgolette, delimitatore auto ; , o tab) ──
 function parseCSV(text: string): string[][] {
@@ -24,62 +25,6 @@ function parseCSV(text: string): string[][] {
   }
   if (cur.length || row.length) { row.push(cur); rows.push(row); }
   return rows;
-}
-
-function toISO(s: string): string {
-  s = (s || "").trim(); if (!s) return "";
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
-  if (m) { let [, d, mo, y] = m; if (y.length === 2) y = "20" + y; return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`; }
-  const dt = new Date(s); return isNaN(+dt) ? "" : dt.toISOString().slice(0, 10);
-}
-function toNum(s: string): number | undefined {
-  if (!s) return undefined;
-  const n = parseFloat(String(s).replace(/[^0-9,.-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", "."));
-  return isNaN(n) ? undefined : n;
-}
-function toChannel(s: string): Channel {
-  s = (s || "").toLowerCase();
-  if (s.includes("booking")) return "booking";
-  if (s.includes("airbnb")) return "airbnb";
-  if (s.includes("expedia") || s.includes("vrbo") || s.includes("homeaway")) return "expedia";
-  return "direct";
-}
-
-const normName = (x: string) => (x || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-
-// ── Parsing ICS / iCal (export prenotazioni da Octorate) ──
-type IcsEvent = { uid: string; guest: string; checkIn: string; checkOut: string; blocked: boolean; channelText: string; note: string; room: string; total?: number; adults?: number };
-function icsUnescape(s: string) { return (s || "").replace(/\\n/gi, " ").replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\\\/g, "\\").trim(); }
-function icsDate(v: string) { const m = v.match(/(\d{4})(\d{2})(\d{2})/); return m ? `${m[1]}-${m[2]}-${m[3]}` : ""; }
-function addDay(iso: string) { if (!iso) return ""; const d = new Date(iso + "T00:00:00Z"); if (isNaN(+d)) return iso; d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); }
-function parseICS(text: string): IcsEvent[] {
-  text = text.replace(/\r\n?/g, "\n").replace(/\n[ \t]/g, ""); // unfold righe continuate
-  const out: IcsEvent[] = [];
-  const blocks = text.split(/BEGIN:VEVENT/i).slice(1);
-  for (const b of blocks) {
-    const body = "\n" + b.split(/END:VEVENT/i)[0];
-    const get = (re: RegExp) => { const m = body.match(re); return m ? icsUnescape(m[1]) : ""; };
-    const dts = body.match(/\nDTSTART[^:\n]*:([0-9TZ]+)/i), dte = body.match(/\nDTEND[^:\n]*:([0-9TZ]+)/i);
-    const summary = get(/\nSUMMARY:(.*)/i), desc = get(/\nDESCRIPTION:(.*)/i), loc = get(/\nLOCATION:(.*)/i);
-    const orgCn = get(/\nORGANIZER[^:\n]*?CN=([^:\n]*):/i);
-    const uid = get(/\nUID:(.*)/i);
-    // Date: preferisci il "Period : gg/mm/aaaa - gg/mm/aaaa" della DESCRIPTION (check-out reale);
-    // altrimenti DTSTART e DTEND+1 (in Octorate DTEND è l'ultima notte, non la partenza).
-    const per = desc.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})\s*[-–]\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/);
-    let ci = per ? toISO(per[1]) : (dts ? icsDate(dts[1]) : "");
-    let co = per ? toISO(per[2]) : (dte ? addDay(icsDate(dte[1])) : "");
-    if (!ci && !co) continue;
-    const blob = (summary + " " + desc + " " + loc).toLowerCase();
-    const blocked = /closed|not available|non disponibil|bloccat|blocked|unavailable|outoforder|out.?of.?order|fuori.?servizio|maintenance|manutenzione/.test(blob);
-    // Nome ospite: ORGANIZER CN (migliore); altrimenti la parte di SUMMARY prima della camera.
-    let guest = orgCn;
-    if (!guest && !blocked) { guest = summary.split(/\s*\|\s*|\s+Camera\b/i)[0].trim(); }
-    const totm = desc.match(/Total\s*:?\s*€?\s*([0-9]+(?:[.,][0-9]+)?)/i) || (desc + " " + summary).match(/€\s?([0-9.,]+)/);
-    const pax = summary.match(/(\d+)\s*pax/i);
-    out.push({ uid, guest: blocked ? "" : guest, checkIn: ci, checkOut: co, blocked, channelText: summary, note: desc || summary, room: loc, total: totm ? toNum(totm[1]) : undefined, adults: pax ? +pax[1] : undefined });
-  }
-  return out;
 }
 
 // Campi di destinazione + parole chiave per l'auto-mappatura (IT/EN)
@@ -159,62 +104,8 @@ export default function ImportaPage() {
   };
 
   const runImportICS = () => {
-    const list = (includeBlocked ? events : events.filter((e) => !e.blocked))
-      .filter((e) => e.checkIn && e.checkOut).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
-    // Camera specifica scelta: tutte le prenotazioni del file vanno in quella camera (rispetta l'assegnazione reale).
-    const forced = targetUnit ? units.find((u) => u.id === targetUnit && u.structureId === structureId) : null;
-    // Sostituisci import precedenti: elimina le prenotazioni già importate (per non duplicarle).
-    // Se è scelta una camera, sostituisci solo quelle di QUELLA camera; altrimenti quelle della struttura.
-    const del = replacePrev ? bookings.filter((b) => (forced ? b.unitId === forced.id : b.structureId === structureId) && (b.extId || (b.note || "").includes("Importato da"))) : [];
-    const delIds = new Set(del.map((b) => b.id));
-    del.forEach((b) => deleteBooking(b.id));
-    const fallbackName = t("Camere importate");
-    // Risolve la tipologia per una camera ICS: usa la mappatura scelta, oppure crea la nuova (una sola volta).
-    const typeCache: Record<string, string> = {};
-    const resolveType = (roomName: string) => {
-      const key = (roomName || "").trim() || "—";
-      if (typeCache[key]) return typeCache[key];
-      const chosen = roomMap[key];
-      let id: string;
-      if (chosen && chosen !== "__new__") id = chosen;
-      else { const nm = (roomName || "").replace(/\s*\|\s*/g, " ").trim().slice(0, 40) || fallbackName; id = addRoomType({ structureId, name: nm, beds: 2, basePrice: 0 }); }
-      typeCache[key] = id; return id;
-    };
-    // Assegnazione camere fisiche (unit) con bin-packing: riusa le esistenti, ne crea quante servono
-    // per le sovrapposizioni, così nessuna prenotazione risulta in overbooking.
-    const slots: Record<string, { unitId: string; last: string }[]> = {};
-    units.filter((u) => u.structureId === structureId).forEach((u) => {
-      const last = bookings.filter((b) => b.unitId === u.id && !delIds.has(b.id)).reduce((mx, b) => (b.checkOut > mx ? b.checkOut : mx), "0000-00-00");
-      (slots[u.roomTypeId] ||= []).push({ unitId: u.id, last });
-    });
-    const assignUnit = (typeId: string, ci: string, co: string) => {
-      const arr = (slots[typeId] ||= []);
-      let s = arr.find((x) => x.last <= ci);
-      if (!s) { const id = addUnit({ structureId, roomTypeId: typeId, name: `${t("Camera")} ${arr.length + 1}` }); s = { unitId: id, last: "0000-00-00" }; arr.push(s); }
-      s.last = co; return s.unitId;
-    };
-    // Import idempotente: le prenotazioni già importate (stesso UID Octorate) vengono AGGIORNATE, non duplicate.
-    const byExt = new Map<string, string>();
-    if (!replacePrev) bookings.forEach((b) => { if (b.extId && !delIds.has(b.id)) byExt.set(b.extId, b.id); });
-    let created = 0, updated = 0;
-    list.forEach((e) => {
-      const typeId = forced ? forced.roomTypeId : resolveType(e.room);
-      const patch = {
-        roomTypeId: typeId,
-        channel: e.blocked ? ("blocked" as const) : toChannel(e.channelText),
-        checkIn: e.checkIn, checkOut: e.checkOut, adults: Math.max(1, Math.round(e.adults ?? 2)),
-        ...(e.total !== undefined ? { total: e.total } : {}),
-      };
-      if (e.uid && byExt.has(e.uid)) { updateBooking(byExt.get(e.uid)!, forced ? { ...patch, unitId: forced.id } : patch); updated++; return; }
-      const unitId = forced ? forced.id : assignUnit(typeId, e.checkIn, e.checkOut);
-      const guestId = addGuest({ fullName: e.guest || (e.blocked ? t("Non disponibile") : t("Ospite (da ICS)")) });
-      addBooking({
-        structureId, unitId, guestId, status: "confirmed", children: 0, ...patch,
-        extId: e.uid || undefined,
-        note: (t("Importato da ICS") + (e.note ? " · " + e.note : "")).slice(0, 280),
-      });
-      created++;
-    });
+    const { created, updated } = importIcsEvents(events, { structureId, includeBlocked, replacePrev, targetUnit, roomMap, source: "ICS" },
+      { bookings, units, roomTypes, addGuest, addBooking, updateBooking, deleteBooking, addRoomType, addUnit, t });
     setDone(created);
     if (updated) setErr(`${updated} ${t("prenotazioni già presenti aggiornate (nessun duplicato).")}`);
   };

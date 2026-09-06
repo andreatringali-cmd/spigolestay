@@ -6,6 +6,7 @@ import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
+import IcalSyncPanel from "@/components/IcalSyncPanel";
 
 // Portali gestiti dal Channel Manager.
 const OTAS = [
@@ -97,6 +98,12 @@ export default function CanaliPage() {
           </div>
         }
       />
+
+      {/* Sincronizzazione iCal reale (sola lettura) */}
+      <IcalSyncPanel />
+
+      {/* ── Da qui in giù: simulazione dimostrativa del channel manager ── */}
+      <div className="mb-3 mt-1 text-xs font-semibold uppercase tracking-wide text-faint">{t("Demo channel manager (connessione live in produzione)")}</div>
 
       {/* KPI */}
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

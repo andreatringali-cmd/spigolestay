@@ -15,6 +15,7 @@
   --ch-booking: #003B95;  /* blu Booking.com */
   --ch-airbnb: #FF385C;   /* rosa/rausch Airbnb */
   --ch-expedia: #FFC93C;  /* giallo Expedia */
+  --ch-other: #7C4DD6;    /* altro / OTA (viola) */
   --ch-direct: #2F9E6F;   /* diretta (verde) */
   --ch-blocked: #8A93A6;
 
@@ -38,6 +39,7 @@
   --ch-booking: #2E6FD6;  /* blu Booking più chiaro per lo scuro */
   --ch-airbnb: #FF5A75;
   --ch-expedia: #FFD25E;
+  --ch-other: #9B7BE8;
   --ch-direct: #3FBD86;
   --ch-blocked: #5A6178;
 
