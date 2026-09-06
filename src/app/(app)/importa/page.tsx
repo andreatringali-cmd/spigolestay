@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
@@ -103,8 +103,14 @@ export default function ImportaPage() {
   const [fileName, setFileName] = useState("");
   const [map, setMap] = useState<Record<string, number>>({});
   const [structureId, setStructureId] = useState<string>(() => (activeStructureId !== "all" ? activeStructureId : structures[0]?.id ?? ""));
+  const [includeBlocked, setIncludeBlocked] = useState(false);
   const [done, setDone] = useState<number | null>(null);
   const [err, setErr] = useState("");
+
+  // Se la struttura non è ancora impostata (store caricato dopo il mount), aggancia la prima disponibile.
+  useEffect(() => {
+    if ((!structureId || !structures.some((s) => s.id === structureId)) && structures[0]) setStructureId(structures[0].id);
+  }, [structures, structureId]);
 
   const headers = rows[0] ?? [];
   const dataRows = useMemo(() => rows.slice(1).filter((r) => r.some((c) => (c || "").trim())), [rows]);
@@ -134,7 +140,8 @@ export default function ImportaPage() {
     if (!rtFallback) rtFallback = addRoomType({ structureId, name: t("Camere importate"), beds: 2, basePrice: 0 });
     const findRoom = (txt: string) => { const s = (txt || "").toLowerCase().trim(); const hit = s ? (sRooms.find((rt) => rt.name.toLowerCase() === s) || sRooms.find((rt) => s.includes(rt.name.toLowerCase()))) : null; return hit ? hit.id : rtFallback; };
     let n = 0, skipped = 0;
-    events.forEach((e) => {
+    const list = includeBlocked ? events : events.filter((e) => !e.blocked);
+    list.forEach((e) => {
       if (!e.checkIn || !e.checkOut) { skipped++; return; }
       const guestId = addGuest({ fullName: e.guest || (e.blocked ? t("Non disponibile") : t("Ospite (da ICS)")) });
       addBooking({
@@ -253,8 +260,15 @@ export default function ImportaPage() {
                   </tbody>
                 </table>
               </div>
-              <p className="mt-3 text-xs text-faint">{t("Trovati")} {events.length} {t("eventi. Mostrati i primi 6.")}</p>
-              <button onClick={runImportICS} disabled={!structureId} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-40">{t("Importa")} {events.length} {t("prenotazioni")}</button>
+              {(() => {
+                const resv = events.filter((e) => !e.blocked).length, blk = events.length - resv;
+                const imp = includeBlocked ? events.length : resv;
+                return (<>
+                  <p className="mt-3 text-xs text-faint">{t("Trovati")} {events.length} {t("eventi")}: <b className="text-dim">{resv}</b> {t("prenotazioni")}, <b className="text-dim">{blk}</b> {t("blocchi (fuori servizio)")}.</p>
+                  <label className="mt-3 flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={includeBlocked} onChange={(e) => setIncludeBlocked(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Importa anche i periodi bloccati (fuori servizio)")}</label>
+                  <button onClick={runImportICS} disabled={!structureId || imp === 0} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-40">{t("Importa")} {imp} {t("prenotazioni")}</button>
+                </>);
+              })()}
             </Card>
           )}
 
