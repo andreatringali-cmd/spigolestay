@@ -141,6 +141,10 @@ export interface RoomType {
   deriveFrom?: string; // id tipologia sorgente ("" o assente = tariffa indipendente)
   deriveMode?: "amount" | "percent"; // ±€ oppure ±%
   deriveValue?: number; // valore con segno (es. -10 = −10€ / −10%)
+  deriveRound?: boolean; // arrotonda il prezzo derivato (assente/true = sì)
+  deriveInherit?: boolean; // eredita disponibilità/restrizioni dalla tipologia sorgente
+  // Restrizioni / disponibilità (a livello tipologia)
+  salesClosed?: boolean; // vendite chiuse per questa tipologia
   // Dettaglio tipologia
   color?: string;
   maxOccupancy?: number;   // ospiti massimi

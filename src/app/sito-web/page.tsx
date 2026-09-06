@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { DataProvider, useData } from "@/lib/store";
 import type { RoomType } from "@/lib/types";
+import { effectiveBase } from "@/lib/pricing";
 import { getImages } from "@/lib/images";
 import { eur } from "@/lib/format";
 
@@ -12,15 +13,6 @@ const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate
 interface Cfg { nome: string; tagline: string; accent: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean }
 const DEFCFG: Cfg = { nome: "", tagline: "Il tuo soggiorno nel cuore di Ortigia", accent: "#4F46E5", hero: true, camere: true, recensioni: true, mappa: true, contatti: true };
 
-function effectiveBase(rt: RoomType, all: RoomType[], seen: Set<string> = new Set()): number {
-  if (!rt.deriveFrom || seen.has(rt.id)) return rt.basePrice;
-  seen.add(rt.id);
-  const src = all.find((x) => x.id === rt.deriveFrom);
-  if (!src) return rt.basePrice;
-  const v = rt.deriveValue ?? 0;
-  const base = effectiveBase(src, all, seen);
-  return Math.max(0, Math.round(rt.deriveMode === "percent" ? base * (1 + v / 100) : base + v));
-}
 
 export default function SitoWebPage() {
   return <DataProvider><Site /></DataProvider>;

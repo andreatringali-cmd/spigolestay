@@ -6,6 +6,7 @@ import type { RoomType, ExtraService } from "@/lib/types";
 import { DEFAULT_EXTRAS } from "@/lib/types";
 import { getImages } from "@/lib/images";
 import { eur } from "@/lib/format";
+import { effectiveBase, effectiveClosed } from "@/lib/pricing";
 
 // ---- pricing helpers --------------------------------------------------------
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
@@ -19,16 +20,6 @@ const DEFAULT_PLANS: Plan[] = [
   { id: "bb", name: "Colazione inclusa", adjPct: 8, refundable: true, board: "Colazione" },
   { id: "nonref", name: "Non rimborsabile", adjPct: -10, refundable: false, board: "Solo pernottamento" },
 ];
-
-function effectiveBase(rt: RoomType, all: RoomType[], seen: Set<string> = new Set()): number {
-  if (!rt.deriveFrom || seen.has(rt.id)) return rt.basePrice;
-  seen.add(rt.id);
-  const src = all.find((x) => x.id === rt.deriveFrom);
-  if (!src) return rt.basePrice;
-  const base = effectiveBase(src, all, seen);
-  const v = rt.deriveValue ?? 0;
-  return Math.max(0, Math.round(rt.deriveMode === "percent" ? base * (1 + v / 100) : base + v));
-}
 
 const box = "rounded-xl border border-line bg-surface";
 const field = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
@@ -64,7 +55,7 @@ function Engine() {
   const [privacy, setPrivacy] = useState(false);
   const [code, setCode] = useState("");
 
-  const types = roomTypes.filter((rt) => rt.structureId === structureId);
+  const types = roomTypes.filter((rt) => rt.structureId === structureId && !effectiveClosed(rt, roomTypes));
   const availUnits = (rt: RoomType) => units.filter((u) => u.roomTypeId === rt.id && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn));
 
   const dayPrice = (rt: RoomType, iso: string, plan: Plan) => {

@@ -3,23 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel, type RoomType } from "@/lib/types";
+import { effBase, effectiveClosed } from "@/lib/pricing";
 import { shiftISO, toISO } from "@/lib/dates";
 import { useLang } from "@/lib/i18n";
 
 const CHANNEL_OPTS: Channel[] = ["direct", "booking", "airbnb", "expedia"];
 const isWeekend = (iso: string) => { const d = new Date(iso).getDay(); return d === 5 || d === 6 || d === 0; };
 const fmtDay = (iso: string) => { try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }); } catch { return iso; } };
-
-// Prezzo base effettivo (gestisce le tariffe derivate come nel booking engine).
-function effBase(rt: RoomType, all: RoomType[], seen: Set<string> = new Set()): number {
-  if (!rt.deriveFrom || seen.has(rt.id)) return rt.basePrice;
-  seen.add(rt.id);
-  const src = all.find((x) => x.id === rt.deriveFrom);
-  if (!src) return rt.basePrice;
-  const base = effBase(src, all, seen);
-  const v = rt.deriveValue ?? 0;
-  return Math.max(0, Math.round(rt.deriveMode === "percent" ? base * (1 + v / 100) : base + v));
-}
 
 export default function NewBookingModal() {
   const { newBooking, closeNewBooking, structures, roomTypes, units, bookings, rateOverrides, addGuest, addBooking, activeStructureId } = useData();
@@ -76,7 +66,7 @@ export default function NewBookingModal() {
   const linePrice = (rt: RoomType) => priceOv[rt.id] ?? stayPrice(rt);
 
   const orderedStructs = structFilter === "all" ? structures : structures.filter((s) => s.id === structFilter);
-  const availTypes = (sId: string) => roomTypes.filter((rt) => rt.structureId === sId && availUnits(rt).length > 0);
+  const availTypes = (sId: string) => roomTypes.filter((rt) => rt.structureId === sId && !effectiveClosed(rt, roomTypes) && availUnits(rt).length > 0);
   const totalAvail = orderedStructs.reduce((a, s) => a + availTypes(s.id).length, 0);
 
   const selectedLines = roomTypes.filter((rt) => (qty[rt.id] ?? 0) > 0);

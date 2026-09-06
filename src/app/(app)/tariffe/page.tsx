@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useData } from "@/lib/store";
 import { addDays, isWeekend, toISO, weekdayShort } from "@/lib/dates";
 import type { RoomType } from "@/lib/types";
+import { effectiveBase, effectiveMinStay, effectiveClosed } from "@/lib/pricing";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -22,17 +23,6 @@ const DEFAULT_PLANS: RatePlan[] = [
 const PLANS_KEY = "spigolestay:rateplans";
 const RULES_KEY = "spigolestay:pricerules";
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `p-${Math.floor(performance.now() * 1000)}`);
-
-// Prezzo base effettivo (con derivazione e guardia anti-ciclo).
-function effectiveBase(rt: RoomType, all: RoomType[], seen: Set<string> = new Set()): number {
-  if (!rt.deriveFrom || seen.has(rt.id)) return rt.basePrice;
-  seen.add(rt.id);
-  const src = all.find((x) => x.id === rt.deriveFrom);
-  if (!src) return rt.basePrice;
-  const base = effectiveBase(src, all, seen);
-  const v = rt.deriveValue ?? 0;
-  return Math.max(0, Math.round(rt.deriveMode === "percent" ? base * (1 + v / 100) : base + v));
-}
 
 const inp = "rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus";
 
@@ -68,6 +58,38 @@ export default function TariffePage() {
     const base = effectiveBase(rt, roomTypes);
     const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(base * (isWeekend(d) ? 1 + weekendPct / 100 : 1));
     return Math.max(0, Math.round(raw * (1 + (activePlan?.adjPct ?? 0) / 100)));
+  };
+
+  // ── Mappa tariffe derivate (albero master → derivate) ──
+  const childrenOf = (id: string) => types.filter((x) => x.deriveFrom === id);
+  const scarto = (rt: RoomType) => { const v = rt.deriveValue ?? 0; const sign = v >= 0 ? "+" : ""; return rt.deriveMode === "percent" ? `${sign}${v}%` : `${sign}${v} €`; };
+  const roots = types.filter((rt) => !rt.deriveFrom || !types.some((x) => x.id === rt.deriveFrom));
+  const TypeNode = ({ rt, seen = new Set<string>() }: { rt: RoomType; seen?: Set<string> }) => {
+    if (seen.has(rt.id)) return null;
+    const nextSeen = new Set(seen); nextSeen.add(rt.id);
+    const kids = childrenOf(rt.id);
+    const closed = effectiveClosed(rt, roomTypes);
+    return (
+      <div>
+        <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 shadow-sm">
+          <span className="font-semibold text-txt">{rt.name}</span>
+          <span className="font-mono text-xs font-bold text-txt">{eur(effectiveBase(rt, roomTypes))}</span>
+          {!rt.deriveFrom && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span>}
+          {rt.deriveInherit && <span title={t("Eredita disponibilità e restrizioni")} className="text-[11px] text-focus">⇊</span>}
+          {closed && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--err)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--err)]">{t("chiusa")}</span>}
+        </div>
+        {kids.length > 0 && (
+          <div className="mt-2 ml-3 flex flex-col gap-2 border-l-2 border-line pl-3">
+            {kids.map((k) => (
+              <div key={k.id} className="flex items-start gap-2">
+                <span className="mt-2 shrink-0 rounded-full bg-focus px-1.5 py-0.5 text-[10px] font-bold text-white">{scarto(k)}</span>
+                <TypeNode rt={k} seen={nextSeen} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -128,23 +150,39 @@ export default function TariffePage() {
                 const derived = !!rt.deriveFrom;
                 const eff = effectiveBase(rt, roomTypes);
                 const sources = types.filter((x) => x.id !== rt.id);
+                const inheriting = derived && !!rt.deriveInherit;
+                const minS = inheriting ? effectiveMinStay(rt, roomTypes) : (rt.minStay ?? 0);
+                const closed = inheriting ? effectiveClosed(rt, roomTypes) : !!rt.salesClosed;
                 return (
-                  <div key={rt.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-line p-2">
-                    <div className="min-w-[110px] flex-1 text-sm font-medium text-txt">{rt.name}</div>
-                    <select value={derived ? "derived" : "indep"} onChange={(e) => updateRoomType(rt.id, e.target.value === "derived" ? { deriveFrom: sources[0]?.id ?? "", deriveMode: rt.deriveMode ?? "amount", deriveValue: rt.deriveValue ?? -10 } : { deriveFrom: undefined })} className={inp}>
-                      <option value="indep">{t("Indipendente")}</option>
-                      <option value="derived">{t("Derivata")}</option>
-                    </select>
-                    {!derived ? (
-                      <input type="number" min={0} value={rt.basePrice} onChange={(e) => updateRoomType(rt.id, { basePrice: Number(e.target.value) })} className={`${inp} w-20`} />
-                    ) : (
-                      <>
-                        <select value={rt.deriveFrom} onChange={(e) => updateRoomType(rt.id, { deriveFrom: e.target.value })} className={inp}>{sources.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
-                        <select value={rt.deriveMode ?? "amount"} onChange={(e) => updateRoomType(rt.id, { deriveMode: e.target.value as "amount" | "percent" })} className={inp}><option value="amount">±€</option><option value="percent">±%</option></select>
-                        <input type="number" value={rt.deriveValue ?? 0} onChange={(e) => updateRoomType(rt.id, { deriveValue: Number(e.target.value) })} className={`${inp} w-16`} />
-                      </>
-                    )}
-                    <div className="ml-auto font-mono text-sm font-bold text-txt">{eur(eff)}{derived && <span className="ml-1 text-[10px] font-normal text-focus">{t("der.")}</span>}</div>
+                  <div key={rt.id} className="rounded-lg border border-line p-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="min-w-[110px] flex-1 text-sm font-medium text-txt">{rt.name}{closed && <span className="ml-1.5 rounded-full bg-[color:color-mix(in_srgb,var(--err)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--err)]">{t("chiusa")}</span>}</div>
+                      <select value={derived ? "derived" : "indep"} onChange={(e) => updateRoomType(rt.id, e.target.value === "derived" ? { deriveFrom: sources[0]?.id ?? "", deriveMode: rt.deriveMode ?? "amount", deriveValue: rt.deriveValue ?? -10 } : { deriveFrom: undefined })} className={inp}>
+                        <option value="indep">{t("Indipendente")}</option>
+                        <option value="derived">{t("Derivata")}</option>
+                      </select>
+                      {!derived ? (
+                        <input type="number" min={0} value={rt.basePrice} onChange={(e) => updateRoomType(rt.id, { basePrice: Number(e.target.value) })} className={`${inp} w-20`} />
+                      ) : (
+                        <>
+                          <select value={rt.deriveFrom} onChange={(e) => updateRoomType(rt.id, { deriveFrom: e.target.value })} className={inp}>{sources.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+                          <select value={rt.deriveMode ?? "amount"} onChange={(e) => updateRoomType(rt.id, { deriveMode: e.target.value as "amount" | "percent" })} className={inp}><option value="amount">±€</option><option value="percent">±%</option></select>
+                          <input type="number" value={rt.deriveValue ?? 0} onChange={(e) => updateRoomType(rt.id, { deriveValue: Number(e.target.value) })} className={`${inp} w-16`} />
+                        </>
+                      )}
+                      <div className="ml-auto font-mono text-sm font-bold text-txt">{eur(eff)}{derived && <span className="ml-1 text-[10px] font-normal text-focus">{t("der.")}</span>}</div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-dim">
+                      {derived && (
+                        <>
+                          <label className="flex items-center gap-1.5"><input type="checkbox" checked={rt.deriveRound !== false} onChange={(e) => updateRoomType(rt.id, { deriveRound: e.target.checked })} className="h-3.5 w-3.5 accent-[color:var(--focus)]" /> {t("Arrotonda")}</label>
+                          <label className="flex items-center gap-1.5"><input type="checkbox" checked={!!rt.deriveInherit} onChange={(e) => updateRoomType(rt.id, { deriveInherit: e.target.checked })} className="h-3.5 w-3.5 accent-[color:var(--focus)]" /> {t("Eredita disp./restrizioni")}</label>
+                        </>
+                      )}
+                      <label className="flex items-center gap-1.5">{t("Notti min")}<input type="number" min={0} disabled={inheriting} value={minS} onChange={(e) => updateRoomType(rt.id, { minStay: Math.max(0, Number(e.target.value)) })} className={`${inp} w-14 py-1 disabled:opacity-40`} /></label>
+                      <label className="flex items-center gap-1.5"><input type="checkbox" disabled={inheriting} checked={closed} onChange={(e) => updateRoomType(rt.id, { salesClosed: e.target.checked })} className="h-3.5 w-3.5 accent-[color:var(--err)] disabled:opacity-40" /> {t("Chiudi vendite")}</label>
+                      {inheriting && <span className="text-faint">{t("(dalla master)")}</span>}
+                    </div>
                   </div>
                 );
               })}
@@ -153,6 +191,19 @@ export default function TariffePage() {
           </Card>
         </div>
       </div>
+
+      {/* Mappa tariffe derivate */}
+      {roots.length > 0 && types.some((rt) => rt.deriveFrom) && (
+        <Card className="mb-5">
+          <SectionTitle>{t("Mappa tariffe derivate")}</SectionTitle>
+          <p className="mb-3 text-xs text-dim">{t("Ogni tipologia master con le sue derivate e lo scarto applicato. Cambia il prezzo della master e le derivate si aggiornano da sole.")}</p>
+          <div className="overflow-x-auto">
+            <div className="flex flex-wrap gap-6 pb-1">
+              {roots.map((rt) => <TypeNode key={rt.id} rt={rt} />)}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Striscia prezzi */}
       <div className="mb-2 flex items-center gap-2">

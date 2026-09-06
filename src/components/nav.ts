@@ -15,6 +15,7 @@ export const NAV: NavItem[] = [
   { label: "Calendario", href: "/calendario", group: "Operatività", icon: "calendar", perm: "calendario", module: "pms" },
   { label: "Pulizie", href: "/pulizie", group: "Operatività", icon: "sparkles", perm: "pulizie", module: "housekeeping" },
   { label: "Messaggi", href: "/messaggi", group: "Operatività", icon: "chat", perm: "webconcierge", module: "messaging" },
+  { label: "Importa prenotazioni", href: "/importa", group: "Operatività", icon: "fileText", perm: "impostazioni", module: "pms" },
 
   // Vendita: cosa vendi e come lo proponi.
   { label: "Preventivi", href: "/preventivi", group: "Vendita", icon: "fileText", perm: "webconcierge", module: "concierge" },
@@ -41,11 +42,10 @@ export const NAV: NavItem[] = [
   { label: "Alloggiati", href: "/alloggiati", group: "Anagrafiche", icon: "id", perm: "alloggiati", module: "pms" },
   { label: "Tassa soggiorno", href: "/tassa-soggiorno", group: "Anagrafiche", icon: "receipt", perm: "tassa", module: "pms" },
 
+  { label: "Utenti", href: "/utenti", group: "Configurazione", icon: "users", perm: "utenti", module: "team" },
   { label: "Strutture", href: "/strutture", group: "Configurazione", icon: "building", perm: "impostazioni", module: "pms" },
   { label: "Camere", href: "/camere", group: "Configurazione", icon: "bed", perm: "camere", module: "pms" },
-  { label: "Importa prenotazioni", href: "/importa", group: "Configurazione", icon: "fileText", perm: "impostazioni", module: "pms" },
   { label: "Guida ospiti", href: "/guida-ospiti", group: "Configurazione", icon: "share", perm: "webconcierge", module: "concierge" },
-  { label: "Utenti", href: "/utenti", group: "Configurazione", icon: "users", perm: "utenti", module: "team" },
   { label: "Impostazioni", href: "/impostazioni", group: "Configurazione", icon: "settings", perm: "impostazioni", module: "pms" },
   { label: "Abbonamento", href: "/abbonamento", group: "Configurazione", icon: "card", perm: "abbonamento", module: "pms" },
 ];

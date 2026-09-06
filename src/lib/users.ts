@@ -156,6 +156,7 @@ export interface User {
   phone: string;            // obbligatorio
   language: string;
   avatarColor?: string;
+  photo?: string; // foto profilo (data URL); se presente ha priorità sulle iniziali
   // Network / strutture
   managerCheckin: boolean;
   managerCheckout: boolean;

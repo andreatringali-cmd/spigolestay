@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel, type RoomType } from "@/lib/types";
+import { effBase } from "@/lib/pricing";
 import { shiftISO, toISO, nights } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { PageHeader, Card } from "@/components/ui";
@@ -13,16 +14,6 @@ import Icon from "@/components/Icon";
 const CHANNEL_OPTS: Channel[] = ["direct", "booking", "airbnb", "expedia"];
 const isWeekend = (iso: string) => { const d = new Date(iso).getDay(); return d === 5 || d === 6 || d === 0; };
 const fmtDay = (iso: string) => { try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; } };
-
-function effBase(rt: RoomType, all: RoomType[], seen: Set<string> = new Set()): number {
-  if (!rt.deriveFrom || seen.has(rt.id)) return rt.basePrice;
-  seen.add(rt.id);
-  const src = all.find((x) => x.id === rt.deriveFrom);
-  if (!src) return rt.basePrice;
-  const base = effBase(src, all, seen);
-  const v = rt.deriveValue ?? 0;
-  return Math.max(0, Math.round(rt.deriveMode === "percent" ? base * (1 + v / 100) : base + v));
-}
 
 export default function NuovaPrenotazionePage() {
   const router = useRouter();

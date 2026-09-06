@@ -157,12 +157,12 @@ export default function CamerePage() {
 
               {/* Tipologie */}
               <SectionTitle>{t("Tipologie")}</SectionTitle>
-              <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="mb-4 flex flex-wrap gap-3">
                 {types.map((rt, i) => {
                   const color = typeColor(rt, i);
                   const n = sUnits.filter((u) => u.roomTypeId === rt.id).length;
                   return (
-                    <button key={rt.id} onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="group overflow-hidden rounded-xl border border-line bg-surface text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                    <button key={rt.id} onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="group grow basis-[250px] min-w-[220px] max-w-[380px] overflow-hidden rounded-xl border border-line bg-surface text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                       <div className="h-1.5 w-full" style={{ backgroundColor: color }} />
                       <div className="p-3">
                         <div className="flex items-start justify-between gap-2">
@@ -182,7 +182,7 @@ export default function CamerePage() {
                     </button>
                   );
                 })}
-                {types.length === 0 && <div className="rounded-xl border border-dashed border-line p-4 text-sm text-faint">{t("Nessuna tipologia. Aggiungine una col pulsante “+ Tipologia”.")}</div>}
+                {types.length === 0 && <div className="w-full rounded-xl border border-dashed border-line p-4 text-sm text-faint">{t("Nessuna tipologia. Aggiungine una col pulsante “+ Tipologia”.")}</div>}
               </div>
 
               {/* Camere — un box separato per ogni tipologia */}

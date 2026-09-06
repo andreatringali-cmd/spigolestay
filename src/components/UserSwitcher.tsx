@@ -18,7 +18,7 @@ export default function UserSwitcher({ sidebar, collapsed }: { sidebar?: boolean
   return (
     <div ref={ref} className="relative">
       <button onClick={() => setOpen((o) => !o)} className={`flex items-center gap-2 rounded-lg border border-line hover:bg-wash ${sidebar ? `w-full ${collapsed ? "justify-center px-1.5 py-1.5" : "px-2 py-1.5"}` : "px-2 py-1"}`} title="Utente collegato">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: user.avatarColor }}>{initials(user.firstName, user.lastName)}</span>
+        <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: user.avatarColor }}>{user.photo ? <img src={user.photo} alt="" className="h-full w-full object-cover" /> : initials(user.firstName, user.lastName)}</span>
         {!(sidebar && collapsed) && <span className={`text-left leading-tight ${sidebar ? "block min-w-0 flex-1" : "hidden sm:block"}`}><span className="block truncate text-xs font-semibold text-txt">{user.firstName} {user.lastName}</span><span className="block text-[10px] text-faint">{roleLabel(user.templateKey)}</span></span>}
       </button>
       {open && (
@@ -26,7 +26,7 @@ export default function UserSwitcher({ sidebar, collapsed }: { sidebar?: boolean
           <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Collegato come (prova ruoli)</div>
           {users.map((u) => (
             <button key={u.id} onClick={() => { const isSame = u.id === user.id; setUserId(u.id); setOpen(false); playSound(isSame ? "logout" : "login"); }} className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left ${u.id === user.id ? "bg-wash" : "hover:bg-wash"}`}>
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: u.avatarColor }}>{initials(u.firstName, u.lastName)}</span>
+              <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full text-xs font-bold text-white" style={{ backgroundColor: u.avatarColor }}>{u.photo ? <img src={u.photo} alt="" className="h-full w-full object-cover" /> : initials(u.firstName, u.lastName)}</span>
               <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-txt">{u.firstName} {u.lastName}</span><span className="block text-[11px] text-dim">{roleLabel(u.templateKey)}</span></span>
               {u.id === user.id && <span className="text-focus">✓</span>}
             </button>

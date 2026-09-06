@@ -43,7 +43,7 @@ export default function UtentiPage() {
               <tr key={u.id} onClick={() => router.push(`/utenti/${u.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-2.5">
-                    <div className="grid h-9 w-9 place-items-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: u.avatarColor }}>{initials(u.firstName, u.lastName)}</div>
+                    <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full text-xs font-bold text-white" style={{ backgroundColor: u.avatarColor }}>{u.photo ? <img src={u.photo} alt="" className="h-full w-full object-cover" /> : initials(u.firstName, u.lastName)}</div>
                     <div>
                       <div className="font-medium text-txt">{u.firstName} {u.lastName}</div>
                       <div className="text-[11px] text-faint">{u.email}</div>

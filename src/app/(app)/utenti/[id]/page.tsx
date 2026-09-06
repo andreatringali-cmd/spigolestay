@@ -12,6 +12,7 @@ import {
   type User, type PermLevel,
 } from "@/lib/users";
 import { eur } from "@/lib/format";
+import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
 
 // --- Micro-componenti ---------------------------------------------------------
@@ -65,10 +66,9 @@ export default function UserSchedaPage() {
   const [resetLink, setResetLink] = useState("");
   const doReset = () => { const t = (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : "abcd1234").replace(/-/g, "").slice(0, 14); setResetLink(`https://spigolestay.app/reset/${t}`); setPwPanel("reset"); };
 
-  // Avatar preview (in sessione)
+  // Avatar / foto profilo (salvata sull'utente)
   const fileRef = useRef<HTMLInputElement>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const onFile = (f?: File) => { if (!f) return; const r = new FileReader(); r.onload = () => setAvatarUrl(String(r.result)); r.readAsDataURL(f); };
+  const onFile = async (f?: File) => { if (!f || !f.type.startsWith("image/")) return; try { set("photo", await downscaleImage(f, 256, 0.8)); } catch {} };
 
   // Strutture (dual-list)
   const [q1, setQ1] = useState(""); const [q2, setQ2] = useState("");
@@ -116,7 +116,7 @@ export default function UserSchedaPage() {
   const fullName = `${u.firstName} ${u.lastName}`.trim() || t("Nuovo utente");
   const avatar = (size: number) => (
     <div className="grid shrink-0 place-items-center overflow-hidden rounded-full font-bold text-white" style={{ width: size, height: size, backgroundColor: u.avatarColor, fontSize: size * 0.36 }}>
-      {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : initials(u.firstName, u.lastName)}
+      {u.photo ? <img src={u.photo} alt="" className="h-full w-full object-cover" /> : initials(u.firstName, u.lastName)}
     </div>
   );
 
@@ -189,7 +189,10 @@ export default function UserSchedaPage() {
             <div className="mb-3 flex items-center gap-3">
               {avatar(56)}
               <div>
-                <button onClick={() => fileRef.current?.click()} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-txt hover:bg-wash">🖼 {t("Seleziona immagine")}</button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => fileRef.current?.click()} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-txt hover:bg-wash">🖼 {t("Seleziona immagine")}</button>
+                  {u.photo && <button onClick={() => set("photo", undefined)} className="text-xs font-medium text-faint hover:text-[color:var(--err)]">{t("Rimuovi foto")}</button>}
+                </div>
                 <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif" hidden onChange={(e) => onFile(e.target.files?.[0])} />
                 <div className="mt-1 text-[11px] text-faint">{t("JPG, GIF o PNG · max 20 MB. In alternativa scegli un colore:")}</div>
                 <div className="mt-1 flex gap-1.5">{AV_COLORS.map((c) => <button key={c} onClick={() => set("avatarColor", c)} className={`h-5 w-5 rounded-full border-2 ${u.avatarColor === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div>
