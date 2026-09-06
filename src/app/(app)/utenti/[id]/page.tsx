@@ -465,22 +465,6 @@ export default function UserSchedaPage() {
             </div>
           </Card>
 
-          {/* Firma, lingue & note */}
-          <Card>
-            <SectionTitle>{t("Comunicazioni & note")}</SectionTitle>
-            <label className="block text-xs font-medium text-dim">{t("Firma su messaggi e preventivi")}
-              <textarea value={u.signature ?? ""} onChange={(e) => set("signature", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={`${t("Es.")} ${u.firstName || t("Nome")} · Xenora · +39…`} />
-            </label>
-            <div className="mt-3 mb-1 text-xs font-medium text-dim">{t("Lingue con cui assiste gli ospiti")}</div>
-            <div className="mb-3 flex flex-wrap gap-1.5">
-              {USER_LANGS.map((l) => { const on = (u.guestLangs ?? []).includes(l.code); return (
-                <button key={l.code} onClick={() => set("guestLangs", on ? (u.guestLangs ?? []).filter((x) => x !== l.code) : [...(u.guestLangs ?? []), l.code])} className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}>{l.flag} {l.label}</button>
-              ); })}
-            </div>
-            <label className="block text-xs font-medium text-dim">{t("Note interne")} <span className="text-faint">({t("visibili solo agli amministratori")})</span>
-              <textarea value={u.internalNote ?? ""} onChange={(e) => set("internalNote", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={t("Appunti sull'utente…")} />
-            </label>
-          </Card>
         </div>
       </div>
     </div>
