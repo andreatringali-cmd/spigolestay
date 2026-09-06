@@ -416,12 +416,6 @@ export default function UserSchedaPage() {
                 </div>
               ))}
             </div>
-
-            <div className="mt-4 flex items-center gap-3 rounded-lg bg-wash px-3 py-2 text-[11px] text-dim">
-              <span className="flex items-center gap-1"><span style={{ color: LEVEL_META.none.color }}>{IcoBan}</span> {t("Nessuno")}</span>
-              <span className="flex items-center gap-1"><span style={{ color: LEVEL_META.view.color }}>{IcoEye}</span> {t("Visualizza")}</span>
-              <span className="flex items-center gap-1"><span style={{ color: LEVEL_META.edit.color }}>{IcoPen}</span> {t("Modifica")}</span>
-            </div>
           </Card>
 
           {/* Limiti operativi */}

@@ -190,6 +190,11 @@ export interface Unit {
   accessInfo?: string; // codice serratura/keybox specifico
   notes?: string;
   oosReason?: string;  // motivo fuori servizio
+  // Personalizzazione della singola camera (oltre alla tipologia)
+  photos?: string[];   // foto della camera (data URL)
+  amenities?: string[];// dotazioni specifiche della camera
+  bedConfig?: string;  // configurazione letti specifica (override tipologia)
+  size?: number;       // mq specifici (override tipologia)
 }
 
 export interface Guest {

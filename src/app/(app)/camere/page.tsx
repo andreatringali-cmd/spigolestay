@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import type { RoomType, Unit } from "@/lib/types";
-import { VIEW_OPTIONS } from "@/lib/types";
+import { VIEW_OPTIONS, ROOM_AMENITIES, BED_CONFIGS } from "@/lib/types";
+import { downscaleImage } from "@/lib/images";
 import { AV_COLORS } from "@/lib/users";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
@@ -317,10 +318,19 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
   const types = roomTypes.filter((rt) => rt.structureId === structureId);
   const [f, setF] = useState<Partial<Unit>>(() => unit ?? { name: "", roomTypeId: types[0]?.id ?? "", floor: "", view: "", code: "", outOfService: false });
   const set = <K extends keyof Unit>(k: K, v: Unit[K]) => setF((p) => ({ ...p, [k]: v }));
+  const onPhotos = async (files: FileList | null) => {
+    if (!files?.length) return;
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith("image/")) continue;
+      try { const url = await downscaleImage(file, 900, 0.72); setF((p) => ({ ...p, photos: [...(p.photos ?? []), url] })); } catch {}
+    }
+  };
+  const removePhoto = (i: number) => setF((p) => ({ ...p, photos: (p.photos ?? []).filter((_, j) => j !== i) }));
+  const toggleAmenity = (a: string) => setF((p) => { const cur = p.amenities ?? []; return { ...p, amenities: cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a] }; });
 
   const save = () => {
     if (!f.name?.trim() || !f.roomTypeId) return;
-    const patch: Partial<Unit> = { name: f.name.trim(), roomTypeId: f.roomTypeId, code: f.code, floor: f.floor, view: f.view, accessInfo: f.accessInfo, notes: f.notes, outOfService: f.outOfService, oosReason: f.outOfService ? f.oosReason : undefined };
+    const patch: Partial<Unit> = { name: f.name.trim(), roomTypeId: f.roomTypeId, code: f.code, floor: f.floor, view: f.view, accessInfo: f.accessInfo, notes: f.notes, outOfService: f.outOfService, oosReason: f.outOfService ? f.oosReason : undefined, photos: f.photos, amenities: f.amenities, bedConfig: f.bedConfig, size: f.size };
     if (unit) updateUnit(unit.id, patch);
     else { const id = addUnit({ structureId, roomTypeId: f.roomTypeId, name: patch.name! }); updateUnit(id, patch); }
     onClose();
@@ -334,6 +344,8 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
         <label className={lbl}>{t("Tipologia")}<select value={f.roomTypeId ?? ""} onChange={(e) => set("roomTypeId", e.target.value)} className={`${inp} mt-1`}>{types.length === 0 && <option value="">{t("Crea prima una tipologia")}</option>}{types.map((rt) => <option key={rt.id} value={rt.id}>{rt.name}</option>)}</select></label>
         <label className={lbl}>{t("Piano")}<input value={f.floor ?? ""} onChange={(e) => set("floor", e.target.value)} className={`${inp} mt-1`} placeholder={t("Terra / 1° / 2°")} /></label>
         <label className={lbl}>{t("Vista")}<select value={f.view ?? ""} onChange={(e) => set("view", e.target.value)} className={`${inp} mt-1`}><option value="">—</option>{VIEW_OPTIONS.map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
+        <label className={lbl}>{t("Configurazione letti")}<select value={f.bedConfig ?? ""} onChange={(e) => set("bedConfig", e.target.value || undefined)} className={`${inp} mt-1`}><option value="">{t("Come tipologia")}</option>{BED_CONFIGS.map((b) => <option key={b} value={b}>{t(b)}</option>)}</select></label>
+        <label className={lbl}>{t("Metri quadri")}<input type="number" min={0} value={f.size ?? ""} onChange={(e) => set("size", e.target.value ? Number(e.target.value) : undefined)} className={`${inp} mt-1`} placeholder={t("Come tipologia")} /></label>
       </div>
       <label className={`${lbl} mt-3`}>{t("Codice/istruzioni di accesso")}<input value={f.accessInfo ?? ""} onChange={(e) => set("accessInfo", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. keybox 4471, porta a sinistra")} /></label>
       {hasGuide ? (
@@ -348,6 +360,38 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
         </div>
       )}
       <label className={`${lbl} mt-3`}>{t("Note interne")}<textarea value={f.notes ?? ""} onChange={(e) => set("notes", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={t("Manutenzioni, particolarità…")} /></label>
+
+      {/* Foto della camera */}
+      <div className="mt-3">
+        <div className="mb-1 flex items-center justify-between">
+          <span className={lbl}>{t("Foto della camera")}</span>
+          <label className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-focus hover:bg-wash">＋ {t("Aggiungi foto")}<input type="file" accept="image/*" multiple hidden onChange={(e) => { onPhotos(e.target.files); e.target.value = ""; }} /></label>
+        </div>
+        {(f.photos ?? []).length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {(f.photos ?? []).map((src, i) => (
+              <div key={i} className="group relative h-20 w-28 overflow-hidden rounded-lg border border-line">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt="" className="h-full w-full object-cover" />
+                <button type="button" onClick={() => removePhoto(i)} className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/55 text-xs text-white opacity-0 transition group-hover:opacity-100" title={t("Rimuovi")}>✕</button>
+              </div>
+            ))}
+          </div>
+        ) : <p className="text-[11px] text-faint">{t("Nessuna foto. Le foto della camera potranno comparire nella guida ospiti e nel booking.")}</p>}
+      </div>
+
+      {/* Dotazioni specifiche della camera */}
+      <div className="mt-3">
+        <span className={lbl}>{t("Dotazioni della camera")}</span>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {ROOM_AMENITIES.map((a) => {
+            const on = (f.amenities ?? []).includes(a);
+            return <button key={a} type="button" onClick={() => toggleAmenity(a)} className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(a)}</button>;
+          })}
+        </div>
+        <p className="mt-1 text-[11px] text-faint">{t("Specifiche di questa camera, in aggiunta a quelle della tipologia.")}</p>
+      </div>
+
       <div className="mt-3 rounded-lg border border-line p-3">
         <div className="flex items-center justify-between"><span className="text-sm font-medium text-txt">{t("Fuori servizio")}</span><Toggle on={!!f.outOfService} onClick={() => set("outOfService", !f.outOfService)} color="var(--warn)" /></div>
         {f.outOfService && <input value={f.oosReason ?? ""} onChange={(e) => set("oosReason", e.target.value)} className={`${inp} mt-2`} placeholder={t("Motivo (es. ristrutturazione)")} />}

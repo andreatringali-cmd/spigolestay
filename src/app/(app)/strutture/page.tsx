@@ -43,6 +43,7 @@ export default function StrutturePage() {
             <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
               <th className="px-3 py-2 font-semibold">{t("Struttura")}</th>
               <th className="px-3 py-2 font-semibold">{t("Città")}</th>
+              <th className="px-3 py-2 font-semibold">{t("Indirizzo")}</th>
               <th className="px-3 py-2 font-semibold">{t("Tipo")}</th>
               <th className="px-3 py-2 font-semibold">{t("Gruppo")}</th>
               <th className="px-3 py-2 font-semibold">{t("Camere")}</th>
@@ -66,11 +67,11 @@ export default function StrutturePage() {
                       <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-xs font-bold text-white" style={{ backgroundColor: color }}>{s.logo ? <img src={s.logo} alt="" className="h-full w-full object-cover" /> : s.name.slice(0, 2).toUpperCase()}</div>
                       <div>
                         <div className="font-medium text-txt">{s.name}</div>
-                        <div className="text-[11px] text-faint">{[s.address, s.city].filter(Boolean).join(", ") || "—"}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-3 py-2.5 text-dim">{s.city || <span className="text-faint">—</span>}</td>
+                  <td className="px-3 py-2.5 text-xs text-dim">{s.address || <span className="text-faint">—</span>}</td>
                   <td className="px-3 py-2.5"><span className="rounded-full bg-wash px-2 py-0.5 text-xs font-semibold text-dim">{s.type ?? "—"}</span></td>
                   <td className="px-3 py-2.5 text-dim">{s.groupName}</td>
                   <td className="px-3 py-2.5 text-dim"><span className="text-txt">{nCamere}</span> <span className="text-faint">· {nTipologie} {t("tipol.")}</span></td>
