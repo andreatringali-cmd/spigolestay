@@ -12,6 +12,7 @@ import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useAccess } from "@/lib/access";
 
 function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
   return (
@@ -37,9 +38,12 @@ export default function StrutturaSchedaPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const isNew = params.id === "nuovo";
-  const { structures, roomTypes, units, addStructure, updateStructure } = useData();
+  const { structures, roomTypes, units, addStructure, updateStructure, setActiveStructure } = useData();
   const ask = useConfirm();
   const { t } = useLang();
+  const { moduleOn } = useAccess();
+  const hasGuide = moduleOn("concierge"); // Guida ospiti personalizzata = modulo Web Concierge
+  const openGuide = () => { if (!existing) return; setActiveStructure(existing.id); router.push("/guida-ospiti"); };
 
   const existing = structures.find((s) => s.id === params.id);
   const [f, setF] = useState<Structure>(() => (isNew ? blankStructure() : { ...blankStructure(), ...existing }));
@@ -298,18 +302,54 @@ export default function StrutturaSchedaPage() {
             </div>
             <div className="mt-3 flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Self check-in (accesso autonomo)")}</span><Toggle on={!!f.selfCheckin} onClick={() => set("selfCheckin", !f.selfCheckin)} /></div>
             <label className={`${lbl} mt-2`}>{t("Istruzioni / codici di accesso")}<textarea value={f.accessInfo ?? ""} onChange={(e) => set("accessInfo", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={t("Es. keybox codice, citofono, piano…")} /></label>
+
+            {/* Guida ospiti personalizzata (servizio a piano) */}
+            {hasGuide ? (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-paper p-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-txt">{t("Guida ospiti personalizzata")}</div>
+                  <div className="text-[11px] text-dim">{t("Pagina web con Wi-Fi, codici, istruzioni e consigli, pronta da inviare all'ospite.")}</div>
+                </div>
+                <button type="button" onClick={openGuide} disabled={!existing} title={!existing ? t("Salva prima la struttura") : undefined} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Apri la guida")} →</button>
+              </div>
+            ) : (
+              <div className="mt-3 rounded-xl border p-3" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 6%, transparent)" }}>
+                <div className="flex items-center gap-2 text-sm font-semibold text-txt">
+                  <span className="grid h-5 w-5 place-items-center rounded-full bg-focus text-white"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg></span>
+                  {t("Guida ospiti personalizzata")}
+                </div>
+                <p className="mt-1.5 text-[11px] leading-snug text-dim">{t("Crea una pagina web elegante con Wi-Fi, codici di accesso, istruzioni e consigli, da inviare a ogni ospite. È un servizio incluso nei piani Pro e Ultimate, oppure aggiungibile al tuo piano.")}</p>
+                <button type="button" onClick={() => router.push("/abbonamento")} className="mt-2.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Aggiungi il servizio")} →</button>
+              </div>
+            )}
           </Card>
 
           {/* Tassa di soggiorno */}
           <Card>
             <div className="mb-2 flex items-center justify-between"><SectionTitle>{t("Tassa di soggiorno")}</SectionTitle><Toggle on={!!f.cityTax} onClick={() => set("cityTax", !f.cityTax)} /></div>
-            {f.cityTax && (
-              <div className="grid grid-cols-3 gap-3">
-                <label className={lbl}>{t("€ persona/notte")}<input value={f.cityTaxAmount ?? ""} onChange={(e) => set("cityTaxAmount", num(e.target.value))} className={`${inp} mt-1`} placeholder="2,00" /></label>
-                <label className={lbl}>{t("Max notti")}<input type="number" min={0} value={f.cityTaxMaxNights ?? ""} onChange={(e) => set("cityTaxMaxNights", num(e.target.value))} className={`${inp} mt-1`} /></label>
-                <label className={lbl}>{t("Comune")}<input value={f.cityTaxComune ?? ""} onChange={(e) => set("cityTaxComune", e.target.value)} className={`${inp} mt-1`} /></label>
-              </div>
-            )}
+            {f.cityTax && (() => {
+              const mode = f.cityTaxMode ?? "fixed";
+              return (
+                <>
+                  <div className="mb-3 inline-flex rounded-lg border border-line bg-paper p-0.5 text-xs font-semibold">
+                    <button type="button" onClick={() => set("cityTaxMode", "fixed")} className={`rounded-md px-3 py-1.5 transition ${mode === "fixed" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Fisso (€ persona/notte)")}</button>
+                    <button type="button" onClick={() => set("cityTaxMode", "percent")} className={`rounded-md px-3 py-1.5 transition ${mode === "percent" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("% del totale")}</button>
+                  </div>
+                  {mode === "percent" ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className={lbl}>{t("% sul totale soggiorno")}<div className="relative mt-1"><input type="number" min={0} step={0.5} value={f.cityTaxPercent ?? ""} onChange={(e) => set("cityTaxPercent", num(e.target.value))} className={`${inp} pr-7`} placeholder="10" /><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-faint">%</span></div></label>
+                      <label className={lbl}>{t("Comune")}<input value={f.cityTaxComune ?? ""} onChange={(e) => set("cityTaxComune", e.target.value)} className={`${inp} mt-1`} /></label>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-3">
+                      <label className={lbl}>{t("€ persona/notte")}<input value={f.cityTaxAmount ?? ""} onChange={(e) => set("cityTaxAmount", num(e.target.value))} className={`${inp} mt-1`} placeholder="2,00" /></label>
+                      <label className={lbl}>{t("Max notti")}<input type="number" min={0} value={f.cityTaxMaxNights ?? ""} onChange={(e) => set("cityTaxMaxNights", num(e.target.value))} className={`${inp} mt-1`} /></label>
+                      <label className={lbl}>{t("Comune")}<input value={f.cityTaxComune ?? ""} onChange={(e) => set("cityTaxComune", e.target.value)} className={`${inp} mt-1`} /></label>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </Card>
 
           {/* Policy & regole */}

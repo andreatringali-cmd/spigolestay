@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
-import { CHANNELS, type Channel, type BookingStatus } from "@/lib/types";
+import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
 import { nights, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { buildFatturaPA } from "@/lib/fatturapa";
@@ -32,8 +32,15 @@ const STATUS: Record<BookingStatus, { label: string; color: string }> = {
   no_show: { label: "No-show", color: "var(--faint)" },
 };
 
-const CITY_TAX_RATE = 2; // € a persona/notte (max 3 notti, minori esenti)
-const cityTaxOf = (adults: number, n: number, exempt?: boolean) => (exempt ? 0 : adults * Math.min(n, 3) * CITY_TAX_RATE);
+// Tassa di soggiorno secondo le impostazioni struttura: fissa (€ a persona/notte, con tetto notti)
+// oppure in percentuale sul totale soggiorno. Default: 2 €/persona/notte, max 3 notti.
+const cityTaxOf = (structure: Structure | undefined, adults: number, n: number, accommodation: number, exempt?: boolean) => {
+  if (exempt || !structure?.cityTax) return 0;
+  if (structure.cityTaxMode === "percent") return Math.round((accommodation || 0) * (structure.cityTaxPercent ?? 0) / 100);
+  const rate = structure.cityTaxAmount ?? 2;
+  const maxN = structure.cityTaxMaxNights ?? 3;
+  return Math.round(adults * Math.min(n, maxN) * rate);
+};
 
 interface Form {
   checkIn: string; checkOut: string;
@@ -107,7 +114,7 @@ export default function BookingDrawer() {
   const nView = nights(booking.checkIn, booking.checkOut);
   const accV = booking.total ?? nView * (roomType?.basePrice ?? 100);
   const cleanV = booking.cleaningFee ?? 35;
-  const taxV = cityTaxOf(booking.adults, nView, booking.cityTaxExempt);
+  const taxV = cityTaxOf(structure, booking.adults, nView, accV, booking.cityTaxExempt);
   const totalV = accV + cleanV + taxV;
   const commPctV = booking.commissionPct ?? Math.round(ch.commission * 100);
   const commV = Math.round(accV * commPctV / 100);
@@ -360,7 +367,7 @@ export default function BookingDrawer() {
   // ─────────────── MODIFICA ───────────────
   const set = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f));
   const nEdit = form ? Math.max(0, nights(form.checkIn, form.checkOut)) : 0;
-  const taxEdit = form ? cityTaxOf(form.adults, nEdit, form.cityTaxExempt) : 0;
+  const taxEdit = form ? cityTaxOf(structure, form.adults, nEdit, form.total, form.cityTaxExempt) : 0;
   const totalEdit = form ? form.total + form.cleaningFee + taxEdit : 0;
   const structUnits = units.filter((u) => u.structureId === booking.structureId);
 
@@ -449,7 +456,7 @@ export default function BookingDrawer() {
             <span className="text-sm font-medium text-txt">{t("Tassa di soggiorno")}</span>
             <span className="font-mono text-sm font-semibold text-txt">{eur(taxEdit)}</span>
           </div>
-          <div className="mt-1 text-xs text-dim">{form.cityTaxExempt ? t("Esente") : `${form.adults} ${t("adulti")} × ${Math.min(nEdit, 3)} ${t("notti")} × € ${CITY_TAX_RATE}`}</div>
+          <div className="mt-1 text-xs text-dim">{form.cityTaxExempt ? t("Esente") : (structure?.cityTaxMode === "percent" ? `${structure.cityTaxPercent ?? 0}% ${t("del totale soggiorno")}` : `${form.adults} ${t("adulti")} × ${Math.min(nEdit, structure?.cityTaxMaxNights ?? 3)} ${t("notti")} × € ${structure?.cityTaxAmount ?? 2}`)}</div>
           <div className="mt-2 flex flex-wrap gap-3">
             <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={form.cityTaxExempt} onChange={(e) => set({ cityTaxExempt: e.target.checked })} /> {t("Esente")}</label>
             <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={form.cityTaxPaid} onChange={(e) => set({ cityTaxPaid: e.target.checked })} /> {t("Incassata")}</label>

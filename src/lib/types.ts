@@ -72,7 +72,9 @@ export interface Structure {
   accessInfo?: string;     // istruzioni/codici accesso (sensibile)
   // Tassa di soggiorno
   cityTax?: boolean;
-  cityTaxAmount?: number;  // € per persona a notte
+  cityTaxMode?: "fixed" | "percent"; // fisso €/persona/notte oppure % del totale prenotazione
+  cityTaxAmount?: number;  // € per persona a notte (modalità "fixed")
+  cityTaxPercent?: number; // % sul totale soggiorno (modalità "percent")
   cityTaxMaxNights?: number;
   cityTaxComune?: string;
   // Policy
