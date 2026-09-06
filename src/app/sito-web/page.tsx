@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DataProvider, useData } from "@/lib/store";
 import type { RoomType } from "@/lib/types";
 import { effectiveBase } from "@/lib/pricing";
@@ -22,8 +22,10 @@ function Site() {
   const { structures, roomTypes, getStructure } = useData();
   const cfg = useMemo<Cfg>(() => { try { const r = localStorage.getItem("spigolestay:sito"); if (r) return { ...DEFCFG, ...JSON.parse(r) }; } catch {} return DEFCFG; }, []);
   const [sid, setSid] = useState(() => { try { return new URLSearchParams(window.location.search).get("s") || structures[0]?.id || ""; } catch { return structures[0]?.id ?? ""; } });
+  // Lo store carica i dati dopo il mount: aggancia la prima struttura appena disponibile.
+  useEffect(() => { if ((!sid || !structures.some((s) => s.id === sid)) && structures[0]) setSid(structures[0].id); }, [structures, sid]);
   const structure = getStructure(sid);
-  const name = cfg.nome || structure?.name || "Xenora";
+  const name = structure?.name || cfg.nome || "Xenora";
   const accent = cfg.accent;
 
   const today = toISO(new Date());
@@ -69,6 +71,14 @@ function Site() {
       )}
 
       <div className="mx-auto max-w-5xl px-4">
+        {/* Chi siamo */}
+        {structure?.description && (
+          <section className="mt-10">
+            <h2 className="mb-3 font-display text-xl font-bold text-txt">Chi siamo</h2>
+            <p className="max-w-3xl whitespace-pre-wrap text-sm leading-relaxed text-dim">{structure.description}</p>
+          </section>
+        )}
+
         {/* Camere */}
         {cfg.camere && (
           <section className="mt-10">
@@ -86,7 +96,7 @@ function Site() {
                   ); })()}
                   <div className="p-3">
                     <div className="flex items-center justify-between"><span className="font-semibold text-txt">{rt.name}</span><span className="font-mono text-sm font-bold text-txt">da {eur(effectiveBase(rt, roomTypes))}</span></div>
-                    <div className="mt-0.5 text-xs text-dim">{rt.beds} letti · fino a {rt.maxOccupancy ?? rt.beds} ospiti{rt.size ? ` · ${rt.size} m²` : ""}</div>
+                    <div className="mt-0.5 text-xs text-dim">{rt.beds} letti · fino a {rt.maxOccupancy ?? rt.beds} ospiti{rt.size ? ` · ${rt.size} m²` : ""}{rt.bedConfig ? ` · ${rt.bedConfig}` : ""}</div>
                     {(rt.amenities ?? []).length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{(rt.amenities ?? []).slice(0, 3).map((a) => <span key={a} className="rounded-full bg-wash px-2 py-0.5 text-[10px] text-dim">{a}</span>)}</div>}
                     <div className="mt-2 text-xs font-medium" style={{ color: accent }}>Prenota →</div>
                   </div>
@@ -103,6 +113,36 @@ function Site() {
             <div className="flex flex-wrap gap-2">{(structure?.services ?? []).map((s) => <span key={s} className="rounded-full border border-line bg-surface px-3 py-1 text-sm text-dim">{s}</span>)}</div>
           </section>
         )}
+
+        {/* Informazioni utili */}
+        {structure && (() => {
+          const polLabel: Record<string, string> = { flessibile: "Cancellazione flessibile", moderata: "Cancellazione moderata", rigida: "Cancellazione rigida" };
+          const tax = structure.cityTax ? (structure.cityTaxMode === "percent" ? `${structure.cityTaxPercent ?? 0}% del soggiorno` : `${structure.cityTaxAmount ?? 2} € a persona/notte`) : "";
+          const cards = ([
+            structure.checkInFrom ? ["Check-in", `dalle ${structure.checkInFrom}${structure.checkInTo ? ` alle ${structure.checkInTo}` : ""}`] : ["", ""],
+            structure.checkOutBy ? ["Check-out", `entro le ${structure.checkOutBy}`] : ["", ""],
+            tax ? ["Tassa di soggiorno", tax] : ["", ""],
+            structure.cancelPolicy ? ["Cancellazione", polLabel[structure.cancelPolicy] ?? ""] : ["", ""],
+            typeof structure.pets === "boolean" ? ["Animali", structure.pets ? "Ammessi" : "Non ammessi"] : ["", ""],
+            typeof structure.smoking === "boolean" ? ["Fumatori", structure.smoking ? "Consentito" : "Vietato fumare"] : ["", ""],
+            structure.minAge ? ["Età minima check-in", `${structure.minAge} anni`] : ["", ""],
+            structure.cin ? ["CIN", structure.cin] : ["", ""],
+          ] as [string, string][]).filter(([l]) => l);
+          if (!cards.length) return null;
+          return (
+            <section className="mt-10">
+              <h2 className="mb-3 font-display text-xl font-bold text-txt">Informazioni utili</h2>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {cards.map(([l, v]) => (
+                  <div key={l} className="rounded-xl border border-line bg-surface p-3">
+                    <div className="text-[11px] uppercase tracking-wide text-faint">{l}</div>
+                    <div className="mt-0.5 text-sm font-medium text-txt">{v}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          );
+        })()}
 
         {/* Recensioni */}
         {cfg.recensioni && (
@@ -122,20 +162,33 @@ function Site() {
 
         {/* Mappa / contatti */}
         <section className="mt-10 grid gap-3 sm:grid-cols-2">
-          {cfg.mappa && (
-            <div className="rounded-xl border border-line bg-surface p-4">
-              <h3 className="font-display text-lg font-bold text-txt">Dove siamo</h3>
-              <p className="mt-1 text-sm text-dim">{[structure?.address, structure?.city].filter(Boolean).join(", ") || "Ortigia, Siracusa"}{structure?.zone ? ` · ${structure.zone}` : ""}</p>
-              <a href={`https://www.google.com/maps/search/${encodeURIComponent(`${structure?.address ?? ""} ${structure?.city ?? "Siracusa"}`)}`} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm font-medium" style={{ color: accent }}>Apri su Google Maps ↗</a>
-            </div>
-          )}
+          {cfg.mappa && (() => {
+            const addr = [structure?.address, structure?.streetNumber].filter(Boolean).join(" ");
+            const full = [addr, [structure?.postalCode, structure?.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+            const q = (structure?.lat && structure?.lng) ? `${structure.lat},${structure.lng}` : encodeURIComponent(full || `${structure?.city ?? "Siracusa"}`);
+            return (
+              <div className="overflow-hidden rounded-xl border border-line bg-surface">
+                <iframe src={`https://maps.google.com/maps?q=${q}&z=15&output=embed`} className="h-52 w-full" style={{ border: 0 }} loading="lazy" title="Mappa" />
+                <div className="p-4">
+                  <h3 className="font-display text-lg font-bold text-txt">Dove siamo</h3>
+                  <p className="mt-1 text-sm text-dim">{full || "Ortigia, Siracusa"}{structure?.zone ? ` · ${structure.zone}` : ""}</p>
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${q}`} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm font-medium" style={{ color: accent }}>Apri su Google Maps ↗</a>
+                </div>
+              </div>
+            );
+          })()}
           {cfg.contatti && (
             <div className="rounded-xl border border-line bg-surface p-4">
               <h3 className="font-display text-lg font-bold text-txt">Contatti</h3>
               <div className="mt-1 flex flex-col gap-1 text-sm text-dim">
-                {structure?.email && <a href={`mailto:${structure.email}`} className="hover:underline">{structure.email}</a>}
-                {structure?.phone && <a href={`tel:${structure.phone}`} className="hover:underline">{structure.phone}</a>}
+                {structure?.email && <a href={`mailto:${structure.email}`} className="hover:underline">✉ {structure.email}</a>}
+                {structure?.phone && <a href={`tel:${structure.phone}`} className="hover:underline">☎ {structure.phone}</a>}
                 {structure?.phone && <a href={`https://wa.me/${structure.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="font-medium" style={{ color: "#25D366" }}>Scrivici su WhatsApp</a>}
+                {structure?.website && <a href={structure.website.startsWith("http") ? structure.website : `https://${structure.website}`} target="_blank" rel="noreferrer" className="hover:underline" style={{ color: accent }}>🌐 {structure.website}</a>}
+                <div className="mt-1 flex gap-3">
+                  {structure?.instagram && <a href={structure.instagram.startsWith("http") ? structure.instagram : `https://instagram.com/${structure.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" className="font-medium hover:underline" style={{ color: "#C13584" }}>Instagram</a>}
+                  {structure?.facebook && <a href={structure.facebook.startsWith("http") ? structure.facebook : `https://facebook.com/${structure.facebook}`} target="_blank" rel="noreferrer" className="font-medium hover:underline" style={{ color: "#1877F2" }}>Facebook</a>}
+                </div>
               </div>
             </div>
           )}

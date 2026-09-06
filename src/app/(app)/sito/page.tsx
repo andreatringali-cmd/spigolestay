@@ -18,9 +18,20 @@ export default function SitoPage() {
   const { t } = useLang();
   const { structures } = useData();
   const [c, setC] = useState<Cfg>(DEF);
+  const [sid, setSid] = useState("");
+  const [copied, setCopied] = useState(false);
   useEffect(() => { try { const r = localStorage.getItem(KEY); if (r) setC({ ...DEF, ...JSON.parse(r) }); } catch {} }, []);
+  useEffect(() => { if ((!sid || !structures.some((s) => s.id === sid)) && structures[0]) setSid(structures[0].id); }, [structures, sid]);
   const set = (patch: Partial<Cfg>) => setC((p) => { const n = { ...p, ...patch }; try { localStorage.setItem(KEY, JSON.stringify(n)); } catch {} return n; });
   const toggleLang = (l: string) => set({ lang: c.lang.includes(l) ? c.lang.filter((x) => x !== l) : [...c.lang, l] });
+  // Nome e link presi dalla struttura (fonte di verità = scheda struttura).
+  const struct = structures.find((s) => s.id === sid);
+  const siteName = struct?.name || "";
+  const slug = (siteName || "struttura").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const publicLink = `${origin}/sito-web${sid ? `?s=${sid}` : ""}`;
+  const suggestedDomain = `${slug}.xenora.app`;
+  const openPublic = () => window.open(publicLink, "_blank");
 
   return (
     <div>
@@ -29,8 +40,21 @@ export default function SitoPage() {
         <div className="flex flex-col gap-4">
           <Card>
             <SectionTitle>{t("Contenuti")}</SectionTitle>
-            <label className="mb-2 block"><span className="text-xs text-dim">{t("Nome struttura")}</span><input value={c.nome} onChange={(e) => set({ nome: e.target.value })} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
-            <label className="mb-2 block"><span className="text-xs text-dim">{t("Dominio")}</span><input value={c.dominio} onChange={(e) => set({ dominio: e.target.value })} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
+            {structures.length > 1 && (
+              <label className="mb-2 block"><span className="text-xs text-dim">{t("Struttura")}</span>
+                <select value={sid} onChange={(e) => setSid(e.target.value)} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+              </label>
+            )}
+            <label className="mb-2 block"><span className="text-xs text-dim">{t("Nome struttura")} <span className="text-faint">({t("dalla scheda struttura")})</span></span><input value={siteName} readOnly disabled className="mt-0.5 w-full cursor-not-allowed rounded-lg border border-line bg-wash px-3 py-2 text-sm text-dim" /></label>
+            <div className="mb-2">
+              <span className="text-xs text-dim">{t("Link del sito")}</span>
+              <div className="mt-0.5 flex items-center gap-2">
+                <input value={publicLink} readOnly className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none" />
+                <button onClick={() => { navigator.clipboard?.writeText(publicLink); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }} className="shrink-0 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash">{copied ? t("Copiato ✓") : t("Copia")}</button>
+                <button onClick={openPublic} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-xs font-semibold text-white hover:opacity-90">{t("Apri")} ↗</button>
+              </div>
+              <span className="mt-1 block text-[11px] text-faint">{t("Dominio consigliato")}: <b className="text-dim">{suggestedDomain}</b> — {t("in produzione potrai collegarlo al tuo dominio.")}</span>
+            </div>
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Sottotitolo")}</span><input value={c.tagline} onChange={(e) => set({ tagline: e.target.value })} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             <div className="mb-1 text-xs text-dim">{t("Colore")}</div>
             <div className="flex gap-2">{["#4F46E5", "#0E9F6E", "#BE5D38", "#2563EB", "#DB2777", "#0891B2"].map((col) => <button key={col} onClick={() => set({ accent: col })} className={`h-7 w-7 rounded-full border-2 ${c.accent === col ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: col }} />)}</div>
@@ -51,11 +75,11 @@ export default function SitoPage() {
         </div>
 
         <Card>
-          <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Anteprima")}</SectionTitle><span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{c.dominio}</span></div>
+          <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Anteprima")}</SectionTitle><span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{suggestedDomain}</span></div>
           <div className="overflow-hidden rounded-xl border border-line">
             {c.hero && (
               <div className="relative p-6 text-white" style={{ background: `linear-gradient(135deg, ${c.accent}, color-mix(in srgb, ${c.accent} 55%, #000))` }}>
-                <div className="text-lg font-bold">{c.nome}</div>
+                <div className="text-lg font-bold">{siteName || c.nome}</div>
                 <div className="mt-1 text-sm opacity-90">{c.tagline}</div>
                 <div className="mt-4 inline-block rounded-lg bg-white/90 px-3 py-1.5 text-xs font-semibold" style={{ color: c.accent }}>{t("Verifica disponibilità")} →</div>
               </div>

@@ -45,6 +45,8 @@ function Engine() {
   const [checkOut, setCheckOut] = useState(() => qp("co") || addDays(today, 8));
   const [adults, setAdults] = useState(() => Number(qp("ad")) || 2);
   const [children, setChildren] = useState(() => Number(qp("ch")) || 0);
+  const [childAges, setChildAges] = useState<number[]>(() => { const n = Number(qp("ch")) || 0; return Array.from({ length: n }, () => 8); });
+  const setChildrenN = (n: number) => { setChildren(n); setChildAges((prev) => { const next = prev.slice(0, n); while (next.length < n) next.push(8); return next; }); };
   const nights = nightsBetween(checkIn, checkOut);
 
   const [step, setStep] = useState<"rooms" | "checkout" | "done">("rooms");
@@ -86,7 +88,7 @@ function Engine() {
     const gid = addGuest({ firstName: guest.firstName.trim(), lastName: guest.lastName.trim(), email: guest.email.trim(), phone: guest.phone.trim(), country: guest.country });
     const chosenExtras = extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => `${extraQty[x.id]}× ${x.name}`);
     const note = [`Sito ufficiale · ${selPlan?.name}`, chosenExtras.length ? `Extra: ${chosenExtras.join(", ")}` : "", guest.arrival !== "Non lo so" ? `Arrivo ~${guest.arrival}` : "", guest.requests.trim()].filter(Boolean).join(" · ");
-    addBooking({ structureId, roomTypeId: selRt.id, unitId: unit?.id ?? null, guestId: gid, channel: "direct", status: "confirmed", checkIn, checkOut, adults, children, total: accommodation, cleaningFee: 0, paid: deposit, cityTaxPaid: false, note });
+    addBooking({ structureId, roomTypeId: selRt.id, unitId: unit?.id ?? null, guestId: gid, channel: "direct", status: "confirmed", checkIn, checkOut, adults, children, childAges: childAges.length ? childAges : undefined, total: accommodation, cleaningFee: 0, paid: deposit, cityTaxPaid: false, note });
     addActivity("booking", `Prenotazione dal sito — ${guest.firstName} ${guest.lastName}`);
     setCode(`SPG-${new Date().getFullYear()}-${Math.abs([...(gid + checkIn)].reduce((a, c) => a + c.charCodeAt(0), 0)) % 100000}`);
     setStep("done");
@@ -118,8 +120,20 @@ function Engine() {
         <label className="block text-xs font-medium text-dim">Arrivo<input type="date" value={checkIn} min={today} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(addDays(e.target.value, 1)); }} className={`${field} mt-1`} /></label>
         <label className="block text-xs font-medium text-dim">Partenza<input type="date" value={checkOut} min={addDays(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className={`${field} mt-1`} /></label>
         <label className="block text-xs font-medium text-dim">Adulti<Stepper value={adults} min={1} onChange={setAdults} /></label>
-        <label className="block text-xs font-medium text-dim">Bambini<Stepper value={children} min={0} onChange={setChildren} /></label>
+        <label className="block text-xs font-medium text-dim">Bambini<Stepper value={children} min={0} onChange={setChildrenN} /></label>
       </div>
+      {children > 0 && (
+        <div className="mt-2">
+          <div className="mb-1 text-[11px] font-medium text-dim">Età dei bambini <span className="text-faint">(per la tassa di soggiorno e la sistemazione)</span></div>
+          <div className="flex flex-wrap gap-2">
+            {childAges.map((age, i) => (
+              <label key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim">Bimbo {i + 1}
+                <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, Number(e.target.value))) : a)))} className="w-14 rounded border border-line bg-surface px-1.5 py-0.5 text-sm text-txt outline-none focus:border-focus" />
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="mt-2 text-xs text-dim">{nights} {nights === 1 ? "notte" : "notti"} · {adults} adulti{children ? ` · ${children} bambini` : ""}</div>
     </div>
   );

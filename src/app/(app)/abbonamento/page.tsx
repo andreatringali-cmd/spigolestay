@@ -6,7 +6,6 @@ import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
-import { useAccess } from "@/lib/access";
 
 // ── Modello a 3 piani (prezzo fisso) + "Su misura" ──
 // Camere incluse: 6 per struttura del piano; oltre, overage per camera. Strutture: limite per piano.
@@ -43,16 +42,9 @@ const MODULES: Module[] = [
 // Calibrati così che, sommando 2-3 moduli, conviene salire di piano.
 const ADDON_PRICE: Record<string, number> = { cm: 0, booking: 0, cassa: 0, concierge: 8, housekeeping: 8, messaging: 7, meta: 6, bi: 9, site: 9, rms: 10, ratecheck: 12, team: 6 };
 
-const INVOICES = [
-  { id: "2026-08", date: "01/08/2026", amount: 39, status: "Pagata" },
-  { id: "2026-07", date: "01/07/2026", amount: 39, status: "Pagata" },
-];
-
 export default function AbbonamentoPage() {
   const { t } = useLang();
-  const { user } = useAccess();
   const { units, structures } = useData();
-  const holder = user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim().toUpperCase() : "";
   const rooms = units.filter((u) => !u.outOfService).length;
   const nStruct = Math.max(1, structures.length);
 
@@ -211,9 +203,8 @@ export default function AbbonamentoPage() {
         )}
       </Card>
 
-      {/* Riepilogo + fatture */}
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <div className="flex flex-col gap-4 lg:col-span-1">
+      {/* Riepilogo abbonamento */}
+      <div className="mt-4 max-w-md">
         <Card>
           <SectionTitle>{t("Il tuo abbonamento")}</SectionTitle>
           <div className="mb-3 rounded-lg border border-line bg-wash p-3">
@@ -229,55 +220,11 @@ export default function AbbonamentoPage() {
           </div>
           {annual && <div className="mt-1 text-right text-[11px] text-[color:var(--ok)]">{t("fatturato annualmente")} ({eur(perMonth * 12)}/{t("anno")})</div>}
           {overStructures && <div className="mt-3 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}>{t("Hai")} {nStruct} {t("strutture: superi il piano")} {tier.name}. {t("Passa a un piano superiore o «Su misura».")}</div>}
-          <button className="mt-4 w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{t("Gestisci pagamento")}</button>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Link href="/abbonamento/pagamento" className="rounded-lg border border-line py-2 text-center text-sm font-semibold text-txt hover:bg-wash">{t("Informazioni pagamento")}</Link>
+            <Link href="/abbonamento/fatture" className="rounded-lg border border-line py-2 text-center text-sm font-semibold text-txt hover:bg-wash">{t("Fatture")}</Link>
+          </div>
           <div className="mt-2 text-center text-[11px] text-faint">{t("Prossimo rinnovo:")} 01/10/2026</div>
-        </Card>
-
-        <Card>
-          <SectionTitle>{t("Metodo di pagamento")}</SectionTitle>
-          <div className="rounded-lg border border-line bg-paper p-3">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Intestatario")}</div>
-            <div className="mt-0.5 text-sm font-medium text-txt">{holder || t("— da impostare —")}</div>
-            <button className="mt-1 text-xs font-medium text-focus hover:underline">{t("Cambia intestatario")}</button>
-          </div>
-          <div className="mt-3 flex items-center gap-3 rounded-lg border border-line bg-paper p-3">
-            <span className="grid h-8 w-11 shrink-0 place-items-center rounded bg-wash text-[10px] font-bold text-dim">CARD</span>
-            <div className="min-w-0 flex-1">
-              <div className="font-mono text-sm text-txt">•••• •••• •••• ••••</div>
-              <div className="text-[11px] text-faint">{t("Nessuna carta salvata")}</div>
-            </div>
-          </div>
-          <button className="mt-3 w-full rounded-lg border border-line py-2 text-sm font-medium text-txt hover:bg-wash">+ {t("Aggiungi carta di credito")}</button>
-          <p className="mt-2 text-[11px] text-faint">{t("Al rinnovo l'importo viene addebitato automaticamente sulla carta salvata; puoi disdire quando vuoi. In produzione i pagamenti sono gestiti da un provider sicuro (Stripe): i dati della carta non passano da qui.")}</p>
-        </Card>
-        </div>
-
-        <Card className="lg:col-span-2">
-          <SectionTitle>{t("Riepilogo fatture")}</SectionTitle>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
-                  <th className="px-2 py-2 font-semibold">{t("Periodo")}</th>
-                  <th className="px-2 py-2 font-semibold">{t("Data")}</th>
-                  <th className="px-2 py-2 font-semibold">{t("Importo")}</th>
-                  <th className="px-2 py-2 font-semibold">{t("Stato")}</th>
-                  <th className="px-2 py-2 font-semibold"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {INVOICES.map((f) => (
-                  <tr key={f.id} className="border-b border-line last:border-0">
-                    <td className="px-2 py-2.5 font-medium text-txt">{f.id}</td>
-                    <td className="px-2 py-2.5 font-mono text-xs text-dim">{f.date}</td>
-                    <td className="px-2 py-2.5 font-mono text-txt">{eur(f.amount)}</td>
-                    <td className="px-2 py-2.5"><span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t(f.status)}</span></td>
-                    <td className="px-2 py-2.5 text-right"><button className="text-xs font-medium text-focus hover:underline">{t("Scarica PDF")}</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </Card>
       </div>
 
