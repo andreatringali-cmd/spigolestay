@@ -47,7 +47,10 @@ export const NAV: NavItem[] = [
   { label: "Camere", href: "/camere", group: "Configurazione", icon: "bed", perm: "camere", module: "pms" },
   { label: "Guida ospiti", href: "/guida-ospiti", group: "Configurazione", icon: "share", perm: "webconcierge", module: "concierge" },
   { label: "Impostazioni", href: "/impostazioni", group: "Configurazione", icon: "settings", perm: "impostazioni", module: "pms" },
-  { label: "Abbonamento", href: "/abbonamento", group: "Configurazione", icon: "card", perm: "abbonamento", module: "pms" },
+
+  { label: "Abbonamento", href: "/abbonamento", group: "Il mio abbonamento", icon: "card", perm: "abbonamento", module: "pms" },
+  { label: "Informazioni pagamento", href: "/abbonamento/pagamento", group: "Il mio abbonamento", icon: "card", perm: "abbonamento", module: "pms" },
+  { label: "Fatture", href: "/abbonamento/fatture", group: "Il mio abbonamento", icon: "receipt", perm: "abbonamento", module: "pms" },
 ];
 
 // Colore accento per categoria (palette terra: terracotta, oliva, ocra, tortora).
@@ -60,4 +63,5 @@ export const GROUP_COLOR: Record<string, string> = {
   "Amministrazione": "#4F46E5",
   "Anagrafiche": "#C08A3A",
   "Configurazione": "#957A66",
+  "Il mio abbonamento": "#4F46E5",
 };

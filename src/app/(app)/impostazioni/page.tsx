@@ -12,10 +12,7 @@ import StyleChooser from "@/components/StyleChooser";
 export default function ImpostazioniPage() {
   const { theme, setTheme } = useTheme();
   const { t } = useLang();
-  const [checkin, setCheckin] = useState("15:00");
-  const [checkout, setCheckout] = useState("10:00");
   const [lang, setLang] = useState("it");
-  const [cleaning, setCleaning] = useState(35);
   const [notifNew, setNotifNew] = useState(true);
   const [notifCancel, setNotifCancel] = useState(true);
   const ask = useConfirm();
@@ -50,18 +47,7 @@ export default function ImpostazioniPage() {
   return (
     <div>
       <PageHeader title={t("Impostazioni")} subtitle={t("Preferenze generali dell'account")} />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <SectionTitle>{t("Struttura")}</SectionTitle>
-          <div className="flex flex-col gap-3">
-            <Row label={t("Check-in dalle")}><input type="time" value={checkin} onChange={(e) => setCheckin(e.target.value)} className={inp} /></Row>
-            <Row label={t("Check-out entro")}><input type="time" value={checkout} onChange={(e) => setCheckout(e.target.value)} className={inp} /></Row>
-            <Row label={t("Costo pulizia €")}><input type="number" value={cleaning} onChange={(e) => setCleaning(Number(e.target.value))} className={inp} /></Row>
-            <Row label={t("Valuta")}><input value="EUR (€)" disabled className={`${inp} opacity-60`} /></Row>
-            <Row label={t("Fuso orario")}><input value="Europe/Rome" disabled className={`${inp} opacity-60`} /></Row>
-          </div>
-        </Card>
-
+      <div className="grid gap-4">
         <Card>
           <SectionTitle>{t("Aspetto, lingua e notifiche")}</SectionTitle>
           <div className="flex flex-col gap-3">

@@ -354,6 +354,7 @@ export default function GuidaOspitiPage() {
   useEffect(() => { if (activeStructureId !== "all") setSid(activeStructureId); }, [activeStructureId]);
   const [all, setAll] = useState<Record<string, Guide>>({});
   const [previewKey, setPreviewKey] = useState(0);
+  const [savedTick, setSavedTick] = useState(false);
 
   useEffect(() => { try { setAll(JSON.parse(localStorage.getItem("spigolestay:guides") || "{}")); } catch {} }, []);
   const persist = (next: Record<string, Guide>) => { setAll(next); try { localStorage.setItem("spigolestay:guides", JSON.stringify(next)); } catch {} };
@@ -587,6 +588,11 @@ export default function GuidaOspitiPage() {
       <PageHeader
         title="Guida ospiti"
         subtitle="Una guida multilingua per struttura · personalizza e genera il link da inviare"
+        actions={
+          <button onClick={() => { refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 2000); }} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+            {savedTick ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Salvato</> : <>💾 Salva</>}
+          </button>
+        }
       />
 
       <div className="mb-3 flex flex-wrap items-center gap-3">

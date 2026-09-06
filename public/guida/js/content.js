@@ -25,6 +25,9 @@
   // Visibilità: l'host può nascondere una sezione (hidden), e le sezioni non compilate
   // spariscono da sole. Le operative (wifi/contatti/recensione) prendono i dati dalla
   // struttura, quindi non contano mai come "vuote".
+  var nzTop = function (x) { return !!(x && String(x).trim()); };
+  var WELCOME = { it: "Benvenuti", en: "Welcome", fr: "Bienvenue", de: "Willkommen", es: "Bienvenidos" };
+  var homeFilled = function (h) { return h && (nzTop(h.welcomeTitle) || (h.welcome && h.welcome.join && nzTop(h.welcome.join("")))); };
   var FUNCSEC = { wifi: 1, contacts: 1, review: 1 };
   function secFilled(s) {
     if (s.hidden) return false;
@@ -91,6 +94,11 @@
       if (amenities.length) { out.amenitiesTitle = hs.amenitiesTitle; out.amenitiesIntro = hs.amenitiesIntro; }
       return out;
     });
-    window.I18N[l] = { ui: base.ui, home: src.home || base.home, groups: groups, sections: merged, sectionsByProperty: {} };
+    // Home: se l'host non ha scritto il benvenuto, NON si ripiega sul demo di Siracusa:
+    // si usa un benvenuto neutro col nome della struttura (riflette i dati reali, non l'esempio).
+    var pname = (window.PROPERTY && window.PROPERTY.name) ? window.PROPERTY.name : "";
+    var neutralHome = { welcomeTitle: (WELCOME[l] || WELCOME.it) + (pname ? " · " + pname : ""), welcome: [] };
+    var homeOut = homeFilled(src.home) ? src.home : neutralHome;
+    window.I18N[l] = { ui: base.ui, home: homeOut, groups: groups, sections: merged, sectionsByProperty: {} };
   });
 })();
