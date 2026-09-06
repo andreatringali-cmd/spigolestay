@@ -71,7 +71,7 @@ export default function StrutturePage() {
                     </div>
                   </td>
                   <td className="px-3 py-2.5 text-dim">{s.city || <span className="text-faint">—</span>}</td>
-                  <td className="px-3 py-2.5 text-xs text-dim">{s.address || <span className="text-faint">—</span>}</td>
+                  <td className="px-3 py-2.5 text-xs text-dim">{[s.address, s.streetNumber].filter(Boolean).join(" ") || <span className="text-faint">—</span>}</td>
                   <td className="px-3 py-2.5"><span className="rounded-full bg-wash px-2 py-0.5 text-xs font-semibold text-dim">{s.type ?? "—"}</span></td>
                   <td className="px-3 py-2.5 text-dim">{s.groupName}</td>
                   <td className="px-3 py-2.5 text-dim"><span className="text-txt">{nCamere}</span> <span className="text-faint">· {nTipologie} {t("tipol.")}</span></td>

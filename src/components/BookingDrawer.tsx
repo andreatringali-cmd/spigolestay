@@ -103,6 +103,11 @@ export default function BookingDrawer() {
   const guest = getGuest(booking.guestId);
   const structure = getStructure(booking.structureId);
   const roomType = getRoomType(booking.roomTypeId);
+  const unitV = getUnit(booking.unitId);
+  // Info effettive della camera: valore della camera se impostato, altrimenti della tipologia; dotazioni sommate.
+  const effBedConfig = unitV?.bedConfig || roomType?.bedConfig;
+  const effSize = unitV?.size ?? roomType?.size;
+  const effAmenities = Array.from(new Set([...(roomType?.amenities ?? []), ...(unitV?.amenities ?? [])]));
   const ch = CHANNELS[booking.channel];
   const st = STATUS[booking.status];
 
@@ -270,11 +275,18 @@ export default function BookingDrawer() {
       <Section title={t("Soggiorno")}>
         <Row label={t("Struttura")} value={structure?.name ?? "—"} />
         <Row label={t("Tipologia")} value={roomType?.name ?? "—"} />
-        <Row label={t("Unità")} value={getUnit(booking.unitId)?.name ?? t("Da assegnare")} />
+        <Row label={t("Unità")} value={unitV?.name ?? t("Da assegnare")} />
+        {effBedConfig && <Row label={t("Letti")} value={effBedConfig} />}
+        {effSize ? <Row label={t("Superficie")} value={`${effSize} m²`} mono /> : null}
         <Row label={t("Check-in")} value={fmtDate(booking.checkIn)} />
         <Row label={t("Check-out")} value={fmtDate(booking.checkOut)} />
         <Row label={t("Notti")} value={String(nView)} mono />
         <Row label={t("Ospiti")} value={`${booking.adults} ${t("adulti")} · ${booking.children} ${t("bambini")}`} />
+        {effAmenities.length > 0 && (
+          <div className="flex flex-wrap gap-1 pt-0.5">
+            {effAmenities.map((a) => <span key={a} className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{t(a)}</span>)}
+          </div>
+        )}
       </Section>
 
       <Section title={t("Conto")}>
