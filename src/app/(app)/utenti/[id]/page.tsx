@@ -418,16 +418,6 @@ export default function UserSchedaPage() {
             </div>
           </Card>
 
-          {/* Limiti operativi */}
-          <Card>
-            <SectionTitle>{t("Limiti operativi")}</SectionTitle>
-            <p className="mb-3 text-xs text-dim">{t("Tetti di sicurezza applicati oltre ai permessi: proteggono da errori e abusi.")}</p>
-            <div className="grid grid-cols-3 gap-3">
-              <label className="block text-xs font-medium text-dim">{t("Sconto max %")}<input inputMode="decimal" value={u.maxDiscount ?? ""} onChange={(e) => set("maxDiscount", e.target.value === "" ? undefined : Number(e.target.value))} className={`${inp} mt-1`} placeholder="0" /></label>
-              <label className="block text-xs font-medium text-dim">{t("Rimborso max €")}<input inputMode="decimal" value={u.maxRefund ?? ""} onChange={(e) => set("maxRefund", e.target.value === "" ? undefined : Number(e.target.value))} className={`${inp} mt-1`} placeholder="—" /></label>
-              <label className="block text-xs font-medium text-dim">{t("Uscita cassa max €")}<input inputMode="decimal" value={u.maxCashOut ?? ""} onChange={(e) => set("maxCashOut", e.target.value === "" ? undefined : Number(e.target.value))} className={`${inp} mt-1`} placeholder="—" /></label>
-            </div>
-          </Card>
 
           {/* Notifiche */}
           <Card>
