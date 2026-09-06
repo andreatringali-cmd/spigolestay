@@ -102,6 +102,7 @@ export interface ExtraService {
   desc?: string;
   price: number;
   per: "stay" | "night" | "person"; // a soggiorno / a notte / a persona
+  active?: boolean; // se false, non proposto/mostrato (undefined = attivo)
 }
 
 export const DEFAULT_EXTRAS: ExtraService[] = [

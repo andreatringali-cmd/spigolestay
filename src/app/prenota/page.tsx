@@ -47,7 +47,7 @@ function Engine() {
   const qp = (k: string) => { try { return new URLSearchParams(window.location.search).get(k); } catch { return null; } };
   const [structureId, setStructureId] = useState(() => qp("s") || structures[0]?.id || "");
   const structure = getStructure(structureId);
-  const extras: ExtraService[] = (structure?.extras && structure.extras.length ? structure.extras : DEFAULT_EXTRAS);
+  const extras: ExtraService[] = (structure?.extras && structure.extras.length ? structure.extras : DEFAULT_EXTRAS).filter((e) => e.active !== false);
 
   const today = toISO(new Date());
   const [checkIn, setCheckIn] = useState(() => qp("ci") || addDays(today, 7));
