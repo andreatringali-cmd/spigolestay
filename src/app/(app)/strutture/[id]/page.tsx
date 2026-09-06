@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
@@ -11,7 +11,6 @@ import { eur } from "@/lib/format";
 import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
-import { useConfirm } from "@/components/ConfirmProvider";
 import { useAccess } from "@/lib/access";
 
 function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
@@ -39,7 +38,6 @@ export default function StrutturaSchedaPage() {
   const params = useParams<{ id: string }>();
   const isNew = params.id === "nuovo";
   const { structures, roomTypes, units, addStructure, updateStructure, setActiveStructure } = useData();
-  const ask = useConfirm();
   const { t } = useLang();
   const { moduleOn } = useAccess();
   const hasGuide = moduleOn("concierge"); // Guida ospiti personalizzata = modulo Web Concierge
@@ -73,15 +71,28 @@ export default function StrutturaSchedaPage() {
     else updateStructure(params.id, patch);
     router.push("/strutture");
   };
-  const remove = async () => {
-    const go = await ask({
-      title: t("Serve l'assistenza"),
-      message: t("Eliminare una struttura è irreversibile e cancella tutti i dati collegati (camere, prenotazioni, ospiti, tariffe). Per sicurezza l'operazione la esegue solo l'assistenza. Vuoi scrivere ora?"),
-      confirmLabel: t("Scrivi all'assistenza"),
-      cancelLabel: t("Annulla"),
-    });
-    if (go) window.location.href = `mailto:assistenza@xenora.app?subject=${encodeURIComponent(`Richiesta eliminazione struttura: ${f.name ?? ""}`)}`;
-  };
+
+  // Salvataggio automatico ogni 10s (solo su struttura esistente): non si perde nulla di quanto digitato.
+  const [autoSavedAt, setAutoSavedAt] = useState<number | null>(null);
+  const fRef = useRef(f); fRef.current = f;
+  const updRef = useRef(updateStructure); updRef.current = updateStructure;
+  const savedJson = useRef<string | null>(null);
+  useEffect(() => { savedJson.current = JSON.stringify(f); /* baseline al montaggio */ // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (isNew) return;
+    const id = window.setInterval(() => {
+      const cur = JSON.stringify(fRef.current);
+      if (savedJson.current !== null && cur !== savedJson.current && fRef.current.name?.trim()) {
+        const patch: Partial<Structure> = { ...fRef.current };
+        delete (patch as { id?: string }).id;
+        updRef.current(params.id, patch);
+        savedJson.current = cur;
+        setAutoSavedAt(Date.now());
+      }
+    }, 10000);
+    return () => window.clearInterval(id);
+  }, [isNew, params.id]);
 
   const mapsUrl = f.lat && f.lng ? `https://www.google.com/maps?q=${f.lat},${f.lng}` : f.address ? `https://www.google.com/maps/search/${encodeURIComponent(`${f.address} ${f.city ?? ""}`)}` : null;
   // Anteprima mappa (embed Google Maps, senza API key).
@@ -141,7 +152,7 @@ export default function StrutturaSchedaPage() {
         actions={
           <div className="flex items-center gap-2">
             {!isNew && <Link href="/camere" className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">{t("Camere")} ({nCamere})</Link>}
-            {!isNew && <button onClick={remove} title={t("L'eliminazione è gestita dall'assistenza")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Elimina struttura")}</button>}
+            {!isNew && autoSavedAt && <span className="flex items-center gap-1 text-xs font-medium text-[color:var(--ok)]" title={t("Le modifiche vengono salvate da sole")}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>{t("Salvato in automatico")}</span>}
             <button onClick={() => router.push("/strutture")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
             <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea struttura") : t("Salva")}</button>
           </div>
