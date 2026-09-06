@@ -69,6 +69,7 @@ export default function CamerePage() {
     const kv = (u: Unit): string | number => {
       const rt = rtOf(u);
       if (sortKey === "type") return (rt?.name ?? "").toLowerCase();
+      if (sortKey === "code") return (u.code ?? "").toLowerCase();
       if (sortKey === "floor") return (u.floor ?? "").toLowerCase();
       if (sortKey === "view") return (u.view ?? "").toLowerCase();
       if (sortKey === "beds") return rt?.beds ?? 0;
@@ -145,11 +146,13 @@ export default function CamerePage() {
             return (
               <tr key={u.id} id={`unit-${u.id}`} onClick={() => setRoomModal({ structureId: s.id, unit: u })} className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${sel.has(u.id) ? "bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)]" : highlight === u.id ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : ""}`}>
                 <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel.has(u.id)} onChange={() => toggleSel(u.id)} className="h-4 w-4 accent-[color:var(--focus)]" /></td>
-                <td className="px-3 py-2.5"><div className="flex items-center gap-2"><span className="h-6 w-1.5 rounded-full" style={{ backgroundColor: color }} /><span className={`font-medium ${u.outOfService ? "text-faint line-through" : "text-txt"}`}>{u.name}</span>{u.code && <span className="font-mono text-[11px] text-faint">#{u.code}</span>}</div></td>
+                <td className="px-3 py-2.5"><div className="flex items-center gap-2"><span className="h-6 w-1.5 rounded-full" style={{ backgroundColor: color }} /><span className={`font-medium ${u.outOfService ? "text-faint line-through" : "text-txt"}`}>{u.name}</span></div></td>
+                <td className="px-3 py-2.5 font-mono text-xs text-dim">{u.code || "—"}</td>
                 {showType && <td className="px-3 py-2.5 text-dim">{rt?.name ?? "—"}</td>}
                 <td className="px-3 py-2.5 text-dim">{u.floor || "—"}</td>
                 <td className="px-3 py-2.5 text-dim">{u.view || "—"}</td>
                 <td className="px-3 py-2.5 text-dim">{rt?.beds ?? "—"}</td>
+                <td className="px-3 py-2.5 max-w-[180px] truncate text-xs text-dim" title={u.accessInfo || ""}>{u.accessInfo || <span className="text-faint">—</span>}</td>
                 <td className="px-3 py-2.5">{u.outOfService ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("Fuori servizio")}</span> : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("In servizio")}</span>}</td>
                 <td className="px-3 py-2.5 text-right text-faint">›</td>
               </tr>
@@ -227,14 +230,16 @@ export default function CamerePage() {
                         </div>
                         {open && (
                           <div className="overflow-x-auto">
-                            <table className="w-full min-w-[560px] text-sm">
+                            <table className="w-full min-w-[720px] text-sm">
                               <thead>
                                 <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
                                   <th className="px-2 py-2"><input type="checkbox" checked={g.length > 0 && g.every((u) => sel.has(u.id))} onChange={(e) => setManySel(g.map((u) => u.id), e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" title={t("Seleziona tutte")} /></th>
                                   <SortTh k="name" label={t("Camera")} />
+                                  <SortTh k="code" label={t("Codice")} />
                                   <SortTh k="floor" label={t("Piano")} />
                                   <SortTh k="view" label={t("Vista")} />
                                   <SortTh k="beds" label={t("Posti")} />
+                                  <th className="px-3 py-2 font-semibold">{t("Accesso")}</th>
                                   <SortTh k="status" label={t("Stato")} />
                                   <th className="px-3 py-2 font-semibold"></th>
                                 </tr>
@@ -258,9 +263,11 @@ export default function CamerePage() {
                               <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
                                 <th className="px-2 py-2"><input type="checkbox" checked={orphans.length > 0 && orphans.every((u) => sel.has(u.id))} onChange={(e) => setManySel(orphans.map((u) => u.id), e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" title={t("Seleziona tutte")} /></th>
                                 <SortTh k="name" label={t("Camera")} />
+                                <SortTh k="code" label={t("Codice")} />
                                 <SortTh k="floor" label={t("Piano")} />
                                 <SortTh k="view" label={t("Vista")} />
                                 <SortTh k="beds" label={t("Posti")} />
+                                <th className="px-3 py-2 font-semibold">{t("Accesso")}</th>
                                 <SortTh k="status" label={t("Stato")} />
                                 <th className="px-3 py-2 font-semibold"></th>
                               </tr>
