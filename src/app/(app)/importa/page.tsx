@@ -47,9 +47,10 @@ function toChannel(s: string): Channel {
 }
 
 // ── Parsing ICS / iCal (export prenotazioni da Octorate) ──
-type IcsEvent = { guest: string; checkIn: string; checkOut: string; blocked: boolean; channelText: string; note: string; room: string; total?: number };
+type IcsEvent = { guest: string; checkIn: string; checkOut: string; blocked: boolean; channelText: string; note: string; room: string; total?: number; adults?: number };
 function icsUnescape(s: string) { return (s || "").replace(/\\n/gi, " ").replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\\\/g, "\\").trim(); }
 function icsDate(v: string) { const m = v.match(/(\d{4})(\d{2})(\d{2})/); return m ? `${m[1]}-${m[2]}-${m[3]}` : ""; }
+function addDay(iso: string) { if (!iso) return ""; const d = new Date(iso + "T00:00:00Z"); if (isNaN(+d)) return iso; d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); }
 function parseICS(text: string): IcsEvent[] {
   text = text.replace(/\r\n?/g, "\n").replace(/\n[ \t]/g, ""); // unfold righe continuate
   const out: IcsEvent[] = [];
@@ -58,13 +59,22 @@ function parseICS(text: string): IcsEvent[] {
     const body = "\n" + b.split(/END:VEVENT/i)[0];
     const get = (re: RegExp) => { const m = body.match(re); return m ? icsUnescape(m[1]) : ""; };
     const dts = body.match(/\nDTSTART[^:\n]*:([0-9TZ]+)/i), dte = body.match(/\nDTEND[^:\n]*:([0-9TZ]+)/i);
-    const ci = dts ? icsDate(dts[1]) : "", co = dte ? icsDate(dte[1]) : "";
-    if (!ci && !co) continue;
     const summary = get(/\nSUMMARY:(.*)/i), desc = get(/\nDESCRIPTION:(.*)/i), loc = get(/\nLOCATION:(.*)/i);
+    const orgCn = get(/\nORGANIZER[^:\n]*?CN=([^:\n]*):/i);
+    // Date: preferisci il "Period : gg/mm/aaaa - gg/mm/aaaa" della DESCRIPTION (check-out reale);
+    // altrimenti DTSTART e DTEND+1 (in Octorate DTEND è l'ultima notte, non la partenza).
+    const per = desc.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})\s*[-–]\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+    let ci = per ? toISO(per[1]) : (dts ? icsDate(dts[1]) : "");
+    let co = per ? toISO(per[2]) : (dte ? addDay(icsDate(dte[1])) : "");
+    if (!ci && !co) continue;
     const blob = (summary + " " + desc + " " + loc).toLowerCase();
-    const blocked = /closed|not available|non disponibil|bloccat|blocked|unavailable/.test(blob);
-    const totm = (desc + " " + summary).match(/€\s?([0-9.,]+)/);
-    out.push({ guest: blocked ? "" : summary, checkIn: ci, checkOut: co, blocked, channelText: summary + " " + desc, note: desc || summary, room: loc, total: totm ? toNum(totm[1]) : undefined });
+    const blocked = /closed|not available|non disponibil|bloccat|blocked|unavailable|outoforder|out.?of.?order|fuori.?servizio|maintenance|manutenzione/.test(blob);
+    // Nome ospite: ORGANIZER CN (migliore); altrimenti la parte di SUMMARY prima della camera.
+    let guest = orgCn;
+    if (!guest && !blocked) { guest = summary.split(/\s*\|\s*|\s+Camera\b/i)[0].trim(); }
+    const totm = desc.match(/Total\s*:?\s*€?\s*([0-9]+(?:[.,][0-9]+)?)/i) || (desc + " " + summary).match(/€\s?([0-9.,]+)/);
+    const pax = summary.match(/(\d+)\s*pax/i);
+    out.push({ guest: blocked ? "" : guest, checkIn: ci, checkOut: co, blocked, channelText: summary, note: desc || summary, room: loc, total: totm ? toNum(totm[1]) : undefined, adults: pax ? +pax[1] : undefined });
   }
   return out;
 }
@@ -130,7 +140,7 @@ export default function ImportaPage() {
       addBooking({
         structureId, roomTypeId: findRoom(e.room), unitId: null, guestId,
         channel: e.blocked ? "blocked" : toChannel(e.channelText), status: "confirmed",
-        checkIn: e.checkIn, checkOut: e.checkOut, adults: 2, children: 0,
+        checkIn: e.checkIn, checkOut: e.checkOut, adults: Math.max(1, Math.round(e.adults ?? 2)), children: 0,
         ...(e.total !== undefined ? { total: e.total } : {}),
         note: (t("Importato da ICS") + (e.note ? " · " + e.note : "")).slice(0, 280),
       });
