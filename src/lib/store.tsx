@@ -7,13 +7,15 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import type { Structure, RoomType, Unit, Guest, Booking, Channel, CalEvent } from "./types";
 import { STRUCTURES, ROOM_TYPES, UNITS } from "./mock-data";
 import { playSound } from "./sound";
+import { loadUsers } from "./users";
 
-export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "quote" | "payment";
+export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "quote" | "payment" | "login" | "message";
 export interface Activity {
   id: string;
   ts: number; // epoch ms
   type: ActivityType;
   text: string;
+  by?: string; // utente che ha compiuto l'azione
 }
 
 export interface NewBookingPrefill {
@@ -104,8 +106,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [rateOverrides, setRateOverrides] = useState<Record<string, number>>({});
   const [activities, setActivities] = useState<Activity[]>([]);
+  const currentActor = (): string | undefined => {
+    try {
+      const cur = localStorage.getItem("spigolestay:currentuser");
+      const us = loadUsers();
+      const u = us.find((x) => x.id === cur) ?? us[0];
+      return u ? (`${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.username) : undefined;
+    } catch { return undefined; }
+  };
   const logAct = (type: ActivityType, text: string) => {
-    setActivities((prev) => [{ id: uid(), ts: Date.now(), type, text }, ...prev].slice(0, 300));
+    setActivities((prev) => [{ id: uid(), ts: Date.now(), type, text, by: currentActor() }, ...prev].slice(0, 500));
     playSound(type === "booking" ? "booking" : type === "cancel" ? "cancel" : "notify");
   };
 
@@ -155,6 +165,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (Array.isArray(d.bookings)) setBookings(d.bookings);
         if (Array.isArray(d.events)) setEvents(d.events);
         if (d.rateOverrides && typeof d.rateOverrides === "object") setRateOverrides(zeroPrices ? {} : d.rateOverrides);
+        if (Array.isArray(d.activities)) setActivities(d.activities);
       } else if (!onboarded) {
         // Primo accesso / reset: si parte vuoti, sarà l'onboarding a creare struttura e camere.
         setStructures([]); setRoomTypes([]); setUnits([]); setGuests([]); setBookings([]); setEvents([]); setRateOverrides({});
@@ -168,8 +179,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // 2) Salvataggio ad ogni cambiamento, solo dopo il caricamento iniziale.
   useEffect(() => {
     if (!ready) return;
-    try { localStorage.setItem(KEY, JSON.stringify({ structures, roomTypes, units, guests, bookings, events, rateOverrides })); } catch {}
-  }, [ready, structures, roomTypes, units, guests, bookings, events, rateOverrides]);
+    try { localStorage.setItem(KEY, JSON.stringify({ structures, roomTypes, units, guests, bookings, events, rateOverrides, activities })); } catch {}
+  }, [ready, structures, roomTypes, units, guests, bookings, events, rateOverrides, activities]);
+  // Registra l'accesso al gestionale una volta per sessione del browser.
+  useEffect(() => {
+    if (!ready) return;
+    try { if (!sessionStorage.getItem("spigolestay:loginlogged")) { sessionStorage.setItem("spigolestay:loginlogged", "1"); logAct("login", "Accesso al gestionale"); } } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [newBooking, setNewBooking] = useState<NewBookingPrefill | null>(null);
   const [activeStructureId, setActiveStructureId] = useState<string>("all");

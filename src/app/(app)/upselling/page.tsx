@@ -13,7 +13,7 @@ const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2
 const isActive = (e: ExtraService) => e.active !== false;
 
 export default function UpsellingPage() {
-  const { bookings, guests, structures, activeStructureId, updateStructure } = useData();
+  const { bookings, guests, structures, activeStructureId, updateStructure, addActivity } = useData();
   const today = toISO(new Date());
   const guest = (id: string) => guests.find((g) => g.id === id);
 
@@ -52,6 +52,7 @@ export default function UpsellingPage() {
     const g = guest(b.guestId); const msg = offerMsg(bookingId);
     if (via === "wa" && g?.phone) window.open(`https://wa.me/${g.phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
     else if (g?.email) window.open(`mailto:${g.email}?subject=${encodeURIComponent("Servizi extra per il tuo soggiorno")}&body=${encodeURIComponent(msg)}`, "_blank");
+    addActivity("message", `Proposta extra inviata${g?.fullName ? " — " + g.fullName : ""} (${via === "wa" ? "WhatsApp" : "email"})`);
     setOfferFor(null); setPicked(new Set());
   };
 
