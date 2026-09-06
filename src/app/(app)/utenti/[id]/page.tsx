@@ -111,7 +111,15 @@ export default function UserSchedaPage() {
     saveUsers(next);
     router.push("/utenti");
   };
-  const remove = async () => { if (!(await ask({ title: t("Elimina utente"), message: `${t("Eliminare definitivamente")} ${u.firstName} ${u.lastName}?`, danger: true, confirmLabel: t("Elimina") }))) return; saveUsers(loadUsers().filter((x) => x.id !== u.id)); router.push("/utenti"); };
+  const isAdmin = u.templateKey === "owner" || u.id === "u-owner"; // l'amministratore non è eliminabile
+  const userCount = loadUsers().length;
+  const canDelete = !isNew && !isAdmin && userCount > 1;
+  const remove = async () => {
+    if (isAdmin) { await ask({ title: t("Non eliminabile"), message: t("L'amministratore non può essere eliminato."), confirmLabel: t("Ho capito") }); return; }
+    if (loadUsers().length <= 1) { await ask({ title: t("Non eliminabile"), message: t("Deve restare almeno un utente."), confirmLabel: t("Ho capito") }); return; }
+    if (!(await ask({ title: t("Elimina utente"), message: `${t("Eliminare definitivamente")} ${u.firstName} ${u.lastName}?`, danger: true, confirmLabel: t("Elimina") }))) return;
+    saveUsers(loadUsers().filter((x) => x.id !== u.id)); router.push("/utenti");
+  };
 
   const fullName = `${u.firstName} ${u.lastName}`.trim() || t("Nuovo utente");
   const avatar = (size: number) => (
@@ -127,7 +135,7 @@ export default function UserSchedaPage() {
         subtitle={isNew ? t("Crea un nuovo accesso al gestionale") : `${fullName} · ${u.email}`}
         actions={
           <div className="flex items-center gap-2">
-            {!isNew && u.id !== "u-owner" && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
+            {canDelete && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
             <button onClick={() => router.push("/utenti")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
             <button onClick={save} disabled={!valid} title={valid ? "" : `${t("Mancano:")} ${errs.join(", ")}`} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea utente") : t("Salva")}</button>
           </div>

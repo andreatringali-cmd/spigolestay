@@ -59,7 +59,7 @@ export default function StrutturePage() {
                 <tr key={s.id} onClick={() => router.push(`/strutture/${s.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-2.5">
-                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-xs font-bold text-white" style={{ backgroundColor: color }}>{s.name.slice(0, 2).toUpperCase()}</div>
+                      <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-xs font-bold text-white" style={{ backgroundColor: color }}>{s.logo ? <img src={s.logo} alt="" className="h-full w-full object-cover" /> : s.name.slice(0, 2).toUpperCase()}</div>
                       <div>
                         <div className="font-medium text-txt">{s.name}</div>
                         <div className="text-[11px] text-faint">{[s.address, s.city].filter(Boolean).join(", ") || "—"}</div>
