@@ -43,6 +43,7 @@ export const NAV: NavItem[] = [
 
   { label: "Strutture", href: "/strutture", group: "Configurazione", icon: "building", perm: "impostazioni", module: "pms" },
   { label: "Camere", href: "/camere", group: "Configurazione", icon: "bed", perm: "camere", module: "pms" },
+  { label: "Importa prenotazioni", href: "/importa", group: "Configurazione", icon: "fileText", perm: "impostazioni", module: "pms" },
   { label: "Guida ospiti", href: "/guida-ospiti", group: "Configurazione", icon: "share", perm: "webconcierge", module: "concierge" },
   { label: "Utenti", href: "/utenti", group: "Configurazione", icon: "users", perm: "utenti", module: "team" },
   { label: "Impostazioni", href: "/impostazioni", group: "Configurazione", icon: "settings", perm: "impostazioni", module: "pms" },
