@@ -31,9 +31,9 @@ export default function UtentiPage() {
             <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
               <th className="px-3 py-2 font-semibold">{t("Utente")}</th>
               <th className="px-3 py-2 font-semibold">{t("Username")}</th>
+              <th className="px-3 py-2 font-semibold">{t("Email")}</th>
               <th className="px-3 py-2 font-semibold">{t("Telefono")}</th>
               <th className="px-3 py-2 font-semibold">{t("Modello permessi")}</th>
-              <th className="px-3 py-2 font-semibold">{t("Mansioni")}</th>
               <th className="px-3 py-2 font-semibold">{t("Strutture")}</th>
               <th className="px-3 py-2 font-semibold">{t("Ultimo accesso")}</th>
               <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
@@ -48,19 +48,13 @@ export default function UtentiPage() {
                     <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full text-xs font-bold text-white" style={{ backgroundColor: u.avatarColor }}>{u.photo ? <img src={u.photo} alt="" className="h-full w-full object-cover" /> : initials(u.firstName, u.lastName)}</div>
                     <div>
                       <div className="font-medium text-txt">{u.firstName} {u.lastName}</div>
-                      <div className="text-[11px] text-faint">{u.email}</div>
                     </div>
                   </div>
                 </td>
                 <td className="px-3 py-2.5 font-mono text-xs text-dim">{u.username}</td>
+                <td className="px-3 py-2.5 text-xs text-dim">{u.email || <span className="text-faint">—</span>}</td>
                 <td className="px-3 py-2.5 whitespace-nowrap text-xs text-dim">{u.phone || <span className="text-faint">—</span>}</td>
                 <td className="px-3 py-2.5"><span className="rounded-full bg-wash px-2 py-0.5 text-xs font-semibold text-dim">{templateLabel(u.templateKey)}</span></td>
-                <td className="px-3 py-2.5">
-                  {(() => {
-                    const m = [u.managerCheckin && t("Check-in"), u.managerCheckout && t("Check-out"), u.managerHousekeeping && t("Pulizie")].filter(Boolean) as string[];
-                    return m.length ? <div className="flex flex-wrap gap-1">{m.map((x) => <span key={x} className="rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-medium text-dim">{x}</span>)}</div> : <span className="text-faint">—</span>;
-                  })()}
-                </td>
                 <td className="px-3 py-2.5 max-w-[220px] truncate text-xs text-dim" title={structLabel(u)}>{structLabel(u)}</td>
                 <td className="px-3 py-2.5 text-xs text-dim">{u.lastLogin ? new Date(u.lastLogin.at).toLocaleDateString("it-IT") : <span className="text-faint">{t("Mai")}</span>}</td>
                 <td className="px-3 py-2.5">
