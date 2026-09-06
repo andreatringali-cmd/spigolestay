@@ -117,6 +117,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     try {
+      // Reset forzato una-tantum: alla prima apertura dopo questo aggiornamento azzera TUTTO
+      // (cancella ogni dato locale) e riparte dal primo accesso. Poi imposta un flag e non si ripete.
+      if (localStorage.getItem("spigolestay:forcereset:v1") !== "1") {
+        Object.keys(localStorage).filter((k) => k.startsWith("spigolestay:")).forEach((k) => localStorage.removeItem(k));
+        localStorage.setItem("spigolestay:forcereset:v1", "1");
+        localStorage.setItem("spigolestay:onboarded", "0");
+        location.reload();
+        return;
+      }
+    } catch {}
+    try {
       // Prima di configurare (onboarding non completato) NON si caricano i dati demo.
       const onboarded = localStorage.getItem("spigolestay:onboarded") === "1";
       const raw = onboarded ? localStorage.getItem(KEY) : null;
