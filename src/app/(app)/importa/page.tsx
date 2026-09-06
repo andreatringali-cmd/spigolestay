@@ -96,7 +96,7 @@ const FIELDS: { key: string; label: string; req?: boolean; kw: RegExp }[] = [
 export default function ImportaPage() {
   const router = useRouter();
   const { t } = useLang();
-  const { structures, roomTypes, activeStructureId, addGuest, addBooking, addRoomType } = useData();
+  const { structures, roomTypes, units, bookings, activeStructureId, addGuest, addBooking, addRoomType, addUnit } = useData();
   const [rows, setRows] = useState<string[][]>([]);
   const [mode, setMode] = useState<"csv" | "ics">("csv");
   const [events, setEvents] = useState<IcsEvent[]>([]);
@@ -104,8 +104,27 @@ export default function ImportaPage() {
   const [map, setMap] = useState<Record<string, number>>({});
   const [structureId, setStructureId] = useState<string>(() => (activeStructureId !== "all" ? activeStructureId : structures[0]?.id ?? ""));
   const [includeBlocked, setIncludeBlocked] = useState(false);
+  const [roomMap, setRoomMap] = useState<Record<string, string>>({}); // nome camera ICS -> id tipologia (o "__new__")
   const [done, setDone] = useState<number | null>(null);
   const [err, setErr] = useState("");
+
+  const icsRooms = useMemo(() => { const set = new Set<string>(); events.forEach((e) => { if (e.room) set.add(e.room.trim()); }); return [...set]; }, [events]);
+  // Auto-mappatura camere ICS → tipologie esistenti (riempie solo le mancanti, così non fa loop).
+  useEffect(() => {
+    if (mode !== "ics" || !icsRooms.length) return;
+    setRoomMap((prev) => {
+      const sRooms = roomTypes.filter((rt) => rt.structureId === structureId);
+      const next = { ...prev }; let changed = false;
+      icsRooms.forEach((r) => {
+        if (next[r] === undefined) {
+          const s = r.toLowerCase();
+          const hit = sRooms.find((rt) => s === rt.name.toLowerCase()) || sRooms.find((rt) => s.includes(rt.name.toLowerCase()) || rt.name.toLowerCase().includes(s));
+          next[r] = hit ? hit.id : "__new__"; changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [icsRooms, structureId, mode, roomTypes]);
 
   // Se la struttura non è ancora impostata (store caricato dopo il mount), aggancia la prima disponibile.
   useEffect(() => {
@@ -135,17 +154,40 @@ export default function ImportaPage() {
   };
 
   const runImportICS = () => {
-    const sRooms = roomTypes.filter((rt) => rt.structureId === structureId);
-    let rtFallback = sRooms[0]?.id ?? "";
-    if (!rtFallback) rtFallback = addRoomType({ structureId, name: t("Camere importate"), beds: 2, basePrice: 0 });
-    const findRoom = (txt: string) => { const s = (txt || "").toLowerCase().trim(); const hit = s ? (sRooms.find((rt) => rt.name.toLowerCase() === s) || sRooms.find((rt) => s.includes(rt.name.toLowerCase()))) : null; return hit ? hit.id : rtFallback; };
-    let n = 0, skipped = 0;
-    const list = includeBlocked ? events : events.filter((e) => !e.blocked);
+    const list = (includeBlocked ? events : events.filter((e) => !e.blocked))
+      .filter((e) => e.checkIn && e.checkOut).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+    const fallbackName = t("Camere importate");
+    // Risolve la tipologia per una camera ICS: usa la mappatura scelta, oppure crea la nuova (una sola volta).
+    const typeCache: Record<string, string> = {};
+    const resolveType = (roomName: string) => {
+      const key = (roomName || "").trim() || "—";
+      if (typeCache[key]) return typeCache[key];
+      const chosen = roomMap[key];
+      let id: string;
+      if (chosen && chosen !== "__new__") id = chosen;
+      else { const nm = (roomName || "").replace(/\s*\|\s*/g, " ").trim().slice(0, 40) || fallbackName; id = addRoomType({ structureId, name: nm, beds: 2, basePrice: 0 }); }
+      typeCache[key] = id; return id;
+    };
+    // Assegnazione camere fisiche (unit) con bin-packing: riusa le esistenti, ne crea quante servono
+    // per le sovrapposizioni, così nessuna prenotazione risulta in overbooking.
+    const slots: Record<string, { unitId: string; last: string }[]> = {};
+    units.filter((u) => u.structureId === structureId).forEach((u) => {
+      const last = bookings.filter((b) => b.unitId === u.id).reduce((mx, b) => (b.checkOut > mx ? b.checkOut : mx), "0000-00-00");
+      (slots[u.roomTypeId] ||= []).push({ unitId: u.id, last });
+    });
+    const assignUnit = (typeId: string, ci: string, co: string) => {
+      const arr = (slots[typeId] ||= []);
+      let s = arr.find((x) => x.last <= ci);
+      if (!s) { const id = addUnit({ structureId, roomTypeId: typeId, name: `${t("Camera")} ${arr.length + 1}` }); s = { unitId: id, last: "0000-00-00" }; arr.push(s); }
+      s.last = co; return s.unitId;
+    };
+    let n = 0;
     list.forEach((e) => {
-      if (!e.checkIn || !e.checkOut) { skipped++; return; }
+      const typeId = resolveType(e.room);
+      const unitId = assignUnit(typeId, e.checkIn, e.checkOut);
       const guestId = addGuest({ fullName: e.guest || (e.blocked ? t("Non disponibile") : t("Ospite (da ICS)")) });
       addBooking({
-        structureId, roomTypeId: findRoom(e.room), unitId: null, guestId,
+        structureId, roomTypeId: typeId, unitId, guestId,
         channel: e.blocked ? "blocked" : toChannel(e.channelText), status: "confirmed",
         checkIn: e.checkIn, checkOut: e.checkOut, adults: Math.max(1, Math.round(e.adults ?? 2)), children: 0,
         ...(e.total !== undefined ? { total: e.total } : {}),
@@ -153,7 +195,7 @@ export default function ImportaPage() {
       });
       n++;
     });
-    setDone(n); if (skipped) setErr(`${skipped} ${t("eventi saltati (date mancanti).")}`);
+    setDone(n);
   };
 
   const val = (r: string[], key: string) => { const i = map[key]; return i === undefined || i < 0 ? "" : (r[i] ?? "").trim(); };
@@ -260,6 +302,24 @@ export default function ImportaPage() {
                   </tbody>
                 </table>
               </div>
+              {icsRooms.length > 0 && (
+                <div className="mt-4 rounded-lg border border-line bg-wash/50 p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">{t("Tipologie trovate nel file → le tue")}</div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {icsRooms.map((r) => (
+                      <div key={r} className="flex items-center gap-2 text-sm">
+                        <span className="min-w-0 flex-1 truncate text-dim" title={r}>{r}</span>
+                        <span className="text-faint">→</span>
+                        <select value={roomMap[r] ?? "__new__"} onChange={(e) => setRoomMap((m) => ({ ...m, [r]: e.target.value }))} className="max-w-[52%] rounded-lg border border-line bg-surface px-2 py-1.5 text-xs text-txt">
+                          {roomTypes.filter((rt) => rt.structureId === structureId).map((rt) => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
+                          <option value="__new__">➕ {t("Crea nuova tipologia")}</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[11px] text-faint">{t("Se le camere non corrispondono, abbina o crea le tipologie: le camere fisiche necessarie vengono create in automatico e assegnate senza sovrapposizioni.")}</p>
+                </div>
+              )}
               {(() => {
                 const resv = events.filter((e) => !e.blocked).length, blk = events.length - resv;
                 const imp = includeBlocked ? events.length : resv;
