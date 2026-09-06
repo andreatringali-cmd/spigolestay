@@ -27,6 +27,7 @@ export default function OnlineUsers() {
       name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.username || t("Utente"),
       role: u.id === user?.id ? t("Titolare") : (u.templateKey && u.templateKey !== "none" ? u.templateKey : t("Utente")),
       you: u.id === user?.id,
+      photo: u.photo,
     }));
 
   if (online.length === 0) return null;
@@ -36,7 +37,7 @@ export default function OnlineUsers() {
       <button onClick={() => setOpen((o) => !o)} title={t("Utenti online")} className="flex items-center gap-2 rounded-lg border border-line px-2 py-1 transition hover:bg-wash">
         <div className="flex -space-x-2">
           {online.slice(0, 3).map((u, i) => (
-            <span key={u.id} className="grid h-6 w-6 place-items-center rounded-full border-2 border-surface text-[10px] font-bold text-white" style={{ backgroundColor: AVATAR[i % AVATAR.length] }}>{initials(u.name)}</span>
+            <span key={u.id} className="grid h-6 w-6 place-items-center overflow-hidden rounded-full border-2 border-surface text-[10px] font-bold text-white" style={{ backgroundColor: AVATAR[i % AVATAR.length] }}>{u.photo ? <img src={u.photo} alt="" className="h-full w-full object-cover" /> : initials(u.name)}</span>
           ))}
         </div>
         <span className="hidden items-center gap-1 text-xs font-medium text-dim sm:flex">
@@ -48,8 +49,8 @@ export default function OnlineUsers() {
           <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-faint">{t("Online adesso")} · {online.length}</div>
           {online.map((u, i) => (
             <div key={u.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5">
-              <span className="relative grid h-7 w-7 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: AVATAR[i % AVATAR.length] }}>
-                {initials(u.name)}
+              <span className="relative grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: AVATAR[i % AVATAR.length] }}>
+                {u.photo ? <img src={u.photo} alt="" className="h-full w-full object-cover" /> : initials(u.name)}
                 <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-[color:var(--ok)]" />
               </span>
               <div className="min-w-0">

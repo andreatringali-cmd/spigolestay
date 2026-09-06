@@ -6,7 +6,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { loadUsers, type User, type PermLevel } from "./users";
+import { loadUsers, saveUsers, type User, type PermLevel } from "./users";
 
 interface AccessValue {
   user: User | null;
@@ -47,6 +47,22 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     window.addEventListener("storage", h);
     return () => { window.removeEventListener("spigolestay:modules", h); window.removeEventListener("spigolestay:users", h); window.removeEventListener("storage", h); };
   }, []);
+
+  // Registra l'ultimo accesso dell'utente collegato una volta per sessione del browser
+  // (il login qui è dimostrativo). Così l'elenco utenti mostra un dato reale, non "Mai".
+  useEffect(() => {
+    if (!userId) return;
+    try {
+      const flag = `spigolestay:stamped:${userId}`;
+      if (sessionStorage.getItem(flag)) return;
+      const list = loadUsers();
+      const now = new Date().toISOString();
+      const next = list.map((u) => (u.id === userId ? { ...u, lastLogin: { at: now, ip: u.lastLogin?.ip ?? "—" } } : u));
+      saveUsers(next);
+      sessionStorage.setItem(flag, "1");
+      setUsers(next);
+    } catch {}
+  }, [userId]);
 
   const setUserId = (id: string) => { setUid(id); try { localStorage.setItem(CUR_KEY, id); } catch {} };
   const user = users.find((u) => u.id === userId) ?? users[0] ?? null;
