@@ -17,9 +17,9 @@ const ALL = ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "mess
 
 interface Tier { key: string; name: string; price: number; structures: number; includes: string[]; tagline: string }
 const TIERS: Tier[] = [
-  { key: "basic", name: "Basic", price: 39, structures: 1, includes: ["pms", "cm", "booking", "cassa"], tagline: "Per iniziare" },
-  { key: "pro", name: "Pro", price: 59, structures: 3, includes: ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi"], tagline: "In crescita" },
-  { key: "ultimate", name: "Ultimate", price: 99, structures: 8, includes: ALL, tagline: "Tutto incluso" },
+  { key: "basic", name: "Basic", price: 29, structures: 1, includes: ["pms", "cm", "booking", "cassa"], tagline: "Per iniziare" },
+  { key: "pro", name: "Pro", price: 49, structures: 3, includes: ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi"], tagline: "In crescita" },
+  { key: "ultimate", name: "Ultimate", price: 89, structures: 8, includes: ALL, tagline: "Tutto incluso" },
 ];
 
 interface Module { key: string; name: string; desc: string; href: string; core?: boolean }

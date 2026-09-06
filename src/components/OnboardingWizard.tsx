@@ -35,9 +35,9 @@ const MODULE_LABELS: Record<string, string> = {
 };
 
 const TIERS = [
-  { key: "basic", name: "Basic", price: 39, structures: 1, desc: "1 struttura · l'essenziale per iniziare", includes: ["pms", "cm", "booking", "cassa"] },
-  { key: "pro", name: "Pro", price: 59, structures: 3, desc: "fino a 3 strutture · marketing e automazioni", includes: ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi"] },
-  { key: "ultimate", name: "Ultimate", price: 99, structures: 8, desc: "fino a 8 strutture · tutto incluso", includes: ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi", "site", "rms", "ratecheck", "team"] },
+  { key: "basic", name: "Basic", price: 29, structures: 1, desc: "1 struttura · l'essenziale per iniziare", includes: ["pms", "cm", "booking", "cassa"] },
+  { key: "pro", name: "Pro", price: 49, structures: 3, desc: "fino a 3 strutture · marketing e automazioni", includes: ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi"] },
+  { key: "ultimate", name: "Ultimate", price: 89, structures: 8, desc: "fino a 8 strutture · tutto incluso", includes: ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi", "site", "rms", "ratecheck", "team"] },
 ];
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-txt outline-none transition focus:border-focus";
