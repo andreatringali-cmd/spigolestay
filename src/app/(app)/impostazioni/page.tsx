@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { resetAll } from "@/lib/onboarding";
@@ -13,8 +13,11 @@ export default function ImpostazioniPage() {
   const { theme, setTheme } = useTheme();
   const { t } = useLang();
   const [lang, setLang] = useState("it");
-  const [notifNew, setNotifNew] = useState(true);
-  const [notifCancel, setNotifCancel] = useState(true);
+  const NOTIF_KEY = "spigolestay:notifs";
+  const NOTIF_DEF = { newBooking: true, cancel: true, checkin: true, payment: false, review: true, message: true, cleaning: false, ota: true };
+  const [notifs, setNotifs] = useState(NOTIF_DEF);
+  useEffect(() => { try { const r = localStorage.getItem(NOTIF_KEY); if (r) setNotifs({ ...NOTIF_DEF, ...JSON.parse(r) }); } catch {} /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  const setNotif = (k: keyof typeof NOTIF_DEF, v: boolean) => setNotifs((p) => { const n = { ...p, [k]: v }; try { localStorage.setItem(NOTIF_KEY, JSON.stringify(n)); } catch {} return n; });
   const ask = useConfirm();
 
   // Backup: esporta/importa tutte le chiavi "spigolestay:*".
@@ -47,32 +50,47 @@ export default function ImpostazioniPage() {
   return (
     <div>
       <PageHeader title={t("Impostazioni")} subtitle={t("Preferenze generali dell'account")} />
-      <div className="grid gap-4">
-        <Card>
-          <SectionTitle>{t("Aspetto, lingua e notifiche")}</SectionTitle>
-          <div className="flex flex-col gap-3">
-            <Row label={t("Tema")}>
-              <div className="flex items-center rounded-lg border border-line p-0.5">
-                <ThemeBtn active={theme === "light"} onClick={() => setTheme("light")} icon="sun" label={t("Chiaro")} />
-                <ThemeBtn active={theme === "dark"} onClick={() => setTheme("dark")} icon="moon" label={t("Scuro")} />
-              </div>
-            </Row>
-            <Row label={t("Lingua interfaccia")}>
-              <select value={lang} onChange={(e) => setLang(e.target.value)} className={inp}>
-                <option value="it">Italiano</option>
-                <option value="en">English</option>
-              </select>
-            </Row>
-            <Toggle label={t("Notifica nuove prenotazioni")} checked={notifNew} onChange={setNotifNew} />
-            <Toggle label={t("Notifica cancellazioni")} checked={notifCancel} onChange={setNotifCancel} />
-          </div>
-        </Card>
-      </div>
+      {/* Tema */}
+      <Card>
+        <SectionTitle>{t("Tema")}</SectionTitle>
+        <div className="mt-1 flex items-center rounded-lg border border-line p-0.5" style={{ width: "fit-content" }}>
+          <ThemeBtn active={theme === "light"} onClick={() => setTheme("light")} icon="sun" label={t("Chiaro")} />
+          <ThemeBtn active={theme === "dark"} onClick={() => setTheme("dark")} icon="moon" label={t("Scuro")} />
+        </div>
+      </Card>
 
+      {/* Stile dell'interfaccia */}
       <Card className="mt-4">
         <SectionTitle>{t("Stile dell'interfaccia")}</SectionTitle>
         <p className="mb-3 text-xs text-dim">{t("Scegli la palette di colori e la forma dei box. Si applica subito a tutto il gestionale e resta salvata.")}</p>
         <StyleChooser />
+      </Card>
+
+      {/* Lingua */}
+      <Card className="mt-4">
+        <SectionTitle>{t("Lingua")}</SectionTitle>
+        <Row label={t("Lingua interfaccia")}>
+          <select value={lang} onChange={(e) => setLang(e.target.value)} className={inp}>
+            <option value="it">Italiano</option>
+            <option value="en">English</option>
+          </select>
+        </Row>
+      </Card>
+
+      {/* Notifiche */}
+      <Card className="mt-4">
+        <SectionTitle>{t("Notifiche")}</SectionTitle>
+        <p className="mb-3 text-xs text-dim">{t("Scegli di cosa vuoi essere avvisato.")}</p>
+        <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          <Toggle label={t("Nuove prenotazioni")} checked={notifs.newBooking} onChange={(v) => setNotif("newBooking", v)} />
+          <Toggle label={t("Cancellazioni")} checked={notifs.cancel} onChange={(v) => setNotif("cancel", v)} />
+          <Toggle label={t("Prenotazioni dalle OTA")} checked={notifs.ota} onChange={(v) => setNotif("ota", v)} />
+          <Toggle label={t("Check-in di oggi")} checked={notifs.checkin} onChange={(v) => setNotif("checkin", v)} />
+          <Toggle label={t("Pagamenti ricevuti")} checked={notifs.payment} onChange={(v) => setNotif("payment", v)} />
+          <Toggle label={t("Nuove recensioni")} checked={notifs.review} onChange={(v) => setNotif("review", v)} />
+          <Toggle label={t("Messaggi degli ospiti")} checked={notifs.message} onChange={(v) => setNotif("message", v)} />
+          <Toggle label={t("Promemoria pulizie")} checked={notifs.cleaning} onChange={(v) => setNotif("cleaning", v)} />
+        </div>
       </Card>
 
       <Card className="mt-4">
