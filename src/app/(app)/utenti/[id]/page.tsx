@@ -372,10 +372,20 @@ export default function UserSchedaPage() {
                 <div key={group}>
                   <div className="mb-1.5 flex items-center justify-between">
                     <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t(group)}</div>
-                    <div className="flex gap-1">
-                      <button onClick={() => setAllGroup(group, "none")} className="rounded px-1.5 py-0.5 text-[10px] text-faint hover:bg-wash" title={t("Tutto Nessuno")}>⊘</button>
-                      <button onClick={() => setAllGroup(group, "view")} className="rounded px-1.5 py-0.5 text-[10px] text-faint hover:bg-wash" title={t("Tutto Visualizza")}>👁</button>
-                      <button onClick={() => setAllGroup(group, "edit")} className="rounded px-1.5 py-0.5 text-[10px] text-faint hover:bg-wash" title={t("Tutto Modifica")}>✎</button>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] font-semibold uppercase tracking-wide text-faint">{t("tutta la categoria")}</span>
+                      <div className="flex shrink-0 overflow-hidden rounded-lg border border-dashed border-line">
+                        {(["none", "view", "edit"] as PermLevel[]).map((lv) => {
+                          const m = LEVEL_META[lv];
+                          return (
+                            <button key={lv} onClick={() => setAllGroup(group, lv)} title={`${t("Imposta tutta la categoria")}: ${t(m.label)}`}
+                              className="grid h-7 w-8 place-items-center border-l border-dashed border-line first:border-l-0 transition hover:bg-wash"
+                              style={{ color: m.color }}>
+                              {m.icon}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                   <div className="flex flex-col divide-y divide-[color:var(--line)]">
