@@ -108,6 +108,7 @@ export default function ImportaPage() {
   const [structureId, setStructureId] = useState<string>(() => (activeStructureId !== "all" ? activeStructureId : structures[0]?.id ?? ""));
   const [includeBlocked, setIncludeBlocked] = useState(false);
   const [replacePrev, setReplacePrev] = useState(true);
+  const [targetUnit, setTargetUnit] = useState<string>(""); // "" = auto per tipologia; altrimenti id camera specifica
   const [roomMap, setRoomMap] = useState<Record<string, string>>({}); // nome camera ICS -> id tipologia (o "__new__")
   const [done, setDone] = useState<number | null>(null);
   const [err, setErr] = useState("");
@@ -160,8 +161,11 @@ export default function ImportaPage() {
   const runImportICS = () => {
     const list = (includeBlocked ? events : events.filter((e) => !e.blocked))
       .filter((e) => e.checkIn && e.checkOut).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+    // Camera specifica scelta: tutte le prenotazioni del file vanno in quella camera (rispetta l'assegnazione reale).
+    const forced = targetUnit ? units.find((u) => u.id === targetUnit && u.structureId === structureId) : null;
     // Sostituisci import precedenti: elimina le prenotazioni già importate (per non duplicarle).
-    const del = replacePrev ? bookings.filter((b) => b.structureId === structureId && (b.extId || (b.note || "").includes("Importato da"))) : [];
+    // Se è scelta una camera, sostituisci solo quelle di QUELLA camera; altrimenti quelle della struttura.
+    const del = replacePrev ? bookings.filter((b) => (forced ? b.unitId === forced.id : b.structureId === structureId) && (b.extId || (b.note || "").includes("Importato da"))) : [];
     const delIds = new Set(del.map((b) => b.id));
     del.forEach((b) => deleteBooking(b.id));
     const fallbackName = t("Camere importate");
@@ -194,15 +198,15 @@ export default function ImportaPage() {
     if (!replacePrev) bookings.forEach((b) => { if (b.extId && !delIds.has(b.id)) byExt.set(b.extId, b.id); });
     let created = 0, updated = 0;
     list.forEach((e) => {
-      const typeId = resolveType(e.room);
+      const typeId = forced ? forced.roomTypeId : resolveType(e.room);
       const patch = {
         roomTypeId: typeId,
         channel: e.blocked ? ("blocked" as const) : toChannel(e.channelText),
         checkIn: e.checkIn, checkOut: e.checkOut, adults: Math.max(1, Math.round(e.adults ?? 2)),
         ...(e.total !== undefined ? { total: e.total } : {}),
       };
-      if (e.uid && byExt.has(e.uid)) { updateBooking(byExt.get(e.uid)!, patch); updated++; return; }
-      const unitId = assignUnit(typeId, e.checkIn, e.checkOut);
+      if (e.uid && byExt.has(e.uid)) { updateBooking(byExt.get(e.uid)!, forced ? { ...patch, unitId: forced.id } : patch); updated++; return; }
+      const unitId = forced ? forced.id : assignUnit(typeId, e.checkIn, e.checkOut);
       const guestId = addGuest({ fullName: e.guest || (e.blocked ? t("Non disponibile") : t("Ospite (da ICS)")) });
       addBooking({
         structureId, unitId, guestId, status: "confirmed", children: 0, ...patch,
@@ -292,6 +296,13 @@ export default function ImportaPage() {
                 <label><span className="mb-1 block text-xs font-medium text-dim">{t("File CSV o ICS")}</span>
                   <input type="file" accept=".csv,.ics,text/csv,text/calendar,text/plain" onChange={(e) => onFile(e.target.files?.[0])} className="block w-full text-sm text-dim file:mr-3 file:rounded-lg file:border-0 file:bg-focus file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:opacity-90" />
                 </label>
+                <label className="sm:col-span-2"><span className="mb-1 block text-xs font-medium text-dim">{t("Assegna a")}</span>
+                  <select value={targetUnit} onChange={(e) => setTargetUnit(e.target.value)} className={sel}>
+                    <option value="">{t("Auto — assegna per tipologia (camere create in automatico)")}</option>
+                    {units.filter((u) => u.structureId === structureId).map((u) => { const rt = roomTypes.find((x) => x.id === u.roomTypeId); return <option key={u.id} value={u.id}>{t("Camera specifica")}: {u.name}{rt ? ` (${rt.name})` : ""}</option>; })}
+                  </select>
+                  <span className="mt-1 block text-[11px] text-faint">{t("Per rispettare l'assegnazione di Octorate: esporta un iCal per singola camera e importalo scegliendo qui la camera corrispondente.")}</span>
+                </label>
               </div>
             )}
             {fileName && <p className="mt-2 text-xs text-faint">{fileName} · {dataRows.length} {t("righe")}</p>}
@@ -319,7 +330,7 @@ export default function ImportaPage() {
                   </tbody>
                 </table>
               </div>
-              {icsRooms.length > 0 && (
+              {icsRooms.length > 0 && !targetUnit && (
                 <div className="mt-4 rounded-lg border border-line bg-wash/50 p-3">
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">{t("Tipologie trovate nel file → le tue")}</div>
                   <div className="grid gap-2 sm:grid-cols-2">
