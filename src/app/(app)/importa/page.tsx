@@ -46,8 +46,10 @@ function toChannel(s: string): Channel {
   return "direct";
 }
 
+const normName = (x: string) => (x || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
 // ── Parsing ICS / iCal (export prenotazioni da Octorate) ──
-type IcsEvent = { guest: string; checkIn: string; checkOut: string; blocked: boolean; channelText: string; note: string; room: string; total?: number; adults?: number };
+type IcsEvent = { uid: string; guest: string; checkIn: string; checkOut: string; blocked: boolean; channelText: string; note: string; room: string; total?: number; adults?: number };
 function icsUnescape(s: string) { return (s || "").replace(/\\n/gi, " ").replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\\\/g, "\\").trim(); }
 function icsDate(v: string) { const m = v.match(/(\d{4})(\d{2})(\d{2})/); return m ? `${m[1]}-${m[2]}-${m[3]}` : ""; }
 function addDay(iso: string) { if (!iso) return ""; const d = new Date(iso + "T00:00:00Z"); if (isNaN(+d)) return iso; d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); }
@@ -61,6 +63,7 @@ function parseICS(text: string): IcsEvent[] {
     const dts = body.match(/\nDTSTART[^:\n]*:([0-9TZ]+)/i), dte = body.match(/\nDTEND[^:\n]*:([0-9TZ]+)/i);
     const summary = get(/\nSUMMARY:(.*)/i), desc = get(/\nDESCRIPTION:(.*)/i), loc = get(/\nLOCATION:(.*)/i);
     const orgCn = get(/\nORGANIZER[^:\n]*?CN=([^:\n]*):/i);
+    const uid = get(/\nUID:(.*)/i);
     // Date: preferisci il "Period : gg/mm/aaaa - gg/mm/aaaa" della DESCRIPTION (check-out reale);
     // altrimenti DTSTART e DTEND+1 (in Octorate DTEND è l'ultima notte, non la partenza).
     const per = desc.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})\s*[-–]\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/);
@@ -74,7 +77,7 @@ function parseICS(text: string): IcsEvent[] {
     if (!guest && !blocked) { guest = summary.split(/\s*\|\s*|\s+Camera\b/i)[0].trim(); }
     const totm = desc.match(/Total\s*:?\s*€?\s*([0-9]+(?:[.,][0-9]+)?)/i) || (desc + " " + summary).match(/€\s?([0-9.,]+)/);
     const pax = summary.match(/(\d+)\s*pax/i);
-    out.push({ guest: blocked ? "" : guest, checkIn: ci, checkOut: co, blocked, channelText: summary, note: desc || summary, room: loc, total: totm ? toNum(totm[1]) : undefined, adults: pax ? +pax[1] : undefined });
+    out.push({ uid, guest: blocked ? "" : guest, checkIn: ci, checkOut: co, blocked, channelText: summary, note: desc || summary, room: loc, total: totm ? toNum(totm[1]) : undefined, adults: pax ? +pax[1] : undefined });
   }
   return out;
 }
@@ -96,7 +99,7 @@ const FIELDS: { key: string; label: string; req?: boolean; kw: RegExp }[] = [
 export default function ImportaPage() {
   const router = useRouter();
   const { t } = useLang();
-  const { structures, roomTypes, units, bookings, activeStructureId, addGuest, addBooking, addRoomType, addUnit } = useData();
+  const { structures, roomTypes, units, bookings, activeStructureId, addGuest, addBooking, updateBooking, deleteBooking, addRoomType, addUnit } = useData();
   const [rows, setRows] = useState<string[][]>([]);
   const [mode, setMode] = useState<"csv" | "ics">("csv");
   const [events, setEvents] = useState<IcsEvent[]>([]);
@@ -104,6 +107,7 @@ export default function ImportaPage() {
   const [map, setMap] = useState<Record<string, number>>({});
   const [structureId, setStructureId] = useState<string>(() => (activeStructureId !== "all" ? activeStructureId : structures[0]?.id ?? ""));
   const [includeBlocked, setIncludeBlocked] = useState(false);
+  const [replacePrev, setReplacePrev] = useState(true);
   const [roomMap, setRoomMap] = useState<Record<string, string>>({}); // nome camera ICS -> id tipologia (o "__new__")
   const [done, setDone] = useState<number | null>(null);
   const [err, setErr] = useState("");
@@ -117,8 +121,8 @@ export default function ImportaPage() {
       const next = { ...prev }; let changed = false;
       icsRooms.forEach((r) => {
         if (next[r] === undefined) {
-          const s = r.toLowerCase();
-          const hit = sRooms.find((rt) => s === rt.name.toLowerCase()) || sRooms.find((rt) => s.includes(rt.name.toLowerCase()) || rt.name.toLowerCase().includes(s));
+          const sn = normName(r);
+          const hit = sRooms.find((rt) => normName(rt.name) === sn) || sRooms.find((rt) => { const rn = normName(rt.name); return sn.includes(rn) || rn.includes(sn); });
           next[r] = hit ? hit.id : "__new__"; changed = true;
         }
       });
@@ -156,6 +160,10 @@ export default function ImportaPage() {
   const runImportICS = () => {
     const list = (includeBlocked ? events : events.filter((e) => !e.blocked))
       .filter((e) => e.checkIn && e.checkOut).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+    // Sostituisci import precedenti: elimina le prenotazioni già importate (per non duplicarle).
+    const del = replacePrev ? bookings.filter((b) => b.structureId === structureId && (b.extId || (b.note || "").includes("Importato da"))) : [];
+    const delIds = new Set(del.map((b) => b.id));
+    del.forEach((b) => deleteBooking(b.id));
     const fallbackName = t("Camere importate");
     // Risolve la tipologia per una camera ICS: usa la mappatura scelta, oppure crea la nuova (una sola volta).
     const typeCache: Record<string, string> = {};
@@ -172,7 +180,7 @@ export default function ImportaPage() {
     // per le sovrapposizioni, così nessuna prenotazione risulta in overbooking.
     const slots: Record<string, { unitId: string; last: string }[]> = {};
     units.filter((u) => u.structureId === structureId).forEach((u) => {
-      const last = bookings.filter((b) => b.unitId === u.id).reduce((mx, b) => (b.checkOut > mx ? b.checkOut : mx), "0000-00-00");
+      const last = bookings.filter((b) => b.unitId === u.id && !delIds.has(b.id)).reduce((mx, b) => (b.checkOut > mx ? b.checkOut : mx), "0000-00-00");
       (slots[u.roomTypeId] ||= []).push({ unitId: u.id, last });
     });
     const assignUnit = (typeId: string, ci: string, co: string) => {
@@ -181,21 +189,30 @@ export default function ImportaPage() {
       if (!s) { const id = addUnit({ structureId, roomTypeId: typeId, name: `${t("Camera")} ${arr.length + 1}` }); s = { unitId: id, last: "0000-00-00" }; arr.push(s); }
       s.last = co; return s.unitId;
     };
-    let n = 0;
+    // Import idempotente: le prenotazioni già importate (stesso UID Octorate) vengono AGGIORNATE, non duplicate.
+    const byExt = new Map<string, string>();
+    if (!replacePrev) bookings.forEach((b) => { if (b.extId && !delIds.has(b.id)) byExt.set(b.extId, b.id); });
+    let created = 0, updated = 0;
     list.forEach((e) => {
       const typeId = resolveType(e.room);
+      const patch = {
+        roomTypeId: typeId,
+        channel: e.blocked ? ("blocked" as const) : toChannel(e.channelText),
+        checkIn: e.checkIn, checkOut: e.checkOut, adults: Math.max(1, Math.round(e.adults ?? 2)),
+        ...(e.total !== undefined ? { total: e.total } : {}),
+      };
+      if (e.uid && byExt.has(e.uid)) { updateBooking(byExt.get(e.uid)!, patch); updated++; return; }
       const unitId = assignUnit(typeId, e.checkIn, e.checkOut);
       const guestId = addGuest({ fullName: e.guest || (e.blocked ? t("Non disponibile") : t("Ospite (da ICS)")) });
       addBooking({
-        structureId, roomTypeId: typeId, unitId, guestId,
-        channel: e.blocked ? "blocked" : toChannel(e.channelText), status: "confirmed",
-        checkIn: e.checkIn, checkOut: e.checkOut, adults: Math.max(1, Math.round(e.adults ?? 2)), children: 0,
-        ...(e.total !== undefined ? { total: e.total } : {}),
+        structureId, unitId, guestId, status: "confirmed", children: 0, ...patch,
+        extId: e.uid || undefined,
         note: (t("Importato da ICS") + (e.note ? " · " + e.note : "")).slice(0, 280),
       });
-      n++;
+      created++;
     });
-    setDone(n);
+    setDone(created);
+    if (updated) setErr(`${updated} ${t("prenotazioni già presenti aggiornate (nessun duplicato).")}`);
   };
 
   const val = (r: string[], key: string) => { const i = map[key]; return i === undefined || i < 0 ? "" : (r[i] ?? "").trim(); };
@@ -325,7 +342,8 @@ export default function ImportaPage() {
                 const imp = includeBlocked ? events.length : resv;
                 return (<>
                   <p className="mt-3 text-xs text-faint">{t("Trovati")} {events.length} {t("eventi")}: <b className="text-dim">{resv}</b> {t("prenotazioni")}, <b className="text-dim">{blk}</b> {t("blocchi (fuori servizio)")}.</p>
-                  <label className="mt-3 flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={includeBlocked} onChange={(e) => setIncludeBlocked(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Importa anche i periodi bloccati (fuori servizio)")}</label>
+                  <label className="mt-3 flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={replacePrev} onChange={(e) => setReplacePrev(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Sostituisci le prenotazioni importate in precedenza (evita duplicati)")}</label>
+                  <label className="mt-2 flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={includeBlocked} onChange={(e) => setIncludeBlocked(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Importa anche i periodi bloccati (fuori servizio)")}</label>
                   <button onClick={runImportICS} disabled={!structureId || imp === 0} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-40">{t("Importa")} {imp} {t("prenotazioni")}</button>
                 </>);
               })()}

@@ -254,6 +254,7 @@ export interface Booking {
   childAges?: number[]; // età dei bambini (per esenzioni tassa di soggiorno: es. under 14 esenti)
   total?: number; // € (soggiorno, per il prototipo)
   note?: string;
+  extId?: string; // id esterno (es. UID iCal/Octorate) per import idempotente
   cleaningFee?: number; // € pulizia finale
   cityTaxExempt?: boolean; // esente tassa di soggiorno
   cityTaxPaid?: boolean; // tassa di soggiorno incassata
