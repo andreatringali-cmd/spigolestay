@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
@@ -43,7 +43,6 @@ export default function CamerePage() {
   const [roomModal, setRoomModal] = useState<{ structureId: string; unit?: Unit } | null>(null);
   const [sortKey, setSortKey] = useState<string>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [groupByType, setGroupByType] = useState(false);
   const toggleSort = (k: string) => { if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc")); else { setSortKey(k); setSortDir("asc"); } };
   const sortUnits = (list: Unit[], tps: typeof roomTypes) => {
     const rtOf = (u: Unit) => tps.find((x) => x.id === u.roomTypeId);
@@ -119,14 +118,14 @@ export default function CamerePage() {
           const sUnits = units.filter((u) => u.structureId === s.id);
           const beds = sUnits.reduce((a, u) => a + (types.find((t) => t.id === u.roomTypeId)?.beds ?? 0), 0);
           const oos = sUnits.filter((u) => u.outOfService).length;
-          const rowOf = (u: Unit) => {
+          const rowOf = (u: Unit, showType = false) => {
             const i = types.findIndex((tt) => tt.id === u.roomTypeId);
             const rt = types[i];
             const color = rt ? typeColor(rt, i) : "var(--line)";
             return (
               <tr key={u.id} id={`unit-${u.id}`} onClick={() => setRoomModal({ structureId: s.id, unit: u })} className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${highlight === u.id ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : ""}`}>
                 <td className="px-3 py-2.5"><div className="flex items-center gap-2"><span className="h-6 w-1.5 rounded-full" style={{ backgroundColor: color }} /><span className={`font-medium ${u.outOfService ? "text-faint line-through" : "text-txt"}`}>{u.name}</span>{u.code && <span className="font-mono text-[11px] text-faint">#{u.code}</span>}</div></td>
-                <td className="px-3 py-2.5 text-dim">{rt?.name ?? "—"}</td>
+                {showType && <td className="px-3 py-2.5 text-dim">{rt?.name ?? "—"}</td>}
                 <td className="px-3 py-2.5 text-dim">{u.floor || "—"}</td>
                 <td className="px-3 py-2.5 text-dim">{u.view || "—"}</td>
                 <td className="px-3 py-2.5 text-dim">{rt?.beds ?? "—"}</td>
@@ -182,37 +181,71 @@ export default function CamerePage() {
                 {types.length === 0 && <div className="rounded-xl border border-dashed border-line p-4 text-sm text-faint">{t("Nessuna tipologia. Aggiungine una col pulsante “+ Tipologia”.")}</div>}
               </div>
 
-              {/* Camere */}
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <SectionTitle>{t("Camere")}</SectionTitle>
-                <label className="flex items-center gap-2 text-xs font-medium text-dim"><input type="checkbox" checked={groupByType} onChange={(e) => setGroupByType(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Raggruppa per tipologia")}</label>
-              </div>
-              <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
-                <table className="w-full min-w-[640px] text-sm">
-                  <thead>
-                    <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
-                      <SortTh k="name" label={t("Camera")} />
-                      <SortTh k="type" label={t("Tipologia")} />
-                      <SortTh k="floor" label={t("Piano")} />
-                      <SortTh k="view" label={t("Vista")} />
-                      <SortTh k="beds" label={t("Posti")} />
-                      <SortTh k="status" label={t("Stato")} />
-                      <th className="px-3 py-2 font-semibold"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sUnits.length === 0 && <tr><td colSpan={7} className="px-3 py-4 text-center text-sm text-faint">{t("Nessuna camera. Aggiungine una col pulsante “+ Camera”.")}</td></tr>}
-                    {groupByType
-                      ? types.map((rt, i) => { const g = sortUnits(sUnits.filter((u) => u.roomTypeId === rt.id), types); if (!g.length) return null; return (
-                          <Fragment key={rt.id}>
-                            <tr className="bg-[color:var(--wash)]"><td colSpan={7} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim"><span className="mr-2 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: typeColor(rt, i) }} />{rt.name} · {g.length}</td></tr>
-                            {g.map(rowOf)}
-                          </Fragment>); })
-                      : sortUnits(sUnits, types).map(rowOf)}
-                    {groupByType && (() => { const orphans = sUnits.filter((u) => !types.some((rt) => rt.id === u.roomTypeId)); return orphans.length ? (<Fragment><tr className="bg-[color:var(--wash)]"><td colSpan={7} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">{t("Altre")}</td></tr>{sortUnits(orphans, types).map(rowOf)}</Fragment>) : null; })()}
-                  </tbody>
-                </table>
-              </div>
+              {/* Camere — un box separato per ogni tipologia */}
+              <SectionTitle>{t("Camere")}</SectionTitle>
+              {sUnits.length === 0 ? (
+                <div className="mt-2 rounded-xl border border-dashed border-line p-4 text-sm text-faint">{t("Nessuna camera. Aggiungine una col pulsante “+ Camera”.")}</div>
+              ) : (
+                <div className="mt-2 flex flex-col gap-4">
+                  {types.map((rt, i) => {
+                    const g = sortUnits(sUnits.filter((u) => u.roomTypeId === rt.id), types);
+                    if (!g.length) return null;
+                    const color = typeColor(rt, i);
+                    return (
+                      <div key={rt.id} className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2.5" style={{ borderLeft: `4px solid ${color}` }}>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+                            <span className="font-display text-base font-bold text-txt">{rt.name}</span>
+                            <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-medium text-dim">{g.length} {g.length === 1 ? t("camera") : t("camere")}</span>
+                            <span className="text-[11px] text-faint">{rt.beds} {t("letti")} · {eur(rt.basePrice)}{t("/notte")}</span>
+                          </div>
+                          <button onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="text-[11px] font-medium text-focus hover:underline">{t("Apri tipologia")} →</button>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[560px] text-sm">
+                            <thead>
+                              <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                                <SortTh k="name" label={t("Camera")} />
+                                <SortTh k="floor" label={t("Piano")} />
+                                <SortTh k="view" label={t("Vista")} />
+                                <SortTh k="beds" label={t("Posti")} />
+                                <SortTh k="status" label={t("Stato")} />
+                                <th className="px-3 py-2 font-semibold"></th>
+                              </tr>
+                            </thead>
+                            <tbody>{g.map((u) => rowOf(u))}</tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {(() => {
+                    const orphans = sortUnits(sUnits.filter((u) => !types.some((rt) => rt.id === u.roomTypeId)), types);
+                    if (!orphans.length) return null;
+                    return (
+                      <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+                        <div className="border-b border-line px-3 py-2.5 text-sm font-semibold text-dim">{t("Altre camere (senza tipologia)")}</div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[560px] text-sm">
+                            <thead>
+                              <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                                <SortTh k="name" label={t("Camera")} />
+                                <SortTh k="floor" label={t("Piano")} />
+                                <SortTh k="view" label={t("Vista")} />
+                                <SortTh k="beds" label={t("Posti")} />
+                                <SortTh k="status" label={t("Stato")} />
+                                <th className="px-3 py-2 font-semibold"></th>
+                              </tr>
+                            </thead>
+                            <tbody>{orphans.map((u) => rowOf(u))}</tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           );
         })}
