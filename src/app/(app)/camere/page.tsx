@@ -10,6 +10,7 @@ import { AV_COLORS } from "@/lib/users";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useAccess } from "@/lib/access";
 import { ROOMS_PER_STRUCT, ROOM_OVERAGE } from "@/lib/plan";
 import { useLang } from "@/lib/i18n";
 
@@ -36,7 +37,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 export default function CamerePage() {
   const router = useRouter();
   const { t } = useLang();
-  const { structures, roomTypes, units, activeStructureId } = useData();
+  const { structures, roomTypes, units, activeStructureId, updateUnit } = useData();
   const ask = useConfirm();
   const [localS, setLocalS] = useState("all");
   const [highlight, setHighlight] = useState<string | null>(null);
@@ -47,6 +48,21 @@ export default function CamerePage() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   useEffect(() => { try { const r = localStorage.getItem(COLLAPSE_KEY); if (r) setCollapsed(new Set(JSON.parse(r))); } catch {} }, []);
   const toggleCollapse = (id: string) => setCollapsed((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...n])); } catch {} return n; });
+  // Selezione multipla camere (modifica in blocco)
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const toggleSel = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const setManySel = (ids: string[], on: boolean) => setSel((p) => { const n = new Set(p); ids.forEach((id) => (on ? n.add(id) : n.delete(id))); return n; });
+  const clearSel = () => setSel(new Set());
+  const [bulkFloor, setBulkFloor] = useState("");
+  const [bulkView, setBulkView] = useState("");
+  const applyBulk = () => {
+    const patch: Partial<Unit> = {};
+    if (bulkFloor.trim()) patch.floor = bulkFloor.trim();
+    if (bulkView) patch.view = bulkView;
+    if (Object.keys(patch).length === 0) return;
+    sel.forEach((id) => updateUnit(id, patch));
+    clearSel(); setBulkFloor(""); setBulkView("");
+  };
   const toggleSort = (k: string) => { if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc")); else { setSortKey(k); setSortDir("asc"); } };
   const sortUnits = (list: Unit[], tps: typeof roomTypes) => {
     const rtOf = (u: Unit) => tps.find((x) => x.id === u.roomTypeId);
@@ -127,7 +143,8 @@ export default function CamerePage() {
             const rt = types[i];
             const color = rt ? typeColor(rt, i) : "var(--line)";
             return (
-              <tr key={u.id} id={`unit-${u.id}`} onClick={() => setRoomModal({ structureId: s.id, unit: u })} className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${highlight === u.id ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : ""}`}>
+              <tr key={u.id} id={`unit-${u.id}`} onClick={() => setRoomModal({ structureId: s.id, unit: u })} className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${sel.has(u.id) ? "bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)]" : highlight === u.id ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : ""}`}>
+                <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel.has(u.id)} onChange={() => toggleSel(u.id)} className="h-4 w-4 accent-[color:var(--focus)]" /></td>
                 <td className="px-3 py-2.5"><div className="flex items-center gap-2"><span className="h-6 w-1.5 rounded-full" style={{ backgroundColor: color }} /><span className={`font-medium ${u.outOfService ? "text-faint line-through" : "text-txt"}`}>{u.name}</span>{u.code && <span className="font-mono text-[11px] text-faint">#{u.code}</span>}</div></td>
                 {showType && <td className="px-3 py-2.5 text-dim">{rt?.name ?? "—"}</td>}
                 <td className="px-3 py-2.5 text-dim">{u.floor || "—"}</td>
@@ -213,6 +230,7 @@ export default function CamerePage() {
                             <table className="w-full min-w-[560px] text-sm">
                               <thead>
                                 <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                                  <th className="px-2 py-2"><input type="checkbox" checked={g.length > 0 && g.every((u) => sel.has(u.id))} onChange={(e) => setManySel(g.map((u) => u.id), e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" title={t("Seleziona tutte")} /></th>
                                   <SortTh k="name" label={t("Camera")} />
                                   <SortTh k="floor" label={t("Piano")} />
                                   <SortTh k="view" label={t("Vista")} />
@@ -238,6 +256,7 @@ export default function CamerePage() {
                           <table className="w-full min-w-[560px] text-sm">
                             <thead>
                               <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                                <th className="px-2 py-2"><input type="checkbox" checked={orphans.length > 0 && orphans.every((u) => sel.has(u.id))} onChange={(e) => setManySel(orphans.map((u) => u.id), e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" title={t("Seleziona tutte")} /></th>
                                 <SortTh k="name" label={t("Camera")} />
                                 <SortTh k="floor" label={t("Piano")} />
                                 <SortTh k="view" label={t("Vista")} />
@@ -259,15 +278,32 @@ export default function CamerePage() {
         })}
       </div>
 
+      {sel.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 rounded-xl border border-line bg-surface p-3 shadow-2xl">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-sm font-semibold text-txt">{sel.size} {sel.size === 1 ? t("camera selezionata") : t("camere selezionate")}</span>
+            <label className="flex items-center gap-1.5 text-xs text-dim">{t("Piano")}<input value={bulkFloor} onChange={(e) => setBulkFloor(e.target.value)} placeholder={t("Terra / 1° / 2°")} className="w-28 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
+            <label className="flex items-center gap-1.5 text-xs text-dim">{t("Vista")}<select value={bulkView} onChange={(e) => setBulkView(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus"><option value="">—</option>{VIEW_OPTIONS.map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
+            <button onClick={applyBulk} disabled={!bulkFloor.trim() && !bulkView} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Applica a")} {sel.size}</button>
+            <button onClick={() => { clearSel(); setBulkFloor(""); setBulkView(""); }} className="ml-auto rounded-lg border border-line px-3 py-1.5 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
+          </div>
+          <p className="mt-1.5 text-[11px] text-faint">{t("Vengono aggiornati solo i campi compilati (piano e/o vista) sulle camere selezionate.")}</p>
+        </div>
+      )}
+
       {roomModal && <RoomModal structureId={roomModal.structureId} unit={roomModal.unit} onClose={() => setRoomModal(null)} />}
     </div>
   );
 }
 
 function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?: Unit; onClose: () => void }) {
-  const { roomTypes, addUnit, updateUnit, deleteUnit } = useData();
+  const { roomTypes, addUnit, updateUnit, deleteUnit, setActiveStructure } = useData();
   const { t } = useLang();
   const ask = useConfirm();
+  const router = useRouter();
+  const { moduleOn } = useAccess();
+  const hasGuide = moduleOn("concierge");
+  const openGuide = () => { setActiveStructure(structureId); onClose(); router.push("/guida-ospiti"); };
   const types = roomTypes.filter((rt) => rt.structureId === structureId);
   const [f, setF] = useState<Partial<Unit>>(() => unit ?? { name: "", roomTypeId: types[0]?.id ?? "", floor: "", view: "", code: "", outOfService: false });
   const set = <K extends keyof Unit>(k: K, v: Unit[K]) => setF((p) => ({ ...p, [k]: v }));
@@ -290,6 +326,17 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
         <label className={lbl}>{t("Vista")}<select value={f.view ?? ""} onChange={(e) => set("view", e.target.value)} className={`${inp} mt-1`}><option value="">—</option>{VIEW_OPTIONS.map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
       </div>
       <label className={`${lbl} mt-3`}>{t("Codice/istruzioni di accesso")}<input value={f.accessInfo ?? ""} onChange={(e) => set("accessInfo", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. keybox 4471, porta a sinistra")} /></label>
+      {hasGuide ? (
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-paper p-2.5">
+          <span className="text-[11px] text-dim">{t("Questi codici e istruzioni possono comparire nella guida ospiti della camera.")}</span>
+          <button type="button" onClick={openGuide} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("Apri la guida")} →</button>
+        </div>
+      ) : (
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2.5" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 6%, transparent)" }}>
+          <span className="text-[11px] text-dim">🔒 {t("Con la Guida ospiti, codici e istruzioni della camera compaiono in una pagina web per l'ospite.")}</span>
+          <button type="button" onClick={() => { onClose(); router.push("/abbonamento"); }} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("Aggiungi il servizio")} →</button>
+        </div>
+      )}
       <label className={`${lbl} mt-3`}>{t("Note interne")}<textarea value={f.notes ?? ""} onChange={(e) => set("notes", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={t("Manutenzioni, particolarità…")} /></label>
       <div className="mt-3 rounded-lg border border-line p-3">
         <div className="flex items-center justify-between"><span className="text-sm font-medium text-txt">{t("Fuori servizio")}</span><Toggle on={!!f.outOfService} onClick={() => set("outOfService", !f.outOfService)} color="var(--warn)" /></div>
