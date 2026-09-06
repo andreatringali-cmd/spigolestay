@@ -42,9 +42,11 @@ export default function StrutturePage() {
           <thead>
             <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
               <th className="px-3 py-2 font-semibold">{t("Struttura")}</th>
+              <th className="px-3 py-2 font-semibold">{t("Città")}</th>
               <th className="px-3 py-2 font-semibold">{t("Tipo")}</th>
               <th className="px-3 py-2 font-semibold">{t("Gruppo")}</th>
               <th className="px-3 py-2 font-semibold">{t("Camere")}</th>
+              <th className="px-3 py-2 font-semibold">{t("Posti letto")}</th>
               <th className="px-3 py-2 font-semibold">CIN</th>
               <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
               <th className="px-3 py-2 font-semibold"></th>
@@ -52,8 +54,10 @@ export default function StrutturePage() {
           </thead>
           <tbody>
             {structures.map((s) => {
-              const nCamere = units.filter((u) => u.structureId === s.id).length;
+              const sUnits = units.filter((u) => u.structureId === s.id);
+              const nCamere = sUnits.length;
               const nTipologie = roomTypes.filter((rt) => rt.structureId === s.id).length;
+              const posti = sUnits.reduce((a, u) => a + (roomTypes.find((rt) => rt.id === u.roomTypeId)?.beds ?? 0), 0);
               const color = s.photoColor ?? AV_COLORS[1];
               return (
                 <tr key={s.id} onClick={() => router.push(`/strutture/${s.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
@@ -66,9 +70,11 @@ export default function StrutturePage() {
                       </div>
                     </div>
                   </td>
+                  <td className="px-3 py-2.5 text-dim">{s.city || <span className="text-faint">—</span>}</td>
                   <td className="px-3 py-2.5"><span className="rounded-full bg-wash px-2 py-0.5 text-xs font-semibold text-dim">{s.type ?? "—"}</span></td>
                   <td className="px-3 py-2.5 text-dim">{s.groupName}</td>
                   <td className="px-3 py-2.5 text-dim"><span className="text-txt">{nCamere}</span> <span className="text-faint">· {nTipologie} {t("tipol.")}</span></td>
+                  <td className="px-3 py-2.5 text-dim">{posti}</td>
                   <td className="px-3 py-2.5">
                     {s.cin ? <span className="font-mono text-xs text-dim">{s.cin}</span> : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("mancante")}</span>}
                   </td>

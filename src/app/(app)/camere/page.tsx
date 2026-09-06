@@ -153,6 +153,7 @@ export default function CamerePage() {
                 <td className="px-3 py-2.5 text-dim">{u.view || "—"}</td>
                 <td className="px-3 py-2.5 text-dim">{rt?.beds ?? "—"}</td>
                 <td className="px-3 py-2.5 max-w-[180px] truncate text-xs text-dim" title={u.accessInfo || ""}>{u.accessInfo || <span className="text-faint">—</span>}</td>
+                <td className="px-3 py-2.5 max-w-[180px] truncate text-xs text-dim" title={u.notes || ""}>{u.notes || <span className="text-faint">—</span>}</td>
                 <td className="px-3 py-2.5">{u.outOfService ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("Fuori servizio")}</span> : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("In servizio")}</span>}</td>
                 <td className="px-3 py-2.5 text-right text-faint">›</td>
               </tr>
@@ -230,7 +231,7 @@ export default function CamerePage() {
                         </div>
                         {open && (
                           <div className="overflow-x-auto">
-                            <table className="w-full min-w-[720px] text-sm">
+                            <table className="w-full min-w-[820px] text-sm">
                               <thead>
                                 <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
                                   <th className="px-2 py-2"><input type="checkbox" checked={g.length > 0 && g.every((u) => sel.has(u.id))} onChange={(e) => setManySel(g.map((u) => u.id), e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" title={t("Seleziona tutte")} /></th>
@@ -240,6 +241,7 @@ export default function CamerePage() {
                                   <SortTh k="view" label={t("Vista")} />
                                   <SortTh k="beds" label={t("Posti")} />
                                   <th className="px-3 py-2 font-semibold">{t("Accesso")}</th>
+                                  <th className="px-3 py-2 font-semibold">{t("Note")}</th>
                                   <SortTh k="status" label={t("Stato")} />
                                   <th className="px-3 py-2 font-semibold"></th>
                                 </tr>
@@ -268,6 +270,7 @@ export default function CamerePage() {
                                 <SortTh k="view" label={t("Vista")} />
                                 <SortTh k="beds" label={t("Posti")} />
                                 <th className="px-3 py-2 font-semibold">{t("Accesso")}</th>
+                                <th className="px-3 py-2 font-semibold">{t("Note")}</th>
                                 <SortTh k="status" label={t("Stato")} />
                                 <th className="px-3 py-2 font-semibold"></th>
                               </tr>
