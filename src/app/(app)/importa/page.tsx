@@ -194,7 +194,7 @@ export default function ImportaPage() {
 
   return (
     <div>
-      <PageHeader title={t("Importa prenotazioni")} subtitle={t("Carica il CSV esportato da Octorate (o da un altro gestionale) e mappa le colonne")} />
+      <PageHeader title={t("Importa prenotazioni")} subtitle={t("Carica il file ICS o CSV esportato da Octorate (o da un altro gestionale)")} />
 
       {done !== null ? (
         <Card>
@@ -223,8 +223,8 @@ export default function ImportaPage() {
                     {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </label>
-                <label><span className="mb-1 block text-xs font-medium text-dim">{t("File CSV")}</span>
-                  <input type="file" accept=".csv,text/csv,text/plain" onChange={(e) => onFile(e.target.files?.[0])} className="block w-full text-sm text-dim file:mr-3 file:rounded-lg file:border-0 file:bg-focus file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:opacity-90" />
+                <label><span className="mb-1 block text-xs font-medium text-dim">{t("File CSV o ICS")}</span>
+                  <input type="file" accept=".csv,.ics,text/csv,text/calendar,text/plain" onChange={(e) => onFile(e.target.files?.[0])} className="block w-full text-sm text-dim file:mr-3 file:rounded-lg file:border-0 file:bg-focus file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:opacity-90" />
                 </label>
               </div>
             )}
