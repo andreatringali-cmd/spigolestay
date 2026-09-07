@@ -75,8 +75,9 @@ function Site() {
   const T = (s: string) => (lang === "it" ? s : (SITE_DICT[s]?.[lang] ?? s));
   const [nl, setNl] = useState({ firstName: "", lastName: "", email: "", phone: "" });
   const [nlDone, setNlDone] = useState(false);
+  const nlValid = !!nl.email.trim() && !!nl.phone.trim() && (!!nl.firstName.trim() || !!nl.lastName.trim());
   const nlSubmit = () => {
-    if (!nl.email.trim() || (!nl.firstName.trim() && !nl.lastName.trim())) return;
+    if (!nlValid) return;
     addGuest({ firstName: nl.firstName.trim() || undefined, lastName: nl.lastName.trim() || undefined, email: nl.email.trim() || undefined, phone: nl.phone.trim() || undefined });
     setNlDone(true); setNl({ firstName: "", lastName: "", email: "", phone: "" });
   };
@@ -329,8 +330,8 @@ function Site() {
                 <input value={nl.firstName} onChange={(e) => setNl({ ...nl, firstName: e.target.value })} placeholder={T("Nome")} className={field} />
                 <input value={nl.lastName} onChange={(e) => setNl({ ...nl, lastName: e.target.value })} placeholder={T("Cognome")} className={field} />
                 <input value={nl.email} onChange={(e) => setNl({ ...nl, email: e.target.value })} placeholder="Email *" className={`${field} col-span-2`} />
-                <input value={nl.phone} onChange={(e) => setNl({ ...nl, phone: e.target.value })} placeholder={T("Telefono")} className={`${field} col-span-2`} />
-                <button onClick={nlSubmit} disabled={!nl.email.trim() || (!nl.firstName.trim() && !nl.lastName.trim())} className="col-span-2 rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: accent }}>{T("Iscrivimi")}</button>
+                <input value={nl.phone} onChange={(e) => setNl({ ...nl, phone: e.target.value })} placeholder={`${T("Telefono")} *`} className={`${field} col-span-2`} />
+                <button onClick={nlSubmit} disabled={!nlValid} className="col-span-2 rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: accent }}>{T("Iscrivimi")}</button>
               </div>
             )}
           </div>
