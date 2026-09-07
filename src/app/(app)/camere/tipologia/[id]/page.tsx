@@ -30,7 +30,7 @@ export default function TipologiaSchedaPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const sp = useSearchParams();
-  const { structures, roomTypes, units, addRoomType, updateRoomType, deleteRoomType } = useData();
+  const { structures, roomTypes, units, bookings, addRoomType, updateRoomType, deleteRoomType, addUnit, deleteUnit } = useData();
   const { t } = useLang();
   const ask = useConfirm();
   const isNew = params.id === "nuovo";
@@ -63,6 +63,41 @@ export default function TipologiaSchedaPage() {
   };
   const remove = async () => { if (existing && (await ask({ title: t("Elimina tipologia"), message: `${t("Eliminare la tipologia")} "${existing.name}" ${t("e le sue")} ${nUnits} ${t("camere?")}`, danger: true, confirmLabel: t("Elimina") }))) { deleteRoomType(existing.id); router.push("/camere"); } };
 
+  // Imposta il numero esatto di camere della tipologia: crea o rimuove le unità per arrivare al totale.
+  const [targetRooms, setTargetRooms] = useState<string>(String(nUnits || 1));
+  const [roomMsg, setRoomMsg] = useState<string | null>(null);
+  const numFromName = (n: string) => { const m = n.match(/(\d+)\s*$/); return m ? Number(m[1]) : 0; };
+  const applyRoomCount = async () => {
+    if (!existing) return;
+    const target = Math.max(0, Number(targetRooms) || 0);
+    const mine = units.filter((u) => u.roomTypeId === existing.id);
+    const cur = mine.length;
+    setRoomMsg(null);
+    if (target === cur) { setRoomMsg(t("Nessuna modifica: hai già questo numero di camere.")); return; }
+    if (target > cur) {
+      const add = target - cur;
+      let maxN = mine.reduce((mx, u) => Math.max(mx, numFromName(u.name)), 0);
+      if (maxN < cur) maxN = cur;
+      for (let i = 1; i <= add; i++) addUnit({ structureId: existing.structureId, roomTypeId: existing.id, name: `${existing.name} ${maxN + i}` });
+      setRoomMsg(`${t("Aggiunte")} ${add} ${t("camere")} · ${t("totale")} ${target}.`);
+    } else {
+      const toRemove = cur - target;
+      const removable = mine.filter((u) => !bookings.some((b) => b.unitId === u.id && b.status !== "cancelled"));
+      const victims = removable.slice(-toRemove);
+      const blocked = toRemove - victims.length;
+      const ok = await ask({
+        title: t("Riduci camere"),
+        message: blocked > 0
+          ? `${t("Posso rimuovere")} ${victims.length} ${t("camere su")} ${toRemove}: ${t("le altre hanno prenotazioni e restano.")} ${t("Procedo?")}`
+          : `${t("Rimuovere")} ${toRemove} ${t("camere di")} ${existing.name}?`,
+        danger: true, confirmLabel: t("Rimuovi"),
+      });
+      if (!ok) return;
+      victims.forEach((u) => deleteUnit(u.id));
+      setRoomMsg(`${t("Rimosse")} ${victims.length} ${t("camere")}.${blocked > 0 ? ` ${blocked} ${t("non rimosse (prenotazioni attive).")}` : ""}`);
+    }
+  };
+
   return (
     <div>
       <PageHeader
@@ -90,6 +125,22 @@ export default function TipologiaSchedaPage() {
             <label className={lbl}>{t("Nome tipologia")} *<input value={f.name ?? ""} onChange={(e) => set("name", e.target.value)} list="rto" className={`${inp} mt-1`} placeholder={t("Es. Camera Matrimoniale Deluxe")} /><datalist id="rto">{ROOM_TYPE_OPTIONS.map((o) => <option key={o} value={o} />)}</datalist></label>
             <label className={`${lbl} mt-3`}>{t("Descrizione breve")}<textarea value={f.description ?? ""} onChange={(e) => set("description", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={t("Sintesi mostrata nei listini interni…")} /></label>
           </Card>
+
+          {!isNew && existing && (
+            <Card>
+              <SectionTitle>{t("Camere di questa tipologia")}</SectionTitle>
+              <p className="mb-2 text-xs text-dim">{t("Imposta quante camere hai di questa tipologia: le creo (o rimuovo) in automatico, senza aggiungerle una a una.")}</p>
+              <div className="flex flex-wrap items-end gap-3">
+                <label className={lbl}>{t("Numero camere")}
+                  <input type="number" min={0} value={targetRooms} onChange={(e) => setTargetRooms(e.target.value.replace(/\D/g, ""))} className={`${inp} mt-1 w-28`} />
+                </label>
+                <button type="button" onClick={applyRoomCount} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Applica")}</button>
+                <span className="text-xs text-faint">{t("Attualmente")}: <b className="text-dim">{nUnits}</b></span>
+              </div>
+              {roomMsg && <div className="mt-2 rounded-lg bg-wash px-3 py-2 text-xs text-dim">{roomMsg}</div>}
+              <p className="mt-2 text-[11px] text-faint">{t("Le camere vengono numerate; le rinomini poi da «Camere». Quelle con prenotazioni attive non vengono rimosse.")}</p>
+            </Card>
+          )}
 
           <Card>
             <SectionTitle>{t("Ospiti & capienza")}</SectionTitle>
