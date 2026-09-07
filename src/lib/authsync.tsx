@@ -135,8 +135,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         if (sessionStorage.getItem(flagKey) === uid) {
-          // Già reidratato in questa scheda: riprendi solo il push.
-          lastPushed.current = JSON.stringify(snapshot());
+          // Già reidratato in questa scheda: salva SUBITO lo stato corrente sul server, così ciò
+          // che è stato fatto prima di un reload (es. onboarding) viene salvato anche senza logout.
+          try {
+            const snap = snapshot();
+            await supabase!.from("app_state").upsert({ user_id: uid, data: snap, updated_at: new Date().toISOString() });
+            lastPushed.current = JSON.stringify(snap);
+          } catch { lastPushed.current = ""; }
           setHydrated(true);
           startPush(uid);
           return;
