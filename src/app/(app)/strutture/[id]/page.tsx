@@ -12,6 +12,7 @@ import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useAccess } from "@/lib/access";
+import { useAuth } from "@/lib/authsync";
 
 function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
   return (
@@ -40,6 +41,7 @@ export default function StrutturaSchedaPage() {
   const { structures, roomTypes, units, addStructure, updateStructure, setActiveStructure } = useData();
   const { t } = useLang();
   const { moduleOn, user } = useAccess();
+  const { user: authUser } = useAuth();
   const hasGuide = moduleOn("concierge"); // Guida ospiti personalizzata = modulo Web Concierge
   const openGuide = () => { if (!existing) return; setActiveStructure(existing.id); router.push("/guida-ospiti"); };
 
@@ -51,15 +53,18 @@ export default function StrutturaSchedaPage() {
   // Precompila i contatti dall'account (dati della registrazione) quando la struttura non li ha ancora.
   const prefilledRef = useRef(false);
   useEffect(() => {
-    if (isNew || prefilledRef.current || !user) return;
+    if (isNew || prefilledRef.current) return;
+    const acctEmail = authUser?.email || user?.email;
+    const acctPhone = (authUser?.user_metadata?.phone as string | undefined) || user?.phone;
+    if (!acctEmail && !acctPhone) return; // niente da precompilare finché l'account non è pronto
     prefilledRef.current = true;
     setF((p) => {
       const next = { ...p };
-      if (!next.email && user.email) next.email = user.email;
-      if (!next.phone && user.phone) next.phone = user.phone;
+      if (!next.email && acctEmail) next.email = acctEmail;
+      if (!next.phone && acctPhone) next.phone = acctPhone;
       return next;
     });
-  }, [isNew, user]);
+  }, [isNew, user, authUser]);
 
   const groups = Array.from(new Set(structures.map((s) => s.groupName)));
   const toggleArr = (k: "services" | "payMethods", x: string) => setF((p) => { const cur = p[k] ?? []; return { ...p, [k]: cur.includes(x) ? cur.filter((y) => y !== x) : [...cur, x] }; });

@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [show, setShow] = useState(false);
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -62,7 +63,7 @@ export default function LoginPage() {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: pwd,
-          options: { data: { full_name: name.trim() }, emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined },
+          options: { data: { full_name: name.trim(), phone: phone.trim() }, emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined },
         });
         if (error) { setErr(traduci(error.message)); return; }
         if (data.session) router.push("/");
@@ -162,7 +163,14 @@ export default function LoginPage() {
                 {mode === "signup" && (
                   <label className="mb-3 block">
                     <span className="mb-1 block text-[13px] font-medium text-[#4a4458]">Nome e cognome</span>
-                    <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Mario Rossi" className={fld} disabled={busy} />
+                    <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Mario Rossi" className={fld} disabled={busy} required />
+                  </label>
+                )}
+
+                {mode === "signup" && (
+                  <label className="mb-3 block">
+                    <span className="mb-1 block text-[13px] font-medium text-[#4a4458]">Telefono</span>
+                    <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+39 333 1234567" className={fld} disabled={busy} required />
                   </label>
                 )}
 
