@@ -108,6 +108,10 @@ export function importIcsEvents(events: IcsEvent[], opts: IcsImportOpts, ctx: Ic
   del.forEach((b) => deleteBooking(b.id));
 
   const fallbackName = t("Camere importate");
+  // Posti letto dedotti dal numero massimo di ospiti (pax) visto per quella camera nel file.
+  const maxPaxByRoom: Record<string, number> = {};
+  list.forEach((e) => { const k = (e.room || "").trim() || "—"; maxPaxByRoom[k] = Math.max(maxPaxByRoom[k] || 0, Math.round(e.adults ?? 0)); });
+  const bedsFor = (roomName: string) => Math.max(2, maxPaxByRoom[(roomName || "").trim() || "—"] || 2);
   const typeCache: Record<string, string> = {};
   const resolveType = (roomName: string) => {
     const key = (roomName || "").trim() || "—";
@@ -116,13 +120,13 @@ export function importIcsEvents(events: IcsEvent[], opts: IcsImportOpts, ctx: Ic
     const mkName = (roomName || "").replace(/\s*\|\s*/g, " ").trim().slice(0, 40) || fallbackName;
     let id: string;
     if (chosen && chosen !== "__new__") id = chosen;
-    else if (chosen === "__new__") id = addRoomType({ structureId, name: mkName, beds: 2, basePrice: 0 });
+    else if (chosen === "__new__") id = addRoomType({ structureId, name: mkName, beds: bedsFor(roomName), basePrice: 0 });
     else {
       // Nessuna scelta esplicita (sync automatica): abbina alla tipologia col nome più simile, altrimenti creala.
       const sn = normName(roomName);
       const sRooms = roomTypes.filter((rt) => rt.structureId === structureId);
       const hit = sn ? (sRooms.find((rt) => normName(rt.name) === sn) || sRooms.find((rt) => { const rn = normName(rt.name); return !!rn && (sn.includes(rn) || rn.includes(sn)); })) : undefined;
-      id = hit ? hit.id : addRoomType({ structureId, name: mkName, beds: 2, basePrice: 0 });
+      id = hit ? hit.id : addRoomType({ structureId, name: mkName, beds: bedsFor(roomName), basePrice: 0 });
     }
     typeCache[key] = id; return id;
   };
