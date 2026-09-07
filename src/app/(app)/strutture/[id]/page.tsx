@@ -39,7 +39,7 @@ export default function StrutturaSchedaPage() {
   const isNew = params.id === "nuovo";
   const { structures, roomTypes, units, addStructure, updateStructure, setActiveStructure } = useData();
   const { t } = useLang();
-  const { moduleOn } = useAccess();
+  const { moduleOn, user } = useAccess();
   const hasGuide = moduleOn("concierge"); // Guida ospiti personalizzata = modulo Web Concierge
   const openGuide = () => { if (!existing) return; setActiveStructure(existing.id); router.push("/guida-ospiti"); };
 
@@ -47,6 +47,19 @@ export default function StrutturaSchedaPage() {
   const [f, setF] = useState<Structure>(() => (isNew ? blankStructure() : { ...blankStructure(), ...existing }));
   const set = <K extends keyof Structure>(k: K, v: Structure[K]) => setF((p) => ({ ...p, [k]: v }));
   const num = (v: string) => (v === "" ? undefined : Number(v.replace(",", ".")));
+
+  // Precompila i contatti dall'account (dati della registrazione) quando la struttura non li ha ancora.
+  const prefilledRef = useRef(false);
+  useEffect(() => {
+    if (isNew || prefilledRef.current || !user) return;
+    prefilledRef.current = true;
+    setF((p) => {
+      const next = { ...p };
+      if (!next.email && user.email) next.email = user.email;
+      if (!next.phone && user.phone) next.phone = user.phone;
+      return next;
+    });
+  }, [isNew, user]);
 
   const groups = Array.from(new Set(structures.map((s) => s.groupName)));
   const toggleArr = (k: "services" | "payMethods", x: string) => setF((p) => { const cur = p[k] ?? []; return { ...p, [k]: cur.includes(x) ? cur.filter((y) => y !== x) : [...cur, x] }; });
@@ -213,7 +226,7 @@ export default function StrutturaSchedaPage() {
           <Card>
             <SectionTitle>{t("Contatti")}</SectionTitle>
             <div className="grid grid-cols-2 gap-3">
-              <label className={lbl}>{t("Email")}<input value={f.email ?? ""} readOnly disabled title={t("Per modificare questo campo contatta l'assistenza")} className={`${inp} mt-1 cursor-not-allowed bg-wash text-dim`} placeholder="info@…" /><span className="mt-1 block text-[11px] text-faint">{t("Email dell'account (inserita in registrazione). Per modificarla contatta l'assistenza.")}</span></label>
+              <label className={lbl}>{t("Email")}<input value={f.email ?? ""} onChange={(e) => set("email", e.target.value)} className={`${inp} mt-1`} placeholder="info@…" /><span className="mt-1 block text-[11px] text-faint">{t("Email di contatto della struttura (precompilata dall'account, modificabile).")}</span></label>
               <label className={lbl}>{t("Telefono")}<input value={f.phone ?? ""} onChange={(e) => set("phone", e.target.value)} className={`${inp} mt-1`} placeholder="+39…" /></label>
               <label className={lbl}>WhatsApp<input value={f.whatsapp ?? ""} onChange={(e) => set("whatsapp", e.target.value)} className={`${inp} mt-1`} placeholder="+39…" /></label>
               <label className={lbl}>{t("Telefono 2")}<input value={f.phone2 ?? ""} onChange={(e) => set("phone2", e.target.value)} className={`${inp} mt-1`} placeholder="+39…" /></label>
