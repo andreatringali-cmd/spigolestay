@@ -6,6 +6,7 @@ import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
+import { useAuth } from "@/lib/authsync";
 
 // ── Modello a 3 piani (prezzo fisso) + "Su misura" ──
 // Camere incluse: 6 per struttura del piano; oltre, overage per camera. Strutture: limite per piano.
@@ -45,6 +46,7 @@ const ADDON_PRICE: Record<string, number> = { cm: 0, booking: 0, cassa: 0, conci
 export default function AbbonamentoPage() {
   const { t } = useLang();
   const { units, structures } = useData();
+  const { user } = useAuth();
   const rooms = units.filter((u) => !u.outOfService).length;
   const nStruct = Math.max(1, structures.length);
 
@@ -63,6 +65,9 @@ export default function AbbonamentoPage() {
   const [active, setActive] = useState<Record<string, boolean>>({});
   const [pendingTier, setPendingTier] = useState<string | null>(null);
   const [pendingAddon, setPendingAddon] = useState<string | null>(null);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [stripeCustomer, setStripeCustomer] = useState<string | null>(null);
   useEffect(() => {
     try {
       const r = localStorage.getItem("spigolestay:plan") || localStorage.getItem("spigolestay:tier");
@@ -88,6 +93,61 @@ export default function AbbonamentoPage() {
     if (MODULES.find((m) => m.key === key)?.core || tier.includes.includes(key)) return;
     setActive((prev) => { const next = { ...prev, [key]: !prev[key] }; persistModules(next); return next; });
   };
+
+  // Stripe: cliente salvato + gestione del ritorno dal pagamento.
+  useEffect(() => {
+    try { const c = localStorage.getItem("spigolestay:stripecustomer"); if (c) setStripeCustomer(c); } catch {}
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const co = sp.get("checkout");
+      if (co === "success") {
+        const sid = sp.get("session_id");
+        if (sid) {
+          fetch(`/api/stripe/session?id=${encodeURIComponent(sid)}`)
+            .then((r) => r.json())
+            .then((d) => {
+              if (d?.plan) choose(d.plan);
+              if (d?.customerId) { try { localStorage.setItem("spigolestay:stripecustomer", d.customerId); } catch {} setStripeCustomer(d.customerId); }
+              setNotice("Abbonamento attivato ✅ Grazie! La prova di 7 giorni è iniziata.");
+            })
+            .catch(() => setNotice("Pagamento ricevuto. Aggiornamento in corso…"));
+        }
+        history.replaceState(null, "", window.location.pathname);
+      } else if (co === "cancel") {
+        setNotice("Pagamento annullato: nessun addebito.");
+        history.replaceState(null, "", window.location.pathname);
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startCheckout = async (planKey: string) => {
+    setNotice(null); setCheckoutBusy(true);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: planKey, email: user?.email, userId: user?.id }),
+      });
+      if (res.status === 503) { choose(planKey); setNotice("Stripe non è ancora collegato: piano impostato in modalità demo. Aggiungi la chiave Stripe per i pagamenti reali."); return; }
+      const d = await res.json().catch(() => ({}));
+      if (d?.url) { window.location.href = d.url; return; }
+      setNotice("Non è stato possibile avviare il pagamento. Riprova.");
+    } catch {
+      setNotice("Errore di rete durante l'avvio del pagamento.");
+    } finally { setCheckoutBusy(false); }
+  };
+
+  const openPortal = async () => {
+    if (!stripeCustomer) return;
+    setCheckoutBusy(true);
+    try {
+      const res = await fetch("/api/stripe/portal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ customerId: stripeCustomer }) });
+      const d = await res.json().catch(() => ({}));
+      if (d?.url) { window.location.href = d.url; return; }
+      setNotice("Impossibile aprire la gestione dell'abbonamento.");
+    } catch { setNotice("Errore di rete."); } finally { setCheckoutBusy(false); }
+  };
   const addons = MODULES.filter((m) => !m.core && !tier.includes.includes(m.key));
   const addonsTotal = addons.filter((m) => active[m.key]).reduce((a, m) => a + (ADDON_PRICE[m.key] || 0), 0);
 
@@ -103,6 +163,13 @@ export default function AbbonamentoPage() {
   return (
     <div>
       <PageHeader title={t("Abbonamento")} subtitle={t("Scegli il piano e aggiungi solo i moduli che ti servono")} />
+
+      {notice && (
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-line px-4 py-3 text-sm text-txt" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" }}>
+          <span>{notice}</span>
+          <button onClick={() => setNotice(null)} className="shrink-0 text-faint hover:text-txt">✕</button>
+        </div>
+      )}
 
       {/* Toggle mensile/annuale */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -256,6 +323,9 @@ export default function AbbonamentoPage() {
             <Link href="/abbonamento/pagamento" className="rounded-lg border border-line py-2 text-center text-sm font-semibold text-txt hover:bg-wash">{t("Informazioni pagamento")}</Link>
             <Link href="/abbonamento/fatture" className="rounded-lg border border-line py-2 text-center text-sm font-semibold text-txt hover:bg-wash">{t("Fatture")}</Link>
           </div>
+          {stripeCustomer && (
+            <button onClick={openPortal} disabled={checkoutBusy} className="mt-2 w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60">{t("Gestisci abbonamento e pagamento")}</button>
+          )}
           <div className="mt-2 text-center text-[11px] text-faint">{t("Prossimo rinnovo:")} 01/10/2026</div>
         </Card>
       </div>
@@ -280,7 +350,7 @@ export default function AbbonamentoPage() {
               <p className="mt-2 text-[11px] text-faint">{t("I moduli attivi verranno riportati a quelli inclusi nel piano; gli eventuali add-on li riaggiungi dopo.")}</p>
               <div className="mt-4 flex gap-2">
                 <button onClick={() => setPendingTier(null)} className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
-                <button onClick={() => { choose(pendingTier!); setPendingTier(null); }} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{t("Conferma")}</button>
+                <button disabled={checkoutBusy} onClick={() => { const k = pendingTier!; setPendingTier(null); startCheckout(k); }} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">{checkoutBusy ? t("Attendi…") : t("Vai al pagamento")}</button>
               </div>
             </div>
           </div>
