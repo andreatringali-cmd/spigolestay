@@ -10,8 +10,8 @@ import { eur } from "@/lib/format";
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
 const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return toISO(d); };
 
-interface Cfg { nome: string; tagline: string; accent: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean }
-const DEFCFG: Cfg = { nome: "", tagline: "Il tuo soggiorno nel cuore di Ortigia", accent: "#4F46E5", hero: true, camere: true, recensioni: true, mappa: true, contatti: true };
+interface Cfg { nome: string; tagline: string; accent: string; heroBg?: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean }
+const DEFCFG: Cfg = { nome: "", tagline: "Il tuo soggiorno nel cuore di Ortigia", accent: "#4F46E5", heroBg: "", hero: true, camere: true, recensioni: true, mappa: true, contatti: true };
 
 
 export default function SitoWebPage() {
@@ -44,8 +44,8 @@ function Site() {
       {/* Top bar */}
       <div className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
-          <div className="grid h-9 w-9 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? accent }}>{name.slice(0, 2).toUpperCase()}</div>
-          <div className="text-sm font-bold text-txt">{name}<span className="ml-1 text-[11px] font-normal text-faint">· Sito ufficiale</span></div>
+          <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? accent }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : name.slice(0, 2).toUpperCase()}</div>
+          <div className="text-sm font-bold text-txt">{name}<span className="ml-1 text-[11px] font-normal text-faint">· Xenorabook</span></div>
           <div className="ml-auto flex items-center gap-3 text-xs text-dim">
             {structure?.phone && <span>{structure.phone}</span>}
             {structures.length > 1 && <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs">{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>}
@@ -55,11 +55,11 @@ function Site() {
 
       {/* Hero + ricerca */}
       {cfg.hero && (
-        <div className="relative overflow-hidden px-4 py-14 text-white" style={{ background: `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 45%, #000))` }}>
+        <div className="relative overflow-hidden px-4 py-14 text-white" style={{ background: cfg.heroBg ? `linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), url(${cfg.heroBg}) center/cover no-repeat` : `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 45%, #000))` }}>
           <div className="mx-auto max-w-5xl">
             <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{name}</h1>
             <p className="mt-2 max-w-xl text-white/90">{cfg.tagline}</p>
-            <div className="mt-6 grid max-w-3xl gap-2 rounded-2xl bg-white/95 p-3 shadow-lg sm:grid-cols-5">
+            <div className="mt-6 grid w-full gap-2 rounded-2xl bg-white/95 p-3 shadow-lg sm:grid-cols-5">
               <label className="block text-[11px] font-medium text-dim">Arrivo<input type="date" value={ci} min={today} onChange={(e) => { setCi(e.target.value); if (e.target.value >= co) setCo(addDays(e.target.value, 1)); }} className={`${field} mt-0.5 w-full`} /></label>
               <label className="block text-[11px] font-medium text-dim">Partenza<input type="date" value={co} min={addDays(ci, 1)} onChange={(e) => setCo(e.target.value)} className={`${field} mt-0.5 w-full`} /></label>
               <label className="block text-[11px] font-medium text-dim">Adulti<input type="number" min={1} value={ad} onChange={(e) => setAd(Math.max(1, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
@@ -160,23 +160,8 @@ function Site() {
           </section>
         )}
 
-        {/* Mappa / contatti */}
+        {/* Contatti (sinistra) / Mappa (destra) */}
         <section className="mt-10 grid gap-3 sm:grid-cols-2">
-          {cfg.mappa && (() => {
-            const addr = [structure?.address, structure?.streetNumber].filter(Boolean).join(" ");
-            const full = [addr, [structure?.postalCode, structure?.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-            const q = (structure?.lat && structure?.lng) ? `${structure.lat},${structure.lng}` : encodeURIComponent(full || `${structure?.city ?? "Siracusa"}`);
-            return (
-              <div className="overflow-hidden rounded-xl border border-line bg-surface">
-                <iframe src={`https://maps.google.com/maps?q=${q}&z=15&output=embed`} className="h-52 w-full" style={{ border: 0 }} loading="lazy" title="Mappa" />
-                <div className="p-4">
-                  <h3 className="font-display text-lg font-bold text-txt">Dove siamo</h3>
-                  <p className="mt-1 text-sm text-dim">{full || "Ortigia, Siracusa"}{structure?.zone ? ` · ${structure.zone}` : ""}</p>
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${q}`} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm font-medium" style={{ color: accent }}>Apri su Google Maps ↗</a>
-                </div>
-              </div>
-            );
-          })()}
           {cfg.contatti && (
             <div className="rounded-xl border border-line bg-surface p-4">
               <h3 className="font-display text-lg font-bold text-txt">Contatti</h3>
@@ -192,11 +177,26 @@ function Site() {
               </div>
             </div>
           )}
+          {cfg.mappa && (() => {
+            const addr = [structure?.address, structure?.streetNumber].filter(Boolean).join(" ");
+            const full = [addr, [structure?.postalCode, structure?.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+            const q = (structure?.lat && structure?.lng) ? `${structure.lat},${structure.lng}` : encodeURIComponent(full || `${structure?.city ?? "Siracusa"}`);
+            return (
+              <div className="overflow-hidden rounded-xl border border-line bg-surface">
+                <iframe src={`https://maps.google.com/maps?q=${q}&z=15&output=embed`} className="h-52 w-full" style={{ border: 0 }} loading="lazy" title="Mappa" />
+                <div className="p-4">
+                  <h3 className="font-display text-lg font-bold text-txt">Dove siamo</h3>
+                  <p className="mt-1 text-sm text-dim">{full || "Ortigia, Siracusa"}{structure?.zone ? ` · ${structure.zone}` : ""}</p>
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${q}`} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm font-medium" style={{ color: accent }}>Apri su Google Maps ↗</a>
+                </div>
+              </div>
+            );
+          })()}
         </section>
 
         <div className="mt-12 flex flex-col items-center gap-3 rounded-2xl border border-line bg-surface p-6 text-center">
           <div className="font-display text-lg font-bold text-txt">Prenota direttamente e risparmia</div>
-          <p className="max-w-md text-sm text-dim">Prenotando dal sito ufficiale eviti le commissioni delle OTA e ottieni il miglior prezzo garantito.</p>
+          <p className="max-w-md text-sm text-dim">Prenotando da qui eviti le commissioni delle OTA e ottieni il miglior prezzo garantito.</p>
           <button onClick={() => go()} className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>Verifica disponibilità</button>
         </div>
       </div>

@@ -87,7 +87,7 @@ function Engine() {
     const unit = availUnits(selRt)[0];
     const gid = addGuest({ firstName: guest.firstName.trim(), lastName: guest.lastName.trim(), email: guest.email.trim(), phone: guest.phone.trim(), country: guest.country });
     const chosenExtras = extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => `${extraQty[x.id]}× ${x.name}`);
-    const note = [`Sito ufficiale · ${selPlan?.name}`, chosenExtras.length ? `Extra: ${chosenExtras.join(", ")}` : "", guest.arrival !== "Non lo so" ? `Arrivo ~${guest.arrival}` : "", guest.requests.trim()].filter(Boolean).join(" · ");
+    const note = [`Sito diretto · ${selPlan?.name}`, chosenExtras.length ? `Extra: ${chosenExtras.join(", ")}` : "", guest.arrival !== "Non lo so" ? `Arrivo ~${guest.arrival}` : "", guest.requests.trim()].filter(Boolean).join(" · ");
     addBooking({ structureId, roomTypeId: selRt.id, unitId: unit?.id ?? null, guestId: gid, channel: "direct", status: "confirmed", checkIn, checkOut, adults, children, childAges: childAges.length ? childAges : undefined, total: accommodation, cleaningFee: 0, paid: deposit, cityTaxPaid: false, note });
     addActivity("booking", `Prenotazione dal sito — ${guest.firstName} ${guest.lastName}`);
     setCode(`SPG-${new Date().getFullYear()}-${Math.abs([...(gid + checkIn)].reduce((a, c) => a + c.charCodeAt(0), 0)) % 100000}`);
@@ -99,10 +99,10 @@ function Engine() {
   const header = (
     <div className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="grid h-9 w-9 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{(structure?.name ?? "SS").slice(0, 2).toUpperCase()}</div>
-          <div className="leading-tight"><div className="text-sm font-bold text-txt">{structure?.name ?? "Xenora"}</div><div className="text-[11px] text-faint">Sito ufficiale · Prenotazione diretta</div></div>
-        </div>
+        <a href={`/sito-web?s=${structureId}`} className="flex items-center gap-2 rounded-lg transition hover:opacity-80" title="Torna alla home">
+          <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : (structure?.name ?? "SS").slice(0, 2).toUpperCase()}</div>
+          <div className="leading-tight"><div className="text-sm font-bold text-txt">{structure?.name ?? "Xenora"}</div><div className="text-[11px] text-faint">← Torna alla home</div></div>
+        </a>
         {structures.length > 1 && step === "rooms" && (
           <select value={structureId} onChange={(e) => { setStructureId(e.target.value); setSel(null); }} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}

@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
 
-interface Cfg { nome: string; dominio: string; tagline: string; accent: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean; lang: string[] }
-const DEF: Cfg = { nome: "Spigole House", dominio: "spigolehouse.it", tagline: "Il tuo soggiorno nel cuore di Ortigia", accent: "#4F46E5", hero: true, camere: true, recensioni: true, mappa: true, contatti: true, lang: ["it", "en"] };
+interface Cfg { nome: string; dominio: string; tagline: string; accent: string; heroBg?: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean; lang: string[] }
+const DEF: Cfg = { nome: "Spigole House", dominio: "spigolehouse.it", tagline: "Il tuo soggiorno nel cuore di Ortigia", accent: "#4F46E5", heroBg: "", hero: true, camere: true, recensioni: true, mappa: true, contatti: true, lang: ["it", "en"] };
 const LANGS = [["it", "Italiano"], ["en", "English"], ["fr", "Français"], ["de", "Deutsch"], ["es", "Español"]] as const;
 const SEZIONI: { key: keyof Cfg; label: string }[] = [
   { key: "hero", label: "Copertina (hero)" }, { key: "camere", label: "Camere e prezzi" }, { key: "recensioni", label: "Recensioni" }, { key: "mappa", label: "Mappa e dintorni" }, { key: "contatti", label: "Contatti" },
@@ -58,6 +59,15 @@ export default function SitoPage() {
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Sottotitolo")}</span><input value={c.tagline} onChange={(e) => set({ tagline: e.target.value })} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             <div className="mb-1 text-xs text-dim">{t("Colore")}</div>
             <div className="flex gap-2">{["#4F46E5", "#0E9F6E", "#BE5D38", "#2563EB", "#DB2777", "#0891B2"].map((col) => <button key={col} onClick={() => set({ accent: col })} className={`h-7 w-7 rounded-full border-2 ${c.accent === col ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: col }} />)}</div>
+            <div className="mb-1 mt-4 text-xs text-dim">{t("Sfondo copertina")}</div>
+            <div className="flex items-center gap-2">
+              {c.heroBg
+                ? <div className="h-12 w-20 shrink-0 overflow-hidden rounded-lg border border-line" style={{ backgroundImage: `url(${c.heroBg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+                : <div className="grid h-12 w-20 shrink-0 place-items-center rounded-lg border border-line text-[10px] text-faint" style={{ background: `linear-gradient(135deg, ${c.accent}, color-mix(in srgb, ${c.accent} 55%, #000))` }}>{t("colore")}</div>}
+              <label className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-focus hover:bg-wash">{c.heroBg ? t("Cambia foto") : t("Carica foto")}<input type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (f) { try { set({ heroBg: await downscaleImage(f, 1600, 0.72) }); } catch {} } e.target.value = ""; }} /></label>
+              {c.heroBg && <button onClick={() => set({ heroBg: "" })} className="text-xs font-medium text-faint hover:text-[color:var(--err)]">{t("Rimuovi")}</button>}
+            </div>
+            <p className="mt-1 text-[11px] text-faint">{t("Se non carichi una foto, la copertina usa il colore scelto.")}</p>
           </Card>
           <Card>
             <SectionTitle>{t("Sezioni")}</SectionTitle>
@@ -78,7 +88,7 @@ export default function SitoPage() {
           <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Anteprima")}</SectionTitle><span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{suggestedDomain}</span></div>
           <div className="overflow-hidden rounded-xl border border-line">
             {c.hero && (
-              <div className="relative p-6 text-white" style={{ background: `linear-gradient(135deg, ${c.accent}, color-mix(in srgb, ${c.accent} 55%, #000))` }}>
+              <div className="relative p-6 text-white" style={{ background: c.heroBg ? `linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), url(${c.heroBg}) center/cover no-repeat` : `linear-gradient(135deg, ${c.accent}, color-mix(in srgb, ${c.accent} 55%, #000))` }}>
                 <div className="text-lg font-bold">{siteName || c.nome}</div>
                 <div className="mt-1 text-sm opacity-90">{c.tagline}</div>
                 <div className="mt-4 inline-block rounded-lg bg-white/90 px-3 py-1.5 text-xs font-semibold" style={{ color: c.accent }}>{t("Verifica disponibilità")} →</div>
