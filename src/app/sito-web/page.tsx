@@ -201,7 +201,25 @@ function Site() {
         </div>
       </div>
 
-      <div className="mx-auto mt-10 max-w-5xl px-4 text-center text-[11px] text-faint">{name} · Prenotazione online sicura powered by Xenora</div>
+      <footer className="mt-12 border-t border-line bg-surface">
+        <div className="mx-auto max-w-5xl px-4 py-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-bold text-txt">
+              <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md text-xs font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? accent }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : name.slice(0, 2).toUpperCase()}</span>
+              {name}
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-faint">
+              {structure?.email && <a href={`mailto:${structure.email}`} className="hover:text-dim">{structure.email}</a>}
+              {structure?.phone && <a href={`tel:${structure.phone}`} className="hover:text-dim">{structure.phone}</a>}
+              {structure?.cin && <span>CIN {structure.cin}</span>}
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-[11px] text-faint">
+            <span>© {new Date().getFullYear()} {name}. Tutti i diritti riservati.</span>
+            <span>Sito creato dal gruppo <b className="text-dim">Xenora</b> · Prenotazione online sicura</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
