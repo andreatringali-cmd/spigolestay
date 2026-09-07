@@ -324,21 +324,21 @@ function Site() {
 
         {/* Contatti (sinistra) / Mappa (destra) */}
         <section className="mt-10 grid gap-3 sm:grid-cols-2">
-          {cfg.contatti && (
-            <div className="rounded-xl border border-line bg-surface p-4">
-              <h3 className="font-display text-lg font-bold text-txt">{T("Contatti")}</h3>
-              <div className="mt-1 flex flex-col gap-1 text-sm text-dim">
-                {structure?.email && <a href={`mailto:${structure.email}`} className="hover:underline">✉ {structure.email}</a>}
-                {structure?.phone && <a href={`tel:${structure.phone}`} className="hover:underline">☎ {structure.phone}</a>}
-                {structure?.phone && <a href={`https://wa.me/${structure.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="font-medium" style={{ color: "#25D366" }}>{T("Scrivici su WhatsApp")}</a>}
-                {structure?.website && <a href={structure.website.startsWith("http") ? structure.website : `https://${structure.website}`} target="_blank" rel="noreferrer" className="hover:underline" style={{ color: accent }}>🌐 {structure.website}</a>}
-                <div className="mt-1 flex gap-3">
-                  {structure?.instagram && <a href={structure.instagram.startsWith("http") ? structure.instagram : `https://instagram.com/${structure.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" className="font-medium hover:underline" style={{ color: "#C13584" }}>Instagram</a>}
-                  {structure?.facebook && <a href={structure.facebook.startsWith("http") ? structure.facebook : `https://facebook.com/${structure.facebook}`} target="_blank" rel="noreferrer" className="font-medium hover:underline" style={{ color: "#1877F2" }}>Facebook</a>}
-                </div>
+          <div className="rounded-xl border border-line bg-surface p-4">
+            <h3 className="font-display text-lg font-bold text-txt">{T("Iscriviti alla newsletter")}</h3>
+            <p className="mt-1 text-sm text-dim">{T("Lascia i tuoi dati e ricevi in anteprima le nostre offerte e promozioni.")}</p>
+            {nlDone ? (
+              <div className="mt-3 rounded-lg border border-line bg-paper p-3 text-center text-sm font-medium text-[color:var(--ok)]">✓ {T("Grazie! Ti terremo aggiornato sulle offerte.")}</div>
+            ) : (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <input value={nl.firstName} onChange={(e) => setNl({ ...nl, firstName: e.target.value })} placeholder={T("Nome")} className={field} />
+                <input value={nl.lastName} onChange={(e) => setNl({ ...nl, lastName: e.target.value })} placeholder={T("Cognome")} className={field} />
+                <input value={nl.email} onChange={(e) => setNl({ ...nl, email: e.target.value })} placeholder="Email *" className={`${field} col-span-2`} />
+                <input value={nl.phone} onChange={(e) => setNl({ ...nl, phone: e.target.value })} placeholder={T("Telefono")} className={`${field} col-span-2`} />
+                <button onClick={nlSubmit} disabled={!nl.email.trim() || (!nl.firstName.trim() && !nl.lastName.trim())} className="col-span-2 rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: accent }}>{T("Iscrivimi")}</button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
           {cfg.mappa && (() => {
             const addr = [structure?.address, structure?.streetNumber].filter(Boolean).join(" ");
             const full = [addr, [structure?.postalCode, structure?.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
@@ -362,27 +362,6 @@ function Site() {
           <button onClick={() => go()} className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>Verifica disponibilità</button>
         </div>
 
-        {/* Newsletter */}
-        <section className="mt-10 rounded-2xl border border-line bg-surface p-6">
-          <div className="grid gap-4 sm:grid-cols-2 sm:items-center">
-            <div>
-              <h2 className="font-display text-xl font-bold text-txt">{T("Iscriviti alla newsletter")}</h2>
-              <p className="mt-1 text-sm text-dim">Lascia i tuoi dati e ricevi in anteprima le nostre offerte e promozioni.</p>
-            </div>
-            {nlDone ? (
-              <div className="rounded-xl border border-line bg-paper p-4 text-center text-sm font-medium text-[color:var(--ok)]">✓ Grazie! Ti terremo aggiornato sulle offerte.</div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <input value={nl.firstName} onChange={(e) => setNl({ ...nl, firstName: e.target.value })} placeholder="Nome" className={field} />
-                <input value={nl.lastName} onChange={(e) => setNl({ ...nl, lastName: e.target.value })} placeholder="Cognome" className={field} />
-                <input value={nl.email} onChange={(e) => setNl({ ...nl, email: e.target.value })} placeholder="Email *" className={`${field} col-span-2`} />
-                <input value={nl.phone} onChange={(e) => setNl({ ...nl, phone: e.target.value })} placeholder="Telefono" className={`${field} col-span-2`} />
-                <button onClick={nlSubmit} disabled={!nl.email.trim() || (!nl.firstName.trim() && !nl.lastName.trim())} className="col-span-2 rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: accent }}>{T("Iscrivimi")}</button>
-                <p className="col-span-2 text-[10px] text-faint">Iscrivendoti acconsenti a ricevere comunicazioni promozionali. Puoi disiscriverti quando vuoi.</p>
-              </div>
-            )}
-          </div>
-        </section>
       </div>
 
       {lightbox && (
