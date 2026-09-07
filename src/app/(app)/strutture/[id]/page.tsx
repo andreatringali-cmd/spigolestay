@@ -221,7 +221,7 @@ export default function StrutturaSchedaPage() {
               <label className={lbl}>{t("Referente")}<input value={f.contactName ?? ""} onChange={(e) => set("contactName", e.target.value)} className={`${inp} mt-1`} placeholder={t("Nome e cognome")} /></label>
             </div>
             <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Social")} <span className="font-normal normal-case text-faint">{t("(compaiono sul piè di pagina del preventivo)")}</span></div>
-            <div className="mt-1 grid grid-cols-3 gap-3">
+            <div className="mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className={lbl}>Facebook<input value={f.facebook ?? ""} onChange={(e) => set("facebook", e.target.value)} className={`${inp} mt-1`} placeholder="facebook.com/…" /></label>
               <label className={lbl}>Instagram<input value={f.instagram ?? ""} onChange={(e) => set("instagram", e.target.value)} className={`${inp} mt-1`} placeholder="instagram.com/…" /></label>
               <label className={lbl}>LinkedIn<input value={f.linkedin ?? ""} onChange={(e) => set("linkedin", e.target.value)} className={`${inp} mt-1`} placeholder="linkedin.com/…" /></label>
@@ -233,7 +233,7 @@ export default function StrutturaSchedaPage() {
             <div className="mb-3">
               <SectionTitle>{t("Indirizzo & posizione")}</SectionTitle>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className={`${lbl} col-span-2`}>{t("Indirizzo")}<input value={f.address ?? ""} onChange={(e) => set("address", e.target.value)} className={`${inp} mt-1`} placeholder={t("Via / Piazza")} /></label>
               <label className={lbl}>{t("Civico")}<input value={f.streetNumber ?? ""} onChange={(e) => set("streetNumber", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("CAP")}<input value={f.postalCode ?? ""} onChange={(e) => set("postalCode", e.target.value)} className={`${inp} mt-1`} placeholder="96100" /></label>
@@ -306,7 +306,7 @@ export default function StrutturaSchedaPage() {
           {/* Check-in / out */}
           <Card>
             <SectionTitle>{t("Check-in & check-out")}</SectionTitle>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className={lbl}>{t("Check-in dalle")}<input type="time" value={f.checkInFrom ?? ""} onChange={(e) => set("checkInFrom", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("alle")}<input type="time" value={f.checkInTo ?? ""} onChange={(e) => set("checkInTo", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Check-out entro")}<input type="time" value={f.checkOutBy ?? ""} onChange={(e) => set("checkOutBy", e.target.value)} className={`${inp} mt-1`} /></label>
@@ -352,7 +352,7 @@ export default function StrutturaSchedaPage() {
                       <label className={lbl}>{t("Comune")}<input value={f.cityTaxComune ?? ""} onChange={(e) => set("cityTaxComune", e.target.value)} className={`${inp} mt-1`} /></label>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                       <label className={lbl}>{t("€ persona/notte")}<input value={f.cityTaxAmount ?? ""} onChange={(e) => set("cityTaxAmount", num(e.target.value))} className={`${inp} mt-1`} placeholder="2,00" /></label>
                       <label className={lbl}>{t("Max notti")}<input type="number" min={0} value={f.cityTaxMaxNights ?? ""} onChange={(e) => set("cityTaxMaxNights", num(e.target.value))} className={`${inp} mt-1`} /></label>
                       <label className={lbl}>{t("Comune")}<input value={f.cityTaxComune ?? ""} onChange={(e) => set("cityTaxComune", e.target.value)} className={`${inp} mt-1`} /></label>
