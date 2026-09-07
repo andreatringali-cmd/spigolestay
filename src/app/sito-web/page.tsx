@@ -118,6 +118,9 @@ function Site() {
     return out.filter((g) => (seen.has(g.src) ? false : (seen.add(g.src), true))).slice(0, 20);
   }, [types, units, sid, roomTypes]);
   const [gi, setGi] = useState(0);
+  const [galFilter, setGalFilter] = useState("all");
+  const galLabels = useMemo(() => Array.from(new Set(gallery.map((g) => g.label))), [gallery]);
+  const galItems = useMemo(() => (galFilter === "all" ? gallery : gallery.filter((g) => g.label === galFilter)), [gallery, galFilter]);
 
   // Offerte attive (modulo Promozioni).
   const offers = useMemo(() => { try { return loadPromos().filter((p) => p.discountPct && p.code); } catch { return []; } }, []);
@@ -225,7 +228,7 @@ function Site() {
 
         {/* Informazioni utili */}
         {structure && (() => {
-          const polLabel: Record<string, string> = { flessibile: "Cancellazione flessibile", moderata: "Cancellazione moderata", rigida: "Cancellazione rigida" };
+          const polLabel: Record<string, string> = { flessibile: "Gratuita fino a 1 giorno prima dell'arrivo", moderata: "Gratuita fino a 5 giorni prima dell'arrivo", rigida: "Gratuita fino a 14 giorni prima dell'arrivo" };
           const tax = structure.cityTax ? (structure.cityTaxMode === "percent" ? `${structure.cityTaxPercent ?? 0}% del soggiorno` : `${structure.cityTaxAmount ?? 2} € a persona/notte`) : "";
           const cards = ([
             structure.checkInFrom ? ["Check-in", `dalle ${structure.checkInFrom}${structure.checkInTo ? ` alle ${structure.checkInTo}` : ""}`] : ["", ""],
@@ -255,30 +258,42 @@ function Site() {
 
         {/* Galleria (carosello) */}
         {gallery.length > 0 && (() => {
-          const cur = gallery[gi % gallery.length];
-          const len = gallery.length;
+          const len = galItems.length || 1;
+          const idx = gi % len;
+          const cur = galItems[idx] ?? galItems[0];
+          if (!cur) return null;
           return (
             <section className="mt-10">
-              <h2 className="mb-3 font-display text-xl font-bold text-txt">{T("Galleria")}</h2>
-              <div className="relative overflow-hidden rounded-2xl border border-line bg-black">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="font-display text-xl font-bold text-txt">{T("Galleria")}</h2>
+                {galLabels.length > 1 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    <button onClick={() => { setGalFilter("all"); setGi(0); }} className="rounded-full border px-3 py-1 text-xs font-medium transition" style={galFilter === "all" ? { backgroundColor: accent, borderColor: accent, color: "#fff" } : { borderColor: "var(--line)", color: "var(--dim)" }}>{T("Tutte")}</button>
+                    {galLabels.map((l) => (
+                      <button key={l} onClick={() => { setGalFilter(l); setGi(0); }} className="rounded-full border px-3 py-1 text-xs font-medium transition" style={galFilter === l ? { backgroundColor: accent, borderColor: accent, color: "#fff" } : { borderColor: "var(--line)", color: "var(--dim)" }}>{l}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="group relative overflow-hidden rounded-2xl border border-line shadow-sm">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={cur.src} alt={cur.label} onClick={() => setLightbox(cur.src)} className="mx-auto max-h-[460px] w-full cursor-zoom-in bg-black object-contain" />
+                <img src={cur.src} alt={cur.label} onClick={() => setLightbox(cur.src)} className="h-[300px] w-full cursor-zoom-in object-cover sm:h-[440px]" />
                 {len > 1 && (
                   <>
-                    <button onClick={() => setGi((g) => (g - 1 + len) % len)} className="absolute left-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-xl text-white hover:bg-black/65">‹</button>
-                    <button onClick={() => setGi((g) => (g + 1) % len)} className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-xl text-white hover:bg-black/65">›</button>
+                    <button onClick={() => setGi((g) => (g - 1 + len) % len)} className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/85 text-2xl text-txt shadow-md transition hover:bg-white">‹</button>
+                    <button onClick={() => setGi((g) => (g + 1) % len)} className="absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/85 text-2xl text-txt shadow-md transition hover:bg-white">›</button>
                   </>
                 )}
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-4">
-                  <div className="text-base font-semibold text-white">{cur.label}</div>
-                  <div className="text-[11px] text-white/70">{(gi % len) + 1} / {len}</div>
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent p-4">
+                  <span className="rounded-full bg-white/90 px-3 py-1 text-sm font-semibold text-txt">{cur.label}</span>
+                  <span className="text-[11px] font-medium text-white/90">{idx + 1} / {len}</span>
                 </div>
               </div>
               {len > 1 && (
                 <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-                  {gallery.map((g, i) => (
+                  {galItems.map((g, i) => (
                     /* eslint-disable-next-line @next/next/no-img-element */
-                    <button key={i} onClick={() => setGi(i)} className={`h-14 w-20 shrink-0 overflow-hidden rounded-lg border-2 ${i === gi % len ? "" : "opacity-60"}`} style={{ borderColor: i === gi % len ? accent : "var(--line)" }}><img src={g.src} alt="" className="h-full w-full object-cover" /></button>
+                    <button key={i} onClick={() => setGi(i)} className={`h-16 w-24 shrink-0 overflow-hidden rounded-lg border-2 transition ${i === idx ? "" : "opacity-55 hover:opacity-100"}`} style={{ borderColor: i === idx ? accent : "var(--line)" }}><img src={g.src} alt="" className="h-full w-full object-cover" /></button>
                   ))}
                 </div>
               )}
