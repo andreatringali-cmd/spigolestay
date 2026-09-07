@@ -239,6 +239,21 @@ function Engine() {
             <div className="flex flex-col gap-4">
               <button onClick={() => setStep("rooms")} className="w-fit text-sm font-medium text-focus hover:underline">← Cambia camera</button>
 
+              {/* Dati ospite */}
+              <div className={`${box} p-4`}>
+                <h2 className="mb-3 font-display text-lg font-bold text-txt">Dettagli ospite</h2>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block text-xs font-medium text-dim">Nome *<input value={guest.firstName} onChange={(e) => setGuest({ ...guest, firstName: e.target.value })} className={`${field} mt-1`} /></label>
+                  <label className="block text-xs font-medium text-dim">Cognome *<input value={guest.lastName} onChange={(e) => setGuest({ ...guest, lastName: e.target.value })} className={`${field} mt-1`} /></label>
+                  <label className="block text-xs font-medium text-dim">Telefono *<input value={guest.phone} onChange={(e) => setGuest({ ...guest, phone: e.target.value })} className={`${field} mt-1`} placeholder="+39…" /></label>
+                  <label className="block text-xs font-medium text-dim">Email *<input value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} className={`${field} mt-1`} /></label>
+                  <label className="block text-xs font-medium text-dim">Città<input value={guest.city} onChange={(e) => setGuest({ ...guest, city: e.target.value })} className={`${field} mt-1`} /></label>
+                  <label className="block text-xs font-medium text-dim">Nazione<input value={guest.country} onChange={(e) => setGuest({ ...guest, country: e.target.value })} className={`${field} mt-1`} /></label>
+                </div>
+                <label className="mt-3 block text-xs font-medium text-dim">Orario di arrivo previsto<select value={guest.arrival} onChange={(e) => setGuest({ ...guest, arrival: e.target.value })} className={`${field} mt-1`}>{["Non lo so", "12:00-14:00", "14:00-16:00", "16:00-18:00", "18:00-20:00", "dopo le 20:00"].map((o) => <option key={o} value={o}>{o}</option>)}</select></label>
+                <label className="mt-3 block text-xs font-medium text-dim">Richieste speciali<textarea value={guest.requests} onChange={(e) => setGuest({ ...guest, requests: e.target.value })} rows={2} className={`${field} mt-1 resize-y`} placeholder="Le richieste non sono garantite ma faremo il possibile." /></label>
+              </div>
+
               {/* Servizi extra */}
               <div className={`${box} p-4`}>
                 <h2 className="mb-1 font-display text-lg font-bold text-txt">Servizi extra</h2>
@@ -255,21 +270,6 @@ function Engine() {
                     </div>
                   ))}
                 </div>
-              </div>
-
-              {/* Dati ospite */}
-              <div className={`${box} p-4`}>
-                <h2 className="mb-3 font-display text-lg font-bold text-txt">Dettagli ospite</h2>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="block text-xs font-medium text-dim">Nome *<input value={guest.firstName} onChange={(e) => setGuest({ ...guest, firstName: e.target.value })} className={`${field} mt-1`} /></label>
-                  <label className="block text-xs font-medium text-dim">Cognome *<input value={guest.lastName} onChange={(e) => setGuest({ ...guest, lastName: e.target.value })} className={`${field} mt-1`} /></label>
-                  <label className="block text-xs font-medium text-dim">Telefono *<input value={guest.phone} onChange={(e) => setGuest({ ...guest, phone: e.target.value })} className={`${field} mt-1`} placeholder="+39…" /></label>
-                  <label className="block text-xs font-medium text-dim">Email *<input value={guest.email} onChange={(e) => setGuest({ ...guest, email: e.target.value })} className={`${field} mt-1`} /></label>
-                  <label className="block text-xs font-medium text-dim">Città<input value={guest.city} onChange={(e) => setGuest({ ...guest, city: e.target.value })} className={`${field} mt-1`} /></label>
-                  <label className="block text-xs font-medium text-dim">Nazione<input value={guest.country} onChange={(e) => setGuest({ ...guest, country: e.target.value })} className={`${field} mt-1`} /></label>
-                </div>
-                <label className="mt-3 block text-xs font-medium text-dim">Orario di arrivo previsto<select value={guest.arrival} onChange={(e) => setGuest({ ...guest, arrival: e.target.value })} className={`${field} mt-1`}>{["Non lo so", "12:00-14:00", "14:00-16:00", "16:00-18:00", "18:00-20:00", "dopo le 20:00"].map((o) => <option key={o} value={o}>{o}</option>)}</select></label>
-                <label className="mt-3 block text-xs font-medium text-dim">Richieste speciali<textarea value={guest.requests} onChange={(e) => setGuest({ ...guest, requests: e.target.value })} rows={2} className={`${field} mt-1 resize-y`} placeholder="Le richieste non sono garantite ma faremo il possibile." /></label>
               </div>
 
               {/* Pagamento */}
@@ -305,7 +305,30 @@ function Engine() {
           </div>
         )}
       </div>
-      <div className="mx-auto max-w-5xl px-4 text-center text-[11px] text-faint">{structure?.name ?? "Xenora"} · Prenotazione online sicura powered by <b>Xenora</b></div>
+      <footer className="mt-12 border-t border-line bg-surface">
+        <div className="mx-auto max-w-5xl px-4 py-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <a href={`/sito-web?s=${structureId}`} className="flex items-center gap-2 text-sm font-bold text-txt hover:opacity-80">
+              <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md text-xs font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : (structure?.name ?? "SS").slice(0, 2).toUpperCase()}</span>
+              {structure?.name ?? "Xenora"}
+            </a>
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-faint">
+              {structure?.email && <a href={`mailto:${structure.email}`} className="hover:text-dim">{structure.email}</a>}
+              {structure?.phone && <a href={`tel:${structure.phone}`} className="hover:text-dim">{structure.phone}</a>}
+              {structure?.cin && <span>CIN {structure.cin}</span>}
+              <div className="flex items-center gap-2">
+                {structure?.phone && <a href={`https://wa.me/${structure.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" title="WhatsApp" className="grid h-7 w-7 place-items-center rounded-full bg-wash" style={{ color: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1-.4-.1-.9-.3-1.6-.6-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8 0-1.3.7-2 .9-2.2.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.6-.3.3c-.2.2-.3.3-.1.6.2.3.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.6 1.6.3.1.5.1.7-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.1.1.5-.1 1Z" /></svg></a>}
+                {structure?.instagram && <a href={structure.instagram.startsWith("http") ? structure.instagram : `https://instagram.com/${structure.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" title="Instagram" className="grid h-7 w-7 place-items-center rounded-full bg-wash" style={{ color: "#C13584" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg></a>}
+                {structure?.facebook && <a href={structure.facebook.startsWith("http") ? structure.facebook : `https://facebook.com/${structure.facebook}`} target="_blank" rel="noreferrer" title="Facebook" className="grid h-7 w-7 place-items-center rounded-full bg-wash" style={{ color: "#1877F2" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" /></svg></a>}
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-[11px] text-faint">
+            <span>© {new Date().getFullYear()} {structure?.name ?? "Xenora"}. Tutti i diritti riservati.</span>
+            <span>Sito creato dal gruppo <b className="text-dim">Xenora</b> · Prenotazione online sicura</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
