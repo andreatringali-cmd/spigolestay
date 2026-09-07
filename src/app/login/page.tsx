@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
+import AuthBackdrop from "@/components/AuthBackdrop";
 
 type Mode = "login" | "signup";
 type Provider = "google";
@@ -122,8 +123,10 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#f2f1ee] px-4 py-8 text-[#1a1523]">
-      {/* Sfondo astratto */}
+      {/* Sfondo astratto: velature tenui + rete di nodi (i "canali" che si collegano) */}
       <div aria-hidden className="xbg" />
+      <AuthBackdrop />
+      <div aria-hidden className="xglow" />
 
       <div className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col justify-center">
         {/* Brand */}
@@ -250,6 +253,8 @@ export default function LoginPage() {
           0%   { transform: translate3d(0,0,0) scale(1); }
           100% { transform: translate3d(-1.5%, 1.5%, 0) scale(1.03); }
         }
+        .xglow { position: absolute; inset: 0; z-index: 0; pointer-events: none;
+          background: radial-gradient(58% 46% at 50% 34%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 60%); }
         @media (prefers-reduced-motion: reduce) { .xbg { animation: none; } }
       `}</style>
     </div>
