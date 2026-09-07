@@ -231,9 +231,16 @@ function Site() {
         {structure && (() => {
           const polLabel: Record<string, string> = { flessibile: "Gratuita fino a 1 giorno prima dell'arrivo", moderata: "Gratuita fino a 5 giorni prima dell'arrivo", rigida: "Gratuita fino a 14 giorni prima dell'arrivo" };
           const tax = structure.cityTax ? (structure.cityTaxMode === "percent" ? `${structure.cityTaxPercent ?? 0}% del soggiorno` : `${structure.cityTaxAmount ?? 2} € a persona/notte`) : "";
+          const svc = (structure.services ?? []).map((s) => s.toLowerCase());
+          const has = (kw: string) => svc.some((s) => s.includes(kw));
           const cards = ([
             structure.checkInFrom ? ["Check-in", `dalle ${structure.checkInFrom}${structure.checkInTo ? ` alle ${structure.checkInTo}` : ""}`] : ["", ""],
             structure.checkOutBy ? ["Check-out", `entro le ${structure.checkOutBy}`] : ["", ""],
+            (has("wi-fi") || has("wifi")) ? ["Wi-Fi", "Gratuito"] : ["", ""],
+            has("parchegg") ? ["Parcheggio", "Disponibile"] : ["", ""],
+            has("colazion") ? ["Colazione", "Inclusa"] : ["", ""],
+            has("aria") ? ["Aria condizionata", "Disponibile"] : ["", ""],
+            ["Deposito bagagli", (has("bagagl") || has("deposito")) ? "Disponibile" : "Su richiesta"],
             tax ? ["Tassa di soggiorno", tax] : ["", ""],
             structure.cancelPolicy ? ["Cancellazione", polLabel[structure.cancelPolicy] ?? ""] : ["", ""],
             typeof structure.pets === "boolean" ? ["Animali", structure.pets ? "Ammessi" : "Non ammessi"] : ["", ""],

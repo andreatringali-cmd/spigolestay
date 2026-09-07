@@ -50,6 +50,16 @@ export default function AbbonamentoPage() {
 
   const [selectedTier, setSelectedTier] = useState<string>("basic");
   const [annual, setAnnual] = useState(false);
+  const [refCode, setRefCode] = useState("");
+  const [refCopied, setRefCopied] = useState(false);
+  useEffect(() => {
+    try {
+      let c = localStorage.getItem("spigolestay:refcode");
+      if (!c) { c = "XEN-" + Math.random().toString(36).slice(2, 8).toUpperCase(); localStorage.setItem("spigolestay:refcode", c); }
+      setRefCode(c);
+    } catch {}
+  }, []);
+  const refLink = typeof window !== "undefined" ? `${window.location.origin}/abbonamento?ref=${refCode}` : "";
   const [active, setActive] = useState<Record<string, boolean>>({});
   const [pendingTier, setPendingTier] = useState<string | null>(null);
   const [pendingAddon, setPendingAddon] = useState<string | null>(null);
@@ -202,6 +212,26 @@ export default function AbbonamentoPage() {
           </div>
         )}
       </Card>
+
+      {/* Invita un amico */}
+      <div className="mt-4 rounded-2xl border p-5" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 6%, transparent)" }}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2"><span className="text-xl">🎁</span><h3 className="font-display text-lg font-bold text-txt">{t("Invita un amico")}</h3></div>
+            <p className="mt-1 max-w-md text-sm text-dim">{t("Per ogni amico che si abbona con il tuo codice, ottieni 1 mese gratis. Nessun limite: più amici inviti, più mesi gratis.")}</p>
+          </div>
+          <div className="rounded-lg border border-line bg-surface px-3 py-2 text-center">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{t("Il tuo codice")}</div>
+            <div className="font-mono text-lg font-bold text-txt">{refCode}</div>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input readOnly value={refLink} className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none" />
+          <button onClick={() => { navigator.clipboard?.writeText(refLink); setRefCopied(true); window.setTimeout(() => setRefCopied(false), 1500); }} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{refCopied ? t("Copiato ✓") : t("Copia link")}</button>
+          <a href={`https://wa.me/?text=${encodeURIComponent(`Provo Xenora per gestire il mio B&B, dai un'occhiata: ${refLink}`)}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
+        </div>
+        <p className="mt-2 text-[11px] text-faint">{t("Amici iscritti: 0 · Mesi gratis maturati: 0 · Il mese gratis si attiva quando l'amico completa il primo pagamento.")}</p>
+      </div>
 
       {/* Riepilogo abbonamento */}
       <div className="mt-4 max-w-md">
