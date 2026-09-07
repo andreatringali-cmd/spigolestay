@@ -120,13 +120,23 @@ export default function LoginPage() {
         </div>
 
         <div className="relative max-w-sm">
-          <h2 className="font-display text-3xl font-bold leading-tight">Prenotazioni e canali, in un unico posto.</h2>
-          <p className="mt-3 text-sm leading-relaxed text-white/80">Il gestionale che sincronizza le tue strutture con le OTA, incassa dal tuo sito e ti tiene tutto sotto controllo.</p>
-          <ul className="mt-6 space-y-3 text-sm text-white/90">
-            {["Sincronizza Booking, Airbnb ed Expedia", "Motore prenotazioni sul tuo sito, senza commissioni", "Tariffe, incassi e statistiche in tempo reale"].map((f) => (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/12 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/85">La piattaforma all-in-one</span>
+          <h2 className="mt-3 font-display text-[28px] font-bold leading-tight">Tutta la tua struttura, in un solo posto.</h2>
+          <p className="mt-3 text-sm leading-relaxed text-white/80">Channel manager, prenotazioni dirette, guida ospiti, guida in TV e sito web: gestisci ogni cosa da un&apos;unica piattaforma, senza saltare da un programma all&apos;altro.</p>
+          <ul className="mt-5 space-y-2.5 text-[13px] leading-snug text-white/90">
+            {[
+              "Channel Manager: Booking, Airbnb, Expedia sempre sincronizzati",
+              "Motore prenotazioni sul tuo sito, senza commissioni",
+              "Guida ospiti digitale: Wi-Fi, codici e consigli",
+              "Guida in TV: benvenuto e info in camera sulla smart TV",
+              "Sito web integrato della struttura",
+              "Check-in online, Alloggiati Web, ISTAT e tassa di soggiorno",
+              "Pulizie, messaggi automatici e preventivi agli ospiti",
+              "Tariffe dinamiche, incassi e statistiche in tempo reale",
+            ].map((f) => (
               <li key={f} className="flex items-start gap-2.5">
-                <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/15">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                <span className="mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full bg-white/15">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                 </span>
                 {f}
               </li>
