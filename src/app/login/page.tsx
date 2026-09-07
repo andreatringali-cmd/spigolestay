@@ -107,7 +107,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen bg-white text-[#1f1b16]">
       {/* Colonna sinistra: pannello brand (nascosto su telefono) */}
-      <aside className="relative hidden w-1/2 flex-col justify-between overflow-hidden p-10 text-white md:flex lg:w-[45%]" style={{ background: "linear-gradient(155deg, #285f92 0%, #1f4a74 45%, #17324e 100%)" }}>
+      <aside className="relative hidden w-2/5 flex-col justify-between overflow-hidden p-8 text-white md:flex lg:w-[34%]" style={{ background: "linear-gradient(155deg, #285f92 0%, #1f4a74 45%, #17324e 100%)" }}>
         <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full" style={{ background: "radial-gradient(circle, rgba(217,127,87,0.28) 0%, rgba(217,127,87,0) 70%)" }} />
         <div aria-hidden className="pointer-events-none absolute -bottom-28 -left-16 h-96 w-96 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 70%)" }} />
 
@@ -138,7 +138,7 @@ export default function LoginPage() {
       </aside>
 
       {/* Colonna destra: form */}
-      <main className="flex w-full flex-col items-center justify-center px-6 py-10 md:w-1/2 lg:w-[55%]">
+      <main className="flex w-full flex-col items-center justify-center px-6 py-10 md:w-3/5 lg:w-[66%]">
         <div className="w-full max-w-sm">
           {/* Brand compatto (solo su telefono) */}
           <div className="mb-7 flex flex-col items-center gap-2 text-center md:hidden">
