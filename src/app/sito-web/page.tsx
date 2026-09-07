@@ -302,12 +302,29 @@ function Site() {
           </section>
         )}
 
-        {/* Recensioni */}
+        {/* Recensioni Google (banner sempre visibile se c'è il link) */}
+        {cfg.googleUrl && (
+          <section className="mt-10">
+            <a href={cfg.googleUrl} target="_blank" rel="noreferrer" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-5 transition hover:shadow-md">
+              <div className="flex items-center gap-3">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-xl" style={{ backgroundColor: "color-mix(in srgb, #4285F4 14%, transparent)" }}>
+                  <span style={{ fontWeight: 800 }}><span style={{ color: "#4285F4" }}>G</span><span style={{ color: "#EA4335" }}>o</span><span style={{ color: "#FBBC05" }}>o</span><span style={{ color: "#4285F4" }}>g</span><span style={{ color: "#34A853" }}>l</span><span style={{ color: "#EA4335" }}>e</span></span>
+                </span>
+                <div>
+                  <div className="font-display text-lg font-bold text-txt">{T("Dicono di noi")}</div>
+                  <div className="text-sm text-dim">★★★★★ · {T("Leggi le recensioni su Google")}</div>
+                </div>
+              </div>
+              <span className="rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>{T("Leggi le recensioni su Google")} ↗</span>
+            </a>
+          </section>
+        )}
+
+        {/* Recensioni interne (dagli ospiti) */}
         {cfg.recensioni && reviews.length > 0 && (
           <section className="mt-10">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-display text-xl font-bold text-txt">Dicono di noi <span className="ml-1 text-sm font-normal text-dim">★ {reviewsAvg.toFixed(1)}/10 · {reviews.length} recensioni</span></h2>
-              {cfg.googleUrl && <a href={cfg.googleUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{T("Leggi le recensioni su Google")} ↗</a>}
+              <h2 className="font-display text-xl font-bold text-txt">{T("Dicono di noi")} <span className="ml-1 text-sm font-normal text-dim">★ {reviewsAvg.toFixed(1)}/10 · {reviews.length} {T("recensioni")}</span></h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               {reviews.map((r) => (
