@@ -120,7 +120,7 @@ export default function AbbonamentoPage() {
           const price = annual ? Math.round(tr.price * (1 - ANNUAL_OFF)) : tr.price;
           const adds = MODULES.filter((m) => !m.core && tr.includes.includes(m.key));
           return (
-            <div key={tr.key} className={`flex flex-col rounded-xl border p-4 transition ${on ? "border-focus ring-2 ring-[color:var(--focus)]" : "border-line hover:shadow-md"}`}>
+            <div key={tr.key} className={`flex flex-col rounded-xl border p-4 transition ${on ? "border-focus bg-surface shadow-md ring-2 ring-[color:var(--focus)]" : "border-line hover:shadow-md"}`}>
               <div className="flex items-center justify-between gap-2">
                 <span className="font-display text-lg font-bold text-txt">{tr.name}</span>
                 {on ? <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-2 py-0.5 text-[10px] font-bold uppercase text-focus">{t("Attivo")}</span>
