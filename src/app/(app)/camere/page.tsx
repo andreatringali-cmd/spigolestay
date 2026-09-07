@@ -56,13 +56,20 @@ export default function CamerePage() {
   const clearSel = () => setSel(new Set());
   const [bulkFloor, setBulkFloor] = useState("");
   const [bulkView, setBulkView] = useState("");
+  const [bulkAmen, setBulkAmen] = useState<Set<string>>(new Set());
+  const [showAmen, setShowAmen] = useState(false);
+  const toggleBulkAmen = (a: string) => setBulkAmen((p) => { const n = new Set(p); n.has(a) ? n.delete(a) : n.add(a); return n; });
   const applyBulk = () => {
     const patch: Partial<Unit> = {};
     if (bulkFloor.trim()) patch.floor = bulkFloor.trim();
     if (bulkView) patch.view = bulkView;
-    if (Object.keys(patch).length === 0) return;
-    sel.forEach((id) => updateUnit(id, patch));
-    clearSel(); setBulkFloor(""); setBulkView("");
+    if (Object.keys(patch).length === 0 && bulkAmen.size === 0) return;
+    sel.forEach((id) => {
+      const p: Partial<Unit> = { ...patch };
+      if (bulkAmen.size) { const u = units.find((x) => x.id === id); p.amenities = Array.from(new Set([...(u?.amenities ?? []), ...bulkAmen])); }
+      updateUnit(id, p);
+    });
+    clearSel(); setBulkFloor(""); setBulkView(""); setBulkAmen(new Set()); setShowAmen(false);
   };
   const toggleSort = (k: string) => { if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc")); else { setSortKey(k); setSortDir("asc"); } };
   const sortUnits = (list: Unit[], tps: typeof roomTypes) => {
@@ -290,15 +297,24 @@ export default function CamerePage() {
       </div>
 
       {sel.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 rounded-xl border border-line bg-surface p-3 shadow-2xl">
+        <div className="fixed bottom-4 left-1/2 z-50 max-h-[70vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 overflow-y-auto rounded-xl border border-line bg-surface p-3 shadow-2xl">
           <div className="flex flex-wrap items-center gap-2.5">
             <span className="text-sm font-semibold text-txt">{sel.size} {sel.size === 1 ? t("camera selezionata") : t("camere selezionate")}</span>
             <label className="flex items-center gap-1.5 text-xs text-dim">{t("Piano")}<input value={bulkFloor} onChange={(e) => setBulkFloor(e.target.value)} placeholder={t("Terra / 1° / 2°")} className="w-28 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
             <label className="flex items-center gap-1.5 text-xs text-dim">{t("Vista")}<select value={bulkView} onChange={(e) => setBulkView(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus"><option value="">—</option>{VIEW_OPTIONS.map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
-            <button onClick={applyBulk} disabled={!bulkFloor.trim() && !bulkView} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Applica a")} {sel.size}</button>
-            <button onClick={() => { clearSel(); setBulkFloor(""); setBulkView(""); }} className="ml-auto rounded-lg border border-line px-3 py-1.5 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
+            <button onClick={() => setShowAmen((s) => !s)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium ${showAmen || bulkAmen.size ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}>{t("Dotazioni")}{bulkAmen.size ? ` (${bulkAmen.size})` : ""}</button>
+            <button onClick={applyBulk} disabled={!bulkFloor.trim() && !bulkView && bulkAmen.size === 0} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Applica a")} {sel.size}</button>
+            <button onClick={() => { clearSel(); setBulkFloor(""); setBulkView(""); setBulkAmen(new Set()); setShowAmen(false); }} className="ml-auto rounded-lg border border-line px-3 py-1.5 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
           </div>
-          <p className="mt-1.5 text-[11px] text-faint">{t("Vengono aggiornati solo i campi compilati (piano e/o vista) sulle camere selezionate.")}</p>
+          {showAmen && (
+            <div className="mt-2 border-t border-line pt-2">
+              <div className="mb-1 text-[11px] font-medium text-dim">{t("Dotazioni da aggiungere alle camere selezionate")}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {ROOM_AMENITIES.map((a) => { const on = bulkAmen.has(a); return <button key={a} onClick={() => toggleBulkAmen(a)} className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(a)}</button>; })}
+              </div>
+            </div>
+          )}
+          <p className="mt-1.5 text-[11px] text-faint">{t("Vengono aggiornati solo i campi compilati (piano, vista, dotazioni). Le dotazioni si aggiungono a quelle esistenti.")}</p>
         </div>
       )}
 
