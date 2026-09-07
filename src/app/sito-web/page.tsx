@@ -11,6 +11,52 @@ import { eur } from "@/lib/format";
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
 const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return toISO(d); };
 
+// Lingue del sito pubblico
+const SITE_LANGS: [string, string][] = [["it", "🇮🇹 IT"], ["en", "🇬🇧 EN"], ["fr", "🇫🇷 FR"], ["de", "🇩🇪 DE"], ["es", "🇪🇸 ES"]];
+// Dizionario UI (chiave = italiano). Le stringhe non presenti restano in italiano.
+const SITE_DICT: Record<string, Record<string, string>> = {
+  "Arrivo": { en: "Check-in", fr: "Arrivée", de: "Anreise", es: "Llegada" },
+  "Partenza": { en: "Check-out", fr: "Départ", de: "Abreise", es: "Salida" },
+  "Adulti": { en: "Adults", fr: "Adultes", de: "Erwachsene", es: "Adultos" },
+  "Bambini": { en: "Children", fr: "Enfants", de: "Kinder", es: "Niños" },
+  "Verifica disponibilità": { en: "Check availability", fr: "Vérifier la disponibilité", de: "Verfügbarkeit prüfen", es: "Ver disponibilidad" },
+  "Età dei bambini": { en: "Children's age", fr: "Âge des enfants", de: "Alter der Kinder", es: "Edad de los niños" },
+  "Chi siamo": { en: "About us", fr: "À propos", de: "Über uns", es: "Quiénes somos" },
+  "Le nostre camere": { en: "Our rooms", fr: "Nos chambres", de: "Unsere Zimmer", es: "Nuestras habitaciones" },
+  "letti": { en: "beds", fr: "lits", de: "Betten", es: "camas" },
+  "fino a": { en: "up to", fr: "jusqu'à", de: "bis zu", es: "hasta" },
+  "ospiti": { en: "guests", fr: "personnes", de: "Gäste", es: "huéspedes" },
+  "Prenota": { en: "Book", fr: "Réserver", de: "Buchen", es: "Reservar" },
+  "Servizi": { en: "Amenities", fr: "Services", de: "Ausstattung", es: "Servicios" },
+  "Informazioni utili": { en: "Useful info", fr: "Infos utiles", de: "Nützliche Infos", es: "Información útil" },
+  "Galleria": { en: "Gallery", fr: "Galerie", de: "Galerie", es: "Galería" },
+  "Offerte": { en: "Offers", fr: "Offres", de: "Angebote", es: "Ofertas" },
+  "Codice": { en: "Code", fr: "Code", de: "Code", es: "Código" },
+  "Dicono di noi": { en: "Reviews", fr: "Avis", de: "Bewertungen", es: "Opiniones" },
+  "recensioni": { en: "reviews", fr: "avis", de: "Bewertungen", es: "opiniones" },
+  "Leggi le recensioni su Google": { en: "Read reviews on Google", fr: "Lire les avis sur Google", de: "Bewertungen auf Google lesen", es: "Ver opiniones en Google" },
+  "Domande frequenti": { en: "FAQ", fr: "FAQ", de: "Häufige Fragen", es: "Preguntas frecuentes" },
+  "Come arrivare": { en: "How to reach us", fr: "Comment nous rejoindre", de: "Anfahrt", es: "Cómo llegar" },
+  "Indicazioni stradali": { en: "Directions", fr: "Itinéraire", de: "Wegbeschreibung", es: "Cómo llegar" },
+  "Contatti": { en: "Contacts", fr: "Contacts", de: "Kontakt", es: "Contacto" },
+  "Dove siamo": { en: "Where we are", fr: "Où nous sommes", de: "Wo wir sind", es: "Dónde estamos" },
+  "Scrivici su WhatsApp": { en: "Message us on WhatsApp", fr: "Écrivez-nous sur WhatsApp", de: "Schreib uns auf WhatsApp", es: "Escríbenos por WhatsApp" },
+  "Apri su Google Maps": { en: "Open in Google Maps", fr: "Ouvrir dans Google Maps", de: "In Google Maps öffnen", es: "Abrir en Google Maps" },
+  "Prenota direttamente e risparmia": { en: "Book direct and save", fr: "Réservez en direct et économisez", de: "Direkt buchen und sparen", es: "Reserva directo y ahorra" },
+  "Prenotando da qui eviti le commissioni delle OTA e ottieni il miglior prezzo garantito.": { en: "Booking here you avoid OTA fees and get the best guaranteed price.", fr: "En réservant ici, vous évitez les commissions des OTA et bénéficiez du meilleur prix garanti.", de: "Bei Direktbuchung sparen Sie OTA-Gebühren und erhalten den garantiert besten Preis.", es: "Reservando aquí evitas las comisiones de las OTA y obtienes el mejor precio garantizado." },
+  "Iscriviti alla newsletter": { en: "Subscribe to the newsletter", fr: "Inscrivez-vous à la newsletter", de: "Newsletter abonnieren", es: "Suscríbete a la newsletter" },
+  "Lascia i tuoi dati e ricevi in anteprima le nostre offerte e promozioni.": { en: "Leave your details and get our offers and promotions first.", fr: "Laissez vos coordonnées et recevez nos offres en avant-première.", de: "Hinterlassen Sie Ihre Daten und erhalten Sie unsere Angebote zuerst.", es: "Déjanos tus datos y recibe antes nuestras ofertas." },
+  "Nome": { en: "First name", fr: "Prénom", de: "Vorname", es: "Nombre" },
+  "Cognome": { en: "Last name", fr: "Nom", de: "Nachname", es: "Apellido" },
+  "Telefono": { en: "Phone", fr: "Téléphone", de: "Telefon", es: "Teléfono" },
+  "Iscrivimi": { en: "Subscribe", fr: "S'inscrire", de: "Abonnieren", es: "Suscribirme" },
+  "Grazie! Ti terremo aggiornato sulle offerte.": { en: "Thanks! We'll keep you posted on our offers.", fr: "Merci ! Nous vous tiendrons informé de nos offres.", de: "Danke! Wir halten Sie über Angebote auf dem Laufenden.", es: "¡Gracias! Te mantendremos al día de las ofertas." },
+  "Tutti i diritti riservati.": { en: "All rights reserved.", fr: "Tous droits réservés.", de: "Alle Rechte vorbehalten.", es: "Todos los derechos reservados." },
+  "Sito creato dal gruppo": { en: "Website by the", fr: "Site créé par le groupe", de: "Website vom Team", es: "Sitio creado por el grupo" },
+  "notte": { en: "night", fr: "nuit", de: "Nacht", es: "noche" },
+  "notti": { en: "nights", fr: "nuits", de: "Nächte", es: "noches" },
+};
+
 interface Cfg { nome: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean }
 const DEFCFG: Cfg = { nome: "", tagline: "Il tuo soggiorno nel cuore di Ortigia", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, camere: true, recensioni: true, mappa: true, contatti: true };
 
@@ -23,6 +69,10 @@ function Site() {
   const { structures, roomTypes, units, bookings, getStructure, getGuest, addGuest } = useData();
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [weather, setWeather] = useState<{ temp: number; code: number } | null>(null);
+  const [lang, setLang] = useState("it");
+  useEffect(() => { try { const l = new URLSearchParams(window.location.search).get("lang") || localStorage.getItem("xenora:sitelang"); if (l && SITE_LANGS.some(([c]) => c === l)) setLang(l); } catch {} }, []);
+  const setLangP = (l: string) => { setLang(l); try { localStorage.setItem("xenora:sitelang", l); } catch {} };
+  const T = (s: string) => (lang === "it" ? s : (SITE_DICT[s]?.[lang] ?? s));
   const [nl, setNl] = useState({ firstName: "", lastName: "", email: "", phone: "" });
   const [nlDone, setNlDone] = useState(false);
   const nlSubmit = () => {
@@ -59,13 +109,15 @@ function Site() {
   const types = roomTypes.filter((rt) => rt.structureId === sid);
   const go = (extra = "") => { window.location.href = `/prenota?s=${sid}&ci=${ci}&co=${co}&ad=${ad}&ch=${ch}${ch > 0 ? `&ages=${childAges.join(",")}` : ""}${extra}`; };
 
-  // Galleria: foto delle tipologie + foto delle singole camere della struttura.
+  // Galleria: foto delle tipologie + foto delle singole camere, con etichetta della tipologia.
   const gallery = useMemo(() => {
-    const imgs: string[] = [];
-    types.forEach((rt) => getImages(`rt:${rt.id}`).forEach((u) => imgs.push(u)));
-    units.filter((u) => u.structureId === sid).forEach((u) => (u.photos ?? []).forEach((p) => imgs.push(p)));
-    return Array.from(new Set(imgs)).slice(0, 12);
-  }, [types, units, sid]);
+    const out: { src: string; label: string }[] = [];
+    types.forEach((rt) => getImages(`rt:${rt.id}`).forEach((u) => out.push({ src: u, label: rt.name })));
+    units.filter((u) => u.structureId === sid).forEach((u) => { const rt = roomTypes.find((r) => r.id === u.roomTypeId); (u.photos ?? []).forEach((p) => out.push({ src: p, label: rt?.name ?? u.name })); });
+    const seen = new Set<string>();
+    return out.filter((g) => (seen.has(g.src) ? false : (seen.add(g.src), true))).slice(0, 20);
+  }, [types, units, sid, roomTypes]);
+  const [gi, setGi] = useState(0);
 
   // Offerte attive (modulo Promozioni).
   const offers = useMemo(() => { try { return loadPromos().filter((p) => p.discountPct && p.code); } catch { return []; } }, []);
@@ -84,7 +136,7 @@ function Site() {
   const field = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
   return (
-    <div className="min-h-full bg-wash pb-20">
+    <div className="flex min-h-full flex-col bg-wash">
       {/* Top bar */}
       <div className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
@@ -92,7 +144,7 @@ function Site() {
           <div className="text-sm font-bold text-txt">{name}<span className="ml-1 text-[11px] font-normal text-faint">· Xenorabook</span></div>
           <div className="ml-auto flex items-center gap-3 text-xs text-dim">
             {weather && <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-1 font-medium" title={`Meteo ${structure?.city ?? "Siracusa"}`}>{wIcon(weather.code)} {weather.temp}° · {structure?.city ?? "Siracusa"}</span>}
-            {structure?.phone && <span>{structure.phone}</span>}
+            <select value={lang} onChange={(e) => setLangP(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs" title="Lingua / Language">{SITE_LANGS.map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select>
             {structures.length > 1 && <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs">{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>}
           </div>
         </div>
@@ -131,7 +183,7 @@ function Site() {
         {/* Chi siamo */}
         {structure?.description && (
           <section className="mt-10">
-            <h2 className="mb-3 font-display text-xl font-bold text-txt">Chi siamo</h2>
+            <h2 className="mb-3 font-display text-xl font-bold text-txt">{T("Chi siamo")}</h2>
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-dim">{structure.description}</p>
           </section>
         )}
@@ -139,7 +191,7 @@ function Site() {
         {/* Camere */}
         {cfg.camere && (
           <section className="mt-10">
-            <h2 className="mb-3 font-display text-xl font-bold text-txt">Le nostre camere</h2>
+            <h2 className="mb-3 font-display text-xl font-bold text-txt">{T("Le nostre camere")}</h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {types.map((rt) => (
                 <button key={rt.id} onClick={() => go()} className="group overflow-hidden rounded-xl border border-line bg-surface text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
@@ -166,7 +218,7 @@ function Site() {
         {/* Servizi struttura */}
         {(structure?.services ?? []).length > 0 && (
           <section className="mt-10">
-            <h2 className="mb-3 font-display text-xl font-bold text-txt">Servizi</h2>
+            <h2 className="mb-3 font-display text-xl font-bold text-txt">{T("Servizi")}</h2>
             <div className="flex flex-wrap gap-2">{(structure?.services ?? []).map((s) => <span key={s} className="rounded-full border border-line bg-surface px-3 py-1 text-sm text-dim">{s}</span>)}</div>
           </section>
         )}
@@ -201,23 +253,43 @@ function Site() {
           );
         })()}
 
-        {/* Galleria foto */}
-        {gallery.length > 0 && (
-          <section className="mt-10">
-            <h2 className="mb-3 font-display text-xl font-bold text-txt">Galleria</h2>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-              {gallery.map((src, i) => (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <button key={i} onClick={() => setLightbox(src)} className="group overflow-hidden rounded-xl border border-line"><img src={src} alt="" className="h-32 w-full object-cover transition group-hover:scale-105" /></button>
-              ))}
-            </div>
-          </section>
-        )}
+        {/* Galleria (carosello) */}
+        {gallery.length > 0 && (() => {
+          const cur = gallery[gi % gallery.length];
+          const len = gallery.length;
+          return (
+            <section className="mt-10">
+              <h2 className="mb-3 font-display text-xl font-bold text-txt">{T("Galleria")}</h2>
+              <div className="relative overflow-hidden rounded-2xl border border-line bg-black">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={cur.src} alt={cur.label} onClick={() => setLightbox(cur.src)} className="mx-auto max-h-[460px] w-full cursor-zoom-in bg-black object-contain" />
+                {len > 1 && (
+                  <>
+                    <button onClick={() => setGi((g) => (g - 1 + len) % len)} className="absolute left-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-xl text-white hover:bg-black/65">‹</button>
+                    <button onClick={() => setGi((g) => (g + 1) % len)} className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-black/45 text-xl text-white hover:bg-black/65">›</button>
+                  </>
+                )}
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-4">
+                  <div className="text-base font-semibold text-white">{cur.label}</div>
+                  <div className="text-[11px] text-white/70">{(gi % len) + 1} / {len}</div>
+                </div>
+              </div>
+              {len > 1 && (
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                  {gallery.map((g, i) => (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <button key={i} onClick={() => setGi(i)} className={`h-14 w-20 shrink-0 overflow-hidden rounded-lg border-2 ${i === gi % len ? "" : "opacity-60"}`} style={{ borderColor: i === gi % len ? accent : "var(--line)" }}><img src={g.src} alt="" className="h-full w-full object-cover" /></button>
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })()}
 
         {/* Offerte attive */}
         {offers.length > 0 && (
           <section className="mt-10">
-            <h2 className="mb-3 font-display text-xl font-bold text-txt">Offerte</h2>
+            <h2 className="mb-3 font-display text-xl font-bold text-txt">{T("Offerte")}</h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {offers.map((p) => (
                 <div key={p.id} className="rounded-xl border p-4" style={{ borderColor: `color-mix(in srgb, ${accent} 40%, var(--line))`, backgroundColor: `color-mix(in srgb, ${accent} 6%, transparent)` }}>
@@ -235,7 +307,7 @@ function Site() {
           <section className="mt-10">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-display text-xl font-bold text-txt">Dicono di noi <span className="ml-1 text-sm font-normal text-dim">★ {reviewsAvg.toFixed(1)}/10 · {reviews.length} recensioni</span></h2>
-              {cfg.googleUrl && <a href={cfg.googleUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Leggi le recensioni su Google ↗</a>}
+              {cfg.googleUrl && <a href={cfg.googleUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{T("Leggi le recensioni su Google")} ↗</a>}
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               {reviews.map((r) => (
@@ -249,49 +321,16 @@ function Site() {
           </section>
         )}
 
-        {/* FAQ + Come arrivare */}
-        {structure && (() => {
-          const faqs: [string, string][] = [
-            structure.checkInFrom ? ["A che ora è il check-in?", `Dalle ${structure.checkInFrom}${structure.checkInTo ? ` alle ${structure.checkInTo}` : ""}. Check-out ${structure.checkOutBy ? `entro le ${structure.checkOutBy}` : "al mattino"}.`] : ["", ""],
-            typeof structure.pets === "boolean" ? ["Sono ammessi gli animali?", structure.pets ? "Sì, gli animali domestici sono i benvenuti." : "Purtroppo non sono ammessi animali."] : ["", ""],
-            typeof structure.smoking === "boolean" ? ["Si può fumare?", structure.smoking ? "È consentito fumare negli spazi indicati." : "La struttura è non fumatori."] : ["", ""],
-            structure.services?.some((s) => /parchegg/i.test(s)) ? ["C'è il parcheggio?", "Sì, è disponibile il parcheggio."] : ["", ""],
-            ["Come si paga?", "Puoi prenotare direttamente dal sito; il saldo si effettua secondo le indicazioni della struttura."],
-          ].filter(([q]) => q) as [string, string][];
-          const addrFull = [[structure.address, structure.streetNumber].filter(Boolean).join(" "), [structure.postalCode, structure.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-          const q = (structure.lat && structure.lng) ? `${structure.lat},${structure.lng}` : encodeURIComponent(addrFull || `${structure.city ?? "Siracusa"}`);
-          return (
-            <section className="mt-10 grid gap-4 sm:grid-cols-2">
-              <div>
-                <h2 className="mb-3 font-display text-xl font-bold text-txt">Domande frequenti</h2>
-                <div className="flex flex-col divide-y divide-[color:var(--line)] rounded-xl border border-line bg-surface">
-                  {faqs.map(([qn, an]) => (
-                    <div key={qn} className="p-3"><div className="text-sm font-semibold text-txt">{qn}</div><div className="mt-0.5 text-sm text-dim">{an}</div></div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h2 className="mb-3 font-display text-xl font-bold text-txt">Come arrivare</h2>
-                <div className="rounded-xl border border-line bg-surface p-4 text-sm text-dim">
-                  <p>{addrFull || "Siracusa"}</p>
-                  <p className="mt-2">🚗 In auto: raggiungi {structure.city ?? "Siracusa"} e segui le indicazioni fino all'indirizzo.</p>
-                  <p className="mt-1">✈️ Aeroporto più vicino: Catania Fontanarossa (CTA).</p>
-                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${q}`} target="_blank" rel="noreferrer" className="mt-2 inline-block font-medium" style={{ color: accent }}>Indicazioni stradali ↗</a>
-                </div>
-              </div>
-            </section>
-          );
-        })()}
 
         {/* Contatti (sinistra) / Mappa (destra) */}
         <section className="mt-10 grid gap-3 sm:grid-cols-2">
           {cfg.contatti && (
             <div className="rounded-xl border border-line bg-surface p-4">
-              <h3 className="font-display text-lg font-bold text-txt">Contatti</h3>
+              <h3 className="font-display text-lg font-bold text-txt">{T("Contatti")}</h3>
               <div className="mt-1 flex flex-col gap-1 text-sm text-dim">
                 {structure?.email && <a href={`mailto:${structure.email}`} className="hover:underline">✉ {structure.email}</a>}
                 {structure?.phone && <a href={`tel:${structure.phone}`} className="hover:underline">☎ {structure.phone}</a>}
-                {structure?.phone && <a href={`https://wa.me/${structure.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="font-medium" style={{ color: "#25D366" }}>Scrivici su WhatsApp</a>}
+                {structure?.phone && <a href={`https://wa.me/${structure.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="font-medium" style={{ color: "#25D366" }}>{T("Scrivici su WhatsApp")}</a>}
                 {structure?.website && <a href={structure.website.startsWith("http") ? structure.website : `https://${structure.website}`} target="_blank" rel="noreferrer" className="hover:underline" style={{ color: accent }}>🌐 {structure.website}</a>}
                 <div className="mt-1 flex gap-3">
                   {structure?.instagram && <a href={structure.instagram.startsWith("http") ? structure.instagram : `https://instagram.com/${structure.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" className="font-medium hover:underline" style={{ color: "#C13584" }}>Instagram</a>}
@@ -308,9 +347,9 @@ function Site() {
               <div className="overflow-hidden rounded-xl border border-line bg-surface">
                 <iframe src={`https://maps.google.com/maps?q=${q}&z=15&output=embed`} className="h-52 w-full" style={{ border: 0 }} loading="lazy" title="Mappa" />
                 <div className="p-4">
-                  <h3 className="font-display text-lg font-bold text-txt">Dove siamo</h3>
+                  <h3 className="font-display text-lg font-bold text-txt">{T("Dove siamo")}</h3>
                   <p className="mt-1 text-sm text-dim">{full || "Ortigia, Siracusa"}{structure?.zone ? ` · ${structure.zone}` : ""}</p>
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${q}`} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm font-medium" style={{ color: accent }}>Apri su Google Maps ↗</a>
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${q}`} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm font-medium" style={{ color: accent }}>{T("Apri su Google Maps")} ↗</a>
                 </div>
               </div>
             );
@@ -327,7 +366,7 @@ function Site() {
         <section className="mt-10 rounded-2xl border border-line bg-surface p-6">
           <div className="grid gap-4 sm:grid-cols-2 sm:items-center">
             <div>
-              <h2 className="font-display text-xl font-bold text-txt">Iscriviti alla newsletter</h2>
+              <h2 className="font-display text-xl font-bold text-txt">{T("Iscriviti alla newsletter")}</h2>
               <p className="mt-1 text-sm text-dim">Lascia i tuoi dati e ricevi in anteprima le nostre offerte e promozioni.</p>
             </div>
             {nlDone ? (
@@ -338,7 +377,7 @@ function Site() {
                 <input value={nl.lastName} onChange={(e) => setNl({ ...nl, lastName: e.target.value })} placeholder="Cognome" className={field} />
                 <input value={nl.email} onChange={(e) => setNl({ ...nl, email: e.target.value })} placeholder="Email *" className={`${field} col-span-2`} />
                 <input value={nl.phone} onChange={(e) => setNl({ ...nl, phone: e.target.value })} placeholder="Telefono" className={`${field} col-span-2`} />
-                <button onClick={nlSubmit} disabled={!nl.email.trim() || (!nl.firstName.trim() && !nl.lastName.trim())} className="col-span-2 rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: accent }}>Iscrivimi</button>
+                <button onClick={nlSubmit} disabled={!nl.email.trim() || (!nl.firstName.trim() && !nl.lastName.trim())} className="col-span-2 rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: accent }}>{T("Iscrivimi")}</button>
                 <p className="col-span-2 text-[10px] text-faint">Iscrivendoti acconsenti a ricevere comunicazioni promozionali. Puoi disiscriverti quando vuoi.</p>
               </div>
             )}
@@ -368,7 +407,7 @@ function Site() {
             </div>
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-[11px] text-faint">
-            <span>© {new Date().getFullYear()} {name}. Tutti i diritti riservati.</span>
+            <span>© {new Date().getFullYear()} {name}. {T("Tutti i diritti riservati.")}</span>
             <span>Sito creato dal gruppo <b className="text-dim">Xenora</b> · Prenotazione online sicura</span>
           </div>
         </div>
