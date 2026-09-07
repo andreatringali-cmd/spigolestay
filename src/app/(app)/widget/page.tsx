@@ -92,7 +92,7 @@ export default function WidgetPage() {
 
   return (
     <div>
-      <PageHeader title={t("Widget sito")} subtitle={t("Il motore prenotazioni per il tuo sito: le prenotazioni entrano dirette nel calendario")} actions={<a href="/prenota" target="_blank" rel="noreferrer" className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Apri il motore")} ↗</a>} />
+      <PageHeader title={t("Widget sito")} subtitle={t("Il motore prenotazioni per il tuo sito: le prenotazioni entrano dirette nel calendario")} actions={<a href={`/prenota?s=${structureId}`} target="_blank" rel="noreferrer" className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Apri il motore")} ↗</a>} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Colonna configurazione */}
