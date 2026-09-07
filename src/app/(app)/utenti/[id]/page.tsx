@@ -38,7 +38,7 @@ const IcoBan = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strok
 const IcoEye = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>;
 const IcoPen = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M14 6l4 4" /></svg>;
 const LEVEL_META: Record<PermLevel, { label: string; icon: React.ReactNode; color: string }> = {
-  none: { label: "Nessuno", icon: IcoBan, color: "#9CA3AF" },
+  none: { label: "Nessuno", icon: IcoBan, color: "#D64545" },
   view: { label: "Visualizza", icon: IcoEye, color: "#2563EB" },
   edit: { label: "Modifica", icon: IcoPen, color: "#0E9F6E" },
 };
@@ -253,7 +253,12 @@ export default function UserSchedaPage() {
           {/* Turni & disponibilità */}
           <Card>
             <SectionTitle>{t("Turni & disponibilità")}</SectionTitle>
-            <div className="mb-1 text-xs text-dim">{t("Giorni lavorativi")}</div>
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs text-dim">{t("Giorni lavorativi")}</span>
+              {(() => { const all = WORK_DAYS.every((d) => (u.workDays ?? []).includes(d)); return (
+                <button onClick={() => set("workDays", all ? [] : [...WORK_DAYS])} className="rounded-md border border-line px-2 py-0.5 text-[11px] font-medium text-focus hover:bg-wash">{all ? t("Deseleziona tutti") : t("Seleziona tutti")}</button>
+              ); })()}
+            </div>
             <div className="mb-3 flex flex-wrap gap-1.5">
               {WORK_DAYS.map((d) => { const on = (u.workDays ?? []).includes(d); return (
                 <button key={d} onClick={() => set("workDays", on ? (u.workDays ?? []).filter((x) => x !== d) : [...(u.workDays ?? []), d])} className={`h-9 w-11 rounded-lg border text-xs font-semibold transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(d)}</button>
