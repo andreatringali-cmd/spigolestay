@@ -278,8 +278,38 @@ export default function PrenotazioniPage() {
         </div>
       </div>
 
-      {/* Tabella */}
-      <div className="max-h-[60vh] overflow-auto rounded-xl border border-line bg-surface shadow-sm">
+      {/* Telefono: lista a schede (la tabella qui sotto è nascosta) */}
+      <div className="flex flex-col gap-2 md:hidden">
+        {sorted.map((b) => {
+          const ch = CHANNELS[b.channel]; const alOk = alloggiatiOk(b); const pay = payStatus(b);
+          return (
+            <button key={b.id} onClick={() => openBooking(b.id)} className="block w-full rounded-xl border border-line bg-surface p-3 text-left shadow-sm active:bg-wash">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-semibold text-txt">{guestName(b.guestId) || "—"}</span>
+                <span title={ch.label} className="inline-flex h-[20px] shrink-0 items-center rounded-md px-2 text-[10px] font-bold" style={{ backgroundColor: `var(${ch.cssVar})`, color: ch.text }}>{ch.label}</span>
+              </div>
+              <div className="mt-1 flex items-center gap-1.5 text-xs text-dim">
+                <span className="font-mono">{fmt(b.checkIn)} → {fmt(b.checkOut)}</span>
+                <span className="text-faint">·</span>
+                <span>{nights(b.checkIn, b.checkOut)} {t("notti")}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <span className="truncate text-xs text-dim">{unitLabel(b) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>} · {b.adults + b.children} {t("osp.")}</span>
+                <span className="shrink-0 font-mono font-semibold text-txt">{b.total ? eur(b.total) : "—"}</span>
+              </div>
+              <div className="mt-2 flex items-center gap-1.5">
+                <StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--faint)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} />
+                <StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} />
+                {activeStructureId === "all" && <span className="ml-auto flex items-center gap-1 truncate text-[11px] text-faint"><span className="h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} />{getStructure(b.structureId)?.name}</span>}
+              </div>
+            </button>
+          );
+        })}
+        {!filtered.length && <div className="rounded-xl border border-line bg-surface p-6 text-center text-sm text-faint">{t("Nessuna prenotazione con questi filtri")}</div>}
+      </div>
+
+      {/* Tabella (tablet/desktop) */}
+      <div className="hidden max-h-[60vh] overflow-auto rounded-xl border border-line bg-surface shadow-sm md:block">
         <table className="w-max min-w-full whitespace-nowrap text-sm">
           <thead className="sticky top-0 z-20">
             <tr className="text-left text-xs uppercase tracking-wide text-faint">
