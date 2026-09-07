@@ -115,7 +115,33 @@ export default function OspitiPage() {
         </div>
       )}
 
-      <div className="rounded-xl border border-line bg-surface shadow-sm">
+      {/* Telefono: registro ospiti a schede */}
+      <div className="md:hidden">
+        <div className="mb-2 px-1 text-sm font-bold text-txt">{t("Registro ospiti")} <span className="text-faint">· {sorted.length}</span></div>
+        <div className="flex flex-col gap-2">
+          {sorted.map(({ guest, stays, nightsTot, spent, last, topCh }) => (
+            <div key={guest.id} className="flex items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm">
+              <input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: "var(--focus)" }} className="shrink-0" />
+              <button onClick={() => router.push(`/ospiti/${guest.id}`)} className="min-w-0 flex-1 text-left">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1.5 truncate font-semibold text-txt">{guest.fullName}{guest.vip && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}</span>
+                  <span className="shrink-0 font-mono font-semibold text-txt">{eur(spent)}</span>
+                </div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-dim">
+                  {topCh && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `var(${CHANNELS[topCh].cssVar})`, color: CHANNELS[topCh].text }}>{CHANNELS[topCh].label}</span>}
+                  <span>{stays} {t("pren.")} · {nightsTot} {t("notti")}</span>
+                  {guest.country && <><span className="text-faint">·</span><span>{guest.country}</span></>}
+                </div>
+                <div className="mt-0.5 text-[11px] text-faint">{t("Ultimo")}: {last ? fmtD(last) : "—"}{guest.phone ? ` · ${guest.phone}` : ""}</div>
+              </button>
+            </div>
+          ))}
+          {sorted.length === 0 && <div className="rounded-xl border border-line bg-surface p-6 text-center text-sm text-faint">{t("Nessun ospite trovato.")}</div>}
+        </div>
+      </div>
+
+      {/* Tablet/desktop: tabella */}
+      <div className="hidden rounded-xl border border-line bg-surface shadow-sm md:block">
         <div className="flex items-center gap-1.5 border-b border-line px-4 py-2.5 text-sm font-bold text-txt">{t("Registro ospiti")} <span className="text-faint">· {sorted.length}</span></div>
         <div className="max-h-[62vh] overflow-auto">
         <table className="w-full min-w-[980px] text-sm">
