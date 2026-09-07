@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { useAccess } from "@/lib/access";
 import { PERM_TEMPLATES, initials } from "@/lib/users";
 import { playSound } from "@/lib/sound";
+import { useAuth } from "@/lib/authsync";
 
 const roleLabel = (k: string) => (k === "custom" ? "Personalizzato" : PERM_TEMPLATES.find((t) => t.key === k)?.label ?? "—");
 
 // Utente "collegato": in produzione arriva dall'autenticazione. Qui puoi cambiarlo per provare i ruoli.
 export default function UserSwitcher({ sidebar, collapsed }: { sidebar?: boolean; collapsed?: boolean }) {
   const { user, users, setUserId } = useAccess();
+  const { enabled: authEnabled, signOut, user: authUser } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
@@ -31,7 +33,16 @@ export default function UserSwitcher({ sidebar, collapsed }: { sidebar?: boolean
               {u.id === user.id && <span className="text-focus">✓</span>}
             </button>
           ))}
-          <div className="border-t border-line px-2 py-1.5 text-[10px] text-faint">In produzione l'utente arriva dal login. Il menu e le pagine si adattano ai suoi permessi e ai moduli attivi.</div>
+          {authEnabled && (
+            <div className="mt-1 border-t border-line pt-1">
+              {authUser?.email && <div className="px-2 pb-1 pt-0.5 text-[11px] text-faint truncate" title={authUser.email}>Account: {authUser.email}</div>}
+              <button onClick={() => { setOpen(false); playSound("logout"); void signOut(); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium text-[color:var(--bad)] hover:bg-wash">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+                Esci
+              </button>
+            </div>
+          )}
+          <div className="border-t border-line px-2 py-1.5 text-[10px] text-faint">In produzione l&apos;utente interno arriva dal login. Il menu e le pagine si adattano ai suoi permessi e ai moduli attivi.</div>
         </div>
       )}
     </div>

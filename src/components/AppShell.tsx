@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { DataProvider } from "@/lib/store";
+import { AuthProvider } from "@/lib/authsync";
 import { ThemeProvider } from "@/lib/theme";
 import { LangProvider } from "@/lib/i18n";
 import { AccessProvider } from "@/lib/access";
@@ -30,6 +31,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
+    <AuthProvider>
     <ThemeProvider>
       <LangProvider>
       <DataProvider>
@@ -77,5 +79,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
       </DataProvider>
       </LangProvider>
     </ThemeProvider>
+    </AuthProvider>
   );
 }
