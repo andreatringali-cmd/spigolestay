@@ -340,13 +340,12 @@ function Site() {
             const full = [addr, [structure?.postalCode, structure?.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
             const q = (structure?.lat && structure?.lng) ? `${structure.lat},${structure.lng}` : encodeURIComponent(full || `${structure?.city ?? "Siracusa"}`);
             return (
-              <div className="overflow-hidden rounded-xl border border-line bg-surface">
-                <iframe src={`https://maps.google.com/maps?q=${q}&z=15&output=embed`} className="h-52 w-full" style={{ border: 0 }} loading="lazy" title="Mappa" />
-                <div className="p-4">
+              <div className="flex flex-col overflow-hidden rounded-xl border border-line bg-surface">
+                <div className="flex items-center justify-between gap-2 p-4">
                   <h3 className="font-display text-lg font-bold text-txt">{T("Dove siamo")}</h3>
-                  <p className="mt-1 text-sm text-dim">{full || "Ortigia, Siracusa"}{structure?.zone ? ` · ${structure.zone}` : ""}</p>
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${q}`} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm font-medium" style={{ color: accent }}>{T("Apri su Google Maps")} ↗</a>
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${q}`} target="_blank" rel="noreferrer" className="text-sm font-medium" style={{ color: accent }}>{T("Apri su Google Maps")} ↗</a>
                 </div>
+                <iframe src={`https://maps.google.com/maps?q=${q}&z=15&output=embed`} className="h-56 w-full" style={{ border: 0 }} loading="lazy" title="Mappa" />
               </div>
             );
           })()}
