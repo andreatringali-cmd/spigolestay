@@ -201,20 +201,18 @@ export default function LoginPage() {
                 </label>
 
                 <label className="block">
-                  <span className="mb-1 flex items-center justify-between">
-                    <span className="text-[13px] font-medium text-[#4a453d]">Password</span>
-                    {mode === "login" && <button type="button" onClick={resetPwd} className="text-[13px] font-medium text-[#2f6bb0] hover:underline" disabled={busy}>Password dimenticata?</button>}
-                  </span>
+                  <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Password</span>
                   <div className="relative">
                     <input type={show ? "text" : "password"} required minLength={6} value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="••••••••" className={`${fld} pr-16`} disabled={busy} />
                     <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[11px] font-semibold text-[#6b6459] hover:text-[#1f1b16]">{show ? "Nascondi" : "Mostra"}</button>
                   </div>
                   {mode === "signup" && <span className="mt-1 block text-[11px] text-[#9a9186]">Almeno 6 caratteri.</span>}
+                  {mode === "login" && <button type="button" onClick={resetPwd} className="mt-1.5 block text-[13px] font-medium text-[#2f6bb0] hover:underline" disabled={busy}>Password dimenticata?</button>}
                 </label>
 
                 <label className="mt-3 flex cursor-pointer items-center gap-2 text-[13px] text-[#4a453d]">
                   <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 rounded accent-[#2f6bb0]" />
-                  Ricordami su questo dispositivo
+                  Ricordami
                 </label>
 
                 {err && <div className="mt-4 rounded-lg border border-[#f0c2c2] bg-[#fdf1f1] px-3 py-2.5 text-[13px] font-medium text-[#c0392b]">{err}</div>}
