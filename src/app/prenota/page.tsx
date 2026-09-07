@@ -102,6 +102,43 @@ function Engine() {
     window.scrollTo(0, 0);
   };
 
+  // Riepilogo prenotazione (per email e PDF).
+  const bookingLines = () => ([
+    ["Codice prenotazione", code],
+    ["Struttura", structure?.name ?? ""],
+    ["Camera", `${selRt?.name ?? ""}${selPlan ? " · " + selPlan.name : ""}`],
+    ["Ospite", `${guest.firstName} ${guest.lastName}`.trim()],
+    ["Check-in", new Date(checkIn).toLocaleDateString("it-IT")],
+    ["Check-out", new Date(checkOut).toLocaleDateString("it-IT")],
+    ["Ospiti", `${adults} adulti${children ? ` · ${children} bambini` : ""}`],
+    ["Totale", eur(total)],
+    ["Acconto versato", eur(deposit)],
+    ["Saldo in struttura", eur(Math.max(0, total - deposit))],
+  ] as [string, string][]);
+
+  const emailConfirm = () => {
+    const body = [`Ciao ${guest.firstName},`, "", "grazie per la tua prenotazione. Ecco il riepilogo:", "", ...bookingLines().map(([k, v]) => `${k}: ${v}`), "", `A presto,`, structure?.name ?? "Xenora"].join("\n");
+    window.open(`mailto:${encodeURIComponent(guest.email)}?subject=${encodeURIComponent(`Conferma prenotazione ${code} · ${structure?.name ?? ""}`)}&body=${encodeURIComponent(body)}`);
+  };
+  const printPdf = () => {
+    const w = window.open("", "_blank", "width=820,height=940");
+    if (!w) return;
+    const rows = bookingLines().map(([k, v]) => `<tr><td class="k">${k}</td><td class="v">${v}</td></tr>`).join("");
+    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Prenotazione ${code}</title>
+      <style>*{box-sizing:border-box}body{font-family:Georgia,'Times New Roman',serif;color:#1a2131;margin:0;padding:48px 54px;font-size:14px;line-height:1.55}
+      .brand{font-size:24px;font-weight:700;color:#4f46e5;border-bottom:3px solid #4f46e5;padding-bottom:14px;margin-bottom:24px}
+      h1{font-size:14px;letter-spacing:2px;text-transform:uppercase;color:#5c6479;margin:0 0 16px}
+      table{width:100%;border-collapse:collapse}td{padding:10px 4px;border-bottom:1px solid #e3e6ef}td.k{color:#5c6479}td.v{text-align:right;font-weight:600}
+      .note{margin-top:28px;font-size:11px;color:#9aa2b6;border-top:1px solid #e3e6ef;padding-top:14px}
+      @media print{body{padding:24px 30px}}</style></head><body>
+      <div class="brand">${structure?.name ?? "Xenora"}</div>
+      <h1>Conferma di prenotazione</h1>
+      <table>${rows}</table>
+      <div class="note">Documento di riepilogo prenotazione. Prenotazione diretta · Xenora.</div>
+      <script>window.onload=function(){window.print()}<\/script></body></html>`);
+    w.document.close();
+  };
+
   // ---- Header ----
   const header = (
     <div className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
@@ -118,6 +155,34 @@ function Engine() {
         <div className="ml-auto flex items-center gap-2 rounded-full bg-wash px-3 py-1.5 text-sm"><span className="text-dim">Totale</span><span className="font-mono font-bold text-txt">{eur(total)}</span></div>
       </div>
     </div>
+  );
+
+  // ---- Footer ----
+  const footer = (
+    <footer className="mt-12 border-t border-line bg-surface">
+      <div className="mx-auto max-w-5xl px-4 py-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <a href={`/sito-web?s=${structureId}`} className="flex items-center gap-2 text-sm font-bold text-txt hover:opacity-80">
+            <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md text-xs font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : (structure?.name ?? "SS").slice(0, 2).toUpperCase()}</span>
+            {structure?.name ?? "Xenora"}
+          </a>
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-faint">
+            {structure?.email && <a href={`mailto:${structure.email}`} className="hover:text-dim">{structure.email}</a>}
+            {structure?.phone && <a href={`tel:${structure.phone}`} className="hover:text-dim">{structure.phone}</a>}
+            {structure?.cin && <span>CIN {structure.cin}</span>}
+            <div className="flex items-center gap-2">
+              {structure?.phone && <a href={`https://wa.me/${structure.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" title="WhatsApp" className="grid h-7 w-7 place-items-center rounded-full bg-wash" style={{ color: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1-.4-.1-.9-.3-1.6-.6-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8 0-1.3.7-2 .9-2.2.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.6-.3.3c-.2.2-.3.3-.1.6.2.3.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.6 1.6.3.1.5.1.7-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.1.1.5-.1 1Z" /></svg></a>}
+              {structure?.instagram && <a href={structure.instagram.startsWith("http") ? structure.instagram : `https://instagram.com/${structure.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" title="Instagram" className="grid h-7 w-7 place-items-center rounded-full bg-wash" style={{ color: "#C13584" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg></a>}
+              {structure?.facebook && <a href={structure.facebook.startsWith("http") ? structure.facebook : `https://facebook.com/${structure.facebook}`} target="_blank" rel="noreferrer" title="Facebook" className="grid h-7 w-7 place-items-center rounded-full bg-wash" style={{ color: "#1877F2" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" /></svg></a>}
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-[11px] text-faint">
+          <span>© {new Date().getFullYear()} {structure?.name ?? "Xenora"}. Tutti i diritti riservati.</span>
+          <span>Sito creato dal gruppo <b className="text-dim">Xenora</b> · Prenotazione online sicura</span>
+        </div>
+      </div>
+    </footer>
   );
 
   // ---- Search bar ----
@@ -163,9 +228,14 @@ function Engine() {
               <div className="mt-1 flex justify-between"><span className="text-dim">Acconto versato</span><span className="font-mono text-txt">{eur(deposit)}</span></div>
               {total - deposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">Saldo in struttura</span><span className="font-mono text-txt">{eur(total - deposit)}</span></div>}
             </div>
-            <p className="mt-4 text-xs text-faint">La prenotazione è entrata nel gestionale della struttura (calendario, cassa e registro attività).</p>
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <button onClick={printPdf} className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg> Scarica PDF</button>
+              <button onClick={emailConfirm} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg> Ricevi via email</button>
+            </div>
+            <p className="mt-4 text-xs text-faint">Ti abbiamo inviato la conferma via email. Puoi anche scaricare il PDF con tutti i dettagli. La prenotazione è entrata nel gestionale della struttura (calendario, cassa e registro attività).</p>
           </div>
         </div>
+        {footer}
       </div>
     );
   }
@@ -305,30 +375,7 @@ function Engine() {
           </div>
         )}
       </div>
-      <footer className="mt-12 border-t border-line bg-surface">
-        <div className="mx-auto max-w-5xl px-4 py-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <a href={`/sito-web?s=${structureId}`} className="flex items-center gap-2 text-sm font-bold text-txt hover:opacity-80">
-              <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md text-xs font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : (structure?.name ?? "SS").slice(0, 2).toUpperCase()}</span>
-              {structure?.name ?? "Xenora"}
-            </a>
-            <div className="flex flex-wrap items-center gap-3 text-[11px] text-faint">
-              {structure?.email && <a href={`mailto:${structure.email}`} className="hover:text-dim">{structure.email}</a>}
-              {structure?.phone && <a href={`tel:${structure.phone}`} className="hover:text-dim">{structure.phone}</a>}
-              {structure?.cin && <span>CIN {structure.cin}</span>}
-              <div className="flex items-center gap-2">
-                {structure?.phone && <a href={`https://wa.me/${structure.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" title="WhatsApp" className="grid h-7 w-7 place-items-center rounded-full bg-wash" style={{ color: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1-.4-.1-.9-.3-1.6-.6-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8 0-1.3.7-2 .9-2.2.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.6-.3.3c-.2.2-.3.3-.1.6.2.3.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.6 1.6.3.1.5.1.7-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.1.1.5-.1 1Z" /></svg></a>}
-                {structure?.instagram && <a href={structure.instagram.startsWith("http") ? structure.instagram : `https://instagram.com/${structure.instagram.replace(/^@/, "")}`} target="_blank" rel="noreferrer" title="Instagram" className="grid h-7 w-7 place-items-center rounded-full bg-wash" style={{ color: "#C13584" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg></a>}
-                {structure?.facebook && <a href={structure.facebook.startsWith("http") ? structure.facebook : `https://facebook.com/${structure.facebook}`} target="_blank" rel="noreferrer" title="Facebook" className="grid h-7 w-7 place-items-center rounded-full bg-wash" style={{ color: "#1877F2" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" /></svg></a>}
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-[11px] text-faint">
-            <span>© {new Date().getFullYear()} {structure?.name ?? "Xenora"}. Tutti i diritti riservati.</span>
-            <span>Sito creato dal gruppo <b className="text-dim">Xenora</b> · Prenotazione online sicura</span>
-          </div>
-        </div>
-      </footer>
+      {footer}
     </div>
   );
 }
