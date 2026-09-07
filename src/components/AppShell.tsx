@@ -57,10 +57,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
               </button>
               <AssistantBar />
               <div className="ml-auto flex items-center gap-2">
-                <OnlineUsers />
-                <ActivityLog />
-                <SoundToggle />
-                <LanguageSwitcher />
+                {/* Secondari: nascosti sul telefono per non affollare la barra (visibili da tablet in su). */}
+                <div className="hidden items-center gap-2 sm:flex">
+                  <OnlineUsers />
+                  <ActivityLog />
+                  <SoundToggle />
+                  <LanguageSwitcher />
+                </div>
                 <StructureSwitcher />
               </div>
             </header>

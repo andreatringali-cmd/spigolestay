@@ -29,8 +29,8 @@ export default function StructureSwitcher() {
         <span style={{ color: "var(--focus)" }}><Icon name="building" size={16} /></span>
         {current ? (
           <span className="flex items-baseline gap-1.5">
-            <span className="max-w-[180px] truncate font-medium text-txt">{current.name}</span>
-            {current.city && <span className="text-[11px] text-faint">{current.city}</span>}
+            <span className="max-w-[110px] truncate font-medium text-txt sm:max-w-[180px]">{current.name}</span>
+            {current.city && <span className="hidden text-[11px] text-faint sm:inline">{current.city}</span>}
           </span>
         ) : (
           <span className="font-medium text-txt">{t("Tutte le strutture")}</span>
