@@ -143,21 +143,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         const { data, error } = await supabase!.from("app_state").select("data").eq("user_id", uid).maybeSingle();
         if (cancelled) return;
+        if (error) {
+          // Problema di rete/permessi: NON tocchiamo i dati locali, per non perderli.
+          // Riprendiamo comunque il salvataggio periodico (che ritenterà a ogni ciclo).
+          lastPushed.current = JSON.stringify(snapshot());
+          setHydrated(true);
+          startPush(uid);
+          return;
+        }
         const serverData = (data?.data ?? null) as Record<string, string> | null;
-        if (!error && serverData && Object.keys(serverData).length > 0) {
+        if (serverData && Object.keys(serverData).length > 0) {
           // Ci sono dati sul server: portali nel browser e ricarica per far ripartire l'app pulita.
           restore(serverData);
           sessionStorage.setItem(flagKey, uid);
           location.reload();
           return;
         }
-        // Primo accesso di questo account: salva sul server lo stato locale attuale (anche se vuoto).
+        // Nessuna riga sul server = ACCOUNT NUOVO. Deve partire da zero e vedere la procedura
+        // guidata: non deve ereditare dati rimasti nel browser da usi/altri account precedenti.
+        wipeLocalAccount();
+        try {
+          localStorage.setItem("spigolestay:forcereset:v1", "1"); // evita il wipe+reload automatico dello store
+          localStorage.setItem("spigolestay:zeroprices:v1", "1");  // evita migrazioni sui dati demo
+          localStorage.setItem("spigolestay:onboarded", "0");      // attiva la procedura guidata (struttura, camere…)
+        } catch {}
         const snap = snapshot();
         await supabase!.from("app_state").upsert({ user_id: uid, data: snap, updated_at: new Date().toISOString() });
         lastPushed.current = JSON.stringify(snap);
         sessionStorage.setItem(flagKey, uid);
-        setHydrated(true);
-        startPush(uid);
+        location.reload(); // riparte pulito → compare l'onboarding
+        return;
       } catch {
         // In caso di problemi di rete non blocchiamo l'uso dell'app (resta il salvataggio locale).
         setHydrated(true);
