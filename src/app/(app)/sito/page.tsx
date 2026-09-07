@@ -7,8 +7,8 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
 
-interface Cfg { nome: string; dominio: string; tagline: string; accent: string; heroBg?: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean; lang: string[] }
-const DEF: Cfg = { nome: "Spigole House", dominio: "spigolehouse.it", tagline: "Il tuo soggiorno nel cuore di Ortigia", accent: "#4F46E5", heroBg: "", hero: true, camere: true, recensioni: true, mappa: true, contatti: true, lang: ["it", "en"] };
+interface Cfg { nome: string; dominio: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean; lang: string[] }
+const DEF: Cfg = { nome: "Spigole House", dominio: "spigolehouse.it", tagline: "Il tuo soggiorno nel cuore di Ortigia", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, camere: true, recensioni: true, mappa: true, contatti: true, lang: ["it", "en"] };
 const LANGS = [["it", "Italiano"], ["en", "English"], ["fr", "Français"], ["de", "Deutsch"], ["es", "Español"]] as const;
 const SEZIONI: { key: keyof Cfg; label: string }[] = [
   { key: "hero", label: "Copertina (hero)" }, { key: "camere", label: "Camere e prezzi" }, { key: "recensioni", label: "Recensioni" }, { key: "mappa", label: "Mappa e dintorni" }, { key: "contatti", label: "Contatti" },
@@ -57,6 +57,7 @@ export default function SitoPage() {
               <span className="mt-1 block text-[11px] text-faint">{t("Dominio consigliato")}: <b className="text-dim">{suggestedDomain}</b> — {t("in produzione potrai collegarlo al tuo dominio.")}</span>
             </div>
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Sottotitolo")}</span><input value={c.tagline} onChange={(e) => set({ tagline: e.target.value })} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
+            <label className="mb-3 block"><span className="text-xs text-dim">{t("Link recensioni Google")} <span className="text-faint">({t("opzionale")})</span></span><input value={c.googleUrl ?? ""} onChange={(e) => set({ googleUrl: e.target.value })} placeholder="https://g.page/…/review" className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             <div className="mb-1 text-xs text-dim">{t("Colore")}</div>
             <div className="flex gap-2">{["#4F46E5", "#0E9F6E", "#BE5D38", "#2563EB", "#DB2777", "#0891B2"].map((col) => <button key={col} onClick={() => set({ accent: col })} className={`h-7 w-7 rounded-full border-2 ${c.accent === col ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: col }} />)}</div>
             <div className="mb-1 mt-4 text-xs text-dim">{t("Sfondo copertina")}</div>

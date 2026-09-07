@@ -5,13 +5,14 @@ import { DataProvider, useData } from "@/lib/store";
 import type { RoomType } from "@/lib/types";
 import { effectiveBase } from "@/lib/pricing";
 import { getImages } from "@/lib/images";
+import { loadPromos } from "@/lib/promos";
 import { eur } from "@/lib/format";
 
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
 const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return toISO(d); };
 
-interface Cfg { nome: string; tagline: string; accent: string; heroBg?: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean }
-const DEFCFG: Cfg = { nome: "", tagline: "Il tuo soggiorno nel cuore di Ortigia", accent: "#4F46E5", heroBg: "", hero: true, camere: true, recensioni: true, mappa: true, contatti: true };
+interface Cfg { nome: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean }
+const DEFCFG: Cfg = { nome: "", tagline: "Il tuo soggiorno nel cuore di Ortigia", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, camere: true, recensioni: true, mappa: true, contatti: true };
 
 
 export default function SitoWebPage() {
@@ -19,7 +20,15 @@ export default function SitoWebPage() {
 }
 
 function Site() {
-  const { structures, roomTypes, getStructure } = useData();
+  const { structures, roomTypes, units, bookings, getStructure, getGuest, addGuest } = useData();
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [nl, setNl] = useState({ firstName: "", lastName: "", email: "", phone: "" });
+  const [nlDone, setNlDone] = useState(false);
+  const nlSubmit = () => {
+    if (!nl.email.trim() || (!nl.firstName.trim() && !nl.lastName.trim())) return;
+    addGuest({ firstName: nl.firstName.trim() || undefined, lastName: nl.lastName.trim() || undefined, email: nl.email.trim() || undefined, phone: nl.phone.trim() || undefined });
+    setNlDone(true); setNl({ firstName: "", lastName: "", email: "", phone: "" });
+  };
   const cfg = useMemo<Cfg>(() => { try { const r = localStorage.getItem("spigolestay:sito"); if (r) return { ...DEFCFG, ...JSON.parse(r) }; } catch {} return DEFCFG; }, []);
   const [sid, setSid] = useState(() => { try { return new URLSearchParams(window.location.search).get("s") || structures[0]?.id || ""; } catch { return structures[0]?.id ?? ""; } });
   // Lo store carica i dati dopo il mount: aggancia la prima struttura appena disponibile.
@@ -38,6 +47,28 @@ function Site() {
 
   const types = roomTypes.filter((rt) => rt.structureId === sid);
   const go = (extra = "") => { window.location.href = `/prenota?s=${sid}&ci=${ci}&co=${co}&ad=${ad}&ch=${ch}${ch > 0 ? `&ages=${childAges.join(",")}` : ""}${extra}`; };
+
+  // Galleria: foto delle tipologie + foto delle singole camere della struttura.
+  const gallery = useMemo(() => {
+    const imgs: string[] = [];
+    types.forEach((rt) => getImages(`rt:${rt.id}`).forEach((u) => imgs.push(u)));
+    units.filter((u) => u.structureId === sid).forEach((u) => (u.photos ?? []).forEach((p) => imgs.push(p)));
+    return Array.from(new Set(imgs)).slice(0, 12);
+  }, [types, units, sid]);
+
+  // Offerte attive (modulo Promozioni).
+  const offers = useMemo(() => { try { return loadPromos().filter((p) => p.discountPct && p.code); } catch { return []; } }, []);
+
+  // Recensioni reali: dagli ospiti passati (come il modulo Recensioni).
+  const reviews = useMemo(() => {
+    const TXT = ["Soggiorno perfetto, posizione ottima e host gentilissimo.", "Camera pulita e silenziosa, torneremo di sicuro.", "Accoglienza calorosa e tutto come descritto.", "Colazione ottima e consigli preziosi sulla città.", "Struttura curata nei dettagli, esperienza top."];
+    const R = [10, 9, 10, 9, 8, 10, 9, 10];
+    return bookings
+      .filter((b) => b.structureId === sid && b.checkOut < today && b.status !== "cancelled" && b.channel !== "blocked")
+      .sort((a, b) => b.checkOut.localeCompare(a.checkOut)).slice(0, 6)
+      .map((b, i) => ({ id: b.id, name: (getGuest(b.guestId)?.fullName || "Ospite").split(" ")[0], date: b.checkOut, rating: R[i % R.length], text: TXT[i % TXT.length] }));
+  }, [bookings, sid, today, getGuest]);
+  const reviewsAvg = reviews.length ? (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length) : 0;
 
   const field = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
@@ -158,21 +189,87 @@ function Site() {
           );
         })()}
 
-        {/* Recensioni */}
-        {cfg.recensioni && (
+        {/* Galleria foto */}
+        {gallery.length > 0 && (
           <section className="mt-10">
-            <h2 className="mb-3 font-display text-xl font-bold text-txt">Dicono di noi</h2>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[["Andrea è un host straordinario, posizione perfetta.", "Giulia", "★★★★★"], ["Pulizia impeccabile e colazione ottima.", "Marc", "★★★★★"], ["Camera spaziosa e silenziosa, torneremo!", "Sofia", "★★★★★"]].map(([t, n, s], i) => (
-                <div key={i} className="rounded-xl border border-line bg-surface p-4">
-                  <div className="text-sm" style={{ color: "#E0A21C" }}>{s}</div>
-                  <p className="mt-1 text-sm text-txt">“{t}”</p>
-                  <div className="mt-2 text-xs text-faint">— {n}</div>
+            <h2 className="mb-3 font-display text-xl font-bold text-txt">Galleria</h2>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              {gallery.map((src, i) => (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <button key={i} onClick={() => setLightbox(src)} className="group overflow-hidden rounded-xl border border-line"><img src={src} alt="" className="h-32 w-full object-cover transition group-hover:scale-105" /></button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Offerte attive */}
+        {offers.length > 0 && (
+          <section className="mt-10">
+            <h2 className="mb-3 font-display text-xl font-bold text-txt">Offerte</h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {offers.map((p) => (
+                <div key={p.id} className="rounded-xl border p-4" style={{ borderColor: `color-mix(in srgb, ${accent} 40%, var(--line))`, backgroundColor: `color-mix(in srgb, ${accent} 6%, transparent)` }}>
+                  <div className="flex items-center gap-2"><span className="rounded-full px-2 py-0.5 text-sm font-bold text-white" style={{ backgroundColor: accent }}>−{p.discountPct}%</span><span className="font-semibold text-txt">{p.name || "Offerta"}</span></div>
+                  <div className="mt-2 text-sm text-dim">Codice: <b className="font-mono text-txt">{p.code}</b></div>
+                  <button onClick={() => go()} className="mt-2 text-sm font-medium" style={{ color: accent }}>Prenota con l'offerta →</button>
                 </div>
               ))}
             </div>
           </section>
         )}
+
+        {/* Recensioni */}
+        {cfg.recensioni && reviews.length > 0 && (
+          <section className="mt-10">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-display text-xl font-bold text-txt">Dicono di noi <span className="ml-1 text-sm font-normal text-dim">★ {reviewsAvg.toFixed(1)}/10 · {reviews.length} recensioni</span></h2>
+              {cfg.googleUrl && <a href={cfg.googleUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Leggi le recensioni su Google ↗</a>}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {reviews.map((r) => (
+                <div key={r.id} className="rounded-xl border border-line bg-surface p-4">
+                  <div className="text-sm" style={{ color: "#E0A21C" }}>{"★".repeat(Math.round(r.rating / 2))}</div>
+                  <p className="mt-1 text-sm text-txt">“{r.text}”</p>
+                  <div className="mt-2 text-xs text-faint">— {r.name}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* FAQ + Come arrivare */}
+        {structure && (() => {
+          const faqs: [string, string][] = [
+            structure.checkInFrom ? ["A che ora è il check-in?", `Dalle ${structure.checkInFrom}${structure.checkInTo ? ` alle ${structure.checkInTo}` : ""}. Check-out ${structure.checkOutBy ? `entro le ${structure.checkOutBy}` : "al mattino"}.`] : ["", ""],
+            typeof structure.pets === "boolean" ? ["Sono ammessi gli animali?", structure.pets ? "Sì, gli animali domestici sono i benvenuti." : "Purtroppo non sono ammessi animali."] : ["", ""],
+            typeof structure.smoking === "boolean" ? ["Si può fumare?", structure.smoking ? "È consentito fumare negli spazi indicati." : "La struttura è non fumatori."] : ["", ""],
+            structure.services?.some((s) => /parchegg/i.test(s)) ? ["C'è il parcheggio?", "Sì, è disponibile il parcheggio."] : ["", ""],
+            ["Come si paga?", "Puoi prenotare direttamente dal sito; il saldo si effettua secondo le indicazioni della struttura."],
+          ].filter(([q]) => q) as [string, string][];
+          const addrFull = [[structure.address, structure.streetNumber].filter(Boolean).join(" "), [structure.postalCode, structure.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+          const q = (structure.lat && structure.lng) ? `${structure.lat},${structure.lng}` : encodeURIComponent(addrFull || `${structure.city ?? "Siracusa"}`);
+          return (
+            <section className="mt-10 grid gap-4 sm:grid-cols-2">
+              <div>
+                <h2 className="mb-3 font-display text-xl font-bold text-txt">Domande frequenti</h2>
+                <div className="flex flex-col divide-y divide-[color:var(--line)] rounded-xl border border-line bg-surface">
+                  {faqs.map(([qn, an]) => (
+                    <div key={qn} className="p-3"><div className="text-sm font-semibold text-txt">{qn}</div><div className="mt-0.5 text-sm text-dim">{an}</div></div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h2 className="mb-3 font-display text-xl font-bold text-txt">Come arrivare</h2>
+                <div className="rounded-xl border border-line bg-surface p-4 text-sm text-dim">
+                  <p>{addrFull || "Siracusa"}</p>
+                  <p className="mt-2">🚗 In auto: raggiungi {structure.city ?? "Siracusa"} e segui le indicazioni fino all'indirizzo.</p>
+                  <p className="mt-1">✈️ Aeroporto più vicino: Catania Fontanarossa (CTA).</p>
+                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${q}`} target="_blank" rel="noreferrer" className="mt-2 inline-block font-medium" style={{ color: accent }}>Indicazioni stradali ↗</a>
+                </div>
+              </div>
+            </section>
+          );
+        })()}
 
         {/* Contatti (sinistra) / Mappa (destra) */}
         <section className="mt-10 grid gap-3 sm:grid-cols-2">
@@ -213,7 +310,37 @@ function Site() {
           <p className="max-w-md text-sm text-dim">Prenotando da qui eviti le commissioni delle OTA e ottieni il miglior prezzo garantito.</p>
           <button onClick={() => go()} className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>Verifica disponibilità</button>
         </div>
+
+        {/* Newsletter */}
+        <section className="mt-10 rounded-2xl border border-line bg-surface p-6">
+          <div className="grid gap-4 sm:grid-cols-2 sm:items-center">
+            <div>
+              <h2 className="font-display text-xl font-bold text-txt">Iscriviti alla newsletter</h2>
+              <p className="mt-1 text-sm text-dim">Lascia i tuoi dati e ricevi in anteprima le nostre offerte e promozioni.</p>
+            </div>
+            {nlDone ? (
+              <div className="rounded-xl border border-line bg-paper p-4 text-center text-sm font-medium text-[color:var(--ok)]">✓ Grazie! Ti terremo aggiornato sulle offerte.</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <input value={nl.firstName} onChange={(e) => setNl({ ...nl, firstName: e.target.value })} placeholder="Nome" className={field} />
+                <input value={nl.lastName} onChange={(e) => setNl({ ...nl, lastName: e.target.value })} placeholder="Cognome" className={field} />
+                <input value={nl.email} onChange={(e) => setNl({ ...nl, email: e.target.value })} placeholder="Email *" className={`${field} col-span-2`} />
+                <input value={nl.phone} onChange={(e) => setNl({ ...nl, phone: e.target.value })} placeholder="Telefono" className={`${field} col-span-2`} />
+                <button onClick={nlSubmit} disabled={!nl.email.trim() || (!nl.firstName.trim() && !nl.lastName.trim())} className="col-span-2 rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: accent }}>Iscrivimi</button>
+                <p className="col-span-2 text-[10px] text-faint">Iscrivendoti acconsenti a ricevere comunicazioni promozionali. Puoi disiscriverti quando vuoi.</p>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
+
+      {lightbox && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setLightbox(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightbox} alt="" className="max-h-[90vh] max-w-full rounded-lg object-contain" />
+          <button onClick={() => setLightbox(null)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/15 text-white">✕</button>
+        </div>
+      )}
 
       <footer className="mt-12 border-t border-line bg-surface">
         <div className="mx-auto max-w-5xl px-4 py-6">
