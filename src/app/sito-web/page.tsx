@@ -33,9 +33,11 @@ function Site() {
   const [co, setCo] = useState(addDays(today, 8));
   const [ad, setAd] = useState(2);
   const [ch, setCh] = useState(0);
+  const [childAges, setChildAges] = useState<number[]>([]);
+  const setChN = (n: number) => { setCh(n); setChildAges((prev) => { const next = prev.slice(0, n); while (next.length < n) next.push(8); return next; }); };
 
   const types = roomTypes.filter((rt) => rt.structureId === sid);
-  const go = (extra = "") => { window.location.href = `/prenota?s=${sid}&ci=${ci}&co=${co}&ad=${ad}&ch=${ch}${extra}`; };
+  const go = (extra = "") => { window.location.href = `/prenota?s=${sid}&ci=${ci}&co=${co}&ad=${ad}&ch=${ch}${ch > 0 ? `&ages=${childAges.join(",")}` : ""}${extra}`; };
 
   const field = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
@@ -63,9 +65,21 @@ function Site() {
               <label className="block text-[11px] font-medium text-dim">Arrivo<input type="date" value={ci} min={today} onChange={(e) => { setCi(e.target.value); if (e.target.value >= co) setCo(addDays(e.target.value, 1)); }} className={`${field} mt-0.5 w-full`} /></label>
               <label className="block text-[11px] font-medium text-dim">Partenza<input type="date" value={co} min={addDays(ci, 1)} onChange={(e) => setCo(e.target.value)} className={`${field} mt-0.5 w-full`} /></label>
               <label className="block text-[11px] font-medium text-dim">Adulti<input type="number" min={1} value={ad} onChange={(e) => setAd(Math.max(1, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
-              <label className="block text-[11px] font-medium text-dim">Bambini<input type="number" min={0} value={ch} onChange={(e) => setCh(Math.max(0, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
+              <label className="block text-[11px] font-medium text-dim">Bambini<input type="number" min={0} value={ch} onChange={(e) => setChN(Math.max(0, +e.target.value))} className={`${field} mt-0.5 w-full`} /></label>
               <button onClick={() => go()} className="mt-auto rounded-lg py-2 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>Verifica disponibilità</button>
             </div>
+            {ch > 0 && (
+              <div className="mt-2 w-full rounded-2xl bg-white/95 p-3 shadow-lg">
+                <div className="mb-1 text-[11px] font-medium text-dim">Età dei bambini <span className="text-faint">(per la tassa di soggiorno e la sistemazione)</span></div>
+                <div className="flex flex-wrap gap-2">
+                  {childAges.map((age, i) => (
+                    <label key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim">Bimbo {i + 1}
+                      <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, +e.target.value)) : a)))} className="w-14 rounded border border-line bg-surface px-1.5 py-0.5 text-sm text-txt outline-none focus:border-focus" />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -75,7 +89,7 @@ function Site() {
         {structure?.description && (
           <section className="mt-10">
             <h2 className="mb-3 font-display text-xl font-bold text-txt">Chi siamo</h2>
-            <p className="max-w-3xl whitespace-pre-wrap text-sm leading-relaxed text-dim">{structure.description}</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-dim">{structure.description}</p>
           </section>
         )}
 

@@ -45,7 +45,11 @@ function Engine() {
   const [checkOut, setCheckOut] = useState(() => qp("co") || addDays(today, 8));
   const [adults, setAdults] = useState(() => Number(qp("ad")) || 2);
   const [children, setChildren] = useState(() => Number(qp("ch")) || 0);
-  const [childAges, setChildAges] = useState<number[]>(() => { const n = Number(qp("ch")) || 0; return Array.from({ length: n }, () => 8); });
+  const [childAges, setChildAges] = useState<number[]>(() => {
+    const n = Number(qp("ch")) || 0;
+    const raw = (qp("ages") || "").split(",").map((x) => Number(x)).filter((x) => !isNaN(x));
+    return Array.from({ length: n }, (_, i) => (raw[i] ?? 8));
+  });
   const setChildrenN = (n: number) => { setChildren(n); setChildAges((prev) => { const next = prev.slice(0, n); while (next.length < n) next.push(8); return next; }); };
   const nights = nightsBetween(checkIn, checkOut);
 
