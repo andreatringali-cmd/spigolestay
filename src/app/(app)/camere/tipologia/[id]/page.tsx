@@ -93,13 +93,13 @@ export default function TipologiaSchedaPage() {
 
           <Card>
             <SectionTitle>{t("Ospiti & capienza")}</SectionTitle>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <label className={lbl}>{t("Ospiti max")}<input type="number" min={1} value={f.maxOccupancy ?? ""} onChange={(e) => set("maxOccupancy", num(e.target.value))} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Adulti max")}<input type="number" min={1} value={f.maxAdults ?? ""} onChange={(e) => set("maxAdults", num(e.target.value))} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Bambini max")}<input type="number" min={0} value={f.maxChildren ?? ""} onChange={(e) => set("maxChildren", num(e.target.value))} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Neonati")}<input type="number" min={0} value={f.infants ?? ""} onChange={(e) => set("infants", num(e.target.value))} className={`${inp} mt-1`} /></label>
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
               <label className={lbl}>{t("Posti letto")}<input type="number" min={1} value={f.beds ?? ""} onChange={(e) => set("beds", Number(e.target.value) || 0)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Letti extra")}<input type="number" min={0} value={f.extraBeds ?? ""} onChange={(e) => set("extraBeds", num(e.target.value))} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("€ letto extra")}<input type="number" min={0} value={f.extraBedPrice ?? ""} onChange={(e) => set("extraBedPrice", num(e.target.value))} className={`${inp} mt-1`} /></label>
@@ -141,7 +141,7 @@ export default function TipologiaSchedaPage() {
         <div className="flex flex-col gap-4">
           <Card>
             <SectionTitle>{t("Prezzo & disponibilità")}</SectionTitle>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               <label className={lbl}>{t("Prezzo base €")}<input type="number" min={0} value={f.basePrice ?? ""} onChange={(e) => set("basePrice", Number(e.target.value) || 0)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Prezzo minimo €")}<input type="number" min={0} value={f.minPrice ?? ""} onChange={(e) => set("minPrice", num(e.target.value))} className={`${inp} mt-1`} placeholder="—" /></label>
               <label className={lbl}>{t("Notti minime")}<input type="number" min={1} value={f.minStay ?? ""} onChange={(e) => set("minStay", num(e.target.value))} className={`${inp} mt-1`} /></label>

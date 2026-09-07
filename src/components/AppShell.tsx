@@ -24,6 +24,7 @@ import AssistantBar from "./AssistantBar";
 import WheelScroll from "./WheelScroll";
 import StyleLoader from "./StyleLoader";
 import OnboardingWizard from "./OnboardingWizard";
+import IdleLogout from "./IdleLogout";
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -76,6 +77,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <NewBookingModal />
           <SupportWidget />
           <OnboardingWizard />
+          <IdleLogout />
         </div>
         </ConfirmProvider>
         </AccessProvider>

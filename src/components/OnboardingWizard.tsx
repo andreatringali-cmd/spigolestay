@@ -225,8 +225,8 @@ export default function OnboardingWizard() {
                 const selVal = isCustom ? "__other__" : c.name;
                 return (
                   <div key={i} className="space-y-2 rounded-lg border border-line p-2">
-                    <div className="flex items-end gap-2">
-                      <label className="flex-1"><span className={lbl}>Tipologia</span>
+                    <div className="flex flex-wrap items-end gap-2">
+                      <label className="w-full sm:flex-1"><span className={lbl}>Tipologia</span>
                         <select value={selVal} onChange={(e) => { const v = e.target.value; setCam(i, v === "__other__" ? { name: " " } : { name: v, ...(v ? { beds: guessBeds(v) } : {}) }); }} className={inp}>
                           <option value="">Seleziona…</option>
                           {ROOM_TYPE_OPTIONS.map((rt) => <option key={rt} value={rt}>{rt}</option>)}
