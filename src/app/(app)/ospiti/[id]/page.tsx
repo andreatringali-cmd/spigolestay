@@ -90,7 +90,7 @@ export default function OspiteSchedaPage() {
             <div className="text-xs text-dim">{g.email || "—"}{g.phone ? ` · ${g.phone}` : ""}</div>
           </div>
           {!isNew && (
-            <div className="grid grid-cols-4 gap-4 text-center">
+            <div className="grid grid-cols-2 gap-4 text-center sm:grid-cols-4">
               <div><div className="font-mono text-xl font-bold text-txt">{stays.length}</div><div className="text-[11px] text-faint">{t("soggiorni")}</div></div>
               <div><div className="font-mono text-xl font-bold text-txt">{totalNights}</div><div className="text-[11px] text-faint">{t("notti")}</div></div>
               <div><div className="font-mono text-xl font-bold text-txt">{eur(totalSpend)}</div><div className="text-[11px] text-faint">{t("spesa")}</div></div>
