@@ -185,17 +185,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     stopPush();
+    let saved = false;
+    const uid = session?.user?.id;
     try {
-      const uid = session?.user?.id;
       if (supabase && uid) {
         // Salvataggio finale prima di uscire.
-        try { await supabase.from("app_state").upsert({ user_id: uid, data: snapshot(), updated_at: new Date().toISOString() }); } catch {}
+        const { error } = await supabase.from("app_state").upsert({ user_id: uid, data: snapshot(), updated_at: new Date().toISOString() });
+        saved = !error;
       }
       if (supabase) await supabase.auth.signOut();
     } catch {}
     try { sessionStorage.removeItem("spigolestay:hydrated-for"); } catch {}
-    // Pulisci i dati dell'account da questo browser così un altro utente non li vede.
-    wipeLocalAccount();
+    // Svuota i dati locali SOLO se sono stati salvati sul server, altrimenti li perderei
+    // (es. tabella app_state non ancora creata / rete assente).
+    if (saved) wipeLocalAccount();
     router.replace("/login");
   };
 
