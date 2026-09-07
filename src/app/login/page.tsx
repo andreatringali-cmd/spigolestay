@@ -123,8 +123,7 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#f2f1ee] px-4 py-8 text-[#1a1523]">
-      {/* Sfondo astratto: velature tenui + rete di nodi (i "canali" che si collegano) */}
-      <div aria-hidden className="xbg" />
+      {/* Sfondo: rete di nodi (i "canali" che si collegano) su fondo neutro pulito */}
       <AuthBackdrop />
       <div aria-hidden className="xglow" />
 
@@ -240,22 +239,8 @@ export default function LoginPage() {
       </div>
 
       <style>{`
-        .xbg {
-          position: absolute; inset: -15% -15% -15% -15%; z-index: 0;
-          background:
-            radial-gradient(46% 52% at 16% 14%, rgba(47,107,176,0.14) 0%, rgba(47,107,176,0) 64%),
-            radial-gradient(50% 55% at 86% 84%, rgba(176,74,44,0.13) 0%, rgba(176,74,44,0) 66%),
-            radial-gradient(70% 70% at 50% 48%, rgba(120,128,146,0.08) 0%, rgba(120,128,146,0) 72%);
-          filter: blur(44px);
-          animation: xflow 34s ease-in-out infinite alternate;
-        }
-        @keyframes xflow {
-          0%   { transform: translate3d(0,0,0) scale(1); }
-          100% { transform: translate3d(-1.5%, 1.5%, 0) scale(1.03); }
-        }
         .xglow { position: absolute; inset: 0; z-index: 0; pointer-events: none;
-          background: radial-gradient(58% 46% at 50% 34%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 60%); }
-        @media (prefers-reduced-motion: reduce) { .xbg { animation: none; } }
+          background: radial-gradient(58% 46% at 50% 34%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 62%); }
       `}</style>
     </div>
   );
