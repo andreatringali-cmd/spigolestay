@@ -118,6 +118,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!uid) { setHydrated(false); return; }
     let cancelled = false;
     const flagKey = "spigolestay:hydrated-for";
+    const authUser = session?.user;
+
+    // Registro clienti: aggiorna la scheda del cliente (email, telefono, struttura/e, piano…)
+    // sulla tabella `profiles`. Riempimento automatico a ogni accesso/aggiornamento.
+    const syncProfile = async (userId: string) => {
+      if (!supabase) return;
+      try {
+        let plan = "", structNames = "", stripeCustomer = "";
+        let structCount = 0;
+        try { plan = localStorage.getItem("spigolestay:plan") || localStorage.getItem("spigolestay:tier") || ""; } catch {}
+        try { stripeCustomer = localStorage.getItem("spigolestay:stripecustomer") || ""; } catch {}
+        try {
+          const raw = localStorage.getItem("spigolestay:data:v1");
+          if (raw) {
+            const d = JSON.parse(raw);
+            if (Array.isArray(d.structures)) {
+              structCount = d.structures.length;
+              structNames = d.structures.map((s: { name?: string }) => s.name).filter(Boolean).join(", ");
+            }
+          }
+        } catch {}
+        const md = (authUser?.user_metadata ?? {}) as Record<string, unknown>;
+        await supabase.from("profiles").upsert({
+          user_id: userId,
+          email: authUser?.email ?? null,
+          full_name: (md.full_name as string) ?? null,
+          phone: (md.phone as string) ?? null,
+          plan: plan || null,
+          structures_count: structCount,
+          structure_names: structNames || null,
+          stripe_customer_id: stripeCustomer || null,
+          last_active: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      } catch {}
+    };
 
     const startPush = (userId: string) => {
       stopPush();
@@ -128,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (s === lastPushed.current) return;
           lastPushed.current = s;
           await supabase!.from("app_state").upsert({ user_id: userId, data: snap, updated_at: new Date().toISOString() });
+          void syncProfile(userId);
         } catch {}
       }, 4000);
     };
@@ -142,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await supabase!.from("app_state").upsert({ user_id: uid, data: snap, updated_at: new Date().toISOString() });
             lastPushed.current = JSON.stringify(snap);
           } catch { lastPushed.current = ""; }
+          void syncProfile(uid);
           setHydrated(true);
           startPush(uid);
           return;
@@ -152,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Problema di rete/permessi: NON tocchiamo i dati locali, per non perderli.
           // Riprendiamo comunque il salvataggio periodico (che ritenterà a ogni ciclo).
           lastPushed.current = JSON.stringify(snapshot());
+          void syncProfile(uid);
           setHydrated(true);
           startPush(uid);
           return;
@@ -175,6 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const snap = snapshot();
         await supabase!.from("app_state").upsert({ user_id: uid, data: snap, updated_at: new Date().toISOString() });
         lastPushed.current = JSON.stringify(snap);
+        await syncProfile(uid);
         sessionStorage.setItem(flagKey, uid);
         location.reload(); // riparte pulito → compare l'onboarding
         return;
