@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
 
 type Mode = "login" | "signup";
-type Provider = "google" | "facebook";
+type Provider = "google";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -82,7 +82,7 @@ export default function LoginPage() {
         provider,
         options: { redirectTo: typeof window !== "undefined" ? `${window.location.origin}/` : undefined },
       });
-      if (error) setErr(`Accesso con ${provider === "google" ? "Google" : "Facebook"} non ancora attivo. Va abilitato nelle impostazioni.`);
+      if (error) { void provider; setErr("Accesso con Google non ancora attivo. Va abilitato nelle impostazioni."); }
     } catch {
       setErr("Accesso social non disponibile al momento.");
     }
@@ -216,9 +216,6 @@ export default function LoginPage() {
                 <button type="button" onClick={() => oauth("google")} className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-[#e3e0e6] bg-white py-2.5 text-sm font-semibold text-[#1a1523] transition hover:bg-[#f6f5f8]">
                   <GoogleIcon /> Google
                 </button>
-                <button type="button" onClick={() => oauth("facebook")} className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-[#e3e0e6] bg-white py-2.5 text-sm font-semibold text-[#1a1523] transition hover:bg-[#f6f5f8]">
-                  <FacebookIcon /> Facebook
-                </button>
               </div>
             </>
           )}
@@ -269,14 +266,6 @@ function GoogleIcon() {
       <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.1 5.5c4.2-3.9 6.9-9.6 6.9-16.9z" />
       <path fill="#FBBC05" d="M10.3 28.6c-.5-1.4-.8-2.9-.8-4.6s.3-3.2.8-4.6l-7.8-6.1C.9 16.5 0 20.1 0 24s.9 7.5 2.5 10.7l7.8-6.1z" />
       <path fill="#34A853" d="M24 48c6.1 0 11.3-2 15-5.5l-7.1-5.5c-2 1.3-4.6 2.1-7.9 2.1-6.4 0-11.8-3.8-13.7-9.4l-7.8 6.1C6.4 42.6 14.6 48 24 48z" />
-    </svg>
-  );
-}
-
-function FacebookIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden>
-      <path fill="#1877F2" d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.68 4.53-4.68 1.31 0 2.68.23 2.68.23v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.25h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z" />
     </svg>
   );
 }
