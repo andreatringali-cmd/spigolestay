@@ -22,6 +22,7 @@ export default function SitoWebPage() {
 function Site() {
   const { structures, roomTypes, units, bookings, getStructure, getGuest, addGuest } = useData();
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [weather, setWeather] = useState<{ temp: number; code: number } | null>(null);
   const [nl, setNl] = useState({ firstName: "", lastName: "", email: "", phone: "" });
   const [nlDone, setNlDone] = useState(false);
   const nlSubmit = () => {
@@ -36,6 +37,16 @@ function Site() {
   const structure = getStructure(sid);
   const name = structure?.name || cfg.nome || "Xenora";
   const accent = cfg.accent;
+
+  // Meteo (Open-Meteo, gratuito e senza chiave): coordinate struttura o Siracusa.
+  const wLat = structure?.lat ?? 37.0755, wLng = structure?.lng ?? 15.2866;
+  useEffect(() => {
+    let ok = true;
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${wLat}&longitude=${wLng}&current=temperature_2m,weather_code&timezone=Europe%2FRome`)
+      .then((r) => r.json()).then((d) => { if (ok && d?.current) setWeather({ temp: Math.round(d.current.temperature_2m), code: d.current.weather_code }); }).catch(() => {});
+    return () => { ok = false; };
+  }, [wLat, wLng]);
+  const wIcon = (c: number) => c === 0 ? "☀️" : c <= 3 ? "⛅" : c <= 48 ? "🌫️" : c <= 67 ? "🌧️" : c <= 77 ? "❄️" : c <= 82 ? "🌦️" : "⛈️";
 
   const today = toISO(new Date());
   const [ci, setCi] = useState(addDays(today, 7));
@@ -80,6 +91,7 @@ function Site() {
           <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? accent }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : name.slice(0, 2).toUpperCase()}</div>
           <div className="text-sm font-bold text-txt">{name}<span className="ml-1 text-[11px] font-normal text-faint">· Xenorabook</span></div>
           <div className="ml-auto flex items-center gap-3 text-xs text-dim">
+            {weather && <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-1 font-medium" title={`Meteo ${structure?.city ?? "Siracusa"}`}>{wIcon(weather.code)} {weather.temp}° · {structure?.city ?? "Siracusa"}</span>}
             {structure?.phone && <span>{structure.phone}</span>}
             {structures.length > 1 && <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs">{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>}
           </div>
