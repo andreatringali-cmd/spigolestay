@@ -347,6 +347,10 @@ export default function AbbonamentoPage() {
                 <div className="flex justify-between"><span className="text-dim">{t("A")}</span><span className="font-semibold text-txt">{pt.name} · {eur(annual ? Math.round(pt.price * (1 - ANNUAL_OFF)) : pt.price)}{t("/mese")}</span></div>
                 <div className="flex justify-between"><span className="text-dim">{t("Strutture")}</span><span className="text-txt">{pt.structures === 1 ? t("1 struttura") : `${t("fino a")} ${pt.structures}`}</span></div>
               </div>
+              <div className="mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-[12px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 9%, transparent)", color: "var(--dim)" }}>
+                <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: "var(--focus)" }}>i</span>
+                <span>{t("La modifica avrà effetto dal mese successivo (dal prossimo rinnovo). Fino ad allora resta attivo il piano attuale.")}</span>
+              </div>
               <p className="mt-2 text-[11px] text-faint">{t("I moduli attivi verranno riportati a quelli inclusi nel piano; gli eventuali add-on li riaggiungi dopo.")}</p>
               <div className="mt-4 flex gap-2">
                 <button onClick={() => setPendingTier(null)} className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
