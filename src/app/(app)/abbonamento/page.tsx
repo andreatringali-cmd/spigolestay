@@ -213,8 +213,10 @@ export default function AbbonamentoPage() {
         )}
       </Card>
 
+      {/* Riepilogo + Invita un amico su 2 colonne */}
+      <div className="mt-4 grid gap-4 lg:grid-cols-2 lg:items-stretch">
       {/* Invita un amico */}
-      <div className="mt-4 rounded-2xl border p-5" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 6%, transparent)" }}>
+      <div className="rounded-2xl border p-5 lg:order-2" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 6%, transparent)" }}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2"><span className="text-xl">🎁</span><h3 className="font-display text-lg font-bold text-txt">{t("Invita un amico")}</h3></div>
@@ -234,7 +236,7 @@ export default function AbbonamentoPage() {
       </div>
 
       {/* Riepilogo abbonamento */}
-      <div className="mt-4 max-w-md">
+      <div className="lg:order-1">
         <Card>
           <SectionTitle>{t("Il tuo abbonamento")}</SectionTitle>
           <div className="mb-3 rounded-lg border border-line bg-wash p-3">
@@ -256,6 +258,7 @@ export default function AbbonamentoPage() {
           </div>
           <div className="mt-2 text-center text-[11px] text-faint">{t("Prossimo rinnovo:")} 01/10/2026</div>
         </Card>
+      </div>
       </div>
 
       <p className="mt-4 text-xs text-faint">{t("Ogni piano include 6 camere per struttura; le camere in più costano")} {eur(ROOM_OVERAGE)}{t("/camera/mese. I prezzi si intendono per mese; con la fatturazione annuale risparmi il 20%.")}</p>

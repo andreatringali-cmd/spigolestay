@@ -99,6 +99,20 @@ function Site() {
   }, [wLat, wLng]);
   const wIcon = (c: number) => c === 0 ? "☀️" : c <= 3 ? "⛅" : c <= 48 ? "🌫️" : c <= 67 ? "🌧️" : c <= 77 ? "❄️" : c <= 82 ? "🌦️" : "⛈️";
 
+  // Effetto d'entrata: le sezioni compaiono in dissolvenza salendo, allo scroll.
+  useEffect(() => {
+    const root = document.getElementById("site-content");
+    if (!root) return;
+    const items = Array.from(root.children) as HTMLElement[];
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || !("IntersectionObserver" in window)) { items.forEach((el) => el.classList.add("xin")); return; }
+    items.forEach((el) => { if (!el.classList.contains("xin")) el.classList.add("xreveal"); });
+    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { (e.target as HTMLElement).classList.add("xin"); io.unobserve(e.target); } }), { threshold: 0.06, rootMargin: "0px 0px -40px 0px" });
+    items.forEach((el) => io.observe(el));
+    const fb = window.setTimeout(() => items.forEach((el) => el.classList.add("xin")), 2500);
+    return () => { io.disconnect(); clearTimeout(fb); };
+  }, [sid]);
+
   const today = toISO(new Date());
   const [ci, setCi] = useState(addDays(today, 7));
   const [co, setCo] = useState(addDays(today, 8));
@@ -141,6 +155,7 @@ function Site() {
 
   return (
     <div className="flex min-h-full flex-col bg-wash">
+      <style>{`.xreveal{opacity:0;transform:translateY(22px);transition:opacity .6s ease,transform .6s ease}.xreveal.xin{opacity:1;transform:none}@media(prefers-reduced-motion:reduce){.xreveal{opacity:1;transform:none;transition:none}}`}</style>
       {/* Top bar */}
       <div className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
@@ -183,7 +198,7 @@ function Site() {
         </div>
       )}
 
-      <div className="mx-auto max-w-5xl px-4">
+      <div id="site-content" className="mx-auto max-w-5xl px-4">
         {/* Chi siamo */}
         {structure?.description && (
           <section className="mt-10">

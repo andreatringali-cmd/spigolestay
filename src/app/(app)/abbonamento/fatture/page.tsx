@@ -21,15 +21,7 @@ export default function FatturePage() {
   const plan = TIER_PRICE[tier] ?? TIER_PRICE.basic;
 
   // Ultime 4 mensilità (dimostrative): la più recente "da pagare", le precedenti pagate.
-  const invoices = useMemo(() => {
-    const out: { id: string; date: Date; amount: number; status: "paid" | "due" }[] = [];
-    const now = new Date();
-    for (let i = 0; i < 4; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      out.push({ id: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, date: d, amount: plan.price, status: i === 0 ? "due" : "paid" });
-    }
-    return out;
-  }, [plan.price]);
+  const invoices = useMemo(() => [] as { id: string; date: Date; amount: number; status: "paid" | "due" }[], []);
 
   const fmt = (d: Date) => d.toLocaleDateString("it-IT", { month: "long", year: "numeric" });
 

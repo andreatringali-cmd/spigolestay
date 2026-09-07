@@ -9,7 +9,7 @@ import { useAccess } from "@/lib/access";
 import { useLang } from "@/lib/i18n";
 import UserSwitcher from "./UserSwitcher";
 
-const isActive = (href: string, pathname: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+const isActive = (href: string, pathname: string) => (href === "/" ? pathname === "/" : (pathname === href || pathname.startsWith(href + "/")));
 
 export default function Sidebar({
   pathname,
@@ -32,7 +32,9 @@ export default function Sidebar({
   const locked = (n: (typeof NAV)[number]) => !moduleOn(n.module);
   const TOP = visible.filter((n) => !n.group);
   const GROUPS = Array.from(new Set(visible.filter((n) => n.group).map((n) => n.group)));
-  const activeGroup = NAV.find((n) => isActive(n.href, pathname))?.group ?? GROUPS[0];
+  // Attiva SOLO la voce col percorso più specifico (evita che "/abbonamento" resti attiva sulle sotto-pagine).
+  const activeHref = visible.reduce((best, n) => (isActive(n.href, pathname) && n.href.length > best.length ? n.href : best), "");
+  const activeGroup = visible.find((n) => n.href === activeHref)?.group ?? GROUPS[0];
   const [open, setOpen] = useState<Record<string, boolean>>({ [activeGroup]: true });
   // Accordion: aprendo un gruppo si chiude quello precedente (uno solo aperto per volta).
   const toggleGroup = (g: string) => setOpen((o) => (o[g] ? {} : { [g]: true }));
@@ -68,7 +70,7 @@ export default function Sidebar({
           {collapsed ? (
             // Modalità compatta: solo icone
             visible.map((n) => {
-              const active = isActive(n.href, pathname);
+              const active = n.href === activeHref;
               const isLk = locked(n);
               const color = "var(--focus)";
               return (
@@ -89,14 +91,14 @@ export default function Sidebar({
               {/* Voci principali (sempre visibili, senza tendina) */}
               <div className="flex flex-col gap-0.5">
                 {TOP.map((n) => {
-                  const active = isActive(n.href, pathname);
+                  const active = n.href === activeHref;
                   const color = "var(--focus)";
                   return (
                     <Link
                       key={n.href}
                       href={n.href}
                       onClick={onCloseMobile}
-                      className="flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition"
+                      className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition ${active ? "" : "hover:bg-wash"}`}
                       style={active ? { backgroundColor: mix(color, 14), color, borderLeft: `3px solid ${color}`, paddingLeft: 9 } : { color: "var(--txt)" }}
                     >
                       <span style={{ color: active ? color : "var(--dim)" }}><Icon name={n.icon} size={18} /></span>
@@ -122,14 +124,14 @@ export default function Sidebar({
                   {isOpen && (
                     <div className="mb-1.5 mt-1 flex flex-col gap-0.5 rounded-lg py-1.5 pl-1.5 pr-1" style={{ backgroundColor: mix(color, 7), boxShadow: `inset 2px 0 0 ${mix(color, 45)}` }}>
                       {visible.filter((n) => n.group === group).map((n) => {
-                        const active = isActive(n.href, pathname);
+                        const active = n.href === activeHref;
                         const isLk = locked(n);
                         return (
                           <Link
                             key={n.href}
                             href={isLk ? "/abbonamento" : n.href}
                             onClick={onCloseMobile}
-                            className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition ${isLk && !active ? "opacity-60 hover:opacity-100" : ""}`}
+                            className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition ${active ? "" : "hover:bg-wash"} ${isLk && !active ? "opacity-60 hover:opacity-100" : ""}`}
                             style={
                               active
                                 ? { backgroundColor: mix(color, 14), color, borderLeft: `3px solid ${color}`, paddingLeft: 9 }
