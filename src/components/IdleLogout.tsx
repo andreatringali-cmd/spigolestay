@@ -27,12 +27,14 @@ export default function IdleLogout() {
       arm();
     };
 
-    const events: (keyof WindowEventMap)[] = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click", "visibilitychange"];
-    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
+    const winEvents: string[] = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"];
+    winEvents.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
+    document.addEventListener("visibilitychange", onActivity);
     arm(); // avvia il conto alla rovescia
 
     return () => {
-      events.forEach((e) => window.removeEventListener(e, onActivity));
+      winEvents.forEach((e) => window.removeEventListener(e, onActivity));
+      document.removeEventListener("visibilitychange", onActivity);
       if (timer.current) clearTimeout(timer.current);
     };
   }, [enabled, uid]);
