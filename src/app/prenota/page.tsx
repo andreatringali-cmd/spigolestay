@@ -71,15 +71,18 @@ function Engine() {
   };
   const stayPrice = (rt: RoomType, plan: Plan) => { let t = 0; for (let i = 0; i < nights; i++) t += dayPrice(rt, addDays(checkIn, i), plan); return t; };
 
-  const cityTaxAmount = structure?.cityTax ? (structure.cityTaxAmount ?? 2) : 0;
-  const cityTaxNights = Math.min(nights, structure?.cityTaxMaxNights ?? 3);
-  const cityTax = cityTaxAmount * adults * cityTaxNights;
-
   const selRt = sel ? types.find((t) => t.id === sel.rtId) : null;
   const selPlan = sel ? plans.find((p) => p.id === sel.planId) ?? plans[0] : null;
   const accommodation = selRt && selPlan ? stayPrice(selRt, selPlan) : 0;
   const extraPrice = (x: ExtraService) => x.per === "night" ? x.price * nights : x.per === "person" ? x.price * adults : x.price;
   const extrasTotal = extras.reduce((a, x) => a + (extraQty[x.id] ?? 0) * extraPrice(x), 0);
+  // Tassa di soggiorno: 0 finché non è selezionata una camera; poi fissa (€/persona/notte) o % del soggiorno.
+  const cityTaxNights = Math.min(nights, structure?.cityTaxMaxNights ?? 3);
+  const cityTax = (selRt && structure?.cityTax)
+    ? (structure.cityTaxMode === "percent"
+        ? Math.round(accommodation * (structure.cityTaxPercent ?? 0) / 100)
+        : (structure.cityTaxAmount ?? 2) * adults * cityTaxNights)
+    : 0;
   const total = accommodation + extrasTotal + cityTax;
   const depositPct = selPlan && !selPlan.refundable ? 100 : (structure?.depositPct ?? 30);
   const deposit = Math.round(total * depositPct / 100);
@@ -290,7 +293,7 @@ function Engine() {
                 <div className="my-3 border-t border-line" />
                 <Line label={`${selRt.name} · ${selPlan.name}`} value={eur(accommodation)} />
                 {extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => <Line key={x.id} label={`${extraQty[x.id]}× ${x.name}`} value={eur((extraQty[x.id] ?? 0) * extraPrice(x))} sub />)}
-                {cityTax > 0 && <Line label={`Tassa di soggiorno (${adults}×${cityTaxNights})`} value={eur(cityTax)} sub />}
+                {cityTax > 0 && <Line label={structure?.cityTaxMode === "percent" ? `Tassa di soggiorno (${structure.cityTaxPercent ?? 0}%)` : `Tassa di soggiorno (${adults}×${cityTaxNights})`} value={eur(cityTax)} sub />}
                 <div className="my-2 border-t border-line" />
                 <div className="flex items-baseline justify-between"><span className="text-sm font-semibold text-txt">Totale</span><span className="font-mono text-xl font-bold text-txt">{eur(total)}</span></div>
                 <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">Acconto adesso</span><span className="font-mono font-semibold text-txt">{eur(deposit)}</span></div>
