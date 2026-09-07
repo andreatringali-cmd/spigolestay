@@ -121,7 +121,7 @@ export default function LoginPage() {
   const fld = "w-full rounded-lg border border-[#e3e0e6] bg-white px-3.5 py-2.5 text-sm text-[#1a1523] outline-none transition focus:border-[#7c6bd6] focus:ring-2 focus:ring-[#7c6bd6]/25 disabled:opacity-60";
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#f6f5f8] px-4 py-8 text-[#1a1523]">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#f2f1ee] px-4 py-8 text-[#1a1523]">
       {/* Sfondo astratto */}
       <div aria-hidden className="xbg" />
 
@@ -238,20 +238,17 @@ export default function LoginPage() {
 
       <style>{`
         .xbg {
-          position: absolute; inset: -20% -20% -20% -20%; z-index: 0;
+          position: absolute; inset: -15% -15% -15% -15%; z-index: 0;
           background:
-            radial-gradient(38% 45% at 18% 22%, rgba(122,163,220,0.55) 0%, rgba(122,163,220,0) 60%),
-            radial-gradient(40% 42% at 82% 18%, rgba(240,169,60,0.55) 0%, rgba(240,169,60,0) 60%),
-            radial-gradient(46% 50% at 78% 78%, rgba(232,106,154,0.55) 0%, rgba(232,106,154,0) 62%),
-            radial-gradient(44% 48% at 22% 82%, rgba(123,108,224,0.50) 0%, rgba(123,108,224,0) 62%),
-            radial-gradient(50% 55% at 50% 50%, rgba(217,127,87,0.35) 0%, rgba(217,127,87,0) 65%);
-          filter: blur(30px) saturate(1.05);
-          animation: xflow 22s ease-in-out infinite alternate;
+            radial-gradient(46% 52% at 16% 14%, rgba(47,107,176,0.14) 0%, rgba(47,107,176,0) 64%),
+            radial-gradient(50% 55% at 86% 84%, rgba(176,74,44,0.13) 0%, rgba(176,74,44,0) 66%),
+            radial-gradient(70% 70% at 50% 48%, rgba(120,128,146,0.08) 0%, rgba(120,128,146,0) 72%);
+          filter: blur(44px);
+          animation: xflow 34s ease-in-out infinite alternate;
         }
         @keyframes xflow {
           0%   { transform: translate3d(0,0,0) scale(1); }
-          50%  { transform: translate3d(2%, -1.5%, 0) scale(1.06); }
-          100% { transform: translate3d(-2%, 2%, 0) scale(1.03); }
+          100% { transform: translate3d(-1.5%, 1.5%, 0) scale(1.03); }
         }
         @media (prefers-reduced-motion: reduce) { .xbg { animation: none; } }
       `}</style>
