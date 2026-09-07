@@ -50,6 +50,15 @@ export default function StrutturaSchedaPage() {
   const set = <K extends keyof Structure>(k: K, v: Structure[K]) => setF((p) => ({ ...p, [k]: v }));
   const num = (v: string) => (v === "" ? undefined : Number(v.replace(",", ".")));
 
+  // La pagina può montarsi PRIMA che lo store abbia caricato i dati: quando la struttura diventa
+  // disponibile, popola il form una volta (evita la scheda vuota al primo ingresso).
+  const loadedRef = useRef(isNew);
+  useEffect(() => {
+    if (loadedRef.current || !existing) return;
+    loadedRef.current = true;
+    setF({ ...blankStructure(), ...existing } as Structure);
+  }, [existing]);
+
   // Precompila i contatti dall'account (dati della registrazione) quando la struttura non li ha ancora.
   const prefilledRef = useRef(false);
   useEffect(() => {
