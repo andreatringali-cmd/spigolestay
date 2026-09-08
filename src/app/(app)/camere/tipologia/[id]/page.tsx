@@ -30,7 +30,7 @@ export default function TipologiaSchedaPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const sp = useSearchParams();
-  const { structures, roomTypes, units, bookings, addRoomType, updateRoomType, deleteRoomType, addUnit, deleteUnit } = useData();
+  const { structures, roomTypes, units, bookings, addRoomType, updateRoomType, deleteRoomType, addUnit, updateUnit, deleteUnit } = useData();
   const { t } = useLang();
   const ask = useConfirm();
   const isNew = params.id === "nuovo";
@@ -78,7 +78,12 @@ export default function TipologiaSchedaPage() {
       const add = target - cur;
       let maxN = mine.reduce((mx, u) => Math.max(mx, numFromName(u.name)), 0);
       if (maxN < cur) maxN = cur;
-      for (let i = 1; i <= add; i++) addUnit({ structureId: existing.structureId, roomTypeId: existing.id, name: `${existing.name} ${maxN + i}` });
+      const prefix = (existing.name || "").replace(/\s+/g, "").slice(0, 3).toUpperCase();
+      for (let i = 1; i <= add; i++) {
+        const n = maxN + i;
+        const id = addUnit({ structureId: existing.structureId, roomTypeId: existing.id, name: String(n) });
+        updateUnit(id, { code: `${prefix}${n}` });
+      }
       setRoomMsg(`${t("Aggiunte")} ${add} ${t("camere")} · ${t("totale")} ${target}.`);
     } else {
       const toRemove = cur - target;

@@ -160,7 +160,6 @@ export default function CamerePage() {
                 <td className="px-3 py-2.5 text-dim">{u.floor || "—"}</td>
                 <td className="px-3 py-2.5 text-dim">{u.view || "—"}</td>
                 <td className="px-3 py-2.5 text-dim">{rt?.beds ?? "—"}</td>
-                <td className="px-3 py-2.5 max-w-[180px] truncate text-xs text-dim" title={u.accessInfo || ""}>{u.accessInfo || <span className="text-faint">—</span>}</td>
                 <td className="px-3 py-2.5 max-w-[180px] truncate text-xs text-dim" title={u.notes || ""}>{u.notes || <span className="text-faint">—</span>}</td>
                 <td className="px-3 py-2.5">{u.outOfService ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("Fuori servizio")}</span> : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("In servizio")}</span>}</td>
                 <td className="px-3 py-2.5 text-right text-faint">›</td>
@@ -248,7 +247,6 @@ export default function CamerePage() {
                                   <SortTh k="floor" label={t("Piano")} />
                                   <SortTh k="view" label={t("Vista")} />
                                   <SortTh k="beds" label={t("Posti")} />
-                                  <th className="px-3 py-2 font-semibold">{t("Accesso")}</th>
                                   <th className="px-3 py-2 font-semibold">{t("Note")}</th>
                                   <SortTh k="status" label={t("Stato")} />
                                   <th className="px-3 py-2 font-semibold"></th>
@@ -277,7 +275,6 @@ export default function CamerePage() {
                                 <SortTh k="floor" label={t("Piano")} />
                                 <SortTh k="view" label={t("Vista")} />
                                 <SortTh k="beds" label={t("Posti")} />
-                                <th className="px-3 py-2 font-semibold">{t("Accesso")}</th>
                                 <th className="px-3 py-2 font-semibold">{t("Note")}</th>
                                 <SortTh k="status" label={t("Stato")} />
                                 <th className="px-3 py-2 font-semibold"></th>
@@ -324,7 +321,7 @@ export default function CamerePage() {
 }
 
 function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?: Unit; onClose: () => void }) {
-  const { roomTypes, addUnit, updateUnit, deleteUnit, setActiveStructure } = useData();
+  const { roomTypes, units, addUnit, updateUnit, deleteUnit, setActiveStructure } = useData();
   const { t } = useLang();
   const ask = useConfirm();
   const router = useRouter();
@@ -332,7 +329,16 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
   const hasGuide = moduleOn("concierge");
   const openGuide = () => { setActiveStructure(structureId); onClose(); router.push("/guida-ospiti"); };
   const types = roomTypes.filter((rt) => rt.structureId === structureId);
-  const [f, setF] = useState<Partial<Unit>>(() => unit ?? { name: "", roomTypeId: types[0]?.id ?? "", floor: "", view: "", code: "", outOfService: false });
+  const numFromName = (n: string) => { const m = (n || "").match(/(\d+)\s*$/); return m ? Number(m[1]) : 0; };
+  // Default nuova camera: nome = numero crescente, codice = prime 3 lettere tipologia + numero.
+  const nextRoom = (rtId: string) => {
+    const mine = units.filter((x) => x.roomTypeId === rtId);
+    const n = mine.reduce((mx, x) => Math.max(mx, numFromName(x.name)), 0) + 1;
+    const rt = roomTypes.find((r) => r.id === rtId);
+    const prefix = (rt?.name || "").replace(/\s+/g, "").slice(0, 3).toUpperCase();
+    return { name: String(n), code: `${prefix}${n}` };
+  };
+  const [f, setF] = useState<Partial<Unit>>(() => unit ?? { ...nextRoom(types[0]?.id ?? ""), roomTypeId: types[0]?.id ?? "", floor: "", view: "", outOfService: false });
   const set = <K extends keyof Unit>(k: K, v: Unit[K]) => setF((p) => ({ ...p, [k]: v }));
   const onPhotos = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -357,7 +363,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
       <div className="grid grid-cols-2 gap-3">
         <label className={`${lbl} col-span-2`}>{t("Nome camera")} *<input value={f.name ?? ""} onChange={(e) => set("name", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. Camera Ortigia")} /></label>
         <label className={lbl}>{t("Codice / numero")}<input value={f.code ?? ""} onChange={(e) => set("code", e.target.value)} className={`${inp} mt-1`} placeholder="101" /></label>
-        <label className={lbl}>{t("Tipologia")}<select value={f.roomTypeId ?? ""} onChange={(e) => set("roomTypeId", e.target.value)} className={`${inp} mt-1`}>{types.length === 0 && <option value="">{t("Crea prima una tipologia")}</option>}{types.map((rt) => <option key={rt.id} value={rt.id}>{rt.name}</option>)}</select></label>
+        <label className={lbl}>{t("Tipologia")}<select value={f.roomTypeId ?? ""} onChange={(e) => { const rid = e.target.value; if (unit) { set("roomTypeId", rid); } else { const nr = nextRoom(rid); setF((p) => ({ ...p, roomTypeId: rid, name: nr.name, code: nr.code })); } }} className={`${inp} mt-1`}>{types.length === 0 && <option value="">{t("Crea prima una tipologia")}</option>}{types.map((rt) => <option key={rt.id} value={rt.id}>{rt.name}</option>)}</select></label>
         <label className={lbl}>{t("Piano")}<input value={f.floor ?? ""} onChange={(e) => set("floor", e.target.value)} className={`${inp} mt-1`} placeholder={t("Terra / 1° / 2°")} /></label>
         <label className={lbl}>{t("Vista")}<select value={f.view ?? ""} onChange={(e) => set("view", e.target.value)} className={`${inp} mt-1`}><option value="">—</option>{VIEW_OPTIONS.map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
         <label className={lbl}>{t("Configurazione letti")}<select value={f.bedConfig ?? ""} onChange={(e) => set("bedConfig", e.target.value || undefined)} className={`${inp} mt-1`}><option value="">{t("Come tipologia")}</option>{BED_CONFIGS.map((b) => <option key={b} value={b}>{t(b)}</option>)}</select></label>

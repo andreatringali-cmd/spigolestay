@@ -117,7 +117,7 @@ export default function OnboardingWizard() {
       if (!name || n <= 0) return;
       const rtId = uid(); const beds = Number(c.beds) || 2;
       roomTypes.push({ id: rtId, structureId: sid, name, beds, basePrice: 0, maxOccupancy: beds });
-      for (let i = 1; i <= n; i++) units.push({ id: uid(), structureId: sid, roomTypeId: rtId, name: `${name} ${i}`, code: `${name.slice(0, 3).toUpperCase()}${i}` });
+      for (let i = 1; i <= n; i++) units.push({ id: uid(), structureId: sid, roomTypeId: rtId, name: String(i), code: `${name.replace(/\s+/g, "").slice(0, 3).toUpperCase()}${i}` });
     });
     try {
       localStorage.setItem("spigolestay:data:v1", JSON.stringify({ structures: [structure], roomTypes, units, guests: [], bookings: [], events: [], rateOverrides: {} }));
