@@ -7,6 +7,7 @@ import { DEFAULT_EXTRAS } from "@/lib/types";
 import { getImages } from "@/lib/images";
 import { eur } from "@/lib/format";
 import { effectiveBase, effectiveClosed } from "@/lib/pricing";
+import { loadDeposit } from "@/lib/deposit";
 
 // ---- pricing helpers --------------------------------------------------------
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
@@ -34,6 +35,7 @@ function Engine() {
   // Config salvata (piani, weekend) — fallback ai default.
   const plans = useMemo<Plan[]>(() => { try { const p = localStorage.getItem("spigolestay:rateplans"); if (p) return JSON.parse(p).filter((x: Plan) => x.id !== "flex"); } catch {} return DEFAULT_PLANS; }, []);
   const weekendPct = useMemo(() => { try { const r = localStorage.getItem("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {} return 25; }, []);
+  const depCfg = useMemo(() => loadDeposit(), []); // acconto: voce unica per tutte le strutture
 
   const qp = (k: string) => { try { return new URLSearchParams(window.location.search).get(k); } catch { return null; } };
   const [structureId, setStructureId] = useState(() => qp("s") || structures[0]?.id || "");
@@ -84,7 +86,7 @@ function Engine() {
         : (structure.cityTaxAmount ?? 2) * adults * cityTaxNights)
     : 0;
   const total = accommodation + extrasTotal + cityTax;
-  const depositPct = selPlan && !selPlan.refundable ? 100 : (structure?.depositPct ?? 30);
+  const depositPct = !depCfg.on ? 0 : (selPlan && !selPlan.refundable ? 100 : depCfg.pct);
   const deposit = Math.round(total * depositPct / 100);
 
   const guestValid = guest.firstName.trim() && guest.lastName.trim() && guest.email.trim() && guest.phone.trim() && privacy;
@@ -225,7 +227,7 @@ function Engine() {
               <div className="mt-1 flex justify-between"><span className="text-dim">Camera</span><span className="text-txt">{selRt?.name}</span></div>
               <div className="mt-1 flex justify-between"><span className="text-dim">Soggiorno</span><span className="text-txt">{new Date(checkIn).toLocaleDateString("it-IT")} → {new Date(checkOut).toLocaleDateString("it-IT")}</span></div>
               <div className="mt-2 flex justify-between border-t border-line pt-2"><span className="font-semibold text-txt">Totale</span><span className="font-mono font-bold text-txt">{eur(total)}</span></div>
-              <div className="mt-1 flex justify-between"><span className="text-dim">Acconto versato</span><span className="font-mono text-txt">{eur(deposit)}</span></div>
+              {deposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">Acconto versato</span><span className="font-mono text-txt">{eur(deposit)}</span></div>}
               {total - deposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">Saldo in struttura</span><span className="font-mono text-txt">{eur(total - deposit)}</span></div>}
             </div>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
@@ -350,7 +352,7 @@ function Engine() {
                     <button key={k} onClick={() => setPay(k)} className={`rounded-lg border p-3 text-center text-sm font-medium transition ${pay === k ? "border-focus ring-1 ring-[color:var(--focus)] text-txt" : "border-line text-dim hover:bg-wash"}`}>{label}</button>
                   ))}
                 </div>
-                <p className="mt-3 text-xs text-dim">Per confermare è richiesto un acconto di <b className="text-txt">{eur(deposit)}</b>{selPlan.refundable ? "" : " (intero importo, tariffa non rimborsabile)"}. Il saldo si versa in struttura. Nessun dato di pagamento viene raccolto in questa demo.</p>
+                <p className="mt-3 text-xs text-dim">{deposit > 0 ? <>Per confermare è richiesto un acconto di <b className="text-txt">{eur(deposit)}</b>{selPlan.refundable ? "" : " (intero importo, tariffa non rimborsabile)"}. Il saldo si versa in struttura.</> : <>Nessun acconto richiesto: l&apos;intero importo si salda in struttura.</>} Nessun dato di pagamento viene raccolto in questa demo.</p>
                 <label className="mt-3 flex items-start gap-2 text-xs text-dim"><input type="checkbox" checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" /> Dichiaro di aver preso visione dell'informativa privacy e accetto i termini di prenotazione.</label>
               </div>
             </div>
@@ -366,7 +368,7 @@ function Engine() {
                 {cityTax > 0 && <Line label={structure?.cityTaxMode === "percent" ? `Tassa di soggiorno (${structure.cityTaxPercent ?? 0}%)` : `Tassa di soggiorno (${adults}×${cityTaxNights})`} value={eur(cityTax)} sub />}
                 <div className="my-2 border-t border-line" />
                 <div className="flex items-baseline justify-between"><span className="text-sm font-semibold text-txt">Totale</span><span className="font-mono text-xl font-bold text-txt">{eur(total)}</span></div>
-                <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">Acconto adesso</span><span className="font-mono font-semibold text-txt">{eur(deposit)}</span></div>
+                {deposit > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">Acconto adesso</span><span className="font-mono font-semibold text-txt">{eur(deposit)}</span></div>}
                 <div className="mt-1 text-[11px]" style={{ color: selPlan.refundable ? "var(--ok)" : "var(--warn)" }}>{selPlan.refundable ? "Nessun costo se cancelli" : "Tariffa non rimborsabile"}</div>
                 <button onClick={confirm} disabled={!guestValid} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">Conferma prenotazione</button>
                 {!guestValid && <div className="mt-2 text-center text-[11px] text-faint">Compila nome, cognome, telefono, email e accetta la privacy.</div>}

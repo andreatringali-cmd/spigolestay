@@ -13,6 +13,7 @@ import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/authsync";
+import { loadDeposit, saveDeposit, type DepositCfg } from "@/lib/deposit";
 
 function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
   return (
@@ -74,6 +75,11 @@ export default function StrutturaSchedaPage() {
       return next;
     });
   }, [isNew, user, authUser]);
+
+  // Acconto richiesto (VOCE UNICA per tutte le strutture, non per-struttura).
+  const [deposit, setDepositState] = useState<DepositCfg>({ on: true, pct: 30 });
+  useEffect(() => { setDepositState(loadDeposit()); }, []);
+  const updateDeposit = (patch: Partial<DepositCfg>) => setDepositState((p) => { const n = { ...p, ...patch }; saveDeposit(n); return n; });
 
   const groups = Array.from(new Set(structures.map((s) => s.groupName)));
   const toggleArr = (k: "services" | "payMethods", x: string) => setF((p) => { const cur = p[k] ?? []; return { ...p, [k]: cur.includes(x) ? cur.filter((y) => y !== x) : [...cur, x] }; });
@@ -339,7 +345,6 @@ export default function StrutturaSchedaPage() {
               <label className={lbl}>{t("Check-out entro")}<input type="time" value={f.checkOutBy ?? ""} onChange={(e) => set("checkOutBy", e.target.value)} className={`${inp} mt-1`} /></label>
             </div>
             <div className="mt-3 flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Self check-in (accesso autonomo)")}</span><Toggle on={!!f.selfCheckin} onClick={() => set("selfCheckin", !f.selfCheckin)} /></div>
-            <label className={`${lbl} mt-2`}>{t("Istruzioni / codici di accesso")}<textarea value={f.accessInfo ?? ""} onChange={(e) => set("accessInfo", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={t("Es. keybox codice, citofono, piano…")} /></label>
 
             {/* Guida ospiti personalizzata (servizio a piano) */}
             {hasGuide ? (
@@ -435,9 +440,18 @@ export default function StrutturaSchedaPage() {
               <SectionTitle>{t("Motore prenotazioni & servizi extra")}</SectionTitle>
               {!isNew && <a href={`/prenota?s=${params.id}`} target="_blank" rel="noreferrer" className="text-xs font-medium text-focus hover:underline">{t("Apri motore")} ↗</a>}
             </div>
-            <div className="mb-2 flex items-center justify-between">
-              <label className={lbl}>{t("Acconto richiesto alla prenotazione diretta")}</label>
-              <span className="flex items-center gap-1"><input type="number" min={0} max={100} value={f.depositPct ?? 30} onChange={(e) => set("depositPct", num(e.target.value))} className={`${inp} w-20`} /><span className="text-dim">%</span></span>
+            <div className="mb-2 rounded-lg border border-line bg-paper p-2.5">
+              <div className="flex items-center justify-between">
+                <label className={lbl}>{t("Acconto richiesto alla prenotazione diretta")}</label>
+                <Toggle on={deposit.on} onClick={() => updateDeposit({ on: !deposit.on })} />
+              </div>
+              {deposit.on && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-xs text-dim">{t("Percentuale")}</span>
+                  <span className="flex items-center gap-1"><input type="number" min={0} max={100} value={deposit.pct} onChange={(e) => updateDeposit({ pct: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} className={`${inp} w-20`} /><span className="text-dim">%</span></span>
+                </div>
+              )}
+              <p className="mt-1.5 text-[11px] text-faint">{t("Voce unica: vale per tutte le strutture. Mostrata all'ospite alla prenotazione diretta.")}</p>
             </div>
             <div className="mb-2 mt-3 flex items-center justify-between">
               <div className="text-xs font-medium text-dim">{t("Servizi extra (upsell)")}</div>
