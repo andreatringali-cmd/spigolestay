@@ -196,6 +196,7 @@ export default function CamerePage() {
               <div className="mb-2 flex items-center justify-between">
                 <div className="font-display text-lg font-bold text-txt">{s.name}</div>
                 <div className="flex gap-2">
+                  {sUnits.some((u) => u.order != null) && <button onClick={() => sUnits.forEach((u) => updateUnit(u.id, { order: undefined }))} title={t("Riporta le camere all'ordine numerico crescente")} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash">↕ {t("Ordine numerico")}</button>}
                   <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
                   <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
                 </div>

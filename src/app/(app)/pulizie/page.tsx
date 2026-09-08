@@ -189,7 +189,7 @@ export default function PuliziePage() {
   };
 
   const rooms = scopedStructures.flatMap((s) =>
-    sortUnitsByName(units.filter((u) => u.structureId === s.id)).map((u) => ({ unit: u, structure: s, oos: !!u.outOfService, ...planFor(u.id) }))
+    sortUnitsByName(units.filter((u) => u.structureId === s.id)).map((u) => ({ unit: u, structure: s, typeName: roomTypes.find((x) => x.id === u.roomTypeId)?.name ?? "", oos: !!u.outOfService, ...planFor(u.id) }))
   );
   type Room = (typeof rooms)[number];
 
@@ -721,6 +721,7 @@ function RoomCard({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle
       <div className="flex items-center justify-between gap-2 px-3 py-2" style={{ backgroundColor: `color-mix(in srgb, ${accent} 12%, var(--surface))`, borderBottom: `1px solid color-mix(in srgb, ${accent} 28%, var(--line))` }}>
         <span className="flex min-w-0 items-center gap-1.5">
           <span className={`truncate font-display text-[15px] font-bold ${done ? "text-dim line-through" : "text-txt"}`}>{r.unit.name}</span>
+          {r.typeName && <span className="shrink-0 text-[10px] font-medium text-faint">· {r.typeName}</span>}
           {hasIssue && <span title={t("Segnalazione aperta")} className="shrink-0 text-[color:var(--err)]"><Icon name="alertTriangle" size={13} /></span>}
         </span>
         <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: accent }}>{t(a.label)}</span>
