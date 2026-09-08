@@ -8,7 +8,7 @@ import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
 
 interface Cfg { nome: string; dominio: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean; lang: string[] }
-const DEF: Cfg = { nome: "Spigole House", dominio: "spigolehouse.it", tagline: "Il tuo soggiorno nel cuore di Ortigia", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, camere: true, recensioni: true, mappa: true, contatti: true, lang: ["it", "en"] };
+const DEF: Cfg = { nome: "", dominio: "", tagline: "", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, camere: true, recensioni: true, mappa: true, contatti: true, lang: ["it", "en"] };
 const LANGS = [["it", "Italiano"], ["en", "English"], ["fr", "Français"], ["de", "Deutsch"], ["es", "Español"]] as const;
 const SEZIONI: { key: keyof Cfg; label: string }[] = [
   { key: "hero", label: "Copertina (hero)" }, { key: "camere", label: "Camere e prezzi" }, { key: "recensioni", label: "Recensioni" }, { key: "mappa", label: "Mappa e dintorni" }, { key: "contatti", label: "Contatti" },
