@@ -571,7 +571,13 @@ export default function PuliziePage() {
 
               {view === "cards" ? (
                 <div className="grid w-full gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                  {list.map((r) => (<RoomCard key={r.unit.id} r={r} k={keyOf(r.unit.id)} done={!!done[keyOf(r.unit.id)]} doneAt={doneTime(keyOf(r.unit.id))} hasIssue={roomHasIssue(r.unit.id)} guestName={guestName} hasDog={hasDog} note={noteInput(keyOf(r.unit.id))} onToggle={() => toggleDone(keyOf(r.unit.id))} onIssue={() => setIssueDraft({ unitId: r.unit.id, unitName: r.unit.name, structureName: r.structure.name, type: "guasto", note: "", photo: undefined })} />))}
+                  {list.flatMap((r, idx) => {
+                    const showHeader = idx === 0 || (list[idx - 1].typeName || "") !== (r.typeName || "");
+                    const card = <RoomCard key={r.unit.id} r={r} k={keyOf(r.unit.id)} done={!!done[keyOf(r.unit.id)]} doneAt={doneTime(keyOf(r.unit.id))} hasIssue={roomHasIssue(r.unit.id)} guestName={guestName} hasDog={hasDog} note={noteInput(keyOf(r.unit.id))} onToggle={() => toggleDone(keyOf(r.unit.id))} onIssue={() => setIssueDraft({ unitId: r.unit.id, unitName: r.unit.name, structureName: r.structure.name, type: "guasto", note: "", photo: undefined })} />;
+                    return showHeader
+                      ? [<div key={`h-${idx}`} className="col-span-full mt-1 text-[11px] font-bold uppercase tracking-wide text-dim">{r.typeName || t("Senza tipologia")}</div>, card]
+                      : [card];
+                  })}
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
