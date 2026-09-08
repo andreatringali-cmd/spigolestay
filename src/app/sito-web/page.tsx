@@ -158,7 +158,7 @@ function Site() {
       <style>{`.xreveal{opacity:0;transform:translateY(22px);transition:opacity .6s ease,transform .6s ease}.xreveal.xin{opacity:1;transform:none}@media(prefers-reduced-motion:reduce){.xreveal{opacity:1;transform:none;transition:none}}`}</style>
       {/* Top bar */}
       <div className="border-b border-line bg-surface">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
           <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? accent }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : name.slice(0, 2).toUpperCase()}</div>
           <div className="text-sm font-bold text-txt">{name}<span className="ml-1 text-[11px] font-normal text-faint">· Xenorabook</span></div>
           <div className="ml-auto flex items-center gap-3 text-xs text-dim">
@@ -172,7 +172,7 @@ function Site() {
       {/* Hero + ricerca */}
       {cfg.hero && (
         <div className="relative overflow-hidden px-4 py-14 text-white" style={{ background: cfg.heroBg ? `linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), url(${cfg.heroBg}) center/cover no-repeat` : `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 45%, #000))` }}>
-          <div className="mx-auto max-w-5xl">
+          <div className="mx-auto max-w-7xl">
             <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{name}</h1>
             {cfg.tagline && <p className="mt-2 max-w-xl text-white/90">{cfg.tagline}</p>}
             <div className="mt-6 grid w-full gap-2 rounded-2xl bg-white/95 p-3 shadow-lg sm:grid-cols-5">
@@ -198,7 +198,7 @@ function Site() {
         </div>
       )}
 
-      <div id="site-content" className="mx-auto max-w-5xl px-4">
+      <div id="site-content" className="mx-auto max-w-7xl px-4">
         {/* Chi siamo */}
         {structure?.description && (
           <section className="mt-10">
@@ -426,7 +426,7 @@ function Site() {
       )}
 
       <footer className="mt-12 border-t border-line bg-surface">
-        <div className="mx-auto max-w-5xl px-4 py-6">
+        <div className="mx-auto max-w-7xl px-4 py-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm font-bold text-txt">
               <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md text-xs font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? accent }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : name.slice(0, 2).toUpperCase()}</span>
