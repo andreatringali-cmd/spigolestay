@@ -47,6 +47,10 @@ export default function CamerePage() {
   const [roomModal, setRoomModal] = useState<{ structureId: string; unit?: Unit } | null>(null);
   const [sortKey, setSortKey] = useState<string>("name");
   const [dragId, setDragId] = useState<string | null>(null); // camera trascinata (riordino manuale)
+  const [search, setSearch] = useState(""); // filtro: cerca per tipologia o nome/codice camera
+  const q = search.trim().toLowerCase();
+  const typeMatchQ = (rt: { name: string }) => !q || rt.name.toLowerCase().includes(q);
+  const unitMatchQ = (u: Unit) => !q || (u.name || "").toLowerCase().includes(q) || (u.code || "").toLowerCase().includes(q);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const COLLAPSE_KEY = "spigolestay:camere:collapsed:v1";
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -197,8 +201,6 @@ export default function CamerePage() {
                 <div className="font-display text-lg font-bold text-txt">{s.name}</div>
                 <div className="flex gap-2">
                   {sUnits.some((u) => u.order != null) && <button onClick={() => sUnits.forEach((u) => updateUnit(u.id, { order: undefined }))} title={t("Riporta le camere all'ordine numerico crescente")} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash">↕ {t("Ordine numerico")}</button>}
-                  <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
-                  <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
                 </div>
               </div>
 
@@ -239,6 +241,16 @@ export default function CamerePage() {
                 {types.length === 0 && <div className="w-full rounded-xl border border-dashed border-line p-4 text-sm text-faint">{t("Nessuna tipologia. Aggiungine una col pulsante “+ Tipologia”.")}</div>}
               </div>
 
+              {/* Filtri camere: ricerca a sinistra, azioni a destra */}
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <div className="relative min-w-[200px] flex-1">
+                  <svg className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
+                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca per tipologia o camera…")} className="w-full rounded-lg border border-line bg-surface py-2 pl-8 pr-3 text-sm text-txt outline-none focus:border-focus" />
+                </div>
+                <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
+                <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
+              </div>
+
               {/* Camere — un box separato per ogni tipologia */}
               <SectionTitle>{t("Camere")}</SectionTitle>
               {sUnits.length === 0 ? (
@@ -246,7 +258,7 @@ export default function CamerePage() {
               ) : (
                 <div className="mt-2 flex flex-col gap-4">
                   {types.map((rt, i) => {
-                    const g = sortUnits(sUnits.filter((u) => u.roomTypeId === rt.id), types);
+                    const g = sortUnits(sUnits.filter((u) => u.roomTypeId === rt.id && (typeMatchQ(rt) || unitMatchQ(u))), types);
                     if (!g.length) return null;
                     const color = typeColor(rt, i);
                     const open = !collapsed.has(rt.id);
@@ -286,7 +298,7 @@ export default function CamerePage() {
                     );
                   })}
                   {(() => {
-                    const orphans = sortUnits(sUnits.filter((u) => !types.some((rt) => rt.id === u.roomTypeId)), types);
+                    const orphans = sortUnits(sUnits.filter((u) => !types.some((rt) => rt.id === u.roomTypeId) && unitMatchQ(u)), types);
                     if (!orphans.length) return null;
                     return (
                       <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
