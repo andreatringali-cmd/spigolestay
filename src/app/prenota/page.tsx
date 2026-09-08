@@ -337,7 +337,7 @@ function Engine() {
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium text-txt">{x.name}</div>
                         {x.desc && <div className="text-[11px] text-faint">{x.desc}</div>}
-                        <div className="mt-0.5 text-xs text-dim">{eur(x.price)} {x.per === "night" ? "a notte" : x.per === "person" ? "a persona" : "a soggiorno"}</div>
+                        <div className="mt-0.5 text-xs text-dim">{eur(x.price)} {x.per === "night" ? "a notte" : x.per === "person" ? "a persona" : x.per === "day" ? "a giornata" : "a soggiorno"}</div>
                       </div>
                       <Stepper value={extraQty[x.id] ?? 0} min={0} compact onChange={(v) => setExtraQty((q) => ({ ...q, [x.id]: v }))} />
                     </div>

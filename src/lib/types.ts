@@ -101,14 +101,14 @@ export interface ExtraService {
   name: string;
   desc?: string;
   price: number;
-  per: "stay" | "night" | "person"; // a soggiorno / a notte / a persona
+  per: "stay" | "night" | "person" | "day"; // a soggiorno / a notte / a persona / a giornata
   active?: boolean; // se false, non proposto/mostrato (undefined = attivo)
 }
 
 export const DEFAULT_EXTRAS: ExtraService[] = [
-  { id: "bici", name: "Noleggio bici a pedalata assistita", desc: "Esplora Ortigia e la costa in bici, 10 € al giorno.", price: 10, per: "night" },
+  { id: "bici", name: "Noleggio bici a pedalata assistita", desc: "Esplora Ortigia e la costa in bici, 10 € al giorno.", price: 10, per: "day" },
   { id: "transfer", name: "Transfer aeroporto", desc: "Servizio taxi da/per l'aeroporto di Catania.", price: 30, per: "stay" },
-  { id: "gommone", name: "Noleggio gommone - giornata intera", desc: "Una giornata in mare alla scoperta delle grotte.", price: 120, per: "stay" },
+  { id: "gommone", name: "Noleggio gommone - giornata intera", desc: "Una giornata in mare alla scoperta delle grotte.", price: 120, per: "day" },
   { id: "latecheckout", name: "Late check-out (ore 14)", desc: "Prolunga il soggiorno fino alle 14:00.", price: 20, per: "stay" },
 ];
 

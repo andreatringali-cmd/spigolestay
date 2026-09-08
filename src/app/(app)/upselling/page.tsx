@@ -8,7 +8,7 @@ import { DEFAULT_EXTRAS, type ExtraService } from "@/lib/types";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
 
-const PER_LABEL: Record<string, string> = { stay: "a soggiorno", night: "a notte", person: "a persona" };
+const PER_LABEL: Record<string, string> = { stay: "a soggiorno", night: "a notte", person: "a persona", day: "a giornata" };
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
 const isActive = (e: ExtraService) => e.active !== false;
 
@@ -110,7 +110,7 @@ export default function UpsellingPage() {
                     <input value={e.desc ?? ""} onChange={(ev) => updExtra(e.id, { desc: ev.target.value })} placeholder="Descrizione" className={inp} />
                     <div className="flex gap-2">
                       <label className="flex-1 text-[11px] text-dim">Prezzo €<input type="number" min={0} value={e.price} onChange={(ev) => updExtra(e.id, { price: Math.max(0, Number(ev.target.value)) })} className={`${inp} mt-0.5`} /></label>
-                      <label className="flex-1 text-[11px] text-dim">Modalità<select value={e.per} onChange={(ev) => updExtra(e.id, { per: ev.target.value as ExtraService["per"] })} className={`${inp} mt-0.5`}><option value="stay">a soggiorno</option><option value="night">a notte</option><option value="person">a persona</option></select></label>
+                      <label className="flex-1 text-[11px] text-dim">Modalità<select value={e.per} onChange={(ev) => updExtra(e.id, { per: ev.target.value as ExtraService["per"] })} className={`${inp} mt-0.5`}><option value="stay">a soggiorno</option><option value="night">a notte</option><option value="day">a giornata</option><option value="person">a persona</option></select></label>
                     </div>
                     <div className="flex justify-end gap-2"><button onClick={() => delExtra(e.id)} className="text-xs text-faint hover:text-[color:var(--err)]">Elimina</button><button onClick={() => setEditId(null)} className="rounded bg-focus px-2.5 py-1 text-xs font-semibold text-white">Fatto</button></div>
                   </div>
