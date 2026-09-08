@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
-import type { Structure, ExtraService } from "@/lib/types";
-import { STRUCTURE_TYPES, AMENITIES, PAY_METHODS, CANCEL_POLICIES, DEFAULT_EXTRAS } from "@/lib/types";
+import type { Structure } from "@/lib/types";
+import { STRUCTURE_TYPES, AMENITIES, PAY_METHODS, CANCEL_POLICIES } from "@/lib/types";
 import { USER_LANGS, AV_COLORS } from "@/lib/users";
 import { eur } from "@/lib/format";
 import { downscaleImage } from "@/lib/images";
@@ -84,10 +84,6 @@ export default function StrutturaSchedaPage() {
   const groups = Array.from(new Set(structures.map((s) => s.groupName)));
   const toggleArr = (k: "services" | "payMethods", x: string) => setF((p) => { const cur = p[k] ?? []; return { ...p, [k]: cur.includes(x) ? cur.filter((y) => y !== x) : [...cur, x] }; });
 
-  const exUid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID().slice(0, 8) : `e${Math.floor(performance.now())}`);
-  const addExtra = () => setF((p) => ({ ...p, extras: [...(p.extras ?? []), { id: exUid(), name: "", price: 0, per: "stay" as ExtraService["per"] }] }));
-  const updExtra = (i: number, patch: Partial<ExtraService>) => setF((p) => ({ ...p, extras: (p.extras ?? []).map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
-  const delExtra = (i: number) => setF((p) => ({ ...p, extras: (p.extras ?? []).filter((_, j) => j !== i) }));
 
   const nCamere = units.filter((u) => u.structureId === params.id).length;
   const nTipologie = roomTypes.filter((rt) => rt.structureId === params.id).length;
@@ -453,27 +449,7 @@ export default function StrutturaSchedaPage() {
               )}
               <p className="mt-1.5 text-[11px] text-faint">{t("Voce unica: vale per tutte le strutture. Mostrata all'ospite alla prenotazione diretta.")}</p>
             </div>
-            <div className="mb-2 mt-3 flex items-center justify-between">
-              <div className="text-xs font-medium text-dim">{t("Servizi extra (upsell)")}</div>
-              <div className="flex gap-2">
-                {(f.extras ?? []).length === 0 && <button onClick={() => set("extras", DEFAULT_EXTRAS)} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-wash">{t("Carica esempi")}</button>}
-                <button onClick={addExtra} className="rounded-md border border-line px-2 py-1 text-xs font-medium text-focus hover:bg-wash">＋ {t("Servizio")}</button>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              {(f.extras ?? []).map((x, i) => (
-                <div key={x.id} className="rounded-lg border border-line p-2">
-                  <div className="flex items-center gap-2">
-                    <input value={x.name} onChange={(e) => updExtra(i, { name: e.target.value })} placeholder={t("Nome servizio")} className={`${inp} min-w-0 flex-1`} />
-                    <input type="number" min={0} value={x.price} onChange={(e) => updExtra(i, { price: Number(e.target.value) })} className={`${inp} w-20`} />
-                    <select value={x.per} onChange={(e) => updExtra(i, { per: e.target.value as ExtraService["per"] })} className={inp}><option value="stay">{t("/soggiorno")}</option><option value="night">{t("/notte")}</option><option value="person">{t("/persona")}</option></select>
-                    <button onClick={() => delExtra(i)} className="rounded p-1 text-faint hover:text-[color:var(--err)]">✕</button>
-                  </div>
-                  <input value={x.desc ?? ""} onChange={(e) => updExtra(i, { desc: e.target.value })} placeholder={t("Descrizione (facoltativa)")} className={`${inp} mt-2 w-full text-xs`} />
-                </div>
-              ))}
-              {(f.extras ?? []).length === 0 && <p className="text-xs text-faint">{t("Nessun servizio extra. Verranno usati quelli predefiniti nel motore di prenotazione.")}</p>}
-            </div>
+            <p className="mt-3 text-[11px] text-faint">{t("I servizi extra si gestiscono in «Upselling & extra»; l'ospite li sceglie durante la prenotazione.")}</p>
           </Card>
         </div>
       </div>

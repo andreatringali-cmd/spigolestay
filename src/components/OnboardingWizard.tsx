@@ -109,7 +109,7 @@ export default function OnboardingWizard() {
   const finish = () => {
     // Struttura
     const sid = uid();
-    const structure = { id: sid, name: sName.trim(), groupName: sName.trim(), type: sType, city: sCity.trim(), address: sAddress.trim(), streetNumber: sStreetNo.trim(), postalCode: sCap.trim(), province: sProvince.trim(), cin: sCin.trim(), active: true };
+    const structure = { id: sid, name: sName.trim(), groupName: sName.trim(), type: sType, city: sCity.trim(), address: sAddress.trim(), streetNumber: sStreetNo.trim(), postalCode: sCap.trim(), province: sProvince.trim(), cin: sCin.trim(), active: true, checkOutBy: "10:30" };
     // Tipologie + unità
     const roomTypes: object[] = []; const units: object[] = [];
     camere.forEach((c) => {

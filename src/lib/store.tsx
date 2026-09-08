@@ -219,7 +219,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       activeStructureId,
       setActiveStructure: (id) => { setActiveStructureId(id); try { localStorage.setItem("spigolestay:activestruct", id); } catch {} },
 
-      addStructure: (s) => { const id = uid(); setStructures((prev) => [...prev, { id, city: "Siracusa", ...s }]); return id; },
+      addStructure: (s) => { const id = uid(); setStructures((prev) => [...prev, { id, city: "Siracusa", checkOutBy: "10:30", ...s }]); return id; },
       updateStructure: (id, patch) => setStructures((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x))),
       addRoomType: (rt) => { const id = uid(); setRoomTypes((prev) => [...prev, { id, ...rt }]); return id; },
       updateRoomType: (id, patch) => setRoomTypes((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x))),

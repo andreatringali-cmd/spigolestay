@@ -159,7 +159,7 @@ export default function CamerePage() {
                 {showType && <td className="px-3 py-2.5 text-dim">{rt?.name ?? "—"}</td>}
                 <td className="px-3 py-2.5 text-dim">{u.floor || "—"}</td>
                 <td className="px-3 py-2.5 text-dim">{u.view || "—"}</td>
-                <td className="px-3 py-2.5 text-dim">{rt?.beds ?? "—"}</td>
+                <td className="px-3 py-2.5 text-dim">{rt?.beds ? <span className="inline-flex items-center gap-0.5 text-dim" title={`${rt.beds} posti letto`} aria-label={`${rt.beds} posti letto`}>{Array.from({ length: Math.min(rt.beds, 8) }).map((_, k) => (<svg key={k} width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" /></svg>))}{rt.beds > 8 ? <span className="ml-0.5 text-xs">×{rt.beds}</span> : null}</span> : <span className="text-faint">—</span>}</td>
                 <td className="px-3 py-2.5 max-w-[180px] truncate text-xs text-dim" title={u.notes || ""}>{u.notes || <span className="text-faint">—</span>}</td>
                 <td className="px-3 py-2.5">{u.outOfService ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("Fuori servizio")}</span> : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("In servizio")}</span>}</td>
                 <td className="px-3 py-2.5 text-right text-faint">›</td>
@@ -340,6 +340,9 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
   };
   const [f, setF] = useState<Partial<Unit>>(() => unit ?? { ...nextRoom(types[0]?.id ?? ""), roomTypeId: types[0]?.id ?? "", floor: "", view: "", outOfService: false });
   const set = <K extends keyof Unit>(k: K, v: Unit[K]) => setF((p) => ({ ...p, [k]: v }));
+  // Codice camera automatico = prime 3 lettere tipologia + numero (nome). Non si digita.
+  const codeOf = (name?: string, rtId?: string) => { const rt = roomTypes.find((r) => r.id === rtId); const prefix = (rt?.name || "").replace(/\s+/g, "").slice(0, 3).toUpperCase(); const nm = (name || "").trim(); return nm ? `${prefix}${nm}` : ""; };
+  const autoCode = codeOf(f.name, f.roomTypeId);
   const onPhotos = async (files: FileList | null) => {
     if (!files?.length) return;
     for (const file of Array.from(files)) {
@@ -352,7 +355,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
 
   const save = () => {
     if (!f.name?.trim() || !f.roomTypeId) return;
-    const patch: Partial<Unit> = { name: f.name.trim(), roomTypeId: f.roomTypeId, code: f.code, floor: f.floor, view: f.view, accessInfo: f.accessInfo, notes: f.notes, outOfService: f.outOfService, oosReason: f.outOfService ? f.oosReason : undefined, photos: f.photos, amenities: f.amenities, bedConfig: f.bedConfig, size: f.size };
+    const patch: Partial<Unit> = { name: f.name.trim(), roomTypeId: f.roomTypeId, code: codeOf(f.name, f.roomTypeId), floor: f.floor, view: f.view, accessInfo: f.accessInfo, notes: f.notes, outOfService: f.outOfService, oosReason: f.outOfService ? f.oosReason : undefined, photos: f.photos, amenities: f.amenities, bedConfig: f.bedConfig, size: f.size };
     if (unit) updateUnit(unit.id, patch);
     else { const id = addUnit({ structureId, roomTypeId: f.roomTypeId, name: patch.name! }); updateUnit(id, patch); }
     onClose();
@@ -362,8 +365,8 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
     <Modal title={unit ? t("Scheda camera") : t("Nuova camera")} onClose={onClose}>
       <div className="grid grid-cols-2 gap-3">
         <label className={`${lbl} col-span-2`}>{t("Nome camera")} *<input value={f.name ?? ""} onChange={(e) => set("name", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. Camera Ortigia")} /></label>
-        <label className={lbl}>{t("Codice / numero")}<input value={f.code ?? ""} onChange={(e) => set("code", e.target.value)} className={`${inp} mt-1`} placeholder="101" /></label>
-        <label className={lbl}>{t("Tipologia")}<select value={f.roomTypeId ?? ""} onChange={(e) => { const rid = e.target.value; if (unit) { set("roomTypeId", rid); } else { const nr = nextRoom(rid); setF((p) => ({ ...p, roomTypeId: rid, name: nr.name, code: nr.code })); } }} className={`${inp} mt-1`}>{types.length === 0 && <option value="">{t("Crea prima una tipologia")}</option>}{types.map((rt) => <option key={rt.id} value={rt.id}>{rt.name}</option>)}</select></label>
+        <label className={lbl}>{t("Codice")} <span className="font-normal text-faint">({t("automatico")})</span><input value={autoCode} readOnly title={t("Generato da tipologia + numero")} className={`${inp} mt-1 cursor-not-allowed bg-wash text-dim`} placeholder="—" /></label>
+        <label className={lbl}>{t("Tipologia")}<select value={f.roomTypeId ?? ""} onChange={(e) => { const rid = e.target.value; if (unit) { set("roomTypeId", rid); } else { const nr = nextRoom(rid); setF((p) => ({ ...p, roomTypeId: rid, name: nr.name })); } }} className={`${inp} mt-1`}>{types.length === 0 && <option value="">{t("Crea prima una tipologia")}</option>}{types.map((rt) => <option key={rt.id} value={rt.id}>{rt.name}</option>)}</select></label>
         <label className={lbl}>{t("Piano")}<input value={f.floor ?? ""} onChange={(e) => set("floor", e.target.value)} className={`${inp} mt-1`} placeholder={t("Terra / 1° / 2°")} /></label>
         <label className={lbl}>{t("Vista")}<select value={f.view ?? ""} onChange={(e) => set("view", e.target.value)} className={`${inp} mt-1`}><option value="">—</option>{VIEW_OPTIONS.map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
         <label className={lbl}>{t("Configurazione letti")}<select value={f.bedConfig ?? ""} onChange={(e) => set("bedConfig", e.target.value || undefined)} className={`${inp} mt-1`}><option value="">{t("Come tipologia")}</option>{BED_CONFIGS.map((b) => <option key={b} value={b}>{t(b)}</option>)}</select></label>
