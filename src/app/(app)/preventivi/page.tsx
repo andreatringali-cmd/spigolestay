@@ -28,14 +28,14 @@ interface QLabels {
   tassa: string; persone: string; totale: string; condizioni: string;
   accNone: string; accPart: string; accFull: string; cancLabel: string; cancText: string;
   modalita: string; bonifico: string; intest: string; causale: string; closing: string; quoteNo: string;
-  perStay: string; perNight: string; perDay: string; perPerson: string; extrasTitle: string; extrasNote: string;
+  perStay: string; perNight: string; perDay: string; perPerson: string; extrasTitle: string; extrasNote: string; extrasIntro: string;
 }
 const QL: Record<Lang, QLabels> = {
-  it: { hi: "Gentile", guest: "Ospite", avail: "ho il piacere di confermarLe la disponibilità per il periodo richiesto", periodo: "Periodo", ci: "Check-in", co: "Check-out", durata: "Durata", notte: "notte", notti: "notti", riepilogo: "Riepilogo economico", room: "camera", aNotte: "a notte", colazione: "Colazione", inclusa: "Inclusa", parcheggio: "Parcheggio", parkIncl: "Incluso nel prezzo (per un'auto)", culla: "Culla", cullaIncl: "Inclusa (su richiesta)", tassa: "Tassa di soggiorno", persone: "persone", totale: "TOTALE COMPLESSIVO", condizioni: "Condizioni e pagamento", accNone: "Nessun acconto richiesto: il saldo di {tot} è dovuto al check-in.", accPart: "Per confermare è richiesto un acconto del {pct}% del totale, ovvero {dep}. Il saldo di {bal} al check-in.", accFull: "Per confermare è richiesto il pagamento dell'intero importo: {tot}.", cancLabel: "Cancellazione", cancText: "tariffa interamente rimborsabile fino a 7 giorni prima del check-in.", modalita: "Modalità di pagamento", bonifico: "Bonifico bancario", intest: "Intestatario", causale: "Causale", closing: "Restiamo a disposizione per qualsiasi informazione. A presto!", quoteNo: "Preventivo n.", perStay: "a soggiorno", perNight: "a notte", perDay: "a giornata", perPerson: "a persona", extrasTitle: "Servizi & esperienze", extrasNote: "Prezzi indicativi — puoi aggiungerli alla prenotazione." },
-  en: { hi: "Dear", guest: "Guest", avail: "we are pleased to confirm availability for the requested dates", periodo: "Dates", ci: "Check-in", co: "Check-out", durata: "Length", notte: "night", notti: "nights", riepilogo: "Price summary", room: "room", aNotte: "per night", colazione: "Breakfast", inclusa: "Included", parcheggio: "Parking", parkIncl: "Included in the price (one car)", culla: "Cot", cullaIncl: "Included (on request)", tassa: "City tax", persone: "guests", totale: "GRAND TOTAL", condizioni: "Terms and payment", accNone: "No deposit required: the balance of {tot} is due at check-in.", accPart: "To confirm, a {pct}% deposit is required, i.e. {dep}. Balance of {bal} at check-in.", accFull: "To confirm, full payment is required: {tot}.", cancLabel: "Cancellation", cancText: "fully refundable up to 7 days before check-in.", modalita: "Payment methods", bonifico: "Bank transfer", intest: "Account holder", causale: "Reference", closing: "We remain at your disposal for any information. See you soon!", quoteNo: "Quote no.", perStay: "per stay", perNight: "per night", perDay: "per day", perPerson: "per person", extrasTitle: "Extras & experiences", extrasNote: "Indicative prices — you can add them to your booking." },
-  fr: { hi: "Cher/Chère", guest: "client", avail: "nous avons le plaisir de confirmer la disponibilité pour les dates demandées", periodo: "Dates", ci: "Arrivée", co: "Départ", durata: "Durée", notte: "nuit", notti: "nuits", riepilogo: "Récapitulatif", room: "chambre", aNotte: "par nuit", colazione: "Petit-déjeuner", inclusa: "Inclus", parcheggio: "Parking", parkIncl: "Inclus dans le prix (une voiture)", culla: "Lit bébé", cullaIncl: "Inclus (sur demande)", tassa: "Taxe de séjour", persone: "personnes", totale: "TOTAL GÉNÉRAL", condizioni: "Conditions et paiement", accNone: "Aucun acompte requis : le solde de {tot} est dû à l'arrivée.", accPart: "Pour confirmer, un acompte de {pct}% est requis, soit {dep}. Solde de {bal} à l'arrivée.", accFull: "Pour confirmer, le paiement intégral est requis : {tot}.", cancLabel: "Annulation", cancText: "entièrement remboursable jusqu'à 7 jours avant l'arrivée.", modalita: "Moyens de paiement", bonifico: "Virement bancaire", intest: "Titulaire", causale: "Motif", closing: "Nous restons à votre disposition. À bientôt !", quoteNo: "Devis n°", perStay: "par séjour", perNight: "par nuit", perDay: "par jour", perPerson: "par personne", extrasTitle: "Services & expériences", extrasNote: "Prix indicatifs — à ajouter à votre réservation." },
-  de: { hi: "Liebe/r", guest: "Gast", avail: "wir bestätigen Ihnen gerne die Verfügbarkeit für den gewünschten Zeitraum", periodo: "Zeitraum", ci: "Anreise", co: "Abreise", durata: "Dauer", notte: "Nacht", notti: "Nächte", riepilogo: "Preisübersicht", room: "Zimmer", aNotte: "pro Nacht", colazione: "Frühstück", inclusa: "Inklusive", parcheggio: "Parkplatz", parkIncl: "Im Preis inbegriffen (ein Auto)", culla: "Kinderbett", cullaIncl: "Inklusive (auf Anfrage)", tassa: "Kurtaxe", persone: "Gäste", totale: "GESAMTBETRAG", condizioni: "Bedingungen und Zahlung", accNone: "Keine Anzahlung erforderlich: Der Restbetrag von {tot} ist bei Anreise fällig.", accPart: "Zur Bestätigung ist eine Anzahlung von {pct}% erforderlich, d.h. {dep}. Restbetrag {bal} bei Anreise.", accFull: "Zur Bestätigung ist die vollständige Zahlung erforderlich: {tot}.", cancLabel: "Stornierung", cancText: "bis 7 Tage vor Anreise voll erstattbar.", modalita: "Zahlungsarten", bonifico: "Banküberweisung", intest: "Kontoinhaber", causale: "Verwendungszweck", closing: "Wir stehen Ihnen gerne zur Verfügung. Bis bald!", quoteNo: "Angebot Nr.", perStay: "pro Aufenthalt", perNight: "pro Nacht", perDay: "pro Tag", perPerson: "pro Person", extrasTitle: "Extras & Erlebnisse", extrasNote: "Richtpreise — zur Buchung hinzufügbar." },
-  es: { hi: "Estimado/a", guest: "huésped", avail: "tenemos el placer de confirmar la disponibilidad para las fechas solicitadas", periodo: "Fechas", ci: "Entrada", co: "Salida", durata: "Duración", notte: "noche", notti: "noches", riepilogo: "Resumen económico", room: "habitación", aNotte: "por noche", colazione: "Desayuno", inclusa: "Incluido", parcheggio: "Aparcamiento", parkIncl: "Incluido en el precio (un coche)", culla: "Cuna", cullaIncl: "Incluida (bajo petición)", tassa: "Tasa turística", persone: "personas", totale: "TOTAL", condizioni: "Condiciones y pago", accNone: "No se requiere anticipo: el saldo de {tot} se paga en la entrada.", accPart: "Para confirmar se requiere un anticipo del {pct}%, es decir {dep}. Saldo de {bal} en la entrada.", accFull: "Para confirmar se requiere el pago íntegro: {tot}.", cancLabel: "Cancelación", cancText: "totalmente reembolsable hasta 7 días antes de la entrada.", modalita: "Formas de pago", bonifico: "Transferencia bancaria", intest: "Titular", causale: "Concepto", closing: "Quedamos a su disposición. ¡Hasta pronto!", quoteNo: "Presupuesto n.º", perStay: "por estancia", perNight: "por noche", perDay: "por día", perPerson: "por persona", extrasTitle: "Servicios y experiencias", extrasNote: "Precios orientativos — puedes añadirlos a la reserva." },
+  it: { hi: "Gentile", guest: "Ospite", avail: "ho il piacere di confermarLe la disponibilità per il periodo richiesto", periodo: "Periodo", ci: "Check-in", co: "Check-out", durata: "Durata", notte: "notte", notti: "notti", riepilogo: "Riepilogo economico", room: "camera", aNotte: "a notte", colazione: "Colazione", inclusa: "Inclusa", parcheggio: "Parcheggio", parkIncl: "Incluso nel prezzo (per un'auto)", culla: "Culla", cullaIncl: "Inclusa (su richiesta)", tassa: "Tassa di soggiorno", persone: "persone", totale: "TOTALE COMPLESSIVO", condizioni: "Condizioni e pagamento", accNone: "Nessun acconto richiesto: il saldo di {tot} è dovuto al check-in.", accPart: "Per confermare è richiesto un acconto del {pct}% del totale, ovvero {dep}. Il saldo di {bal} al check-in.", accFull: "Per confermare è richiesto il pagamento dell'intero importo: {tot}.", cancLabel: "Cancellazione", cancText: "tariffa interamente rimborsabile fino a 7 giorni prima del check-in.", modalita: "Modalità di pagamento", bonifico: "Bonifico bancario", intest: "Intestatario", causale: "Causale", closing: "Restiamo a disposizione per qualsiasi informazione. A presto!", quoteNo: "Preventivo n.", perStay: "a soggiorno", perNight: "a notte", perDay: "a giornata", perPerson: "a persona", extrasTitle: "Servizi & esperienze", extrasNote: "Prezzi indicativi — puoi aggiungerli alla prenotazione.", extrasIntro: "Per rendere il tuo soggiorno indimenticabile, abbiamo pensato a una selezione di servizi ed esperienze su misura. Scopri le nostre proposte e aggiungi alla prenotazione ciò che desideri: al resto pensiamo noi." },
+  en: { hi: "Dear", guest: "Guest", avail: "we are pleased to confirm availability for the requested dates", periodo: "Dates", ci: "Check-in", co: "Check-out", durata: "Length", notte: "night", notti: "nights", riepilogo: "Price summary", room: "room", aNotte: "per night", colazione: "Breakfast", inclusa: "Included", parcheggio: "Parking", parkIncl: "Included in the price (one car)", culla: "Cot", cullaIncl: "Included (on request)", tassa: "City tax", persone: "guests", totale: "GRAND TOTAL", condizioni: "Terms and payment", accNone: "No deposit required: the balance of {tot} is due at check-in.", accPart: "To confirm, a {pct}% deposit is required, i.e. {dep}. Balance of {bal} at check-in.", accFull: "To confirm, full payment is required: {tot}.", cancLabel: "Cancellation", cancText: "fully refundable up to 7 days before check-in.", modalita: "Payment methods", bonifico: "Bank transfer", intest: "Account holder", causale: "Reference", closing: "We remain at your disposal for any information. See you soon!", quoteNo: "Quote no.", perStay: "per stay", perNight: "per night", perDay: "per day", perPerson: "per person", extrasTitle: "Extras & experiences", extrasNote: "Indicative prices — you can add them to your booking.", extrasIntro: "To make your stay unforgettable, we've curated a selection of tailored services and experiences. Explore our proposals and add what you like to your booking — we'll take care of the rest." },
+  fr: { hi: "Cher/Chère", guest: "client", avail: "nous avons le plaisir de confirmer la disponibilité pour les dates demandées", periodo: "Dates", ci: "Arrivée", co: "Départ", durata: "Durée", notte: "nuit", notti: "nuits", riepilogo: "Récapitulatif", room: "chambre", aNotte: "par nuit", colazione: "Petit-déjeuner", inclusa: "Inclus", parcheggio: "Parking", parkIncl: "Inclus dans le prix (une voiture)", culla: "Lit bébé", cullaIncl: "Inclus (sur demande)", tassa: "Taxe de séjour", persone: "personnes", totale: "TOTAL GÉNÉRAL", condizioni: "Conditions et paiement", accNone: "Aucun acompte requis : le solde de {tot} est dû à l'arrivée.", accPart: "Pour confirmer, un acompte de {pct}% est requis, soit {dep}. Solde de {bal} à l'arrivée.", accFull: "Pour confirmer, le paiement intégral est requis : {tot}.", cancLabel: "Annulation", cancText: "entièrement remboursable jusqu'à 7 jours avant l'arrivée.", modalita: "Moyens de paiement", bonifico: "Virement bancaire", intest: "Titulaire", causale: "Motif", closing: "Nous restons à votre disposition. À bientôt !", quoteNo: "Devis n°", perStay: "par séjour", perNight: "par nuit", perDay: "par jour", perPerson: "par personne", extrasTitle: "Services & expériences", extrasNote: "Prix indicatifs — à ajouter à votre réservation.", extrasIntro: "Pour rendre votre séjour inoubliable, nous avons imaginé une sélection de services et d'expériences sur mesure. Découvrez nos propositions et ajoutez à votre réservation ce qui vous plaît : nous nous occupons du reste." },
+  de: { hi: "Liebe/r", guest: "Gast", avail: "wir bestätigen Ihnen gerne die Verfügbarkeit für den gewünschten Zeitraum", periodo: "Zeitraum", ci: "Anreise", co: "Abreise", durata: "Dauer", notte: "Nacht", notti: "Nächte", riepilogo: "Preisübersicht", room: "Zimmer", aNotte: "pro Nacht", colazione: "Frühstück", inclusa: "Inklusive", parcheggio: "Parkplatz", parkIncl: "Im Preis inbegriffen (ein Auto)", culla: "Kinderbett", cullaIncl: "Inklusive (auf Anfrage)", tassa: "Kurtaxe", persone: "Gäste", totale: "GESAMTBETRAG", condizioni: "Bedingungen und Zahlung", accNone: "Keine Anzahlung erforderlich: Der Restbetrag von {tot} ist bei Anreise fällig.", accPart: "Zur Bestätigung ist eine Anzahlung von {pct}% erforderlich, d.h. {dep}. Restbetrag {bal} bei Anreise.", accFull: "Zur Bestätigung ist die vollständige Zahlung erforderlich: {tot}.", cancLabel: "Stornierung", cancText: "bis 7 Tage vor Anreise voll erstattbar.", modalita: "Zahlungsarten", bonifico: "Banküberweisung", intest: "Kontoinhaber", causale: "Verwendungszweck", closing: "Wir stehen Ihnen gerne zur Verfügung. Bis bald!", quoteNo: "Angebot Nr.", perStay: "pro Aufenthalt", perNight: "pro Nacht", perDay: "pro Tag", perPerson: "pro Person", extrasTitle: "Extras & Erlebnisse", extrasNote: "Richtpreise — zur Buchung hinzufügbar.", extrasIntro: "Damit Ihr Aufenthalt unvergesslich wird, haben wir eine Auswahl maßgeschneiderter Services und Erlebnisse zusammengestellt. Entdecken Sie unsere Angebote und fügen Sie Ihrer Buchung hinzu, was Ihnen gefällt – um den Rest kümmern wir uns." },
+  es: { hi: "Estimado/a", guest: "huésped", avail: "tenemos el placer de confirmar la disponibilidad para las fechas solicitadas", periodo: "Fechas", ci: "Entrada", co: "Salida", durata: "Duración", notte: "noche", notti: "noches", riepilogo: "Resumen económico", room: "habitación", aNotte: "por noche", colazione: "Desayuno", inclusa: "Incluido", parcheggio: "Aparcamiento", parkIncl: "Incluido en el precio (un coche)", culla: "Cuna", cullaIncl: "Incluida (bajo petición)", tassa: "Tasa turística", persone: "personas", totale: "TOTAL", condizioni: "Condiciones y pago", accNone: "No se requiere anticipo: el saldo de {tot} se paga en la entrada.", accPart: "Para confirmar se requiere un anticipo del {pct}%, es decir {dep}. Saldo de {bal} en la entrada.", accFull: "Para confirmar se requiere el pago íntegro: {tot}.", cancLabel: "Cancelación", cancText: "totalmente reembolsable hasta 7 días antes de la entrada.", modalita: "Formas de pago", bonifico: "Transferencia bancaria", intest: "Titular", causale: "Concepto", closing: "Quedamos a su disposición. ¡Hasta pronto!", quoteNo: "Presupuesto n.º", perStay: "por estancia", perNight: "por noche", perDay: "por día", perPerson: "por persona", extrasTitle: "Servicios y experiencias", extrasNote: "Precios orientativos — puedes añadirlos a la reserva.", extrasIntro: "Para hacer tu estancia inolvidable, hemos preparado una selección de servicios y experiencias a medida. Descubre nuestras propuestas y añade a tu reserva lo que desees: del resto nos ocupamos nosotros." },
 };
 
 type QuoteRoom = { roomTypeId: string; qty: number; price: number };
@@ -107,8 +107,9 @@ export default function PreventiviPage() {
   const taxKids = childAges.filter((a) => a >= 15).length;
   const taxPersons = adults + taxKids;
   const [acconto, setAcconto] = useState<number>(50);
+  const [structPct, setStructPct] = useState<number>(50); // % acconto impostata nella scheda struttura (card centrale)
   // Predefinito dalla % acconto impostata nella scheda struttura (voce globale).
-  useEffect(() => { try { const d = loadDeposit(); setAcconto(d.on ? Math.min(100, Math.max(0, Math.round(d.pct))) : 0); } catch {} }, []);
+  useEffect(() => { try { const d = loadDeposit(); const pct = Math.min(100, Math.max(0, Math.round(d.pct || 0))); setStructPct(pct || 50); setAcconto(d.on ? pct : 0); } catch {} }, []);
   const [breakfast, setBreakfast] = useState(true);
   const [parking, setParking] = useState(true);
   const [parkingPrice, setParkingPrice] = useState(0); // € a notte (0 = incluso)
@@ -309,12 +310,13 @@ export default function PreventiviPage() {
     const extrasRows = structExtras.map((e) => `<tr><td><b>${esc(e.name)}</b>${e.desc ? `<div class="mut" style="font-weight:400;margin-top:2px">${esc(e.desc)}</div>` : ""}</td><td class="r"><b>${eur(e.price)}</b> <span class="mut">${esc(perLabel(e.per, L))}</span></td></tr>`).join("");
     const extrasHtml = (extrasPage && structExtras.length)
       ? `<div class="sheet page2"><div class="bar"></div>
-<div class="head">${logoHtml}<div style="min-width:0"><div class="brand">${esc(structureName || "Xenora")}</div>${stContacts ? `<div class="sub">${esc(stContacts)}</div>` : ""}</div>
+<div class="head">${logoHtml}<div style="min-width:0"><div class="brand">${esc(structureName || "Xenora")}</div>${stAddress ? `<div class="sub">${esc(stAddress)}</div>` : ""}${stContacts ? `<div class="sub" style="margin-top:1px">${esc(stContacts)}</div>` : ""}</div>
 <div class="qbadge"><div class="qlabel">${esc(L.quoteNo)}</div><div class="qno">${quoteRef}</div><div class="qdate">${todayStr}</div></div></div>
 <h2>${esc(L.extrasTitle)}</h2>
-<p class="lead">${esc(L.extrasNote)}</p>
+<p class="lead">${esc(L.extrasIntro)}</p>
 <table>${extrasRows}</table>
-<div class="foot"><span>${[esc(structureName || "Xenora"), esc(stContacts), esc(stLegal)].filter(Boolean).join("  ·  ")}</span><span class="social">${stSocials.map((s) => `<a href="${esc(s.url)}"><svg viewBox="0 0 24 24" width="15" height="15" fill="#fff"><path d="${SOCIAL_PATH[s.k]}"/></svg></a>`).join("")}</span></div>
+<p class="note">${esc(L.extrasNote)}</p>
+<div class="foot"><span>${[esc(structureName || "Xenora"), esc(stAddress), esc(stContacts), esc(stLegal)].filter(Boolean).join("  ·  ")}</span><span class="social">${stSocials.map((s) => `<a href="${esc(s.url)}"><svg viewBox="0 0 24 24" width="15" height="15" fill="#fff"><path d="${SOCIAL_PATH[s.k]}"/></svg></a>`).join("")}${stSocials.length ? "" : todayStr}</span></div>
 </div>`
       : "";
 
@@ -456,13 +458,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             <Field label={t("Bambini")}><input type="number" min={0} value={children} onChange={(e) => { const v = Math.max(0, Number(e.target.value)); setChildren(v); setChildAges((prev) => { const next = prev.slice(0, v); while (next.length < v) next.push(8); return next; }); }} className={inp} /></Field>
             {children > 0 && (
               <div className="col-span-2">
-                <div className="mb-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                  <div className="text-xs font-medium text-dim">{t("Età dei bambini")} <span className="font-normal text-faint">({t("sotto i 15 anni esenti dalla tassa")})</span></div>
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-2 text-sm font-medium text-txt"><input type="checkbox" checked={cot} onChange={(e) => setCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Culla")}</label>
-                    {cot && (<label className="flex items-center gap-1.5 text-xs text-dim">{t("€/notte (0 = inclusa)")}<input type="number" min={0} value={cotPrice} onChange={(e) => setCotPrice(Number(e.target.value))} className="w-20 rounded-lg border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" /></label>)}
-                  </div>
-                </div>
+                <div className="mb-1 text-xs font-medium text-dim">{t("Età dei bambini")} <span className="font-normal text-faint">({t("sotto i 15 anni esenti dalla tassa")})</span></div>
                 <div className="flex flex-wrap gap-2">
                   {childAges.map((age, i) => (
                     <div key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5">
@@ -471,6 +467,10 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                       <span className="text-[10px] font-semibold" style={{ color: age >= 15 ? "var(--warn)" : "var(--ok)" }}>{age >= 15 ? t("paga") : t("esente")}</span>
                     </div>
                   ))}
+                  <div className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5">
+                    <label className="flex items-center gap-1.5"><input type="checkbox" checked={cot} onChange={(e) => setCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /><span className="text-[11px] text-faint">{t("Culla")}</span></label>
+                    {cot && (<><input type="number" min={0} value={cotPrice} onChange={(e) => setCotPrice(Number(e.target.value))} title={t("€/notte (0 = inclusa)")} className="w-14 rounded border border-line bg-surface px-1.5 py-0.5 text-sm text-txt outline-none focus:border-focus" /><span className="text-[10px] text-faint">€/{t("notte")}</span></>)}
+                  </div>
                 </div>
               </div>
             )}
@@ -531,18 +531,14 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               </label>
             )}
             <div className="col-span-2">
-              <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs font-medium text-dim">{t("Acconto per confermare")} (%)</span>
-                <span className="text-[11px] text-faint">{t("Predefinito dalla scheda struttura")}</span>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-dim">{t("Acconto per confermare")}</span>
+                <span className="text-[11px] text-faint">{acconto > 0 && acconto < 100 ? `${eur(deposit)} ${t("ora")} · ${eur(balance)} ${t("al check-in")}` : ""}</span>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <input type="number" min={0} max={100} value={acconto} onChange={(e) => setAcconto(Math.min(100, Math.max(0, Math.round(Number(e.target.value)))))} className="w-24 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-txt outline-none focus:border-focus" />
-                <div className="flex items-center gap-1">
-                  {[0, 30, 50, 100].map((v) => (
-                    <button key={v} onClick={() => setAcconto(v)} className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${acconto === v ? "bg-focus text-white" : "border border-line text-dim hover:text-txt"}`}>{v === 0 ? t("Nessuno") : `${v}%`}</button>
-                  ))}
-                </div>
-                <span className="text-xs text-faint">{acconto <= 0 ? t("saldo al check-in") : acconto >= 100 ? t("intero importo ora") : `${eur(deposit)} ${t("ora")} · ${eur(balance)} ${t("al check-in")}`}</span>
+              <div className="flex items-center rounded-lg border border-line p-0.5">
+                {([[0, t("Nessuno")], [structPct, `${structPct}% (${t("saldo prima")})`], [100, "100%"]] as [number, string][]).map(([v, lab]) => (
+                  <button key={v} onClick={() => setAcconto(v)} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${acconto === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>
+                ))}
               </div>
             </div>
             <div className="col-span-2 rounded-lg border border-line bg-paper p-3">
@@ -721,7 +717,7 @@ function QuoteDoc(p: {
   quoteNo: string; date: string; guest: string; checkIn: string; checkOut: string; nights: number; nWord: string;
   roomLines: { label: string; sub: string; amount: string }[]; breakfast: boolean; parking: boolean; parkText: string; cot?: boolean; cotText?: string;
   cityTax: string; taxPersons: number; total: string; accText: string; payHolder: string; payIban: string; payExtra: string; causale: string; note: string;
-  extras?: { name: string; desc?: string; price: string; per: string }[]; extrasTitle?: string; extrasNote?: string;
+  extras?: { name: string; desc?: string; price: string; per: string }[]; extrasTitle?: string; extrasNote?: string; extrasIntro?: string;
 }) {
   const ink = "#2b2b2b", muted = "#726b62", hair = "#ece7df";
   const row = { display: "flex", justifyContent: "space-between", padding: "9px 2px", borderBottom: `1px solid ${hair}`, fontSize: 14 } as const;
@@ -812,19 +808,53 @@ function QuoteDoc(p: {
     {p.extras && p.extras.length ? (
       <div style={{ width: "100%", margin: "10px auto 0", background: "#fff", color: ink, borderRadius: 10, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,.08), 0 12px 30px -14px rgba(0,0,0,.2)", fontFamily: "Arial, Helvetica, sans-serif" }}>
         <div style={{ height: 6, background: p.accent }} />
-        <div style={{ padding: "24px 30px 28px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, borderBottom: `1px solid ${hair}`, paddingBottom: 14, marginBottom: 16 }}>
-            <div style={{ fontSize: 18, fontWeight: 800 }}>{p.structureName}</div>
-            <div style={{ marginLeft: "auto", fontSize: 11, color: muted, fontWeight: 700 }}>{p.L.quoteNo} {p.quoteNo}</div>
-          </div>
-          <div style={{ fontSize: 11.5, letterSpacing: ".1em", color: muted, textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>{p.extrasTitle}</div>
-          <p style={{ margin: "0 0 12px", fontSize: 13, color: muted }}>{p.extrasNote}</p>
-          {p.extras.map((e, i) => (
-            <div key={i} style={{ ...row, alignItems: "flex-start" }}>
-              <span style={{ minWidth: 0 }}><b>{e.name}</b>{e.desc ? <span style={{ display: "block", color: muted, fontWeight: 400, fontSize: 12 }}>{e.desc}</span> : null}</span>
-              <span style={{ whiteSpace: "nowrap", paddingLeft: 12 }}><b>{e.price}</b> <span style={{ color: muted }}>{e.per}</span></span>
+        <div style={{ padding: "28px 30px 0" }}>
+          {/* Intestazione identica alla pagina 1 */}
+          <div style={{ display: "flex", alignItems: "center", gap: 16, borderBottom: `1px solid ${hair}`, paddingBottom: 20 }}>
+            {p.logo
+              ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={p.logo} alt="" style={{ width: 64, height: 64, objectFit: "contain", borderRadius: 12, background: "#fff", border: `1px solid ${hair}` }} />)
+              : <div style={{ width: 64, height: 64, borderRadius: 12, background: p.accent, color: "#fff", display: "grid", placeItems: "center", fontWeight: 800, fontSize: 30 }}>{(p.structureName || "S").slice(0, 1).toUpperCase()}</div>}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-.4px" }}>{p.structureName || "La tua struttura"}</div>
+              {p.address && <div style={{ fontSize: 13, color: muted, marginTop: 3 }}>{p.address}</div>}
+              {p.contacts && <div style={{ fontSize: 12, color: muted, marginTop: 1 }}>{p.contacts}</div>}
             </div>
-          ))}
+            <div style={{ textAlign: "right", flex: "none" }}>
+              <div style={{ fontSize: 11, letterSpacing: ".13em", color: muted, textTransform: "uppercase", fontWeight: 700 }}>{p.L.quoteNo}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: p.accent }}>{p.quoteNo}</div>
+              <div style={{ fontSize: 12.5, color: muted }}>{p.date}</div>
+            </div>
+          </div>
+
+          <div style={{ padding: "22px 0 30px" }}>
+            <div style={{ fontSize: 11.5, letterSpacing: ".1em", color: muted, textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>{p.extrasTitle}</div>
+            {p.extrasIntro && <p style={{ margin: "0 0 18px", fontSize: 14, color: muted, lineHeight: 1.6 }}>{p.extrasIntro}</p>}
+            {p.extras.map((e, i) => (
+              <div key={i} style={{ ...row, alignItems: "flex-start" }}>
+                <span style={{ minWidth: 0 }}><b>{e.name}</b>{e.desc ? <span style={{ display: "block", color: muted, fontWeight: 400, fontSize: 12 }}>{e.desc}</span> : null}</span>
+                <span style={{ whiteSpace: "nowrap", paddingLeft: 12 }}><b>{e.price}</b> <span style={{ color: muted }}>{e.per}</span></span>
+              </div>
+            ))}
+            {p.extrasNote && <p style={{ margin: "12px 0 0", fontSize: 12, fontStyle: "italic", color: muted }}>{p.extrasNote}</p>}
+
+            {/* Piè di pagina identico alla pagina 1 */}
+            <div style={{ marginTop: 22, paddingTop: 12, borderTop: `1px solid ${hair}`, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ fontSize: 10.5, color: "#b3a99c", lineHeight: 1.5, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, color: muted }}>{p.structureName}</div>
+                {p.address && <div>{p.address}</div>}
+                {(p.contacts || p.legal) && <div>{[p.contacts, p.legal].filter(Boolean).join("  ·  ")}</div>}
+              </div>
+              {p.socials.length > 0 && (
+                <div style={{ display: "flex", gap: 7, flex: "none" }}>
+                  {p.socials.map((s) => (
+                    <a key={s.k} href={s.url} target="_blank" rel="noreferrer" title={s.k} style={{ width: 26, height: 26, borderRadius: 999, background: p.accent, color: "#fff", display: "grid", placeItems: "center" }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d={SOCIAL_PATH[s.k]} /></svg>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     ) : null}
