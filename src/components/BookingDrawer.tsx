@@ -550,6 +550,31 @@ export default function BookingDrawer() {
           </div>
         </div>
 
+        {/* Avanzamento prenotazione (ispirato a Octorate, senza ripetizioni) */}
+        {mode === "view" && (() => {
+          const steps = [
+            { label: t("Confermata"), done: booking.status === "confirmed" },
+            { label: t("Check-in"), done: !!booking.webCheckin },
+            { label: t("Incassata"), done: totalV > 0 && paidV >= totalV },
+            { label: t("Fatturata"), done: !!booking.invoiceNo },
+          ];
+          return (
+            <div className="flex items-center gap-1.5 overflow-x-auto border-b border-line px-5 py-2 [scrollbar-width:none]">
+              {steps.map((s, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold" style={s.done ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--faint)" }}>
+                    {s.done
+                      ? <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+                      : <span className="grid h-3.5 w-3.5 place-items-center rounded-full border border-current text-[8px] leading-none">{i + 1}</span>}
+                    {s.label}
+                  </span>
+                  {i < steps.length - 1 && <span className="h-px w-3 bg-line" />}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
         {/* Corpo */}
         <div className="flex-1 overflow-y-auto">{mode === "view" ? viewBody : editBody}</div>
 
