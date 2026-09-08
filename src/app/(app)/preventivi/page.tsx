@@ -427,7 +427,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
     else pay = `• ${L.dep} (${pct}%): ${eur(deposit)}\n• ${L.bal}: ${eur(balance)} ${L.atc}`;
     return `${L.hi} ${q.name},\n${L.ok}\n\n• ${L.struct}: ${q.structure}\n• ${L.ci}: ${fmt(q.checkIn)}\n• ${L.co}: ${fmt(q.checkOut)}\n• ${L.nt}: ${nn}\n• ${L.pax}: ${q.adults}${q.children ? ` + ${q.children}` : ""}\n• ${L.tot}: ${eur(q.total)}\n\n${L.pay}:\n${pay}\n\n${L.bye}`;
   };
-  const confirmBooking = () => {
+  const confirmBooking = (collectDeposit: boolean) => {
     if (!confirming) return;
     const { q, pct } = confirming;
     // Evita doppioni in anagrafica: riusa un ospite esistente (stessa email, oppure stesso nome con
@@ -460,7 +460,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
     flat.forEach((r, i) => {
       const kidCount = nRooms > 1 ? dist(q.children, i) : q.children;
       const ages = (q.childAges ?? []).slice(ci, ci + kidCount); ci += kidCount;
-      addBooking({ groupId, structureId: q.structureId, roomTypeId: r.roomTypeId, unitId: null, guestId: gid, channel: "direct", status: "confirmed", checkIn: q.checkIn, checkOut: q.checkOut, adults: nRooms > 1 ? dist(q.adults, i) : q.adults, children: kidCount, childAges: ages.length ? ages : undefined, total: split(q.total, i), cleaningFee: 0, paid: split(depositTot, i) });
+      addBooking({ groupId, structureId: q.structureId, roomTypeId: r.roomTypeId, unitId: null, guestId: gid, channel: "direct", status: "confirmed", checkIn: q.checkIn, checkOut: q.checkOut, adults: nRooms > 1 ? dist(q.adults, i) : q.adults, children: kidCount, childAges: ages.length ? ages : undefined, total: split(q.total, i), cleaningFee: 0, paid: collectDeposit ? split(depositTot, i) : 0 });
     });
     setSaved((prev) => prev.map((x) => (x.id === q.id ? { ...x, status: "confermato" as const } : x)));
     setConfirming((c) => (c ? { ...c, q: { ...c.q, status: "confermato" } } : c));
@@ -738,7 +738,10 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               <textarea readOnly value={confMsg} rows={9} className="mt-1 w-full resize-none rounded-lg border border-line bg-paper p-3 text-xs text-txt" />
 
               {!confirmed ? (
-                <button onClick={confirmBooking} className="mt-3 w-full rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">{t("Crea prenotazione e incassa anticipo")}</button>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button onClick={() => confirmBooking(false)} className="rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt hover:bg-wash">{t("Crea prenotazione")}</button>
+                  <button onClick={() => confirmBooking(true)} disabled={pct === 0} title={pct === 0 ? t("Imposta un anticipo maggiore di 0") : undefined} className="rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Incassa anticipo")}</button>
+                </div>
               ) : (
                 <div className="mt-3 rounded-lg px-3 py-2 text-sm font-medium text-[color:var(--ok)]" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)" }}>{t("Prenotazione creata")} ✓ — {t("invia la conferma all'ospite:")}</div>
               )}
