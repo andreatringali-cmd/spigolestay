@@ -121,6 +121,18 @@ export default function AbbonamentoPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Recupera il cliente Stripe dall'email se non è memorizzato: così l'app riconosce una carta
+  // già salvata (anche aggiunta fuori dall'app) e il cambio piano non richiede un nuovo pagamento.
+  useEffect(() => {
+    if (stripeCustomer || !user?.email) return;
+    let cancel = false;
+    fetch(`/api/stripe/customer?email=${encodeURIComponent(user.email)}`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancel && d?.customerId) { setStripeCustomer(d.customerId); try { localStorage.setItem("spigolestay:stripecustomer", d.customerId); } catch {} } })
+      .catch(() => {});
+    return () => { cancel = true; };
+  }, [user?.email, stripeCustomer]);
+
   const startCheckout = async (planKey: string) => {
     setNotice(null); setCheckoutBusy(true);
     try {
@@ -355,7 +367,7 @@ export default function AbbonamentoPage() {
               <p className="mt-2 text-[11px] text-faint">{t("I moduli attivi verranno riportati a quelli inclusi nel piano; gli eventuali add-on li riaggiungi dopo.")}</p>
               <div className="mt-4 flex gap-2">
                 <button onClick={() => setPendingTier(null)} className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
-                <button disabled={checkoutBusy} onClick={() => { const k = pendingTier!; if (stripeCustomer) { choose(k); setPendingTier(null); setNotice(`${t("Piano aggiornato a")} ${pt.name} — ${t("attivo dal prossimo rinnovo, senza nuovo pagamento (usiamo la carta salvata).")}`); } else { setPendingTier(null); startCheckout(k); } }} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">{checkoutBusy ? t("Attendi…") : (stripeCustomer ? t("Conferma cambio piano") : t("Vai al pagamento"))}</button>
+                <button disabled={checkoutBusy} onClick={() => { const k = pendingTier!; if (stripeCustomer) { choose(k); setPendingTier(null); setNotice(`${t("Piano aggiornato a")} ${pt.name} — ${t("attivo dal prossimo rinnovo, senza nuovo pagamento (usiamo la carta salvata).")}`); } else { setPendingTier(null); startCheckout(k); } }} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">{checkoutBusy ? t("Attendi…") : (stripeCustomer ? t("Conferma cambio") : t("Vai al pagamento"))}</button>
               </div>
             </div>
           </div>

@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
+import { useAuth } from "@/lib/authsync";
 
 interface Billing { businessName: string; vat: string; taxCode: string; address: string; sdi: string; pec: string; email: string }
 const KEY = "spigolestay:billing";
@@ -15,6 +16,7 @@ const empty: Billing = { businessName: "", vat: "", taxCode: "", address: "", sd
 export default function PagamentoPage() {
   const { t } = useLang();
   const router = useRouter();
+  const { user } = useAuth();
   const [b, setB] = useState<Billing>(empty);
   const [saved, setSaved] = useState(false);
   const [customer, setCustomer] = useState<string | null>(null);
@@ -22,6 +24,16 @@ export default function PagamentoPage() {
   const [notice, setNotice] = useState("");
   useEffect(() => { try { const r = localStorage.getItem(KEY); if (r) setB({ ...empty, ...JSON.parse(r) }); } catch {} }, []);
   useEffect(() => { try { const c = localStorage.getItem("spigolestay:stripecustomer"); if (c) setCustomer(c); } catch {} }, []);
+  // Recupera il cliente Stripe dall'email se non memorizzato (riconosce la carta già salvata).
+  useEffect(() => {
+    if (customer || !user?.email) return;
+    let cancel = false;
+    fetch(`/api/stripe/customer?email=${encodeURIComponent(user.email)}`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancel && d?.customerId) { setCustomer(d.customerId); try { localStorage.setItem("spigolestay:stripecustomer", d.customerId); } catch {} } })
+      .catch(() => {});
+    return () => { cancel = true; };
+  }, [user?.email, customer]);
   const set = (k: keyof Billing, v: string) => setB((p) => ({ ...p, [k]: v }));
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(b)); } catch {} setSaved(true); window.setTimeout(() => setSaved(false), 2000); };
 
