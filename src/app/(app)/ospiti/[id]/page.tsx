@@ -9,6 +9,7 @@ import { USER_LANGS, AV_COLORS, initials } from "@/lib/users";
 import { eur } from "@/lib/format";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { type Promo, loadPromos, promoMailto } from "@/lib/promos";
 import { useEffect } from "react";
 
@@ -24,7 +25,8 @@ export default function OspiteSchedaPage() {
   const { t } = useLang();
   const params = useParams<{ id: string }>();
   const isNew = params.id === "nuovo";
-  const { guests, bookings, addGuest, updateGuest, getStructure, getUnit, openBooking } = useData();
+  const { guests, bookings, addGuest, updateGuest, deleteGuest, getStructure, getUnit, openBooking } = useData();
+  const ask = useConfirm();
 
   const existing = guests.find((g) => g.id === params.id);
   const [g, setG] = useState<Guest>(() => existing ?? { id: "", fullName: "", firstName: "", lastName: "", language: "it", tags: [] });
@@ -65,6 +67,20 @@ export default function OspiteSchedaPage() {
 
   const fullName = `${g.firstName ?? ""} ${g.lastName ?? ""}`.trim() || g.fullName || t("Nuovo ospite");
 
+  const remove = async () => {
+    const n = list.length;
+    const ok = await ask({
+      title: t("Elimina ospite"),
+      message: n > 0
+        ? `${fullName} ${t("ha")} ${n} ${t("prenotazioni: eliminando l'anagrafica resteranno senza ospite collegato. Procedere?")}`
+        : `${t("Eliminare definitivamente l'ospite")} ${fullName}?`,
+      danger: true, confirmLabel: t("Elimina"),
+    });
+    if (!ok) return;
+    deleteGuest(params.id);
+    router.push("/ospiti");
+  };
+
   return (
     <div>
       <PageHeader
@@ -73,6 +89,7 @@ export default function OspiteSchedaPage() {
         actions={
           <div className="flex items-center gap-2">
             {!isNew && g.email && <button onClick={() => setPickPromo(true)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">✉ {t("Invia promo")}</button>}
+            {!isNew && <button onClick={remove} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
             <button onClick={() => router.push("/ospiti")} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
             <button onClick={save} disabled={!valid} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{isNew ? t("Crea ospite") : t("Salva")}</button>
           </div>
