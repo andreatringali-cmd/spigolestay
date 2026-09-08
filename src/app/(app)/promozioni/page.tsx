@@ -5,6 +5,7 @@ import { useData } from "@/lib/store";
 import { toISO, parseISO } from "@/lib/dates";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
+import ScrollStrip from "@/components/ScrollStrip";
 import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, promoMailto, DEFAULT_PROMOS } from "@/lib/promos";
 
 type Segment = "consenso" | "abituali" | "lapsed" | "tutti";
@@ -40,7 +41,7 @@ export default function PromozioniPage() {
   const persistLogs = (n: SendLog[]) => { setLogs(n); try { localStorage.setItem("spigolestay:promolog", JSON.stringify(n)); } catch {} };
 
   // ── Editor promo ──
-  const empty = { name: "", subject: "Un'offerta speciale per te 🌊", discount: 15, code: "BENTORNATO15", body: "Ciao {nome},\nci piacerebbe riaverti come nostro ospite! Prenota direttamente e approfitta del {sconto}% di sconto con il codice {codice}.\nOfferta valida fino al {scadenza}.\nTi aspettiamo a Siracusa. ☀️\n\nA presto,\nAndrea e Agreta\n{struttura}\n{contatti}" };
+  const empty = { name: "", subject: "", discount: 0, code: "", body: "" };
   const [editId, setEditId] = useState<string | null>(null);
   const [name, setName] = useState(empty.name);
   const [subject, setSubject] = useState(empty.subject);
@@ -110,6 +111,35 @@ export default function PromozioniPage() {
         ))}
       </div>
 
+      {/* Promo salvate — libreria (scorrimento orizzontale ‹ ›) */}
+      <div className="mb-4">
+        <SectionTitle>Promo salvate ({promos.length})</SectionTitle>
+        {promos.length === 0 ? (
+          <Card className="py-8 text-center text-sm text-faint">Nessuna promo salvata. Creane una qui sotto e salvala per riutilizzarla.</Card>
+        ) : (
+          <ScrollStrip gap="gap-3" items={promos.map((p) => ({
+            key: p.id,
+            className: "flex-none snap-start w-[300px] max-w-[85vw]",
+            node: (
+              <div className="flex h-full flex-col rounded-xl border border-line bg-surface p-3 shadow-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0"><div className="truncate font-bold text-txt">{p.name}</div><div className="truncate text-[11px] text-faint">{p.subject}</div></div>
+                  {p.discountPct ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>-{p.discountPct}%</span> : null}
+                </div>
+                {p.description && <p className="mt-1 text-xs text-dim">{p.description}</p>}
+                <p className="mt-1.5 line-clamp-2 flex-1 text-xs text-dim">{p.body}</p>
+                <div className="mt-2 flex items-center gap-1 border-t border-line pt-2">
+                  <button onClick={() => setSending(p)} className="flex items-center gap-1 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-white hover:opacity-90"><Icon name="mail" size={13} /> Invia</button>
+                  <button onClick={() => editPromo(p)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash">Modifica</button>
+                  <button onClick={() => dupPromo(p)} title="Duplica" className="rounded-lg border border-line px-2 py-1.5 text-xs text-dim hover:bg-wash"><Icon name="copy" size={13} /></button>
+                  <button onClick={() => delPromo(p.id)} title="Elimina" className="ml-auto rounded-lg px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)]">✕</button>
+                </div>
+              </div>
+            ),
+          }))} />
+        )}
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
         {/* Editor: crea/salva (nessun invio qui) */}
         <Card>
@@ -140,32 +170,6 @@ export default function PromozioniPage() {
             </div>
           </div>
         </Card>
-      </div>
-
-      {/* Promo salvate */}
-      <div className="mt-6">
-        <SectionTitle>Promo salvate ({promos.length})</SectionTitle>
-        {promos.length === 0 ? (
-          <Card className="py-8 text-center text-sm text-faint">Nessuna promo salvata. Creane una qui sopra e salvala per riutilizzarla.</Card>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {promos.map((p) => (
-              <div key={p.id} className="flex flex-col rounded-xl border border-line bg-surface p-3 shadow-sm">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0"><div className="truncate font-bold text-txt">{p.name}</div><div className="truncate text-[11px] text-faint">{p.subject}</div></div>
-                  {p.discountPct ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>-{p.discountPct}%</span> : null}
-                </div>
-                <p className="mt-1.5 line-clamp-2 flex-1 text-xs text-dim">{p.body}</p>
-                <div className="mt-2 flex items-center gap-1 border-t border-line pt-2">
-                  <button onClick={() => setSending(p)} className="flex items-center gap-1 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-white hover:opacity-90"><Icon name="mail" size={13} /> Invia</button>
-                  <button onClick={() => editPromo(p)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash">Modifica</button>
-                  <button onClick={() => dupPromo(p)} title="Duplica" className="rounded-lg border border-line px-2 py-1.5 text-xs text-dim hover:bg-wash"><Icon name="copy" size={13} /></button>
-                  <button onClick={() => delPromo(p.id)} title="Elimina" className="ml-auto rounded-lg px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)]">✕</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Storico invii */}
