@@ -318,10 +318,18 @@ export default function BookingDrawer() {
       </div>
 
       <Section title={t("Ospite")}>
-        <Row label={t("Nome")} value={guest?.fullName ?? "—"} />
-        <Row label={t("Email")} value={guest?.email ?? "—"} />
-        <Row label={t("Telefono")} value={guest?.phone ?? "—"} mono />
-        <Row label={t("Paese")} value={guest?.country ?? "—"} />
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 flex flex-col gap-2">
+            <Row label={t("Email")} value={guest?.email ?? "—"} />
+            <Row label={t("Telefono")} value={guest?.phone ?? "—"} mono />
+            <Row label={t("Paese")} value={guest?.country ?? "—"} />
+          </div>
+          <div className="flex shrink-0 gap-1.5">
+            <a href={phoneDigits ? `https://wa.me/${phoneDigits}?text=${waText}` : undefined} target="_blank" rel="noopener noreferrer" title="WhatsApp" className={`grid h-8 w-8 place-items-center rounded-lg text-white ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-30"}`} style={{ backgroundColor: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.8-4.3-.1-.2-1.1-1.5-1.1-2.9 0-1.3.7-2 1-2.3.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.6c-.1.2-.3.3-.1.6.1.3.7 1.1 1.5 1.8 1 .9 1.8 1.1 2.1 1.3.3.1.4.1.6-.1l.7-.9c.2-.2.4-.2.6-.1l1.9.9c.2.1.4.2.5.3.1.3.1.7-.1 1.4Z" /></svg></a>
+            <a href={guest?.phone ? `tel:${guest.phone}` : undefined} title={t("Chiama")} className={`grid h-8 w-8 place-items-center rounded-lg bg-focus text-white ${guest?.phone ? "hover:opacity-90" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.5 2.1L8 9.5a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2Z" /></svg></a>
+            <a href={guest?.email ? `mailto:${guest.email}` : undefined} title="Email" className={`grid h-8 w-8 place-items-center rounded-lg border border-line text-dim ${guest?.email ? "hover:bg-wash hover:text-txt" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></a>
+          </div>
+        </div>
       </Section>
 
       <Section title={t("Soggiorno")}>
@@ -379,43 +387,33 @@ export default function BookingDrawer() {
             : <span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: "var(--wash)", color: "var(--dim)" }}>{t("Da compilare")}</span>}
         </div>
         {booking.arrivalTime && booking.arrivalTime !== "Non lo so" && <Row label={t("Arrivo previsto")} value={booking.arrivalTime} />}
-        {(() => {
+        {!booking.webCheckin && (() => {
           const origin = typeof window !== "undefined" ? window.location.origin : "";
           const link = `${origin}/checkin?b=${booking.id}`;
           const waText = encodeURIComponent(`Buongiorno${guest?.fullName ? " " + guest.fullName.split(" ")[0] : ""}, per velocizzare l'arrivo a ${structure?.name ?? "Xenora"} completa il check-in online qui: ${link}`);
           return (
-            <div className="flex flex-wrap gap-2 pt-0.5">
+            <div className="flex gap-2 pt-0.5">
               {phoneDigits && <a href={`https://wa.me/${phoneDigits}?text=${waText}`} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-white" style={{ backgroundColor: "#25D366" }}>{t("Invia link WhatsApp")}</a>}
               <button onClick={() => navigator.clipboard?.writeText(link)} className="flex-1 rounded-lg border border-line py-2 text-center text-xs font-semibold text-txt hover:bg-wash">{t("Copia link")}</button>
-              <a href={link} target="_blank" rel="noreferrer" className="flex-1 rounded-lg border border-line py-2 text-center text-xs font-semibold text-txt hover:bg-wash">{t("Apri")} ↗</a>
             </div>
           );
         })()}
-      </Section>
-
-      {(booking.webCheckin || booking.docPhotoFront || booking.signature) && (
-        <Section title={t("Check-in online")}>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }}>✓ {t("Completato")}</span>
-            {booking.arrivalTime && booking.arrivalTime !== "Non lo so" && <span className="text-dim">{t("Arrivo previsto")}: <b className="text-txt">{booking.arrivalTime}</b></span>}
+        {(booking.docPhotoFront || booking.docPhotoBack) && (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {[booking.docPhotoFront, booking.docPhotoBack].filter(Boolean).map((src, i) => (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <a key={i} href={src as string} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-line"><img src={src as string} alt={t("Documento")} className="h-24 w-full object-cover" /></a>
+            ))}
           </div>
-          {(booking.docPhotoFront || booking.docPhotoBack) && (
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              {[booking.docPhotoFront, booking.docPhotoBack].filter(Boolean).map((src, i) => (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <a key={i} href={src as string} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-line"><img src={src as string} alt={t("Documento")} className="h-24 w-full object-cover" /></a>
-              ))}
-            </div>
-          )}
-          {booking.signature && (
-            <div className="mt-2">
-              <div className="mb-1 text-xs text-dim">{t("Firma ospite")}</div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={booking.signature} alt={t("Firma")} className="h-16 rounded-lg border border-line bg-white p-1" />
-            </div>
-          )}
-        </Section>
-      )}
+        )}
+        {booking.signature && (
+          <div className="mt-2">
+            <div className="mb-1 text-xs text-dim">{t("Firma ospite")}</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={booking.signature} alt={t("Firma")} className="h-16 rounded-lg border border-line bg-white p-1" />
+          </div>
+        )}
+      </Section>
 
       <Section title={t("Documenti")}>
         <button onClick={printReceipt} className="flex w-full items-center justify-between rounded-lg border border-line bg-paper px-3 py-2.5 text-sm font-medium text-txt hover:border-focus hover:bg-wash">
@@ -433,12 +431,7 @@ export default function BookingDrawer() {
       </Section>
 
       <div className="border-t border-line px-5 py-3">
-        <div className="flex gap-2">
-          <ContactBtn href={phoneDigits ? `https://wa.me/${phoneDigits}?text=${waText}` : undefined} label="WhatsApp" color="#25D366" missingTitle={t("Dato mancante")} />
-          <ContactBtn href={guest?.phone ? `tel:${guest.phone}` : undefined} label={t("Chiama")} color="var(--focus)" missingTitle={t("Dato mancante")} />
-          <ContactBtn href={guest?.email ? `mailto:${guest.email}` : undefined} label={t("Email")} color="var(--dim)" missingTitle={t("Dato mancante")} />
-        </div>
-        <button onClick={sendVoucherNow} disabled={voucher.sending || !guest?.email} title={!guest?.email ? t("L'ospite non ha un'email.") : undefined} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#285f92" }}>
+        <button onClick={sendVoucherNow} disabled={voucher.sending || !guest?.email} title={!guest?.email ? t("L'ospite non ha un'email.") : undefined} className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#285f92" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v14H4z" /><path d="m4 6 8 6 8-6" /></svg>
           {voucher.sending ? t("Invio…") : t("Invia voucher / conferma")}
         </button>
