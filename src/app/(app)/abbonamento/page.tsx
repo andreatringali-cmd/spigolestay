@@ -7,41 +7,7 @@ import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-
-// ── Modello a 3 piani (prezzo fisso) + "Su misura" ──
-// Camere incluse: 6 per struttura del piano; oltre, overage per camera. Strutture: limite per piano.
-const ROOMS_PER_STRUCT = 6;
-const ROOM_OVERAGE = 4; // €/camera/mese oltre le incluse
-const ANNUAL_OFF = 0.2; // −20% con fatturazione annuale
-const ALL = ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi", "site", "rms", "ratecheck", "team"];
-
-interface Tier { key: string; name: string; price: number; structures: number; includes: string[]; tagline: string }
-const TIERS: Tier[] = [
-  { key: "basic", name: "Basic", price: 29, structures: 1, includes: ["pms", "cm", "booking", "cassa"], tagline: "Per iniziare" },
-  { key: "pro", name: "Pro", price: 49, structures: 3, includes: ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi"], tagline: "In crescita" },
-  { key: "ultimate", name: "Ultimate", price: 89, structures: 8, includes: ALL, tagline: "Tutto incluso" },
-];
-
-interface Module { key: string; name: string; desc: string; href: string; core?: boolean }
-const MODULES: Module[] = [
-  { key: "pms", name: "PMS", desc: "Prenotazioni, calendario, camere, ospiti, Alloggiati Web + ISTAT e tassa di soggiorno.", href: "/prenotazioni", core: true },
-  { key: "cm", name: "Channel Manager", desc: "Connessione OTA (Booking, Airbnb, Expedia…) con sincronizzazione prezzi e disponibilità.", href: "/canali" },
-  { key: "booking", name: "Booking Engine", desc: "Motore prenotazioni sul tuo sito, senza commissioni.", href: "/widget" },
-  { key: "cassa", name: "Cassa · Prima Nota", desc: "Entrate/uscite, pagamenti ricorrenti, saldo per conto e analisi.", href: "/cassa" },
-  { key: "concierge", name: "Web Concierge", desc: "Check-in online, preventivi e offerte personalizzati, upsell.", href: "/preventivi" },
-  { key: "housekeeping", name: "Housekeeping", desc: "Planning pulizie giornaliero per camera, note e invio su WhatsApp.", href: "/pulizie" },
-  { key: "messaging", name: "Messaggi & automazioni", desc: "Messaggi automatici agli ospiti (WhatsApp/email): benvenuto, check-in, recensione.", href: "/messaggi" },
-  { key: "meta", name: "Meta Search", desc: "Connessione ai principali metasearch (Google, Trivago…).", href: "/metasearch" },
-  { key: "bi", name: "Statistiche & BI", desc: "Report avanzati e statistiche sui tuoi dati.", href: "/statistiche" },
-  { key: "site", name: "Sito web", desc: "Mini-sito integrato con il motore prenotazioni.", href: "/sito" },
-  { key: "rms", name: "Revenue · prezzi dinamici", desc: "Suggerimenti di prezzo in base a occupazione ed eventi.", href: "/revenue" },
-  { key: "ratecheck", name: "Rate checker", desc: "Confronto tariffe con i competitor.", href: "/rate-checker" },
-  { key: "team", name: "Utenti & permessi", desc: "Multi-utente con permessi granulari, ruoli, turni e limiti operativi.", href: "/utenti" },
-];
-
-// Prezzo add-on (€/mese) per attivare un singolo modulo NON incluso nel piano.
-// Calibrati così che, sommando 2-3 moduli, conviene salire di piano.
-const ADDON_PRICE: Record<string, number> = { cm: 0, booking: 0, cassa: 0, concierge: 8, housekeeping: 8, messaging: 7, meta: 6, bi: 9, site: 9, rms: 10, ratecheck: 12, team: 6 };
+import { ROOMS_PER_STRUCT, ROOM_OVERAGE, ANNUAL_OFF, TIERS, MODULES, ADDON_PRICE } from "@/lib/plans";
 
 export default function AbbonamentoPage() {
   const { t } = useLang();
@@ -161,7 +127,9 @@ export default function AbbonamentoPage() {
     } catch { setNotice("Errore di rete."); } finally { setCheckoutBusy(false); }
   };
   const addons = MODULES.filter((m) => !m.core && !tier.includes.includes(m.key));
-  const addonsTotal = addons.filter((m) => active[m.key]).reduce((a, m) => a + (ADDON_PRICE[m.key] || 0), 0);
+  const addedModules = addons.filter((m) => active[m.key]); // moduli extra non inclusi nel piano
+  const isCustom = addedModules.length > 0;
+  const addonsTotal = addedModules.reduce((a, m) => a + (ADDON_PRICE[m.key] || 0), 0);
 
   // Camere incluse e overage.
   const roomsIncluded = tier.structures * ROOMS_PER_STRUCT;
@@ -324,10 +292,14 @@ export default function AbbonamentoPage() {
           <SectionTitle>{t("Il tuo abbonamento")}</SectionTitle>
           <div className="mb-3 rounded-lg border border-line bg-wash p-3">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Piano attivo")}</div>
-            <div className="mt-0.5 font-display text-base font-bold text-txt">{tier.name}{annual ? ` · ${t("annuale")}` : ` · ${t("mensile")}`}</div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-2">
+              <span className="font-display text-base font-bold text-txt">{tier.name}{isCustom ? ` ${t("personalizzato")}` : ""}{annual ? ` · ${t("annuale")}` : ` · ${t("mensile")}`}</span>
+              {isCustom && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>+{addedModules.length} {t("extra")}</span>}
+            </div>
+            {isCustom && <div className="mt-2 flex flex-wrap gap-1">{addedModules.map((m) => <span key={m.key} className="rounded-md border px-1.5 py-0.5 text-[10px] font-medium" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, var(--line))", color: "var(--focus)" }}>{m.name}</span>)}</div>}
           </div>
           <div className="flex justify-between text-sm"><span className="text-dim">{t("Piano")} {tier.name}</span><span className="font-mono text-txt">{eur(annual ? Math.round(tier.price * (1 - ANNUAL_OFF)) : tier.price)}</span></div>
-          {addonsTotal > 0 && <div className="mt-1.5 flex justify-between text-sm"><span className="text-dim">{t("Moduli aggiuntivi")} ({addons.filter((m) => active[m.key]).length})</span><span className="font-mono text-txt">{eur(annual ? Math.round(addonsTotal * (1 - ANNUAL_OFF)) : addonsTotal)}</span></div>}
+          {addonsTotal > 0 && <div className="mt-1.5 flex justify-between text-sm"><span className="font-semibold text-[color:var(--focus)]">{t("Moduli aggiuntivi")} ({addedModules.length}) <span className="font-normal text-faint">· {t("non inclusi nel piano")}</span></span><span className="font-mono font-semibold text-[color:var(--focus)]">{eur(annual ? Math.round(addonsTotal * (1 - ANNUAL_OFF)) : addonsTotal)}</span></div>}
           {extraRooms > 0 && <div className="mt-1.5 flex justify-between text-sm"><span className="text-dim">{extraRooms} {t("camere extra")} × {eur(ROOM_OVERAGE)}</span><span className="font-mono text-txt">{eur(annual ? Math.round(extraRooms * ROOM_OVERAGE * (1 - ANNUAL_OFF)) : extraRooms * ROOM_OVERAGE)}</span></div>}
           <div className="mt-2 text-[11px] text-faint">{t("Importi IVA inclusa (22%)")}</div>
           <div className="mt-2 border-t border-line pt-3">

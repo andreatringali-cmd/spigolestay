@@ -7,12 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { eur } from "@/lib/format";
 import { useLang } from "@/lib/i18n";
-
-const TIER_PRICE: Record<string, { name: string; price: number }> = {
-  basic: { name: "Basic", price: 29 },
-  pro: { name: "Pro", price: 49 },
-  ultimate: { name: "Ultimate", price: 89 },
-};
+import { readSubscription, type SubSummary } from "@/lib/plans";
 
 const VAT = 0.22; // IVA 22%
 
@@ -22,9 +17,11 @@ const statusOf = (iv: Invoice): InvStatus => (iv.paidOn ? "paid" : (iv.due.getTi
 
 export default function FatturePage() {
   const { t } = useLang();
-  const [tier, setTier] = useState<string>("basic");
-  useEffect(() => { try { setTier(localStorage.getItem("spigolestay:plan") || localStorage.getItem("spigolestay:tier") || "basic"); } catch {} }, []);
-  const plan = TIER_PRICE[tier] ?? TIER_PRICE.basic;
+  const [sub, setSub] = useState<SubSummary | null>(null);
+  useEffect(() => { setSub(readSubscription()); }, []);
+  const planName = sub?.label ?? "Basic";   // es. "Basic personalizzato"
+  const monthly = sub?.monthlyTotal ?? 0;   // piano + moduli extra
+  const added = sub?.addedModules ?? [];    // moduli non inclusi nel piano
   const [billing, setBilling] = useState<{ businessName?: string; vat?: string; taxCode?: string; address?: string; sdi?: string; pec?: string; email?: string }>({});
   useEffect(() => { try { const r = localStorage.getItem("spigolestay:billing"); if (r) setBilling(JSON.parse(r)); } catch {} }, []);
 
@@ -40,7 +37,7 @@ export default function FatturePage() {
     const rows = months.map((d) => {
       const y = d.getFullYear();
       perYear[y] = (perYear[y] ?? 0) + 1;
-      const amount = plan.price;
+      const amount = monthly;
       const net = Math.round((amount / (1 + VAT)) * 100) / 100;
       const tax = Math.round((amount - net) * 100) / 100;
       const isCurrent = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
@@ -48,7 +45,7 @@ export default function FatturePage() {
         date: d,
         due: new Date(d.getFullYear(), d.getMonth() + 1, 1), // scadenza = rinnovo (1° del mese successivo)
         number: `${String(perYear[y]).padStart(4, "0")}/${y}`,
-        description: `${t("Rinnovo abbonamento Xenora")} · ${t("Piano")} ${plan.name} · ${fmtMonth(d)}`,
+        description: `${t("Rinnovo abbonamento Xenora")} · ${t("Piano")} ${planName} · ${fmtMonth(d)}${added.length ? ` · +${added.length} ${t("moduli extra")}` : ""}`,
         net, tax, amount,
         method: "Carta ••4242",
         paidOn: isCurrent ? null : new Date(d.getFullYear(), d.getMonth(), 3),
@@ -56,7 +53,7 @@ export default function FatturePage() {
     });
     return rows.reverse(); // più recente in alto
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plan]);
+  }, [monthly, planName, added]);
 
   const tot = invoices.reduce((a, iv) => ({ net: a.net + iv.net, tax: a.tax + iv.tax, amount: a.amount + iv.amount }), { net: 0, tax: 0, amount: 0 });
 
@@ -128,8 +125,8 @@ td{padding:11px 8px;border-bottom:1px solid #f0ebe3}
       <PageHeader title={t("Fatture")} subtitle={t("Le fatture del tuo abbonamento Xenora")} />
 
       <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Piano attivo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{plan.name}</div></Card>
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Canone mensile")}</div><div className="mt-0.5 font-mono text-lg font-bold text-txt">{eur(plan.price)} <span className="text-[11px] font-normal text-faint">{t("IVA inclusa")}</span></div><div className="mt-0.5 text-[11px] text-faint">{t("Netto")} {eur(Math.round((plan.price / (1 + VAT)) * 100) / 100)} + {t("IVA")} 22% {eur(Math.round((plan.price - plan.price / (1 + VAT)) * 100) / 100)}</div></Card>
+        <Card className="!p-4"><div className="text-xs text-dim">{t("Piano attivo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{planName}</div>{added.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{added.map((m) => <span key={m.key} className="rounded-md border px-1.5 py-0.5 text-[10px] font-medium" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, var(--line))", color: "var(--focus)" }}>{m.name}</span>)}</div>}</Card>
+        <Card className="!p-4"><div className="text-xs text-dim">{t("Canone mensile")}</div><div className="mt-0.5 font-mono text-lg font-bold text-txt">{eur(monthly)} <span className="text-[11px] font-normal text-faint">{t("IVA inclusa")}</span></div><div className="mt-0.5 text-[11px] text-faint">{t("Netto")} {eur(Math.round((monthly / (1 + VAT)) * 100) / 100)} + {t("IVA")} 22% {eur(Math.round((monthly - monthly / (1 + VAT)) * 100) / 100)}</div></Card>
         <Card className="!p-4"><div className="text-xs text-dim">{t("Prossimo rinnovo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{fmtDay(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1))}</div><div className="mt-0.5 text-[11px] text-faint">{t("Rinnovo il 1° di ogni mese")}</div></Card>
       </div>
 
