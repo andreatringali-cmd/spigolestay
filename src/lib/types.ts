@@ -215,7 +215,9 @@ export interface Guest {
   docNumber?: string;   // numero documento
   docPlace?: string;    // luogo di rilascio
   docExpiry?: string;   // scadenza documento (ISO)
-  address?: string;     // residenza
+  address?: string;     // residenza (via/indirizzo)
+  streetNumber?: string; // numero civico
+  province?: string;    // provincia (es. SR)
   // CRM
   vip?: boolean;
   marketingConsent?: boolean;

@@ -111,7 +111,9 @@ export default function OspiteSchedaPage() {
               <label className={lbl}>{t("Data di nascita")}<input type="date" value={g.birthDate ?? ""} onChange={(e) => set("birthDate", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Luogo di nascita")}<input value={g.birthPlace ?? ""} onChange={(e) => set("birthPlace", e.target.value)} className={`${inp} mt-1`} placeholder={t("Comune o Stato")} /></label>
               <label className={lbl}>{t("Cittadinanza")}<input value={g.citizenship ?? ""} onChange={(e) => set("citizenship", e.target.value)} className={`${inp} mt-1`} /></label>
-              <label className={`${lbl} col-span-2`}>{t("Residenza")}<input value={g.address ?? ""} onChange={(e) => set("address", e.target.value)} className={`${inp} mt-1`} placeholder={t("Indirizzo completo")} /></label>
+              <label className={`${lbl} col-span-2`}>{t("Residenza")}<input value={g.address ?? ""} onChange={(e) => set("address", e.target.value)} className={`${inp} mt-1`} placeholder={t("Via / indirizzo")} /></label>
+              <label className={lbl}>{t("Numero civico")}<input value={g.streetNumber ?? ""} onChange={(e) => set("streetNumber", e.target.value)} className={`${inp} mt-1`} /></label>
+              <label className={lbl}>{t("Provincia")}<input value={g.province ?? ""} onChange={(e) => set("province", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. SR")} maxLength={2} /></label>
             </div>
           </Card>
 
