@@ -42,9 +42,17 @@ export default function AlloggiatiPage() {
     if (idx === 0) return tot > 1 ? (grp ? "18" : "17") : "16";
     return grp ? "20" : "19";
   };
-  const primaryOk = (id: string) => { const g = guest(id); return !!(g && (g.lastName || g.fullName) && g.sex && g.birthDate && g.birthPlace && g.citizenship && g.docType && g.docNumber); };
+  // Ospite principale: dall'anagrafica se collegata, altrimenti dai dati conservati sulla prenotazione.
+  type PG = NonNullable<import("@/lib/types").Booking["primaryGuest"]>;
+  const primaryOf = (b: { guestId: string; primaryGuest?: PG }): PG & { fullName?: string } => {
+    const g = guest(b.guestId);
+    if (g) return { firstName: g.firstName, lastName: g.lastName, sex: g.sex, birthDate: g.birthDate, birthPlace: g.birthPlace, citizenship: g.citizenship, docType: g.docType, docNumber: g.docNumber, fullName: g.fullName };
+    const pg = b.primaryGuest ?? {};
+    return { ...pg, fullName: `${pg.firstName ?? ""} ${pg.lastName ?? ""}`.trim() };
+  };
+  const primaryOk = (b: { guestId: string; primaryGuest?: PG }) => { const p = primaryOf(b); return !!((p.lastName || p.fullName) && p.sex && p.birthDate && p.birthPlace && p.citizenship && p.docType && p.docNumber); };
   const coOk = (c: Co) => !!(c.lastName && c.firstName && c.sex && c.birthDate && c.birthPlace && c.citizenship);
-  const bookingOk = (b: { id: string; guestId: string; extraGuests?: Co[] }) => primaryOk(b.guestId) && cosOf(b).every(coOk);
+  const bookingOk = (b: { id: string; guestId: string; primaryGuest?: PG; extraGuests?: Co[] }) => primaryOk(b) && cosOf(b).every(coOk);
   const readyCount = arrivals.filter(bookingOk).length;
   const totalPeople = (b: { extraGuests?: Co[] }) => 1 + cosOf(b).length;
 
@@ -52,6 +60,11 @@ export default function AlloggiatiPage() {
     const g = guest(id); const next = { ...g, ...patch } as Record<string, unknown>;
     if ("lastName" in patch || "firstName" in patch) next.fullName = `${next.firstName ?? ""} ${next.lastName ?? ""}`.toString().trim() || g?.fullName || "";
     updateGuest(id, next);
+  };
+  // Scrive sull'anagrafica se collegata, altrimenti sui dati conservati nella prenotazione.
+  const setPrimaryOf = (b: { id: string; guestId: string; primaryGuest?: PG }, patch: Record<string, unknown>) => {
+    if (guest(b.guestId)) setPrimary(b.guestId, patch);
+    else updateBooking(b.id, { primaryGuest: { ...(b.primaryGuest ?? {}), ...patch } });
   };
   const setCo = (b: { id: string; extraGuests?: Co[] }, i: number, patch: Partial<Co>) => updateBooking(b.id, { extraGuests: cosOf(b).map((c, j) => (j === i ? { ...c, ...patch } : c)) });
   const addCo = (b: { id: string; extraGuests?: Co[] }) => updateBooking(b.id, { extraGuests: [...cosOf(b), { firstName: "", lastName: "" } as Co] });
@@ -72,7 +85,7 @@ export default function AlloggiatiPage() {
     const lines: string[] = [];
     for (const b of arrivals.filter(bookingOk)) {
       const nn = nights(b.checkIn, b.checkOut);
-      const g = guest(b.guestId)!;
+      const g = primaryOf(b);
       lines.push(record(roleFor(b, 0), b.checkIn, nn, g));
       cosOf(b).forEach((c, i) => lines.push(record(roleFor(b, i + 1), b.checkIn, nn, c)));
     }
@@ -123,7 +136,7 @@ export default function AlloggiatiPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {arrivals.map((b) => {
-            const g = guest(b.guestId);
+            const g = primaryOf(b);
             const complete = bookingOk(b);
             const declared = totalPeople(b);
             const pax = b.adults + b.children;
@@ -142,14 +155,14 @@ export default function AlloggiatiPage() {
 
                 {/* Ospite principale */}
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                  <F label={t("Cognome")}><input className={inp} value={g?.lastName ?? ""} onChange={(e) => setPrimary(b.guestId, { lastName: e.target.value })} /></F>
-                  <F label={t("Nome")}><input className={inp} value={g?.firstName ?? ""} onChange={(e) => setPrimary(b.guestId, { firstName: e.target.value })} /></F>
-                  <F label={t("Sesso")}><select className={inp} value={g?.sex ?? ""} onChange={(e) => setPrimary(b.guestId, { sex: e.target.value || undefined })}><option value="">—</option><option value="M">M</option><option value="F">F</option></select></F>
-                  <F label={t("Data di nascita")}><input type="date" className={inp} value={g?.birthDate ?? ""} onChange={(e) => setPrimary(b.guestId, { birthDate: e.target.value })} /></F>
-                  <F label={t("Luogo di nascita")}><input className={inp} value={g?.birthPlace ?? ""} onChange={(e) => setPrimary(b.guestId, { birthPlace: e.target.value })} placeholder={t("Comune o Stato")} /></F>
-                  <F label={t("Cittadinanza")}><input className={inp} value={g?.citizenship ?? ""} onChange={(e) => setPrimary(b.guestId, { citizenship: e.target.value })} placeholder={t("Es. ITALIA")} /></F>
-                  <F label={t("Tipo documento")}><select className={inp} value={g?.docType ?? ""} onChange={(e) => setPrimary(b.guestId, { docType: e.target.value || undefined })}><option value="">—</option>{DOC_TYPES.map((d) => (<option key={d} value={d}>{d}</option>))}</select></F>
-                  <F label={t("Numero documento")}><input className={inp} value={g?.docNumber ?? ""} onChange={(e) => setPrimary(b.guestId, { docNumber: e.target.value })} /></F>
+                  <F label={t("Cognome")}><input className={inp} value={g?.lastName ?? ""} onChange={(e) => setPrimaryOf(b, { lastName: e.target.value })} /></F>
+                  <F label={t("Nome")}><input className={inp} value={g?.firstName ?? ""} onChange={(e) => setPrimaryOf(b, { firstName: e.target.value })} /></F>
+                  <F label={t("Sesso")}><select className={inp} value={g?.sex ?? ""} onChange={(e) => setPrimaryOf(b, { sex: e.target.value || undefined })}><option value="">—</option><option value="M">M</option><option value="F">F</option></select></F>
+                  <F label={t("Data di nascita")}><input type="date" className={inp} value={g?.birthDate ?? ""} onChange={(e) => setPrimaryOf(b, { birthDate: e.target.value })} /></F>
+                  <F label={t("Luogo di nascita")}><input className={inp} value={g?.birthPlace ?? ""} onChange={(e) => setPrimaryOf(b, { birthPlace: e.target.value })} placeholder={t("Comune o Stato")} /></F>
+                  <F label={t("Cittadinanza")}><input className={inp} value={g?.citizenship ?? ""} onChange={(e) => setPrimaryOf(b, { citizenship: e.target.value })} placeholder={t("Es. ITALIA")} /></F>
+                  <F label={t("Tipo documento")}><select className={inp} value={g?.docType ?? ""} onChange={(e) => setPrimaryOf(b, { docType: e.target.value || undefined })}><option value="">—</option>{DOC_TYPES.map((d) => (<option key={d} value={d}>{d}</option>))}</select></F>
+                  <F label={t("Numero documento")}><input className={inp} value={g?.docNumber ?? ""} onChange={(e) => setPrimaryOf(b, { docNumber: e.target.value })} /></F>
                 </div>
 
                 {/* Co-ospiti */}

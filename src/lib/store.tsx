@@ -266,8 +266,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       },
       updateGuest: (id, patch) => setGuests((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g))),
       deleteGuest: (id) => {
-        setBookings((prev) => prev.map((b) => (b.guestId === id ? { ...b, guestId: "" } : b)));
-        setGuests((prev) => prev.filter((g) => g.id !== id));
+        // Conserva i dati dell'ospite sulla prenotazione (per Alloggiati Web) prima di sganciarlo.
+        const g = guests.find((x) => x.id === id);
+        const snap = g ? { firstName: g.firstName, lastName: g.lastName, sex: g.sex, birthDate: g.birthDate, birthPlace: g.birthPlace, citizenship: g.citizenship, docType: g.docType, docNumber: g.docNumber } : undefined;
+        setBookings((prev) => prev.map((b) => (b.guestId === id ? { ...b, guestId: "", primaryGuest: b.primaryGuest ?? snap } : b)));
+        setGuests((prev) => prev.filter((x) => x.id !== id));
       },
       mergeGuests: (keepId, dropIds) => {
         const drop = new Set(dropIds.filter((d) => d && d !== keepId));
