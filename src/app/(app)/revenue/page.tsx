@@ -23,7 +23,7 @@ export default function RevenuePage() {
   const { units, bookings, roomTypes, events, rateOverrides, setDayRates, activeStructureId } = useData();
   const { t } = useLang();
   const [days] = useState(21);
-  const [applied, setApplied] = useState<string>("");
+  const [applied, setApplied] = useState<Set<string>>(new Set()); // giorni già applicati (spunta permanente)
 
   const activeUnits = units.filter((u) => !u.outOfService && (activeStructureId === "all" || u.structureId === activeStructureId));
   const totalUnits = activeUnits.length || 1;
@@ -44,7 +44,7 @@ export default function RevenuePage() {
     const map: Record<string, number> = {};
     for (const rt of scopedTypes) map[rateKey(rt.id, iso)] = Math.max(0, Math.round(rateForType(rt.id, iso) * (1 + pct / 100)));
     setDayRates(map);
-    setApplied(iso); window.setTimeout(() => setApplied(""), 1500);
+    setApplied((p) => new Set(p).add(iso)); // resta spuntato: niente doppia applicazione
   };
 
   const rows = useMemo(() => {
@@ -133,8 +133,8 @@ export default function RevenuePage() {
                     <td className="px-2 py-2"><span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${s.color} 15%, transparent)`, color: s.color }}>{t(s.label)}{s.pct !== 0 ? ` ${s.pct > 0 ? "+" : ""}${s.pct}%` : ""}</span></td>
                     <td className="px-2 py-2 font-mono font-semibold text-txt">{eur(nuovo)}</td>
                     <td className="px-2 py-2 text-right">
-                      {applied === r.iso
-                        ? <span className="text-[11px] font-semibold text-[color:var(--ok)]">{t("Applicato")} ✓</span>
+                      {applied.has(r.iso)
+                        ? <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--ok)]"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>{t("Applicato")}</span>
                         : <button onClick={() => applyDay(r.iso, s.pct)} disabled={s.pct === 0} className="rounded-md border border-line px-2 py-1 text-[11px] font-medium text-dim hover:bg-wash hover:text-focus disabled:opacity-30">{t("Applica")}</button>}
                     </td>
                   </tr>
