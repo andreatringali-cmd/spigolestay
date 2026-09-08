@@ -286,4 +286,5 @@ export interface Booking {
   invoiceNo?: string;   // numero fattura emessa
   extraGuests?: { firstName: string; lastName: string; sex?: "M" | "F"; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string }[]; // co-ospiti (dal web check-in o aggiunti a mano)
   primaryGuest?: { firstName?: string; lastName?: string; sex?: "M" | "F"; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string }; // dati ospite principale conservati sulla prenotazione (es. se l'anagrafica viene eliminata) — per Alloggiati Web
+  extras?: { name: string; price: number }[]; // servizi/consumi extra aggiunti alla prenotazione
 }

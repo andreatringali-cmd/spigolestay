@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { sortUnitsByName } from "@/lib/sortUnits";
@@ -74,6 +74,11 @@ export default function BookingDrawer() {
   const [form, setForm] = useState<Form | null>(null);
   const [saved, setSaved] = useState(false);
   const [voucher, setVoucher] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
+  const [qa, setQa] = useState<null | "incasso" | "extra">(null); // azione rapida aperta
+  const [incassoAmt, setIncassoAmt] = useState("");
+  const [extraName, setExtraName] = useState("");
+  const [extraPrice, setExtraPrice] = useState("");
+  const checkinRef = useRef<HTMLDivElement>(null);
 
   const loadForm = () => {
     if (!booking) { setForm(null); return; }
@@ -122,8 +127,10 @@ export default function BookingDrawer() {
   const nView = nights(booking.checkIn, booking.checkOut);
   const accV = booking.total ?? nView * (roomType?.basePrice ?? 100);
   const cleanV = booking.cleaningFee ?? 35;
+  const extrasList = booking.extras ?? [];
+  const extrasV = extrasList.reduce((a, e) => a + (e.price || 0), 0);
   const taxV = cityTaxOf(structure, booking.adults, nView, accV, booking.cityTaxExempt);
-  const totalV = accV + cleanV + taxV;
+  const totalV = accV + cleanV + extrasV + taxV;
   const commPctV = booking.commissionPct ?? Math.round(ch.commission * 100);
   const commV = Math.round(accV * commPctV / 100);
   const nettoV = accV - commV;
@@ -265,8 +272,51 @@ export default function BookingDrawer() {
   };
 
   // ─────────────── VISTA (sola lettura) ───────────────
+  const registraIncasso = () => { const amt = Math.round(Number(incassoAmt) * 100) / 100; if (!amt) return; updateBooking(booking.id, { paid: paidV + amt }); setIncassoAmt(""); setQa(null); };
+  const aggiungiExtra = () => { const p = Math.round(Number(extraPrice) * 100) / 100; if (!extraName.trim() || !p) return; updateBooking(booking.id, { extras: [...extrasList, { name: extraName.trim(), price: p }] }); setExtraName(""); setExtraPrice(""); setQa(null); };
+  const removeExtra = (i: number) => updateBooking(booking.id, { extras: extrasList.filter((_, j) => j !== i) });
+  const gestisciCheckin = () => { setQa(null); setTimeout(() => checkinRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); };
+  const qaBtn = "flex flex-col items-center gap-1 rounded-xl border border-line bg-paper px-2 py-2.5 text-[11px] font-semibold text-txt transition hover:border-focus hover:bg-wash";
+
   const viewBody = (
     <>
+      {/* Azioni rapide */}
+      <div className="border-b border-line px-5 py-3">
+        <div className="grid grid-cols-4 gap-2">
+          <button onClick={() => setQa(qa === "incasso" ? null : "incasso")} className={qaBtn} style={qa === "incasso" ? { borderColor: "var(--focus)", color: "var(--focus)" } : undefined}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /></svg>
+            {t("Incasso")}
+          </button>
+          <button onClick={printReceipt} className={qaBtn}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z" /><path d="M9 7h6M9 11h6" /></svg>
+            {t("Ricevuta")}
+          </button>
+          <button onClick={() => setQa(qa === "extra" ? null : "extra")} className={qaBtn} style={qa === "extra" ? { borderColor: "var(--focus)", color: "var(--focus)" } : undefined}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+            {t("Extra")}
+          </button>
+          <button onClick={gestisciCheckin} className={qaBtn}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 8v8a2 2 0 0 1-2 2h-6" /><path d="M4 12h11" /><path d="m11 8 4 4-4 4" /></svg>
+            {t("Check-in")}
+          </button>
+        </div>
+        {qa === "incasso" && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash p-2">
+            <span className="text-xs text-dim">{t("Importo")} €</span>
+            <input type="number" min={0} value={incassoAmt} onChange={(e) => setIncassoAmt(e.target.value)} placeholder="0" className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
+            {balanceV > 0 && <button onClick={() => setIncassoAmt(String(balanceV))} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(balanceV)}</button>}
+            <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Registra")}</button>
+          </div>
+        )}
+        {qa === "extra" && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash p-2">
+            <input value={extraName} onChange={(e) => setExtraName(e.target.value)} placeholder={t("Descrizione (es. Transfer)")} className="min-w-[140px] flex-1 rounded-md border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
+            <input type="number" min={0} value={extraPrice} onChange={(e) => setExtraPrice(e.target.value)} placeholder="€" className="w-20 rounded-md border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
+            <button onClick={aggiungiExtra} className="rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Aggiungi")}</button>
+          </div>
+        )}
+      </div>
+
       <Section title={t("Ospite")}>
         <Row label={t("Nome")} value={guest?.fullName ?? "—"} />
         <Row label={t("Email")} value={guest?.email ?? "—"} />
@@ -280,15 +330,18 @@ export default function BookingDrawer() {
         <Row label={t("Unità")} value={unitV?.name ?? t("Da assegnare")} />
         {effBedConfig && <Row label={t("Letti")} value={effBedConfig} />}
         {effSize ? <Row label={t("Superficie")} value={`${effSize} m²`} mono /> : null}
-        <Row label={t("Check-in")} value={fmtDate(booking.checkIn)} />
-        <Row label={t("Check-out")} value={fmtDate(booking.checkOut)} />
-        <Row label={t("Notti")} value={String(nView)} mono />
         <Row label={t("Ospiti")} value={`${booking.adults} ${t("adulti")} · ${booking.children} ${t("bambini")}`} />
       </Section>
 
       <Section title={t("Conto")}>
         <Row label={`${t("Soggiorno")} (${nView} ${t("notti")})`} value={eur(accV)} mono />
         <Row label={t("Pulizia")} value={eur(cleanV)} mono />
+        {extrasList.map((e, i) => (
+          <div key={i} className="flex items-baseline justify-between gap-4">
+            <span className="text-sm text-dim">{e.name} <button onClick={() => removeExtra(i)} className="ml-1 text-faint hover:text-[color:var(--err)]" title={t("Rimuovi")}>✕</button></span>
+            <span className="text-right font-mono text-sm text-txt">{eur(e.price)}</span>
+          </div>
+        ))}
         <div className="flex items-baseline justify-between gap-4">
           <span className="text-sm text-dim">{t("Tassa di soggiorno")} {booking.cityTaxPaid && <span className="ml-1 rounded bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--ok)]">{t("incassata")}</span>}</span>
           <span className="text-right font-mono text-sm text-txt">{eur(taxV)}</span>
@@ -317,6 +370,7 @@ export default function BookingDrawer() {
         <Section title={t("Note")}><p className="whitespace-pre-wrap text-sm text-txt">{booking.note}</p></Section>
       )}
 
+      <div ref={checkinRef} className="scroll-mt-2" />
       <Section title={t("Check-in online")}>
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm text-dim">{t("Stato")}</span>
