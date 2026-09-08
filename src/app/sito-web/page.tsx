@@ -60,6 +60,36 @@ const SITE_DICT: Record<string, Record<string, string>> = {
 interface Cfg { nome: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean }
 const DEFCFG: Cfg = { nome: "", tagline: "", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, camere: true, recensioni: true, mappa: true, contatti: true };
 
+// Servizi/dotazioni → icona (emoji). Il nome resta come tooltip per l'accessibilità.
+function amenityEmoji(name: string): string {
+  const s = (name || "").toLowerCase();
+  if (s.includes("wi") || s.includes("internet")) return "📶";
+  if (s.includes("condizion") || s.includes("aria") || s.includes("clima")) return "❄️";
+  if (s.includes("riscald")) return "🔥";
+  if (s.includes("parch") || s.includes("garage")) return "🅿️";
+  if (s.includes("colaz")) return "🥐";
+  if (s.includes("caff")) return "☕";
+  if (s.includes("tv") || s.includes("televis")) return "📺";
+  if (s.includes("bagno") || s.includes("doccia") || s.includes("wc")) return "🚿";
+  if (s.includes("piscin")) return "🏊";
+  if (s.includes("animal") || s.includes("pet")) return "🐾";
+  if (s.includes("cucin") || s.includes("cottura")) return "🍳";
+  if (s.includes("frigo") || s.includes("minibar")) return "🧊";
+  if (s.includes("balcon") || s.includes("terraz")) return "🪟";
+  if (s.includes("mare")) return "🌊";
+  if (s.includes("giardin")) return "🌿";
+  if (s.includes("asciugacapelli") || s.includes("phon") || s.includes("fon")) return "💨";
+  if (s.includes("cassaforte") || s.includes("safe")) return "🔒";
+  if (s.includes("ascensore") || s.includes("lift")) return "🛗";
+  if (s.includes("lavatric")) return "🧺";
+  if (s.includes("culla") || s.includes("bamb") || s.includes("bimb")) return "🍼";
+  if (s.includes("non fumat")) return "🚭";
+  if (s.includes("insonoriz") || s.includes("silenzi")) return "🔇";
+  if (s.includes("scrivania") || s.includes("lavoro")) return "💻";
+  if (s.includes("asciugam") || s.includes("bianche")) return "🛏️";
+  return "✓";
+}
+
 
 export default function SitoWebPage() {
   return <DataProvider><Site /></DataProvider>;
@@ -232,7 +262,7 @@ function Site() {
                   <div className="p-3">
                     <div className="flex items-center justify-between"><span className="font-semibold text-txt">{rt.name}</span><span className="font-mono text-sm font-bold text-txt">da {eur(effectiveBase(rt, roomTypes))}</span></div>
                     <div className="mt-0.5 text-xs text-dim">{rt.beds} letti · fino a {rt.maxOccupancy ?? rt.beds} ospiti{rt.size ? ` · ${rt.size} m²` : ""}{rt.bedConfig ? ` · ${rt.bedConfig}` : ""}</div>
-                    {(rt.amenities ?? []).length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{(rt.amenities ?? []).slice(0, 3).map((a) => <span key={a} className="rounded-full bg-wash px-2 py-0.5 text-[10px] text-dim">{a}</span>)}</div>}
+                    {(rt.amenities ?? []).length > 0 && <div className="mt-2 flex flex-wrap items-center gap-2 text-lg leading-none">{(rt.amenities ?? []).slice(0, 8).map((a) => <span key={a} title={a} aria-label={a} className="cursor-default">{amenityEmoji(a)}</span>)}</div>}
                     <div className="mt-2 text-xs font-medium" style={{ color: accent }}>Prenota →</div>
                   </div>
                 </button>
