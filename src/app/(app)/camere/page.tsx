@@ -12,6 +12,7 @@ import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useAccess } from "@/lib/access";
+import { amenityIcon } from "@/lib/amenities";
 import { ROOMS_PER_STRUCT, ROOM_OVERAGE } from "@/lib/plan";
 import { useLang } from "@/lib/i18n";
 
@@ -204,7 +205,7 @@ export default function CamerePage() {
                           <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{n} {t("camere")}</span>
                         </div>
                         {rt.bedConfig && <div className="mt-1.5 text-[11px] text-faint">{rt.bedConfig}</div>}
-                        {(rt.amenities ?? []).length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{(rt.amenities ?? []).slice(0, 4).map((a) => <span key={a} className="rounded border border-line px-1.5 py-0.5 text-[10px] text-dim">{t(a)}</span>)}{(rt.amenities ?? []).length > 4 && <span className="text-[10px] text-faint">+{(rt.amenities ?? []).length - 4}</span>}</div>}
+                        {(rt.amenities ?? []).length > 0 && <div className="mt-2 flex flex-wrap items-center gap-1.5 text-dim">{(rt.amenities ?? []).slice(0, 6).map((a) => <span key={a} title={t(a)} aria-label={t(a)} className="[&>svg]:h-4 [&>svg]:w-4">{amenityIcon(a)}</span>)}{(rt.amenities ?? []).length > 6 && <span className="text-[10px] text-faint">+{(rt.amenities ?? []).length - 6}</span>}</div>}
                         <div className="mt-2 text-[11px] font-medium text-focus opacity-0 transition group-hover:opacity-100">{t("Apri scheda")} →</div>
                       </div>
                     </button>

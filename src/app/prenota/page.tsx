@@ -281,7 +281,6 @@ function Engine() {
                             <div className="text-[11px] text-faint">{nights} {nights === 1 ? "notte" : "notti"}</div>
                           </div>
                         </div>
-                        {(rt.amenities ?? []).length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{(rt.amenities ?? []).slice(0, 6).map((a) => <span key={a} className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{a}</span>)}</div>}
                         {/* Piani */}
                         {free > 0 && !tooSmall && !noRate ? (
                           <div className="mt-3 flex flex-col gap-1.5">

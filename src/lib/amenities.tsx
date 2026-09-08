@@ -14,6 +14,7 @@ export function amenityIcon(name: string) {
   if (s.includes("colaz")) return ico(<><path d="M4 6h11v3a5.5 5.5 0 0 1-11 0z" /><path d="M15 7h2.5a2 2 0 0 1 0 4H15" /><path d="M5 20h9" /></>);
   if (s.includes("caff")) return ico(<><path d="M6 8h9v4a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4z" /><path d="M15 9h2a2 2 0 0 1 0 4h-2" /><path d="M6 20h10" /></>);
   if (s.includes("tv") || s.includes("televis")) return ico(<><rect x="3" y="5" width="18" height="12" rx="2" /><path d="M8 21h8" /></>);
+  if (s.includes("vasca") || s.includes("jacuzzi") || s.includes("idromass")) return ico(<><path d="M4 12h16v3a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z" /><path d="M8 12V7.5a1.6 1.6 0 0 1 3.2 0" /><path d="M6.5 19l-1 2M17.5 19l1 2" /></>);
   if (s.includes("bagno") || s.includes("doccia") || s.includes("wc")) return ico(<><path d="M4 12h16" /><path d="M6 12V7a3 3 0 0 1 6 0" /><path d="M8 16v2M12 16v2M16 16v2" /></>);
   if (s.includes("piscin") || s.includes("mare")) return ico(<><path d="M3 12c2-2 4-2 6 0s4 2 6 0 4-2 6 0" /><path d="M3 17c2-2 4-2 6 0s4 2 6 0 4-2 6 0" /></>);
   if (s.includes("animal") || s.includes("pet")) return ico(<><circle cx="8" cy="9" r="1.3" /><circle cx="16" cy="9" r="1.3" /><circle cx="6" cy="13" r="1.3" /><circle cx="18" cy="13" r="1.3" /><path d="M12 12c-2.8 0-4.5 1.8-4.5 3.6A2.4 2.4 0 0 0 10 18h4a2.4 2.4 0 0 0 2.5-2.4c0-1.8-1.7-3.6-4.5-3.6z" /></>);
