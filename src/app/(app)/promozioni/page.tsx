@@ -119,7 +119,7 @@ export default function PromozioniPage() {
         ) : (
           <ScrollStrip gap="gap-3" items={promos.map((p) => ({
             key: p.id,
-            className: "flex-none snap-start w-[300px] max-w-[85vw]",
+            className: "flex-none snap-start w-[260px] max-w-[85vw] lg:w-[calc((100%-2.25rem)/4)]",
             node: (
               <div className="flex h-full flex-col rounded-xl border border-line bg-surface p-3 shadow-sm">
                 <div className="flex items-start justify-between gap-2">

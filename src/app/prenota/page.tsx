@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DataProvider, useData } from "@/lib/store";
 import type { RoomType, ExtraService } from "@/lib/types";
 import { DEFAULT_EXTRAS } from "@/lib/types";
@@ -9,6 +9,7 @@ import { eur } from "@/lib/format";
 import { effectiveBase, effectiveClosed } from "@/lib/pricing";
 import { loadDeposit } from "@/lib/deposit";
 import { amenityIcon } from "@/lib/amenities";
+import { loadPromos } from "@/lib/promos";
 
 // ---- pricing helpers --------------------------------------------------------
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
@@ -37,6 +38,7 @@ function Engine() {
   const plans = useMemo<Plan[]>(() => { try { const p = localStorage.getItem("spigolestay:rateplans"); if (p) return JSON.parse(p).filter((x: Plan) => x.id !== "flex"); } catch {} return DEFAULT_PLANS; }, []);
   const weekendPct = useMemo(() => { try { const r = localStorage.getItem("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {} return 25; }, []);
   const depCfg = useMemo(() => loadDeposit(), []); // acconto: voce unica per tutte le strutture
+  const promos = useMemo(() => { try { return loadPromos(); } catch { return []; } }, []);
 
   const qp = (k: string) => { try { return new URLSearchParams(window.location.search).get(k); } catch { return null; } };
   const [structureId, setStructureId] = useState(() => qp("s") || structures[0]?.id || "");
@@ -63,6 +65,20 @@ function Engine() {
   const [pay, setPay] = useState<"card" | "transfer" | "paypal">("card");
   const [privacy, setPrivacy] = useState(false);
   const [code, setCode] = useState("");
+  // Codice sconto / promo
+  const [promoInput, setPromoInput] = useState(() => (qp("promo") || "").toUpperCase());
+  const [appliedPromo, setAppliedPromo] = useState<{ name?: string; code: string; pct: number } | null>(null);
+  const [promoErr, setPromoErr] = useState("");
+  const applyPromoCode = (raw?: string) => {
+    const c = (raw ?? promoInput).trim().toUpperCase();
+    setPromoErr("");
+    if (!c) { setAppliedPromo(null); return; }
+    const p = promos.find((x) => (x.code || "").toUpperCase() === c && !!x.discountPct);
+    if (p) setAppliedPromo({ name: p.name, code: (p.code || "").toUpperCase(), pct: p.discountPct! });
+    else { setAppliedPromo(null); setPromoErr("Codice non valido o scaduto."); }
+  };
+  // Applica automaticamente il codice arrivato dall'offerta (?promo=).
+  useEffect(() => { const c = (qp("promo") || "").trim(); if (c && promos.length) applyPromoCode(c); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [promos.length]);
 
   const types = roomTypes.filter((rt) => rt.structureId === structureId && !effectiveClosed(rt, roomTypes));
   const availUnits = (rt: RoomType) => units.filter((u) => u.roomTypeId === rt.id && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn));
@@ -86,7 +102,8 @@ function Engine() {
         ? Math.round(accommodation * (structure.cityTaxPercent ?? 0) / 100)
         : (structure.cityTaxAmount ?? 2) * adults * cityTaxNights)
     : 0;
-  const total = accommodation + extrasTotal + cityTax;
+  const discount = appliedPromo ? Math.round(accommodation * appliedPromo.pct / 100) : 0;
+  const total = accommodation + extrasTotal + cityTax - discount;
   const depositPct = !depCfg.on ? 0 : (selPlan && !selPlan.refundable ? 100 : depCfg.pct);
   const deposit = Math.round(total * depositPct / 100);
 
@@ -97,7 +114,7 @@ function Engine() {
     const unit = availUnits(selRt)[0];
     const gid = addGuest({ firstName: guest.firstName.trim(), lastName: guest.lastName.trim(), email: guest.email.trim(), phone: guest.phone.trim(), country: guest.country });
     const chosenExtras = extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => `${extraQty[x.id]}× ${x.name}`);
-    const note = [`Sito diretto · ${selPlan?.name}`, chosenExtras.length ? `Extra: ${chosenExtras.join(", ")}` : "", guest.arrival !== "Non lo so" ? `Arrivo ~${guest.arrival}` : "", guest.requests.trim()].filter(Boolean).join(" · ");
+    const note = [`Sito diretto · ${selPlan?.name}`, appliedPromo ? `Promo ${appliedPromo.code} (−${appliedPromo.pct}%)` : "", chosenExtras.length ? `Extra: ${chosenExtras.join(", ")}` : "", guest.arrival !== "Non lo so" ? `Arrivo ~${guest.arrival}` : "", guest.requests.trim()].filter(Boolean).join(" · ");
     addBooking({ structureId, roomTypeId: selRt.id, unitId: unit?.id ?? null, guestId: gid, channel: "direct", status: "confirmed", checkIn, checkOut, adults, children, childAges: childAges.length ? childAges : undefined, total: accommodation, cleaningFee: 0, paid: deposit, cityTaxPaid: false, note });
     addActivity("booking", `Prenotazione dal sito — ${guest.firstName} ${guest.lastName}`);
     setCode(`SPG-${new Date().getFullYear()}-${Math.abs([...(gid + checkIn)].reduce((a, c) => a + c.charCodeAt(0), 0)) % 100000}`);
@@ -251,6 +268,13 @@ function Engine() {
           <>
             <h1 className="mb-3 font-display text-xl font-bold text-txt">Verifica disponibilità</h1>
             {searchBar}
+            <div className={`${box} mb-3 flex flex-wrap items-center gap-2 p-3`}>
+              <span className="text-sm font-medium text-dim">Hai un codice sconto?</span>
+              <input value={promoInput} onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoErr(""); }} placeholder="CODICE" className="w-40 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm uppercase text-txt outline-none focus:border-focus" />
+              <button onClick={() => applyPromoCode()} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-focus hover:bg-wash">Applica</button>
+              {appliedPromo && <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--ok)" }}>✓ {appliedPromo.name || appliedPromo.code} · −{appliedPromo.pct}%<button onClick={() => { setAppliedPromo(null); setPromoInput(""); }} className="text-xs font-normal text-faint hover:text-[color:var(--err)]">rimuovi</button></span>}
+              {promoErr && <span className="text-sm text-[color:var(--err)]">{promoErr}</span>}
+            </div>
             <div className="flex flex-col gap-3">
               {types.map((rt) => {
                 const free = availUnits(rt).length;
@@ -368,6 +392,7 @@ function Engine() {
                 <Line label={`${selRt.name} · ${selPlan.name}`} value={eur(accommodation)} />
                 {extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => <Line key={x.id} label={`${extraQty[x.id]}× ${x.name}`} value={eur((extraQty[x.id] ?? 0) * extraPrice(x))} sub />)}
                 {cityTax > 0 && <Line label={structure?.cityTaxMode === "percent" ? `Tassa di soggiorno (${structure.cityTaxPercent ?? 0}%)` : `Tassa di soggiorno (${adults}×${cityTaxNights})`} value={eur(cityTax)} sub />}
+                {discount > 0 && <div className="mt-1 flex items-baseline justify-between gap-3 text-xs" style={{ color: "var(--ok)" }}><span className="min-w-0">Sconto{appliedPromo?.code ? ` ${appliedPromo.code}` : ""} (−{appliedPromo?.pct}%)</span><span className="shrink-0 font-mono">−{eur(discount)}</span></div>}
                 <div className="my-2 border-t border-line" />
                 <div className="flex items-baseline justify-between"><span className="text-sm font-semibold text-txt">Totale</span><span className="font-mono text-xl font-bold text-txt">{eur(total)}</span></div>
                 {deposit > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">Acconto adesso</span><span className="font-mono font-semibold text-txt">{eur(deposit)}</span></div>}

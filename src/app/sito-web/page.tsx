@@ -351,7 +351,7 @@ function Site() {
                   {p.description && <p className="mt-1.5 text-sm text-dim">{p.description}</p>}
                   {(p.features ?? []).length > 0 && <ul className="mt-2 flex-1 space-y-1 text-[13px] text-dim">{(p.features ?? []).map((f, i) => <li key={i} className="flex items-start gap-1.5"><span style={{ color: accent }}>✓</span>{f}</li>)}</ul>}
                   <div className="mt-2 text-xs text-dim">{T("Codice")}: <b className="font-mono text-txt">{p.code}</b></div>
-                  <button onClick={() => go()} className="mt-2 text-sm font-medium" style={{ color: accent }}>{T("Prenota")} →</button>
+                  <button onClick={() => go(p.code ? `&promo=${encodeURIComponent(p.code)}` : "")} className="mt-2 text-sm font-medium" style={{ color: accent }}>{T("Prenota")} →</button>
                 </div>
               ))}
             </div>
