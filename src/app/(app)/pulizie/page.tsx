@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useData } from "@/lib/store";
+import { sortUnitsByName } from "@/lib/sortUnits";
 import { CHANNELS, type Channel, type Booking } from "@/lib/types";
 import { toISO, parseISO, addDays, nights } from "@/lib/dates";
 import { playSound } from "@/lib/sound";
@@ -188,7 +189,7 @@ export default function PuliziePage() {
   };
 
   const rooms = scopedStructures.flatMap((s) =>
-    units.filter((u) => u.structureId === s.id).map((u) => ({ unit: u, structure: s, oos: !!u.outOfService, ...planFor(u.id) }))
+    sortUnitsByName(units.filter((u) => u.structureId === s.id)).map((u) => ({ unit: u, structure: s, oos: !!u.outOfService, ...planFor(u.id) }))
   );
   type Room = (typeof rooms)[number];
 

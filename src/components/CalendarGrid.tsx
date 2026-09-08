@@ -150,6 +150,11 @@ export default function CalendarGrid() {
   const [oos, setOos] = useState<null | { id?: string; unitId: string; structureId: string; roomTypeId: string; from: string; to: string; reason: string }>(null);
   // Conferma correzione prezzo (Copilota = prezzo singolo, Simulatore = variazione % massiva su un periodo scelto).
   const [priceConfirm, setPriceConfirm] = useState<null | { kind: "single"; subject: string; detail?: string; from: number; to: number; onOk: () => void } | { kind: "bulk"; pct: number; from: string; to: string }>(null);
+  // Suggerimenti del Copilota revenue già applicati (spunta permanente, salvata nel browser).
+  const [tipDone, setTipDone] = useState<Set<string>>(new Set());
+  useEffect(() => { try { const r = localStorage.getItem("spigolestay:caltips"); if (r) setTipDone(new Set(JSON.parse(r))); } catch {} }, []);
+  const markTip = (k: string) => setTipDone((p) => { const n = new Set(p).add(k); try { localStorage.setItem("spigolestay:caltips", JSON.stringify([...n])); } catch {} return n; });
+  const tipKey = (s: { dir?: string; subject?: string; detail?: string }) => `${s.dir ?? ""}|${s.subject ?? ""}|${s.detail ?? ""}`;
   // Conferma spostamento prenotazione (drag su un'altra camera/data).
   const [moveConfirm, setMoveConfirm] = useState<null | { id: string; targetUnitId: string; checkIn: string; checkOut: string; prev: { unitId: string | null; checkIn: string; checkOut: string } }>(null);
   // Selettore che compare cliccando su una cella libera: prenotazione o fuori servizio.
@@ -893,7 +898,9 @@ export default function CalendarGrid() {
               <div key={i} className="flex items-start gap-2 rounded-lg border border-line p-2">
                 <span className="text-sm leading-none" style={{ color: s.color }}>{s.icon}</span>
                 <span className="min-w-0 flex-1 text-xs leading-snug text-txt">{s.text}</span>
-                {s.apply && s.cta && <button onClick={() => { if (s.from != null && s.to != null && s.subject) setPriceConfirm({ kind: "single", subject: s.subject, detail: s.detail, from: s.from, to: s.to, onOk: s.apply! }); else s.apply!(); }} className="shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: s.dir === "up" ? "var(--ok)" : s.dir === "down" ? "var(--err)" : "var(--focus)" }}>{s.cta}</button>}
+                {s.apply && s.cta && (tipDone.has(tipKey(s))
+                  ? <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--ok)]"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>Applicato</span>
+                  : <button onClick={() => { const k = tipKey(s); const doIt = () => { s.apply!(); markTip(k); }; if (s.from != null && s.to != null && s.subject) setPriceConfirm({ kind: "single", subject: s.subject, detail: s.detail, from: s.from, to: s.to, onOk: doIt }); else doIt(); }} className="shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: s.dir === "up" ? "var(--ok)" : s.dir === "down" ? "var(--err)" : "var(--focus)" }}>{s.cta}</button>)}
               </div>
             ))}
           </div>
