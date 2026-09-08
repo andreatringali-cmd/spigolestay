@@ -370,6 +370,8 @@ export default function BookingDrawer() {
       </Section>
 
       <Section title={t("Soggiorno")}>
+        <Row label={t("Codice")} value={bookingCode(booking)} mono />
+        <Row label={t("Canale")} value={ch.label} />
         <Row label={t("Struttura")} value={structure?.name ?? "—"} />
         <Row label={t("Tipologia")} value={roomType?.name ?? "—"} />
         <Row label={t("Unità")} value={unitV?.name ?? t("Da assegnare")} />
@@ -611,11 +613,7 @@ export default function BookingDrawer() {
         <div className="flex items-start gap-3 border-b border-line px-5 py-4">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold text-white shadow-sm" style={{ backgroundColor: `var(${ch.cssVar})` }}>{(guest?.fullName ?? "?").split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?"}</div>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `var(${ch.cssVar})`, color: ch.text }}>{ch.label}</span>
-              <span className="rounded-md bg-wash px-1.5 py-0.5 font-mono text-[11px] text-dim">#{bookingCode(booking)}</span>
-            </div>
-            <div className="mt-1.5 flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <h2 className="truncate font-display text-2xl font-bold tracking-tight text-txt">{guest?.fullName ?? t("Ospite")}</h2>
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 14%, transparent)`, color: st.color }}>
                 <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: st.color }} />{t(st.label)}
