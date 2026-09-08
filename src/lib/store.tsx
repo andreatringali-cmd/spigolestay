@@ -264,7 +264,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       },
       updateGuest: (id, patch) => setGuests((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g))),
       addBooking: (b) => {
-        setBookings((prev) => [...prev, { id: uid(), ...b }]);
+        // Codice leggibile progressivo per anno di arrivo: XEN-2026-0001.
+        const year = (b.checkIn || new Date().toISOString()).slice(0, 4);
+        const prefix = `XEN-${year}-`;
+        const maxN = bookings.reduce((mx, x) => (x.code?.startsWith(prefix) ? Math.max(mx, Number(x.code.slice(prefix.length)) || 0) : mx), 0);
+        const code = b.code ?? `${prefix}${String(maxN + 1).padStart(4, "0")}`;
+        setBookings((prev) => [...prev, { id: uid(), ...b, code }]);
         const gName = guests.find((g) => g.id === b.guestId)?.fullName;
         if (b.channel === "blocked") logAct("block", `Fuori servizio${b.note ? " — " + b.note : ""}`);
         else logAct("booking", `Nuova prenotazione${gName ? " — " + gName : ""} · ${b.channel}`);

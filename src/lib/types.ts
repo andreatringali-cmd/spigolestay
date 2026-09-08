@@ -252,6 +252,7 @@ export const EVENT_COLORS = ["#E0552B", "#E0A21C", "#7C3AED", "#0E9F6E", "#2563E
 
 export interface Booking {
   id: string;
+  code?: string; // codice leggibile per l'ospite (es. "XEN-2026-0001"), generato alla creazione
   groupId?: string; // se presente, la prenotazione fa parte di un gruppo (prenotazione multipla/di gruppo)
   structureId: string;
   roomTypeId: string;

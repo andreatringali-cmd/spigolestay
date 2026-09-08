@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/store";
+import { bookingCode } from "@/lib/bookingCode";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { nights, parseISO, toISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
@@ -85,7 +86,7 @@ export default function PrenotazioniPage() {
       if (!from && !to && b.checkOut < todayISO) return false;
       // Filtro globale struttura (selettore in alto a destra)
       if (activeStructureId !== "all" && b.structureId !== activeStructureId) return false;
-      if (term && !guestName(b.guestId).toLowerCase().includes(term) && !b.id.toLowerCase().includes(term)) return false;
+      if (term && !guestName(b.guestId).toLowerCase().includes(term) && !b.id.toLowerCase().includes(term) && !bookingCode(b).toLowerCase().includes(term)) return false;
       if (channel !== "all" && b.channel !== channel) return false;
       if (loc.startsWith("str:") && b.structureId !== loc.slice(4)) return false;
       if (loc.startsWith("unit:") && b.unitId !== loc.slice(5)) return false;
@@ -203,7 +204,7 @@ export default function PrenotazioniPage() {
       "prenotazioni",
       [t("Codice"), t("Prenotata il"), t("Struttura"), t("Camera"), t("Canale"), t("Ospite"), t("N. ospiti"), t("Check-in"), t("Check-out"), t("Notti"), t("Totale €"), t("Commissioni €"), t("Netto €")],
       filtered.map((b) => [
-        b.id.toUpperCase(), b.bookedOn ?? "", getStructure(b.structureId)?.name ?? "", getUnit(b.unitId)?.name ?? t("Da assegnare"),
+        bookingCode(b), b.bookedOn ?? "", getStructure(b.structureId)?.name ?? "", getUnit(b.unitId)?.name ?? t("Da assegnare"),
         CHANNELS[b.channel].label, guestName(b.guestId), b.adults + b.children,
         b.checkIn, b.checkOut, nights(b.checkIn, b.checkOut), b.total ?? 0, commissionOf(b), nettoOf(b),
       ])
@@ -334,7 +335,7 @@ export default function PrenotazioniPage() {
               const ch = CHANNELS[b.channel];
               return (
                 <tr key={b.id} onClick={() => openBooking(b.id)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
-                  <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.id.toUpperCase()}</td>
+                  <td className="px-3 py-2.5 font-mono text-xs text-dim">{bookingCode(b)}</td>
                   <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.bookedOn ? fmt(b.bookedOn) : "—"}</td>
                   {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
                   <td className="whitespace-nowrap px-3 py-2.5 text-dim">{unitLabel(b) ?? <span className="italic font-medium text-[color:var(--err)]">{t("Da assegnare")}</span>}</td>

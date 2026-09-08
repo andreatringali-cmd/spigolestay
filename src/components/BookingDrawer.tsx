@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { sortUnitsByName } from "@/lib/sortUnits";
+import { bookingCode } from "@/lib/bookingCode";
+import { sendVoucher } from "@/lib/mailer";
 import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
 import { nights, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
@@ -71,6 +73,7 @@ export default function BookingDrawer() {
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [form, setForm] = useState<Form | null>(null);
   const [saved, setSaved] = useState(false);
+  const [voucher, setVoucher] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
 
   const loadForm = () => {
     if (!booking) { setForm(null); return; }
@@ -139,7 +142,7 @@ export default function BookingDrawer() {
       ["Pulizia finale", money(cleanV)],
     ];
     if (taxV > 0) rows.push(["Tassa di soggiorno", money(taxV)]);
-    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Ricevuta ${booking.id.toUpperCase()}</title>
+    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Ricevuta ${bookingCode(booking)}</title>
     <style>
       *{box-sizing:border-box} body{font-family:Georgia,'Times New Roman',serif;color:#1a2131;margin:0;padding:48px 54px;font-size:14px;line-height:1.5}
       .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #4f46e5;padding-bottom:18px;margin-bottom:26px}
@@ -162,7 +165,7 @@ export default function BookingDrawer() {
           <div style="font-size:12px;color:#5c6479;margin-top:4px">${structure?.address ?? "Siracusa"}${structure?.phone ? " · " + structure.phone : ""}</div>
           ${structure?.cin ? `<div style="font-size:11px;color:#9aa2b6;margin-top:2px">CIN ${structure.cin}</div>` : ""}
         </div>
-        <div class="meta">Ricevuta n. <b style="color:#1a2131">${booking.id.toUpperCase()}</b><br>${today}</div>
+        <div class="meta">Ricevuta n. <b style="color:#1a2131">${bookingCode(booking)}</b><br>${today}</div>
       </div>
       <h1>Ricevuta di pagamento</h1>
       <div class="sub">Soggiorno turistico · ${ch.label}</div>
@@ -232,7 +235,7 @@ export default function BookingDrawer() {
       </div>
       <div class="grid2">
         <div class="box"><b>Cliente</b>${guest?.fullName ?? "—"}${guest?.email ? "<br>" + guest.email : ""}${guest?.phone ? "<br>" + guest.phone : ""}</div>
-        <div class="box"><b>Riferimento</b>Prenotazione ${booking.id.toUpperCase()}<br>${roomType?.name ?? ""}${unitV?.name ? " — " + unitV.name : ""}<br>${booking.adults} adulti${booking.children ? " · " + booking.children + " bambini" : ""}</div>
+        <div class="box"><b>Riferimento</b>Prenotazione ${bookingCode(booking)}<br>${roomType?.name ?? ""}${unitV?.name ? " — " + unitV.name : ""}<br>${booking.adults} adulti${booking.children ? " · " + booking.children + " bambini" : ""}</div>
       </div>
       <table>
         <tr><th>Descrizione</th><th style="text-align:right">${forfettario ? "Importo" : "Imponibile"}</th></tr>
@@ -254,6 +257,14 @@ export default function BookingDrawer() {
 
   const remove = async () => { if (await ask({ title: t("Elimina prenotazione"), message: t("Eliminare definitivamente questa prenotazione?"), danger: true, confirmLabel: t("Elimina") })) deleteBooking(booking.id); };
 
+  const sendVoucherNow = async () => {
+    if (!booking) return;
+    if (!guest?.email) { setVoucher({ ok: false, msg: t("L'ospite non ha un'email.") }); return; }
+    setVoucher({ sending: true });
+    const r = await sendVoucher(booking, { getStructure, getGuest, getRoomType, getUnit });
+    setVoucher({ sending: false, ok: r.ok, msg: r.ok ? t("Voucher inviato a") + " " + guest.email : r.error });
+  };
+
   // ─────────────── VISTA (sola lettura) ───────────────
   const viewBody = (
     <>
@@ -263,6 +274,11 @@ export default function BookingDrawer() {
           <ContactBtn href={guest?.phone ? `tel:${guest.phone}` : undefined} label={t("Chiama")} color="var(--focus)" missingTitle={t("Dato mancante")} />
           <ContactBtn href={guest?.email ? `mailto:${guest.email}` : undefined} label={t("Email")} color="var(--dim)" missingTitle={t("Dato mancante")} />
         </div>
+        <button onClick={sendVoucherNow} disabled={voucher.sending || !guest?.email} title={!guest?.email ? t("L'ospite non ha un'email.") : undefined} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#285f92" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v14H4z" /><path d="m4 6 8 6 8-6" /></svg>
+          {voucher.sending ? t("Invio…") : t("Invia voucher / conferma")}
+        </button>
+        {voucher.msg && <div className={`mt-1.5 text-center text-[11px] ${voucher.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{voucher.msg}</div>}
       </div>
 
       <Section title={t("Ospite")}>
@@ -512,7 +528,7 @@ export default function BookingDrawer() {
               <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: st.color }}>
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: st.color }} />{t(st.label)}
               </span>
-              <span className="text-xs text-dim">#{booking.id.toUpperCase()}</span>
+              <span className="text-xs text-dim">#{bookingCode(booking)}</span>
             </div>
             <h2 className="mt-2 truncate font-display text-xl font-bold tracking-tight text-txt">{guest?.fullName ?? t("Ospite")}</h2>
             {(() => { const bd = birthdayInStay(guest?.birthDate, booking.checkIn, booking.checkOut); return bd ? (

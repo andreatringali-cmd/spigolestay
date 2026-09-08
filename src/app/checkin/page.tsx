@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { DataProvider, useData } from "@/lib/store";
 import { DOC_TYPES } from "@/lib/types";
 import { downscaleImage } from "@/lib/images";
+import { sendCheckinNotice } from "@/lib/mailer";
 import SignaturePad from "@/components/SignaturePad";
 
 const box = "rounded-xl border border-line bg-surface";
@@ -71,7 +72,10 @@ function Engine() {
   const submit = () => {
     if (!booking || !guest || !doc || !valid) return;
     updateGuest(guest.id, { firstName: doc.firstName.trim(), lastName: doc.lastName.trim(), fullName: `${doc.firstName} ${doc.lastName}`.trim(), sex: (doc.sex || undefined) as "M" | "F" | undefined, birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: doc.docNumber.trim(), docPlace: doc.docPlace });
-    updateBooking(booking.id, { webCheckin: true, arrivalTime: arrival, extraGuests: extras.filter((e) => e.firstName.trim() && e.lastName.trim()), docPhotoFront: photoFront, docPhotoBack: photoBack, signature });
+    const cleanExtras = extras.filter((e) => e.firstName.trim() && e.lastName.trim());
+    updateBooking(booking.id, { webCheckin: true, arrivalTime: arrival, extraGuests: cleanExtras, docPhotoFront: photoFront, docPhotoBack: photoBack, signature });
+    // Avvisa il gestore via email (best-effort, non blocca la conferma all'ospite).
+    void sendCheckinNotice(booking, { getStructure, getGuest, getRoomType, getUnit }, [{ ...doc }, ...cleanExtras], arrival);
     setDone(true); window.scrollTo(0, 0);
   };
 
