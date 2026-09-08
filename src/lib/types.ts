@@ -182,6 +182,7 @@ export interface Unit {
   structureId: string;
   roomTypeId: string;
   name: string; // "Allegra", "Ortigia"
+  order?: number; // ordine manuale (drag & drop in Camere); pilota anche il calendario
   outOfService?: boolean;
   // Dettaglio camera fisica
   code?: string;       // numero/codice interno

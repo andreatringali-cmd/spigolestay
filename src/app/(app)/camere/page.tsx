@@ -13,6 +13,7 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useAccess } from "@/lib/access";
 import { amenityIcon } from "@/lib/amenities";
+import { byUnitName } from "@/lib/sortUnits";
 import { ROOMS_PER_STRUCT, ROOM_OVERAGE } from "@/lib/plan";
 import { useLang } from "@/lib/i18n";
 
@@ -45,6 +46,7 @@ export default function CamerePage() {
   const [highlight, setHighlight] = useState<string | null>(null);
   const [roomModal, setRoomModal] = useState<{ structureId: string; unit?: Unit } | null>(null);
   const [sortKey, setSortKey] = useState<string>("name");
+  const [dragId, setDragId] = useState<string | null>(null); // camera trascinata (riordino manuale)
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const COLLAPSE_KEY = "spigolestay:camere:collapsed:v1";
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -88,11 +90,24 @@ export default function CamerePage() {
       return (u.name ?? "").toLowerCase();
     };
     return [...list].sort((a, b) => {
+      // Vista predefinita "Camera": rispetta l'ordine manuale (drag & drop), poi il numero.
+      if (sortKey === "name") { const c0 = byUnitName(a, b); return sortDir === "asc" ? c0 : -c0; }
       const va = kv(a), vb = kv(b);
       let c = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), undefined, { numeric: true });
-      if (c === 0) c = (a.name ?? "").localeCompare(b.name ?? "", undefined, { numeric: true });
+      if (c === 0) c = byUnitName(a, b);
       return sortDir === "asc" ? c : -c;
     });
+  };
+  // Riordino manuale: sposta la camera trascinata prima di quella di destinazione e salva l'ordine.
+  const reorderUnit = (group: Unit[], targetId: string) => {
+    if (!dragId || dragId === targetId) { setDragId(null); return; }
+    const rest = group.map((u) => u.id).filter((id) => id !== dragId);
+    const ti = rest.indexOf(targetId);
+    if (ti < 0) { setDragId(null); return; }
+    rest.splice(ti, 0, dragId);
+    rest.forEach((id, idx) => updateUnit(id, { order: idx }));
+    if (sortKey !== "name") { setSortKey("name"); setSortDir("asc"); }
+    setDragId(null);
   };
   const SortTh = ({ k, label }: { k: string; label: string }) => (
     <th className="cursor-pointer select-none px-3 py-2 font-semibold hover:text-txt" onClick={() => toggleSort(k)}>
@@ -150,14 +165,21 @@ export default function CamerePage() {
           const sUnits = units.filter((u) => u.structureId === s.id);
           const beds = sUnits.reduce((a, u) => a + (types.find((t) => t.id === u.roomTypeId)?.beds ?? 0), 0);
           const oos = sUnits.filter((u) => u.outOfService).length;
-          const rowOf = (u: Unit, showType = false) => {
+          const rowOf = (u: Unit, showType = false, group?: Unit[]) => {
             const i = types.findIndex((tt) => tt.id === u.roomTypeId);
             const rt = types[i];
             const color = rt ? typeColor(rt, i) : "var(--line)";
             return (
-              <tr key={u.id} id={`unit-${u.id}`} onClick={() => setRoomModal({ structureId: s.id, unit: u })} className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${sel.has(u.id) ? "bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)]" : highlight === u.id ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : ""}`}>
+              <tr key={u.id} id={`unit-${u.id}`}
+                draggable={!!group}
+                onDragStart={(e) => { setDragId(u.id); e.dataTransfer.effectAllowed = "move"; }}
+                onDragOver={(e) => { if (dragId && dragId !== u.id) e.preventDefault(); }}
+                onDrop={(e) => { e.preventDefault(); if (group) reorderUnit(group, u.id); }}
+                onDragEnd={() => setDragId(null)}
+                onClick={() => setRoomModal({ structureId: s.id, unit: u })}
+                className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${dragId === u.id ? "opacity-40" : ""} ${sel.has(u.id) ? "bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)]" : highlight === u.id ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : ""}`}>
                 <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel.has(u.id)} onChange={() => toggleSel(u.id)} className="h-4 w-4 accent-[color:var(--focus)]" /></td>
-                <td className="px-3 py-2.5"><div className="flex min-w-0 items-center gap-2"><span className="h-6 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} /><span className={`truncate font-medium ${u.outOfService ? "text-faint line-through" : "text-txt"}`}>{u.name}</span></div></td>
+                <td className="px-3 py-2.5"><div className="flex min-w-0 items-center gap-2"><span className="shrink-0 cursor-grab text-faint active:cursor-grabbing" title={t("Trascina per riordinare")} aria-hidden><svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor"><circle cx="4" cy="4" r="1.3" /><circle cx="8" cy="4" r="1.3" /><circle cx="4" cy="8" r="1.3" /><circle cx="8" cy="8" r="1.3" /><circle cx="4" cy="12" r="1.3" /><circle cx="8" cy="12" r="1.3" /></svg></span><span className="h-6 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} /><span className={`truncate font-medium ${u.outOfService ? "text-faint line-through" : "text-txt"}`}>{u.name}</span></div></td>
                 <td className="px-3 py-2.5 font-mono text-xs text-dim">{u.code || "—"}</td>
                 {showType && <td className="px-3 py-2.5 text-dim">{rt?.name ?? "—"}</td>}
                 <td className="px-3 py-2.5 text-dim">{u.floor || "—"}</td>
@@ -255,7 +277,7 @@ export default function CamerePage() {
                                   <th className="px-3 py-2 font-semibold"></th>
                                 </tr>
                               </thead>
-                              <tbody>{g.map((u) => rowOf(u))}</tbody>
+                              <tbody>{g.map((u) => rowOf(u, false, g))}</tbody>
                             </table>
                           </div>
                         )}
@@ -283,7 +305,7 @@ export default function CamerePage() {
                                 <th className="px-3 py-2 font-semibold"></th>
                               </tr>
                             </thead>
-                            <tbody>{orphans.map((u) => rowOf(u))}</tbody>
+                            <tbody>{orphans.map((u) => rowOf(u, false, orphans))}</tbody>
                           </table>
                         </div>
                       </div>
