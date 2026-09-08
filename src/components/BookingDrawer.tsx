@@ -111,7 +111,6 @@ export default function BookingDrawer() {
   // Info effettive della camera: valore della camera se impostato, altrimenti della tipologia; dotazioni sommate.
   const effBedConfig = unitV?.bedConfig || roomType?.bedConfig;
   const effSize = unitV?.size ?? roomType?.size;
-  const effAmenities = Array.from(new Set([...(roomType?.amenities ?? []), ...(unitV?.amenities ?? [])]));
   const ch = CHANNELS[booking.channel];
   const st = STATUS[booking.status];
 
@@ -268,19 +267,6 @@ export default function BookingDrawer() {
   // ─────────────── VISTA (sola lettura) ───────────────
   const viewBody = (
     <>
-      <div className="border-b border-line px-5 py-3">
-        <div className="flex gap-2">
-          <ContactBtn href={phoneDigits ? `https://wa.me/${phoneDigits}?text=${waText}` : undefined} label="WhatsApp" color="#25D366" missingTitle={t("Dato mancante")} />
-          <ContactBtn href={guest?.phone ? `tel:${guest.phone}` : undefined} label={t("Chiama")} color="var(--focus)" missingTitle={t("Dato mancante")} />
-          <ContactBtn href={guest?.email ? `mailto:${guest.email}` : undefined} label={t("Email")} color="var(--dim)" missingTitle={t("Dato mancante")} />
-        </div>
-        <button onClick={sendVoucherNow} disabled={voucher.sending || !guest?.email} title={!guest?.email ? t("L'ospite non ha un'email.") : undefined} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#285f92" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v14H4z" /><path d="m4 6 8 6 8-6" /></svg>
-          {voucher.sending ? t("Invio…") : t("Invia voucher / conferma")}
-        </button>
-        {voucher.msg && <div className={`mt-1.5 text-center text-[11px] ${voucher.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{voucher.msg}</div>}
-      </div>
-
       <Section title={t("Ospite")}>
         <Row label={t("Nome")} value={guest?.fullName ?? "—"} />
         <Row label={t("Email")} value={guest?.email ?? "—"} />
@@ -299,11 +285,6 @@ export default function BookingDrawer() {
         <Row label={t("Check-out")} value={fmtDate(booking.checkOut)} />
         <Row label={t("Notti")} value={String(nView)} mono />
         <Row label={t("Ospiti")} value={`${booking.adults} ${t("adulti")} · ${booking.children} ${t("bambini")}`} />
-        {effAmenities.length > 0 && (
-          <div className="flex flex-wrap gap-1 pt-0.5">
-            {effAmenities.map((a) => <span key={a} className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{t(a)}</span>)}
-          </div>
-        )}
       </Section>
 
       <Section title={t("Conto")}>
@@ -390,6 +371,19 @@ export default function BookingDrawer() {
           <span className="text-xs text-dim">{t("Scarica XML")} →</span>
         </button>
       </Section>
+
+      <div className="border-t border-line px-5 py-3">
+        <div className="flex gap-2">
+          <ContactBtn href={phoneDigits ? `https://wa.me/${phoneDigits}?text=${waText}` : undefined} label="WhatsApp" color="#25D366" missingTitle={t("Dato mancante")} />
+          <ContactBtn href={guest?.phone ? `tel:${guest.phone}` : undefined} label={t("Chiama")} color="var(--focus)" missingTitle={t("Dato mancante")} />
+          <ContactBtn href={guest?.email ? `mailto:${guest.email}` : undefined} label={t("Email")} color="var(--dim)" missingTitle={t("Dato mancante")} />
+        </div>
+        <button onClick={sendVoucherNow} disabled={voucher.sending || !guest?.email} title={!guest?.email ? t("L'ospite non ha un'email.") : undefined} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#285f92" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v14H4z" /><path d="m4 6 8 6 8-6" /></svg>
+          {voucher.sending ? t("Invio…") : t("Invia voucher / conferma")}
+        </button>
+        {voucher.msg && <div className={`mt-1.5 text-center text-[11px] ${voucher.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{voucher.msg}</div>}
+      </div>
     </>
   );
 
