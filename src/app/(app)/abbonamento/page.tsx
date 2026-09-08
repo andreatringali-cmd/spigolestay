@@ -169,6 +169,9 @@ export default function AbbonamentoPage() {
   const overStructures = nStruct > tier.structures;
   const monthlyBase = tier.price + addonsTotal + extraRooms * ROOM_OVERAGE;
   const perMonth = useMemo(() => (annual ? Math.round(monthlyBase * (1 - ANNUAL_OFF)) : monthlyBase), [annual, monthlyBase]);
+  // Scorporo IVA (i prezzi mostrati sono IVA inclusa, 22%).
+  const netMonth = Math.round(perMonth / 1.22);
+  const vatMonth = perMonth - netMonth;
 
   const suggested = useMemo(() => (TIERS.find((tr) => nStruct <= tr.structures) ?? TIERS[TIERS.length - 1]).key, [nStruct]);
 
@@ -326,9 +329,14 @@ export default function AbbonamentoPage() {
           <div className="flex justify-between text-sm"><span className="text-dim">{t("Piano")} {tier.name}</span><span className="font-mono text-txt">{eur(annual ? Math.round(tier.price * (1 - ANNUAL_OFF)) : tier.price)}</span></div>
           {addonsTotal > 0 && <div className="mt-1.5 flex justify-between text-sm"><span className="text-dim">{t("Moduli aggiuntivi")} ({addons.filter((m) => active[m.key]).length})</span><span className="font-mono text-txt">{eur(annual ? Math.round(addonsTotal * (1 - ANNUAL_OFF)) : addonsTotal)}</span></div>}
           {extraRooms > 0 && <div className="mt-1.5 flex justify-between text-sm"><span className="text-dim">{extraRooms} {t("camere extra")} × {eur(ROOM_OVERAGE)}</span><span className="font-mono text-txt">{eur(annual ? Math.round(extraRooms * ROOM_OVERAGE * (1 - ANNUAL_OFF)) : extraRooms * ROOM_OVERAGE)}</span></div>}
-          <div className="mt-3 flex items-baseline justify-between border-t border-line pt-3">
-            <span className="text-sm font-semibold text-txt">{t("Totale / mese")}</span>
-            <span className="font-mono text-2xl font-bold text-txt">{eur(perMonth)}</span>
+          <div className="mt-2 text-[11px] text-faint">{t("Importi IVA inclusa (22%)")}</div>
+          <div className="mt-2 border-t border-line pt-3">
+            <div className="flex justify-between text-sm"><span className="text-dim">{t("Imponibile")}</span><span className="font-mono text-txt">{eur(netMonth)}</span></div>
+            <div className="mt-1 flex justify-between text-sm"><span className="text-dim">{t("IVA")} 22%</span><span className="font-mono text-txt">{eur(vatMonth)}</span></div>
+            <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2">
+              <span className="text-sm font-semibold text-txt">{t("Totale / mese")} <span className="font-normal text-faint">({t("IVA inclusa")})</span></span>
+              <span className="font-mono text-2xl font-bold text-txt">{eur(perMonth)}</span>
+            </div>
           </div>
           {annual && <div className="mt-1 text-right text-[11px] text-[color:var(--ok)]">{t("fatturato annualmente")} ({eur(perMonth * 12)}/{t("anno")})</div>}
           {overStructures && <div className="mt-3 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}>{t("Hai")} {nStruct} {t("strutture: superi il piano")} {tier.name}. {t("Passa a un piano superiore o «Su misura».")}</div>}
