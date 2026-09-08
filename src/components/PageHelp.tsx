@@ -166,10 +166,30 @@ const HELP: Record<string, Guide> = {
   },
   "/preventivi": {
     title: "Preventivi",
-    intro: "Crea un preventivo e invialo; se confermato, trasformalo in prenotazione.",
+    intro: "Crea un preventivo professionale su carta intestata, invialo all'ospite e trasformalo in prenotazione con un clic. In alto due schede: «Nuovo preventivo» e «Archivio».",
     sections: [
-      { h: "Creare", items: ["Scegli struttura, date e ospiti: il prezzo si compila dalle tariffe del calendario (poi modificabile).", "Tassa di soggiorno, colazione e parcheggio entrano nel totale; scegli l'acconto (0/50/100%).", "L'anteprima è modificabile a mano; invia su WhatsApp/Email o genera il PDF su carta intestata."] },
-      { h: "Archivio", items: ["Ogni preventivo è numerato e datato.", "\"Modifica\" lo ricarica nel form; \"Conferma\" crea la prenotazione e prepara la conferma con i dati di pagamento."] },
+      { h: "Creare un preventivo", icon: "📝", items: [
+        "Scegli struttura, date, adulti e bambini: il prezzo si compila da solo dalle tariffe del calendario (sempre modificabile per riga).",
+        "Puoi mettere più tipologie di camera nello stesso preventivo, ciascuna con quantità e prezzo.",
+        "Con bambini compare la chip «Culla» accanto alle età: spuntala e indica il prezzo a notte (0 = inclusa).",
+      ] },
+      { h: "Cosa entra nel totale", icon: "🧮", items: [
+        "Soggiorno, tassa di soggiorno (Siracusa: 4%, max 5 €/persona a notte, max 7 notti, under 15 esenti), colazione, parcheggio ed eventuale culla.",
+        "Acconto per confermare: le 3 card sono «Nessuno» · «la % impostata nella scheda struttura» · «100%». La percentuale centrale si aggiorna da sola da «Struttura → Acconto richiesto».",
+      ] },
+      { h: "PDF su carta intestata", icon: "📄", items: [
+        "L'anteprima è un foglio A4 reale (le due pagine hanno le stesse dimensioni); «Scarica / stampa PDF» genera il documento con logo, intestazione e piè di pagina della struttura.",
+        "Seconda pagina «Servizi & esperienze» (opzionale): se la struttura ha extra attivi in Upselling, viene aggiunta con una presentazione e il listino, stessa intestazione e footer della prima pagina.",
+        "5 lingue: cambia la bandierina sopra l'anteprima per tradurre etichette e testi (i contenuti che scrivi tu restano come inseriti).",
+      ] },
+      { h: "Inviare", icon: "📤", items: [
+        "Invia su WhatsApp o via email, oppure copia il testo. All'invio (o allo scarico del PDF) il preventivo si salva in automatico nella scheda «Archivio».",
+        "Il testo/anteprima è modificabile a mano prima dell'invio.",
+      ] },
+      { h: "Archivio", icon: "🗂️", items: [
+        "La scheda «Archivio» raccoglie tutti i preventivi, numerati per anno e datati, con stato Inviato/Confermato.",
+        "«Modifica» ricarica il preventivo nell'editor; «Conferma» crea la prenotazione e prepara il messaggio di conferma con i dati di pagamento.",
+      ] },
     ],
   },
   "/widget": {

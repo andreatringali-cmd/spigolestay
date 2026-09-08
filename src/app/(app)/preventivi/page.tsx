@@ -116,8 +116,18 @@ export default function PreventiviPage() {
   const [cot, setCot] = useState(false);       // culla (mostrata solo con bambini)
   const [cotPrice, setCotPrice] = useState(0); // € a notte per la culla (0 = inclusa)
   const [extrasPage, setExtrasPage] = useState(true); // 2ª pagina PDF con i servizi extra
+  const [tab, setTab] = useState<"nuovo" | "archivio">("nuovo"); // sezione: editor o archivio
   const [note, setNote] = useState("");
   const [lang, setLang] = useState<Lang>("it");
+  // Anteprima come foglio A4 reale: misuro la larghezza disponibile e scalo la pagina (794px = A4 @96dpi).
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [pw, setPw] = useState(720);
+  useEffect(() => {
+    const el = previewRef.current; if (!el) return;
+    const upd = () => setPw(Math.max(280, el.clientWidth - 16));
+    const ro = new ResizeObserver(upd); ro.observe(el); upd();
+    return () => ro.disconnect();
+  }, []);
   // Dati di pagamento (salvati nel browser, si inseriscono una volta).
   const [payHolder, setPayHolder] = useState("");
   const [payIban, setPayIban] = useState("");
@@ -240,6 +250,7 @@ export default function PreventiviPage() {
 
   // Ricarica un preventivo salvato nel form (per modificarlo).
   const loadQuote = (p: Preventivo) => {
+    setTab("nuovo");
     setFirstName(p.name.split(" ")[0] ?? ""); setLastName(p.name.split(" ").slice(1).join(" "));
     setEmail(p.email ?? ""); setPhone(p.phone ?? "");
     setStructureId(p.structureId);
@@ -435,6 +446,13 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
     <div>
       <PageHeader title={t("Preventivi")} subtitle={t("Crea un preventivo e invialo su WhatsApp o via email")} />
 
+      {/* Sezioni: Nuovo preventivo · Archivio */}
+      <div className="mb-4 inline-flex rounded-lg border border-line bg-surface p-0.5">
+        <button onClick={() => setTab("nuovo")} className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === "nuovo" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Nuovo preventivo")}</button>
+        <button onClick={() => setTab("archivio")} className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === "archivio" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Archivio")} {saved.length > 0 ? `(${saved.length})` : ""}</button>
+      </div>
+
+      {tab === "nuovo" && (
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
         {/* Form */}
         <Card>
@@ -575,8 +593,8 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               ))}
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto rounded-lg border border-line bg-wash p-2" style={{ minHeight: 340 }}>
-            <QuoteDoc
+          <div ref={previewRef} className="flex-1 overflow-y-auto rounded-lg border border-line bg-wash p-2" style={{ minHeight: 340 }}>
+            <QuoteDoc scale={pw / 794}
               accent={structure?.photoColor || "#BE5D38"} logo={structure?.logo}
               structureName={structureName} address={stAddress} contacts={stContacts} legal={stLegal} socials={stSocials}
               L={QL[lang]} quoteNo={quoteRef} date={todayStr} guest={name}
@@ -597,13 +615,17 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             <a href={waLink} onClick={save} target="_blank" rel="noreferrer" className={`rounded-lg px-3 py-2 text-sm font-semibold text-white ${phone ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
             <button onClick={() => navigator.clipboard?.writeText(outMsg)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">{t("Copia testo")}</button>
           </div>
-          <p className="mt-2 text-xs text-faint">{t("All'invio (PDF/email/WhatsApp) il preventivo viene salvato in automatico nell'archivio qui sotto.")}</p>
+          <p className="mt-2 text-xs text-faint">{t("All'invio (PDF/email/WhatsApp) il preventivo viene salvato in automatico nella scheda «Archivio».")}</p>
         </Card>
       </div>
+      )}
 
-      {/* Salvati */}
-      {saved.length > 0 && (
-        <div className="mt-6">
+      {/* Archivio */}
+      {tab === "archivio" && saved.length === 0 && (
+        <Card><div className="py-12 text-center text-sm text-faint">{t("Nessun preventivo in archivio.")}<br />{t("Crea e invia un preventivo per ritrovarlo qui.")}</div></Card>
+      )}
+      {tab === "archivio" && saved.length > 0 && (
+        <div>
           <SectionTitle>{t("Preventivi salvati")} ({saved.length})</SectionTitle>
           <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
             <table className="w-full min-w-[860px] text-sm">
@@ -712,19 +734,32 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 // Documento PDF visivo (foglio bianco) mostrato in anteprima. Colori fissi = come stampato.
+// Foglio A4 in scala: canvas fisso 794×1123 (A4 @96dpi) scalato per riempire la larghezza disponibile.
+// Entrambe le pagine hanno così identiche dimensioni A4 nell'anteprima.
+function A4Page({ scale, accent, children }: { scale: number; accent: string; children: React.ReactNode }) {
+  return (
+    <div style={{ width: "100%", aspectRatio: "794 / 1123", overflow: "hidden", borderRadius: 10, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.08), 0 12px 30px -14px rgba(0,0,0,.2)", marginBottom: 14 }}>
+      <div style={{ width: 794, height: 1123, transform: `scale(${scale})`, transformOrigin: "top left", position: "relative", overflow: "hidden", fontFamily: "Arial, Helvetica, sans-serif", color: "#2b2b2b" }}>
+        <div style={{ height: 6, background: accent }} />
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function QuoteDoc(p: {
+  scale: number;
   accent: string; logo?: string; structureName: string; address: string; contacts: string; legal: string; socials: { k: string; url: string }[]; L: QLabels;
   quoteNo: string; date: string; guest: string; checkIn: string; checkOut: string; nights: number; nWord: string;
   roomLines: { label: string; sub: string; amount: string }[]; breakfast: boolean; parking: boolean; parkText: string; cot?: boolean; cotText?: string;
   cityTax: string; taxPersons: number; total: string; accText: string; payHolder: string; payIban: string; payExtra: string; causale: string; note: string;
   extras?: { name: string; desc?: string; price: string; per: string }[]; extrasTitle?: string; extrasNote?: string; extrasIntro?: string;
 }) {
-  const ink = "#2b2b2b", muted = "#726b62", hair = "#ece7df";
+  const muted = "#726b62", hair = "#ece7df";
   const row = { display: "flex", justifyContent: "space-between", padding: "9px 2px", borderBottom: `1px solid ${hair}`, fontSize: 14 } as const;
   return (
     <>
-    <div style={{ width: "100%", margin: "0 auto", background: "#fff", color: ink, borderRadius: 10, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,.08), 0 12px 30px -14px rgba(0,0,0,.2)", fontFamily: "Arial, Helvetica, sans-serif" }}>
-      <div style={{ height: 6, background: p.accent }} />
+    <A4Page scale={p.scale} accent={p.accent}>
       <div style={{ padding: "28px 30px 0" }}>
         {/* Intestazione */}
         <div style={{ display: "flex", alignItems: "center", gap: 16, borderBottom: `1px solid ${hair}`, paddingBottom: 20 }}>
@@ -804,10 +839,9 @@ function QuoteDoc(p: {
           </div>
         </div>
       </div>
-    </div>
+    </A4Page>
     {p.extras && p.extras.length ? (
-      <div style={{ width: "100%", margin: "10px auto 0", background: "#fff", color: ink, borderRadius: 10, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,.08), 0 12px 30px -14px rgba(0,0,0,.2)", fontFamily: "Arial, Helvetica, sans-serif" }}>
-        <div style={{ height: 6, background: p.accent }} />
+      <A4Page scale={p.scale} accent={p.accent}>
         <div style={{ padding: "28px 30px 0" }}>
           {/* Intestazione identica alla pagina 1 */}
           <div style={{ display: "flex", alignItems: "center", gap: 16, borderBottom: `1px solid ${hair}`, paddingBottom: 20 }}>
@@ -856,7 +890,7 @@ function QuoteDoc(p: {
             </div>
           </div>
         </div>
-      </div>
+      </A4Page>
     ) : null}
     </>
   );
