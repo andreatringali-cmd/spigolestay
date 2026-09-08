@@ -149,7 +149,7 @@ td{padding:11px 8px;border-bottom:1px solid #f0ebe3}
                 <th className="px-3 py-2 font-semibold">{t("Descrizione")}</th>
                 <th className="px-3 py-2 font-semibold">{t("Scadenza")}</th>
                 <th className="px-3 py-2 text-right font-semibold">{t("Prezzo netto")}</th>
-                <th className="px-3 py-2 text-right font-semibold">{t("Tasse")}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t("Importo IVA")}</th>
                 <th className="px-3 py-2 text-right font-semibold">{t("Importo")}</th>
                 <th className="px-3 py-2 font-semibold">{t("Metodo")}</th>
                 <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
