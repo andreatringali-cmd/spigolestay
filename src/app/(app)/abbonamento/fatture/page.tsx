@@ -31,8 +31,7 @@ export default function FatturePage() {
   // Ultime 6 mensilità (dimostrative): la più recente "da incassare", le precedenti incassate.
   const invoices = useMemo<Invoice[]>(() => {
     const now = new Date();
-    const months: Date[] = [];
-    for (let i = 5; i >= 0; i--) months.push(new Date(now.getFullYear(), now.getMonth() - i, 1));
+    const months: Date[] = [new Date(now.getFullYear(), now.getMonth(), 1)]; // solo l'ultima (mese corrente)
     const perYear: Record<number, number> = {};
     const rows = months.map((d) => {
       const y = d.getFullYear();
@@ -175,6 +174,7 @@ td{padding:11px 8px;border-bottom:1px solid #f0ebe3}
                 </tr>
               ); })}
             </tbody>
+            {invoices.length > 1 && (
             <tfoot>
               <tr className="border-t-2 border-line font-semibold">
                 <td className="px-3 py-2.5 text-txt" colSpan={4}>{t("Totale")}</td>
@@ -184,6 +184,7 @@ td{padding:11px 8px;border-bottom:1px solid #f0ebe3}
                 <td className="px-3 py-2.5" colSpan={4}></td>
               </tr>
             </tfoot>
+            )}
           </table>
         </div>
         <p className="mt-3 text-xs text-faint">{t("Elenco dimostrativo. In produzione le fatture sono emesse automaticamente a ogni rinnovo (Stripe + fattura elettronica) e scaricabili in PDF.")}</p>
