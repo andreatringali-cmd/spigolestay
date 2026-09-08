@@ -373,7 +373,6 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
         <label className={lbl}>{t("Configurazione letti")}<select value={f.bedConfig ?? ""} onChange={(e) => set("bedConfig", e.target.value || undefined)} className={`${inp} mt-1`}><option value="">{t("Come tipologia")}</option>{BED_CONFIGS.map((b) => <option key={b} value={b}>{t(b)}</option>)}</select></label>
         <label className={lbl}>{t("Metri quadri")}<input type="number" min={0} value={f.size ?? ""} onChange={(e) => set("size", e.target.value ? Number(e.target.value) : undefined)} className={`${inp} mt-1`} placeholder={t("Come tipologia")} /></label>
       </div>
-      <label className={`${lbl} mt-3`}>{t("Codice/istruzioni di accesso")}<input value={f.accessInfo ?? ""} onChange={(e) => set("accessInfo", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. keybox 4471, porta a sinistra")} /></label>
       {hasGuide ? (
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-paper p-2.5">
           <span className="text-[11px] text-dim">{t("Questi codici e istruzioni possono comparire nella guida ospiti della camera.")}</span>

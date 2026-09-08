@@ -86,6 +86,13 @@ function Site() {
   // Lo store carica i dati dopo il mount: aggancia la prima struttura appena disponibile.
   useEffect(() => { if ((!sid || !structures.some((s) => s.id === sid)) && structures[0]) setSid(structures[0].id); }, [structures, sid]);
   const structure = getStructure(sid);
+  const waRaw = structure?.whatsapp || structure?.phone || "";
+  const waNum = waRaw.replace(/\D/g, "");
+  const [cookieOk, setCookieOk] = useState(true);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  useEffect(() => { try { setCookieOk(localStorage.getItem("xenora:cookieok") === "1"); } catch {} }, []);
+  const acceptCookie = () => { try { localStorage.setItem("xenora:cookieok", "1"); } catch {} setCookieOk(true); };
+  useEffect(() => { if (structure?.name) { try { document.title = `${structure.name} · Prenota direttamente`; } catch {} } }, [structure?.name]);
   const name = structure?.name || cfg.nome || "Xenora";
   const accent = cfg.accent;
 
@@ -154,7 +161,7 @@ function Site() {
   const field = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
   return (
-    <div className="flex min-h-full flex-col bg-wash">
+    <div className="flex min-h-full flex-col bg-wash pb-16 md:pb-0">
       <style>{`.xreveal{opacity:0;transform:translateY(22px);transition:opacity .6s ease,transform .6s ease}.xreveal.xin{opacity:1;transform:none}@media(prefers-reduced-motion:reduce){.xreveal{opacity:1;transform:none;transition:none}}`}</style>
       {/* Top bar */}
       <div className="border-b border-line bg-surface">
@@ -445,11 +452,51 @@ function Site() {
             </div>
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 text-[11px] text-faint">
-            <span>© {new Date().getFullYear()} {name}. {T("Tutti i diritti riservati.")}</span>
+            <span>© {new Date().getFullYear()} {name}. {T("Tutti i diritti riservati.")} · <button onClick={() => setShowPrivacy(true)} className="underline hover:text-dim">Privacy</button></span>
             <span>Sito creato dal gruppo <b className="text-dim">Xenora</b> · Prenotazione online sicura</span>
           </div>
         </div>
       </footer>
+
+      {/* WhatsApp flottante */}
+      {waNum && (
+        <a href={`https://wa.me/${waNum}`} target="_blank" rel="noreferrer" aria-label="WhatsApp" className="fixed bottom-20 right-4 z-40 grid h-12 w-12 place-items-center rounded-full text-white shadow-lg transition hover:scale-105 md:bottom-6" style={{ backgroundColor: "#25D366" }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1-.4-.1-.9-.3-1.6-.6-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8 0-1.3.7-2 .9-2.2.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.6-.3.3c-.2.2-.3.3-.1.6.2.3.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.6 1.6.3.1.5.1.7-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.1.1.5-.1 1Z" /></svg>
+        </a>
+      )}
+
+      {/* Barra Prenota fissa (telefono) */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 px-4 py-2.5 backdrop-blur md:hidden">
+        <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="w-full rounded-lg py-2.5 text-sm font-bold text-white shadow-sm" style={{ backgroundColor: accent }}>{T("Prenota")}</button>
+      </div>
+
+      {/* Cookie banner */}
+      {!cookieOk && (
+        <div className="fixed inset-x-0 bottom-16 z-50 mx-auto max-w-3xl px-4 md:bottom-4">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-xl">
+            <span className="min-w-0 flex-1 text-xs text-dim">Usiamo solo cookie tecnici necessari al funzionamento del sito. <button onClick={() => setShowPrivacy(true)} className="font-semibold underline" style={{ color: accent }}>Informativa privacy</button>.</span>
+            <button onClick={acceptCookie} className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold text-white" style={{ backgroundColor: accent }}>Accetta</button>
+          </div>
+        </div>
+      )}
+
+      {/* Informativa privacy */}
+      {showPrivacy && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={() => setShowPrivacy(false)}>
+          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between"><h3 className="font-display text-lg font-bold text-txt">Informativa sulla privacy</h3><button onClick={() => setShowPrivacy(false)} className="text-faint hover:text-txt">✕</button></div>
+            <div className="space-y-2.5 text-xs leading-relaxed text-dim">
+              <p><b className="text-txt">Titolare del trattamento.</b> {name}{structure?.email ? ` · ${structure.email}` : ""}{structure?.phone ? ` · ${structure.phone}` : ""}.</p>
+              <p><b className="text-txt">Dati raccolti.</b> Quando prenoti o ti iscrivi alla newsletter raccogliamo i dati che ci fornisci: nome, cognome, email, telefono ed eventuali richieste. Non raccogliamo dati di pagamento su questo sito.</p>
+              <p><b className="text-txt">Finalità e base giuridica.</b> I dati servono a gestire la tua prenotazione (esecuzione del contratto) e, con il tuo consenso, a inviarti offerte e comunicazioni.</p>
+              <p><b className="text-txt">Conservazione.</b> Conserviamo i dati per il tempo necessario alle finalità indicate e agli obblighi di legge, poi li cancelliamo o anonimizziamo.</p>
+              <p><b className="text-txt">I tuoi diritti.</b> Puoi chiedere accesso, rettifica, cancellazione, limitazione o portabilità dei dati e revocare il consenso, scrivendo ai contatti del titolare qui sopra.</p>
+              <p><b className="text-txt">Cookie.</b> Il sito usa solo cookie tecnici necessari al funzionamento; nessun cookie di profilazione di terze parti.</p>
+              <p className="text-faint">Modello base: fai verificare l&apos;informativa definitiva a un consulente prima della pubblicazione ufficiale.</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
