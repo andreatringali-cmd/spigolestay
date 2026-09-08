@@ -18,6 +18,7 @@ const META: Record<ActivityType, { label: string; color: string }> = {
   payment: { label: "Pagamento", color: "#4F46E5" },
   login: { label: "Accesso", color: "#957A66" },
   message: { label: "Messaggio", color: "#25A0A0" },
+  config: { label: "Configurazione", color: "#5E7C8B" },
 };
 
 export default function RegistroPage() {

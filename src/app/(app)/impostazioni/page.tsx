@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
-import { resetAll } from "@/lib/onboarding";
 import { useTheme } from "@/lib/theme";
 import { useLang } from "@/lib/i18n";
 import Icon from "@/components/Icon";
@@ -44,8 +43,6 @@ export default function ImpostazioniPage() {
     };
     r.readAsText(file);
   };
-  const doReset = async () => { if (!(await ask({ title: t("Reset dati"), message: t("Cancellare tutti i dati e tornare ai dati di esempio? Operazione irreversibile."), danger: true, confirmLabel: t("Reset") }))) return; keysOf().forEach((k) => localStorage.removeItem(k)); location.reload(); };
-  const doFirstAccess = async () => { if (!(await ask({ title: t("Ricomincia da zero"), message: t("Cancella tutti i dati e riparte dalla configurazione iniziale (primo accesso), con struttura e camere da impostare. Operazione irreversibile."), danger: true, confirmLabel: t("Ricomincia") }))) return; resetAll(); };
 
   return (
     <div>
@@ -100,16 +97,8 @@ export default function ImpostazioniPage() {
           <button onClick={doExport} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">↓ {t("Esporta backup (.json)")}</button>
           <button onClick={() => fileRef.current?.click()} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">↑ {t("Importa backup")}</button>
           <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => doImport(e.target.files?.[0])} />
-          <button onClick={doReset} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Reset ai dati di esempio")}</button>
         </div>
         {msg && <p className="mt-2 text-xs font-medium text-focus">{msg}</p>}
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3" style={{ borderColor: "color-mix(in srgb, var(--err) 30%, var(--line))" }}>
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-txt">🔄 {t("Ricomincia da zero (primo accesso)")}</div>
-            <div className="text-[11px] text-faint">{t("Svuota tutto e riparte dalla configurazione guidata: profilo, struttura, camere, piano.")}</div>
-          </div>
-          <button onClick={doFirstAccess} className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--err)" }}>{t("Ricomincia")}</button>
-        </div>
       </Card>
 
       <p className="mt-3 text-xs text-faint">{t("Dimostrativo. Le preferenze saranno salvate per utente sul backend; il backup include tutti i dati locali dell'app.")}</p>

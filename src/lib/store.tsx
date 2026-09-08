@@ -9,7 +9,7 @@ import { STRUCTURES, ROOM_TYPES, UNITS } from "./mock-data";
 import { playSound } from "./sound";
 import { loadUsers } from "./users";
 
-export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "quote" | "payment" | "login" | "message";
+export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "quote" | "payment" | "login" | "message" | "config";
 export interface Activity {
   id: string;
   ts: number; // epoch ms
@@ -219,11 +219,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       activeStructureId,
       setActiveStructure: (id) => { setActiveStructureId(id); try { localStorage.setItem("spigolestay:activestruct", id); } catch {} },
 
-      addStructure: (s) => { const id = uid(); setStructures((prev) => [...prev, { id, city: "Siracusa", checkOutBy: "10:30", ...s }]); return id; },
+      addStructure: (s) => { const id = uid(); setStructures((prev) => [...prev, { id, city: "Siracusa", checkOutBy: "10:30", ...s }]); logAct("config", `Struttura creata — ${s.name}`); return id; },
       updateStructure: (id, patch) => setStructures((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x))),
-      addRoomType: (rt) => { const id = uid(); setRoomTypes((prev) => [...prev, { id, ...rt }]); return id; },
+      addRoomType: (rt) => { const id = uid(); setRoomTypes((prev) => [...prev, { id, ...rt }]); logAct("config", `Tipologia creata — ${rt.name}`); return id; },
       updateRoomType: (id, patch) => setRoomTypes((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x))),
-      addUnit: (u) => { const id = uid(); setUnits((prev) => [...prev, { id, ...u }]); return id; },
+      addUnit: (u) => { const id = uid(); setUnits((prev) => [...prev, { id, ...u }]); logAct("config", `Camera aggiunta — ${u.name}`); return id; },
       updateUnit: (id, patch) => setUnits((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x))),
       setUnitRoomType: (unitId, roomTypeId) =>
         setUnits((prev) => prev.map((u) => (u.id === unitId ? { ...u, roomTypeId } : u))),
@@ -231,23 +231,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setUnits((prev) => prev.map((u) => (u.id === unitId ? { ...u, outOfService: !u.outOfService } : u))),
 
       deleteStructure: (id) => {
+        const nm = structures.find((s) => s.id === id)?.name;
         const rtIds = roomTypes.filter((rt) => rt.structureId === id).map((rt) => rt.id);
         setBookings((prev) => prev.filter((b) => b.structureId !== id));
         setUnits((prev) => prev.filter((u) => u.structureId !== id));
         setRoomTypes((prev) => prev.filter((rt) => rt.structureId !== id));
         setStructures((prev) => prev.filter((s) => s.id !== id));
+        logAct("config", `Struttura eliminata${nm ? " — " + nm : ""}`);
         void rtIds;
       },
       deleteRoomType: (id) => {
+        const nm = roomTypes.find((rt) => rt.id === id)?.name;
         const unitIds = units.filter((u) => u.roomTypeId === id).map((u) => u.id);
         setBookings((prev) => prev.filter((b) => b.roomTypeId !== id && !unitIds.includes(b.unitId ?? "")));
         setUnits((prev) => prev.filter((u) => u.roomTypeId !== id));
         setRoomTypes((prev) => prev.filter((rt) => rt.id !== id));
+        logAct("config", `Tipologia eliminata${nm ? " — " + nm : ""}`);
       },
       deleteUnit: (id) => {
+        const nm = units.find((u) => u.id === id)?.name;
         // Le prenotazioni dell'unità restano ma tornano "da assegnare".
         setBookings((prev) => prev.map((b) => (b.unitId === id ? { ...b, unitId: null } : b)));
         setUnits((prev) => prev.filter((u) => u.id !== id));
+        logAct("config", `Camera eliminata${nm ? " — " + nm : ""}`);
       },
 
       addGuest: (g) => {

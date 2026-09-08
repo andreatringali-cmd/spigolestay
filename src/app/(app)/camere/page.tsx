@@ -154,7 +154,7 @@ export default function CamerePage() {
             return (
               <tr key={u.id} id={`unit-${u.id}`} onClick={() => setRoomModal({ structureId: s.id, unit: u })} className={`cursor-pointer border-b border-line last:border-0 hover:bg-wash ${sel.has(u.id) ? "bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)]" : highlight === u.id ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : ""}`}>
                 <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel.has(u.id)} onChange={() => toggleSel(u.id)} className="h-4 w-4 accent-[color:var(--focus)]" /></td>
-                <td className="px-3 py-2.5"><div className="flex items-center gap-2"><span className="h-6 w-1.5 rounded-full" style={{ backgroundColor: color }} /><span className={`font-medium ${u.outOfService ? "text-faint line-through" : "text-txt"}`}>{u.name}</span></div></td>
+                <td className="px-3 py-2.5"><div className="flex min-w-0 items-center gap-2"><span className="h-6 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} /><span className={`truncate font-medium ${u.outOfService ? "text-faint line-through" : "text-txt"}`}>{u.name}</span></div></td>
                 <td className="px-3 py-2.5 font-mono text-xs text-dim">{u.code || "—"}</td>
                 {showType && <td className="px-3 py-2.5 text-dim">{rt?.name ?? "—"}</td>}
                 <td className="px-3 py-2.5 text-dim">{u.floor || "—"}</td>
@@ -238,7 +238,7 @@ export default function CamerePage() {
                         </div>
                         {open && (
                           <div className="overflow-x-auto">
-                            <table className="w-full min-w-[820px] text-sm">
+                            <table className="w-full min-w-[820px] table-fixed text-sm"><colgroup><col style={{ width: 40 }} /><col style={{ width: "26%" }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} /><col style={{ width: "18%" }} /><col style={{ width: "12%" }} /><col style={{ width: 44 }} /></colgroup>
                               <thead>
                                 <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
                                   <th className="px-2 py-2"><input type="checkbox" checked={g.length > 0 && g.every((u) => sel.has(u.id))} onChange={(e) => setManySel(g.map((u) => u.id), e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" title={t("Seleziona tutte")} /></th>
@@ -266,7 +266,7 @@ export default function CamerePage() {
                       <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
                         <div className="border-b border-line px-3 py-2.5 text-sm font-semibold text-dim">{t("Altre camere (senza tipologia)")}</div>
                         <div className="overflow-x-auto">
-                          <table className="w-full min-w-[560px] text-sm">
+                          <table className="w-full min-w-[820px] table-fixed text-sm"><colgroup><col style={{ width: 40 }} /><col style={{ width: "26%" }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} /><col style={{ width: "18%" }} /><col style={{ width: "12%" }} /><col style={{ width: 44 }} /></colgroup>
                             <thead>
                               <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
                                 <th className="px-2 py-2"><input type="checkbox" checked={orphans.length > 0 && orphans.every((u) => sel.has(u.id))} onChange={(e) => setManySel(orphans.map((u) => u.id), e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" title={t("Seleziona tutte")} /></th>

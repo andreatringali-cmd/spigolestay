@@ -11,6 +11,7 @@ import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import ImageUploader from "@/components/ImageUploader";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { amenityIcon } from "@/lib/amenities";
 import { useLang } from "@/lib/i18n";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
@@ -190,7 +191,7 @@ export default function TipologiaSchedaPage() {
 
           <Card>
             <SectionTitle>{t("Dotazioni della camera")}</SectionTitle>
-            <div className="flex flex-wrap gap-1.5">{ROOM_AMENITIES.map((a) => <button key={a} onClick={() => toggleAmen(a)} className={`rounded-full border px-2.5 py-1 text-xs transition ${(f.amenities ?? []).includes(a) ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(a)}</button>)}</div>
+            <div className="flex flex-wrap gap-1.5">{ROOM_AMENITIES.map((a) => <button key={a} onClick={() => toggleAmen(a)} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition ${(f.amenities ?? []).includes(a) ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}><span className="[&>svg]:h-4 [&>svg]:w-4">{amenityIcon(a)}</span>{t(a)}</button>)}</div>
           </Card>
         </div>
 
