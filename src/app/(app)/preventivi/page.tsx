@@ -737,16 +737,24 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               <div className="mt-3 text-xs font-medium text-dim">{t("Messaggio di conferma")} ({LANGS.find(([l]) => l === q.lang)?.[1]})</div>
               <textarea readOnly value={confMsg} rows={9} className="mt-1 w-full resize-none rounded-lg border border-line bg-paper p-3 text-xs text-txt" />
 
-              {confirmed && (
-                <div className="mt-3 rounded-lg px-3 py-2 text-sm font-medium text-[color:var(--ok)]" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)" }}>{t("Prenotazione creata")} ✓ — {t("invia la conferma all'ospite:")}</div>
+              {confirmed ? (
+                <div className="mt-3 rounded-xl p-3" style={{ border: "1px solid color-mix(in srgb, var(--ok) 45%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 8%, transparent)" }}>
+                  <div className="flex items-center gap-1.5 text-sm font-semibold text-[color:var(--ok)]"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>{t("Prenotazione creata")}</div>
+                  <div className="mt-0.5 text-xs text-dim">{t("Invia la conferma all'ospite:")}</div>
+                  <div className="mt-2 flex flex-nowrap items-center gap-1.5">
+                    <a href={mail} className={`whitespace-nowrap rounded-lg border border-line bg-surface px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash ${q.email ? "" : "pointer-events-none opacity-40"}`}>{t("Email")}</a>
+                    <a href={wa} target="_blank" rel="noreferrer" className={`whitespace-nowrap rounded-lg px-2.5 py-2 text-xs font-semibold text-white ${digits ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
+                    <button onClick={() => navigator.clipboard?.writeText(confMsg)} className="whitespace-nowrap rounded-lg border border-line bg-surface px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash">{t("Copia")}</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3 flex flex-nowrap items-center gap-1.5">
+                  <button onClick={() => confirmBooking(false)} className="whitespace-nowrap rounded-lg bg-focus px-2.5 py-2 text-xs font-semibold text-white hover:opacity-90">{t("Crea prenotazione")}</button>
+                  <a href={mail} className={`whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash ${q.email ? "" : "pointer-events-none opacity-40"}`}>{t("Email")}</a>
+                  <a href={wa} target="_blank" rel="noreferrer" className={`whitespace-nowrap rounded-lg px-2.5 py-2 text-xs font-semibold text-white ${digits ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
+                  <button onClick={() => navigator.clipboard?.writeText(confMsg)} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash">{t("Copia")}</button>
+                </div>
               )}
-
-              <div className="mt-3 flex flex-nowrap items-center gap-1.5">
-                {!confirmed && <button onClick={() => confirmBooking(false)} className="whitespace-nowrap rounded-lg bg-focus px-2.5 py-2 text-xs font-semibold text-white hover:opacity-90">{t("Crea prenotazione")}</button>}
-                <a href={mail} className={`whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash ${q.email ? "" : "pointer-events-none opacity-40"}`}>{t("Email")}</a>
-                <a href={wa} target="_blank" rel="noreferrer" className={`whitespace-nowrap rounded-lg px-2.5 py-2 text-xs font-semibold text-white ${digits ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
-                <button onClick={() => navigator.clipboard?.writeText(confMsg)} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash">{t("Copia")}</button>
-              </div>
             </div>
           </div>
         );
