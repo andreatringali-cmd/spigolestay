@@ -104,7 +104,7 @@ tfoot td{border-top:2px solid #e6e8ec;font-weight:700}
 
       <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         <Card className="!p-4"><div className="text-xs text-dim">{t("Piano attivo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{plan.name}</div></Card>
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Canone mensile")}</div><div className="mt-0.5 font-mono text-lg font-bold text-txt">{eur(plan.price)}</div></Card>
+        <Card className="!p-4"><div className="text-xs text-dim">{t("Canone mensile")}</div><div className="mt-0.5 font-mono text-lg font-bold text-txt">{eur(plan.price)} <span className="text-[11px] font-normal text-faint">{t("IVA inclusa")}</span></div><div className="mt-0.5 text-[11px] text-faint">{t("Netto")} {eur(Math.round((plan.price / (1 + VAT)) * 100) / 100)} + {t("IVA")} 22% {eur(Math.round((plan.price - plan.price / (1 + VAT)) * 100) / 100)}</div></Card>
         <Card className="!p-4"><div className="text-xs text-dim">{t("Prossimo rinnovo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{fmtMonth(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1))}</div></Card>
       </div>
 

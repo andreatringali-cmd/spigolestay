@@ -195,6 +195,7 @@ export default function AbbonamentoPage() {
               </div>
               <div className="mt-0.5 text-xs text-dim">{t(tr.tagline)}</div>
               <div className="mt-3 font-mono text-3xl font-bold text-txt">{eur(price)}<span className="text-xs font-normal text-dim">{t("/mese")}</span></div>
+              <div className="text-[11px] text-faint">{t("IVA inclusa")} · {t("netto")} {eur(Math.round((price / 1.22) * 100) / 100)} + {t("IVA")} {eur(Math.round((price - price / 1.22) * 100) / 100)}</div>
               <div className="mt-1 text-[11px] text-faint">{tr.structures === 1 ? t("1 struttura") : `${t("fino a")} ${tr.structures} ${t("strutture")}`} · {t("6 camere incluse per struttura")}</div>
               <ul className="mt-3 flex-1 space-y-1 text-[12px] text-dim">
                 {tr.key !== "basic" && <li className="font-semibold text-txt">{t("Tutto")} {TIERS[TIERS.findIndex((x) => x.key === tr.key) - 1].name}, {t("più:")}</li>}
