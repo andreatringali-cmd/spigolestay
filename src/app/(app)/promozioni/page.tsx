@@ -5,7 +5,7 @@ import { useData } from "@/lib/store";
 import { toISO, parseISO } from "@/lib/dates";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
-import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, promoMailto } from "@/lib/promos";
+import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, promoMailto, DEFAULT_PROMOS } from "@/lib/promos";
 
 type Segment = "consenso" | "abituali" | "lapsed" | "tutti";
 interface SendLog { id: string; promoName: string; date: string; recipients: number; segment: Segment; }
@@ -27,7 +27,15 @@ export default function PromozioniPage() {
   // ── Libreria promo (salvate) ──
   const [promos, setPromos] = useState<Promo[]>([]);
   const [logs, setLogs] = useState<SendLog[]>([]);
-  useEffect(() => { setPromos(loadPromos()); try { const r = localStorage.getItem("spigolestay:promolog"); if (r) setLogs(JSON.parse(r)); } catch {} }, []);
+  useEffect(() => {
+    let list = loadPromos();
+    try {
+      const seeded = localStorage.getItem("spigolestay:promosseeded") === "1";
+      if (!seeded) { if (list.length === 0) { list = DEFAULT_PROMOS; savePromos(list); } localStorage.setItem("spigolestay:promosseeded", "1"); }
+    } catch {}
+    setPromos(list);
+    try { const r = localStorage.getItem("spigolestay:promolog"); if (r) setLogs(JSON.parse(r)); } catch {}
+  }, []);
   const persistPromos = (n: Promo[]) => { setPromos(n); savePromos(n); };
   const persistLogs = (n: SendLog[]) => { setLogs(n); try { localStorage.setItem("spigolestay:promolog", JSON.stringify(n)); } catch {} };
 

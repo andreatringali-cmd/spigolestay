@@ -145,6 +145,13 @@ function Site() {
   const [galFilter, setGalFilter] = useState("all");
   const galLabels = useMemo(() => Array.from(new Set(gallery.map((g) => g.label))), [gallery]);
   const galItems = useMemo(() => (galFilter === "all" ? gallery : gallery.filter((g) => g.label === galFilter)), [gallery, galFilter]);
+  // Carosello automatico: cambia foto ogni 5 secondi.
+  useEffect(() => {
+    const len = galItems.length;
+    if (len <= 1) return;
+    const id = setInterval(() => setGi((g) => (g + 1) % len), 5000);
+    return () => clearInterval(id);
+  }, [galItems.length]);
 
   // Offerte attive (modulo Promozioni).
   const offers = useMemo(() => { try { return loadPromos().filter((p) => p.discountPct && p.code); } catch { return []; } }, []);
@@ -339,10 +346,12 @@ function Site() {
             <h2 className="mb-3 font-display text-xl font-bold text-txt">{T("Offerte")}</h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {offers.map((p) => (
-                <div key={p.id} className="rounded-xl border p-4" style={{ borderColor: `color-mix(in srgb, ${accent} 40%, var(--line))`, backgroundColor: `color-mix(in srgb, ${accent} 6%, transparent)` }}>
+                <div key={p.id} className="flex flex-col rounded-xl border p-4" style={{ borderColor: `color-mix(in srgb, ${accent} 40%, var(--line))`, backgroundColor: `color-mix(in srgb, ${accent} 6%, transparent)` }}>
                   <div className="flex items-center gap-2"><span className="rounded-full px-2 py-0.5 text-sm font-bold text-white" style={{ backgroundColor: accent }}>−{p.discountPct}%</span><span className="font-semibold text-txt">{p.name || "Offerta"}</span></div>
-                  <div className="mt-2 text-sm text-dim">Codice: <b className="font-mono text-txt">{p.code}</b></div>
-                  <button onClick={() => go()} className="mt-2 text-sm font-medium" style={{ color: accent }}>Prenota con l'offerta →</button>
+                  {p.description && <p className="mt-1.5 text-sm text-dim">{p.description}</p>}
+                  {(p.features ?? []).length > 0 && <ul className="mt-2 flex-1 space-y-1 text-[13px] text-dim">{(p.features ?? []).map((f, i) => <li key={i} className="flex items-start gap-1.5"><span style={{ color: accent }}>✓</span>{f}</li>)}</ul>}
+                  <div className="mt-2 text-xs text-dim">{T("Codice")}: <b className="font-mono text-txt">{p.code}</b></div>
+                  <button onClick={() => go()} className="mt-2 text-sm font-medium" style={{ color: accent }}>{T("Prenota")} →</button>
                 </div>
               ))}
             </div>
