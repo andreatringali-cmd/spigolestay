@@ -67,6 +67,8 @@ interface DataContextValue {
   // Azioni prenotazioni / ospiti
   addGuest: (g: { fullName?: string; firstName?: string; lastName?: string; email?: string; phone?: string; country?: string }) => string;
   updateGuest: (id: string, patch: Partial<Guest>) => void;
+  deleteGuest: (id: string) => void;
+  mergeGuests: (keepId: string, dropIds: string[]) => void; // accorpa doppioni: sposta le prenotazioni e rimuove le voci duplicate
   addBooking: (b: Omit<Booking, "id">) => void;
   updateBooking: (id: string, patch: Partial<Booking>) => void;
   moveBooking: (id: string, to: { unitId: string; checkIn: string; checkOut: string }) => void;
@@ -263,6 +265,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return id;
       },
       updateGuest: (id, patch) => setGuests((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g))),
+      deleteGuest: (id) => {
+        setBookings((prev) => prev.map((b) => (b.guestId === id ? { ...b, guestId: "" } : b)));
+        setGuests((prev) => prev.filter((g) => g.id !== id));
+      },
+      mergeGuests: (keepId, dropIds) => {
+        const drop = new Set(dropIds.filter((d) => d && d !== keepId));
+        if (drop.size === 0) return;
+        setBookings((prev) => prev.map((b) => (drop.has(b.guestId) ? { ...b, guestId: keepId } : b)));
+        setGuests((prev) => prev.filter((g) => !drop.has(g.id)));
+        logAct("config", `Anagrafica: ${drop.size} doppione/i uniti`);
+      },
       addBooking: (b) => {
         // Codice leggibile progressivo per anno di arrivo: XEN-2026-0001.
         const year = (b.checkIn || new Date().toISOString()).slice(0, 4);

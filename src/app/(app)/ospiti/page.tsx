@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { AV_COLORS, initials } from "@/lib/users";
 import { useLang } from "@/lib/i18n";
 import { PageHeader } from "@/components/ui";
@@ -19,7 +20,29 @@ type SortKey = "name" | "stays" | "nights" | "avg" | "spent" | "comm" | "last";
 export default function OspitiPage() {
   const router = useRouter();
   const { t } = useLang();
-  const { guests, bookings, structures, activeStructureId } = useData();
+  const { guests, bookings, structures, activeStructureId, mergeGuests, updateGuest } = useData();
+  const ask = useConfirm();
+  // Rileva doppioni: stessa email, oppure stesso nome completo.
+  const dupGroups = useMemo(() => {
+    const nrm = (s?: string) => (s ?? "").trim().toLowerCase();
+    const byKey = new Map<string, typeof guests>();
+    guests.forEach((g) => { const key = nrm(g.email) || nrm(g.fullName); if (!key) return; const arr = byKey.get(key) ?? []; arr.push(g); byKey.set(key, arr); });
+    return [...byKey.values()].filter((a) => a.length > 1);
+  }, [guests]);
+  const dupCount = dupGroups.reduce((a, g) => a + g.length - 1, 0);
+  const mergeDuplicates = async () => {
+    if (!dupCount) return;
+    if (!(await ask({ title: t("Unisci duplicati"), message: `${t("Trovati")} ${dupCount} ${t("ospiti duplicati. Li unisco in un'unica voce spostando tutte le prenotazioni nello storico?")}`, confirmLabel: t("Unisci") }))) return;
+    const fields = ["email", "phone", "country", "firstName", "lastName", "birthDate", "birthPlace", "citizenship", "docType", "docNumber", "docPlace", "address"] as const;
+    dupGroups.forEach((group) => {
+      const bookCount = (id: string) => bookings.filter((b) => b.guestId === id).length;
+      const keeper = [...group].sort((a, b) => bookCount(b.id) - bookCount(a.id))[0];
+      const merged: Record<string, unknown> = { ...keeper };
+      group.forEach((g) => fields.forEach((k) => { if (!merged[k] && g[k]) merged[k] = g[k]; }));
+      updateGuest(keeper.id, merged);
+      mergeGuests(keeper.id, group.filter((g) => g.id !== keeper.id).map((g) => g.id));
+    });
+  };
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "stays", dir: "desc" });
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -86,7 +109,9 @@ export default function OspitiPage() {
 
   return (
     <div>
-      <PageHeader title={t("Ospiti")} subtitle={`${guests.length} ${t("anagrafiche")}`} />
+      <PageHeader title={t("Ospiti")} subtitle={`${guests.length} ${t("anagrafiche")}`}
+        actions={dupCount > 0 ? <button onClick={mergeDuplicates} className="rounded-lg border border-[color:color-mix(in_srgb,var(--warn)_50%,var(--line))] bg-[color:color-mix(in_srgb,var(--warn)_10%,transparent)] px-3 py-2 text-sm font-semibold text-txt hover:bg-[color:color-mix(in_srgb,var(--warn)_18%,transparent)]">⤳ {t("Unisci duplicati")} ({dupCount})</button> : undefined}
+      />
 
       {/* Card statistiche */}
       <div className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">

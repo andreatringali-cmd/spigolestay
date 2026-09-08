@@ -74,7 +74,7 @@ interface Preventivo {
 
 export default function PreventiviPage() {
   const { t } = useLang();
-  const { structures, roomTypes, units, bookings, rateOverrides, addGuest, addBooking, addActivity, activeStructureId } = useData();
+  const { structures, roomTypes, units, bookings, guests, rateOverrides, addGuest, updateGuest, addBooking, addActivity, activeStructureId } = useData();
   const lockedStructure = activeStructureId !== "all"; // struttura scelta in alto → niente scelta nel preventivo
 
   const [lastName, setLastName] = useState("");
@@ -423,7 +423,22 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
   const confirmBooking = () => {
     if (!confirming) return;
     const { q, pct } = confirming;
-    const gid = addGuest({ fullName: q.name, firstName: q.name.split(" ")[0], lastName: q.name.split(" ").slice(1).join(" "), email: q.email, phone: q.phone });
+    // Evita doppioni in anagrafica: riusa un ospite esistente (stessa email, oppure stesso nome con
+    // telefono compatibile) così resta una sola voce con lo storico delle prenotazioni.
+    const norm = (s?: string) => (s ?? "").trim().toLowerCase();
+    const fn = q.name.split(" ")[0], ln = q.name.split(" ").slice(1).join(" ");
+    const found = guests.find((g) => {
+      if (norm(q.email) && norm(g.email) === norm(q.email)) return true;
+      if (norm(q.name) && norm(g.fullName) === norm(q.name) && (!norm(g.phone) || !norm(q.phone) || norm(g.phone) === norm(q.phone))) return true;
+      return false;
+    });
+    let gid: string;
+    if (found) {
+      gid = found.id;
+      updateGuest(found.id, { fullName: found.fullName || q.name, firstName: found.firstName || fn, lastName: found.lastName || ln, email: found.email || q.email || undefined, phone: found.phone || q.phone || undefined });
+    } else {
+      gid = addGuest({ fullName: q.name, firstName: fn, lastName: ln, email: q.email, phone: q.phone });
+    }
     // Espande le righe camera in singole prenotazioni (fallback alla vecchia struttura a camera singola).
     const lines = (q.roomLines && q.roomLines.length) ? q.roomLines : [{ roomTypeId: q.roomTypeId, qty: q.rooms ?? 1, price: q.price }];
     const flat: { roomTypeId: string }[] = [];

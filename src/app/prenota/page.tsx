@@ -32,7 +32,7 @@ export default function PrenotaPage() {
 }
 
 function Engine() {
-  const { structures, roomTypes, units, bookings, rateOverrides, addGuest, addBooking, addActivity, getStructure } = useData();
+  const { structures, roomTypes, units, bookings, guests, rateOverrides, addGuest, updateGuest, addBooking, addActivity, getStructure } = useData();
 
   // Config salvata (piani, weekend) — fallback ai default.
   const plans = useMemo<Plan[]>(() => { try { const p = localStorage.getItem("spigolestay:rateplans"); if (p) return JSON.parse(p).filter((x: Plan) => x.id !== "flex"); } catch {} return DEFAULT_PLANS; }, []);
@@ -115,7 +115,21 @@ function Engine() {
   const confirm = () => {
     if (!selRt || !guestValid) return;
     const unit = availUnits(selRt)[0];
-    const gid = addGuest({ firstName: guest.firstName.trim(), lastName: guest.lastName.trim(), email: guest.email.trim(), phone: guest.phone.trim(), country: guest.country });
+    // Evita doppioni in anagrafica: riusa l'ospite esistente (stessa email, o stesso nome con telefono compatibile).
+    const norm = (s?: string) => (s ?? "").trim().toLowerCase();
+    const full = `${guest.firstName.trim()} ${guest.lastName.trim()}`.trim();
+    const found = guests.find((g) => {
+      if (norm(guest.email) && norm(g.email) === norm(guest.email)) return true;
+      if (norm(full) && norm(g.fullName) === norm(full) && (!norm(g.phone) || !norm(guest.phone) || norm(g.phone) === norm(guest.phone))) return true;
+      return false;
+    });
+    let gid: string;
+    if (found) {
+      gid = found.id;
+      updateGuest(found.id, { firstName: found.firstName || guest.firstName.trim(), lastName: found.lastName || guest.lastName.trim(), fullName: found.fullName || full, email: found.email || guest.email.trim() || undefined, phone: found.phone || guest.phone.trim() || undefined, country: found.country || guest.country });
+    } else {
+      gid = addGuest({ firstName: guest.firstName.trim(), lastName: guest.lastName.trim(), email: guest.email.trim(), phone: guest.phone.trim(), country: guest.country });
+    }
     const chosenExtras = extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => `${extraQty[x.id]}× ${x.name}`);
     const note = [`Sito diretto · ${selPlan?.name}`, appliedPromo ? `Promo ${appliedPromo.code} (−${appliedPromo.pct}%)` : "", chosenExtras.length ? `Extra: ${chosenExtras.join(", ")}` : "", guest.arrival !== "Non lo so" ? `Arrivo ~${guest.arrival}` : "", guest.requests.trim()].filter(Boolean).join(" · ");
     addBooking({ structureId, roomTypeId: selRt.id, unitId: unit?.id ?? null, guestId: gid, channel: "direct", status: "confirmed", checkIn, checkOut, adults, children, childAges: childAges.length ? childAges : undefined, total: accommodation, cleaningFee: 0, paid: deposit, cityTaxPaid: false, note });
