@@ -39,7 +39,7 @@ export default function StrutturaSchedaPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const isNew = params.id === "nuovo";
-  const { structures, roomTypes, units, addStructure, updateStructure, setActiveStructure } = useData();
+  const { structures, roomTypes, units, addStructure, updateStructure, setActiveStructure, addActivity } = useData();
   const { t } = useLang();
   const { moduleOn, user } = useAccess();
   const { user: authUser } = useAuth();
@@ -97,7 +97,7 @@ export default function StrutturaSchedaPage() {
     const patch: Partial<Structure> = { ...f };
     delete (patch as { id?: string }).id;
     if (isNew) { const sid = addStructure({ name: f.name.trim(), groupName: (f.groupName || f.name).trim(), city: f.city, address: f.address }); updateStructure(sid, patch); }
-    else updateStructure(params.id, patch);
+    else { updateStructure(params.id, patch); addActivity("config", `Struttura modificata — ${f.name.trim()}`); }
     router.push("/strutture");
   };
 

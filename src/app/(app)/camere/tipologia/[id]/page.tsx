@@ -31,7 +31,7 @@ export default function TipologiaSchedaPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const sp = useSearchParams();
-  const { structures, roomTypes, units, bookings, addRoomType, updateRoomType, deleteRoomType, addUnit, updateUnit, deleteUnit } = useData();
+  const { structures, roomTypes, units, bookings, addRoomType, updateRoomType, deleteRoomType, addUnit, updateUnit, deleteUnit, addActivity } = useData();
   const { t } = useLang();
   const ask = useConfirm();
   const isNew = params.id === "nuovo";
@@ -59,7 +59,7 @@ export default function TipologiaSchedaPage() {
     const patch: Partial<RoomType> = { ...f };
     delete (patch as { id?: string }).id;
     if (isNew) { const id = addRoomType({ structureId, name: f.name!.trim(), beds: f.beds ?? 1, basePrice: f.basePrice ?? 0 }); updateRoomType(id, patch); }
-    else updateRoomType(params.id, patch);
+    else { updateRoomType(params.id, patch); addActivity("config", `Tipologia modificata — ${f.name!.trim()}`); }
     router.push("/camere");
   };
   const remove = async () => { if (existing && (await ask({ title: t("Elimina tipologia"), message: `${t("Eliminare la tipologia")} "${existing.name}" ${t("e le sue")} ${nUnits} ${t("camere?")}`, danger: true, confirmLabel: t("Elimina") }))) { deleteRoomType(existing.id); router.push("/camere"); } };

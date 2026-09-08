@@ -24,11 +24,23 @@ function relTime(ts: number, t: (s: string) => string): string {
   const d = Math.floor(h / 24); return `${d} ${t("g fa")}`;
 }
 
+const SEEN_KEY = "spigolestay:activityseen";
+
 export default function ActivityLog() {
   const { activities } = useData();
   const { t } = useLang();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  // "Non letti" = attività più recenti dell'ultima apertura del pannello (persistito nel browser).
+  const [seenTs, setSeenTs] = useState<number>(0);
+  useEffect(() => { try { setSeenTs(Number(localStorage.getItem(SEEN_KEY)) || 0); } catch {} }, []);
+  const unread = activities.filter((a) => a.ts > seenTs).length;
+  const markSeen = () => {
+    const now = Date.now();
+    setSeenTs(now);
+    try { localStorage.setItem(SEEN_KEY, String(now)); } catch {}
+  };
+  const toggle = () => setOpen((o) => { if (!o) markSeen(); return !o; });
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", h);
@@ -37,12 +49,12 @@ export default function ActivityLog() {
 
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => setOpen((o) => !o)} title={t("Registro attività")} aria-label={t("Registro attività")} className="relative grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt">
+      <button onClick={toggle} title={t("Registro attività")} aria-label={t("Registro attività")} className="relative grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3 2" />
         </svg>
-        {activities.length > 0 && (
-          <span className="absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-focus px-1 text-[9px] font-bold text-white">{activities.length > 99 ? "99+" : activities.length}</span>
+        {unread > 0 && (
+          <span className="absolute -right-1 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-focus px-1 text-[9px] font-bold text-white">{unread > 99 ? "99+" : unread}</span>
         )}
       </button>
       {open && (

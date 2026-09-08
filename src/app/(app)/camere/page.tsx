@@ -39,7 +39,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 export default function CamerePage() {
   const router = useRouter();
   const { t } = useLang();
-  const { structures, roomTypes, units, activeStructureId, updateUnit } = useData();
+  const { structures, roomTypes, units, activeStructureId, updateUnit, addActivity } = useData();
   const ask = useConfirm();
   const [localS, setLocalS] = useState("all");
   const [highlight, setHighlight] = useState<string | null>(null);
@@ -65,11 +65,13 @@ export default function CamerePage() {
     if (bulkFloor.trim()) patch.floor = bulkFloor.trim();
     if (bulkView) patch.view = bulkView;
     if (Object.keys(patch).length === 0 && bulkAmen.size === 0) return;
+    const n = sel.size;
     sel.forEach((id) => {
       const p: Partial<Unit> = { ...patch };
       if (bulkAmen.size) { const u = units.find((x) => x.id === id); p.amenities = Array.from(new Set([...(u?.amenities ?? []), ...bulkAmen])); }
       updateUnit(id, p);
     });
+    if (n > 0) addActivity("config", `Camere aggiornate in blocco · ${n}`);
     clearSel(); setBulkFloor(""); setBulkView(""); setBulkAmen(new Set()); setShowAmen(false);
   };
   const toggleSort = (k: string) => { if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc")); else { setSortKey(k); setSortDir("asc"); } };
@@ -322,7 +324,7 @@ export default function CamerePage() {
 }
 
 function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?: Unit; onClose: () => void }) {
-  const { roomTypes, units, addUnit, updateUnit, deleteUnit, setActiveStructure } = useData();
+  const { roomTypes, units, addUnit, updateUnit, deleteUnit, setActiveStructure, addActivity } = useData();
   const { t } = useLang();
   const ask = useConfirm();
   const router = useRouter();
@@ -358,7 +360,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
   const save = () => {
     if (!f.name?.trim() || !f.roomTypeId) return;
     const patch: Partial<Unit> = { name: f.name.trim(), roomTypeId: f.roomTypeId, code: codeOf(f.name, f.roomTypeId), floor: f.floor, view: f.view, accessInfo: f.accessInfo, notes: f.notes, outOfService: f.outOfService, oosReason: f.outOfService ? f.oosReason : undefined, photos: f.photos, amenities: f.amenities, bedConfig: f.bedConfig, size: f.size };
-    if (unit) updateUnit(unit.id, patch);
+    if (unit) { updateUnit(unit.id, patch); addActivity("config", `Camera modificata — ${patch.name}`); }
     else { const id = addUnit({ structureId, roomTypeId: f.roomTypeId, name: patch.name! }); updateUnit(id, patch); }
     onClose();
   };
