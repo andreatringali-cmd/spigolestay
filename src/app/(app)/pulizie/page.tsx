@@ -562,13 +562,11 @@ export default function PuliziePage() {
         {scopedStructures.map((s) => {
           const list = rooms.filter((r) => r.structure.id === s.id && (r.oos ? actionFilter === "tutte" : matchAction(r.action)));
           if (actionFilter !== "tutte" && list.length === 0) return null;
-          const sColor = structColorOf(s.id);
           const sToClean = list.filter((r) => !r.oos && r.action !== "niente").length;
           return (
             <div key={s.id} className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
-              <div className="flex items-center gap-2 px-3 py-2" style={{ backgroundColor: `color-mix(in srgb, ${sColor} 10%, var(--surface))`, borderBottom: `2px solid ${sColor}` }}>
-                <span className="h-3.5 w-3.5 rounded-md" style={{ backgroundColor: sColor }} />
-                <span className="text-sm font-bold uppercase tracking-wide" style={{ color: sColor }}>{s.name}</span>
+              <div className="flex items-center gap-2 border-b border-line bg-wash px-3 py-2">
+                <span className="text-sm font-bold uppercase tracking-wide text-txt">{s.name}</span>
                 <span className="text-xs text-faint">· {sToClean} {t("da fare")}</span>
               </div>
               <div className="p-3">
