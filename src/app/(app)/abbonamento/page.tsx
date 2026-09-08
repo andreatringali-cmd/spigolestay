@@ -116,16 +116,6 @@ export default function AbbonamentoPage() {
     } finally { setCheckoutBusy(false); }
   };
 
-  const openPortal = async () => {
-    if (!stripeCustomer) return;
-    setCheckoutBusy(true);
-    try {
-      const res = await fetch("/api/stripe/portal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ customerId: stripeCustomer }) });
-      const d = await res.json().catch(() => ({}));
-      if (d?.url) { window.location.href = d.url; return; }
-      setNotice("Impossibile aprire la gestione dell'abbonamento.");
-    } catch { setNotice("Errore di rete."); } finally { setCheckoutBusy(false); }
-  };
   const addons = MODULES.filter((m) => !m.core && !tier.includes.includes(m.key));
   const addedModules = addons.filter((m) => active[m.key]); // moduli extra non inclusi nel piano
   const isCustom = addedModules.length > 0;
@@ -316,9 +306,6 @@ export default function AbbonamentoPage() {
             <Link href="/abbonamento/pagamento" className="rounded-lg border border-line py-2 text-center text-sm font-semibold text-txt hover:bg-wash">{t("Informazioni pagamento")}</Link>
             <Link href="/abbonamento/fatture" className="rounded-lg border border-line py-2 text-center text-sm font-semibold text-txt hover:bg-wash">{t("Fatture")}</Link>
           </div>
-          {stripeCustomer && (
-            <button onClick={openPortal} disabled={checkoutBusy} className="mt-2 w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60">{t("Gestisci abbonamento e pagamento")}</button>
-          )}
           <div className="mt-2 text-center text-[11px] text-faint">{t("Prossimo rinnovo:")} 01/10/2026</div>
         </Card>
       </div>
