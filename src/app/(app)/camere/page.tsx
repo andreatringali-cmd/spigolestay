@@ -241,14 +241,16 @@ export default function CamerePage() {
                 {types.length === 0 && <div className="w-full rounded-xl border border-dashed border-line p-4 text-sm text-faint">{t("Nessuna tipologia. Aggiungine una col pulsante “+ Tipologia”.")}</div>}
               </div>
 
-              {/* Filtri camere: ricerca a sinistra, azioni a destra */}
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <div className="relative min-w-[200px] flex-1">
+              {/* Filtri camere: riquadro con ricerca a sinistra e azioni a destra */}
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm">
+                <div className="relative w-full sm:w-60">
                   <svg className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
-                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca per tipologia o camera…")} className="w-full rounded-lg border border-line bg-surface py-2 pl-8 pr-3 text-sm text-txt outline-none focus:border-focus" />
+                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca tipologia o camera…")} className="w-full rounded-lg border border-line bg-paper py-1.5 pl-8 pr-3 text-sm text-txt outline-none focus:border-focus" />
                 </div>
-                <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
-                <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
+                <div className="flex gap-2">
+                  <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
+                  <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
+                </div>
               </div>
 
               {/* Camere — un box separato per ogni tipologia */}
