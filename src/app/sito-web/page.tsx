@@ -161,7 +161,7 @@ function Site() {
   const field = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
   return (
-    <div className="flex min-h-full flex-col bg-wash pb-16">
+    <div className="flex min-h-full flex-col bg-wash pb-16 md:pb-0">
       <style>{`.xreveal{opacity:0;transform:translateY(22px);transition:opacity .6s ease,transform .6s ease}.xreveal.xin{opacity:1;transform:none}@media(prefers-reduced-motion:reduce){.xreveal{opacity:1;transform:none;transition:none}}`}</style>
       {/* Top bar */}
       <div className="border-b border-line bg-surface">
@@ -460,22 +460,19 @@ function Site() {
 
       {/* WhatsApp flottante */}
       {waNum && (
-        <a href={`https://wa.me/${waNum}`} target="_blank" rel="noreferrer" aria-label="WhatsApp" className="fixed bottom-20 right-4 z-40 grid h-12 w-12 place-items-center rounded-full text-white shadow-lg transition hover:scale-105" style={{ backgroundColor: "#25D366" }}>
+        <a href={`https://wa.me/${waNum}`} target="_blank" rel="noreferrer" aria-label="WhatsApp" className="fixed bottom-20 right-4 z-40 grid h-12 w-12 place-items-center rounded-full text-white shadow-lg transition hover:scale-105 md:bottom-6" style={{ backgroundColor: "#25D366" }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1-.4-.1-.9-.3-1.6-.6-2.8-1.2-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8 0-1.3.7-2 .9-2.2.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.6-.3.3c-.2.2-.3.3-.1.6.2.3.9 1.4 1.9 2.3 1.3 1.1 2.3 1.5 2.6 1.6.3.1.5.1.7-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.1.1.5-.1 1Z" /></svg>
         </a>
       )}
 
-      {/* Barra Prenota fissa (telefono e desktop) */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 px-4 py-2.5 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-          <span className="hidden text-sm font-semibold text-txt sm:block">{T("Prenota direttamente e risparmia")}</span>
-          <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="w-full rounded-lg py-2.5 text-sm font-bold text-white shadow-sm sm:w-auto sm:px-10" style={{ backgroundColor: accent }}>{T("Prenota")}</button>
-        </div>
+      {/* Barra Prenota fissa (solo telefono) */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 px-4 py-2.5 backdrop-blur md:hidden">
+        <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="w-full rounded-lg py-2.5 text-sm font-bold text-white shadow-sm" style={{ backgroundColor: accent }}>{T("Prenota")}</button>
       </div>
 
       {/* Cookie banner */}
       {!cookieOk && (
-        <div className="fixed inset-x-0 bottom-16 z-50 mx-auto max-w-3xl px-4">
+        <div className="fixed inset-x-0 bottom-16 z-50 mx-auto max-w-3xl px-4 md:bottom-4">
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-xl">
             <span className="min-w-0 flex-1 text-xs text-dim">Usiamo solo cookie tecnici necessari al funzionamento del sito. <button onClick={() => setShowPrivacy(true)} className="font-semibold underline" style={{ color: accent }}>Informativa privacy</button>.</span>
             <button onClick={acceptCookie} className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold text-white" style={{ backgroundColor: accent }}>Accetta</button>

@@ -307,9 +307,10 @@ function Engine() {
         )}
 
         {step === "checkout" && selRt && selPlan && (
-          <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+          <div>
+            <button onClick={() => setStep("rooms")} className="mb-3 text-sm font-medium text-focus hover:underline">← Cambia camera</button>
+            <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
             <div className="flex flex-col gap-4">
-              <button onClick={() => setStep("rooms")} className="w-fit text-sm font-medium text-focus hover:underline">← Cambia camera</button>
 
               {/* Dati ospite */}
               <div className={`${box} p-4`}>
@@ -374,6 +375,7 @@ function Engine() {
                 {!guestValid && <div className="mt-2 text-center text-[11px] text-faint">Compila nome, cognome, telefono, email e accetta la privacy.</div>}
               </div>
             </div>
+          </div>
           </div>
         )}
       </div>
