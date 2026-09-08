@@ -188,9 +188,17 @@ export default function PuliziePage() {
     return { action, dep, arr, stay };
   };
 
-  const rooms = scopedStructures.flatMap((s) =>
-    sortUnitsByName(units.filter((u) => u.structureId === s.id)).map((u) => ({ unit: u, structure: s, typeName: roomTypes.find((x) => x.id === u.roomTypeId)?.name ?? "", oos: !!u.outOfService, ...planFor(u.id) }))
-  );
+  const rooms = scopedStructures.flatMap((s) => {
+    // Stesso ordine di Camere: prima raggruppate per tipologia (nell'ordine delle tipologie),
+    // poi dentro ogni tipologia per ordine manuale / numero.
+    const su = units.filter((u) => u.structureId === s.id);
+    const tps = roomTypes.filter((rt) => rt.structureId === s.id);
+    const ordered = [
+      ...tps.flatMap((rt) => sortUnitsByName(su.filter((u) => u.roomTypeId === rt.id))),
+      ...sortUnitsByName(su.filter((u) => !tps.some((rt) => rt.id === u.roomTypeId))),
+    ];
+    return ordered.map((u) => ({ unit: u, structure: s, typeName: roomTypes.find((x) => x.id === u.roomTypeId)?.name ?? "", oos: !!u.outOfService, ...planFor(u.id) }));
+  });
   type Room = (typeof rooms)[number];
 
   const toClean = rooms.filter((r) => !r.oos && r.action !== "niente");
@@ -574,7 +582,7 @@ export default function PuliziePage() {
                     const clickable = r.action !== "niente";
                     return (
                       <div key={r.unit.id} className={`flex flex-wrap items-start gap-3 p-3 ${i > 0 ? "border-t border-line" : ""} ${isDone ? "opacity-60" : ""}`}>
-                        <div className="w-24 shrink-0"><div className={`font-display text-base font-bold ${isDone ? "text-dim line-through" : "text-txt"}`}>{r.unit.name}</div></div>
+                        <div className="w-24 shrink-0"><div className={`font-display text-base font-bold ${isDone ? "text-dim line-through" : "text-txt"}`}>{r.unit.name}</div>{r.typeName && <div className="truncate text-[10px] text-faint">{r.typeName}</div>}</div>
                         <div className="w-32 shrink-0"><span className="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white" style={{ backgroundColor: a.color }}>{t(a.label)}</span></div>
                         <div className="min-w-0 flex-1 basis-64 text-sm">{details(r)}<div className="mt-2">{noteInput(k)}</div></div>
                         {clickable && (
