@@ -43,7 +43,7 @@ export default function FatturePage() {
       return {
         date: d,
         number: `${String(perYear[y]).padStart(4, "0")}/${y}`,
-        description: `${t("Abbonamento Xenora")} ${plan.name} · ${fmtMonth(d)}`,
+        description: `${t("Rinnovo abbonamento Xenora")} · ${t("Piano")} ${plan.name} · ${fmtMonth(d)}`,
         net, tax, amount,
         paidOn: isCurrent ? null : new Date(d.getFullYear(), d.getMonth(), 3),
       } as Invoice;
