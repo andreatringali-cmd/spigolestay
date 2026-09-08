@@ -74,6 +74,7 @@ export default function BookingDrawer() {
   const [form, setForm] = useState<Form | null>(null);
   const [saved, setSaved] = useState(false);
   const [voucher, setVoucher] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
+  const [expanded, setExpanded] = useState(false); // false = anteprima, true = scheda intera
   const [qa, setQa] = useState<null | "incasso" | "extra">(null); // azione rapida aperta
   const [incassoAmt, setIncassoAmt] = useState("");
   const [extraName, setExtraName] = useState("");
@@ -102,6 +103,8 @@ export default function BookingDrawer() {
   // All'apertura di una prenotazione: torna in vista e ricarica i dati.
   useEffect(() => {
     setMode("view");
+    setExpanded(false);
+    setQa(null);
     setSaved(false);
     loadForm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -278,6 +281,44 @@ export default function BookingDrawer() {
   const gestisciCheckin = () => { setQa(null); setTimeout(() => checkinRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); };
   const qaBtn = "flex flex-col items-center gap-1 rounded-xl border border-line bg-paper px-2 py-2.5 text-[11px] font-semibold text-txt transition hover:border-focus hover:bg-wash";
 
+  const contactIcons = (
+    <div className="flex shrink-0 gap-1.5">
+      <a href={phoneDigits ? `https://wa.me/${phoneDigits}?text=${waText}` : undefined} target="_blank" rel="noopener noreferrer" title="WhatsApp" className={`grid h-8 w-8 place-items-center rounded-lg text-white ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-30"}`} style={{ backgroundColor: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.8-4.3-.1-.2-1.1-1.5-1.1-2.9 0-1.3.7-2 1-2.3.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.6c-.1.2-.3.3-.1.6.1.3.7 1.1 1.5 1.8 1 .9 1.8 1.1 2.1 1.3.3.1.4.1.6-.1l.7-.9c.2-.2.4-.2.6-.1l1.9.9c.2.1.4.2.5.3.1.3.1.7-.1 1.4Z" /></svg></a>
+      <a href={guest?.phone ? `tel:${guest.phone}` : undefined} title={t("Chiama")} className={`grid h-8 w-8 place-items-center rounded-lg bg-focus text-white ${guest?.phone ? "hover:opacity-90" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.5 2.1L8 9.5a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2Z" /></svg></a>
+      <a href={guest?.email ? `mailto:${guest.email}` : undefined} title="Email" className={`grid h-8 w-8 place-items-center rounded-lg border border-line text-dim ${guest?.email ? "hover:bg-wash hover:text-txt" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></a>
+    </div>
+  );
+
+  // ── ANTEPRIMA compatta ──
+  const previewBody = (
+    <div className="flex flex-col gap-3 px-5 py-4">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Contatti")}</span>
+        {contactIcons}
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+        <div><div className="text-[11px] font-medium text-dim">{t("Camera")}</div><div className="truncate text-sm text-txt">{roomType?.name ?? "—"}{unitV?.name ? ` · ${unitV.name}` : ""}</div></div>
+        <div><div className="text-[11px] font-medium text-dim">{t("Ospiti")}</div><div className="text-sm text-txt">{booking.adults} {t("adulti")}{booking.children ? ` · ${booking.children} ${t("bambini")}` : ""}</div></div>
+        <div><div className="text-[11px] font-medium text-dim">{t("Check-in")}</div><div className="text-sm text-txt">{fmtDate(booking.checkIn)}</div></div>
+        <div><div className="text-[11px] font-medium text-dim">{t("Check-out")}</div><div className="text-sm text-txt">{fmtDate(booking.checkOut)}</div></div>
+      </div>
+      <div className="rounded-xl bg-wash px-3 py-2.5">
+        <div className="flex items-baseline justify-between gap-4"><span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span><span className="font-mono text-lg font-bold tabular-nums text-txt">{eur(totalV)}</span></div>
+        <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Saldo dovuto")}</span><span className="font-mono text-sm font-bold tabular-nums" style={{ color: balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span></div>
+      </div>
+      {balanceV > 0 && (
+        qa === "incasso"
+          ? <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash p-2">
+              <span className="text-xs text-dim">{t("Importo")} €</span>
+              <input type="number" min={0} value={incassoAmt} onChange={(e) => setIncassoAmt(e.target.value)} placeholder="0" className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
+              <button onClick={() => setIncassoAmt(String(balanceV))} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(balanceV)}</button>
+              <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Registra")}</button>
+            </div>
+          : <button onClick={() => setQa("incasso")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-focus hover:bg-wash">💶 {t("Registra incasso")}</button>
+      )}
+    </div>
+  );
+
   const viewBody = (
     <>
       {/* Azioni rapide */}
@@ -324,11 +365,7 @@ export default function BookingDrawer() {
             <Row label={t("Telefono")} value={guest?.phone ?? "—"} mono />
             <Row label={t("Paese")} value={guest?.country ?? "—"} />
           </div>
-          <div className="flex shrink-0 gap-1.5">
-            <a href={phoneDigits ? `https://wa.me/${phoneDigits}?text=${waText}` : undefined} target="_blank" rel="noopener noreferrer" title="WhatsApp" className={`grid h-8 w-8 place-items-center rounded-lg text-white ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-30"}`} style={{ backgroundColor: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.8-4.3-.1-.2-1.1-1.5-1.1-2.9 0-1.3.7-2 1-2.3.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.6c-.1.2-.3.3-.1.6.1.3.7 1.1 1.5 1.8 1 .9 1.8 1.1 2.1 1.3.3.1.4.1.6-.1l.7-.9c.2-.2.4-.2.6-.1l1.9.9c.2.1.4.2.5.3.1.3.1.7-.1 1.4Z" /></svg></a>
-            <a href={guest?.phone ? `tel:${guest.phone}` : undefined} title={t("Chiama")} className={`grid h-8 w-8 place-items-center rounded-lg bg-focus text-white ${guest?.phone ? "hover:opacity-90" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.5 2.1L8 9.5a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2Z" /></svg></a>
-            <a href={guest?.email ? `mailto:${guest.email}` : undefined} title="Email" className={`grid h-8 w-8 place-items-center rounded-lg border border-line text-dim ${guest?.email ? "hover:bg-wash hover:text-txt" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></a>
-          </div>
+          {contactIcons}
         </div>
       </Section>
 
@@ -567,7 +604,7 @@ export default function BookingDrawer() {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <button aria-label={t("Chiudi")} onClick={closeBooking} className="fixed inset-0 bg-black/40" />
 
-      <div className="anim-in relative z-10 flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
+      <div className={`anim-in relative z-10 flex max-h-[85vh] w-full flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl transition-[max-width] ${expanded || mode === "edit" ? "max-w-2xl" : "max-w-md"}`}>
         {/* Accento canale */}
         <div className="h-1 w-full shrink-0" style={{ background: `var(${ch.cssVar})` }} />
         {/* Intestazione */}
@@ -576,12 +613,14 @@ export default function BookingDrawer() {
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `var(${ch.cssVar})`, color: ch.text }}>{ch.label}</span>
-              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 14%, transparent)`, color: st.color }}>
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: st.color }} />{t(st.label)}
-              </span>
               <span className="rounded-md bg-wash px-1.5 py-0.5 font-mono text-[11px] text-dim">#{bookingCode(booking)}</span>
             </div>
-            <h2 className="mt-1.5 truncate font-display text-2xl font-bold tracking-tight text-txt">{guest?.fullName ?? t("Ospite")}</h2>
+            <div className="mt-1.5 flex items-center gap-2">
+              <h2 className="truncate font-display text-2xl font-bold tracking-tight text-txt">{guest?.fullName ?? t("Ospite")}</h2>
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 14%, transparent)`, color: st.color }}>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: st.color }} />{t(st.label)}
+              </span>
+            </div>
             <div className="mt-0.5 truncate text-xs text-dim">{roomType?.name}{unitV?.name ? ` · ${unitV.name}` : ""} · {fmtDate(booking.checkIn)} → {fmtDate(booking.checkOut)} · {nView} {nView === 1 ? t("notte") : t("notti")}</div>
             {(() => { const bd = birthdayInStay(guest?.birthDate, booking.checkIn, booking.checkOut); return bd ? (
               <span className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, #DB2777 15%, transparent)", color: "#DB2777" }} title={t("Compleanno durante il soggiorno")}>
@@ -590,9 +629,6 @@ export default function BookingDrawer() {
             ) : null; })()}
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            {mode === "view" && (
-              <button onClick={() => { loadForm(); setMode("edit"); }} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("Modifica")}</button>
-            )}
             <button onClick={closeBooking} aria-label={t("Chiudi")} className="grid h-8 w-8 place-items-center rounded-lg text-dim hover:bg-wash hover:text-txt">✕</button>
           </div>
         </div>
@@ -623,7 +659,7 @@ export default function BookingDrawer() {
         })()}
 
         {/* Corpo */}
-        <div className="flex-1 overflow-y-auto">{mode === "view" ? viewBody : editBody}</div>
+        <div className="flex-1 overflow-y-auto">{mode === "edit" ? editBody : (expanded ? viewBody : previewBody)}</div>
 
         {/* Barra azioni */}
         {mode === "edit" ? (
@@ -632,9 +668,11 @@ export default function BookingDrawer() {
             <button onClick={save} className="ml-auto rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Salva modifiche")}</button>
           </div>
         ) : (
-          <div className="flex items-center gap-3 border-t border-line bg-surface px-5 py-3 text-xs text-dim">
-            {saved ? <span className="font-medium text-[color:var(--ok)]">{t("Salvato ✓")}</span> : <span>{t("Clicca “Modifica” per aggiornare la prenotazione.")}</span>}
-            <button onClick={closeBooking} className="ml-auto rounded-lg border border-line px-4 py-2 text-sm text-dim hover:bg-wash">{t("Chiudi")}</button>
+          <div className="flex items-center gap-2 border-t border-line bg-surface px-5 py-3 text-xs text-dim">
+            {saved && <span className="font-medium text-[color:var(--ok)]">{t("Salvato ✓")}</span>}
+            <button onClick={() => setExpanded((v) => !v)} className="mr-auto rounded-lg border border-line px-3 py-2 text-sm font-medium text-focus hover:bg-wash">{expanded ? `← ${t("Anteprima")}` : `${t("Dettagli")} →`}</button>
+            <button onClick={closeBooking} className="rounded-lg border border-line px-4 py-2 text-sm text-dim hover:bg-wash">{t("Chiudi")}</button>
+            <button onClick={() => { loadForm(); setMode("edit"); }} className="rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Modifica")}</button>
           </div>
         )}
       </div>
