@@ -741,11 +741,11 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                 <div className="mt-3 rounded-lg px-3 py-2 text-sm font-medium text-[color:var(--ok)]" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)" }}>{t("Prenotazione creata")} ✓ — {t("invia la conferma all'ospite:")}</div>
               )}
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                {!confirmed && <button onClick={() => confirmBooking(false)} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Crea prenotazione")}</button>}
-                <a href={mail} className={`rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash ${q.email ? "" : "pointer-events-none opacity-40"}`}>{t("Invia email")}</a>
-                <a href={wa} target="_blank" rel="noreferrer" className={`rounded-lg px-3 py-2 text-sm font-semibold text-white ${digits ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
-                <button onClick={() => navigator.clipboard?.writeText(confMsg)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">{t("Copia")}</button>
+              <div className="mt-3 flex flex-nowrap items-center gap-1.5">
+                {!confirmed && <button onClick={() => confirmBooking(false)} className="whitespace-nowrap rounded-lg bg-focus px-2.5 py-2 text-xs font-semibold text-white hover:opacity-90">{t("Crea prenotazione")}</button>}
+                <a href={mail} className={`whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash ${q.email ? "" : "pointer-events-none opacity-40"}`}>{t("Email")}</a>
+                <a href={wa} target="_blank" rel="noreferrer" className={`whitespace-nowrap rounded-lg px-2.5 py-2 text-xs font-semibold text-white ${digits ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
+                <button onClick={() => navigator.clipboard?.writeText(confMsg)} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash">{t("Copia")}</button>
               </div>
             </div>
           </div>

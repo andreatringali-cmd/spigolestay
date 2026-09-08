@@ -563,20 +563,20 @@ export default function PuliziePage() {
           const sColor = structColorOf(s.id);
           const sToClean = list.filter((r) => !r.oos && r.action !== "niente").length;
           return (
-            <div key={s.id} className="rounded-xl border-l-4 pl-3" style={{ borderColor: sColor }}>
-              <div className="mb-2.5 flex items-center gap-2 border-b pb-1.5" style={{ borderColor: `color-mix(in srgb, ${sColor} 30%, var(--line))` }}>
+            <div key={s.id} className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+              <div className="flex items-center gap-2 px-3 py-2" style={{ backgroundColor: `color-mix(in srgb, ${sColor} 10%, var(--surface))`, borderBottom: `2px solid ${sColor}` }}>
                 <span className="h-3.5 w-3.5 rounded-md" style={{ backgroundColor: sColor }} />
                 <span className="text-sm font-bold uppercase tracking-wide" style={{ color: sColor }}>{s.name}</span>
                 <span className="text-xs text-faint">· {sToClean} {t("da fare")}</span>
               </div>
-
+              <div className="p-3">
               {view === "cards" ? (
                 <div className="grid w-full gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   {list.flatMap((r, idx) => {
                     const showHeader = idx === 0 || (list[idx - 1].typeName || "") !== (r.typeName || "");
                     const card = <RoomCard key={r.unit.id} r={r} k={keyOf(r.unit.id)} done={!!done[keyOf(r.unit.id)]} doneAt={doneTime(keyOf(r.unit.id))} hasIssue={roomHasIssue(r.unit.id)} guestName={guestName} hasDog={hasDog} note={noteInput(keyOf(r.unit.id))} onToggle={() => toggleDone(keyOf(r.unit.id))} onIssue={() => setIssueDraft({ unitId: r.unit.id, unitName: r.unit.name, structureName: r.structure.name, type: "guasto", note: "", photo: undefined })} />;
                     return showHeader
-                      ? [<div key={`h-${idx}`} className="col-span-full mt-1 text-[11px] font-bold uppercase tracking-wide text-dim">{r.typeName || t("Senza tipologia")}</div>, card]
+                      ? [<div key={`h-${idx}`} className="col-span-full mt-1 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-dim" style={{ backgroundColor: `color-mix(in srgb, ${sColor} 9%, transparent)` }}>{r.typeName || t("Senza tipologia")}</div>, card]
                       : [card];
                   })}
                 </div>
@@ -594,7 +594,7 @@ export default function PuliziePage() {
                       lastType = r.typeName || "";
                       return (
                         <div key={r.unit.id}>
-                          {showHeader && <div className="border-t border-line bg-wash px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-dim">{r.typeName || t("Senza tipologia")}</div>}
+                          {showHeader && <div className="border-t border-line px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-dim" style={{ backgroundColor: `color-mix(in srgb, ${sColor} 9%, transparent)` }}>{r.typeName || t("Senza tipologia")}</div>}
                           <div className={`flex flex-wrap items-start gap-3 border-t border-line p-3 ${isDone ? "opacity-60" : ""}`}>
                             <div className="w-24 shrink-0"><div className={`font-display text-base font-bold ${isDone ? "text-dim line-through" : "text-txt"}`}>{r.unit.name}</div></div>
                             <div className="w-32 shrink-0"><span className="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white" style={{ backgroundColor: a.color }}>{t(a.label)}</span></div>
@@ -609,6 +609,7 @@ export default function PuliziePage() {
                   })()}
                 </div>
               )}
+              </div>
             </div>
           );
         })}
