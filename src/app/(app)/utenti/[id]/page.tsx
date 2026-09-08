@@ -14,6 +14,8 @@ import {
 import { eur } from "@/lib/format";
 import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/authsync";
 
 // --- Micro-componenti ---------------------------------------------------------
 function Toggle({ on, onClick, disabled, color = "var(--focus)" }: { on: boolean; onClick?: () => void; disabled?: boolean; color?: string }) {
@@ -60,11 +62,38 @@ export default function UserSchedaPage() {
   });
   const set = <K extends keyof User>(k: K, v: User[K]) => setU((p) => ({ ...p, [k]: v }));
 
-  // Password / reset (prototipo)
-  const [pwPanel, setPwPanel] = useState<null | "edit" | "reset">(null);
+  // Cambio password reale (account collegato via Supabase): attuale + nuova ×2.
+  const { user: authUser } = useAuth();
+  const [pwOpen, setPwOpen] = useState(false);
+  const [curPw, setCurPw] = useState("");
   const [newPw, setNewPw] = useState("");
-  const [resetLink, setResetLink] = useState("");
-  const doReset = () => { const t = (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : "abcd1234").replace(/-/g, "").slice(0, 14); setResetLink(`https://spigolestay.app/reset/${t}`); setPwPanel("reset"); };
+  const [newPw2, setNewPw2] = useState("");
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const resetPwFields = () => { setCurPw(""); setNewPw(""); setNewPw2(""); setPwMsg(null); };
+  const changePw = async () => {
+    setPwMsg(null);
+    if (newPw.length < 6) { setPwMsg({ ok: false, text: t("La nuova password deve avere almeno 6 caratteri.") }); return; }
+    if (newPw !== newPw2) { setPwMsg({ ok: false, text: t("Le due nuove password non coincidono.") }); return; }
+    if (!supabase || !authUser?.email) { setPwMsg({ ok: false, text: t("Accesso non disponibile.") }); return; }
+    setPwBusy(true);
+    try {
+      const { error: e1 } = await supabase.auth.signInWithPassword({ email: authUser.email, password: curPw });
+      if (e1) { setPwMsg({ ok: false, text: t("Password attuale errata.") }); return; }
+      const { error: e2 } = await supabase.auth.updateUser({ password: newPw });
+      if (e2) { setPwMsg({ ok: false, text: e2.message }); return; }
+      resetPwFields(); setPwOpen(false); setPwMsg({ ok: true, text: t("Password aggiornata ✅") });
+    } catch { setPwMsg({ ok: false, text: t("Si è verificato un problema. Riprova.") }); }
+    finally { setPwBusy(false); }
+  };
+  const forgotPw = async () => {
+    if (!supabase || !authUser?.email) { setPwMsg({ ok: false, text: t("Accesso non disponibile.") }); return; }
+    setPwBusy(true); setPwMsg(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(authUser.email, { redirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined });
+      setPwMsg(error ? { ok: false, text: error.message } : { ok: true, text: t("Ti abbiamo inviato un'email per reimpostare la password.") });
+    } finally { setPwBusy(false); }
+  };
 
   // Avatar / foto profilo (salvata sull'utente)
   const fileRef = useRef<HTMLInputElement>(null);
@@ -163,21 +192,21 @@ export default function UserSchedaPage() {
             <div className="mt-3">
               <div className="text-xs font-medium text-dim">{t("Password")}</div>
               <div className="mt-1 flex flex-wrap gap-2">
-                <button onClick={() => { setPwPanel(pwPanel === "edit" ? null : "edit"); setNewPw(""); }} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-txt hover:bg-wash">✎ {t("Modifica")}</button>
-                <button onClick={doReset} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-txt hover:bg-wash">↺ {t("Reset password")}</button>
+                <button onClick={() => { setPwOpen((o) => !o); resetPwFields(); }} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-txt hover:bg-wash">🔑 {t("Cambia password")}</button>
               </div>
-              {pwPanel === "edit" && (
-                <div className="mt-2 flex gap-2">
-                  <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder={t("Nuova password")} className={inp} />
-                  <button onClick={() => setPwPanel(null)} className="shrink-0 rounded-lg bg-focus px-3 text-xs font-semibold text-white">OK</button>
+              {pwOpen && (
+                <div className="mt-2 space-y-2">
+                  <input type="password" autoComplete="current-password" value={curPw} onChange={(e) => setCurPw(e.target.value)} placeholder={t("Password attuale")} className={inp} />
+                  <input type="password" autoComplete="new-password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder={t("Nuova password (min. 6)")} className={inp} />
+                  <input type="password" autoComplete="new-password" value={newPw2} onChange={(e) => setNewPw2(e.target.value)} placeholder={t("Ripeti nuova password")} className={inp} />
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button onClick={changePw} disabled={pwBusy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">{pwBusy ? t("Attendi…") : t("Aggiorna password")}</button>
+                    <button type="button" onClick={forgotPw} disabled={pwBusy} className="text-xs font-medium text-focus hover:underline">{t("Password dimenticata?")}</button>
+                  </div>
+                  <p className="text-[11px] text-faint">{t("Se non ricordi quella attuale, usa «Password dimenticata»: ti arriva un link via email per reimpostarla.")}</p>
                 </div>
               )}
-              {pwPanel === "reset" && (
-                <div className="mt-2">
-                  <Info>{t("Link di reset generato — invialo all'utente per impostare una nuova password:")}</Info>
-                  <div className="mt-1 flex gap-2"><input readOnly value={resetLink} onFocus={(e) => e.target.select()} className={inp} /><button onClick={() => navigator.clipboard?.writeText(resetLink)} className="shrink-0 rounded-lg border border-line px-3 text-xs font-medium hover:bg-wash">{t("Copia")}</button></div>
-                </div>
-              )}
+              {pwMsg && <div className="mt-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: pwMsg.ok ? "color-mix(in srgb, var(--ok) 12%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: pwMsg.ok ? "var(--ok)" : "var(--err)" }}>{pwMsg.text}</div>}
             </div>
             <div className="mt-3 flex items-center justify-between py-1.5">
               <span className="max-w-[70%] text-sm text-txt">{t("Autenticazione a 2 fattori")}</span>
