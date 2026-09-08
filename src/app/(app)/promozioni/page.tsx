@@ -48,17 +48,19 @@ export default function PromozioniPage() {
   const [discount, setDiscount] = useState(empty.discount);
   const [code, setCode] = useState(empty.code);
   const [validUntil, setValidUntil] = useState("");
+  const [validFrom, setValidFrom] = useState("");
+  const [validTo, setValidTo] = useState("");
   const [body, setBody] = useState(empty.body);
 
-  const resetEditor = () => { setEditId(null); setName(""); setSubject(empty.subject); setDiscount(empty.discount); setCode(empty.code); setValidUntil(""); setBody(empty.body); };
+  const resetEditor = () => { setEditId(null); setName(""); setSubject(empty.subject); setDiscount(empty.discount); setCode(empty.code); setValidUntil(""); setValidFrom(""); setValidTo(""); setBody(empty.body); };
   const savePromo = () => {
     if (!name.trim() && !subject.trim()) return;
-    const data = { name: name.trim() || subject.trim(), subject: subject.trim(), body, discountPct: discount || undefined, code: code.trim() || undefined, validUntil: validUntil || undefined };
+    const data = { name: name.trim() || subject.trim(), subject: subject.trim(), body, discountPct: discount || undefined, code: code.trim() || undefined, validUntil: validUntil || undefined, validFrom: validFrom || undefined, validTo: validTo || undefined };
     if (editId) persistPromos(promos.map((p) => (p.id === editId ? { ...p, ...data } : p)));
     else persistPromos([{ id: newPromoId(), ...data, createdAt: today }, ...promos]);
     resetEditor();
   };
-  const editPromo = (p: Promo) => { setEditId(p.id); setName(p.name); setSubject(p.subject); setDiscount(p.discountPct ?? 0); setCode(p.code ?? ""); setValidUntil(p.validUntil ?? ""); setBody(p.body); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const editPromo = (p: Promo) => { setEditId(p.id); setName(p.name); setSubject(p.subject); setDiscount(p.discountPct ?? 0); setCode(p.code ?? ""); setValidUntil(p.validUntil ?? ""); setValidFrom(p.validFrom ?? ""); setValidTo(p.validTo ?? ""); setBody(p.body); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
   const dupPromo = (p: Promo) => persistPromos([{ ...p, id: newPromoId(), name: `${p.name} (copia)`, createdAt: today }, ...promos]);
   const delPromo = (id: string) => { persistPromos(promos.filter((p) => p.id !== id)); if (editId === id) resetEditor(); };
 
@@ -149,7 +151,9 @@ export default function PromozioniPage() {
             <label className="col-span-2 block text-xs font-medium text-dim">Oggetto email<input value={subject} onChange={(e) => setSubject(e.target.value)} className={`${inp} mt-1`} /></label>
             <label className="block text-xs font-medium text-dim">Sconto %<input type="number" min={0} max={90} value={discount} onChange={(e) => setDiscount(Math.max(0, Number(e.target.value)))} className={`${inp} mt-1`} /></label>
             <label className="block text-xs font-medium text-dim">Codice promo<input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className={`${inp} mt-1`} /></label>
-            <label className="col-span-2 block text-xs font-medium text-dim">Scadenza offerta<input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={`${inp} mt-1`} /></label>
+            <label className="col-span-2 block text-xs font-medium text-dim">Scadenza offerta <span className="font-normal text-faint">· ultimo giorno per prenotare</span><input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={`${inp} mt-1`} /></label>
+            <label className="block text-xs font-medium text-dim">Valida per soggiorni dal<input type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} className={`${inp} mt-1`} /></label>
+            <label className="block text-xs font-medium text-dim">al<input type="date" value={validTo} min={validFrom || undefined} onChange={(e) => setValidTo(e.target.value)} className={`${inp} mt-1`} /></label>
             <label className="col-span-2 block text-xs font-medium text-dim">Messaggio <span className="font-normal text-faint">· {"{nome}"} {"{sconto}"} {"{codice}"} {"{scadenza}"} {"{struttura}"} {"{contatti}"}</span><textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} className={`${inp} mt-1 resize-y`} /></label>
           </div>
           <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">

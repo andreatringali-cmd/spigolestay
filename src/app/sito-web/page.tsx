@@ -154,7 +154,7 @@ function Site() {
   }, [galItems.length]);
 
   // Offerte attive (modulo Promozioni).
-  const offers = useMemo(() => { try { return loadPromos().filter((p) => p.discountPct && p.code); } catch { return []; } }, []);
+  const offers = useMemo(() => { try { const t = new Date().toISOString().slice(0, 10); return loadPromos().filter((p) => p.discountPct && p.code && (!p.validUntil || p.validUntil >= t)); } catch { return []; } }, []);
 
   // Recensioni reali: dagli ospiti passati (come il modulo Recensioni).
   const reviews = useMemo(() => {
@@ -351,6 +351,8 @@ function Site() {
                   {p.description && <p className="mt-1.5 text-sm text-dim">{p.description}</p>}
                   {(p.features ?? []).length > 0 && <ul className="mt-2 flex-1 space-y-1 text-[13px] text-dim">{(p.features ?? []).map((f, i) => <li key={i} className="flex items-start gap-1.5"><span style={{ color: accent }}>✓</span>{f}</li>)}</ul>}
                   <div className="mt-2 text-xs text-dim">{T("Codice")}: <b className="font-mono text-txt">{p.code}</b></div>
+                  {(p.validFrom || p.validTo) && <div className="mt-1 text-[11px] text-faint">{T("Valida per soggiorni")}{p.validFrom ? ` ${T("dal")} ${new Date(p.validFrom).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}` : ""}{p.validTo ? ` ${T("al")} ${new Date(p.validTo).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}` : ""}</div>}
+                  {p.validUntil && <div className="text-[11px] text-faint">{T("Prenota entro il")} {new Date(p.validUntil).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</div>}
                   <button onClick={() => go(p.code ? `&promo=${encodeURIComponent(p.code)}` : "")} className="mt-2 text-sm font-medium" style={{ color: accent }}>{T("Prenota")} →</button>
                 </div>
               ))}

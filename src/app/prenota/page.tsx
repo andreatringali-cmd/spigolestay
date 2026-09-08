@@ -74,8 +74,11 @@ function Engine() {
     setPromoErr("");
     if (!c) { setAppliedPromo(null); return; }
     const p = promos.find((x) => (x.code || "").toUpperCase() === c && !!x.discountPct);
-    if (p) setAppliedPromo({ name: p.name, code: (p.code || "").toUpperCase(), pct: p.discountPct! });
-    else { setAppliedPromo(null); setPromoErr("Codice non valido o scaduto."); }
+    if (!p) { setAppliedPromo(null); setPromoErr("Codice non valido."); return; }
+    if (p.validUntil && today > p.validUntil) { setAppliedPromo(null); setPromoErr("Offerta scaduta."); return; }
+    if (p.validFrom && checkIn < p.validFrom) { setAppliedPromo(null); setPromoErr(`Valida per soggiorni dal ${new Date(p.validFrom).toLocaleDateString("it-IT")}.`); return; }
+    if (p.validTo && checkIn > p.validTo) { setAppliedPromo(null); setPromoErr(`Valida per soggiorni fino al ${new Date(p.validTo).toLocaleDateString("it-IT")}.`); return; }
+    setAppliedPromo({ name: p.name, code: (p.code || "").toUpperCase(), pct: p.discountPct! });
   };
   // Applica automaticamente il codice arrivato dall'offerta (?promo=).
   useEffect(() => { const c = (qp("promo") || "").trim(); if (c && promos.length) applyPromoCode(c); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [promos.length]);

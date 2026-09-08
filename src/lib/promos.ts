@@ -8,7 +8,9 @@ export interface Promo {
   features?: string[];  // elenco puntato di condizioni/vantaggi
   discountPct?: number;
   code?: string;
-  validUntil?: string; // scadenza offerta (ISO)
+  validUntil?: string; // scadenza offerta = ultimo giorno utile per prenotare (ISO)
+  validFrom?: string;  // periodo di validità: primo giorno di soggiorno coperto (ISO)
+  validTo?: string;    // periodo di validità: ultimo giorno di soggiorno coperto (ISO)
   createdAt?: string;
 }
 
