@@ -8,6 +8,7 @@ import { getImages } from "@/lib/images";
 import { eur } from "@/lib/format";
 import { effectiveBase, effectiveClosed } from "@/lib/pricing";
 import { loadDeposit } from "@/lib/deposit";
+import { amenityIcon } from "@/lib/amenities";
 
 // ---- pricing helpers --------------------------------------------------------
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
@@ -272,6 +273,7 @@ function Engine() {
                           <div>
                             <div className="font-display text-lg font-bold text-txt">{rt.name}</div>
                             <div className="text-xs text-dim">{rt.beds} letti · fino a {rt.maxOccupancy ?? rt.beds} ospiti{rt.size ? ` · ${rt.size} m²` : ""}</div>
+                            {(rt.amenities ?? []).length > 0 && <div className="mt-1.5 flex flex-wrap items-center gap-2 text-dim">{(rt.amenities ?? []).slice(0, 8).map((a) => <span key={a} title={a} aria-label={a}>{amenityIcon(a)}</span>)}</div>}
                           </div>
                           <div className="text-right">
                             <div className="text-[11px] text-faint">da</div>
