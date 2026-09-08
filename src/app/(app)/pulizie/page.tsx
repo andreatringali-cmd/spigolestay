@@ -131,7 +131,8 @@ export default function PuliziePage() {
   const scopeIds = scopeStructures.map((s) => s.id);
   const stockScoped = stock.filter((p) => scopeIds.includes(p.structureId));
   const structNameOf = (id: string) => structures.find((s) => s.id === id)?.name ?? "";
-  const structColorOf = (id: string) => STRUCT_COLORS[Math.max(0, structures.findIndex((s) => s.id === id)) % STRUCT_COLORS.length];
+  // Colore della struttura: quello scelto nella scheda struttura (photoColor); in mancanza, palette di riserva.
+  const structColorOf = (id: string) => structures.find((s) => s.id === id)?.photoColor || STRUCT_COLORS[Math.max(0, structures.findIndex((s) => s.id === id)) % STRUCT_COLORS.length];
   const structInitials = (id: string) => structNameOf(id).split(/\s+/).map((w) => w[0] || "").join("").slice(0, 3).toUpperCase();
   const structOrder = (id: string) => structures.findIndex((s) => s.id === id);
   const eur = (n: number) => "€ " + (Math.round(n * 100) / 100).toFixed(2).replace(".", ",");
@@ -559,7 +560,7 @@ export default function PuliziePage() {
         {scopedStructures.map((s) => {
           const list = rooms.filter((r) => r.structure.id === s.id && (r.oos ? actionFilter === "tutte" : matchAction(r.action)));
           if (actionFilter !== "tutte" && list.length === 0) return null;
-          const sColor = STRUCT_COLORS[Math.max(0, structures.findIndex((x) => x.id === s.id)) % STRUCT_COLORS.length];
+          const sColor = structColorOf(s.id);
           const sToClean = list.filter((r) => !r.oos && r.action !== "niente").length;
           return (
             <div key={s.id} className="rounded-xl border-l-4 pl-3" style={{ borderColor: sColor }}>

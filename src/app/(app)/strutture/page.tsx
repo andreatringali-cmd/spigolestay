@@ -5,36 +5,24 @@ import { useData } from "@/lib/store";
 import { AV_COLORS } from "@/lib/users";
 import { useLang } from "@/lib/i18n";
 import { PageHeader } from "@/components/ui";
-import { useConfirm } from "@/components/ConfirmProvider";
 import { planStructureLimit, planName } from "@/lib/plan";
 
 export default function StrutturePage() {
   const router = useRouter();
   const { structures, roomTypes, units } = useData();
   const { t } = useLang();
-  const ask = useConfirm();
 
-  const addStructure = async () => {
-    const limit = planStructureLimit();
-    if (structures.length >= limit) {
-      const goPlans = await ask({
-        title: t("Struttura aggiuntiva"),
-        message: `${t("Il tuo piano")} ${planName()} ${t("include")} ${limit === 1 ? t("1 struttura") : `${limit} ${t("strutture")}`}. ${t("Aggiungere un'altra struttura comporta un costo aggiuntivo o il passaggio a un piano superiore. Vuoi vedere i piani?")}`,
-        confirmLabel: t("Vedi i piani"),
-        cancelLabel: t("Aggiungi comunque"),
-      });
-      router.push(goPlans ? "/abbonamento" : "/strutture/nuovo");
-      return;
-    }
-    router.push("/strutture/nuovo");
-  };
+  const limit = planStructureLimit();
+  const overLimit = structures.length >= limit; // piano al completo di strutture
 
   return (
     <div>
       <PageHeader
         title={t("Strutture")}
         subtitle={t("Anagrafica completa delle tue strutture · le singole camere si gestiscono in “Camere”")}
-        actions={<button onClick={addStructure} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ {t("Nuova struttura")}</button>}
+        actions={overLimit
+          ? <button onClick={() => router.push("/abbonamento")} title={`${t("Il tuo piano")} ${planName()} ${t("include")} ${limit === 1 ? t("1 struttura") : `${limit} ${t("strutture")}`}`} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-dim hover:bg-wash"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg> {t("Aggiungi struttura (piano superiore)")}</button>
+          : <button onClick={() => router.push("/strutture/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ {t("Nuova struttura")}</button>}
       />
 
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
