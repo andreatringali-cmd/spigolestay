@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/lib/store";
 import { nights, parseISO, toISO, shiftISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
+import { loadDeposit } from "@/lib/deposit";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 
@@ -29,11 +30,11 @@ interface QLabels {
   modalita: string; bonifico: string; intest: string; causale: string; closing: string; quoteNo: string;
 }
 const QL: Record<Lang, QLabels> = {
-  it: { hi: "Gentile", guest: "Ospite", avail: "ho il piacere di confermarLe la disponibilità per il periodo richiesto", periodo: "Periodo", ci: "Check-in", co: "Check-out", durata: "Durata", notte: "notte", notti: "notti", riepilogo: "Riepilogo economico", room: "camera", aNotte: "a notte", colazione: "Colazione", inclusa: "Inclusa", parcheggio: "Parcheggio", parkIncl: "Incluso nel prezzo (per un'auto)", culla: "Culla", cullaIncl: "Inclusa (su richiesta)", tassa: "Tassa di soggiorno", persone: "persone", totale: "TOTALE COMPLESSIVO", condizioni: "Condizioni e pagamento", accNone: "Nessun acconto richiesto: il saldo di {tot} è dovuto al check-in.", accPart: "Per confermare è richiesto un acconto del 50% del totale, ovvero {dep}. Il saldo di {bal} al check-in.", accFull: "Per confermare è richiesto il pagamento dell'intero importo: {tot}.", cancLabel: "Cancellazione", cancText: "tariffa interamente rimborsabile fino a 7 giorni prima del check-in.", modalita: "Modalità di pagamento", bonifico: "Bonifico bancario", intest: "Intestatario", causale: "Causale", closing: "Restiamo a disposizione per qualsiasi informazione. A presto!", quoteNo: "Preventivo n." },
-  en: { hi: "Dear", guest: "Guest", avail: "we are pleased to confirm availability for the requested dates", periodo: "Dates", ci: "Check-in", co: "Check-out", durata: "Length", notte: "night", notti: "nights", riepilogo: "Price summary", room: "room", aNotte: "per night", colazione: "Breakfast", inclusa: "Included", parcheggio: "Parking", parkIncl: "Included in the price (one car)", culla: "Cot", cullaIncl: "Included (on request)", tassa: "City tax", persone: "guests", totale: "GRAND TOTAL", condizioni: "Terms and payment", accNone: "No deposit required: the balance of {tot} is due at check-in.", accPart: "To confirm, a 50% deposit is required, i.e. {dep}. Balance of {bal} at check-in.", accFull: "To confirm, full payment is required: {tot}.", cancLabel: "Cancellation", cancText: "fully refundable up to 7 days before check-in.", modalita: "Payment methods", bonifico: "Bank transfer", intest: "Account holder", causale: "Reference", closing: "We remain at your disposal for any information. See you soon!", quoteNo: "Quote no." },
-  fr: { hi: "Cher/Chère", guest: "client", avail: "nous avons le plaisir de confirmer la disponibilité pour les dates demandées", periodo: "Dates", ci: "Arrivée", co: "Départ", durata: "Durée", notte: "nuit", notti: "nuits", riepilogo: "Récapitulatif", room: "chambre", aNotte: "par nuit", colazione: "Petit-déjeuner", inclusa: "Inclus", parcheggio: "Parking", parkIncl: "Inclus dans le prix (une voiture)", culla: "Lit bébé", cullaIncl: "Inclus (sur demande)", tassa: "Taxe de séjour", persone: "personnes", totale: "TOTAL GÉNÉRAL", condizioni: "Conditions et paiement", accNone: "Aucun acompte requis : le solde de {tot} est dû à l'arrivée.", accPart: "Pour confirmer, un acompte de 50% est requis, soit {dep}. Solde de {bal} à l'arrivée.", accFull: "Pour confirmer, le paiement intégral est requis : {tot}.", cancLabel: "Annulation", cancText: "entièrement remboursable jusqu'à 7 jours avant l'arrivée.", modalita: "Moyens de paiement", bonifico: "Virement bancaire", intest: "Titulaire", causale: "Motif", closing: "Nous restons à votre disposition. À bientôt !", quoteNo: "Devis n°" },
-  de: { hi: "Liebe/r", guest: "Gast", avail: "wir bestätigen Ihnen gerne die Verfügbarkeit für den gewünschten Zeitraum", periodo: "Zeitraum", ci: "Anreise", co: "Abreise", durata: "Dauer", notte: "Nacht", notti: "Nächte", riepilogo: "Preisübersicht", room: "Zimmer", aNotte: "pro Nacht", colazione: "Frühstück", inclusa: "Inklusive", parcheggio: "Parkplatz", parkIncl: "Im Preis inbegriffen (ein Auto)", culla: "Kinderbett", cullaIncl: "Inklusive (auf Anfrage)", tassa: "Kurtaxe", persone: "Gäste", totale: "GESAMTBETRAG", condizioni: "Bedingungen und Zahlung", accNone: "Keine Anzahlung erforderlich: Der Restbetrag von {tot} ist bei Anreise fällig.", accPart: "Zur Bestätigung ist eine Anzahlung von 50% erforderlich, d.h. {dep}. Restbetrag {bal} bei Anreise.", accFull: "Zur Bestätigung ist die vollständige Zahlung erforderlich: {tot}.", cancLabel: "Stornierung", cancText: "bis 7 Tage vor Anreise voll erstattbar.", modalita: "Zahlungsarten", bonifico: "Banküberweisung", intest: "Kontoinhaber", causale: "Verwendungszweck", closing: "Wir stehen Ihnen gerne zur Verfügung. Bis bald!", quoteNo: "Angebot Nr." },
-  es: { hi: "Estimado/a", guest: "huésped", avail: "tenemos el placer de confirmar la disponibilidad para las fechas solicitadas", periodo: "Fechas", ci: "Entrada", co: "Salida", durata: "Duración", notte: "noche", notti: "noches", riepilogo: "Resumen económico", room: "habitación", aNotte: "por noche", colazione: "Desayuno", inclusa: "Incluido", parcheggio: "Aparcamiento", parkIncl: "Incluido en el precio (un coche)", culla: "Cuna", cullaIncl: "Incluida (bajo petición)", tassa: "Tasa turística", persone: "personas", totale: "TOTAL", condizioni: "Condiciones y pago", accNone: "No se requiere anticipo: el saldo de {tot} se paga en la entrada.", accPart: "Para confirmar se requiere un anticipo del 50%, es decir {dep}. Saldo de {bal} en la entrada.", accFull: "Para confirmar se requiere el pago íntegro: {tot}.", cancLabel: "Cancelación", cancText: "totalmente reembolsable hasta 7 días antes de la entrada.", modalita: "Formas de pago", bonifico: "Transferencia bancaria", intest: "Titular", causale: "Concepto", closing: "Quedamos a su disposición. ¡Hasta pronto!", quoteNo: "Presupuesto n.º" },
+  it: { hi: "Gentile", guest: "Ospite", avail: "ho il piacere di confermarLe la disponibilità per il periodo richiesto", periodo: "Periodo", ci: "Check-in", co: "Check-out", durata: "Durata", notte: "notte", notti: "notti", riepilogo: "Riepilogo economico", room: "camera", aNotte: "a notte", colazione: "Colazione", inclusa: "Inclusa", parcheggio: "Parcheggio", parkIncl: "Incluso nel prezzo (per un'auto)", culla: "Culla", cullaIncl: "Inclusa (su richiesta)", tassa: "Tassa di soggiorno", persone: "persone", totale: "TOTALE COMPLESSIVO", condizioni: "Condizioni e pagamento", accNone: "Nessun acconto richiesto: il saldo di {tot} è dovuto al check-in.", accPart: "Per confermare è richiesto un acconto del {pct}% del totale, ovvero {dep}. Il saldo di {bal} al check-in.", accFull: "Per confermare è richiesto il pagamento dell'intero importo: {tot}.", cancLabel: "Cancellazione", cancText: "tariffa interamente rimborsabile fino a 7 giorni prima del check-in.", modalita: "Modalità di pagamento", bonifico: "Bonifico bancario", intest: "Intestatario", causale: "Causale", closing: "Restiamo a disposizione per qualsiasi informazione. A presto!", quoteNo: "Preventivo n." },
+  en: { hi: "Dear", guest: "Guest", avail: "we are pleased to confirm availability for the requested dates", periodo: "Dates", ci: "Check-in", co: "Check-out", durata: "Length", notte: "night", notti: "nights", riepilogo: "Price summary", room: "room", aNotte: "per night", colazione: "Breakfast", inclusa: "Included", parcheggio: "Parking", parkIncl: "Included in the price (one car)", culla: "Cot", cullaIncl: "Included (on request)", tassa: "City tax", persone: "guests", totale: "GRAND TOTAL", condizioni: "Terms and payment", accNone: "No deposit required: the balance of {tot} is due at check-in.", accPart: "To confirm, a {pct}% deposit is required, i.e. {dep}. Balance of {bal} at check-in.", accFull: "To confirm, full payment is required: {tot}.", cancLabel: "Cancellation", cancText: "fully refundable up to 7 days before check-in.", modalita: "Payment methods", bonifico: "Bank transfer", intest: "Account holder", causale: "Reference", closing: "We remain at your disposal for any information. See you soon!", quoteNo: "Quote no." },
+  fr: { hi: "Cher/Chère", guest: "client", avail: "nous avons le plaisir de confirmer la disponibilité pour les dates demandées", periodo: "Dates", ci: "Arrivée", co: "Départ", durata: "Durée", notte: "nuit", notti: "nuits", riepilogo: "Récapitulatif", room: "chambre", aNotte: "par nuit", colazione: "Petit-déjeuner", inclusa: "Inclus", parcheggio: "Parking", parkIncl: "Inclus dans le prix (une voiture)", culla: "Lit bébé", cullaIncl: "Inclus (sur demande)", tassa: "Taxe de séjour", persone: "personnes", totale: "TOTAL GÉNÉRAL", condizioni: "Conditions et paiement", accNone: "Aucun acompte requis : le solde de {tot} est dû à l'arrivée.", accPart: "Pour confirmer, un acompte de {pct}% est requis, soit {dep}. Solde de {bal} à l'arrivée.", accFull: "Pour confirmer, le paiement intégral est requis : {tot}.", cancLabel: "Annulation", cancText: "entièrement remboursable jusqu'à 7 jours avant l'arrivée.", modalita: "Moyens de paiement", bonifico: "Virement bancaire", intest: "Titulaire", causale: "Motif", closing: "Nous restons à votre disposition. À bientôt !", quoteNo: "Devis n°" },
+  de: { hi: "Liebe/r", guest: "Gast", avail: "wir bestätigen Ihnen gerne die Verfügbarkeit für den gewünschten Zeitraum", periodo: "Zeitraum", ci: "Anreise", co: "Abreise", durata: "Dauer", notte: "Nacht", notti: "Nächte", riepilogo: "Preisübersicht", room: "Zimmer", aNotte: "pro Nacht", colazione: "Frühstück", inclusa: "Inklusive", parcheggio: "Parkplatz", parkIncl: "Im Preis inbegriffen (ein Auto)", culla: "Kinderbett", cullaIncl: "Inklusive (auf Anfrage)", tassa: "Kurtaxe", persone: "Gäste", totale: "GESAMTBETRAG", condizioni: "Bedingungen und Zahlung", accNone: "Keine Anzahlung erforderlich: Der Restbetrag von {tot} ist bei Anreise fällig.", accPart: "Zur Bestätigung ist eine Anzahlung von {pct}% erforderlich, d.h. {dep}. Restbetrag {bal} bei Anreise.", accFull: "Zur Bestätigung ist die vollständige Zahlung erforderlich: {tot}.", cancLabel: "Stornierung", cancText: "bis 7 Tage vor Anreise voll erstattbar.", modalita: "Zahlungsarten", bonifico: "Banküberweisung", intest: "Kontoinhaber", causale: "Verwendungszweck", closing: "Wir stehen Ihnen gerne zur Verfügung. Bis bald!", quoteNo: "Angebot Nr." },
+  es: { hi: "Estimado/a", guest: "huésped", avail: "tenemos el placer de confirmar la disponibilidad para las fechas solicitadas", periodo: "Fechas", ci: "Entrada", co: "Salida", durata: "Duración", notte: "noche", notti: "noches", riepilogo: "Resumen económico", room: "habitación", aNotte: "por noche", colazione: "Desayuno", inclusa: "Incluido", parcheggio: "Aparcamiento", parkIncl: "Incluido en el precio (un coche)", culla: "Cuna", cullaIncl: "Incluida (bajo petición)", tassa: "Tasa turística", persone: "personas", totale: "TOTAL", condizioni: "Condiciones y pago", accNone: "No se requiere anticipo: el saldo de {tot} se paga en la entrada.", accPart: "Para confirmar se requiere un anticipo del {pct}%, es decir {dep}. Saldo de {bal} en la entrada.", accFull: "Para confirmar se requiere el pago íntegro: {tot}.", cancLabel: "Cancelación", cancText: "totalmente reembolsable hasta 7 días antes de la entrada.", modalita: "Formas de pago", bonifico: "Transferencia bancaria", intest: "Titular", causale: "Concepto", closing: "Quedamos a su disposición. ¡Hasta pronto!", quoteNo: "Presupuesto n.º" },
 };
 
 type QuoteRoom = { roomTypeId: string; qty: number; price: number };
@@ -60,7 +61,7 @@ interface Preventivo {
   breakfast: boolean;
   cot?: boolean;       // culla richiesta (solo con bambini)
   cotPrice?: number;   // € a notte per la culla (0 = inclusa)
-  acconto: 0 | 50 | 100;
+  acconto: number; // % acconto (predefinita dalla scheda struttura)
   note?: string;
   lang: Lang;
   total: number;
@@ -103,7 +104,9 @@ export default function PreventiviPage() {
   // Persone soggette a tassa: automatico = adulti + bambini di 15 anni o più (sotto i 15 esenti).
   const taxKids = childAges.filter((a) => a >= 15).length;
   const taxPersons = adults + taxKids;
-  const [acconto, setAcconto] = useState<0 | 50 | 100>(50);
+  const [acconto, setAcconto] = useState<number>(50);
+  // Predefinito dalla % acconto impostata nella scheda struttura (voce globale).
+  useEffect(() => { try { const d = loadDeposit(); setAcconto(d.on ? Math.min(100, Math.max(0, Math.round(d.pct))) : 0); } catch {} }, []);
   const [breakfast, setBreakfast] = useState(true);
   const [parking, setParking] = useState(true);
   const [parkingPrice, setParkingPrice] = useState(0); // € a notte (0 = incluso)
@@ -137,6 +140,17 @@ export default function PreventiviPage() {
     if (co) setCheckOut(co);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Idratazione: lo store carica dopo il mount. Appena le strutture ci sono, se la selezione è
+  // vuota/non valida scegli la struttura giusta e popola la prima riga camera (evita "scheda vuota").
+  useEffect(() => {
+    if (!structures.length) return;
+    const validSid = !!structureId && structures.some((s) => s.id === structureId);
+    const sid = validSid ? structureId : (lockedStructure && structures.some((s) => s.id === activeStructureId) ? activeStructureId : structures[0].id);
+    if (!validSid) setStructureId(sid);
+    if (roomLines.length === 0) { const rt0 = roomTypes.find((r) => r.structureId === sid); if (rt0) setRoomLines([{ roomTypeId: rt0.id, qty: 1, price: rt0.basePrice }]); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structures, roomTypes]);
 
   // Tariffa automatica dalle tariffe del calendario per il periodo scelto (poi modificabile per riga).
   useEffect(() => {
@@ -174,7 +188,7 @@ export default function PreventiviPage() {
     let acc: string;
     if (acconto === 0) acc = L.accNone.replace("{tot}", eur(total));
     else if (acconto === 100) acc = L.accFull.replace("{tot}", eur(total));
-    else acc = L.accPart.replace("{dep}", eur(deposit)).replace("{bal}", eur(balance));
+    else acc = L.accPart.replace("{dep}", eur(deposit)).replace("{bal}", eur(balance)).replace("{pct}", String(acconto));
     const causale = `${(name || "").trim()} ${fmt(checkIn)}-${fmt(checkOut)}`.trim();
     const payBlock = (docHolder || docIban)
       ? [`• ${L.bonifico}:`, `   ${L.intest}: ${docHolder}`, `   IBAN: ${docIban}`, `   ${L.causale}: ${causale}`, ...(payExtra ? [`• ${payExtra}`] : [])].join("\n")
@@ -267,7 +281,7 @@ export default function PreventiviPage() {
     const L = QL[lang];
     const nWord = n === 1 ? L.notte : L.notti;
     const parkTxt = parkingPrice > 0 ? `${eur(parkingPrice)} ${L.aNotte}` : L.parkIncl;
-    const accText = acconto === 0 ? L.accNone.replace("{tot}", eur(total)) : acconto === 100 ? L.accFull.replace("{tot}", eur(total)) : L.accPart.replace("{dep}", eur(deposit)).replace("{bal}", eur(balance));
+    const accText = acconto === 0 ? L.accNone.replace("{tot}", eur(total)) : acconto === 100 ? L.accFull.replace("{tot}", eur(total)) : L.accPart.replace("{dep}", eur(deposit)).replace("{bal}", eur(balance)).replace("{pct}", String(acconto));
     const causale = `${(name || "").trim()} ${fmt(checkIn)}-${fmt(checkOut)}`.trim();
     const accent = structure?.photoColor || "#BE5D38";
     const logoHtml = structure?.logo
@@ -432,6 +446,10 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                     </div>
                   ))}
                 </div>
+                <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-line pt-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-txt"><input type="checkbox" checked={cot} onChange={(e) => setCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Culla")}</label>
+                  {cot && (<label className="flex items-center gap-2 text-xs text-dim">{t("€/notte (0 = inclusa)")}<input type="number" min={0} value={cotPrice} onChange={(e) => setCotPrice(Number(e.target.value))} className="w-20 rounded-lg border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" /></label>)}
+                </div>
               </div>
             )}
             <div className="col-span-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 text-sm">
@@ -482,24 +500,21 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                   <input type="number" min={0} value={parkingPrice} onChange={(e) => setParkingPrice(Number(e.target.value))} className="w-20 rounded-lg border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
                 </label>
               )}
-              {children > 0 && (
-                <>
-                  <label className="flex items-center gap-2 text-sm font-medium text-txt"><input type="checkbox" checked={cot} onChange={(e) => setCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Culla")}</label>
-                  {cot && (
-                    <label className="flex items-center gap-2 text-xs text-dim">{t("€/notte (0 = inclusa)")}
-                      <input type="number" min={0} value={cotPrice} onChange={(e) => setCotPrice(Number(e.target.value))} className="w-20 rounded-lg border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
-                    </label>
-                  )}
-                </>
-              )}
               <label className="ml-auto flex items-center gap-2 text-sm font-medium text-txt"><input type="checkbox" checked={breakfast} onChange={(e) => setBreakfast(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Colazione inclusa")}</label>
             </div>
             <div className="col-span-2">
-              <div className="mb-1 text-xs font-medium text-dim">{t("Acconto per confermare")}</div>
-              <div className="flex items-center rounded-lg border border-line p-0.5">
-                {([[0, t("Nessuno")], [50, t("50% (saldo prima)")], [100, "100%"]] as const).map(([v, lab]) => (
-                  <button key={v} onClick={() => setAcconto(v as 0 | 50 | 100)} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${acconto === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>
-                ))}
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs font-medium text-dim">{t("Acconto per confermare")} (%)</span>
+                <span className="text-[11px] text-faint">{t("Predefinito dalla scheda struttura")}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <input type="number" min={0} max={100} value={acconto} onChange={(e) => setAcconto(Math.min(100, Math.max(0, Math.round(Number(e.target.value)))))} className="w-24 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-txt outline-none focus:border-focus" />
+                <div className="flex items-center gap-1">
+                  {[0, 30, 50, 100].map((v) => (
+                    <button key={v} onClick={() => setAcconto(v)} className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${acconto === v ? "bg-focus text-white" : "border border-line text-dim hover:text-txt"}`}>{v === 0 ? t("Nessuno") : `${v}%`}</button>
+                  ))}
+                </div>
+                <span className="text-xs text-faint">{acconto <= 0 ? t("saldo al check-in") : acconto >= 100 ? t("intero importo ora") : `${eur(deposit)} ${t("ora")} · ${eur(balance)} ${t("al check-in")}`}</span>
               </div>
             </div>
             <div className="col-span-2 rounded-lg border border-line bg-paper p-3">
@@ -546,7 +561,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               breakfast={breakfast} parking={parking} parkText={parkingPrice > 0 ? `${eur(parkingPrice)} ${QL[lang].aNotte}` : QL[lang].parkIncl}
               cot={wantsCot} cotText={cotPrice > 0 ? `${eur(cotPrice)} ${QL[lang].aNotte}` : QL[lang].cullaIncl}
               cityTax={eur(cityTax)} taxPersons={taxPersons} total={eur(total)}
-              accText={acconto === 0 ? QL[lang].accNone.replace("{tot}", eur(total)) : acconto === 100 ? QL[lang].accFull.replace("{tot}", eur(total)) : QL[lang].accPart.replace("{dep}", eur(deposit)).replace("{bal}", eur(balance))}
+              accText={acconto === 0 ? QL[lang].accNone.replace("{tot}", eur(total)) : acconto === 100 ? QL[lang].accFull.replace("{tot}", eur(total)) : QL[lang].accPart.replace("{dep}", eur(deposit)).replace("{bal}", eur(balance)).replace("{pct}", String(acconto))}
               payHolder={docHolder} payIban={docIban} payExtra={payExtra}
               causale={`${(name || "").trim()} ${fmt(checkIn)}-${fmt(checkOut)}`.trim()} note={note}
             />
