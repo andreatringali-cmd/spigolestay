@@ -8,7 +8,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import {
   PERMISSIONS, PERM_GROUPS, PERM_TEMPLATES, USER_LANGS, AV_COLORS, initials,
   loadUsers, saveUsers, blankUser, defaultNotify,
-  NOTIFY_EVENTS, NOTIFY_CHANNELS, WORK_DAYS, PAY_TYPES, TWO_FA_METHODS,
+  NOTIFY_EVENTS, NOTIFY_CHANNELS, WORK_DAYS, PAY_TYPES,
   type User, type PermLevel,
 } from "@/lib/users";
 import { eur } from "@/lib/format";
@@ -16,6 +16,7 @@ import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
+import MfaSetup from "@/components/MfaSetup";
 
 // --- Micro-componenti ---------------------------------------------------------
 function Toggle({ on, onClick, disabled, color = "var(--focus)" }: { on: boolean; onClick?: () => void; disabled?: boolean; color?: string }) {
@@ -208,16 +209,7 @@ export default function UserSchedaPage() {
               )}
               {pwMsg && <div className="mt-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: pwMsg.ok ? "color-mix(in srgb, var(--ok) 12%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: pwMsg.ok ? "var(--ok)" : "var(--err)" }}>{pwMsg.text}</div>}
             </div>
-            <div className="mt-3 flex items-center justify-between py-1.5">
-              <span className="max-w-[70%] text-sm text-txt">{t("Autenticazione a 2 fattori")}</span>
-              <Toggle on={true} disabled color="var(--ok)" />
-            </div>
-            <label className="mt-1 block text-xs font-medium text-dim">{t("Metodo secondo fattore")}
-              <select value={u.twoFactorMethod ?? "email"} onChange={(e) => set("twoFactorMethod", e.target.value as User["twoFactorMethod"])} className={`${inp} mt-1`}>
-                {TWO_FA_METHODS.map((m) => <option key={m.key} value={m.key}>{t(m.label)}</option>)}
-              </select>
-            </label>
-            <Info>{t("L'autenticazione a due fattori è obbligatoria per tutti gli accessi e non può essere disattivata.")}</Info>
+            <MfaSetup />
           </Card>
 
           {/* Informazioni generali */}

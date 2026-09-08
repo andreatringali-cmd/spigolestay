@@ -12,6 +12,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { useRouter } from "next/navigation";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase, supabaseEnabled } from "./supabase";
+import MfaChallenge from "@/components/MfaChallenge";
 
 // Prefissi delle chiavi che rappresentano lo stato dell'account (da sincronizzare).
 const SYNC_PREFIXES = ["spigolestay:", "xenora:"];
@@ -91,6 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
+  const [mfaChecked, setMfaChecked] = useState(false); // AAL verificato per la sessione corrente
+  const [mfaNeeded, setMfaNeeded] = useState(false);    // il 2FA è attivo ma la sessione è a un fattore
   const pushTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastPushed = useRef<string>("");
 
@@ -111,11 +114,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!loading && !session) router.replace("/login");
   }, [loading, session, router]);
 
+  // 2b) Livello di sicurezza (2FA): se l'account ha il 2FA attivo e la sessione è ancora a un fattore,
+  // va richiesto il secondo fattore. In caso di errore non blocchiamo (fail-open, evita lockout).
+  useEffect(() => {
+    if (!supabaseEnabled || !supabase) { setMfaChecked(true); setMfaNeeded(false); return; }
+    if (!session) { setMfaChecked(true); setMfaNeeded(false); return; }
+    let cancelled = false;
+    setMfaChecked(false);
+    (async () => {
+      try {
+        const { data, error } = await supabase!.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (cancelled) return;
+        setMfaNeeded(!error && !!data && data.nextLevel === "aal2" && data.currentLevel !== "aal2");
+      } catch { if (!cancelled) setMfaNeeded(false); }
+      finally { if (!cancelled) setMfaChecked(true); }
+    })();
+    return () => { cancelled = true; };
+  }, [session]);
+
   // 3) Al login: scarica lo stato dal server e reidrata una sola volta per questo utente/tab.
   useEffect(() => {
     if (!supabaseEnabled || !supabase) return;
     const uid = session?.user?.id;
     if (!uid) { setHydrated(false); return; }
+    if (!mfaChecked || mfaNeeded) return; // attendi la verifica 2FA prima di reidratare
     let cancelled = false;
     const flagKey = "spigolestay:hydrated-for";
     const authUser = session?.user;
@@ -226,7 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user?.id]);
+  }, [session?.user?.id, mfaChecked, mfaNeeded]);
 
   const signOut = async () => {
     stopPush();
@@ -253,6 +275,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   if (!supabaseEnabled) return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
   if (loading) return <Splash label="Avvio…" />;
   if (!session) return <Splash label="Reindirizzamento all'accesso…" />;
+  if (!mfaChecked) return <Splash label="Verifica sicurezza…" />;
+  if (mfaNeeded) return <MfaChallenge onVerified={() => setMfaNeeded(false)} onSignOut={signOut} />;
   if (!hydrated) return <Splash label="Carico i tuoi dati…" />;
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
