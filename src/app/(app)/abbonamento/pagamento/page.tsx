@@ -4,6 +4,7 @@
 // Stripe e NON passano dall'app: qui si mostra solo lo stato e i dati di fatturazione.
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 
@@ -13,11 +14,30 @@ const empty: Billing = { businessName: "", vat: "", taxCode: "", address: "", sd
 
 export default function PagamentoPage() {
   const { t } = useLang();
+  const router = useRouter();
   const [b, setB] = useState<Billing>(empty);
   const [saved, setSaved] = useState(false);
+  const [customer, setCustomer] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
   useEffect(() => { try { const r = localStorage.getItem(KEY); if (r) setB({ ...empty, ...JSON.parse(r) }); } catch {} }, []);
+  useEffect(() => { try { const c = localStorage.getItem("spigolestay:stripecustomer"); if (c) setCustomer(c); } catch {} }, []);
   const set = (k: keyof Billing, v: string) => setB((p) => ({ ...p, [k]: v }));
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(b)); } catch {} setSaved(true); window.setTimeout(() => setSaved(false), 2000); };
+
+  // Aggiungi/gestisci carta: la carta è gestita da Stripe (non passa dall'app).
+  const addCard = async () => {
+    setNotice("");
+    if (!customer) { setNotice(t("Per aggiungere la carta scegli prima un piano: la carta si inserisce al pagamento (gestito da Stripe).")); setTimeout(() => router.push("/abbonamento"), 1400); return; }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/stripe/portal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ customerId: customer }) });
+      const d = await res.json().catch(() => ({}));
+      if (d?.url) { window.location.href = d.url; return; }
+      setNotice(t("Non è stato possibile aprire il portale pagamenti. Riprova."));
+    } catch { setNotice(t("Errore di rete. Riprova.")); }
+    setBusy(false);
+  };
 
   const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
@@ -35,11 +55,12 @@ export default function PagamentoPage() {
           <div className="mt-2 flex items-center gap-3 rounded-xl border border-line bg-paper p-3">
             <div className="grid h-10 w-14 place-items-center rounded-md bg-wash text-dim"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg></div>
             <div className="flex-1">
-              <div className="text-sm font-semibold text-txt">{t("Nessuna carta salvata")}</div>
-              <div className="text-[11px] text-faint">{t("Aggiungi una carta per attivare il pagamento automatico dell'abbonamento.")}</div>
+              <div className="text-sm font-semibold text-txt">{customer ? t("Carta gestita su Stripe") : t("Nessuna carta salvata")}</div>
+              <div className="text-[11px] text-faint">{customer ? t("Apri il portale per vedere o cambiare la carta.") : t("Aggiungi una carta per attivare il pagamento automatico dell'abbonamento.")}</div>
             </div>
           </div>
-          <button disabled className="mt-3 w-full cursor-not-allowed rounded-lg border border-line py-2 text-sm font-semibold text-dim opacity-70" title={t("Disponibile alla messa in produzione")}>＋ {t("Aggiungi metodo di pagamento")}</button>
+          <button onClick={addCard} disabled={busy} className="mt-3 w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60">{busy ? t("Attendi…") : (customer ? t("Gestisci carta su Stripe") : `＋ ${t("Aggiungi metodo di pagamento")}`)}</button>
+          {notice && <div className="mt-2 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 12%, transparent)", color: "var(--dim)" }}>{notice}</div>}
           <div className="mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-[11px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 9%, transparent)", color: "var(--dim)" }}>
             <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: "var(--focus)" }}>i</span>
             <span>{t("In produzione il pagamento è gestito in modo sicuro da Stripe: i dati della carta non passano né vengono salvati dall'app.")}</span>

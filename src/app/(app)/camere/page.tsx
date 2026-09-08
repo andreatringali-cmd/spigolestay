@@ -342,7 +342,9 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
     return { name: String(n), code: `${prefix}${n}` };
   };
   const amenitiesFor = (rtId: string) => roomTypes.find((r) => r.id === rtId)?.amenities ?? [];
-  const [f, setF] = useState<Partial<Unit>>(() => unit ?? { ...nextRoom(types[0]?.id ?? ""), roomTypeId: types[0]?.id ?? "", amenities: [...amenitiesFor(types[0]?.id ?? "")], floor: "", view: "", outOfService: false });
+  const [f, setF] = useState<Partial<Unit>>(() => unit
+    ? { ...unit, amenities: Array.from(new Set([...amenitiesFor(unit.roomTypeId), ...(unit.amenities ?? [])])) }
+    : { ...nextRoom(types[0]?.id ?? ""), roomTypeId: types[0]?.id ?? "", amenities: [...amenitiesFor(types[0]?.id ?? "")], floor: "", view: "", outOfService: false });
   const set = <K extends keyof Unit>(k: K, v: Unit[K]) => setF((p) => ({ ...p, [k]: v }));
   // Codice camera automatico = prime 3 lettere tipologia + numero (nome). Non si digita.
   const codeOf = (name?: string, rtId?: string) => { const rt = roomTypes.find((r) => r.id === rtId); const prefix = (rt?.name || "").replace(/\s+/g, "").slice(0, 3).toUpperCase(); const nm = (name || "").trim(); return nm ? `${prefix}${nm}` : ""; };
@@ -370,7 +372,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
       <div className="grid grid-cols-2 gap-3">
         <label className={`${lbl} col-span-2`}>{t("Nome camera")} *<input value={f.name ?? ""} onChange={(e) => set("name", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. Camera Ortigia")} /></label>
         <label className={lbl}>{t("Codice")} <span className="font-normal text-faint">({t("automatico")})</span><input value={autoCode} readOnly title={t("Generato da tipologia + numero")} className={`${inp} mt-1 cursor-not-allowed bg-wash text-dim`} placeholder="—" /></label>
-        <label className={lbl}>{t("Tipologia")}<select value={f.roomTypeId ?? ""} onChange={(e) => { const rid = e.target.value; if (unit) { set("roomTypeId", rid); } else { const nr = nextRoom(rid); setF((p) => ({ ...p, roomTypeId: rid, name: nr.name, amenities: [...amenitiesFor(rid)] })); } }} className={`${inp} mt-1`}>{types.length === 0 && <option value="">{t("Crea prima una tipologia")}</option>}{types.map((rt) => <option key={rt.id} value={rt.id}>{rt.name}</option>)}</select></label>
+        <label className={lbl}>{t("Tipologia")}<select value={f.roomTypeId ?? ""} onChange={(e) => { const rid = e.target.value; if (unit) { setF((p) => ({ ...p, roomTypeId: rid, amenities: Array.from(new Set([...amenitiesFor(rid), ...(p.amenities ?? [])])) })); } else { const nr = nextRoom(rid); setF((p) => ({ ...p, roomTypeId: rid, name: nr.name, amenities: [...amenitiesFor(rid)] })); } }} className={`${inp} mt-1`}>{types.length === 0 && <option value="">{t("Crea prima una tipologia")}</option>}{types.map((rt) => <option key={rt.id} value={rt.id}>{rt.name}</option>)}</select></label>
         <label className={lbl}>{t("Piano")}<input value={f.floor ?? ""} onChange={(e) => set("floor", e.target.value)} className={`${inp} mt-1`} placeholder={t("Terra / 1° / 2°")} /></label>
         <label className={lbl}>{t("Vista")}<select value={f.view ?? ""} onChange={(e) => set("view", e.target.value)} className={`${inp} mt-1`}><option value="">—</option>{VIEW_OPTIONS.map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
         <label className={lbl}>{t("Configurazione letti")}<select value={f.bedConfig ?? ""} onChange={(e) => set("bedConfig", e.target.value || undefined)} className={`${inp} mt-1`}><option value="">{t("Come tipologia")}</option>{BED_CONFIGS.map((b) => <option key={b} value={b}>{t(b)}</option>)}</select></label>
@@ -410,7 +412,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
 
       {/* Dotazioni specifiche della camera */}
       <div className="mt-3">
-        <span className={lbl}>{t("Dotazioni della camera")}</span>
+        <span className={lbl}>{t("Dotazioni della camera")} <span className="font-normal text-faint">· {t("ereditate dalla tipologia, personalizzabili")}</span></span>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {ROOM_AMENITIES.map((a) => {
             const on = (f.amenities ?? []).includes(a);
