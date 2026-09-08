@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
+import { sortUnitsByName } from "@/lib/sortUnits";
 import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
 import { nights, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
@@ -381,7 +382,7 @@ export default function BookingDrawer() {
   const nEdit = form ? Math.max(0, nights(form.checkIn, form.checkOut)) : 0;
   const taxEdit = form ? cityTaxOf(structure, form.adults, nEdit, form.total, form.cityTaxExempt) : 0;
   const totalEdit = form ? form.total + form.cleaningFee + taxEdit : 0;
-  const structUnits = units.filter((u) => u.structureId === booking.structureId);
+  const structUnits = sortUnitsByName(units.filter((u) => u.structureId === booking.structureId));
 
   const save = () => {
     if (!form) return;

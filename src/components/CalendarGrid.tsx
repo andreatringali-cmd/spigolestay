@@ -17,6 +17,7 @@ import {
   weekdayShort,
 } from "@/lib/dates";
 import { eur } from "@/lib/format";
+import { sortUnitsByName } from "@/lib/sortUnits";
 import Icon from "@/components/Icon";
 import DateField from "@/components/DateField";
 
@@ -709,7 +710,7 @@ export default function CalendarGrid() {
     const { keyId, name, beds, typeIds, sectionUnits, editableAvail } = opts;
     const gStrip = groupStrip(typeIds, sectionUnits);
     const cap = sectionUnits.filter((u) => typeIds.includes(u.roomTypeId) && !u.outOfService).length;
-    const secUnits = sectionUnits.filter((u) => typeIds.includes(u.roomTypeId));
+    const secUnits = sortUnitsByName(sectionUnits.filter((u) => typeIds.includes(u.roomTypeId)));
     return (
       <div key={keyId} className="border-t-2 border-line">
         {vw.rate && (

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
+import { sortUnitsByName } from "@/lib/sortUnits";
 import { CHANNELS, type Channel, type RoomType } from "@/lib/types";
 import { effBase, effectiveClosed } from "@/lib/pricing";
 import { shiftISO, toISO } from "@/lib/dates";
@@ -59,7 +60,7 @@ export default function NewBookingModal() {
   const nightsN = Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000));
   const party = adults + children;
 
-  const availUnits = (rt: RoomType) => units.filter((u) => u.roomTypeId === rt.id && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn));
+  const availUnits = (rt: RoomType) => sortUnitsByName(units.filter((u) => u.roomTypeId === rt.id && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn)));
   const dayPrice = (rt: RoomType, iso: string) => { const base = effBase(rt, roomTypes); const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(base * (isWeekend(iso) ? 1 + weekendPct / 100 : 1)); return Math.max(0, Math.round(raw)); };
   const stayPrice = (rt: RoomType) => { let s = 0; for (let i = 0; i < nightsN; i++) s += dayPrice(rt, shiftISO(checkIn, i)); return s; };
   const cap = (rt: RoomType) => rt.maxOccupancy ?? rt.beds ?? 2;
