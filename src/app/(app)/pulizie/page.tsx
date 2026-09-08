@@ -22,10 +22,10 @@ const STRUCT_COLORS = ["#4F46E5", "#2F9E6F", "#C08A3A", "#B3453A", "#0891B2", "#
 
 type ActionKey = "turnover" | "arrivo" | "partenza" | "riassetto" | "niente";
 const ACT: Record<ActionKey, { label: string; color: string }> = {
-  turnover: { label: "Partenza + Arrivo", color: "var(--err)" },
-  arrivo: { label: "Arrivo", color: "var(--focus)" },
-  partenza: { label: "Partenza", color: "var(--warn)" },
-  riassetto: { label: "Riassetto", color: "var(--ok)" },
+  turnover: { label: "Partenza + Arrivo", color: "#7C3AED" },
+  arrivo: { label: "Arrivo", color: "var(--ok)" },
+  partenza: { label: "Partenza", color: "var(--err)" },
+  riassetto: { label: "Riassetto", color: "var(--warn)" },
   niente: { label: "Niente", color: "var(--faint)" },
 };
 

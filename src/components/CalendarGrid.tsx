@@ -146,7 +146,6 @@ export default function CalendarGrid() {
     return new Date(t.getFullYear(), t.getMonth(), 1); // vista mensile: parte dal 1° del mese
   });
   const [dragView, setDragView] = useState<DragView | null>(null);
-  const [toast, setToast] = useState<{ id: string; prev: { unitId: string | null; checkIn: string; checkOut: string } } | null>(null);
   const [oos, setOos] = useState<null | { id?: string; unitId: string; structureId: string; roomTypeId: string; from: string; to: string; reason: string }>(null);
   // Conferma correzione prezzo (Copilota = prezzo singolo, Simulatore = variazione % massiva su un periodo scelto).
   const [priceConfirm, setPriceConfirm] = useState<null | { kind: "single"; subject: string; detail?: string; from: number; to: number; onOk: () => void } | { kind: "bulk"; pct: number; from: string; to: string }>(null);
@@ -312,7 +311,6 @@ export default function CalendarGrid() {
   const unitsRef = useRef(units);
   const typesRef = useRef(roomTypes);
   const startRef = useRef(start);
-  const toastTimer = useRef<number | undefined>(undefined);
   useEffect(() => { dragViewRef.current = dragView; }, [dragView]);
   useEffect(() => { bookingsRef.current = bookings; }, [bookings]);
   useEffect(() => { unitsRef.current = units; }, [units]);
@@ -375,9 +373,6 @@ export default function CalendarGrid() {
     const mc = moveConfirm;
     moveBooking(mc.id, { unitId: mc.targetUnitId, checkIn: mc.checkIn, checkOut: mc.checkOut });
     setMoveConfirm(null);
-    setToast({ id: mc.id, prev: mc.prev });
-    window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(null), 6000);
   };
 
   function onBarPointerDown(e: React.PointerEvent, bId: string) {
@@ -387,11 +382,6 @@ export default function CalendarGrid() {
     window.addEventListener("pointerup", onPointerUp);
   }
 
-  function undo() {
-    if (!toast) return;
-    moveBooking(toast.id, { unitId: toast.prev.unitId as string, checkIn: toast.prev.checkIn, checkOut: toast.prev.checkOut });
-    setToast(null);
-  }
 
   // Geometria barra (cella piena: occupa per intero i giorni pernottati).
   function geom(checkIn: string, checkOut: string) {
@@ -1344,13 +1334,6 @@ export default function CalendarGrid() {
         </div>
       )}
 
-      {/* Toast con Annulla */}
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5 shadow-lg">
-          <span className="text-sm text-txt">Prenotazione spostata</span>
-          <button onClick={undo} className="rounded-md bg-focus px-2.5 py-1 text-xs font-semibold text-white">Annulla</button>
-        </div>
-      )}
 
       {/* Selettore su selezione cella: prenotazione o fuori servizio (per l'intervallo scelto) */}
       {pick && (() => {
