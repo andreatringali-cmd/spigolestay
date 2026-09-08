@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { toISO, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
@@ -27,6 +27,18 @@ export default function UpsellingPage() {
   const catStruct = structures.find((s) => s.id === catId);
   const catExtras = catStruct?.extras ?? [];
   const saveCat = (next: ExtraService[]) => { if (catId) updateStructure(catId, { extras: next }); };
+  // Alla PRIMA apertura del catalogo di una struttura (se vuoto) carica gli esempi in automatico,
+  // una sola volta: se poi l'utente li elimina, non ricompaiono.
+  useEffect(() => {
+    if (!catId || !catStruct) return;
+    try {
+      const seeded: string[] = JSON.parse(localStorage.getItem("spigolestay:extrasseeded") || "[]");
+      if (seeded.includes(catId)) return;
+      if ((catStruct.extras ?? []).length === 0) updateStructure(catId, { extras: DEFAULT_EXTRAS });
+      localStorage.setItem("spigolestay:extrasseeded", JSON.stringify([...new Set([...seeded, catId])]));
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catId]);
   const addExtra = () => { const e: ExtraService = { id: String(Date.now()), name: "Nuovo extra", desc: "", price: 20, per: "stay" }; saveCat([...catExtras, e]); setEditId(e.id); };
   const updExtra = (id: string, patch: Partial<ExtraService>) => saveCat(catExtras.map((e) => (e.id === id ? { ...e, ...patch } : e)));
   const delExtra = (id: string) => saveCat(catExtras.filter((e) => e.id !== id));
@@ -88,7 +100,6 @@ export default function UpsellingPage() {
             {catExtras.length === 0 && (
               <div className="rounded-lg border border-dashed border-line py-6 text-center text-sm text-faint">
                 Nessun extra per questa struttura.
-                <div className="mt-2"><button onClick={() => saveCat(DEFAULT_EXTRAS)} disabled={!catId} className="rounded-md border border-line px-2.5 py-1 text-xs font-medium text-focus hover:bg-wash disabled:opacity-40">Carica esempi</button></div>
               </div>
             )}
             {catExtras.map((e) => (
