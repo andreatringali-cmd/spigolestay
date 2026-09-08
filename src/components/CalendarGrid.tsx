@@ -843,6 +843,9 @@ export default function CalendarGrid() {
           <button onClick={() => (INSIGHT_CARDS.some((c) => showCard(c.key)) ? persistCards(new Set(INSIGHT_CARDS.map((c) => c.key))) : persistCards(new Set()))} title={INSIGHT_CARDS.some((c) => showCard(c.key)) ? "Nascondi le card" : "Mostra le card"} className={`grid h-9 w-9 place-items-center rounded-lg border border-line transition ${INSIGHT_CARDS.some((c) => showCard(c.key)) ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
             <Icon name="chart" size={16} />
           </button>
+          <Link href="/importa" title="Importa prenotazioni" aria-label="Importa prenotazioni" className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12" /><path d="m8 11 4 4 4-4" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>
+          </Link>
           <Link href="/prenotazioni/nuova" className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-txt transition hover:bg-wash">+ Nuova</Link>
         </div>
       </div>
