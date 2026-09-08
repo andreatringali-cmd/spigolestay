@@ -109,9 +109,7 @@ export default function OspitiPage() {
 
   return (
     <div>
-      <PageHeader title={t("Ospiti")} subtitle={`${guests.length} ${t("anagrafiche")}`}
-        actions={dupCount > 0 ? <button onClick={mergeDuplicates} className="rounded-lg border border-[color:color-mix(in_srgb,var(--warn)_50%,var(--line))] bg-[color:color-mix(in_srgb,var(--warn)_10%,transparent)] px-3 py-2 text-sm font-semibold text-txt hover:bg-[color:color-mix(in_srgb,var(--warn)_18%,transparent)]">⤳ {t("Unisci duplicati")} ({dupCount})</button> : undefined}
-      />
+      <PageHeader title={t("Ospiti")} subtitle={`${guests.length} ${t("anagrafiche")}`} />
 
       {/* Card statistiche */}
       <div className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
@@ -125,8 +123,11 @@ export default function OspitiPage() {
 
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca per nome, email o paese…")} className="w-full max-w-sm rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
-        <button onClick={() => router.push("/promozioni")} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">✉ {t("Promozioni")}</button>
-        <button onClick={() => router.push("/ospiti/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ {t("Nuovo ospite")}</button>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {dupCount > 0 && <button onClick={mergeDuplicates} className="rounded-lg border px-3 py-2 text-sm font-semibold text-txt hover:opacity-90" style={{ borderColor: "color-mix(in srgb, var(--warn) 50%, var(--line))", backgroundColor: "color-mix(in srgb, var(--warn) 10%, transparent)" }}>⤳ {t("Unisci duplicati")} ({dupCount})</button>}
+          <button onClick={() => router.push("/promozioni")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">✉ {t("Promozioni")}</button>
+          <button onClick={() => router.push("/ospiti/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ {t("Nuovo ospite")}</button>
+        </div>
       </div>
 
       {sel.size > 0 && (
