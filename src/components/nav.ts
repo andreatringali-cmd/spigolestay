@@ -15,7 +15,6 @@ export const NAV: NavItem[] = [
   { label: "Calendario", href: "/calendario", group: "Operatività", icon: "calendar", perm: "calendario", module: "pms" },
   { label: "Pulizie", href: "/pulizie", group: "Operatività", icon: "sparkles", perm: "pulizie", module: "housekeeping" },
   { label: "Messaggi", href: "/messaggi", group: "Operatività", icon: "chat", perm: "webconcierge", module: "messaging" },
-  { label: "Importa prenotazioni", href: "/importa", group: "Operatività", icon: "fileText", perm: "impostazioni", module: "pms" },
 
   // Vendita: cosa vendi e come lo proponi.
   { label: "Preventivi", href: "/preventivi", group: "Vendita", icon: "fileText", perm: "webconcierge", module: "concierge" },
