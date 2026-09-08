@@ -737,17 +737,13 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               <div className="mt-3 text-xs font-medium text-dim">{t("Messaggio di conferma")} ({LANGS.find(([l]) => l === q.lang)?.[1]})</div>
               <textarea readOnly value={confMsg} rows={9} className="mt-1 w-full resize-none rounded-lg border border-line bg-paper p-3 text-xs text-txt" />
 
-              {!confirmed ? (
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <button onClick={() => confirmBooking(false)} className="rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt hover:bg-wash">{t("Crea prenotazione")}</button>
-                  <button onClick={() => confirmBooking(true)} disabled={pct === 0} title={pct === 0 ? t("Imposta un anticipo maggiore di 0") : undefined} className="rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Incassa anticipo")}</button>
-                </div>
-              ) : (
+              {confirmed && (
                 <div className="mt-3 rounded-lg px-3 py-2 text-sm font-medium text-[color:var(--ok)]" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)" }}>{t("Prenotazione creata")} ✓ — {t("invia la conferma all'ospite:")}</div>
               )}
 
-              <div className="mt-2 flex flex-wrap gap-2">
-                <a href={mail} className={`rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white ${q.email ? "" : "pointer-events-none opacity-40"}`}>{t("Invia email")}</a>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {!confirmed && <button onClick={() => confirmBooking(false)} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Crea prenotazione")}</button>}
+                <a href={mail} className={`rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash ${q.email ? "" : "pointer-events-none opacity-40"}`}>{t("Invia email")}</a>
                 <a href={wa} target="_blank" rel="noreferrer" className={`rounded-lg px-3 py-2 text-sm font-semibold text-white ${digits ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
                 <button onClick={() => navigator.clipboard?.writeText(confMsg)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">{t("Copia")}</button>
               </div>
