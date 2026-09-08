@@ -121,13 +121,17 @@ export default function PreventiviPage() {
   const [lang, setLang] = useState<Lang>("it");
   // Anteprima come foglio A4 reale: misuro la larghezza disponibile e scalo la pagina (794px = A4 @96dpi).
   const previewRef = useRef<HTMLDivElement>(null);
-  const [pw, setPw] = useState(720);
+  const [pw, setPw] = useState(700);
   useEffect(() => {
     const el = previewRef.current; if (!el) return;
-    const upd = () => setPw(Math.max(280, el.clientWidth - 16));
-    const ro = new ResizeObserver(upd); ro.observe(el); upd();
-    return () => ro.disconnect();
-  }, []);
+    const measure = () => { const w = el.clientWidth - 16; if (w > 60) setPw(w); };
+    measure();
+    const raf = requestAnimationFrame(measure);
+    const ro = new ResizeObserver((entries) => { const w = entries[0]?.contentRect.width; if (w && w > 60) setPw(w); });
+    ro.observe(el);
+    window.addEventListener("resize", measure);
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); window.removeEventListener("resize", measure); };
+  }, [tab]);
   // Dati di pagamento (salvati nel browser, si inseriscono una volta).
   const [payHolder, setPayHolder] = useState("");
   const [payIban, setPayIban] = useState("");
