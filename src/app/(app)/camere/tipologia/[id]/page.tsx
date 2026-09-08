@@ -79,10 +79,11 @@ export default function TipologiaSchedaPage() {
       let maxN = mine.reduce((mx, u) => Math.max(mx, numFromName(u.name)), 0);
       if (maxN < cur) maxN = cur;
       const prefix = (existing.name || "").replace(/\s+/g, "").slice(0, 3).toUpperCase();
+      const inheritAmenities = [...(f.amenities ?? existing.amenities ?? [])];
       for (let i = 1; i <= add; i++) {
         const n = maxN + i;
         const id = addUnit({ structureId: existing.structureId, roomTypeId: existing.id, name: String(n) });
-        updateUnit(id, { code: `${prefix}${n}` });
+        updateUnit(id, { code: `${prefix}${n}`, amenities: inheritAmenities });
       }
       setRoomMsg(`${t("Aggiunte")} ${add} ${t("camere")} · ${t("totale")} ${target}.`);
     } else {
