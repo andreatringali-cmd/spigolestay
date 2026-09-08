@@ -272,7 +272,6 @@ export default function BookingDrawer() {
         <Row label={t("Email")} value={guest?.email ?? "—"} />
         <Row label={t("Telefono")} value={guest?.phone ?? "—"} mono />
         <Row label={t("Paese")} value={guest?.country ?? "—"} />
-        <button onClick={() => { const gid = booking.guestId; closeBooking(); router.push(`/ospiti/${gid}`); }} className="mt-1 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-focus hover:bg-wash">{t("Scheda completa ospite")} →</button>
       </Section>
 
       <Section title={t("Soggiorno")}>
@@ -383,6 +382,7 @@ export default function BookingDrawer() {
           {voucher.sending ? t("Invio…") : t("Invia voucher / conferma")}
         </button>
         {voucher.msg && <div className={`mt-1.5 text-center text-[11px] ${voucher.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{voucher.msg}</div>}
+        <button onClick={() => { const gid = booking.guestId; closeBooking(); router.push(`/ospiti/${gid}`); }} className="mt-2 w-full rounded-lg border border-line px-3 py-2 text-xs font-medium text-focus hover:bg-wash">{t("Scheda completa ospite")} →</button>
       </div>
     </>
   );
@@ -510,10 +510,10 @@ export default function BookingDrawer() {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto p-4 sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <button aria-label={t("Chiudi")} onClick={closeBooking} className="fixed inset-0 bg-black/40" />
 
-      <div className="anim-in relative z-10 my-auto flex max-h-[calc(100vh-3rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
+      <div className="anim-in relative z-10 flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
         {/* Intestazione */}
         <div className="flex items-start justify-between border-b border-line px-5 py-4">
           <div className="min-w-0">
