@@ -513,7 +513,7 @@ export default function BookingDrawer() {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <button aria-label={t("Chiudi")} onClick={closeBooking} className="fixed inset-0 bg-black/40" />
 
-      <div className="anim-in relative z-10 flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
+      <div className="anim-in relative z-10 flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
         {/* Intestazione */}
         <div className="flex items-start justify-between border-b border-line px-5 py-4">
           <div className="min-w-0">
