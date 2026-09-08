@@ -294,14 +294,21 @@ export default function BookingDrawer() {
           <span className="text-right font-mono text-sm text-txt">{eur(taxV)}</span>
         </div>
         {booking.depositPaid && <Row label={t("Caparra")} value={t("ricevuta ✓")} />}
-        <div className="my-2 border-t border-line" />
-        <Row label={t("Totale ospite")} value={eur(totalV)} mono strong />
-        <Row label={t("Incassato")} value={eur(paidV)} mono />
-        <div className="flex items-baseline justify-between gap-4">
-          <span className="text-sm text-dim">{t("Saldo dovuto")}</span>
-          <span className="text-right font-mono text-sm font-bold" style={{ color: balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span>
+        <div className="mt-1 rounded-xl bg-wash px-3 py-2.5">
+          <div className="flex items-baseline justify-between gap-4">
+            <span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span>
+            <span className="font-mono text-lg font-bold tabular-nums text-txt">{eur(totalV)}</span>
+          </div>
+          <div className="mt-1.5 flex items-baseline justify-between gap-4 text-sm">
+            <span className="text-dim">{t("Incassato")}</span>
+            <span className="font-mono tabular-nums text-dim">{eur(paidV)}</span>
+          </div>
+          <div className="mt-1 flex items-baseline justify-between gap-4">
+            <span className="text-sm text-dim">{t("Saldo dovuto")}</span>
+            <span className="font-mono text-sm font-bold tabular-nums" style={{ color: balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span>
+          </div>
         </div>
-        <div className="my-2 border-t border-line" />
+        <div className="my-1 border-t border-line" />
         {commV > 0 && <Row label={`${t("Commissione")} (${commPctV}%)`} value={eur(commV)} mono />}
         <Row label={t("Netto struttura")} value={eur(nettoV)} mono strong />
       </Section>
@@ -514,28 +521,32 @@ export default function BookingDrawer() {
       <button aria-label={t("Chiudi")} onClick={closeBooking} className="fixed inset-0 bg-black/40" />
 
       <div className="anim-in relative z-10 flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
+        {/* Accento canale */}
+        <div className="h-1 w-full shrink-0" style={{ background: `var(${ch.cssVar})` }} />
         {/* Intestazione */}
-        <div className="flex items-start justify-between border-b border-line px-5 py-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: `var(${ch.cssVar})`, color: ch.text }}>{ch.label}</span>
-              <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: st.color }}>
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: st.color }} />{t(st.label)}
+        <div className="flex items-start gap-3 border-b border-line px-5 py-4">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold text-white shadow-sm" style={{ backgroundColor: `var(${ch.cssVar})` }}>{(guest?.fullName ?? "?").split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?"}</div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `var(${ch.cssVar})`, color: ch.text }}>{ch.label}</span>
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 14%, transparent)`, color: st.color }}>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: st.color }} />{t(st.label)}
               </span>
-              <span className="text-xs text-dim">#{bookingCode(booking)}</span>
+              <span className="rounded-md bg-wash px-1.5 py-0.5 font-mono text-[11px] text-dim">#{bookingCode(booking)}</span>
             </div>
-            <h2 className="mt-2 truncate font-display text-xl font-bold tracking-tight text-txt">{guest?.fullName ?? t("Ospite")}</h2>
+            <h2 className="mt-1.5 truncate font-display text-2xl font-bold tracking-tight text-txt">{guest?.fullName ?? t("Ospite")}</h2>
+            <div className="mt-0.5 truncate text-xs text-dim">{roomType?.name}{unitV?.name ? ` · ${unitV.name}` : ""} · {fmtDate(booking.checkIn)} → {fmtDate(booking.checkOut)} · {nView} {nView === 1 ? t("notte") : t("notti")}</div>
             {(() => { const bd = birthdayInStay(guest?.birthDate, booking.checkIn, booking.checkOut); return bd ? (
               <span className="mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, #DB2777 15%, transparent)", color: "#DB2777" }} title={t("Compleanno durante il soggiorno")}>
                 <Icon name="cake" size={13} />{t("Compleanno")} {fmtDate(bd)}
               </span>
             ) : null; })()}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             {mode === "view" && (
               <button onClick={() => { loadForm(); setMode("edit"); }} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("Modifica")}</button>
             )}
-            <button onClick={closeBooking} className="rounded-md px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+            <button onClick={closeBooking} aria-label={t("Chiudi")} className="grid h-8 w-8 place-items-center rounded-lg text-dim hover:bg-wash hover:text-txt">✕</button>
           </div>
         </div>
 
