@@ -370,7 +370,9 @@ async function translateContent(content: GContent, to: string): Promise<GContent
 }
 
 export default function GuidaOspitiPage() {
-  const { structures, units, roomTypes, activeStructureId, updateStructure, bookings, getUnit, getGuest } = useData();
+  const { structures, units, roomTypes, activeStructureId, updateStructure, bookings, getUnit, getGuest, addActivity } = useData();
+  // Registra nel "Registro attività" una voce per sessione di modifica della guida (non a ogni tasto).
+  const loggedGuideSids = useRef<Set<string>>(new Set());
   const [sid, setSid] = useState(activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""));
   // La struttura si sceglie dal selettore globale in alto (StructureSwitcher): qui la seguiamo.
   useEffect(() => { if (activeStructureId !== "all") setSid(activeStructureId); }, [activeStructureId]);
@@ -391,7 +393,11 @@ export default function GuidaOspitiPage() {
 
   const struct = structures.find((s) => s.id === sid);
   const guide = all[sid] ?? emptyGuide(sid, struct?.name ?? "", struct?.city ?? "Siracusa");
-  const set = (patch: Partial<Guide>) => persist({ ...all, [sid]: { ...guide, ...patch, id: sid } });
+  const set = (patch: Partial<Guide>) => {
+    // Prima modifica manuale di questa guida nella sessione → una voce nel registro attività.
+    if (loaded && !loggedGuideSids.current.has(sid)) { loggedGuideSids.current.add(sid); addActivity("config", `Guida ospiti aggiornata${struct?.name ? " — " + struct.name : ""}`); }
+    persist({ ...all, [sid]: { ...guide, ...patch, id: sid } });
+  };
   const setSocial = (patch: Partial<Guide["social"]>) => set({ social: { ...guide.social, ...patch } });
   const tv = guide.tv ?? { enabled: false, bg: "", welcome: "", sections: [], showGuest: true };
   const setTv = (patch: Partial<NonNullable<Guide["tv"]>>) => set({ tv: { ...tv, ...patch } });
