@@ -94,7 +94,7 @@ window.I18N.en = {
         sub: "We are always here for you",
         items: [
           { h: "WhatsApp, Telegram, Viber", p: "The fastest way to reach us.", actions: [{ label: "Open WhatsApp", href: "{whatsapp}", type: "wa", icon: "chat" }] },
-          { h: "Phone", p: "For urgent matters and quick messages.", actions: [{ label: "Stefano", href: "{phone}", type: "tel", icon: "phone" }, { label: "Greta", href: "{phoneGreta}", type: "tel", icon: "phone" }] },
+          { h: "Phone", p: "For urgent matters and quick messages.", actions: [{ label: "Call", href: "{phone}", type: "tel", icon: "phone", onlyIf: "phone" }, { label: "Other number", href: "{phoneGreta}", type: "tel", icon: "phone", onlyIf: "phoneGreta" }] },
           { h: "Email", p: "{email}", actions: [{ label: "Write an email", href: "{email}", type: "mail", icon: "info" }] },
           { h: "Come back and see us!", p: "Book directly for your next stays: returning guests always get the very best treatment we can offer.", actions: [{ label: "Book on WhatsApp", href: "{whatsapp}", type: "wa", icon: "chat" }] }
         ]
@@ -150,9 +150,9 @@ window.I18N.en = {
       sub: "At the best bars nearby, with vouchers",
       intro: "Breakfast is served at the best bars nearby. Use the vouchers you will find on your room desk and freely choose one of the three partner bars, whichever you prefer each day — Monday to Sunday, from 7:30 am with no time limit.",
       steps: [
-        { h: "Bar Ulma", p: "Via Giuseppe Testaferrata, 18 — just steps from us — [u]Closed on Sundays[/u]", actions: [{ label: "Open in Google Maps", href: "https://www.google.com/maps/place/Bar+Ulma/@37.0728936,15.2826342,17z/data=!3m1!4b1!4m6!3m5!1s0x1313ce9bea0ad7f9:0x27634dfbce8517a3!8m2!3d37.0728936!4d15.2826342!16s%2Fg%2F1tj70tqr", icon: "pin" }] },
-        { h: "Bar Milano", p: "Via Giuseppe di Natale, 16 — gluten-free and lactose-free options available — [u]Closed on Sundays[/u]", actions: [{ label: "Open in Google Maps", href: "https://www.google.com/maps/place/Bar+Milano/@37.0722014,15.2836088,17z/data=!3m1!4b1!4m6!3m5!1s0x1313ce9be3177055:0x79dbcf2cb6326ec4!8m2!3d37.0722014!4d15.2836088!16s%2Fg%2F11b6j85d63", icon: "pin" }] },
-        { h: "Blend | La Miscela del Gusto", p: "Corso Gelone, 77 — [u]Closed on Tuesdays[/u]", actions: [{ label: "Open in Google Maps", href: "https://www.google.com/maps/place/Blend+-+La+miscela+del+gusto/@37.0713338,15.2829346,17z/data=!3m1!4b1!4m6!3m5!1s0x1313cfb2a11c99cb:0xaec137875a966b3f!8m2!3d37.0713338!4d15.2829346!16s%2Fg%2F11r_x62945", icon: "pin" }] }
+        { h: "Caffè Aurora", p: "Via dei Tigli, 3 — just steps from us — [u]Closed on Sundays[/u]", actions: [{ label: "Open in Google Maps", href: "https://www.google.com/maps/search/?api=1&query=bar+colazione", icon: "pin" }] },
+        { h: "Bar Centrale", p: "Piazza Grande, 1 — gluten-free and lactose-free options available — [u]Closed on Sundays[/u]", actions: [{ label: "Open in Google Maps", href: "https://www.google.com/maps/search/?api=1&query=bar+colazione", icon: "pin" }] },
+        { h: "Pasticceria Bella Epoca", p: "Corso Principale, 45 — [u]Closed on Tuesdays[/u]", actions: [{ label: "Open in Google Maps", href: "https://www.google.com/maps/search/?api=1&query=pasticceria", icon: "pin" }] }
       ]
     },
     {
@@ -179,13 +179,13 @@ window.I18N.en = {
       id: "restaurants", icon: "pizza",
       title: "Where to eat & drink",
       sub: "The best spots, all walkable from here",
-      intro: "Here are the best places within walking distance of Corso Gelone 93. Tip: at weekends, we suggest booking!",
+      intro: "Here are the best places within walking distance of Via dei Mandorli 12. Tip: at weekends, we suggest booking!",
       items: [
-        { h: "🍕 Pizzerias", list: [{ n: "Piano B", sub: "Via Cairoli, 18 · Ortigia", tel: "+39 0931 66851" }, { n: "Era Ora", sub: "Riva Garibaldi, 10 · Ortigia", tel: "+39 327 0113454" }, { n: "Oleum", sub: "Via dei Candelai, 21 · Ortigia", tel: "+39 0931 1567295" }, { n: "Anima e Core", sub: "Via Claudio Mario Arezzo, 9 · Ortigia", tel: "+39 0931 66506" }, { n: "Il Nazionale", sub: "Cassibile, 20′ by car", tel: "+39 333 5724811" }, { n: "Il Matto", sub: "Via Francesco Crispi, 21", tel: "+39 0931 1852741" }, { n: "Meditè", sub: "Riva Porto Lachio", tel: "+39 351 6769819" }, { n: "Schiticchio", sub: "Via Cavour, 30 · Ortigia", tel: "+39 331 3343721" }] },
-        { h: "🍽️ Restaurants", list: [{ n: "Agape", sub: "Corso Umberto I, 50", tel: "+39 376 2265068" }, { n: "aLevante", sub: "Largo della Gancia, 5 · Ortigia", tel: "+39 349 0763996" }, { n: "Ranieri", sub: "Piazza San Giuseppe, 8 · Ortigia", tel: "+39 328 2015715" }, { n: "Locanda Maniace", sub: "Via Castello Maniace, 52 · Ortigia", tel: "+39 0931 61308" }, { n: "Vin dell'Assassin", sub: "Via Roma, 115 · Ortigia", tel: "+39 0931 66159" }, { n: "Tavernetta da Piero", sub: "Via Cavour, 59 · Ortigia", tel: "+39 0931 1855291" }, { n: "Gusto", sub: "Corso Gelone, 33b", tel: "+39 0931 465080" }, { n: "Latteria Mamma Iabica", sub: "Via G.B. Perasso, 13", tel: "+39 333 1893176" }, { n: "Locanda Colibrì", sub: "Via Garigliano, 15", tel: "+39 0931 64797" }, { n: "City Life", sub: "Via Cairoli, 9 · Ortigia", tel: "+39 0931 62971" }, { n: "Time Out", sub: "Via Somalia, 10", tel: "+39 366 5494979" }, { n: "A Putia di Giugiò", sub: "Via Saverio Landolina, 21 · Ortigia", tel: "+39 329 7695764" }, { n: "A Putia", sub: "Via Roma, 8 · Ortigia", tel: "+39 334 3524585" }, { n: "Osteria Mariano", sub: "Vicolo Zuccalà, 9 · Ortigia", tel: "+39 0931 67444" }, { n: "MOON — Move Ortigia Out of Normality", sub: "Via Roma, 114 · Ortigia · 100% vegan", tel: "+39 334 257 1002" }] },
-        { h: "🐟 Fish", list: [{ n: "Taverna Russo", sub: "Via Vittorio Veneto, 22 · Ortigia", tel: "+39 0931 314900" }, { n: "Astrattu", sub: "Via del Porto Grande, 6", tel: "+39 347 7740548" }, { n: "La Locandiera", sub: "Via Capodieci, 6 · Ortigia", tel: "+39 331 4954218" }, { n: "Fuori Ortigia", sub: "Via Tripoli, 6", tel: "+39 0931 093690" }, { n: "Il Tiranno", sub: "Viale Montedoro, 78", tel: "+39 0931 581528" }, { n: "La Lisca", sub: "Viale Montedoro, 95", tel: "+39 0931 1623944" }, { n: "Kaleido Terrace", sub: "Via Pompeo Picherali, 10 · Ortigia", tel: "+39 388 8336182" }, { n: "Area M", sub: "Riva Nazario Sauro, 6 · Ortigia", tel: "+39 0931 21367" }] },
-        { h: "🥂 Aperitifs", list: [{ n: "Barcollo", sub: "Via Pompeo Picherali, 10 · Ortigia", tel: "+39 0931 24580" }, { n: "Boats", sub: "Via dell'Apollonion, 5 · Ortigia · overlooking the Temple of Apollo", tel: "+39 328 8818373" }, { n: "Cortile Verga", sub: "Via della Maestranza, 33 · Ortigia", tel: "+39 0931 61440" }, { n: "Sunset", sub: "Lungomare Alfeo · Ortigia", tel: "+39 392 6652014" }, { n: "Fratelli Burgio", sub: "Mercato di Ortigia", tel: "+39 0931 60069" }, { n: "AfC Atmosphere", sub: "Via Brenta, 26", tel: "+39 345 2797189" }, { n: "Moon Bar", sub: "Via Roma, 112 · Ortigia", tel: "+39 0931 449516" }, { n: "Kaleido Terrace", sub: "Via Pompeo Picherali, 10 · Ortigia", tel: "+39 388 8336182" }, { n: "Burgio Al Porto", sub: "Foro V. Emanuele II, 6 · Ortigia", tel: "+39 347 5392104" }] },
-        { h: "🍰 Sweets & coffee", list: [{ n: "Caffè Apollo", sub: "Largo XXV Luglio, 13 · Ortigia", tel: "+39 327 8506419" }, { n: "Brancato", sub: "Via Grottasanta, 219", tel: "+39 0931 442702" }, { n: "Artale", sub: "Via Saverio Landolina, 32 · Ortigia", tel: "+39 0931 21829" }, { n: "Marciante", sub: "Via Saverio Landolina, 7 · Ortigia", tel: "+39 0931 67384" }, { n: "Uccello", sub: "Via Monte Pellegrino, 23", tel: "+39 0931 740784" }, { n: "Filingeri", sub: "Via Rosolini, 12", tel: "+39 0931 757833" }] }
+        { h: "🍕 Pizzerias", list: [{ n: "Pizzeria da Marco", sub: "Via dei Tigli, 5", tel: "+39 000 000 0000" }, { n: "La Forneria", sub: "Via delle Rose, 12", tel: "+39 000 000 0000" }, { n: "Forno Antico", sub: "Piazza Grande, 7", tel: "+39 000 000 0000" }] },
+        { h: "🍽️ Restaurants", list: [{ n: "Trattoria del Borgo", sub: "Via del Mare, 8", tel: "+39 000 000 0000" }, { n: "Osteria Antica", sub: "Piazza Centrale, 3", tel: "+39 000 000 0000" }, { n: "Locanda dei Tigli", sub: "Via dei Tigli, 20", tel: "+39 000 000 0000" }] },
+        { h: "🐟 Seafood", list: [{ n: "Il Pescatore", sub: "Via del Porto, 20", tel: "+39 000 000 0000" }, { n: "La Sirena", sub: "Lungomare, 2", tel: "+39 000 000 0000" }] },
+        { h: "🥂 Aperitifs", list: [{ n: "Bar Centrale", sub: "Piazza Grande, 1", tel: "+39 000 000 0000" }, { n: "Terrazza Blu", sub: "Via Belvedere, 9", tel: "+39 000 000 0000" }] },
+        { h: "🍰 Desserts & coffee", list: [{ n: "Caffè delle Palme", sub: "Corso Principale, 45", tel: "+39 000 000 0000" }, { n: "Forno Dolce", sub: "Via Roma, 30", tel: "+39 000 000 0000" }] }
       ]
     },
     {
@@ -262,7 +262,7 @@ window.I18N.en = {
       sub: "We are always here for you",
       items: [
         { h: "WhatsApp, Telegram, Viber", p: "The fastest way to reach us.", actions: [{ label: "Open WhatsApp", href: "{whatsapp}", type: "wa", icon: "chat" }] },
-        { h: "Phone", p: "For urgent matters and quick messages.", actions: [{ label: "Greta", href: "{phoneGreta}", type: "tel", icon: "phone" }, { label: "Andrea", href: "{phone}", type: "tel", icon: "phone" }] },
+        { h: "Phone", p: "For urgent matters and quick messages.", actions: [{ label: "Call", href: "{phone}", type: "tel", icon: "phone", onlyIf: "phone" }, { label: "Other number", href: "{phoneGreta}", type: "tel", icon: "phone", onlyIf: "phoneGreta" }] },
         { h: "Email", p: "{email}", actions: [{ label: "Write an email", href: "{email}", type: "mail", icon: "info" }] },
         { h: "Come back and see us!", p: "Book directly for your next stays: returning guests always get the very best treatment we can offer.", actions: [{ label: "Book online", href: "{bookingUrl}", icon: "calplus" }, { label: "Book on WhatsApp", href: "{whatsapp}", type: "wa", icon: "chat", style: "secondary" }] }
       ]
