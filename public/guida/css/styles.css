@@ -109,6 +109,8 @@ button { font-family: inherit; cursor: pointer; }
   height: auto;
   object-fit: contain;
   margin-bottom: 2px;
+  /* Se il logo caricato ha uno sfondo bianco/chiaro, lo fonde con la pagina (sembra senza sfondo). */
+  mix-blend-mode: multiply;
 }
 
 /* Scritta del logo: "Spigole" calligrafico + "HOUSE" in maiuscolo */
@@ -241,6 +243,7 @@ button { font-family: inherit; cursor: pointer; }
   width: 50px;
   height: 50px;
   object-fit: contain;
+  mix-blend-mode: multiply;
 }
 
 .brand-name {
@@ -755,7 +758,7 @@ main { max-width: 900px; margin: 0 auto; padding: 26px 18px 60px; }
 }
 .map-sheet-btn svg { width: 18px; height: 18px; }
 
-.home-welcome-logo { display: block; margin: 0 auto 14px; width: 96px; max-width: 40%; height: auto; }
+.home-welcome-logo { display: block; margin: 0 auto 14px; width: 96px; max-width: 40%; height: auto; mix-blend-mode: multiply; }
 .map-sheet-cancel {
   width: 100%; padding: 12px; border: none; background: transparent;
   color: var(--soft); font: inherit; font-weight: 600; cursor: pointer;
