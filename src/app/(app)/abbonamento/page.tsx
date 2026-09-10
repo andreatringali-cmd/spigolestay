@@ -144,18 +144,19 @@ export default function AbbonamentoPage() {
         </div>
       )}
 
-      {/* Toggle mensile/annuale */}
-      <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
+      {/* Riga: info prova + struttura/camere (a sinistra) · toggle mensile/annuale (a destra) */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-faint">
+          <span className="font-bold" style={{ color: "var(--focus)" }}>{nStruct} {t("struttura/e")} · {rooms} {t("camere attive")}</span> · {t("Prova gratuita 7 giorni · nessun costo di attivazione · disdici quando vuoi")}
+        </p>
         <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface p-0.5 text-sm">
           <button onClick={() => setAnnual(false)} className={`rounded-md px-3 py-1 font-semibold transition ${!annual ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Mensile")}</button>
           <button onClick={() => setAnnual(true)} className={`rounded-md px-3 py-1 font-semibold transition ${annual ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Annuale")} <span className="text-[10px] font-bold text-[color:var(--ok)]">−20%</span></button>
         </div>
       </div>
 
-      <p className="mb-4 text-center text-xs text-faint">{t("Prova gratuita 7 giorni · nessun costo di attivazione · disdici quando vuoi")} · <span className="font-bold" style={{ color: "var(--focus)" }}>{nStruct} {t("struttura/e")} · {rooms} {t("camere attive")}</span></p>
-
       {/* Effetto riflesso/luce che scorre sulle card */}
-      <style>{`.xn-shine{position:relative;overflow:hidden}.xn-shine::after{content:"";position:absolute;top:-10%;left:-40%;width:18%;height:120%;background:linear-gradient(115deg,transparent 0%,color-mix(in srgb,var(--focus) 30%,#fff) 50%,transparent 100%);opacity:.55;transform:skewX(-16deg);animation:xnShine 9s cubic-bezier(.25,.6,.3,1) infinite;pointer-events:none;will-change:left}@keyframes xnShine{0%{left:-40%}22%{left:150%}100%{left:150%}}@media (prefers-reduced-motion:reduce){.xn-shine::after{display:none}}`}</style>
+      <style>{`.xn-active{transform:translateY(-6px);box-shadow:0 22px 46px -20px color-mix(in srgb,var(--focus) 58%,transparent),0 6px 16px -8px rgba(0,0,0,.18);position:relative;overflow:hidden}.xn-active::before{content:"";position:absolute;inset:0 0 auto 0;height:42%;background:linear-gradient(180deg,color-mix(in srgb,var(--focus) 16%,transparent) 0%,transparent 100%);pointer-events:none}.xn-active::after{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--focus) 70%,#fff),transparent);opacity:.7;animation:xnGloss 4.5s ease-in-out infinite;pointer-events:none}@keyframes xnGloss{0%,100%{opacity:.35}50%{opacity:.9}}@media (prefers-reduced-motion:reduce){.xn-active::after{animation:none}}`}</style>
 
       {/* Piani */}
       <div className="grid gap-3 lg:grid-cols-4">
@@ -164,7 +165,7 @@ export default function AbbonamentoPage() {
           const price = annual ? Math.round(tr.price * (1 - ANNUAL_OFF)) : tr.price;
           const adds = MODULES.filter((m) => !m.core && tr.includes.includes(m.key));
           return (
-            <div key={tr.key} className={`flex flex-col rounded-xl border p-4 transition ${on ? "xn-shine border-focus bg-surface shadow-md ring-2 ring-[color:var(--focus)]" : "border-line hover:shadow-md"}`}>
+            <div key={tr.key} className={`flex flex-col rounded-xl border p-4 transition ${on ? "xn-active border-focus bg-surface ring-2 ring-[color:var(--focus)]" : "border-line hover:shadow-md"}`}>
               <div className="flex items-center justify-between gap-2">
                 <span className="font-display text-lg font-bold text-txt">{tr.name}</span>
                 {on ? <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-2 py-0.5 text-[10px] font-bold uppercase text-focus">{t("Attivo")}</span>
