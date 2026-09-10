@@ -322,16 +322,6 @@ export default function CassaPage() {
         <Card className="!p-4"><div className="text-xs font-medium text-dim">{t("Saldo")} {month === "all" ? t("totale") : t("del mese")}</div><div className={`mt-1 font-mono text-2xl font-bold ${saldo >= 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{eur(saldo)}</div><div className="mt-1 text-[11px] text-faint">{t("entrate − uscite")}</div></Card>
       </div>
 
-      {/* Riga filtri + toggle grafici + Esporta */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
-        <button onClick={() => setMonth("all")} className={`rounded-full px-3 py-1 text-xs font-medium transition ${month === "all" ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{t("Tutto lo storico")}</button>
-        {months.map((ym) => <button key={ym} onClick={() => setMonth(ym)} className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition ${month === ym ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{monthLabel(ym)}</button>)}
-        <div className="ml-auto flex items-center gap-2">
-          <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
-          <span className="rounded-full bg-wash px-3 py-1 text-xs text-dim">{structLabel}</span>
-          <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
-        </div>
-      </div>
       {chartsOn && (
       <div className="mb-4 grid gap-4 lg:grid-cols-4">
         <Card className="lg:col-span-1">
@@ -365,6 +355,17 @@ export default function CassaPage() {
         </Card>
       </div>
       )}
+
+      {/* Riga filtri + toggle grafici + Esporta */}
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
+        <button onClick={() => setMonth("all")} className={`rounded-full px-3 py-1 text-xs font-medium transition ${month === "all" ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{t("Tutto lo storico")}</button>
+        {months.map((ym) => <button key={ym} onClick={() => setMonth(ym)} className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition ${month === ym ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{monthLabel(ym)}</button>)}
+        <div className="ml-auto flex items-center gap-2">
+          <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
+          <span className="rounded-full bg-wash px-3 py-1 text-xs text-dim">{structLabel}</span>
+          <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
+        </div>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Colonna sinistra */}

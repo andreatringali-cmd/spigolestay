@@ -81,8 +81,8 @@ export default function PagamentiPage() {
       </div>
 
       {/* Filtri */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca ospite o codice…")} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca ospite o codice…")} className="rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
         <div className="flex items-center rounded-lg border border-line p-0.5">
           {([["due", "Con saldo"], ["overdue", "Scaduti"], ["all", "Tutti"]] as const).map(([k, l]) => (
             <button key={k} onClick={() => setFilter(k)} className={`rounded-md px-3 py-1.5 text-xs font-medium ${filter === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t(l)}</button>
