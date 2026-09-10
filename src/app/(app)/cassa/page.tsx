@@ -323,7 +323,7 @@ export default function CassaPage() {
       </div>
 
       {/* Riga filtri + toggle grafici + Esporta */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <button onClick={() => setMonth("all")} className={`rounded-full px-3 py-1 text-xs font-medium transition ${month === "all" ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{t("Tutto lo storico")}</button>
         {months.map((ym) => <button key={ym} onClick={() => setMonth(ym)} className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition ${month === ym ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{monthLabel(ym)}</button>)}
         <div className="ml-auto flex items-center gap-2">
