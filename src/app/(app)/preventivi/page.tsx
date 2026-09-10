@@ -97,8 +97,14 @@ export default function PreventiviPage() {
   // Disponibilità reale di una tipologia nel periodo (camere fisiche non occupate).
   const availOf = (rtId: string) => units.filter((u) => u.roomTypeId === rtId && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn)).length;
   const datesOk = !!(checkIn && checkOut && checkOut > checkIn);
-  // Prezzo automatico dal calendario per una tipologia nel periodo (poi modificabile).
-  const autoPrice = (rtId: string) => { const base = roomTypes.find((r) => r.id === rtId)?.basePrice ?? 100; let sum = 0, cnt = 0; for (let d = checkIn; d && d < checkOut && cnt < 60; d = shiftISO(d, 1)) { sum += rateOverrides[`${rtId}|${d}`] ?? rateOverrides[d] ?? base; cnt++; } return cnt > 0 ? Math.round(sum / cnt) : base; };
+  // Piani tariffari (definiti in Tariffe): scelti qui, applicano il loro scarto al prezzo del calendario.
+  const [plans, setPlans] = useState<{ id: string; name: string; adjPct: number; board: string; refundable: boolean; minStay: number; enabled?: boolean }[]>([]);
+  const [planId, setPlanId] = useState("std");
+  useEffect(() => { try { const p = localStorage.getItem("spigolestay:rateplans"); if (p) setPlans(JSON.parse(p)); } catch {} }, []);
+  const activePlan = plans.find((p) => p.id === planId);
+  const planAdj = activePlan?.adjPct ?? 0;
+  // Prezzo automatico dal calendario per una tipologia nel periodo, con lo scarto del piano scelto (poi modificabile).
+  const autoPrice = (rtId: string) => { const base = roomTypes.find((r) => r.id === rtId)?.basePrice ?? 100; let sum = 0, cnt = 0; for (let d = checkIn; d && d < checkOut && cnt < 60; d = shiftISO(d, 1)) { sum += rateOverrides[`${rtId}|${d}`] ?? rateOverrides[d] ?? base; cnt++; } const avg = cnt > 0 ? sum / cnt : base; return Math.max(0, Math.round(avg * (1 + planAdj / 100))); };
   const updateLine = (i: number, patch: Partial<QuoteRoom>) => setRoomLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const addLine = () => setRoomLines((ls) => { const used = new Set(ls.map((l) => l.roomTypeId)); const next = typesOf.find((t) => !used.has(t.id)) ?? typesOf[0]; return next ? [...ls, { roomTypeId: next.id, qty: 1, price: autoPrice(next.id) }] : ls; });
   const removeLine = (i: number) => setRoomLines((ls) => ls.filter((_, j) => j !== i));
@@ -177,7 +183,7 @@ export default function PreventiviPage() {
     if (!checkIn || !checkOut || checkOut <= checkIn) return;
     setRoomLines((ls) => ls.map((l) => ({ ...l, price: autoPrice(l.roomTypeId) })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkIn, checkOut, rateOverrides]);
+  }, [checkIn, checkOut, rateOverrides, planId]);
 
   const n = Math.max(0, nights(checkIn, checkOut));
   const accommodation = roomLines.reduce((a, l) => a + l.qty * l.price * n, 0);
@@ -523,6 +529,26 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               <b className="ml-auto font-mono text-txt">{taxPersons}</b>
               <span className="text-[11px] text-faint">= {adults} {t("adulti")}{taxKids > 0 ? ` + ${taxKids} ${t("bambini ≥15")}` : ""}</span>
             </div>
+
+            {/* Piano tariffario: applica lo scarto al prezzo del calendario */}
+            {plans.filter((p) => p.enabled !== false).length > 0 && (
+              <div className="sm:col-span-2">
+                <div className="mb-1 text-xs font-medium text-dim">{t("Piano tariffario")} <span className="font-normal text-faint">({t("parte dal prezzo del calendario")})</span></div>
+                <div className="flex flex-wrap gap-2">
+                  {plans.filter((p) => p.enabled !== false).map((p) => {
+                    const on = p.id === planId;
+                    return (
+                      <button key={p.id} type="button" onClick={() => setPlanId(p.id)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${on ? "font-semibold" : "text-dim hover:bg-wash"}`} style={on ? { borderColor: "var(--focus)", backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)", color: "var(--focus)" } : { borderColor: "var(--line)" }}>
+                        {p.name}{p.adjPct !== 0 && <span className="ml-1 text-[11px] font-bold">{p.adjPct > 0 ? "+" : ""}{p.adjPct}%</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {activePlan && (
+                  <p className="mt-1 text-[11px] text-faint">{t(activePlan.board)} · {activePlan.refundable ? t("rimborsabile") : t("non rimborsabile")}{activePlan.minStay > 1 ? ` · ${t("min")} ${activePlan.minStay} ${t("notti")}` : ""}</p>
+                )}
+              </div>
+            )}
 
             {/* Camere del preventivo — multi-camera con disponibilità reale nel periodo */}
             <div className="sm:col-span-2">
