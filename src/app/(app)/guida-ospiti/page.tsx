@@ -356,6 +356,7 @@ export default function GuidaOspitiPage() {
   const [all, setAll] = useState<Record<string, Guide>>({});
   const [previewKey, setPreviewKey] = useState(0);
   const [savedTick, setSavedTick] = useState(false);
+  const [lastSaved, setLastSaved] = useState<number | null>(null);
 
   useEffect(() => { try { setAll(JSON.parse(localStorage.getItem("spigolestay:guides") || "{}")); } catch {} }, []);
   const persist = (next: Record<string, Guide>) => { setAll(next); try { localStorage.setItem("spigolestay:guides", JSON.stringify(next)); } catch {} };
@@ -584,6 +585,25 @@ export default function GuidaOspitiPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guideSig]);
 
+  // Salvataggio automatico ogni 10 secondi: i dati sono già scritti in localStorage a ogni
+  // modifica; qui, se qualcosa è cambiato dall'ultimo salvataggio, aggiorniamo l'anteprima e
+  // mostriamo il segnale "Salvato" con l'orario, così non serve premere nulla.
+  const sigRef = useRef(guideSig);
+  useEffect(() => { sigRef.current = guideSig; }, [guideSig]);
+  const savedSigRef = useRef(guideSig);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (sigRef.current === savedSigRef.current) return; // niente di nuovo da salvare
+      savedSigRef.current = sigRef.current;
+      setLastSaved(Date.now());
+      setSavedTick(true);
+      window.setTimeout(() => setSavedTick(false), 1500);
+      reloadPreview();
+    }, 10000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div>
       <PageHeader
@@ -624,8 +644,10 @@ export default function GuidaOspitiPage() {
             <option value="es">🇪🇸 Español</option>
           </select>
           <a href={previewUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">Schermo intero ↗</a>
-          <button onClick={() => { refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 2000); }} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-1 text-xs font-semibold text-white hover:opacity-90">
-            {savedTick ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Salvato</> : <>💾 Salva</>}
+          <button onClick={() => { savedSigRef.current = sigRef.current; setLastSaved(Date.now()); refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 1500); }} title="Salvataggio automatico attivo · clicca per salvare subito" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1 text-xs font-semibold text-dim hover:bg-wash">
+            {savedTick
+              ? <span className="flex items-center gap-1" style={{ color: "var(--ok)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Salvato</span>
+              : <>💾 Salvataggio automatico{lastSaved ? ` · ${new Date(lastSaved).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : ""}</>}
           </button>
         </div>
       </div>
