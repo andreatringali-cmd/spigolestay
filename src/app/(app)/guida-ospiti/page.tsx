@@ -287,7 +287,28 @@ const EMPTY_CONTENT: GContent = {
     return { ...base, items: [{ h: "", p: "" }] as GItem[] };
   }),
 };
-const fileToDataUrl = (file: File): Promise<string> => new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsDataURL(file); });
+// Ridimensiona e comprime l'immagine prima di salvarla: le foto a piena risoluzione come base64
+// saturerebbero il localStorage (~5MB) e farebbero fallire TUTTI i salvataggi successivi.
+const compressImage = (file: File, maxDim: number, quality: number, fmt: string = "image/jpeg"): Promise<string> => new Promise((resolve) => {
+  const r = new FileReader();
+  r.onload = () => {
+    const src = r.result as string;
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) { const s = maxDim / Math.max(width, height); width = Math.round(width * s); height = Math.round(height * s); }
+      const canvas = document.createElement("canvas"); canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(src); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      try { resolve(canvas.toDataURL(fmt, quality)); } catch { resolve(src); }
+    };
+    img.onerror = () => resolve(src);
+    img.src = src;
+  };
+  r.onerror = () => resolve("");
+  r.readAsDataURL(file);
+});
 // Definiti a livello di modulo: se stessero dentro il componente verrebbero ricreati a ogni
 // render e React rimonterebbe gli input (focus perso → si scrive un carattere alla volta).
 const fld = "w-full rounded-lg border border-line bg-paper px-3.5 py-2.5 text-[15px] text-txt outline-none focus:border-focus";
@@ -359,8 +380,14 @@ export default function GuidaOspitiPage() {
   const [lastSaved, setLastSaved] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false); // true quando i dati salvati sono stati caricati
 
+  const [storageFull, setStorageFull] = useState(false);
+
   useEffect(() => { try { setAll(JSON.parse(localStorage.getItem("spigolestay:guides") || "{}")); } catch {} finally { setLoaded(true); } }, []);
-  const persist = (next: Record<string, Guide>) => { setAll(next); try { localStorage.setItem("spigolestay:guides", JSON.stringify(next)); } catch {} };
+  const persist = (next: Record<string, Guide>) => {
+    setAll(next);
+    try { localStorage.setItem("spigolestay:guides", JSON.stringify(next)); setStorageFull(false); }
+    catch { setStorageFull(true); } // quota superata (di solito foto troppo pesanti): il salvataggio non è andato
+  };
 
   const struct = structures.find((s) => s.id === sid);
   const guide = all[sid] ?? emptyGuide(sid, struct?.name ?? "", struct?.city ?? "Siracusa");
@@ -462,8 +489,8 @@ export default function GuidaOspitiPage() {
   const removeItem = (si: number, ii: number) => updSection(si, { items: content.sections[si].items.filter((_, j) => j !== ii) });
   const addPhoto = (si: number, url: string) => { if (url) updSection(si, { photos: [...content.sections[si].photos, url] }); };
   const removePhoto = (si: number, pi: number) => updSection(si, { photos: content.sections[si].photos.filter((_, j) => j !== pi) });
-  const onLogo = async (f?: File) => { if (f) set({ guideLogo: await fileToDataUrl(f) }); };
-  const onSecPhoto = async (si: number, f?: File) => { if (f) addPhoto(si, await fileToDataUrl(f)); };
+  const onLogo = async (f?: File) => { if (f) set({ guideLogo: await compressImage(f, 512, 0.9, "image/png") }); };
+  const onSecPhoto = async (si: number, f?: File) => { if (f) { const d = await compressImage(f, 1400, 0.72); if (d) addPhoto(si, d); } };
   const acts = (si: number, ii: number) => content.sections[si].items[ii].actions ?? [];
   const addAction = (si: number, ii: number) => updItem(si, ii, { actions: [...acts(si, ii), { label: "", href: "", type: "", icon: "info" }] });
   const updAction = (si: number, ii: number, ai: number, patch: Partial<GAction>) => updItem(si, ii, { actions: acts(si, ii).map((a, j) => (j === ai ? { ...a, ...patch } : a)) });
@@ -668,6 +695,11 @@ export default function GuidaOspitiPage() {
         </div>
       </div>
 
+      {storageFull && (
+        <div className="mb-3 rounded-xl border px-3 py-2 text-sm" style={{ borderColor: "var(--err)", backgroundColor: "color-mix(in srgb, var(--err) 8%, transparent)", color: "var(--err)" }}>
+          ⚠️ Memoria piena: le ultime modifiche non sono state salvate. Di solito succede con foto troppo pesanti. Rimuovi qualche foto e riprova (le foto nuove ora vengono compresse in automatico; quelle caricate prima potrebbero occupare troppo spazio).
+        </div>
+      )}
       {mainTab === "app" && (<>
       <div className="grid gap-5 lg:grid-cols-[1.05fr_minmax(340px,0.92fr)]">
         {/* Pannello personalizzazione */}
