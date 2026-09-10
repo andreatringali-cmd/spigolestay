@@ -1,17 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useData } from "@/lib/store";
-import { toISO, parseISO } from "@/lib/dates";
+import { useEffect, useState } from "react";
+import { parseISO } from "@/lib/dates";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" });
-const REV = {
-  pos: ["Soggiorno perfetto, posizione ottima e host gentilissimi.", "Camera pulita e colazione ottima, torneremo di sicuro!", "Vista stupenda su Ortigia, consigliatissimo.", "Tutto impeccabile, accoglienza top e consigli utili.", "Bellissima esperienza, ci siamo sentiti a casa."],
-  neu: ["Bene nel complesso, ma il parcheggio è un po' scomodo.", "Camera carina, colazione migliorabile.", "Posizione comoda, wi-fi a tratti lento."],
-  neg: ["Pulizia non all'altezza e check-in complicato.", "Ci aspettavamo di più per il prezzo."],
-};
 
 // Fonti recensioni: OTA + Google. Il collegamento reale (API) arriva con il white-label.
 const SOURCES = [
@@ -27,9 +21,6 @@ const SRC = Object.fromEntries(SOURCES.map((s) => [s.k, s])) as Record<SourceKey
 const CONN_KEY = "spigolestay:reviewsources";
 
 export default function RecensioniPage() {
-  const { bookings, guests, activeStructureId } = useData();
-  const today = toISO(new Date());
-  const guestName = (id: string) => guests.find((g) => g.id === id)?.fullName ?? "Ospite";
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [conn, setConn] = useState<Record<string, boolean>>({}); // nessuna fonte collegata di default: niente dati finti
@@ -43,20 +34,9 @@ export default function RecensioniPage() {
 
   const connectedSources = SOURCES.filter((s) => conn[s.k]).map((s) => s.k);
 
-  // Recensioni simulate a partire dai soggiorni passati (deterministiche), distribuite sulle fonti collegate.
-  const reviews = useMemo(() => {
-    if (connectedSources.length === 0) return [];
-    const past = bookings.filter((b) => b.checkOut < today && b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId)).sort((a, b) => b.checkOut.localeCompare(a.checkOut)).slice(0, 24);
-    const ratings = [10, 9, 8, 10, 9, 7, 10, 8, 9, 6, 10, 9, 8, 10, 7, 9, 10, 8, 9, 10, 5, 9, 8, 10];
-    return past.map((b, i) => {
-      const rating = ratings[i % ratings.length];
-      const bucket = rating >= 8 ? "pos" : rating >= 6 ? "neu" : "neg";
-      const text = REV[bucket][i % REV[bucket].length];
-      const source = connectedSources[i % connectedSources.length];
-      return { id: b.id, guest: guestName(b.guestId), date: b.checkOut, rating, text, bucket: bucket as "pos" | "neu" | "neg", source };
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookings, activeStructureId, conn]);
+  // Recensioni REALI: arrivano dal collegamento alle fonti (Google/Booking/…). Nessun dato finto.
+  type Review = { id: string; guest: string; date: string; rating: number; text: string; bucket: "pos" | "neu" | "neg"; source: SourceKey };
+  const reviews: Review[] = [];
 
   const shown = filter === "all" ? reviews : reviews.filter((r) => r.source === filter);
   const avg = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : 0;
@@ -144,10 +124,10 @@ export default function RecensioniPage() {
             )}
           </Card>
         ))}
-        {connectedSources.length === 0 && <Card className="py-8 text-center text-sm text-faint">Collega almeno una fonte (Google, Booking…) per vedere le recensioni.</Card>}
-        {connectedSources.length > 0 && shown.length === 0 && <Card className="py-8 text-center text-sm text-faint">Nessuna recensione per questa fonte.</Card>}
+        {connectedSources.length === 0 && <Card className="py-8 text-center text-sm text-faint">Collega una fonte (Google, Booking…) per importare qui le recensioni.</Card>}
+        {connectedSources.length > 0 && shown.length === 0 && <Card className="py-8 text-center text-sm text-faint">Nessuna recensione ancora: verranno importate dalle fonti collegate.</Card>}
       </div>
-      <p className="mt-3 text-[11px] text-faint">Demo: le recensioni sono generate dai soggiorni passati e distribuite sulle fonti collegate. Il collegamento reale alle API (Google, Booking, Tripadvisor…) verrà attivato con il white-label.</p>
+      <p className="mt-3 text-[11px] text-faint">Le recensioni vengono importate dalle fonti collegate (Google, Booking, Tripadvisor…). Il collegamento reale alle API verrà attivato con il white-label.</p>
     </div>
   );
 }
