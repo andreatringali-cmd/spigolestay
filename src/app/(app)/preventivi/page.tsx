@@ -657,9 +657,9 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               )}
             </div>
           </div>
-          <div ref={previewRef} className="flex-1 overflow-y-auto rounded-lg border border-line bg-wash p-2" style={{ minHeight: 340, perspective: "1600px" }}>
-            <style>{`@keyframes qpFlipNext{from{transform:rotateY(-88deg);opacity:.25}to{transform:rotateY(0);opacity:1}}@keyframes qpFlipPrev{from{transform:rotateY(88deg);opacity:.25}to{transform:rotateY(0);opacity:1}}`}</style>
-            <div key={previewPage} style={{ transformOrigin: flipDir >= 0 ? "left center" : "right center", animation: `${flipDir >= 0 ? "qpFlipNext" : "qpFlipPrev"} .55s cubic-bezier(.2,.7,.3,1)`, boxShadow: "0 20px 40px -24px rgba(0,0,0,.35)" }}>
+          <div ref={previewRef} className="flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-line bg-wash p-2" style={{ minHeight: 340 }}>
+            <style>{`@keyframes qpSlideNext{from{transform:translateX(34px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes qpSlidePrev{from{transform:translateX(-34px);opacity:0}to{transform:translateX(0);opacity:1}}`}</style>
+            <div key={previewPage} style={{ animation: `${flipDir >= 0 ? "qpSlideNext" : "qpSlidePrev"} .38s cubic-bezier(.2,.7,.3,1)` }}>
             <QuoteDoc scale={pw / 794} page={(extrasPage && structExtras.length > 0) ? previewPage : 0}
               accent={structure?.photoColor || "#BE5D38"} logo={structure?.logo}
               structureName={structureName} address={stAddress} contacts={stContacts} legal={stLegal} socials={stSocials}
