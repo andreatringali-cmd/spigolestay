@@ -31,6 +31,18 @@ function StepDot({ n }: { n: number }) {
   return <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: "var(--focus)" }}>{n}</span>;
 }
 
+// Iconcine ospiti (occupazione della tariffa): es. "doppia uso singola" = 1, "tripla uso matrimoniale" = 2.
+function Occ({ n }: { n: number }) {
+  const c = Math.max(1, Math.min(Math.round(n) || 1, 8));
+  return (
+    <span className="inline-flex items-center gap-0.5 align-middle text-dim" title={`${c} ${c === 1 ? "ospite" : "ospiti"}`}>
+      {Array.from({ length: c }).map((_, i) => (
+        <svg key={i} width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 8a7 7 0 1114 0H3z" /></svg>
+      ))}
+    </span>
+  );
+}
+
 export default function TariffePage() {
   const { structures, roomTypes, rateOverrides, updateRoomType, activeStructureId } = useData();
   const [localStructure, setLocalStructure] = useState<string>("all");
@@ -78,6 +90,7 @@ export default function TariffePage() {
       <div>
         <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 shadow-sm">
           <span className="font-semibold text-txt">{rt.name}</span>
+          <Occ n={rt.maxOccupancy ?? rt.beds} />
           <span className="font-mono text-xs font-bold text-txt">{eur(effectiveBase(rt, roomTypes))}</span>
           {!rt.deriveFrom && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span>}
           {rt.deriveInherit && <span title={t("Eredita disponibilità e restrizioni")} className="text-[11px] text-focus">⇊</span>}
@@ -160,6 +173,7 @@ export default function TariffePage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="min-w-[110px] flex-1 text-sm font-semibold text-txt">
                       {rt.name}
+                      <span className="ml-1.5"><Occ n={rt.maxOccupancy ?? rt.beds} /></span>
                       {!derived && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span>}
                       {closed && <span className="ml-1.5 rounded-full bg-[color:color-mix(in_srgb,var(--err)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--err)]">{t("chiusa")}</span>}
                     </div>
@@ -189,6 +203,7 @@ export default function TariffePage() {
                         <label className="flex items-center gap-1.5"><input type="checkbox" checked={!!rt.deriveInherit} onChange={(e) => updateRoomType(rt.id, { deriveInherit: e.target.checked })} className="h-3.5 w-3.5 accent-[color:var(--focus)]" /> {t("Eredita disp./restrizioni")}</label>
                       </>
                     )}
+                    <label className="flex items-center gap-1.5">{t("Ospiti")}<input type="number" min={1} value={rt.maxOccupancy ?? rt.beds} onChange={(e) => updateRoomType(rt.id, { maxOccupancy: Math.max(1, Number(e.target.value)) })} className={`${inp} w-14 py-1`} /></label>
                     <label className="flex items-center gap-1.5">{t("Notti min")}<input type="number" min={0} disabled={inheriting} value={minS} onChange={(e) => updateRoomType(rt.id, { minStay: Math.max(0, Number(e.target.value)) })} className={`${inp} w-14 py-1 disabled:opacity-40`} /></label>
                     <label className="flex items-center gap-1.5"><input type="checkbox" disabled={inheriting} checked={closed} onChange={(e) => updateRoomType(rt.id, { salesClosed: e.target.checked })} className="h-3.5 w-3.5 accent-[color:var(--err)] disabled:opacity-40" /> {t("Chiudi vendite")}</label>
                     {inheriting && <span className="text-faint">{t("(dalla master)")}</span>}
