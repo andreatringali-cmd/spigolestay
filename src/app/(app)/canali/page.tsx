@@ -6,6 +6,7 @@ import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
+import Icon from "@/components/Icon";
 import IcalSyncPanel from "@/components/IcalSyncPanel";
 
 // Portali gestiti dal Channel Manager.
@@ -139,8 +140,8 @@ export default function CanaliPage() {
         <div className="mb-2 flex items-center justify-between gap-2">
           <SectionTitle>{t("Connessioni")}</SectionTitle>
           <div className="inline-flex rounded-lg border border-line bg-surface p-0.5">
-            <button onClick={() => setView("list")} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${view === "list" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>☰ {t("Lista")}</button>
-            <button onClick={() => setView("card")} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${view === "card" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>▦ {t("Card")}</button>
+            <button onClick={() => setView("list")} title={t("Vista lista")} className={`rounded-md p-1.5 transition ${view === "list" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}><Icon name="menu" size={16} /></button>
+            <button onClick={() => setView("card")} title={t("Vista card")} className={`rounded-md p-1.5 transition ${view === "card" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}><Icon name="grid" size={16} /></button>
           </div>
         </div>
 
