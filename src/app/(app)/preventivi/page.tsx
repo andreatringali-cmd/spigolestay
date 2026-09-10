@@ -483,7 +483,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
         {/* Form */}
         <Card>
           <SectionTitle>{t("Dati preventivo")}</SectionTitle>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label={t("Cognome *")}><input value={lastName} onChange={(e) => setLastName(e.target.value)} className={inp} placeholder={t("Cognome")} /></Field>
             <Field label={t("Nome")}><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inp} placeholder={t("Nome")} /></Field>
             <Field label={t("Email")}><input value={email} onChange={(e) => setEmail(e.target.value)} className={inp} placeholder={t("opzionale")} /></Field>
@@ -501,7 +501,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             <Field label={t("Adulti")}><input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, Number(e.target.value)))} className={inp} /></Field>
             <Field label={t("Bambini")}><input type="number" min={0} value={children} onChange={(e) => { const v = Math.max(0, Number(e.target.value)); setChildren(v); setChildAges((prev) => { const next = prev.slice(0, v); while (next.length < v) next.push(8); return next; }); }} className={inp} /></Field>
             {children > 0 && (
-              <div className="col-span-2">
+              <div className="sm:col-span-2">
                 <div className="mb-1 text-xs font-medium text-dim">{t("Età dei bambini")} <span className="font-normal text-faint">({t("sotto i 15 anni esenti dalla tassa")})</span></div>
                 <div className="flex flex-wrap gap-2">
                   {childAges.map((age, i) => (
@@ -518,14 +518,14 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                 </div>
               </div>
             )}
-            <div className="col-span-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 text-sm">
+            <div className="sm:col-span-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 text-sm">
               <span className="text-dim">{t("Persone soggette a tassa")} <span className="text-faint">({t("automatico")})</span></span>
               <b className="ml-auto font-mono text-txt">{taxPersons}</b>
               <span className="text-[11px] text-faint">= {adults} {t("adulti")}{taxKids > 0 ? ` + ${taxKids} ${t("bambini ≥15")}` : ""}</span>
             </div>
 
             {/* Camere del preventivo — multi-camera con disponibilità reale nel periodo */}
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Camere del preventivo")} · {roomsTotal}</span>
                 <button type="button" onClick={addLine} className="rounded-md border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash">+ {t("Aggiungi camera")}</button>
@@ -559,7 +559,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               </div>
             </div>
             <Field label={`${t("Totale complessivo")} (${n} ${t("notti")})`}><div className="rounded-lg bg-wash px-3 py-2 font-mono text-sm font-bold text-txt">{eur(total)}</div></Field>
-            <div className="col-span-2 flex flex-wrap items-center gap-4 rounded-lg border border-line bg-paper px-3 py-2">
+            <div className="sm:col-span-2 flex flex-wrap items-center gap-4 rounded-lg border border-line bg-paper px-3 py-2">
               <label className="flex items-center gap-2 text-sm font-medium text-txt"><input type="checkbox" checked={parking} onChange={(e) => setParking(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Parcheggio")}</label>
               {parking && (
                 <label className="flex items-center gap-2 text-xs text-dim">{t("€/notte (0 = incluso)")}
@@ -569,12 +569,12 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               <label className="ml-auto flex items-center gap-2 text-sm font-medium text-txt"><input type="checkbox" checked={breakfast} onChange={(e) => setBreakfast(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {t("Colazione inclusa")}</label>
             </div>
             {structExtras.length > 0 && (
-              <label className="col-span-2 flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 text-sm font-medium text-txt">
+              <label className="sm:col-span-2 flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 text-sm font-medium text-txt">
                 <input type="checkbox" checked={extrasPage} onChange={(e) => setExtrasPage(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" />
                 {t("Includi 2ª pagina: servizi extra")} <span className="font-normal text-faint">({structExtras.length})</span>
               </label>
             )}
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <div className="mb-1 flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-dim">{t("Acconto per confermare")}</span>
                 <span className="text-[11px] text-faint">{acconto > 0 && acconto < 100 ? `${eur(deposit)} ${t("ora")} · ${eur(balance)} ${t("al check-in")}` : ""}</span>
@@ -585,7 +585,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                 ))}
               </div>
             </div>
-            <div className="col-span-2 rounded-lg border border-line bg-paper p-3">
+            <div className="sm:col-span-2 rounded-lg border border-line bg-paper p-3">
               <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">{t("Dati di pagamento")}</div>
               {(structure?.iban || structure?.ibanHolder) ? (
                 <div className="rounded-lg border border-line bg-wash p-2.5 text-xs text-dim">
@@ -597,7 +597,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               ) : (
                 <>
                   <div className="mb-2 text-[11px] text-faint">{t("Nessun IBAN sulla struttura: inserisci qui i dati (salvati nel browser). Suggerito: impostarlo nella scheda struttura.")}</div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <Field label={t("Intestatario")}><input value={payHolder} onChange={(e) => setPayHolder(e.target.value)} className={inp} placeholder={t("Nome Cognome")} /></Field>
                     <Field label="IBAN"><input value={payIban} onChange={(e) => setPayIban(e.target.value)} className={inp} placeholder="IT…" /></Field>
                   </div>
@@ -605,7 +605,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               )}
               <div className="mt-2"><Field label={t("Altri metodi (facoltativo)")}><input value={payExtra} onChange={(e) => setPayExtra(e.target.value)} className={inp} /></Field></div>
             </div>
-            <div className="col-span-2"><Field label={t("Note (opzionale)")}><textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className={`${inp} resize-none`} placeholder={t("Es. offerta valida 3 giorni, richieste particolari…")} /></Field></div>
+            <div className="sm:col-span-2"><Field label={t("Note (opzionale)")}><textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className={`${inp} resize-none`} placeholder={t("Es. offerta valida 3 giorni, richieste particolari…")} /></Field></div>
           </div>
         </Card>
 
