@@ -589,11 +589,6 @@ export default function GuidaOspitiPage() {
       <PageHeader
         title="Guida ospiti"
         subtitle="Una guida multilingua per struttura · personalizza e genera il link da inviare"
-        actions={
-          <button onClick={() => { refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 2000); }} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
-            {savedTick ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Salvato</> : <>💾 Salva</>}
-          </button>
-        }
       />
 
       {/* App / TV: due card in alto */}
@@ -629,6 +624,9 @@ export default function GuidaOspitiPage() {
             <option value="es">🇪🇸 Español</option>
           </select>
           <a href={previewUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">Schermo intero ↗</a>
+          <button onClick={() => { refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 2000); }} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-1 text-xs font-semibold text-white hover:opacity-90">
+            {savedTick ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Salvato</> : <>💾 Salva</>}
+          </button>
         </div>
       </div>
 
