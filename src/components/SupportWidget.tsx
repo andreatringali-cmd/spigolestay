@@ -9,14 +9,16 @@ export default function SupportWidget() {
   const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([
-    { from: "bot", text: t("Ciao! Sono l'assistente Xenora. Come posso aiutarti?") },
+    { from: "bot", text: t("Ciao! Scrivici la tua richiesta: la inviamo al nostro team di assistenza.") },
   ]);
   const [text, setText] = useState("");
 
   const send = () => {
     const val = text.trim();
     if (!val) return;
-    setMsgs((m) => [...m, { from: "user", text: val }, { from: "bot", text: t("Grazie! Un operatore ti risponderà a breve. (assistente dimostrativo)") }]);
+    setMsgs((m) => [...m, { from: "user", text: val }]);
+    try { window.open(`mailto:amministrazione@xenoradigitalsolutions.com?subject=${encodeURIComponent("Assistenza Xenora")}&body=${encodeURIComponent(val)}`); } catch {}
+    setMsgs((m) => [...m, { from: "bot", text: t("Ho aperto la tua email per inviarci il messaggio. Ti rispondiamo al più presto!") }]);
     setText("");
   };
 

@@ -32,7 +32,7 @@ export default function RecensioniPage() {
   const guestName = (id: string) => guests.find((g) => g.id === id)?.fullName ?? "Ospite";
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState<Record<string, string>>({});
-  const [conn, setConn] = useState<Record<string, boolean>>({ google: true, booking: true });
+  const [conn, setConn] = useState<Record<string, boolean>>({}); // nessuna fonte collegata di default: niente dati finti
   const [filter, setFilter] = useState<"all" | SourceKey>("all");
   useEffect(() => {
     try { const r = localStorage.getItem("spigolestay:reviews"); if (r) setReplies(JSON.parse(r)); } catch {}

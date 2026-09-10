@@ -114,7 +114,7 @@ export default function AssistenteRicaviPage() {
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[11px] text-faint">I prezzi consigliati aggiornano le tariffe del calendario. Logica dimostrativa (occupazione + weekend + eventi + last-minute); in produzione si aggiungono storico, pickup e tariffe dei competitor.</p>
+      <p className="mt-2 text-[11px] text-faint">I prezzi consigliati aggiornano le tariffe del calendario. Basati su occupazione reale + weekend + eventi + last-minute; li affineremo con storico, pickup e tariffe competitor.</p>
     </div>
   );
 }
