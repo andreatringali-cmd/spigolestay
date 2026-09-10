@@ -399,7 +399,9 @@ export default function GuidaOspitiPage() {
     if (!loaded) return;
     const cur = all[sid];
     const base = cur ?? emptyGuide(sid, struct?.name ?? "", struct?.city ?? "Siracusa");
-    const merged = { ...base, ...structFields, id: sid, social: { ...base.social, ...(structFields.social ?? {}) } };
+    // Lo scaffold delle sezioni è sempre presente: così le operative (contatti, WiFi, recensioni)
+    // compaiono da sole appena la struttura ha i dati, senza che l'host scriva nulla.
+    const merged = { ...base, ...structFields, content: base.content ?? EMPTY_CONTENT, id: sid, social: { ...base.social, ...(structFields.social ?? {}) } };
     if (JSON.stringify(cur ?? null) !== JSON.stringify(merged)) persist({ ...all, [sid]: merged });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sid, structFields, loaded]);
@@ -408,6 +410,13 @@ export default function GuidaOspitiPage() {
   const [openSec, setOpenSec] = useState<string | null>(null);
   const content: GContent = guide.content ?? EMPTY_CONTENT;
   const setContent = (c: GContent) => set({ content: c });
+  // "Contenuti pronti" = l'host ha scritto davvero qualcosa (non basta lo scaffold vuoto).
+  const hasRealContent = !!(
+    content.home.welcomeTitle?.trim() || content.home.welcomeSub?.trim() || content.home.welcome.join("").trim() ||
+    content.sections.some((s) => (s.intro?.trim()) || (s.photos?.length) ||
+      (s.items?.some((it) => it.h?.trim() || it.p?.trim() || (it.list?.length ?? 0))) ||
+      (s.steps?.some((st) => st.h?.trim() || st.p?.trim())) || (s.amenities?.length))
+  );
   const loadDemo = () => { if (guide.content && !confirm("Sostituire i contenuti attuali con l'esempio di Siracusa?")) return; updateStructure(sid, DEMO_STRUCT); set({ ...DEMO_GUIDE, content: DEMO_CONTENT, i18n: {} }); refresh(); };
 
   // Traduzione automatica multilingua (base italiano → EN/FR/DE/ES)
@@ -632,7 +641,7 @@ export default function GuidaOspitiPage() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <span className="font-semibold text-faint">Pronta:</span>
-          {([["Struttura", !!(guide.name && guide.address)], ["Contatti", !!(guide.whatsapp || guide.phone)], ["WiFi", !!(guide.wifiNetwork && guide.wifiPassword)], ["Contenuti", !!guide.content], ["Traduzioni", hasTranslations]] as [string, boolean][]).map(([lbl, ok]) => (
+          {([["Struttura", !!(guide.name && guide.address)], ["Contatti", !!(guide.whatsapp || guide.phone)], ["WiFi", !!(guide.wifiNetwork && guide.wifiPassword)], ["Contenuti", hasRealContent], ["Traduzioni", hasTranslations]] as [string, boolean][]).map(([lbl, ok]) => (
             <span key={lbl} className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${ok ? "text-white" : "bg-wash text-faint"}`} style={ok ? { backgroundColor: "var(--ok)" } : undefined}>{ok ? "✓" : "○"} {lbl}</span>
           ))}
         </div>
