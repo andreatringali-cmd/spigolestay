@@ -15,7 +15,6 @@ const OTAS = [
   { key: "expedia", label: "Expedia", color: "#FFC72C", commission: 18 },
   { key: "vrbo", label: "Vrbo", color: "#1668E3", commission: 8 },
   { key: "agoda", label: "Agoda", color: "#5A2D8C", commission: 17 },
-  { key: "google", label: "Google Hotel Ads", color: "#4285F4", commission: 12 },
 ] as const;
 type OtaKey = typeof OTAS[number]["key"];
 
@@ -290,6 +289,34 @@ export default function CanaliPage() {
               <label className={`${lbl} mb-4 block`}>{t("Filtro di importazione")} <span className="font-normal text-faint">({t("facoltativo")})</span>
                 <input value={c.importFilter ?? ""} onChange={(e) => patchConn(o.key, { importFilter: e.target.value })} placeholder={t("es. solo camere con prefisso…")} className={fld} />
               </label>
+
+              {/* Mappatura camere di questo canale (stile "Impostazioni del mapping" di Octorate) */}
+              <div className="mb-4">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">{t("Mappatura camere")} <span className="font-normal normal-case text-faint">— {o.label}</span></div>
+                {types.length === 0 ? (
+                  <p className="text-xs text-faint">{t("Nessuna tipologia per questa struttura.")}</p>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    {types.map((rt) => {
+                      const e = getMap(rt.id, o.key);
+                      const price = e.adjMode === "percent" ? Math.round(rt.basePrice * (1 + e.adj / 100)) : Math.max(0, rt.basePrice + e.adj);
+                      return (
+                        <div key={rt.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-2">
+                          <div className="min-w-[110px] flex-1 text-sm font-medium text-txt">{rt.name}</div>
+                          <input value={e.listingId} onChange={(ev) => setMapEntry(rt.id, o.key, { listingId: ev.target.value })} placeholder={t("ID annuncio OTA")} className="w-32 rounded-md border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-focus" />
+                          <div className="flex items-center gap-1">
+                            <input type="number" value={e.adj} onChange={(ev) => setMapEntry(rt.id, o.key, { adj: Number(ev.target.value) })} className="w-14 rounded-md border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-focus" />
+                            <button onClick={() => setMapEntry(rt.id, o.key, { adjMode: e.adjMode === "amount" ? "percent" : "amount" })} className="rounded-md border border-line px-1.5 py-1 text-xs text-dim hover:bg-wash">{e.adjMode === "amount" ? "€" : "%"}</button>
+                          </div>
+                          <span className="w-16 text-right font-mono text-xs font-semibold text-txt">{e.on ? eur(price) : "—"}</span>
+                          <input type="checkbox" checked={e.on} onChange={(ev) => setMapEntry(rt.id, o.key, { on: ev.target.checked })} title={t("Attivo")} className="h-4 w-4 accent-[color:var(--focus)]" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className="mt-1.5 text-[11px] text-faint">{t("Abbina ogni tua tipologia all'annuncio corrispondente su questo portale. La correzione prezzo qui è specifica del canale.")}</p>
+              </div>
 
               {/* Azioni */}
               <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
