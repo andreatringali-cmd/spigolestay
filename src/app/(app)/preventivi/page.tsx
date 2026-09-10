@@ -891,8 +891,8 @@ function QuoteDoc(p: {
           <p style={{ margin: "22px 0 0", fontSize: 14 }}>{p.L.closing}</p>
           <p style={{ margin: "3px 0 0", fontSize: 14, fontWeight: 700 }}>{p.structureName}</p>
 
-          {/* Piè di pagina */}
-          <div style={{ marginTop: 22, paddingTop: 12, borderTop: `1px solid ${hair}`, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+          {/* Piè di pagina fissato in fondo al foglio A4 (come pagina 2) */}
+          <div style={{ position: "absolute", left: 30, right: 30, bottom: 24, paddingTop: 12, borderTop: `1px solid ${hair}`, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
             <div style={{ fontSize: 10.5, color: "#b3a99c", lineHeight: 1.5, minWidth: 0 }}>
               <div style={{ fontWeight: 700, color: muted }}>{p.structureName}</div>
               {p.address && <div>{p.address}</div>}
