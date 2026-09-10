@@ -199,17 +199,7 @@ export default function StatistichePage() {
       </div>
       <p className="mt-2 text-xs text-faint">{t("Valori riferiti a")} <b className="text-dim">{R.label.toLowerCase()}</b>{prev ? ` · ${t("confronto con")} ${R.cmp}` : ""}. {t("Complessivo storico: ricavi")} {eur(totalRevenue)} · ADR {eur(adr)} · {totalNights} {t("notti")}.</p>
 
-      {/* Riga filtro unica: mese (guida KPI e report) + toggle grafici */}
-      <div className="mt-6 mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        <span className="text-sm font-semibold text-txt">{t("Mese")}</span>
-        <select value={repMonth} onChange={(e) => setRepMonth(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm capitalize text-txt outline-none focus:border-focus">
-          {monthOptions.map((mk) => <option key={mk} value={mk} className="capitalize">{monthLabelOf(mk)}</option>)}
-        </select>
-        <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
-        <span className="ml-auto text-[11px] text-faint">{t("Card e report seguono il mese scelto")}</span>
-      </div>
-
-      <div>
+      <div className="mt-6">
         {chartsOn && (
         <ScrollStrip
           gap="gap-3"
@@ -226,6 +216,16 @@ export default function StatistichePage() {
           }; })}
         />
         )}
+      </div>
+
+      {/* Riga filtro unica: mese (guida KPI e report) + toggle grafici */}
+      <div className="mt-4 mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
+        <span className="text-sm font-semibold text-txt">{t("Mese")}</span>
+        <select value={repMonth} onChange={(e) => setRepMonth(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm capitalize text-txt outline-none focus:border-focus">
+          {monthOptions.map((mk) => <option key={mk} value={mk} className="capitalize">{monthLabelOf(mk)}</option>)}
+        </select>
+        <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
+        <span className="ml-auto text-[11px] text-faint">{t("Card e report seguono il mese scelto")}</span>
       </div>
 
       {/* Report previsionale (stile Octorate): giorno per giorno, storico + previsione */}
