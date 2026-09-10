@@ -145,15 +145,14 @@ export default function AbbonamentoPage() {
       )}
 
       {/* Toggle mensile/annuale */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{nStruct} {t("struttura/e")} · {rooms} {t("camere attive")}</span>
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
         <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface p-0.5 text-sm">
           <button onClick={() => setAnnual(false)} className={`rounded-md px-3 py-1 font-semibold transition ${!annual ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Mensile")}</button>
           <button onClick={() => setAnnual(true)} className={`rounded-md px-3 py-1 font-semibold transition ${annual ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Annuale")} <span className="text-[10px] font-bold text-[color:var(--ok)]">−20%</span></button>
         </div>
       </div>
 
-      <p className="mb-4 text-center text-xs text-faint">{t("Prova gratuita 7 giorni · nessun costo di attivazione · disdici quando vuoi")}</p>
+      <p className="mb-4 text-center text-xs text-faint">{t("Prova gratuita 7 giorni · nessun costo di attivazione · disdici quando vuoi")} · <span className="font-bold" style={{ color: "var(--focus)" }}>{nStruct} {t("struttura/e")} · {rooms} {t("camere attive")}</span></p>
 
       {/* Effetto riflesso/luce che scorre sulle card */}
       <style>{`.xn-shine{position:relative;overflow:hidden}.xn-shine::after{content:"";position:absolute;top:0;left:-70%;width:45%;height:100%;background:linear-gradient(115deg,transparent 0%,color-mix(in srgb,var(--focus) 22%,#fff) 50%,transparent 100%);opacity:.5;transform:skewX(-18deg);animation:xnShine 5.5s ease-in-out infinite;animation-delay:var(--sd,0s);pointer-events:none}@keyframes xnShine{0%{left:-70%}35%{left:150%}100%{left:150%}}@media (prefers-reduced-motion:reduce){.xn-shine::after{display:none}}`}</style>
