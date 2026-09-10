@@ -196,7 +196,10 @@ export default function AbbonamentoPage() {
         </div>
       </div>
 
-      <p className="mt-3 text-center text-xs text-faint">{t("Prova gratuita 7 giorni · nessun costo di attivazione · disdici quando vuoi")} · <span className="font-semibold" style={{ color: "var(--focus)" }}>{nStruct} {t("struttura/e")} · {rooms} {t("camere attive")}</span></p>
+      <div className="mt-3 flex flex-col items-center gap-2">
+        <p className="text-center text-xs text-faint">{t("Prova gratuita 7 giorni · nessun costo di attivazione · disdici quando vuoi")}</p>
+        <span className="rounded-full px-3 py-1 text-xs font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{nStruct} {t("struttura/e")} · {rooms} {t("camere attive")}</span>
+      </div>
 
       {/* Cosa include ogni piano */}
       <Card className="mt-6">
