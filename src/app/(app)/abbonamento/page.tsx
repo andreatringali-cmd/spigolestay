@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
@@ -153,14 +153,19 @@ export default function AbbonamentoPage() {
         </div>
       </div>
 
+      <p className="mb-4 text-center text-xs text-faint">{t("Prova gratuita 7 giorni · nessun costo di attivazione · disdici quando vuoi")}</p>
+
+      {/* Effetto riflesso/luce che scorre sulle card */}
+      <style>{`.xn-shine{position:relative;overflow:hidden}.xn-shine::after{content:"";position:absolute;top:0;left:-70%;width:45%;height:100%;background:linear-gradient(115deg,transparent 0%,color-mix(in srgb,var(--focus) 22%,#fff) 50%,transparent 100%);opacity:.5;transform:skewX(-18deg);animation:xnShine 5.5s ease-in-out infinite;animation-delay:var(--sd,0s);pointer-events:none}@keyframes xnShine{0%{left:-70%}35%{left:150%}100%{left:150%}}@media (prefers-reduced-motion:reduce){.xn-shine::after{display:none}}`}</style>
+
       {/* Piani */}
       <div className="grid gap-3 lg:grid-cols-4">
-        {TIERS.map((tr) => {
+        {TIERS.map((tr, i) => {
           const on = tr.key === tier.key;
           const price = annual ? Math.round(tr.price * (1 - ANNUAL_OFF)) : tr.price;
           const adds = MODULES.filter((m) => !m.core && tr.includes.includes(m.key));
           return (
-            <div key={tr.key} className={`flex flex-col rounded-xl border p-4 transition ${on ? "border-focus bg-surface shadow-md ring-2 ring-[color:var(--focus)]" : "border-line hover:shadow-md"}`}>
+            <div key={tr.key} style={{ ["--sd"]: `${i * 0.9}s` } as CSSProperties} className={`xn-shine flex flex-col rounded-xl border p-4 transition ${on ? "border-focus bg-surface shadow-md ring-2 ring-[color:var(--focus)]" : "border-line hover:shadow-md"}`}>
               <div className="flex items-center justify-between gap-2">
                 <span className="font-display text-lg font-bold text-txt">{tr.name}</span>
                 {on ? <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-2 py-0.5 text-[10px] font-bold uppercase text-focus">{t("Attivo")}</span>
@@ -196,7 +201,6 @@ export default function AbbonamentoPage() {
         </div>
       </div>
 
-      <p className="mt-3 text-center text-xs text-faint">{t("Prova gratuita 7 giorni · nessun costo di attivazione · disdici quando vuoi")}</p>
 
       {/* Cosa include ogni piano */}
       <Card className="mt-6">
