@@ -94,11 +94,9 @@
       if (amenities.length) { out.amenitiesTitle = hs.amenitiesTitle; out.amenitiesIntro = hs.amenitiesIntro; }
       return out;
     });
-    // Home: se l'host non ha scritto il benvenuto, NON si ripiega sul demo di Siracusa:
-    // si usa un benvenuto neutro col nome della struttura (riflette i dati reali, non l'esempio).
-    var pname = (window.PROPERTY && window.PROPERTY.name) ? window.PROPERTY.name : "";
-    var neutralHome = { welcomeTitle: (WELCOME[l] || WELCOME.it) + (pname ? " · " + pname : ""), welcome: [] };
-    var homeOut = homeFilled(src.home) ? src.home : neutralHome;
+    // Home: se l'host non ha scritto il benvenuto, resta VUOTA (niente fallback "Benvenuti · nome").
+    // Solo ciò che l'host compila qui compare: i dati della struttura vivono nelle loro sezioni.
+    var homeOut = homeFilled(src.home) ? src.home : { welcomeTitle: "", welcomeSub: "", welcome: [] };
     window.I18N[l] = { ui: base.ui, home: homeOut, groups: groups, sections: merged, sectionsByProperty: {} };
   });
 })();

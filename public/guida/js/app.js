@@ -457,7 +457,7 @@
         html += "<p" + (i === 0 ? ' class="welcome-lead"' : "") + ">" + esc(fill(para)) + "</p>";
       });
       html += "</div>";
-    } else {
+    } else if ((t.home.title && t.home.title.trim()) || (t.home.subtitle && t.home.subtitle.trim())) {
       html += '<div class="hero"><h2>' + esc(fill(t.home.title)) + "</h2><p>" + esc(fill(t.home.subtitle)) + "</p></div>";
     }
 
