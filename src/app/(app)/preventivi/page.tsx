@@ -127,6 +127,9 @@ export default function PreventiviPage() {
   const [tab, setTab] = useState<"nuovo" | "archivio">("nuovo"); // sezione: editor o archivio
   const [note, setNote] = useState("");
   const [lang, setLang] = useState<Lang>("it");
+  const [previewPage, setPreviewPage] = useState(0); // anteprima: 0 = pagina 1, 1 = pagina 2 (extra)
+  const [flipDir, setFlipDir] = useState(1); // verso dello sfoglio (1 avanti, -1 indietro)
+  const flipTo = (p: number) => { setFlipDir(p >= previewPage ? 1 : -1); setPreviewPage(p); };
   // Anteprima come foglio A4 reale: misuro la larghezza disponibile e scalo la pagina (794px = A4 @96dpi).
   const previewRef = useRef<HTMLDivElement>(null);
   const [pw, setPw] = useState(700);
@@ -639,14 +642,25 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
         <Card className="flex h-full flex-col">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <SectionTitle>{t("Anteprima PDF")}</SectionTitle>
-            <div className="flex items-center gap-0.5 rounded-lg border border-line bg-paper p-0.5">
-              {LANGS.map(([l, nm]) => (
-                <button key={l} onClick={() => setLang(l)} title={nm} aria-label={nm} className={`rounded-md px-1.5 py-1 text-lg leading-none transition ${lang === l ? "scale-110 bg-wash ring-1 ring-[color:var(--focus)]" : "opacity-45 grayscale hover:opacity-90 hover:grayscale-0"}`}>{FLAG[l]}</button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-0.5 rounded-lg border border-line bg-paper p-0.5">
+                {LANGS.map(([l, nm]) => (
+                  <button key={l} onClick={() => setLang(l)} title={nm} aria-label={nm} className={`rounded-md px-1.5 py-1 text-lg leading-none transition ${lang === l ? "scale-110 bg-wash ring-1 ring-[color:var(--focus)]" : "opacity-45 grayscale hover:opacity-90 hover:grayscale-0"}`}>{FLAG[l]}</button>
+                ))}
+              </div>
+              {(extrasPage && structExtras.length > 0) && (
+                <div className="flex items-center gap-1 rounded-lg border border-line bg-paper p-0.5">
+                  <button onClick={() => flipTo(0)} disabled={previewPage === 0} title={t("Pagina precedente")} className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-wash disabled:opacity-30">‹</button>
+                  <span className="px-1 text-xs font-semibold text-txt">{t("Pag.")} {previewPage + 1}<span className="text-faint">/2</span></span>
+                  <button onClick={() => flipTo(1)} disabled={previewPage === 1} title={t("Pagina successiva")} className="grid h-7 w-7 place-items-center rounded-md text-dim hover:bg-wash disabled:opacity-30">›</button>
+                </div>
+              )}
             </div>
           </div>
-          <div ref={previewRef} className="flex-1 overflow-y-auto rounded-lg border border-line bg-wash p-2" style={{ minHeight: 340 }}>
-            <QuoteDoc scale={pw / 794}
+          <div ref={previewRef} className="flex-1 overflow-y-auto rounded-lg border border-line bg-wash p-2" style={{ minHeight: 340, perspective: "1600px" }}>
+            <style>{`@keyframes qpFlipNext{from{transform:rotateY(-88deg);opacity:.25}to{transform:rotateY(0);opacity:1}}@keyframes qpFlipPrev{from{transform:rotateY(88deg);opacity:.25}to{transform:rotateY(0);opacity:1}}`}</style>
+            <div key={previewPage} style={{ transformOrigin: flipDir >= 0 ? "left center" : "right center", animation: `${flipDir >= 0 ? "qpFlipNext" : "qpFlipPrev"} .55s cubic-bezier(.2,.7,.3,1)`, boxShadow: "0 20px 40px -24px rgba(0,0,0,.35)" }}>
+            <QuoteDoc scale={pw / 794} page={(extrasPage && structExtras.length > 0) ? previewPage : 0}
               accent={structure?.photoColor || "#BE5D38"} logo={structure?.logo}
               structureName={structureName} address={stAddress} contacts={stContacts} legal={stLegal} socials={stSocials}
               L={QL[lang]} quoteNo={quoteRef} date={todayStr} guest={name}
@@ -660,6 +674,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               payHolder={docHolder} payIban={docIban} payExtra={payExtra}
               causale={`${(name || "").trim()} ${fmt(checkIn)}-${fmt(checkOut)}`.trim()} note={note}
             />
+            </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <button onClick={printPdf} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Scarica / stampa PDF")}</button>
@@ -806,11 +821,15 @@ function QuoteDoc(p: {
   roomLines: { label: string; sub: string; amount: string }[]; breakfast: boolean; parking: boolean; parkText: string; cot?: boolean; cotText?: string;
   cityTax: string; taxPersons: number; total: string; accText: string; payHolder: string; payIban: string; payExtra: string; causale: string; note: string;
   extras?: { name: string; desc?: string; price: string; per: string }[]; extrasTitle?: string; extrasNote?: string; extrasIntro?: string;
+  page?: number; // se definito: mostra solo quella pagina (0 = principale, 1 = extra)
 }) {
   const muted = "#726b62", hair = "#ece7df";
+  const showP1 = p.page === undefined || p.page === 0;
+  const showP2 = p.page === undefined || p.page === 1;
   const row = { display: "flex", justifyContent: "space-between", padding: "9px 2px", borderBottom: `1px solid ${hair}`, fontSize: 14 } as const;
   return (
     <>
+    {showP1 && (
     <A4Page scale={p.scale} accent={p.accent}>
       <div style={{ padding: "28px 30px 0" }}>
         {/* Intestazione */}
@@ -892,7 +911,8 @@ function QuoteDoc(p: {
         </div>
       </div>
     </A4Page>
-    {p.extras && p.extras.length ? (
+    )}
+    {showP2 && p.extras && p.extras.length ? (
       <A4Page scale={p.scale} accent={p.accent}>
         <div style={{ padding: "28px 30px 0" }}>
           {/* Intestazione identica alla pagina 1 */}
