@@ -56,7 +56,7 @@ export default function PuliziePage() {
   const { t } = useLang();
   const todayISO = toISO(new Date());
   const [date, setDate] = useState(todayISO);
-  const [view, setView] = useState<"rows" | "cards">("cards");
+  const [view, setView] = useState<"rows" | "cards">("rows");
   const [structFilter, setStructFilter] = useState("all");
   const [actionFilter, setActionFilter] = useState<"tutte" | "dafare" | "riassetto" | "partenze" | "arrivi">("tutte");
   const matchAction = (action: ActionKey) => {
@@ -494,8 +494,8 @@ export default function PuliziePage() {
         </div>
         <button onClick={() => setDate(todayISO)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt">{t("Oggi")}</button>
         <div className="flex items-center rounded-lg border border-line p-0.5">
+          <Seg v="rows" icon="menu" title={t("Vista lista")} />
           <Seg v="cards" icon="grid" title={t("Vista card")} />
-          <Seg v="rows" icon="menu" title={t("Vista righe")} />
         </div>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={copyPlan} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-dim hover:bg-wash">{copied ? t("Copiato ✓") : t("Copia")}</button>
