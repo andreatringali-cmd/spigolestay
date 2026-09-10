@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { toISO, parseISO } from "@/lib/dates";
-import { CHANNELS } from "@/lib/types";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
 
@@ -13,7 +12,19 @@ const REV = {
   neu: ["Bene nel complesso, ma il parcheggio è un po' scomodo.", "Camera carina, colazione migliorabile.", "Posizione comoda, wi-fi a tratti lento."],
   neg: ["Pulizia non all'altezza e check-in complicato.", "Ci aspettavamo di più per il prezzo."],
 };
-const CHS = ["booking", "airbnb", "direct", "expedia"] as const;
+
+// Fonti recensioni: OTA + Google. Il collegamento reale (API) arriva con il white-label.
+const SOURCES = [
+  { k: "google", label: "Google", color: "#4285F4", note: "Recensioni + risposta diretta (Business Profile)." },
+  { k: "booking", label: "Booking.com", color: "#003580", note: "Via connessione partner / channel manager." },
+  { k: "airbnb", label: "Airbnb", color: "#FF5A5F", note: "Copertura parziale (nessuna API pubblica)." },
+  { k: "expedia", label: "Expedia", color: "#FFC72C", note: "Dipende dal contratto." },
+  { k: "tripadvisor", label: "Tripadvisor", color: "#00AA6C", note: "Via Content/Review API." },
+  { k: "direct", label: "Diretta", color: "#7A8450", note: "Recensioni dei tuoi ospiti diretti." },
+] as const;
+type SourceKey = typeof SOURCES[number]["k"];
+const SRC = Object.fromEntries(SOURCES.map((s) => [s.k, s])) as Record<SourceKey, typeof SOURCES[number]>;
+const CONN_KEY = "spigolestay:reviewsources";
 
 export default function RecensioniPage() {
   const { bookings, guests, activeStructureId } = useData();
@@ -21,28 +32,39 @@ export default function RecensioniPage() {
   const guestName = (id: string) => guests.find((g) => g.id === id)?.fullName ?? "Ospite";
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState<Record<string, string>>({});
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:reviews"); if (r) setReplies(JSON.parse(r)); } catch {} }, []);
+  const [conn, setConn] = useState<Record<string, boolean>>({ google: true, booking: true });
+  const [filter, setFilter] = useState<"all" | SourceKey>("all");
+  useEffect(() => {
+    try { const r = localStorage.getItem("spigolestay:reviews"); if (r) setReplies(JSON.parse(r)); } catch {}
+    try { const c = localStorage.getItem(CONN_KEY); if (c) setConn(JSON.parse(c)); } catch {}
+  }, []);
   const persist = (n: Record<string, string>) => { setReplies(n); try { localStorage.setItem("spigolestay:reviews", JSON.stringify(n)); } catch {} };
+  const toggleConn = (k: SourceKey) => setConn((p) => { const n = { ...p, [k]: !p[k] }; try { localStorage.setItem(CONN_KEY, JSON.stringify(n)); } catch {} return n; });
 
-  // Recensioni simulate a partire dai soggiorni passati (deterministiche).
+  const connectedSources = SOURCES.filter((s) => conn[s.k]).map((s) => s.k);
+
+  // Recensioni simulate a partire dai soggiorni passati (deterministiche), distribuite sulle fonti collegate.
   const reviews = useMemo(() => {
+    if (connectedSources.length === 0) return [];
     const past = bookings.filter((b) => b.checkOut < today && b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId)).sort((a, b) => b.checkOut.localeCompare(a.checkOut)).slice(0, 24);
     const ratings = [10, 9, 8, 10, 9, 7, 10, 8, 9, 6, 10, 9, 8, 10, 7, 9, 10, 8, 9, 10, 5, 9, 8, 10];
     return past.map((b, i) => {
       const rating = ratings[i % ratings.length];
       const bucket = rating >= 8 ? "pos" : rating >= 6 ? "neu" : "neg";
       const text = REV[bucket][i % REV[bucket].length];
-      const channel = CHS[i % CHS.length];
-      return { id: b.id, guest: guestName(b.guestId), date: b.checkOut, rating, text, bucket: bucket as "pos" | "neu" | "neg", channel };
+      const source = connectedSources[i % connectedSources.length];
+      return { id: b.id, guest: guestName(b.guestId), date: b.checkOut, rating, text, bucket: bucket as "pos" | "neu" | "neg", source };
     });
-  }, [bookings, activeStructureId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings, activeStructureId, conn]);
 
+  const shown = filter === "all" ? reviews : reviews.filter((r) => r.source === filter);
   const avg = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : 0;
   const unanswered = reviews.filter((r) => !replies[r.id]).length;
-  const byChannel = CHS.map((c) => { const rs = reviews.filter((r) => r.channel === c); return { c, n: rs.length, avg: rs.length ? rs.reduce((a, r) => a + r.rating, 0) / rs.length : 0 }; }).filter((x) => x.n);
+  const bySource = connectedSources.map((c) => { const rs = reviews.filter((r) => r.source === c); return { c, n: rs.length, avg: rs.length ? rs.reduce((a, r) => a + r.rating, 0) / rs.length : 0 }; }).filter((x) => x.n);
   const dist = [10, 9, 8, 7, 6, 5].map((v) => ({ v, n: reviews.filter((r) => r.rating === v).length }));
 
-  const suggest = (r: { guest: string; bucket: string; channel: string }) => {
+  const suggest = (r: { guest: string; bucket: string }) => {
     const first = r.guest.split(" ")[0];
     if (r.bucket === "pos") return `Grazie di cuore ${first}! Siamo felicissimi che il soggiorno sia stato all'altezza. Ti aspettiamo di nuovo a Siracusa — alla prossima con una sorpresa riservata a chi torna. 🌊`;
     if (r.bucket === "neu") return `Grazie ${first} per il feedback prezioso. Abbiamo preso nota dei punti da migliorare e ci stiamo già lavorando. Ci farebbe piacere riaverti per mostrarti i progressi!`;
@@ -53,7 +75,28 @@ export default function RecensioniPage() {
 
   return (
     <div>
-      <PageHeader title="Recensioni & reputazione" subtitle="Tutte le recensioni in un posto, con risposte suggerite dall'AI" />
+      <PageHeader title="Recensioni & reputazione" subtitle="Tutte le recensioni delle OTA e di Google in un posto, con risposte suggerite dall'AI" />
+
+      {/* Fonti recensioni: OTA + Google */}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <SectionTitle>Fonti recensioni</SectionTitle>
+        <span className="text-[11px] font-semibold text-faint">{connectedSources.length}/{SOURCES.length} collegate</span>
+      </div>
+      <div className="mb-5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+        {SOURCES.map((s) => {
+          const on = !!conn[s.k];
+          return (
+            <div key={s.k} className="flex items-center gap-3 rounded-xl border p-3 shadow-sm" style={{ borderColor: on ? s.color : "var(--line)" }}>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: s.color }}>{s.label[0]}</span>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-txt">{s.label}</div>
+                <div className="truncate text-[11px] text-faint">{s.note}</div>
+              </div>
+              <button onClick={() => toggleConn(s.k)} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${on ? "text-white" : "border border-line text-dim hover:bg-wash"}`} style={on ? { backgroundColor: "var(--ok)" } : undefined}>{on ? "Collegato" : "Collega"}</button>
+            </div>
+          );
+        })}
+      </div>
 
       <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Media</div><div className="font-mono text-lg font-bold text-txt">{avg.toFixed(1)}<span className="text-xs text-faint">/10</span></div></div>
@@ -63,18 +106,26 @@ export default function RecensioniPage() {
       </div>
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2">
-        <Card><SectionTitle>Media per canale</SectionTitle><div className="space-y-2">{byChannel.map((x) => (<div key={x.c} className="flex items-center gap-2"><span className="w-24 text-sm text-txt">{CHANNELS[x.c].label}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${x.avg * 10}%`, backgroundColor: `var(${CHANNELS[x.c].cssVar})` }} /></div><span className="w-16 text-right font-mono text-sm font-semibold text-txt">{x.avg.toFixed(1)} <span className="text-[10px] text-faint">({x.n})</span></span></div>))}</div></Card>
+        <Card><SectionTitle>Media per fonte</SectionTitle><div className="space-y-2">{bySource.length === 0 ? <p className="text-sm text-faint">Collega una fonte per vedere i dati.</p> : bySource.map((x) => (<div key={x.c} className="flex items-center gap-2"><span className="w-24 text-sm text-txt">{SRC[x.c].label}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${x.avg * 10}%`, backgroundColor: SRC[x.c].color }} /></div><span className="w-16 text-right font-mono text-sm font-semibold text-txt">{x.avg.toFixed(1)} <span className="text-[10px] text-faint">({x.n})</span></span></div>))}</div></Card>
         <Card><SectionTitle>Distribuzione voti</SectionTitle><div className="space-y-1.5">{dist.map((d) => (<div key={d.v} className="flex items-center gap-2"><span className="w-6 text-right font-mono text-sm text-dim">{d.v}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full bg-focus" style={{ width: `${reviews.length ? (d.n / reviews.length) * 100 : 0}%` }} /></div><span className="w-8 text-right font-mono text-sm text-dim">{d.n}</span></div>))}</div></Card>
       </div>
 
-      <SectionTitle>Recensioni</SectionTitle>
+      {/* Filtro per fonte */}
+      <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
+        <span className="mr-1 text-xs font-semibold text-faint">Fonte:</span>
+        <button onClick={() => setFilter("all")} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${filter === "all" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Tutte</button>
+        {connectedSources.map((c) => (
+          <button key={c} onClick={() => setFilter(c)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${filter === c ? "text-white" : "text-dim hover:bg-wash"}`} style={filter === c ? { backgroundColor: SRC[c].color } : undefined}>{SRC[c].label}</button>
+        ))}
+      </div>
+
       <div className="space-y-3">
-        {reviews.map((r) => (
+        {shown.map((r) => (
           <Card key={r.id}>
             <div className="flex flex-wrap items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color(r.bucket) }} />
               <span className="font-semibold text-txt">{r.guest}</span>
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ backgroundColor: `var(${CHANNELS[r.channel].cssVar})` }}>{CHANNELS[r.channel].label}</span>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ backgroundColor: SRC[r.source].color }}>{SRC[r.source].label}</span>
               <span className="text-sm" style={{ color: color(r.bucket) }}>{star(r.rating)}</span>
               <span className="font-mono text-sm text-dim">{r.rating}/10</span>
               <span className="ml-auto text-xs text-faint">{fmt(r.date)}</span>
@@ -93,9 +144,10 @@ export default function RecensioniPage() {
             )}
           </Card>
         ))}
-        {reviews.length === 0 && <Card className="py-8 text-center text-sm text-faint">Nessuna recensione nel periodo. Compariranno dai soggiorni conclusi.</Card>}
+        {connectedSources.length === 0 && <Card className="py-8 text-center text-sm text-faint">Collega almeno una fonte (Google, Booking…) per vedere le recensioni.</Card>}
+        {connectedSources.length > 0 && shown.length === 0 && <Card className="py-8 text-center text-sm text-faint">Nessuna recensione per questa fonte.</Card>}
       </div>
-      <p className="mt-3 text-[11px] text-faint">Demo: le recensioni sono generate dai soggiorni passati. In produzione si collegano le API di Booking/Airbnb/Google per importarle e rispondere direttamente.</p>
+      <p className="mt-3 text-[11px] text-faint">Demo: le recensioni sono generate dai soggiorni passati e distribuite sulle fonti collegate. Il collegamento reale alle API (Google, Booking, Tripadvisor…) verrà attivato con il white-label.</p>
     </div>
   );
 }
