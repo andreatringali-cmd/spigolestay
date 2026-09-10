@@ -576,7 +576,7 @@ export default function GuidaOspitiPage() {
 
   const tvUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/guida/tv.html?p=${encodeURIComponent(sid)}`;
   // Anteprima: telefono (guida mobile) o TV, in una delle 5 lingue.
-  const [pvMode, setPvMode] = useState<"phone" | "tv">("phone");
+  const [pvMode] = useState<"phone" | "tv">("phone");
   const [mainTab, setMainTab] = useState<"app" | "tv">("app"); // 📱 App cellulare · 📺 TV
   const [pvLang, setPvLang] = useState("it");
   useEffect(() => { try { localStorage.setItem("spigole_lang", pvLang); } catch {} }, [pvLang]);
@@ -860,21 +860,15 @@ export default function GuidaOspitiPage() {
               <SectionTitle>Anteprima live</SectionTitle>
               <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-faint"><span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: savedThis ? "var(--ok)" : "var(--faint)" }} />{savedThis ? "live" : "compila per vedere"}</span>
             </div>
-            {/* Telefono / TV */}
-            <div className="inline-flex rounded-lg border border-line bg-surface p-0.5">
-              <button onClick={() => setPvMode("phone")} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${pvMode === "phone" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>📱 Telefono</button>
-              <button onClick={() => setPvMode("tv")} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${pvMode === "tv" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>📺 TV</button>
-            </div>
-          </div>
-          {/* Lingue + apri a schermo intero */}
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div className="inline-flex overflow-hidden rounded-lg border border-line">
-              {["it", "en", "fr", "de", "es"].map((l) => (
-                <button key={l} onClick={() => setPvLang(l)} className={`px-2 py-1 text-xs font-semibold transition ${pvLang === l ? "bg-focus text-white" : "bg-surface text-dim hover:text-txt"}`}>{l.toUpperCase()}</button>
-              ))}
-            </div>
             <div className="flex items-center gap-2">
-              <button onClick={refresh} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">↻</button>
+              <button onClick={refresh} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">↻ Aggiorna</button>
+              <select value={pvLang} onChange={(e) => setPvLang(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-dim outline-none focus:border-focus">
+                <option value="it">🇮🇹 Italiano</option>
+                <option value="en">🇬🇧 English</option>
+                <option value="fr">🇫🇷 Français</option>
+                <option value="de">🇩🇪 Deutsch</option>
+                <option value="es">🇪🇸 Español</option>
+              </select>
               <a href={previewUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">Schermo intero ↗</a>
             </div>
           </div>
