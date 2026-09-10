@@ -23,7 +23,7 @@ interface GAction { label: string; href: string; type?: string; icon?: string }
 interface GListRow { n: string; sub: string; tel?: string }
 interface GItem { h: string; p: string; actions?: GAction[]; list?: GListRow[] }
 // Passaggio numerato (check-in, colazione). `code` = quale codice del link ospite mostrare sotto.
-interface GStep { h: string; p: string; code?: "" | "gate" | "door" | "door2"; actions?: GAction[] }
+interface GStep { h: string; p: string; code?: "" | "gate" | "door" | "door2"; codeNote?: string; actions?: GAction[] }
 interface GAmenity { icon: string; label: string }
 interface GSection {
   id: string; icon: string; title: string; sub: string; intro: string; photos: string[]; items: GItem[];
@@ -338,7 +338,7 @@ async function translateContent(content: GContent, to: string): Promise<GContent
     const ns: GSection = { ...s, title: await T(s.title), sub: await T(s.sub), intro: await T(s.intro) };
     if (s.amenitiesTitle != null) ns.amenitiesTitle = await T(s.amenitiesTitle);
     if (s.amenitiesIntro != null) ns.amenitiesIntro = await T(s.amenitiesIntro);
-    if (s.steps) { const st: GStep[] = []; for (const k of s.steps) st.push({ ...k, h: await T(k.h), p: await T(k.p), actions: await trActions(k.actions) }); ns.steps = st; }
+    if (s.steps) { const st: GStep[] = []; for (const k of s.steps) st.push({ ...k, h: await T(k.h), p: await T(k.p), codeNote: k.codeNote ? await T(k.codeNote) : k.codeNote, actions: await trActions(k.actions) }); ns.steps = st; }
     if (s.amenities) ns.amenities = await Promise.all(s.amenities.map(async (a) => ({ ...a, label: await T(a.label) })));
     const items: GItem[] = [];
     for (const it of s.items) items.push({ ...it, h: await T(it.h), p: await T(it.p), actions: await trActions(it.actions) }); // liste (nomi/indirizzi) non tradotte
@@ -806,8 +806,16 @@ export default function GuidaOspitiPage() {
                                   className="w-32 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus"
                                 />
                               )}
+                              {st.code && (
+                                <input
+                                  value={st.codeNote ?? ""}
+                                  onChange={(e) => updStep(si, ki, { codeNote: e.target.value })}
+                                  placeholder="Nota dopo il codice (es. + tasto centrale)"
+                                  className="min-w-[10rem] flex-1 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus"
+                                />
+                              )}
                             </div>
-                            {st.code && <p className="mt-1 text-[11px] text-faint">Il codice appare sotto questo passaggio. Per sicurezza non viene salvato nella guida: puoi scriverlo qui (vale anche per il link ospite) oppure lasciarlo all&apos;ospite tramite il suo link personale.</p>}
+                            {st.code && <p className="mt-1 text-[11px] text-faint">Il codice appare sotto questo passaggio. Per sicurezza non viene salvato nella guida: puoi scriverlo qui (vale anche per il link ospite) oppure lasciarlo all&apos;ospite tramite il suo link personale. La &ldquo;nota dopo il codice&rdquo; sostituisce il &ldquo;#&rdquo; e appare accanto al codice.</p>}
                             <div className="mt-1.5">
                               {stepActs(si, ki).map((a, ai) => (
                                 <div key={ai} className="mb-1 flex flex-wrap items-center gap-1.5">
