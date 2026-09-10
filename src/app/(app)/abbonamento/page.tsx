@@ -146,7 +146,7 @@ export default function AbbonamentoPage() {
 
       {/* Toggle mensile/annuale */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <span className="rounded-full bg-wash px-3 py-1 text-xs font-medium text-dim">{nStruct} {t("struttura/e")} · {rooms} {t("camere attive")}</span>
+        <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{nStruct} {t("struttura/e")} · {rooms} {t("camere attive")}</span>
         <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface p-0.5 text-sm">
           <button onClick={() => setAnnual(false)} className={`rounded-md px-3 py-1 font-semibold transition ${!annual ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Mensile")}</button>
           <button onClick={() => setAnnual(true)} className={`rounded-md px-3 py-1 font-semibold transition ${annual ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Annuale")} <span className="text-[10px] font-bold text-[color:var(--ok)]">−20%</span></button>
@@ -196,7 +196,7 @@ export default function AbbonamentoPage() {
         </div>
       </div>
 
-      <p className="mt-3 text-center text-xs text-faint">{t("Prova gratuita 7 giorni · nessun costo di attivazione · disdici quando vuoi")}</p>
+      <p className="mt-3 text-center text-xs text-faint">{t("Prova gratuita 7 giorni · nessun costo di attivazione · disdici quando vuoi")} · <span className="font-semibold" style={{ color: "var(--focus)" }}>{nStruct} {t("struttura/e")} · {rooms} {t("camere attive")}</span></p>
 
       {/* Cosa include ogni piano */}
       <Card className="mt-6">
