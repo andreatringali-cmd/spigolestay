@@ -2,6 +2,7 @@
 
 import { useState, type CSSProperties } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Logo from "./Logo";
 import Icon from "./Icon";
 import { NAV } from "./nav";
@@ -38,6 +39,11 @@ export default function Sidebar({
   const [open, setOpen] = useState<Record<string, boolean>>({ [activeGroup]: true });
   // Accordion: aprendo un gruppo si chiude quello precedente (uno solo aperto per volta).
   const toggleGroup = (g: string) => setOpen((o) => (o[g] ? {} : { [g]: true }));
+  const router = useRouter();
+  // Voce col lucchetto: prima di portare all'Abbonamento, spieghiamo il motivo.
+  const [lockedItem, setLockedItem] = useState<(typeof NAV)[number] | null>(null);
+  const openLocked = (n: (typeof NAV)[number]) => (e: React.MouseEvent) => { e.preventDefault(); setLockedItem(n); };
+  const goToPlans = () => { const n = lockedItem; setLockedItem(null); onCloseMobile(); router.push("/abbonamento"); void n; };
 
   return (
     <>
@@ -77,6 +83,7 @@ export default function Sidebar({
                 <Link
                   key={n.href}
                   href={isLk ? "/abbonamento" : n.href}
+                  onClick={isLk ? openLocked(n) : undefined}
                   title={isLk ? `${t(n.label)} · ${t("attiva nel piano")}` : t(n.label)}
                   className={`relative flex items-center justify-center rounded-lg p-2.5 transition ${active ? "" : "text-dim hover:bg-wash hover:text-[color:var(--hovc)]"} ${isLk && !active ? "opacity-55" : ""}`}
                   style={active ? { backgroundColor: mix(color, 16), color } : ({ "--hovc": color } as CSSProperties)}
@@ -130,7 +137,7 @@ export default function Sidebar({
                           <Link
                             key={n.href}
                             href={isLk ? "/abbonamento" : n.href}
-                            onClick={onCloseMobile}
+                            onClick={isLk ? openLocked(n) : onCloseMobile}
                             className={`flex items-center gap-2.5 rounded-lg py-2 pl-3 pr-2.5 text-sm transition ${active ? "" : "hover:bg-wash"} ${isLk && !active ? "opacity-60 hover:opacity-100" : ""}`}
                             style={
                               active
@@ -158,6 +165,24 @@ export default function Sidebar({
           <UserSwitcher sidebar collapsed={collapsed} />
         </div>
       </aside>
+
+      {/* Sezione col lucchetto: spiega il motivo prima di portare ai piani */}
+      {lockedItem && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <button aria-label={t("Chiudi")} onClick={() => setLockedItem(null)} className="absolute inset-0 bg-black/40" />
+          <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="grid h-10 w-10 place-items-center rounded-full" style={{ backgroundColor: mix("var(--focus)", 14), color: "var(--focus)" }}><Icon name="lock" size={18} /></span>
+              <h2 className="font-display text-lg font-bold text-txt">{t(lockedItem.label)}</h2>
+            </div>
+            <p className="text-sm text-dim">{t("Questa sezione non è inclusa nel tuo piano attuale. Attivala dall'Abbonamento per sbloccarla.")}</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setLockedItem(null)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
+              <button onClick={goToPlans} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Vai ai piani")}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
