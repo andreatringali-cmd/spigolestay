@@ -53,8 +53,8 @@ const ACT_KINDS: { k: string; label: string; type: string; icon: string }[] = [
 ];
 const kindOf = (a: GAction) => (a.type === "wa" ? "wa" : a.type === "tel" ? "tel" : a.type === "mail" ? "mail" : a.icon === "pin" ? "map" : "link");
 // Limiti caratteri calibrati sull'esempio Spigolehouse: mantengono la grafica impeccabile.
-const LIM = { guideName: 40, name: 60, wtitle: 30, welcome: 420, title: 45, sub: 70, intro: 260, h: 55, p: 950, alabel: 34, ln: 44, lsub: 56, ltel: 22 };
-interface GContent { home: { welcomeTitle: string; welcome: string[] }; sections: GSection[] }
+const LIM = { guideName: 40, name: 60, wtitle: 30, wsub: 70, welcome: 420, title: 45, sub: 70, intro: 260, h: 55, p: 950, alabel: 34, ln: 44, lsub: 56, ltel: 22 };
+interface GContent { home: { welcomeTitle: string; welcomeSub?: string; welcome: string[] }; sections: GSection[] }
 const ICON_OPTS = ["key", "wifi", "coffee", "temple", "pizza", "beach", "taxi", "info", "sparkle", "star", "phone", "bed", "pin", "calendar"];
 // wifi/contacts/review restano operative "pure" (credenziali e contatti automatici dai dati struttura).
 const FUNC_SECTIONS = ["wifi", "contacts", "review"];
@@ -91,7 +91,7 @@ const SEC_BLOCKS: Record<string, { label: string; add: string; hint?: string; hP
 };
 // Template fedele alla struttura dell'originale: ogni sezione ha la SUA forma.
 const DEFAULT_CONTENT: GContent = {
-  home: { welcomeTitle: "Benvenuti,", welcome: ["siamo davvero felici di accogliervi!", "Questa guida vi aiuterà a scoprire la città e a vivere al meglio il vostro soggiorno.", "Buona permanenza!"] },
+  home: { welcomeTitle: "Benvenuti,", welcomeSub: "siamo felici di ospitarvi", welcome: ["siamo davvero felici di accogliervi!", "Questa guida vi aiuterà a scoprire la città e a vivere al meglio il vostro soggiorno.", "Buona permanenza!"] },
   sections: [
     { id: "checkin", icon: "key", title: "Arrivo e Self Check-in", sub: "Come raggiungerci ed entrare in camera", intro: "Potete arrivare in piena libertà. Ecco come entrare.", photos: [],
       steps: [
@@ -179,7 +179,7 @@ const DEMO_GUIDE = {
   reviewUrl: "https://www.google.com/maps/search/?api=1&query=Spigolehouse+Siracusa",
 };
 const DEMO_CONTENT: GContent = {
-  home: { welcomeTitle: "Benvenuti a Siracusa,", welcome: ["siamo davvero felici di accogliervi!", "Questa guida vi aiuterà a scoprire la città e a vivere al meglio il soggiorno.", "Buona permanenza!"] },
+  home: { welcomeTitle: "Benvenuti a Siracusa,", welcomeSub: "siamo felici di ospitarvi", welcome: ["siamo davvero felici di accogliervi!", "Questa guida vi aiuterà a scoprire la città e a vivere al meglio il soggiorno.", "Buona permanenza!"] },
   sections: [
     { id: "checkin", icon: "key", title: "Arrivo e Self Check-in", sub: "Come raggiungerci ed entrare in camera", intro: "Potete arrivare in piena libertà. Ecco come entrare.",
       photos: ["assets/rooms/room-6.jpg", "assets/rooms/room-3.jpg", "assets/rooms/room-2.jpg"],
@@ -272,7 +272,7 @@ const EXAMPLE_META: Record<string, { title: string; sub: string }> = {
 };
 const EMPTY_CONTENT: GContent = {
   // Nuova guida = tutto da compilare: nessun testo di benvenuto precaricato.
-  home: { welcomeTitle: "", welcome: [] },
+  home: { welcomeTitle: "", welcomeSub: "", welcome: [] },
   sections: DEFAULT_CONTENT.sections.map((s) => {
     const meta = EXAMPLE_META[s.id];
     const base = { id: s.id, icon: s.icon, title: meta?.title ?? s.title, sub: meta?.sub ?? s.sub, intro: "", photos: [] as string[] };
@@ -331,7 +331,7 @@ async function translateContent(content: GContent, to: string): Promise<GContent
     cache.set(s, out); return out;
   };
   const trActions = async (as?: GAction[]) => as ? await Promise.all(as.map(async (a) => ({ ...a, label: await T(a.label) }))) : as;
-  const home = { welcomeTitle: await T(content.home.welcomeTitle), welcome: [] as string[] };
+  const home = { welcomeTitle: await T(content.home.welcomeTitle), welcomeSub: await T(content.home.welcomeSub), welcome: [] as string[] };
   for (const w of content.home.welcome) home.welcome.push(await T(w));
   const sections: GSection[] = [];
   for (const s of content.sections) {
@@ -689,6 +689,7 @@ export default function GuidaOspitiPage() {
           <Card>
             <SectionTitle>Home · benvenuto</SectionTitle>
             <F label="Titolo di benvenuto"><input value={content.home.welcomeTitle} maxLength={LIM.wtitle} onChange={(e) => setHome({ welcomeTitle: e.target.value })} className={fld} /></F>
+            <div className="mt-3"><F label="Sottotitolo"><input value={content.home.welcomeSub ?? ""} maxLength={LIM.wsub} onChange={(e) => setHome({ welcomeSub: e.target.value })} className={fld} /></F></div>
             <div className="mt-3"><F label="Messaggio (una riga per paragrafo)"><textarea value={content.home.welcome.join("\n")} maxLength={LIM.welcome} onChange={(e) => setHome({ welcome: e.target.value.split("\n") })} rows={3} className={`${fld} resize-y`} /></F></div>
           </Card>
 

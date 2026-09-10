@@ -438,16 +438,22 @@
   function renderHome(t) {
     var html = "";
 
-    if (t.home.welcome && t.home.welcome.length) {
+    var _wTitle = t.home.welcomeTitle && t.home.welcomeTitle.trim();
+    var _wSub = t.home.welcomeSub && t.home.welcomeSub.trim();
+    var _wBody = t.home.welcome && t.home.welcome.length && t.home.welcome.join("").trim();
+    if (_wTitle || _wSub || _wBody) {
       // Messaggio di benvenuto: titolo dentro al box, niente titolone in cima
       html += '<div class="home-welcome">';
-      if (t.home.welcomeTitle) {
+      if (_wTitle) {
         // Saluto personalizzato col nome ospite (dal link della prenotazione), se presente.
         var head = fill(t.home.welcomeTitle);
         if (P.guestName) head = /[,–-]\s*$/.test(head) ? head + " " + P.guestName : head + ", " + P.guestName;
         html += '<h2 class="welcome-heading">' + esc(head) + "</h2>";
       }
-      t.home.welcome.forEach(function (para, i) {
+      if (_wSub) {
+        html += '<p class="welcome-subheading">' + esc(fill(t.home.welcomeSub)) + "</p>";
+      }
+      (t.home.welcome || []).forEach(function (para, i) {
         html += "<p" + (i === 0 ? ' class="welcome-lead"' : "") + ">" + esc(fill(para)) + "</p>";
       });
       html += "</div>";
