@@ -110,7 +110,7 @@ window.I18N.en = {
       gallery: true,
       intro: "You can arrive at your leisure from 3.00 pm.",
       steps: [
-        { h: "Where we are", p: "{address}. You will find us just after the church of Santa Rita, on the right (grey gate).", actions: [{ label: "B&B Spigolehouse", href: "{mapsUrl}", icon: "pin" }] },
+        { h: "Where we are", p: "{address}.", actions: [{ label: "{name}", href: "{mapsUrl}", icon: "pin" }] },
         { h: "Parking", p: "You have a reserved parking space in the inner courtyard. To enter the courtyard, type the code on the keypad below the intercom and press the centre button. Spaces are not assigned: park wherever you like within the marked areas.", codeKey: "gateCode", parkOnly: true },
         { h: "Parking", p: "Your booking shows that you have not booked parking. If you need it, contact us to check availability: the cost is €6 per night.", actions: [{ label: "Contact us on WhatsApp", href: "{whatsapp}", type: "wa", icon: "chat" }], noParkOnly: true },
         { h: "Pedestrian entrance", p: "To enter on foot, type the code on the keypad below the intercom and press the centre button.", codeKey: "doorCode", noParkOnly: true },

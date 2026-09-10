@@ -110,7 +110,7 @@ window.I18N.de = {
       gallery: true,
       intro: "Sie können ab 15.00 Uhr ganz entspannt anreisen.",
       steps: [
-        { h: "Wo wir sind", p: "{address}. Sie finden uns direkt nach der Kirche Santa Rita, auf der rechten Seite (graues Tor).", actions: [{ label: "B&B Spigolehouse", href: "{mapsUrl}", icon: "pin" }] },
+        { h: "Wo wir sind", p: "{address}.", actions: [{ label: "{name}", href: "{mapsUrl}", icon: "pin" }] },
         { h: "Parken", p: "Sie haben einen reservierten Parkplatz im Innenhof. Um in den Hof zu gelangen, geben Sie den Code auf dem Tastenfeld unter der Gegensprechanlage ein und drücken Sie die mittlere Taste. Die Plätze sind nicht zugewiesen: Parken Sie, wo Sie möchten, innerhalb der markierten Flächen.", codeKey: "gateCode", parkOnly: true },
         { h: "Parken", p: "Laut Ihrer Buchung haben Sie keinen Parkplatz reserviert. Falls Sie einen benötigen, kontaktieren Sie uns, um die Verfügbarkeit zu prüfen: Die Kosten betragen 6 € pro Nacht.", actions: [{ label: "Kontaktieren Sie uns per WhatsApp", href: "{whatsapp}", type: "wa", icon: "chat" }], noParkOnly: true },
         { h: "Fußgängereingang", p: "Um zu Fuß einzutreten, geben Sie den Code auf dem Tastenfeld unter der Gegensprechanlage ein und drücken Sie die mittlere Taste.", codeKey: "doorCode", noParkOnly: true },

@@ -110,7 +110,7 @@ window.I18N.it = {
       gallery: true,
       intro: "Potete arrivare in piena libertà a partire dalle 15.00.",
       steps: [
-        { h: "Dove siamo", p: "{address}. Ci trovate subito dopo la chiesa di Santa Rita, sulla destra (cancello grigio).", actions: [{ label: "B&B Spigolehouse", href: "{mapsUrl}", icon: "pin" }] },
+        { h: "Dove siamo", p: "{address}.", actions: [{ label: "{name}", href: "{mapsUrl}", icon: "pin" }] },
         { h: "Parcheggio", p: "Avete il posto auto riservato nel cortile interno. Per accedere al cortile digitate il codice sul tastierino sotto il citofono e premete il tasto centrale. I posti non sono assegnati: parcheggiate dove preferite negli spazi delimitati.", codeKey: "gateCode", parkOnly: true },
         { h: "Parcheggio", p: "Dalla vostra prenotazione risulta che non avete prenotato il parcheggio. Se vi serve, contattateci per verificare la disponibilità: il costo è di 6 € a notte.", actions: [{ label: "Contattaci su WhatsApp", href: "{whatsapp}", type: "wa", icon: "chat" }], noParkOnly: true },
         { h: "Ingresso pedonale", p: "Per entrare a piedi, digitate il codice sul tastierino sotto il citofono e premete il tasto centrale.", codeKey: "doorCode", noParkOnly: true },
