@@ -21,13 +21,6 @@ export const NAV: NavItem[] = [
   { label: "Promozioni", href: "/promozioni", group: "Vendita", icon: "mail", perm: "webconcierge", module: "concierge" },
   { label: "Upselling & extra", href: "/upselling", group: "Vendita", icon: "tag", perm: "webconcierge", module: "concierge" },
 
-  // Distribuzione: dove sei prenotabile e a quali prezzi.
-  { label: "Tariffe", href: "/tariffe", group: "Distribuzione", icon: "tag", perm: "tariffe", module: "pms" },
-  { label: "Canali", href: "/canali", group: "Distribuzione", icon: "share", perm: "canali", module: "cm" },
-  { label: "Meta Search", href: "/metasearch", group: "Distribuzione", icon: "search", perm: "canali", module: "meta" },
-  { label: "Widget sito", href: "/widget", group: "Distribuzione", icon: "eye", perm: "sito", module: "booking" },
-  { label: "Sito web", href: "/sito", group: "Distribuzione", icon: "grid", perm: "sito", module: "site" },
-
   { label: "Assistente ricavi", href: "/assistente-ricavi", group: "Report", icon: "sparkles", perm: "webconcierge", module: "concierge" },
   { label: "Recensioni", href: "/recensioni", group: "Report", icon: "chat", perm: "webconcierge", module: "concierge" },
   { label: "Statistiche", href: "/statistiche", group: "Report", icon: "chart", perm: "statistiche", module: "pms" },
@@ -40,6 +33,13 @@ export const NAV: NavItem[] = [
   { label: "Ospiti", href: "/ospiti", group: "Anagrafiche", icon: "users", perm: "prenotazioni", module: "pms" },
   { label: "Alloggiati", href: "/alloggiati", group: "Anagrafiche", icon: "id", perm: "alloggiati", module: "pms" },
   { label: "Tassa soggiorno", href: "/tassa-soggiorno", group: "Anagrafiche", icon: "receipt", perm: "tassa", module: "pms" },
+
+  // Distribuzione: dove sei prenotabile e a quali prezzi.
+  { label: "Tariffe", href: "/tariffe", group: "Distribuzione", icon: "tag", perm: "tariffe", module: "pms" },
+  { label: "Canali", href: "/canali", group: "Distribuzione", icon: "share", perm: "canali", module: "cm" },
+  { label: "Meta Search", href: "/metasearch", group: "Distribuzione", icon: "search", perm: "canali", module: "meta" },
+  { label: "Widget sito", href: "/widget", group: "Distribuzione", icon: "eye", perm: "sito", module: "booking" },
+  { label: "Sito web", href: "/sito", group: "Distribuzione", icon: "grid", perm: "sito", module: "site" },
 
   { label: "Utenti", href: "/utenti", group: "Configurazione", icon: "users", perm: "utenti", module: "pms" },
   { label: "Strutture", href: "/strutture", group: "Configurazione", icon: "building", perm: "impostazioni", module: "pms" },

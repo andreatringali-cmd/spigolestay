@@ -24,6 +24,7 @@ interface Conn {
   hotelId?: string; connType?: string; url?: string;
   priceRound?: boolean; priceAdjMode?: "percent" | "amount"; priceAdj?: number;
   availPct?: number; commissionPct?: number; importFilter?: string;
+  otaRooms?: { id: string; name: string }[]; // camere importate dal portale (per la mappatura)
 }
 const CONN_TYPES = ["iCal (sola lettura)", "XML", "API"];
 interface MapEntry { on: boolean; listingId: string; adjMode: "amount" | "percent"; adj: number }
@@ -67,8 +68,20 @@ export default function CanaliPage() {
   const saveLog = (next: LogEntry[]) => { setLog(next); try { localStorage.setItem(LOG_KEY, JSON.stringify(next.slice(0, 40))); } catch {} };
 
   const [configuring, setConfiguring] = useState<OtaKey | null>(null);
+  const [view, setView] = useState<"card" | "list">("card");
   const getConn = (k: string): Conn => conn[k] ?? { connected: false, auto: false };
   const patchConn = (k: OtaKey, patch: Partial<Conn>) => saveConn({ ...conn, [k]: { ...getConn(k), ...patch } });
+  // Prezzo inviato all'OTA = prezzo base con l'UNICA correzione del canale (uguale per tutte le tipologie).
+  const chPrice = (base: number, ota: string) => { const c = getConn(ota); const mode = c.priceAdjMode ?? "percent"; const adj = c.priceAdj ?? 0; const p = mode === "percent" ? base * (1 + adj / 100) : base + adj; return Math.max(0, Math.round(p)); };
+  const corrLabel = (ota: string) => { const c = getConn(ota); const adj = c.priceAdj ?? 0; if (!adj) return t("nessuna"); return `${adj > 0 ? "+" : ""}${adj}${(c.priceAdjMode ?? "percent") === "percent" ? "%" : "€"}`; };
+  const mappedCount = (ota: string) => types.filter((rt) => getMap(rt.id, ota).on && getMap(rt.id, ota).listingId).length;
+  // "Importa camere": popola la lista di camere del portale (demo: usa i nomi delle nostre tipologie).
+  const importRooms = (ota: OtaKey) => {
+    const rooms = types.map((rt) => ({ id: `${ota}-${rt.id.slice(0, 6)}`, name: rt.name }));
+    patchConn(ota, { otaRooms: rooms });
+    const o = OTAS.find((x) => x.key === ota)!;
+    saveLog([{ id: uid(), ts: Date.now(), text: `${rooms.length} ${t("camere importate da")} ${o.label}`, color: o.color }, ...log]);
+  };
   const getMap = (rt: string, ota: string): MapEntry => map[`${rt}:${ota}`] ?? { on: getConn(ota).connected, listingId: "", adjMode: "amount", adj: 0 };
   const setMapEntry = (rt: string, ota: string, patch: Partial<MapEntry>) => saveMap({ ...map, [`${rt}:${ota}`]: { ...getMap(rt, ota), ...patch } });
 
@@ -121,81 +134,70 @@ export default function CanaliPage() {
         <Card className="!p-4"><div className="text-xs text-dim">{t("Prenotazioni via OTA")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{otaBookings}</div></Card>
       </div>
 
-      {/* Connessioni */}
-      <Card className="mb-5">
-        <SectionTitle>{t("Connessioni")}</SectionTitle>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {OTAS.map((o) => {
-            const c = getConn(o.key);
-            return (
-              <div key={o.key} className="rounded-xl border p-3" style={{ borderColor: c.connected ? o.color : "var(--line)" }}>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-sm font-semibold text-txt"><span className="grid h-7 w-7 place-items-center rounded-lg text-xs font-bold text-white" style={{ backgroundColor: o.color }}>{o.label[0]}</span>{o.label}</span>
-                  <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={c.connected ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{c.connected ? t("Connesso") : t("Da collegare")}</span>
-                </div>
-                <div className="mt-2 flex items-center justify-between text-[11px] text-faint">
-                  <span>{t("Commissione")} {o.commission}%</span>
-                  <span>{c.lastSync ? `sync ${relTime(new Date(c.lastSync).getTime())}` : t("mai sincronizzato")}</span>
-                </div>
-                <div className="mt-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => toggleConn(o.key)} className={`rounded-lg px-3 py-1 text-xs font-semibold ${c.connected ? "border border-line text-[color:var(--err)] hover:bg-wash" : "text-white"}`} style={!c.connected ? { backgroundColor: o.color } : undefined}>{c.connected ? t("Scollega") : t("Collega")}</button>
-                    <button onClick={() => setConfiguring(o.key)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">⚙ {t("Configura")}</button>
-                  </div>
-                  {c.connected && <label className="flex items-center gap-1.5 text-[11px] text-dim">{t("Auto-sync")}<Toggle on={c.auto} onClick={() => toggleAuto(o.key)} color="var(--ok)" /></label>}
-                </div>
-              </div>
-            );
-          })}
+      {/* Connessioni — doppia vista card/lista, clic per aprire la scheda */}
+      <div className="mb-6">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <SectionTitle>{t("Connessioni")}</SectionTitle>
+          <div className="inline-flex rounded-lg border border-line bg-surface p-0.5">
+            <button onClick={() => setView("card")} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${view === "card" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>▦ {t("Card")}</button>
+            <button onClick={() => setView("list")} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${view === "list" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>☰ {t("Lista")}</button>
+          </div>
         </div>
-      </Card>
 
-      {/* Mappatura tipologie */}
-      <SectionTitle>{t("Mappatura camere → portali")}</SectionTitle>
-      <div className="mt-2 flex flex-col gap-4">
-        {types.length === 0 && <Card><div className="py-6 text-center text-sm text-faint">{t("Nessuna tipologia per questa struttura.")}</div></Card>}
-        {types.map((rt) => (
-          <Card key={rt.id}>
-            <div className="mb-3 flex items-baseline justify-between">
-              <div className="font-display text-lg font-bold text-txt">{rt.name}</div>
-              <div className="text-xs text-dim">{t("prezzo base")} <span className="font-mono font-semibold text-txt">{eur(rt.basePrice)}</span></div>
-            </div>
+        {view === "card" ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {OTAS.map((o) => {
+              const c = getConn(o.key);
+              const mc = mappedCount(o.key);
+              return (
+                <button key={o.key} onClick={() => setConfiguring(o.key)} className="group rounded-2xl border bg-surface p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md" style={{ borderColor: c.connected ? o.color : "var(--line)" }}>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 text-sm font-bold text-txt"><span className="grid h-9 w-9 place-items-center rounded-xl text-sm font-bold text-white" style={{ backgroundColor: o.color }}>{o.label[0]}</span>{o.label}</span>
+                    <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={c.connected ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{c.connected ? t("Connesso") : t("Da collegare")}</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                    <div><div className="text-[10px] uppercase tracking-wide text-faint">{t("Camere")}</div><div className="font-mono text-sm font-bold" style={{ color: mc > 0 && mc === types.length ? "var(--ok)" : "var(--txt)" }}>{mc}/{types.length}</div></div>
+                    <div><div className="text-[10px] uppercase tracking-wide text-faint">{t("Correzione")}</div><div className="font-mono text-sm font-bold text-txt">{corrLabel(o.key)}</div></div>
+                    <div><div className="text-[10px] uppercase tracking-wide text-faint">{t("Commiss.")}</div><div className="font-mono text-sm font-bold text-txt">{c.commissionPct ?? o.commission}%</div></div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between border-t border-line pt-2.5">
+                    <span className="text-[11px] text-faint">{c.lastSync ? `sync ${relTime(new Date(c.lastSync).getTime())}` : t("mai sincronizzato")}</span>
+                    <span className="text-xs font-semibold transition group-hover:translate-x-0.5" style={{ color: o.color }}>{t("Apri")} →</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <Card className="!p-0">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-sm">
-                <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wide text-faint">
-                    <th className="py-1.5 font-semibold">{t("Portale")}</th>
-                    <th className="py-1.5 font-semibold">{t("ID annuncio")}</th>
-                    <th className="py-1.5 font-semibold">{t("Correzione")}</th>
-                    <th className="py-1.5 text-right font-semibold">{t("Prezzo portale")}</th>
-                    <th className="py-1.5 text-center font-semibold">{t("Attivo")}</th>
-                  </tr>
-                </thead>
+              <table className="w-full min-w-[680px] text-sm">
+                <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+                  <th className="px-3 py-2 font-semibold">{t("Portale")}</th>
+                  <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
+                  <th className="px-3 py-2 text-center font-semibold">{t("Camere")}</th>
+                  <th className="px-3 py-2 text-center font-semibold">{t("Correzione")}</th>
+                  <th className="px-3 py-2 text-center font-semibold">{t("Commissione")}</th>
+                  <th className="px-3 py-2 font-semibold">{t("Ultima sync")}</th>
+                  <th className="px-3 py-2 text-right font-semibold"></th>
+                </tr></thead>
                 <tbody>
-                  {OTAS.map((o) => {
-                    const c = getConn(o.key);
-                    const e = getMap(rt.id, o.key);
-                    const price = e.adjMode === "percent" ? Math.round(rt.basePrice * (1 + e.adj / 100)) : Math.max(0, rt.basePrice + e.adj);
-                    return (
-                      <tr key={o.key} className={`border-t border-line ${!c.connected ? "opacity-40" : ""}`}>
-                        <td className="py-2"><span className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm" style={{ backgroundColor: o.color }} />{o.label}</span></td>
-                        <td className="py-2"><input disabled={!c.connected} value={e.listingId} onChange={(ev) => setMapEntry(rt.id, o.key, { listingId: ev.target.value })} placeholder="—" className="w-28 rounded-md border border-line bg-paper px-2 py-1 text-xs outline-none focus:border-focus disabled:bg-transparent" /></td>
-                        <td className="py-2">
-                          <div className="flex items-center gap-1">
-                            <input type="number" disabled={!c.connected} value={e.adj} onChange={(ev) => setMapEntry(rt.id, o.key, { adj: Number(ev.target.value) })} className="w-16 rounded-md border border-line bg-paper px-2 py-1 text-xs outline-none focus:border-focus disabled:bg-transparent" />
-                            <button disabled={!c.connected} onClick={() => setMapEntry(rt.id, o.key, { adjMode: e.adjMode === "amount" ? "percent" : "amount" })} className="rounded-md border border-line px-1.5 py-1 text-xs text-dim hover:bg-wash disabled:opacity-40">{e.adjMode === "amount" ? "€" : "%"}</button>
-                          </div>
-                        </td>
-                        <td className="py-2 text-right font-mono font-semibold text-txt">{c.connected && e.on ? eur(price) : "—"}</td>
-                        <td className="py-2 text-center"><input type="checkbox" disabled={!c.connected} checked={c.connected && e.on} onChange={(ev) => setMapEntry(rt.id, o.key, { on: ev.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></td>
-                      </tr>
-                    );
-                  })}
+                  {OTAS.map((o) => { const c = getConn(o.key); return (
+                    <tr key={o.key} onClick={() => setConfiguring(o.key)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
+                      <td className="px-3 py-2.5"><span className="flex items-center gap-2 font-semibold text-txt"><span className="grid h-6 w-6 place-items-center rounded-md text-[11px] font-bold text-white" style={{ backgroundColor: o.color }}>{o.label[0]}</span>{o.label}</span></td>
+                      <td className="px-3 py-2.5"><span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={c.connected ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{c.connected ? t("Connesso") : t("Da collegare")}</span></td>
+                      <td className="px-3 py-2.5 text-center font-mono text-dim">{mappedCount(o.key)}/{types.length}</td>
+                      <td className="px-3 py-2.5 text-center font-mono text-dim">{corrLabel(o.key)}</td>
+                      <td className="px-3 py-2.5 text-center font-mono text-dim">{c.commissionPct ?? o.commission}%</td>
+                      <td className="px-3 py-2.5 text-[11px] text-faint">{c.lastSync ? relTime(new Date(c.lastSync).getTime()) : t("mai")}</td>
+                      <td className="px-3 py-2.5 text-right"><span className="text-xs font-semibold" style={{ color: o.color }}>{t("Apri")} →</span></td>
+                    </tr>
+                  );})}
                 </tbody>
               </table>
             </div>
           </Card>
-        ))}
+        )}
       </div>
 
       {/* Registro sincronizzazioni */}
@@ -239,9 +241,12 @@ export default function CanaliPage() {
 
               {/* Connessione */}
               <div className="mb-4">
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Connessione")}</div>
-                  <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={c.connected ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{c.connected ? t("Connesso") : t("Da collegare")}</span>
+                  <div className="flex items-center gap-2">
+                    {c.connected && <label className="flex items-center gap-1.5 text-[11px] text-dim">{t("Auto-sync")}<Toggle on={c.auto} onClick={() => toggleAuto(o.key)} color="var(--ok)" /></label>}
+                    <button onClick={() => toggleConn(o.key)} className={`rounded-lg px-3 py-1 text-xs font-semibold ${c.connected ? "border border-line text-[color:var(--err)] hover:bg-wash" : "text-white"}`} style={!c.connected ? { backgroundColor: o.color } : undefined}>{c.connected ? t("Scollega") : t("Collega")}</button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <label className={lbl}>{t("Tipo di connessione")}
@@ -290,37 +295,58 @@ export default function CanaliPage() {
                 <input value={c.importFilter ?? ""} onChange={(e) => patchConn(o.key, { importFilter: e.target.value })} placeholder={t("es. solo camere con prefisso…")} className={fld} />
               </label>
 
-              {/* Mappatura camere di questo canale (stile "Impostazioni del mapping" di Octorate) */}
+              {/* Mappatura camere: le tue camere ↔ camere del portale, collegate da una freccia */}
               <div className="mb-4">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-faint">{t("Mappatura camere")} <span className="font-normal normal-case text-faint">— {o.label}</span></div>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Mappatura camere")}</div>
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={types.length && mappedCount(o.key) === types.length ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{mappedCount(o.key)}/{types.length} {t("mappate")}</span>
+                </div>
                 {types.length === 0 ? (
                   <p className="text-xs text-faint">{t("Nessuna tipologia per questa struttura.")}</p>
+                ) : !(c.otaRooms && c.otaRooms.length) ? (
+                  <div className="rounded-xl border border-dashed border-line p-4 text-center">
+                    <p className="text-xs text-dim">{t("Prima importa le camere dal portale, poi collega ciascuna alla tua tipologia con una freccia.")}</p>
+                    <button onClick={() => importRooms(o.key)} className="mt-2 rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: o.color }}>⬇ {t("Importa camere da")} {o.label}</button>
+                  </div>
                 ) : (
-                  <div className="flex flex-col gap-1.5">
-                    {types.map((rt) => {
-                      const e = getMap(rt.id, o.key);
-                      const price = e.adjMode === "percent" ? Math.round(rt.basePrice * (1 + e.adj / 100)) : Math.max(0, rt.basePrice + e.adj);
-                      return (
-                        <div key={rt.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-2">
-                          <div className="min-w-[110px] flex-1 text-sm font-medium text-txt">{rt.name}</div>
-                          <input value={e.listingId} onChange={(ev) => setMapEntry(rt.id, o.key, { listingId: ev.target.value })} placeholder={t("ID annuncio OTA")} className="w-32 rounded-md border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-focus" />
-                          <div className="flex items-center gap-1">
-                            <input type="number" value={e.adj} onChange={(ev) => setMapEntry(rt.id, o.key, { adj: Number(ev.target.value) })} className="w-14 rounded-md border border-line bg-surface px-2 py-1 text-xs outline-none focus:border-focus" />
-                            <button onClick={() => setMapEntry(rt.id, o.key, { adjMode: e.adjMode === "amount" ? "percent" : "amount" })} className="rounded-md border border-line px-1.5 py-1 text-xs text-dim hover:bg-wash">{e.adjMode === "amount" ? "€" : "%"}</button>
+                  <div className="rounded-xl border border-line bg-paper p-3">
+                    <div className="mb-2 grid grid-cols-[1fr_26px_1fr] items-center gap-2 text-[10px] font-bold uppercase tracking-wide text-faint">
+                      <div>{t("Le tue camere")}</div><div></div><div>{o.label}</div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {types.map((rt) => {
+                        const e = getMap(rt.id, o.key);
+                        const linked = !!e.listingId && e.on;
+                        return (
+                          <div key={rt.id} className="grid grid-cols-[1fr_26px_1fr] items-center gap-2">
+                            <div className="rounded-lg border px-2.5 py-1.5" style={{ borderColor: linked ? "var(--focus)" : "var(--line)", backgroundColor: linked ? "color-mix(in srgb, var(--focus) 6%, transparent)" : "var(--surface)" }}>
+                              <div className="truncate text-sm font-semibold text-txt">{rt.name}</div>
+                              <div className="text-[10px] text-faint">{eur(chPrice(rt.basePrice, o.key))} {t("su")} {o.label}</div>
+                            </div>
+                            <div className="flex justify-center">
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={linked ? o.color : "var(--faint)"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                            </div>
+                            <div className="rounded-lg border px-1 py-0.5" style={{ borderColor: linked ? o.color : "var(--line)" }}>
+                              <select value={e.listingId} onChange={(ev) => setMapEntry(rt.id, o.key, { listingId: ev.target.value, on: !!ev.target.value })} className="w-full bg-transparent px-1 py-1 text-sm text-txt outline-none">
+                                <option value="">{t("— non collegata —")}</option>
+                                {c.otaRooms!.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                              </select>
+                            </div>
                           </div>
-                          <span className="w-16 text-right font-mono text-xs font-semibold text-txt">{e.on ? eur(price) : "—"}</span>
-                          <input type="checkbox" checked={e.on} onChange={(ev) => setMapEntry(rt.id, o.key, { on: ev.target.checked })} title={t("Attivo")} className="h-4 w-4 accent-[color:var(--focus)]" />
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2.5 flex items-center justify-between border-t border-line pt-2">
+                      <button onClick={() => importRooms(o.key)} className="text-[11px] font-semibold text-dim hover:text-txt">↻ {t("Reimporta camere")}</button>
+                      <button onClick={() => { const next = { ...map }; types.forEach((rt) => { const m = c.otaRooms!.find((r) => r.name.toLowerCase().trim() === rt.name.toLowerCase().trim()); if (m) next[`${rt.id}:${o.key}`] = { ...getMap(rt.id, o.key), listingId: m.id, on: true }; }); saveMap(next); }} className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-white" style={{ backgroundColor: o.color }}>✨ {t("Abbina automaticamente")}</button>
+                    </div>
                   </div>
                 )}
-                <p className="mt-1.5 text-[11px] text-faint">{t("Abbina ogni tua tipologia all'annuncio corrispondente su questo portale. La correzione prezzo qui è specifica del canale.")}</p>
               </div>
 
               {/* Azioni */}
               <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
-                <button onClick={() => { saveLog([{ id: uid(), ts: Date.now(), text: `${t("Camere importate da")} ${o.label}`, color: o.color }, ...log]); }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">⬇ {t("Importa camere")}</button>
+                <button onClick={() => importRooms(o.key)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">⬇ {t("Importa camere")}</button>
                 <button disabled={!c.connected} onClick={() => { patchConn(o.key, { lastSync: new Date().toISOString() }); saveLog([{ id: uid(), ts: Date.now(), text: `${t("Tariffe e disponibilità inviate a")} ${o.label}`, color: o.color }, ...log]); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">↻ {t("Sincronizza ora")}</button>
                 <button onClick={() => setConfiguring(null)} className="ml-auto rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: o.color }}>💾 {t("Salva e chiudi")}</button>
               </div>
