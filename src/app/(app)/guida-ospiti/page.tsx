@@ -403,6 +403,26 @@ export default function GuidaOspitiPage() {
   const content: GContent = guide.content ?? EMPTY_CONTENT;
   const setContent = (c: GContent) => set({ content: c });
   const loadDemo = () => { if (guide.content && !confirm("Sostituire i contenuti attuali con l'esempio di Siracusa?")) return; updateStructure(sid, DEMO_STRUCT); set({ ...DEMO_GUIDE, content: DEMO_CONTENT, i18n: {} }); refresh(); };
+  // Svuota TUTTI i campi compilabili di questa struttura (benvenuto, sezioni, WiFi, orari,
+  // link…) così l'anteprima di destra riparte da zero. I dati "Struttura e contatti" restano:
+  // arrivano in sola lettura dalle Impostazioni struttura, non si toccano da qui.
+  const clearAll = () => {
+    if (!confirm("Svuotare tutti i campi compilabili di questa guida? L'anteprima di destra tornerà vuota. (I dati struttura restano.)")) return;
+    const blankSections: GSection[] = content.sections.map((s) => ({
+      ...s, title: "", sub: "", intro: "", photos: [], items: [],
+      ...(s.steps ? { steps: [] as GStep[] } : {}),
+      ...(s.amenities ? { amenities: [] as GAmenity[] } : {}),
+      ...(s.amenitiesTitle != null ? { amenitiesTitle: "" } : {}),
+      ...(s.amenitiesIntro != null ? { amenitiesIntro: "" } : {}),
+    }));
+    set({
+      content: { home: { welcomeTitle: "", welcome: [] }, sections: blankSections },
+      i18n: {},
+      wifiNetwork: "", wifiPassword: "", checkinTime: "", checkoutTime: "",
+      reviewUrl: "", bookingUrl: "",
+    });
+    refresh();
+  };
 
   // Traduzione automatica multilingua (base italiano → EN/FR/DE/ES)
   const [tr, setTr] = useState<{ running: boolean; lang: string; done: number; total: number; ok?: boolean; err?: string }>({ running: false, lang: "", done: 0, total: 0 });
@@ -589,9 +609,12 @@ export default function GuidaOspitiPage() {
         title="Guida ospiti"
         subtitle="Una guida multilingua per struttura · personalizza e genera il link da inviare"
         actions={
-          <button onClick={() => { refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 2000); }} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
-            {savedTick ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Salvato</> : <>💾 Salva</>}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={clearAll} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-dim hover:bg-wash">🧹 Svuota tutto</button>
+            <button onClick={() => { refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 2000); }} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+              {savedTick ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Salvato</> : <>💾 Salva</>}
+            </button>
+          </div>
         }
       />
 
