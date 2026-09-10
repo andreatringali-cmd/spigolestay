@@ -68,7 +68,7 @@ export default function CanaliPage() {
   const saveLog = (next: LogEntry[]) => { setLog(next); try { localStorage.setItem(LOG_KEY, JSON.stringify(next.slice(0, 40))); } catch {} };
 
   const [configuring, setConfiguring] = useState<OtaKey | null>(null);
-  const [view, setView] = useState<"card" | "list">("card");
+  const [view, setView] = useState<"card" | "list">("list");
   const getConn = (k: string): Conn => conn[k] ?? { connected: false, auto: false };
   const patchConn = (k: OtaKey, patch: Partial<Conn>) => saveConn({ ...conn, [k]: { ...getConn(k), ...patch } });
   // Prezzo inviato all'OTA = prezzo base con l'UNICA correzione del canale (uguale per tutte le tipologie).
@@ -139,8 +139,8 @@ export default function CanaliPage() {
         <div className="mb-2 flex items-center justify-between gap-2">
           <SectionTitle>{t("Connessioni")}</SectionTitle>
           <div className="inline-flex rounded-lg border border-line bg-surface p-0.5">
-            <button onClick={() => setView("card")} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${view === "card" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>▦ {t("Card")}</button>
             <button onClick={() => setView("list")} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${view === "list" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>☰ {t("Lista")}</button>
+            <button onClick={() => setView("card")} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${view === "card" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>▦ {t("Card")}</button>
           </div>
         </div>
 

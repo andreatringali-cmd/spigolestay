@@ -33,21 +33,21 @@ export default function RegistroPage() {
   }, [activities, type, q]);
 
   const fmt = (ts: number) => new Date(ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  const sel = "rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
   return (
     <div>
-      <PageHeader title={t("Registro attività")} subtitle={t("Storico delle azioni: prenotazioni, messaggi, accessi, tariffe e altro")}
-        actions={
-          <div className="flex items-center gap-2">
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca…")} className={sel} />
-            <select value={type} onChange={(e) => setType(e.target.value)} className={sel}>
-              <option value="all">{t("Tutti gli eventi")}</option>
-              {(Object.keys(META) as ActivityType[]).map((k) => <option key={k} value={k}>{t(META[k].label)}</option>)}
-            </select>
-          </div>
-        }
-      />
+      <PageHeader title={t("Registro attività")} subtitle={t("Storico delle azioni: prenotazioni, messaggi, accessi, tariffe e altro")} />
+
+      {/* Riga filtri */}
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca…")} className="w-48 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+        <select value={type} onChange={(e) => setType(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-txt outline-none focus:border-focus">
+          <option value="all">{t("Tutti gli eventi")}</option>
+          {(Object.keys(META) as ActivityType[]).map((k) => <option key={k} value={k}>{t(META[k].label)}</option>)}
+        </select>
+        {(q || type !== "all") && <button onClick={() => { setQ(""); setType("all"); }} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash">✕ {t("Azzera")}</button>}
+        <span className="ml-auto text-xs text-faint">{rows.length} {rows.length === 1 ? t("evento") : t("eventi")}</span>
+      </div>
 
       <Card>
         <div className="overflow-x-auto">
@@ -68,7 +68,7 @@ export default function RegistroPage() {
                   <tr key={a.id} className="border-b border-line last:border-0">
                     <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs text-dim">{fmt(a.ts)}</td>
                     <td className="px-3 py-2.5"><span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${m.color} 16%, transparent)`, color: m.color }}><span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: m.color }} />{t(m.label)}</span></td>
-                    <td className="px-3 py-2.5 text-txt">{a.text}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-txt">{a.text}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-dim">{a.by || <span className="text-faint">—</span>}</td>
                   </tr>
                 );

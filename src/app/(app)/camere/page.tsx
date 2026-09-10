@@ -213,14 +213,14 @@ export default function CamerePage() {
 
               {/* Tipologie */}
               <SectionTitle>{t("Tipologie")}</SectionTitle>
-              <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="mb-4 grid auto-rows-fr grid-cols-2 gap-2 sm:grid-cols-4">
                 {types.map((rt, i) => {
                   const color = typeColor(rt, i);
                   const n = sUnits.filter((u) => u.roomTypeId === rt.id).length;
                   return (
-                    <button key={rt.id} onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="group overflow-hidden rounded-xl border border-line bg-surface text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                      <div className="h-1.5 w-full" style={{ backgroundColor: color }} />
-                      <div className="p-3">
+                    <button key={rt.id} onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="group flex h-full flex-col overflow-hidden rounded-xl border border-line bg-surface text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                      <div className="h-1.5 w-full shrink-0" style={{ backgroundColor: color }} />
+                      <div className="flex flex-1 flex-col p-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="font-semibold text-txt">{rt.name}</div>
                           <div className="font-mono text-sm font-bold text-txt">{eur(rt.basePrice)}<span className="text-[10px] font-normal text-faint">{t("/notte")}</span></div>
@@ -233,7 +233,7 @@ export default function CamerePage() {
                         </div>
                         {rt.bedConfig && <div className="mt-1.5 text-[11px] text-faint">{rt.bedConfig}</div>}
                         {(rt.amenities ?? []).length > 0 && <div className="mt-2 flex flex-wrap items-center gap-1.5 text-dim">{(rt.amenities ?? []).slice(0, 6).map((a) => <span key={a} title={t(a)} aria-label={t(a)} className="[&>svg]:h-4 [&>svg]:w-4">{amenityIcon(a)}</span>)}{(rt.amenities ?? []).length > 6 && <span className="text-[10px] text-faint">+{(rt.amenities ?? []).length - 6}</span>}</div>}
-                        <div className="mt-2 text-[11px] font-medium text-focus opacity-0 transition group-hover:opacity-100">{t("Apri scheda")} →</div>
+                        <div className="mt-auto pt-2 text-[11px] font-medium text-focus opacity-0 transition group-hover:opacity-100">{t("Apri scheda")} →</div>
                       </div>
                     </button>
                   );
@@ -266,15 +266,15 @@ export default function CamerePage() {
                     const open = !collapsed.has(rt.id);
                     return (
                       <div key={rt.id} className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
-                        <div className={`flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 ${open ? "border-b border-line" : ""}`} style={{ borderLeft: `4px solid ${color}` }}>
-                          <button onClick={() => toggleCollapse(rt.id)} className="flex flex-1 flex-wrap items-center gap-2 text-left" title={open ? t("Comprimi") : t("Espandi")}>
+                        <div className={`flex items-center justify-between gap-2 px-3 py-2.5 ${open ? "border-b border-line" : ""}`} style={{ borderLeft: `4px solid ${color}` }}>
+                          <button onClick={() => toggleCollapse(rt.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left" title={open ? t("Comprimi") : t("Espandi")}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-faint transition-transform" style={{ transform: open ? "rotate(90deg)" : "none" }}><polyline points="9 18 15 12 9 6" /></svg>
-                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-                            <span className="font-display text-base font-bold text-txt">{rt.name}</span>
-                            <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-medium text-dim">{g.length} {g.length === 1 ? t("camera") : t("camere")}</span>
-                            <span className="text-[11px] text-faint">{rt.beds} {t("letti")} · {eur(rt.basePrice)}{t("/notte")}</span>
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                            <span className="truncate font-display text-base font-bold text-txt">{rt.name}</span>
+                            <span className="shrink-0 rounded-full bg-wash px-2 py-0.5 text-[11px] font-medium text-dim">{g.length} {g.length === 1 ? t("camera") : t("camere")}</span>
+                            <span className="hidden shrink-0 text-[11px] text-faint sm:inline">{rt.beds} {t("letti")} · {eur(rt.basePrice)}{t("/notte")}</span>
                           </button>
-                          <button onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="text-[11px] font-medium text-focus hover:underline">{t("Apri tipologia")} →</button>
+                          <button onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="shrink-0 whitespace-nowrap text-[11px] font-medium text-focus hover:underline">{t("Apri tipologia")} →</button>
                         </div>
                         {open && (
                           <div className="overflow-x-auto">

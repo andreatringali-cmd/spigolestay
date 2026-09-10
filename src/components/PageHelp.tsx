@@ -318,6 +318,15 @@ const HELP: Record<string, Guide> = {
     intro: "Porta il prezzo diretto sui comparatori (Google, Trivago…).",
     sections: [{ h: "Cosa puoi fare", items: ["Collega o scollega ogni comparatore.", "Le tariffe arrivano dal tuo Booking Engine diretto.", "L'ospite vede il tuo prezzo accanto alle OTA e prenota da te."] }],
   },
+  "/registro": {
+    title: "Registro attività",
+    intro: "Lo storico automatico di tutto ciò che succede nel gestionale: chi ha fatto cosa e quando. Serve per controllo, sicurezza e per ricostruire cosa è cambiato — utile soprattutto quando lavorate in più persone.",
+    sections: [
+      { h: "Cosa registra", icon: "🗂️", items: ["Nuove prenotazioni, cancellazioni, spostamenti di camera, fuori servizio.", "Cambi tariffa, preventivi, pagamenti, messaggi inviati.", "Modifiche a strutture, tipologie, camere e alla guida ospiti.", "Accessi al gestionale.", "Vengono conservati gli ultimi 500 eventi."] },
+      { h: "Filtri", icon: "🔎", items: ["Cerca per testo nella descrizione o nell'utente.", "Filtra per tipo di evento (prenotazioni, tariffe, configurazione…)."] },
+      { h: "A cosa serve", icon: "✅", items: ["Capire chi ha modificato qualcosa quando ci sono più utenti o staff.", "Ricostruire la cronologia in caso di errori o contestazioni."] },
+    ],
+  },
 };
 
 export default function PageHelp() {
