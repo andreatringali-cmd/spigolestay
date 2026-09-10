@@ -357,8 +357,9 @@ export default function GuidaOspitiPage() {
   const [previewKey, setPreviewKey] = useState(0);
   const [savedTick, setSavedTick] = useState(false);
   const [lastSaved, setLastSaved] = useState<number | null>(null);
+  const [loaded, setLoaded] = useState(false); // true quando i dati salvati sono stati caricati
 
-  useEffect(() => { try { setAll(JSON.parse(localStorage.getItem("spigolestay:guides") || "{}")); } catch {} }, []);
+  useEffect(() => { try { setAll(JSON.parse(localStorage.getItem("spigolestay:guides") || "{}")); } catch {} finally { setLoaded(true); } }, []);
   const persist = (next: Record<string, Guide>) => { setAll(next); try { localStorage.setItem("spigolestay:guides", JSON.stringify(next)); } catch {} };
 
   const struct = structures.find((s) => s.id === sid);
@@ -392,13 +393,16 @@ export default function GuidaOspitiPage() {
   const setCheckin = (from: string, to: string) => set({ checkinTime: from ? (to ? `${from} – ${to}` : from) : "" });
   const setCheckout = (by: string) => set({ checkoutTime: by ? `entro le ${by}` : "" });
   // Tiene il record guida allineato ai dati struttura (fonte di verità = Impostazioni struttura).
+  // IMPORTANTE: non tocca nulla finché i dati salvati non sono stati caricati, altrimenti
+  // al primo render (all ancora vuoto) sovrascriverebbe la guida salvata azzerando i contenuti.
   useEffect(() => {
+    if (!loaded) return;
     const cur = all[sid];
     const base = cur ?? emptyGuide(sid, struct?.name ?? "", struct?.city ?? "Siracusa");
     const merged = { ...base, ...structFields, id: sid, social: { ...base.social, ...(structFields.social ?? {}) } };
     if (JSON.stringify(cur ?? null) !== JSON.stringify(merged)) persist({ ...all, [sid]: merged });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sid, structFields]);
+  }, [sid, structFields, loaded]);
 
   const [tab, setTab] = useState<"setup" | "content">("setup");
   const [openSec, setOpenSec] = useState<string | null>(null);
