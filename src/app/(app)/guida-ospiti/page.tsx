@@ -271,7 +271,8 @@ const EXAMPLE_META: Record<string, { title: string; sub: string }> = {
   review: { title: "Lasciate una recensione", sub: "Il vostro supporto per noi è prezioso" },
 };
 const EMPTY_CONTENT: GContent = {
-  home: DEFAULT_CONTENT.home,
+  // Nuova guida = tutto da compilare: nessun testo di benvenuto precaricato.
+  home: { welcomeTitle: "", welcome: [] },
   sections: DEFAULT_CONTENT.sections.map((s) => {
     const meta = EXAMPLE_META[s.id];
     const base = { id: s.id, icon: s.icon, title: meta?.title ?? s.title, sub: meta?.sub ?? s.sub, intro: "", photos: [] as string[] };
@@ -296,8 +297,8 @@ const F = ({ label, children }: { label: string; children: React.ReactNode }) =>
 const emptyGuide = (id: string, name: string, city: string): Guide => ({
   id, guideName: name, guideLogo: "assets/logo-trasparente.png", name, city, address: "",
   phone: "", phoneGreta: "", whatsapp: "", email: "", mapsUrl: "",
-  wifiNetwork: "", wifiPassword: "", checkinTime: "15:00 – 00:00", checkoutTime: "entro le 10:30",
-  reviewUrl: "", bookingUrl: "", taxiPhone: "+39 0931 17977",
+  wifiNetwork: "", wifiPassword: "", checkinTime: "", checkoutTime: "",
+  reviewUrl: "", bookingUrl: "", taxiPhone: "",
   social: { instagram: "", facebook: "", website: "" }, roomTypes: {},
   tv: { enabled: false, bg: "", welcome: "", sections: [], showGuest: true },
 });
@@ -403,26 +404,6 @@ export default function GuidaOspitiPage() {
   const content: GContent = guide.content ?? EMPTY_CONTENT;
   const setContent = (c: GContent) => set({ content: c });
   const loadDemo = () => { if (guide.content && !confirm("Sostituire i contenuti attuali con l'esempio di Siracusa?")) return; updateStructure(sid, DEMO_STRUCT); set({ ...DEMO_GUIDE, content: DEMO_CONTENT, i18n: {} }); refresh(); };
-  // Svuota TUTTI i campi compilabili di questa struttura (benvenuto, sezioni, WiFi, orari,
-  // link…) così l'anteprima di destra riparte da zero. I dati "Struttura e contatti" restano:
-  // arrivano in sola lettura dalle Impostazioni struttura, non si toccano da qui.
-  const clearAll = () => {
-    if (!confirm("Svuotare tutti i campi compilabili di questa guida? L'anteprima di destra tornerà vuota. (I dati struttura restano.)")) return;
-    const blankSections: GSection[] = content.sections.map((s) => ({
-      ...s, title: "", sub: "", intro: "", photos: [], items: [],
-      ...(s.steps ? { steps: [] as GStep[] } : {}),
-      ...(s.amenities ? { amenities: [] as GAmenity[] } : {}),
-      ...(s.amenitiesTitle != null ? { amenitiesTitle: "" } : {}),
-      ...(s.amenitiesIntro != null ? { amenitiesIntro: "" } : {}),
-    }));
-    set({
-      content: { home: { welcomeTitle: "", welcome: [] }, sections: blankSections },
-      i18n: {},
-      wifiNetwork: "", wifiPassword: "", checkinTime: "", checkoutTime: "",
-      reviewUrl: "", bookingUrl: "",
-    });
-    refresh();
-  };
 
   // Traduzione automatica multilingua (base italiano → EN/FR/DE/ES)
   const [tr, setTr] = useState<{ running: boolean; lang: string; done: number; total: number; ok?: boolean; err?: string }>({ running: false, lang: "", done: 0, total: 0 });
@@ -609,28 +590,46 @@ export default function GuidaOspitiPage() {
         title="Guida ospiti"
         subtitle="Una guida multilingua per struttura · personalizza e genera il link da inviare"
         actions={
-          <div className="flex items-center gap-2">
-            <button onClick={clearAll} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-dim hover:bg-wash">🧹 Svuota tutto</button>
-            <button onClick={() => { refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 2000); }} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
-              {savedTick ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Salvato</> : <>💾 Salva</>}
-            </button>
-          </div>
+          <button onClick={() => { refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 2000); }} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+            {savedTick ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Salvato</> : <>💾 Salva</>}
+          </button>
         }
       />
 
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        {/* Completezza della guida: colpo d'occhio su cosa manca prima di inviarla */}
+      {/* App / TV: due card in alto */}
+      <div className="mb-3 grid grid-cols-2 gap-3 sm:max-w-lg">
+        {([["app", "📱", "App · cellulare", "La guida che l'ospite apre sul telefono"], ["tv", "📺", "TV in camera", "La schermata di benvenuto sulla Smart TV"]] as const).map(([key, icon, title, desc]) => (
+          <button key={key} onClick={() => setMainTab(key)} className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${mainTab === key ? "shadow-sm" : "border-line bg-surface hover:bg-wash"}`} style={mainTab === key ? { borderColor: "var(--focus)", backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : undefined}>
+            <span className="text-2xl leading-none">{icon}</span>
+            <span className="min-w-0">
+              <span className={`block text-sm font-semibold ${mainTab === key ? "text-focus" : "text-txt"}`}>{title}</span>
+              <span className="block text-[11px] leading-tight text-faint">{desc}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Riga filtri: a sinistra lo stato "Pronta", a destra i controlli dell'anteprima */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <span className="font-semibold text-faint">Pronta:</span>
           {([["Struttura", !!(guide.name && guide.address)], ["Contatti", !!(guide.whatsapp || guide.phone)], ["WiFi", !!(guide.wifiNetwork && guide.wifiPassword)], ["Contenuti", !!guide.content], ["Traduzioni", hasTranslations]] as [string, boolean][]).map(([lbl, ok]) => (
             <span key={lbl} className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${ok ? "text-white" : "bg-wash text-faint"}`} style={ok ? { backgroundColor: "var(--ok)" } : undefined}>{ok ? "✓" : "○"} {lbl}</span>
           ))}
         </div>
-      </div>
-
-      <div className="mb-3 inline-flex rounded-xl border border-line bg-surface p-0.5 shadow-sm">
-        <button onClick={() => setMainTab("app")} className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${mainTab === "app" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>📱 App · cellulare</button>
-        <button onClick={() => setMainTab("tv")} className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${mainTab === "tv" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>📺 TV</button>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold text-txt">Anteprima live</span>
+          <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-faint"><span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: savedThis ? "var(--ok)" : "var(--faint)" }} />{savedThis ? "live" : "compila per vedere"}</span>
+          <button onClick={refresh} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">↻ Aggiorna</button>
+          <select value={pvLang} onChange={(e) => setPvLang(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-dim outline-none focus:border-focus">
+            <option value="it">🇮🇹 Italiano</option>
+            <option value="en">🇬🇧 English</option>
+            <option value="fr">🇫🇷 Français</option>
+            <option value="de">🇩🇪 Deutsch</option>
+            <option value="es">🇪🇸 Español</option>
+          </select>
+          <a href={previewUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">Schermo intero ↗</a>
+        </div>
       </div>
 
       {mainTab === "app" && (<>
@@ -855,23 +854,6 @@ export default function GuidaOspitiPage() {
 
         {/* Anteprima live */}
         <div className="lg:sticky lg:top-4 lg:self-start">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <SectionTitle>Anteprima live</SectionTitle>
-              <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-faint"><span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: savedThis ? "var(--ok)" : "var(--faint)" }} />{savedThis ? "live" : "compila per vedere"}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={refresh} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">↻ Aggiorna</button>
-              <select value={pvLang} onChange={(e) => setPvLang(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-dim outline-none focus:border-focus">
-                <option value="it">🇮🇹 Italiano</option>
-                <option value="en">🇬🇧 English</option>
-                <option value="fr">🇫🇷 Français</option>
-                <option value="de">🇩🇪 Deutsch</option>
-                <option value="es">🇪🇸 Español</option>
-              </select>
-              <a href={previewUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">Schermo intero ↗</a>
-            </div>
-          </div>
           {pvMode === "phone" ? (
             // Mockup telefono: la guida è resa alla larghezza REALE di un telefono (390px) e poi
             // scalata, così tasti e proporzioni sono identici a uno smartphone vero (non "stirati").
