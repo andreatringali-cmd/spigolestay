@@ -575,10 +575,13 @@ export default function GuidaOspitiPage() {
   const [mainTab, setMainTab] = useState<"app" | "tv">("app"); // 📱 App cellulare · 📺 TV
   const [pvLang, setPvLang] = useState("it");
   useEffect(() => { try { localStorage.setItem("spigole_lang", pvLang); } catch {} }, [pvLang]);
-  useEffect(() => { setPreviewKey((k) => k + 1); }, [pvMode, pvLang]);
+  // I codici (cancello/porta) che scrivi vengono mostrati anche nell'anteprima di destra,
+  // così vedi subito come appariranno sotto i passaggi di check-in.
+  const codeK = [gate.trim(), door.trim(), door2.trim()].join("-").replace(/-+$/g, "");
+  useEffect(() => { setPreviewKey((k) => k + 1); }, [pvMode, pvLang, gate, door, door2]);
   const previewUrl = pvMode === "tv"
     ? `/guida/tv.html?p=${encodeURIComponent(sid)}&lang=${pvLang}&_=${previewKey}`
-    : `/guida/index.html?p=${encodeURIComponent(sid)}&_=${previewKey}`;
+    : `/guida/index.html?p=${encodeURIComponent(sid)}${codeK.replace(/-/g, "") ? `&k=${encodeURIComponent(codeK)}` : ""}&_=${previewKey}`;
   // Anteprima di ESEMPIO (Siracusa pronta): un id struttura inesistente fa cadere il motore
   // sull'esempio incluso nel pacchetto, senza toccare i dati reali dell'host.
   const exampleUrl = `/guida/index.html?p=__esempio__&_=${previewKey}`;
@@ -795,7 +798,16 @@ export default function GuidaOspitiPage() {
                             <div className="mt-1.5 flex flex-wrap items-center gap-2">
                               <span className="text-[11px] text-faint">Codice sotto il passaggio:</span>
                               <select value={st.code || ""} onChange={(e) => updStep(si, ki, { code: e.target.value as GStep["code"] })} className="rounded border border-line bg-surface px-1.5 py-1 text-xs text-txt outline-none focus:border-focus">{CODE_OPTS.map((c) => <option key={c.v} value={c.v}>{c.label}</option>)}</select>
+                              {st.code && (
+                                <input
+                                  value={st.code === "gate" ? gate : st.code === "door" ? door : door2}
+                                  onChange={(e) => { const v = e.target.value; if (st.code === "gate") setGate(v); else if (st.code === "door") setDoor(v); else setDoor2(v); }}
+                                  placeholder="Scrivi il codice"
+                                  className="w-32 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus"
+                                />
+                              )}
                             </div>
+                            {st.code && <p className="mt-1 text-[11px] text-faint">Il codice appare sotto questo passaggio. Per sicurezza non viene salvato nella guida: puoi scriverlo qui (vale anche per il link ospite) oppure lasciarlo all&apos;ospite tramite il suo link personale.</p>}
                             <div className="mt-1.5">
                               {stepActs(si, ki).map((a, ai) => (
                                 <div key={ai} className="mb-1 flex flex-wrap items-center gap-1.5">
