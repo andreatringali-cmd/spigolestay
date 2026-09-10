@@ -19,7 +19,14 @@ const OTAS = [
 ] as const;
 type OtaKey = typeof OTAS[number]["key"];
 
-interface Conn { connected: boolean; auto: boolean; lastSync?: string }
+interface Conn {
+  connected: boolean; auto: boolean; lastSync?: string;
+  // Configurazione connessione (pannello per canale, stile Octorate)
+  hotelId?: string; connType?: string; url?: string;
+  priceRound?: boolean; priceAdjMode?: "percent" | "amount"; priceAdj?: number;
+  availPct?: number; commissionPct?: number; importFilter?: string;
+}
+const CONN_TYPES = ["iCal (sola lettura)", "XML", "API"];
 interface MapEntry { on: boolean; listingId: string; adjMode: "amount" | "percent"; adj: number }
 interface LogEntry { id: string; ts: number; text: string; color: string }
 
@@ -60,7 +67,9 @@ export default function CanaliPage() {
   const saveMap = (next: Record<string, MapEntry>) => { setMap(next); try { localStorage.setItem(MAP_KEY, JSON.stringify(next)); } catch {} };
   const saveLog = (next: LogEntry[]) => { setLog(next); try { localStorage.setItem(LOG_KEY, JSON.stringify(next.slice(0, 40))); } catch {} };
 
+  const [configuring, setConfiguring] = useState<OtaKey | null>(null);
   const getConn = (k: string): Conn => conn[k] ?? { connected: false, auto: false };
+  const patchConn = (k: OtaKey, patch: Partial<Conn>) => saveConn({ ...conn, [k]: { ...getConn(k), ...patch } });
   const getMap = (rt: string, ota: string): MapEntry => map[`${rt}:${ota}`] ?? { on: getConn(ota).connected, listingId: "", adjMode: "amount", adj: 0 };
   const setMapEntry = (rt: string, ota: string, patch: Partial<MapEntry>) => saveMap({ ...map, [`${rt}:${ota}`]: { ...getMap(rt, ota), ...patch } });
 
@@ -130,7 +139,10 @@ export default function CanaliPage() {
                   <span>{c.lastSync ? `sync ${relTime(new Date(c.lastSync).getTime())}` : t("mai sincronizzato")}</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between">
-                  <button onClick={() => toggleConn(o.key)} className={`rounded-lg px-3 py-1 text-xs font-semibold ${c.connected ? "border border-line text-[color:var(--err)] hover:bg-wash" : "text-white"}`} style={!c.connected ? { backgroundColor: o.color } : undefined}>{c.connected ? t("Scollega") : t("Collega")}</button>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => toggleConn(o.key)} className={`rounded-lg px-3 py-1 text-xs font-semibold ${c.connected ? "border border-line text-[color:var(--err)] hover:bg-wash" : "text-white"}`} style={!c.connected ? { backgroundColor: o.color } : undefined}>{c.connected ? t("Scollega") : t("Collega")}</button>
+                    <button onClick={() => setConfiguring(o.key)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">⚙ {t("Configura")}</button>
+                  </div>
                   {c.connected && <label className="flex items-center gap-1.5 text-[11px] text-dim">{t("Auto-sync")}<Toggle on={c.auto} onClick={() => toggleAuto(o.key)} color="var(--ok)" /></label>}
                 </div>
               </div>
@@ -207,6 +219,89 @@ export default function CanaliPage() {
       </Card>
 
       <p className="mt-3 text-xs text-faint">{t("In produzione la connessione è reale (via Channex/Nuitée): push bidirezionale di tariffe, disponibilità e prenotazioni. Qui i dati sono dimostrativi e salvati nel browser.")}</p>
+
+      {/* Pannello di connessione per canale */}
+      {configuring && (() => {
+        const o = OTAS.find((x) => x.key === configuring)!;
+        const c = getConn(o.key);
+        const mode = c.priceAdjMode ?? "percent";
+        const adj = c.priceAdj ?? 0;
+        const sample = mode === "percent" ? Math.round(100 * (1 + adj / 100)) : Math.max(0, 100 + adj);
+        const lbl = "block text-xs font-medium text-dim";
+        const fld = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+        return (
+          <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[5vh]">
+            <button aria-label={t("Chiudi")} onClick={() => setConfiguring(null)} className="absolute inset-0 bg-black/40" />
+            <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+              <div className="mb-4 flex items-center justify-between">
+                <span className="flex items-center gap-2 text-lg font-bold text-txt"><span className="grid h-8 w-8 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: o.color }}>{o.label[0]}</span>{o.label}</span>
+                <button onClick={() => setConfiguring(null)} className="rounded-lg p-1 text-faint hover:text-txt">✕</button>
+              </div>
+
+              {/* Connessione */}
+              <div className="mb-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Connessione")}</div>
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={c.connected ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{c.connected ? t("Connesso") : t("Da collegare")}</span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className={lbl}>{t("Tipo di connessione")}
+                    <select value={c.connType ?? CONN_TYPES[0]} onChange={(e) => patchConn(o.key, { connType: e.target.value })} className={fld}>{CONN_TYPES.map((ct) => <option key={ct} value={ct}>{ct}</option>)}</select>
+                  </label>
+                  <label className={lbl}>{t("Hotel / Property ID")}
+                    <input value={c.hotelId ?? ""} onChange={(e) => patchConn(o.key, { hotelId: e.target.value })} placeholder="es. 38629909" className={fld} />
+                  </label>
+                  <label className={`${lbl} sm:col-span-2`}>URL / Endpoint
+                    <input value={c.url ?? ""} onChange={(e) => patchConn(o.key, { url: e.target.value })} placeholder="es. ycs.agoda.com" className={fld} />
+                  </label>
+                </div>
+              </div>
+
+              {/* Correzione prezzo */}
+              <div className="mb-4 rounded-xl border border-line bg-paper p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Correzione prezzo")}</div>
+                  <label className="flex items-center gap-1.5 text-[11px] text-dim">{t("Arrotonda")}<Toggle on={c.priceRound !== false} onClick={() => patchConn(o.key, { priceRound: !(c.priceRound !== false) })} color="var(--ok)" /></label>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <select value={mode} onChange={(e) => patchConn(o.key, { priceAdjMode: e.target.value as "percent" | "amount" })} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus"><option value="percent">{t("Percentuale")}</option><option value="amount">{t("Importo €")}</option></select>
+                  <input type="number" value={adj} onChange={(e) => patchConn(o.key, { priceAdj: Number(e.target.value) })} className="w-24 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+                  <span className="text-dim">{mode === "percent" ? "%" : "€"}</span>
+                  <span className="ml-auto text-[11px] text-faint">{t("es.")} {eur(100)} → <b className="text-txt">{eur(sample)}</b></span>
+                </div>
+                <p className="mt-1.5 text-[11px] text-faint">{t("Applicata al prezzo inviato a questo canale (per compensare la commissione).")}</p>
+              </div>
+
+              {/* Disponibilità + Commissione */}
+              <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-line bg-paper p-3">
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">{t("Disponibilità")}</div>
+                  <div className="flex items-center gap-2"><input type="number" min={0} max={100} value={c.availPct ?? 100} onChange={(e) => patchConn(o.key, { availPct: Math.max(0, Math.min(100, Number(e.target.value))) })} className="w-20 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /><span className="text-dim">%</span></div>
+                  <p className="mt-1.5 text-[11px] text-faint">{t("Quota del pool camere venduta su questo canale (protezione overbooking).")}</p>
+                </div>
+                <div className="rounded-xl border border-line bg-paper p-3">
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">{t("Commissione")}</div>
+                  <div className="flex items-center gap-2"><input type="number" min={0} value={c.commissionPct ?? o.commission} onChange={(e) => patchConn(o.key, { commissionPct: Math.max(0, Number(e.target.value)) })} className="w-20 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /><span className="text-dim">%</span></div>
+                  <p className="mt-1.5 text-[11px] text-faint">{t("Usata per calcolare il netto e la correzione prezzo suggerita.")}</p>
+                </div>
+              </div>
+
+              {/* Filtro importazione */}
+              <label className={`${lbl} mb-4 block`}>{t("Filtro di importazione")} <span className="font-normal text-faint">({t("facoltativo")})</span>
+                <input value={c.importFilter ?? ""} onChange={(e) => patchConn(o.key, { importFilter: e.target.value })} placeholder={t("es. solo camere con prefisso…")} className={fld} />
+              </label>
+
+              {/* Azioni */}
+              <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                <button onClick={() => { saveLog([{ id: uid(), ts: Date.now(), text: `${t("Camere importate da")} ${o.label}`, color: o.color }, ...log]); }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">⬇ {t("Importa camere")}</button>
+                <button disabled={!c.connected} onClick={() => { patchConn(o.key, { lastSync: new Date().toISOString() }); saveLog([{ id: uid(), ts: Date.now(), text: `${t("Tariffe e disponibilità inviate a")} ${o.label}`, color: o.color }, ...log]); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">↻ {t("Sincronizza ora")}</button>
+                <button onClick={() => setConfiguring(null)} className="ml-auto rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: o.color }}>💾 {t("Salva e chiudi")}</button>
+              </div>
+              <p className="mt-2 text-[11px] text-faint">{t("Le modifiche si salvano automaticamente. Impostazioni dimostrative salvate nel browser.")}</p>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
