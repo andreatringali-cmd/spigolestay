@@ -805,13 +805,16 @@ export default function GuidaOspitiPage() {
         {/* Pannello personalizzazione */}
         <div className="space-y-4">
         {(<>
-          <div className="grid gap-4">
+          <SectionTitle>Sezioni della guida ({content.sections.length})</SectionTitle>
           <Card>
-            <button onClick={() => setOpenStruct((o) => !o)} className="flex w-full items-center gap-2 text-left">
-              <span className="text-faint">{openStruct ? "▾" : "▸"}</span>
-              <span className="font-semibold text-txt">Struttura e contatti</span>
+            <button onClick={() => setOpenStruct((o) => !o)} className="group flex w-full min-w-0 items-center gap-3 text-left">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[17px]" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)" }}>🏠</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-semibold text-txt">Struttura e contatti</span>
+                {!openStruct && <span className="block truncate text-[11px] text-faint">Nome, indirizzo, telefono, social · dalle Impostazioni struttura</span>}
+              </span>
               <ReadyDot ok={structReady} />
-              <span className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-wash px-2.5 py-1 text-[10px] font-medium text-dim"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> dalle Impostazioni struttura</span>
+              <span className="shrink-0 text-lg text-faint transition-transform duration-200 group-hover:text-txt" style={{ transform: openStruct ? "rotate(90deg)" : "none" }}>›</span>
             </button>
             {openStruct && (<>
               <div className="mt-3 grid grid-cols-2 gap-3">
@@ -832,14 +835,6 @@ export default function GuidaOspitiPage() {
               <a href={`/strutture/${sid}`} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-focus hover:bg-wash">✎ Modifica i dati della struttura →</a>
             </>)}
           </Card>
-
-
-          </div>
-
-        </>)}
-
-        {(<>
-          <SectionTitle>Sezioni della guida ({content.sections.length})</SectionTitle>
           <Card>
             <div className="flex items-center gap-2">
               <button onClick={() => setOpenHome((o) => !o)} className="group flex min-w-0 flex-1 items-center gap-3 text-left">
