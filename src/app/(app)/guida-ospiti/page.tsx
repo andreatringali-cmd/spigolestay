@@ -816,7 +816,7 @@ export default function GuidaOspitiPage() {
         <div className="space-y-4">
         {(<>
           <SectionTitle>Sezioni della guida ({content.sections.length})</SectionTitle>
-          <div className="anim-in overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+          <div className="anim-in overflow-hidden rounded-2xl border border-line bg-surface shadow-sm transition-all hover:border-focus hover:shadow-md">
             <button onClick={() => setOpenStruct((o) => !o)} className="flex w-full min-w-0 items-center gap-2.5 px-4 py-2.5 text-left">
               <span className="text-[16px] leading-none">🏠</span>
               <span className="min-w-0 flex-1 truncate text-sm font-semibold text-txt">Struttura e contatti</span>
@@ -841,7 +841,7 @@ export default function GuidaOspitiPage() {
               </div>
             )}
           </div>
-          <div className="anim-in overflow-hidden rounded-2xl border border-line bg-surface shadow-sm" style={{ opacity: content.home.hidden ? 0.7 : 1 }}>
+          <div className="anim-in overflow-hidden rounded-2xl border border-line bg-surface shadow-sm transition-all hover:border-focus hover:shadow-md" style={{ opacity: content.home.hidden ? 0.7 : 1 }}>
             <div className="flex items-center gap-2 px-4 py-2.5">
               <button onClick={() => setOpenHome((o) => !o)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
                 <span className="text-[16px] leading-none" style={{ filter: content.home.hidden ? "grayscale(1)" : undefined }}>👋</span>
@@ -858,7 +858,7 @@ export default function GuidaOspitiPage() {
             )}
           </div>
           {orderedSections.map(({ s, si }) => { const open = openSec === s.id; const func = FUNC_SECTIONS.includes(s.id); const custom = !SECTION_ORDER.includes(s.id); const opFilled = (s.id === "wifi" && !!(guide.wifiNetwork || guide.wifiPassword)) || (s.id === "contacts" && !!(guide.phone || guide.whatsapp || guide.phoneGreta)) || (s.id === "review" && !!guide.reviewUrl); const autoHidden = !s.hidden && !sectionFilled(s) && !opFilled; return (
-            <div key={s.id} className="anim-in overflow-hidden rounded-2xl border border-line bg-surface shadow-sm" style={{ opacity: s.hidden ? 0.7 : 1 }}>
+            <div key={s.id} className="anim-in overflow-hidden rounded-2xl border border-line bg-surface shadow-sm transition-all hover:border-focus hover:shadow-md" style={{ opacity: s.hidden ? 0.7 : 1 }}>
               <div className="flex items-center gap-2 px-4 py-2.5">
                 <button onClick={() => setOpenSec(open ? null : s.id)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
                   <span className="text-[16px] leading-none" style={{ filter: s.hidden ? "grayscale(1)" : undefined }}>{SEC_EMOJI[s.id] || "📄"}</span>
