@@ -1051,8 +1051,7 @@ export default function GuidaOspitiPage() {
                 ); })()}
             </Card>
           ); })}
-          <button onClick={addSection} className="w-full rounded-lg border border-dashed border-line px-3 py-2.5 text-sm font-semibold text-focus hover:bg-wash">+ Aggiungi sezione</button>
-          <p className="text-[11px] text-faint">I testi valgono per tutte le lingue (nella lingua in cui scrivi); la traduzione automatica multilingua è la fase successiva. Le stringhe dell&apos;interfaccia (Indietro, WiFi…) sono già tradotte IT/EN/FR/DE/ES.</p>
+          <button onClick={addSection} className="w-full rounded-lg px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Aggiungi sezione</button>
         </>)}
         </div>
 
