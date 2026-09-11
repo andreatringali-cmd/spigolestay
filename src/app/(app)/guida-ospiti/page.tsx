@@ -315,6 +315,8 @@ const compressImage = (file: File, maxDim: number, quality: number, fmt: string 
 // Definiti a livello di modulo: se stessero dentro il componente verrebbero ricreati a ogni
 // render e React rimonterebbe gli input (focus perso → si scrive un carattere alla volta).
 const fld = "w-full rounded-lg border border-line bg-paper px-3.5 py-2.5 text-[15px] text-txt outline-none focus:border-focus";
+// Textarea "alto" standard: stessa altezza per tutti i campi di testo lunghi (come il messaggio Home).
+const fldTA = "w-full resize-y rounded-lg border border-line bg-paper px-3.5 py-2.5 text-[15px] leading-relaxed text-txt outline-none focus:border-focus min-h-[9rem]";
 // Campo in sola lettura: il dato arriva dalle Impostazioni struttura, qui non si modifica.
 const fldRO = "w-full rounded-lg border border-line bg-wash px-3.5 py-2.5 text-[15px] text-dim outline-none cursor-not-allowed";
 const F = ({ label, children }: { label: string; children: React.ReactNode }) => (<label className="block text-xs font-medium text-dim">{label}<div className="mt-1">{children}</div></label>);
@@ -472,8 +474,11 @@ export default function GuidaOspitiPage() {
   const [openSec, setOpenSec] = useState<string | null>(null);
   const [openStruct, setOpenStruct] = useState(false); // "Struttura e contatti" (chiusa di default)
   const [openHome, setOpenHome] = useState(false);      // "Home · benvenuto" (chiusa di default)
+  const [codesUnit, setCodesUnit] = useState<string | null>(null); // camera di cui si stanno modificando i codici (scheda)
   const content: GContent = guide.content ?? EMPTY_CONTENT;
   const setContent = (c: GContent) => set({ content: c });
+  const contentSig = useMemo(() => JSON.stringify(content), [content]);
+  const lastTrSig = useRef<string>(""); // firma dell'ultimo contenuto tradotto (per l'auto-traduzione)
   // "Contenuti pronti" = l'host ha scritto davvero qualcosa (non basta lo scaffold vuoto).
   const hasRealContent = !!(
     content.home.welcomeTitle?.trim() || content.home.welcomeSub?.trim() || content.home.welcome.join("").trim() ||
@@ -482,6 +487,12 @@ export default function GuidaOspitiPage() {
       (s.steps?.some((st) => st.h?.trim() || st.p?.trim())) || (s.amenities?.length))
   );
   const loadDemo = () => { if (guide.content && !confirm("Sostituire i contenuti attuali con l'esempio di Siracusa?")) return; updateStructure(sid, DEMO_STRUCT); set({ ...DEMO_GUIDE, content: DEMO_CONTENT, i18n: {} }); refresh(); };
+
+  // Stato "pronta" mostrato nell'header di ogni card a tendina (✓ compilata / ○ da compilare).
+  const secReady = (s: GSection) => { const op = (s.id === "wifi" && !!(guide.wifiNetwork || guide.wifiPassword)) || (s.id === "contacts" && !!(guide.phone || guide.whatsapp || guide.phoneGreta)) || (s.id === "review" && !!guide.reviewUrl); return !s.hidden && (sectionFilled(s) || op); };
+  const structReady = !!(guide.name && guide.address);
+  const homeReady = !content.home.hidden && !!(content.home.welcomeTitle?.trim() || content.home.welcomeSub?.trim() || content.home.welcome.join("").trim());
+  const ReadyDot = ({ ok }: { ok: boolean }) => (<span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${ok ? "text-white" : "bg-wash text-faint"}`} style={ok ? { backgroundColor: "var(--ok)" } : undefined}>{ok ? "attiva" : "non attiva"}</span>);
 
   // Traduzione automatica multilingua (base italiano → EN/FR/DE/ES)
   const [tr, setTr] = useState<{ running: boolean; lang: string; done: number; total: number; ok?: boolean; err?: string }>({ running: false, lang: "", done: 0, total: 0 });
@@ -494,6 +505,7 @@ export default function GuidaOspitiPage() {
         i18n[TR_LANGS[i]] = await translateContent(content, TR_LANGS[i]);
       }
       set({ content, i18n }); // salvo anche il contenuto base: senza, la guida resterebbe sul demo
+      lastTrSig.current = contentSig; // segna questo contenuto come tradotto (per l'auto-traduzione)
       setTr({ running: false, lang: "", done: TR_LANGS.length, total: TR_LANGS.length, ok: true });
       refresh();
     } catch {
@@ -501,6 +513,16 @@ export default function GuidaOspitiPage() {
     }
   };
   const hasTranslations = !!guide.i18n && TR_LANGS.some((l) => guide.i18n![l]);
+  // Auto-traduzione: all'avvio considera "già tradotto" ciò che c'è (per non ritradurre a ogni accesso).
+  useEffect(() => { if (loaded && hasTranslations && !lastTrSig.current) lastTrSig.current = contentSig; }, [loaded, hasTranslations, contentSig]);
+  // ...poi, quando modifichi i contenuti, ritraduci da solo in EN/FR/DE/ES dopo una breve pausa.
+  useEffect(() => {
+    if (!loaded || !hasRealContent) return;
+    if (contentSig === lastTrSig.current || tr.running) return;
+    const t = setTimeout(() => { void runTranslate(); }, 7000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentSig, loaded, hasRealContent]);
   const setHome = (patch: Partial<GContent["home"]>) => setContent({ ...content, home: { ...content.home, ...patch } });
   const updSection = (i: number, patch: Partial<GSection>) => setContent({ ...content, sections: content.sections.map((s, j) => (j === i ? { ...s, ...patch } : s)) });
   const removeSection = (i: number) => setContent({ ...content, sections: content.sections.filter((_, j) => j !== i) });
@@ -751,21 +773,8 @@ export default function GuidaOspitiPage() {
       </div>
 
       {/* Riga filtri: a sinistra lo stato "Pronta", a destra i controlli dell'anteprima */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
-        <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="font-semibold text-faint">Pronta:</span>
-          {(() => {
-            const short: Record<string, string> = { checkin: "Check-in", breakfast: "Colazione", wifi: "WiFi", attractions: "Esplora", restaurants: "Ristoranti", excursions: "Mare", taxi: "Taxi", info: "Info", faq: "FAQ", extras: "Extra", contacts: "Contatti", review: "Recensioni" };
-            const homeReady = !content.home.hidden && !!(content.home.welcomeTitle?.trim() || content.home.welcomeSub?.trim() || content.home.welcome.join("").trim());
-            const secReady = (s: GSection) => { const op = (s.id === "wifi" && !!(guide.wifiNetwork || guide.wifiPassword)) || (s.id === "contacts" && !!(guide.phone || guide.whatsapp || guide.phoneGreta)) || (s.id === "review" && !!guide.reviewUrl); return !s.hidden && (sectionFilled(s) || op); };
-            const chips: [string, boolean][] = [["Struttura", !!(guide.name && guide.address)], ["Home", homeReady], ...orderedSections.map(({ s }) => [short[s.id] || s.title, secReady(s)] as [string, boolean]), ["Traduzioni", hasTranslations]];
-            return chips.map(([lbl, ok], i) => (
-              <span key={lbl + i} className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${ok ? "text-white" : "bg-wash text-faint"}`} style={ok ? { backgroundColor: "var(--ok)" } : undefined}>{ok ? "✓" : "○"} {lbl}</span>
-            ));
-          })()}
-        </div>
+      <div className="mb-4 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-semibold text-txt">Anteprima live</span>
           <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-faint"><span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: savedThis ? "var(--ok)" : "var(--faint)" }} />{savedThis ? "live" : "compila per vedere"}</span>
           <button onClick={refresh} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">↻ Aggiorna</button>
           <select value={pvLang} onChange={(e) => setPvLang(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-dim outline-none focus:border-focus">
@@ -798,10 +807,11 @@ export default function GuidaOspitiPage() {
           <Card>
             <button onClick={() => setOpenStruct((o) => !o)} className="flex w-full items-center gap-2 text-left">
               <span className="text-faint">{openStruct ? "▾" : "▸"}</span>
-              <span className="flex-1 font-semibold text-txt">Struttura e contatti</span>
-              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-wash px-2.5 py-1 text-[10px] font-medium text-dim"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> dalle Impostazioni struttura</span>
+              <span className="font-semibold text-txt">Struttura e contatti</span>
+              <ReadyDot ok={structReady} />
+              <span className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-wash px-2.5 py-1 text-[10px] font-medium text-dim"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> dalle Impostazioni struttura</span>
             </button>
-            {openStruct && (
+            {openStruct && (<>
               <div className="mt-3 grid grid-cols-2 gap-3">
               <F label="Nome guida"><input value={`Guida - ${guide.name}`} disabled readOnly className={fldRO} /></F>
               <F label="Nome struttura"><input value={guide.name} disabled readOnly className={fldRO} /></F>
@@ -817,7 +827,8 @@ export default function GuidaOspitiPage() {
               <F label="Facebook"><input value={guide.social.facebook} disabled readOnly className={fldRO} /></F>
               <F label="Sito web"><input value={guide.social.website} disabled readOnly className={fldRO} /></F>
               </div>
-            )}
+              <a href={`/strutture/${sid}`} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-focus hover:bg-wash">✎ Modifica i dati della struttura →</a>
+            </>)}
           </Card>
 
 
@@ -832,6 +843,7 @@ export default function GuidaOspitiPage() {
               <button onClick={() => setOpenHome((o) => !o)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
                 <span className="text-faint">{openHome ? "▾" : "▸"}</span>
                 <span className={`truncate font-semibold ${content.home.hidden ? "text-faint line-through" : "text-txt"}`}>Home · benvenuto</span>
+                <ReadyDot ok={homeReady} />
                 {content.home.hidden && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">nascosta</span>}
               </button>
               <button onClick={() => setHome({ hidden: !content.home.hidden })} title={content.home.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">{content.home.hidden ? "Mostra" : "Nascondi"}</button>
@@ -840,7 +852,7 @@ export default function GuidaOspitiPage() {
               <div className="mt-3 space-y-3 border-t border-line pt-3">
                 <F label="Titolo di benvenuto"><input value={content.home.welcomeTitle} maxLength={LIM.wtitle} onChange={(e) => setHome({ welcomeTitle: e.target.value })} className={fld} /></F>
                 <F label="Sottotitolo"><input value={content.home.welcomeSub ?? ""} maxLength={LIM.wsub} onChange={(e) => setHome({ welcomeSub: e.target.value })} className={fld} /></F>
-                <F label="Messaggio (una riga per paragrafo)"><textarea value={content.home.welcome.join("\n")} maxLength={LIM.welcome} onChange={(e) => setHome({ welcome: e.target.value.split("\n") })} rows={7} className={`${fld} resize-y min-h-[9rem] text-[15px] leading-relaxed`} /></F>
+                <F label="Messaggio (una riga per paragrafo)"><textarea value={content.home.welcome.join("\n")} maxLength={LIM.welcome} onChange={(e) => setHome({ welcome: e.target.value.split("\n") })} rows={7} className={fldTA} /></F>
               </div>
             )}
           </Card>
@@ -850,9 +862,9 @@ export default function GuidaOspitiPage() {
                 <button onClick={() => setOpenSec(open ? null : s.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
                   <span className="text-faint">{open ? "▾" : "▸"}</span>
                   <span className={`truncate font-semibold ${s.hidden ? "text-faint line-through" : "text-txt"}`}>{s.title || s.id}</span>
+                  <ReadyDot ok={secReady(s)} />
                   {func && !autoHidden && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>operativa</span>}
                   {s.hidden && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">nascosta</span>}
-                  {autoHidden && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>vuota · nascosta</span>}
                 </button>
                 <button onClick={() => toggleHidden(si)} title={s.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">{s.hidden ? "Mostra" : "Nascondi"}</button>
                 {custom && <button onClick={() => removeSection(si)} title="Elimina sezione personalizzata" className="shrink-0 px-1 text-faint hover:text-[color:var(--err)]">✕</button>}
@@ -927,7 +939,7 @@ export default function GuidaOspitiPage() {
                   )}
                   {/* Galleria in alto: sezioni città (nell'app le foto stanno sopra l'introduzione) */}
                   {!isCheckin && !STEP_SECTIONS.has(s.id) && galleryUI}
-                  <F label={`Introduzione (${s.intro.length}/${LIM.intro})`}><textarea value={s.intro} maxLength={LIM.intro} onChange={(e) => updSection(si, { intro: e.target.value })} rows={2} className={`${fld} resize-y`} /></F>
+                  <F label={`Introduzione (${s.intro.length}/${LIM.intro})`}><textarea value={s.intro} maxLength={LIM.intro} onChange={(e) => updSection(si, { intro: e.target.value })} rows={7} className={fldTA} /></F>
                   {/* PASSAGGI numerati (check-in / colazione): compilabili dall'host, codici dal link ospite */}
                   {STEP_SECTIONS.has(s.id) && (
                     <div>
@@ -943,7 +955,7 @@ export default function GuidaOspitiPage() {
                               <button onClick={() => moveStep(si, ki, 1)} title="Giù" className="px-1 text-faint hover:text-txt">↓</button>
                               <button onClick={() => removeStep(si, ki)} className="text-faint hover:text-[color:var(--err)]">✕</button>
                             </div>
-                            <textarea value={st.p} maxLength={LIM.p} onChange={(e) => updStep(si, ki, { p: e.target.value })} rows={2} placeholder="Descrizione…  ([[evidenziato]] · [i]corsivo[/i])" className="mt-1 w-full resize-y rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
+                            <textarea value={st.p} maxLength={LIM.p} onChange={(e) => updStep(si, ki, { p: e.target.value })} rows={5} placeholder="Descrizione…  ([[evidenziato]] · [i]corsivo[/i])" className="mt-1 min-h-[9rem] w-full resize-y rounded border border-line bg-surface px-2.5 py-2 text-[15px] leading-relaxed text-txt outline-none focus:border-focus" />
                             <div className="mt-1.5 flex flex-wrap items-center gap-2">
                               <span className="text-[11px] text-faint">Codice sotto il passaggio:</span>
                               <select value={st.code || ""} onChange={(e) => updStep(si, ki, { code: e.target.value as GStep["code"] })} className="rounded border border-line bg-surface px-1.5 py-1 text-xs text-txt outline-none focus:border-focus">{CODE_OPTS.map((c) => <option key={c.v} value={c.v}>{c.label}</option>)}</select>
@@ -1012,7 +1024,7 @@ export default function GuidaOspitiPage() {
                           <div key={ii} className="rounded-lg border border-line bg-paper p-2">
                             <div className="flex items-center gap-2"><input value={it.h} maxLength={LIM.h} onChange={(e) => updItem(si, ii, { h: e.target.value })} placeholder={SEC_BLOCKS[s.id]?.hPh || "Titolo blocco"} className="flex-1 rounded border border-line bg-surface px-2 py-1 text-sm font-semibold text-txt outline-none focus:border-focus" />{!hasList && <span className="text-[10px] text-faint">{it.p.length}/{LIM.p}</span>}<button onClick={() => removeItem(si, ii)} className="text-faint hover:text-[color:var(--err)]">✕</button></div>
                             {/* Descrizione: nascosta nelle sezioni a elenco puro salvo testo già presente */}
-                            {(!hasList || it.p) && <textarea value={it.p} maxLength={LIM.p} onChange={(e) => updItem(si, ii, { p: e.target.value })} rows={hasList ? 1 : 2} placeholder={hasList ? "Nota breve (facoltativa)…" : "Descrizione…  ([[evidenziato]] · [i]corsivo[/i] · [u]sottolineato[/u])"} className="mt-1 w-full resize-y rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />}
+                            {(!hasList || it.p) && <textarea value={it.p} maxLength={LIM.p} onChange={(e) => updItem(si, ii, { p: e.target.value })} rows={hasList ? 1 : 5} placeholder={hasList ? "Nota breve (facoltativa)…" : "Descrizione…  ([[evidenziato]] · [i]corsivo[/i] · [u]sottolineato[/u])"} className={`mt-1 w-full resize-y rounded border border-line bg-surface text-txt outline-none focus:border-focus ${hasList ? "px-2 py-1 text-sm" : "min-h-[9rem] px-2.5 py-2 text-[15px] leading-relaxed"}`} />}
                             {/* Elenco voci (nome · indirizzo · tel): solo sezioni directory o item con elenco */}
                             {hasList && (
                               <div className="mt-1.5">
@@ -1162,20 +1174,47 @@ export default function GuidaOspitiPage() {
             </div>
             <p className="mt-0.5 text-[11px] text-faint">Scrivi i codici di ogni camera: entrano in automatico nel link di ogni ospite. Per sicurezza non vengono mai salvati nella guida pubblica.</p>
             {structUnits.length > 0 ? (
-              <div className="mt-3 space-y-3">
-                {structUnits.map((u) => { const a = roomAccess[u.id] || {}; return (
-                  <div key={u.id} className="rounded-lg border border-line bg-paper p-3">
-                    <div className="mb-2 text-sm font-semibold text-txt">{u.name}{u.code ? <span className="ml-1 font-normal text-faint">· {u.code}</span> : null}</div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <label className="block text-[10px] font-medium text-faint">Cancello/portone<input value={a.gate || ""} onChange={(e) => setUnitAccess(u.id, { gate: e.target.value })} placeholder="—" className="mt-0.5 w-full rounded border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
-                      <label className="block text-[10px] font-medium text-faint">Porta/cassetta<input value={a.door || ""} onChange={(e) => setUnitAccess(u.id, { door: e.target.value })} placeholder="—" className="mt-0.5 w-full rounded border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
-                      <label className="block text-[10px] font-medium text-faint">Codice 2 (facolt.)<input value={a.door2 || ""} onChange={(e) => setUnitAccess(u.id, { door2: e.target.value })} placeholder="—" className="mt-0.5 w-full rounded border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
+              <div className="mt-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                {structUnits.map((u) => { const a = roomAccess[u.id] || {}; const n = [a.gate, a.door, a.door2].filter(Boolean).length; return (
+                  <button key={u.id} onClick={() => setCodesUnit(u.id)} className="flex items-center gap-2.5 rounded-xl border border-line bg-paper p-3 text-left transition hover:border-focus hover:bg-wash">
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 12%, transparent)", color: "var(--focus)" }}>{u.code || (u.name || "?").slice(0, 2)}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-txt">{u.name}</div>
+                      <div className="text-[11px]" style={{ color: n ? "var(--ok)" : "var(--faint)" }}>{n ? `${n} ${n === 1 ? "codice" : "codici"} ✓` : "imposta codici"}</div>
                     </div>
-                  </div>
+                    <span className="text-faint">›</span>
+                  </button>
                 ); })}
               </div>
             ) : <p className="mt-2 text-xs text-faint">Aggiungi le camere nella sezione <b className="text-dim">Camere</b> per impostarne i codici.</p>}
           </Card>
+
+          {/* Scheda codici della camera (si apre al clic su una card) */}
+          {codesUnit && (() => {
+            const u = structUnits.find((x) => x.id === codesUnit); if (!u) return null; const a = roomAccess[u.id] || {};
+            return (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setCodesUnit(null)}>
+                <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                  <div className="mb-1 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 12%, transparent)", color: "var(--focus)" }}>{u.code || (u.name || "?").slice(0, 2)}</div>
+                      <div className="text-base font-semibold text-txt">{u.name}</div>
+                    </div>
+                    <button onClick={() => setCodesUnit(null)} className="text-lg text-faint hover:text-txt">✕</button>
+                  </div>
+                  <p className="mb-3 text-[11px] text-faint">Codici di accesso di questa camera. Entrano in automatico nel link dell&apos;ospite; non vengono mai salvati nella guida pubblica.</p>
+                  <div className="space-y-3">
+                    {([["Cancello/portone", "gate"], ["Porta/cassetta", "door"], ["Codice 2 (facoltativo)", "door2"]] as [string, "gate" | "door" | "door2"][]).map(([lbl, key]) => (
+                      <label key={key} className="block text-xs font-medium text-dim">{lbl}
+                        <input value={a[key] || ""} onChange={(e) => setUnitAccess(u.id, { [key]: e.target.value })} placeholder="—" className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-[15px] text-txt outline-none focus:border-focus" />
+                      </label>
+                    ))}
+                  </div>
+                  <button onClick={() => setCodesUnit(null)} className="mt-4 w-full rounded-lg py-2.5 text-sm font-semibold text-white transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>Fatto</button>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Traduzione automatica multilingua */}
           <Card>
@@ -1185,14 +1224,16 @@ export default function GuidaOspitiPage() {
                 <p className="mt-0.5 text-[11px] text-faint">Scrivi in italiano: genero EN · FR · DE · ES per gli ospiti. Segnaposto, codici e link restano intatti; nomi e indirizzi degli elenchi non vengono tradotti.</p>
               </div>
               <div className="flex items-center gap-2">
-                {tr.running && <span className="text-xs font-medium text-dim">Traduco {tr.lang.toUpperCase()}… ({tr.done}/{tr.total})</span>}
-                {!tr.running && tr.ok && <span className="flex items-center gap-1 text-xs font-semibold text-[color:var(--ok)]">✓ Tradotto</span>}
-                {!tr.running && hasTranslations && !tr.ok && <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-faint">traduzioni presenti</span>}
-                <button onClick={runTranslate} disabled={tr.running} className="rounded-lg px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60" style={{ backgroundColor: "var(--focus)" }}>{tr.running ? "Traduzione…" : hasTranslations ? "Ritraduci tutto" : "Traduci in 4 lingue"}</button>
+                {tr.running
+                  ? <span className="flex items-center gap-1.5 text-xs font-medium text-dim"><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-line" style={{ borderTopColor: "var(--focus)" }} />Traduco {tr.lang.toUpperCase()}… ({tr.done}/{tr.total})</span>
+                  : tr.err
+                    ? <button onClick={() => void runTranslate()} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash">↻ Riprova</button>
+                    : hasTranslations
+                      ? <span className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-white" style={{ backgroundColor: "var(--ok)" }}>✓ Aggiornate</span>
+                      : <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-faint">in attesa di contenuti</span>}
               </div>
             </div>
             {tr.err && <p className="mt-2 text-xs font-medium text-[color:var(--err)]">{tr.err}</p>}
-            {hasTranslations && !tr.running && <p className="mt-2 text-[11px] text-faint">Hai modificato dei testi dopo l&apos;ultima traduzione? Premi <b className="text-dim">Ritraduci tutto</b> per aggiornare le lingue. Le traduzioni automatiche sono un buon punto di partenza: rivedile per i dettagli.</p>}
           </Card>
       </>)}
 
