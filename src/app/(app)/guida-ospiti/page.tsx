@@ -1155,25 +1155,6 @@ export default function GuidaOspitiPage() {
             );
           })()}
 
-          {/* Traduzione automatica multilingua */}
-          <Card>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0">
-                <SectionTitle>Traduzione automatica</SectionTitle>
-                <p className="mt-0.5 text-[11px] text-faint">Scrivi in italiano: genero EN · FR · DE · ES per gli ospiti. Segnaposto, codici e link restano intatti; nomi e indirizzi degli elenchi non vengono tradotti.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {tr.running
-                  ? <span className="flex items-center gap-1.5 text-xs font-medium text-dim"><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-line" style={{ borderTopColor: "var(--focus)" }} />Traduco {tr.lang.toUpperCase()}… ({tr.done}/{tr.total})</span>
-                  : tr.err
-                    ? <button onClick={() => void runTranslate()} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash">↻ Riprova</button>
-                    : hasTranslations
-                      ? <span className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-white" style={{ backgroundColor: "var(--ok)" }}>✓ Aggiornate</span>
-                      : <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-faint">in attesa di contenuti</span>}
-              </div>
-            </div>
-            {tr.err && <p className="mt-2 text-xs font-medium text-[color:var(--err)]">{tr.err}</p>}
-          </Card>
       </>)}
 
       {mainTab === "tv" && (<>
