@@ -1105,66 +1105,6 @@ export default function GuidaOspitiPage() {
         </div>
       </div>
         {/* In fondo alla pagina: invio guida agli arrivi + impostazioni codici */}
-          {/* AZIONE DI OGNI GIORNO: invia la guida agli arrivi */}
-          <Card>
-            <SectionTitle>Invia la guida agli arrivi</SectionTitle>
-            <p className="mt-0.5 mb-3 text-xs text-dim">Tutto è già impostato. Premi <b className="text-txt">Invia</b> accanto all&apos;ospite: parte su WhatsApp la guida con la <b className="text-txt">sua camera</b> e i <b className="text-txt">suoi codici</b>. Non devi compilare nulla.</p>
-
-            {/* Arrivi di oggi */}
-            <div className="mb-1.5 flex items-center gap-2">
-              <span className="text-sm font-semibold text-txt">Oggi</span>
-              <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-faint">{todayArrivals.length} {todayArrivals.length === 1 ? "arrivo" : "arrivi"}</span>
-            </div>
-            {todayArrivals.length > 0
-              ? <div className="space-y-2">{todayArrivals.map(arrivalRow)}</div>
-              : <p className="rounded-lg bg-wash px-3 py-2.5 text-xs text-faint">Nessun arrivo oggi per questa struttura.</p>}
-
-            {nextArrivals.length > 0 && (
-              <details className="mt-3">
-                <summary className="cursor-pointer list-none text-sm font-semibold text-dim hover:text-txt">▸ Prossimi arrivi ({nextArrivals.length})</summary>
-                <div className="mt-2 space-y-2">{nextArrivals.map(arrivalRow)}</div>
-              </details>
-            )}
-
-            {/* Personalizza il messaggio (uno solo) */}
-            <details className="mt-4 border-t border-line pt-3">
-              <summary className="cursor-pointer list-none text-sm font-semibold text-dim hover:text-txt">✎ Personalizza il messaggio</summary>
-              <div className="mt-2">
-                <textarea value={guide.inviteMsg ?? DEFAULT_MSG} maxLength={600} onChange={(e) => set({ inviteMsg: e.target.value })} rows={4} className={`${fld} resize-y`} />
-                <p className="mt-1 text-[11px] text-faint">Parte insieme alla guida. <b className="text-dim">{"{nome}"}</b> = nome dell&apos;ospite · <b className="text-dim">{"{link}"}</b> = link della guida.</p>
-              </div>
-            </details>
-
-            {/* Opzioni avanzate + ospite senza prenotazione */}
-            <details className="mt-2">
-              <summary className="cursor-pointer list-none text-sm font-semibold text-dim hover:text-txt">⚙ Opzioni avanzate</summary>
-              <div className="mt-2 space-y-3">
-                <div className="flex flex-wrap items-center gap-4">
-                  <label className="flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={parking} onChange={(e) => setParking(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Includi parcheggio</label>
-                  <label className="flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={taxFixed} onChange={(e) => setTaxFixed(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Tassa di soggiorno fissa</label>
-                  <label className="flex items-center gap-2 text-sm text-dim">Portale documenti <input value={docs} onChange={(e) => setDocs(e.target.value)} placeholder="https://… (facolt.)" className="w-48 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus" /></label>
-                </div>
-                <div className="rounded-lg border border-line bg-paper p-2.5">
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-faint">Ospite senza prenotazione</div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <F label="Nome ospite"><input value={guestName} onChange={(e) => setGuestName(e.target.value)} className={fld} placeholder="es. Mario Rossi" /></F>
-                    <F label="Camera/e"><input value={rooms} onChange={(e) => setRooms(e.target.value)} className={fld} placeholder="es. 4 o 2,3" /></F>
-                  </div>
-                  {structUnits.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {structUnits.map((u) => (<button key={u.id} onClick={() => setRooms((r) => { const set2 = new Set(r.split(",").map((x) => x.trim()).filter(Boolean)); const n = (u.code || u.name); set2.has(n) ? set2.delete(n) : set2.add(n); return [...set2].join(","); })} className="rounded-full border border-line px-2.5 py-1 text-xs text-dim hover:bg-wash">{u.name}</button>))}
-                    </div>
-                  )}
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <a href={`https://wa.me/?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={14} /> Invia</a>
-                    <button onClick={() => navigator.clipboard?.writeText(guestLink)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash"><Icon name="copy" size={14} /> Copia link</button>
-                    <button onClick={() => printCard(guestLink, rooms)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">🖨️ Stampa QR</button>
-                  </div>
-                </div>
-              </div>
-            </details>
-          </Card>
-
           {/* IMPOSTAZIONE UNA-TANTUM: codici di accesso per camera */}
           <Card>
             <div className="flex items-center gap-2">
