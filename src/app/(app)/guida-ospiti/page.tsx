@@ -818,7 +818,7 @@ export default function GuidaOspitiPage() {
 
         {(<>
           <Card>
-            <details open>
+            <details>
               <summary className="flex cursor-pointer list-none items-center gap-1.5">
                 <span className="text-faint">▸</span><SectionTitle>Home · benvenuto</SectionTitle>
               </summary>
