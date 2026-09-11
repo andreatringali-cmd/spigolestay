@@ -492,7 +492,7 @@ export default function GuidaOspitiPage() {
   const secReady = (s: GSection) => { const op = (s.id === "wifi" && !!(guide.wifiNetwork || guide.wifiPassword)) || (s.id === "contacts" && !!(guide.phone || guide.whatsapp || guide.phoneGreta)) || (s.id === "review" && !!guide.reviewUrl); return !s.hidden && (sectionFilled(s) || op); };
   const structReady = !!(guide.name && guide.address);
   const homeReady = !content.home.hidden && !!(content.home.welcomeTitle?.trim() || content.home.welcomeSub?.trim() || content.home.welcome.join("").trim());
-  const ReadyDot = ({ ok }: { ok: boolean }) => (<span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${ok ? "text-white" : "bg-wash text-faint"}`} style={ok ? { backgroundColor: "var(--ok)" } : undefined}>{ok ? "attiva" : "non attiva"}</span>);
+  const ReadyDot = ({ ok }: { ok: boolean }) => (<span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide" style={ok ? { backgroundColor: "var(--ok)", color: "#fff" } : { backgroundColor: "color-mix(in srgb, var(--err) 14%, transparent)", color: "var(--err)" }}>{ok ? "attiva" : "non attiva"}</span>);
 
   // Traduzione automatica multilingua (base italiano → EN/FR/DE/ES)
   const [tr, setTr] = useState<{ running: boolean; lang: string; done: number; total: number; ok?: boolean; err?: string }>({ running: false, lang: "", done: 0, total: 0 });
@@ -863,7 +863,6 @@ export default function GuidaOspitiPage() {
                   <span className="text-faint">{open ? "▾" : "▸"}</span>
                   <span className={`truncate font-semibold ${s.hidden ? "text-faint line-through" : "text-txt"}`}>{s.title || s.id}</span>
                   <ReadyDot ok={secReady(s)} />
-                  {func && !autoHidden && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>operativa</span>}
                   {s.hidden && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">nascosta</span>}
                 </button>
                 <button onClick={() => toggleHidden(si)} title={s.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">{s.hidden ? "Mostra" : "Nascondi"}</button>
