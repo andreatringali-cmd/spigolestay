@@ -71,7 +71,9 @@ export async function createProperty(p: SyncProperty) {
       city: p.city || undefined, address: p.address || undefined,
       email: p.email || undefined, phone: p.phone || undefined,
       latitude: p.latitude || undefined, longitude: p.longitude || undefined,
-      logo_url: p.logo_url || undefined, website: p.website || undefined,
+      // Channex accetta solo URL http(s) validi: logo caricato (data:/relativo) e siti non-URL vengono omessi.
+      logo_url: (p.logo_url && /^https?:\/\/\S+$/i.test(p.logo_url)) ? p.logo_url : undefined,
+      website: (p.website && /^https?:\/\/\S+$/i.test(p.website)) ? p.website : undefined,
     } }),
   });
 }
