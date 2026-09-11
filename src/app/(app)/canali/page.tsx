@@ -77,10 +77,18 @@ export default function CanaliPage() {
   const [chxSync, setChxSync] = useState<{ running: boolean; msg?: string; ok?: boolean }>({ running: false });
   const [ariSync, setAriSync] = useState<{ running: boolean; msg?: string; ok?: boolean }>({ running: false });
   useEffect(() => { try { const m = localStorage.getItem("spigolestay:channexmap"); if (m) setChxMap(JSON.parse(m)); } catch {} }, []);
+  const unlinkChannex = () => {
+    const sid = effStructure;
+    const next = { ...chxMap }; delete next[sid];
+    setChxMap(next); try { localStorage.setItem("spigolestay:channexmap", JSON.stringify(next)); } catch {}
+    setChxSync({ running: false, msg: "Struttura scollegata. Puoi ricrearla su Channex." }); setAriSync({ running: false });
+  };
   const syncToChannex = async () => {
     const sid = effStructure;
     const st = structures.find((s) => s.id === sid);
     if (!st) { setChxSync({ running: false, ok: false, msg: "Seleziona una struttura specifica (non 'Tutte')." }); return; }
+    // Idempotente: se già collegata, NON creare un doppione. Per aggiornare si usa "Prezzi & disponibilità".
+    if (chxMap[sid]) { setChxSync({ running: false, ok: false, msg: "Struttura già collegata a Channex: per aggiornare usa «Prezzi & disponibilità». Per ricrearla, prima «Scollega»." }); return; }
     const rts = roomTypes.filter((rt) => rt.structureId === sid);
     if (rts.length === 0) { setChxSync({ running: false, ok: false, msg: "Nessuna tipologia in questa struttura." }); return; }
     const rooms = rts.map((rt) => ({
@@ -210,8 +218,14 @@ export default function CanaliPage() {
             {ariSync.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: ariSync.ok === false ? "var(--err)" : ariSync.ok ? "var(--ok)" : "var(--dim)" }}>{ariSync.msg}</div>}
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            {chxMap[effStructure] && <button onClick={pushAri} disabled={ariSync.running} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{ariSync.running ? t("Invio…") : "↑ " + t("Prezzi & disponibilità")}</button>}
-            <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{chxSync.running ? t("Sincronizzo…") : chxMap[effStructure] ? t("Ri-sincronizza") : t("Sincronizza con Channex")}</button>
+            {chxMap[effStructure] ? (
+              <>
+                <button onClick={pushAri} disabled={ariSync.running} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{ariSync.running ? t("Invio…") : "↑ " + t("Prezzi & disponibilità")}</button>
+                <button onClick={unlinkChannex} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Scollega")}</button>
+              </>
+            ) : (
+              <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{chxSync.running ? t("Sincronizzo…") : t("Sincronizza con Channex")}</button>
+            )}
           </div>
         </div>
       </Card>
