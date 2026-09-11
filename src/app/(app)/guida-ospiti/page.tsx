@@ -603,7 +603,7 @@ export default function GuidaOspitiPage() {
 
   // Codici e istruzioni PER CAMERA (mai nella guida pubblica: viaggiano solo nel link ospite).
   // Mappa unitId → { gate, door, door2 }. Salvata a parte, sincronizzata col prefisso spigolestay:.
-  type RoomCode = { label: string; value: string };
+  type RoomCode = { label: string; value: string; cond?: "always" | "parking" | "noparking" };
   const DEFAULT_CODES: RoomCode[] = [{ label: "Cancello", value: "" }, { label: "Portone", value: "" }, { label: "Porta", value: "" }];
   const [roomAccess, setRoomAccess] = useState<Record<string, RoomCode[]>>({});
   useEffect(() => {
@@ -625,8 +625,10 @@ export default function GuidaOspitiPage() {
   }, []);
   const codesOf = (uid?: string): RoomCode[] => (uid && roomAccess[uid]) ? roomAccess[uid] : DEFAULT_CODES.map((c) => ({ ...c }));
   const setUnitCodes = (uid: string, codes: RoomCode[]) => { const next = { ...roomAccess, [uid]: codes }; setRoomAccess(next); try { localStorage.setItem("spigolestay:roomaccess", JSON.stringify(next)); } catch {} };
-  // I primi 3 codici viaggiano nel link ospite (posizioni cancello-porta-porta2 del motore guida).
-  const unitCodesK = (uid?: string) => codesOf(uid).slice(0, 3).map((c) => c.value.trim()).join("-").replace(/-+$/g, "");
+  // Filtra i codici in base al parcheggio della prenotazione (tag "parcheggio").
+  const codesForLink = (uid: string | undefined, hasParking: boolean) => codesOf(uid).filter((c) => c.cond === "parking" ? hasParking : c.cond === "noparking" ? !hasParking : true);
+  // I primi 3 codici (dopo il filtro parcheggio) viaggiano nel link ospite (cancello-porta-porta2).
+  const unitCodesK = (uid?: string, hasParking = true) => codesForLink(uid, hasParking).slice(0, 3).map((c) => c.value.trim()).join("-").replace(/-+$/g, "");
 
   // Collegamento con le prenotazioni: le prossime/attuali di questa struttura.
   const todayISO = new Date().toISOString().slice(0, 10);
@@ -1160,10 +1162,20 @@ export default function GuidaOspitiPage() {
                   <p className="mb-3 text-[11px] text-faint">Dai un nome a ogni codice (Cancello, Portone, Porta…) e scrivi il valore. Entrano in automatico nel link dell&apos;ospite; non vengono mai salvati nella guida pubblica.</p>
                   <div className="space-y-2">
                     {codes.map((c, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <input value={c.label} onChange={(e) => upd(i, { label: e.target.value })} placeholder="Nome" className="w-28 shrink-0 rounded-lg border border-line bg-paper px-2.5 py-2 text-sm font-medium text-txt outline-none focus:border-focus" />
-                        <input value={c.value} onChange={(e) => upd(i, { value: e.target.value })} placeholder="Codice" className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-[15px] text-txt outline-none focus:border-focus" />
-                        <button onClick={() => rm(i)} title="Rimuovi" className="shrink-0 rounded-lg p-1.5 text-faint transition hover:bg-wash hover:text-[color:var(--err)]">✕</button>
+                      <div key={i} className="rounded-lg border border-line bg-paper p-2.5">
+                        <div className="flex items-center gap-2">
+                          <input value={c.label} onChange={(e) => upd(i, { label: e.target.value })} placeholder="Nome" className="w-28 shrink-0 rounded-lg border border-line bg-surface px-2.5 py-2 text-sm font-medium text-txt outline-none focus:border-focus" />
+                          <input value={c.value} onChange={(e) => upd(i, { value: e.target.value })} placeholder="Codice" className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-[15px] text-txt outline-none focus:border-focus" />
+                          <button onClick={() => rm(i)} title="Rimuovi" className="shrink-0 rounded-lg p-1.5 text-faint transition hover:bg-wash hover:text-[color:var(--err)]">✕</button>
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <span className="text-[11px] text-faint">Quando inviare:</span>
+                          <select value={c.cond || "always"} onChange={(e) => upd(i, { cond: e.target.value as RoomCode["cond"] })} className="rounded border border-line bg-surface px-1.5 py-1 text-xs text-txt outline-none focus:border-focus">
+                            <option value="always">Sempre</option>
+                            <option value="parking">Solo con parcheggio</option>
+                            <option value="noparking">Solo senza parcheggio</option>
+                          </select>
+                        </div>
                       </div>
                     ))}
                   </div>
