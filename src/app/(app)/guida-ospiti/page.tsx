@@ -829,7 +829,7 @@ export default function GuidaOspitiPage() {
             <option value="es">🇪🇸 Español</option>
           </select>
           <a href={previewUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">Schermo intero ↗</a>
-          <button onClick={() => { savedSigRef.current = sigRef.current; setLastSaved(Date.now()); refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 1500); }} title="Salvataggio automatico attivo · clicca per salvare subito" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1 text-xs font-semibold text-dim hover:bg-wash">
+          <button onClick={() => { savedSigRef.current = sigRef.current; setLastSaved(Date.now()); refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 1500); if (supabase && sid && all[sid]) supabase.from("public_guides").upsert({ id: sid, data: all[sid], updated_at: new Date().toISOString() }).then(undefined, () => {}); }} title="Salvataggio automatico attivo · clicca per salvare e pubblicare subito" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1 text-xs font-semibold text-dim hover:bg-wash">
             {savedTick
               ? <span className="flex items-center gap-1" style={{ color: "var(--ok)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Salvato</span>
               : <>💾 Salvataggio automatico{lastSaved ? ` · ${new Date(lastSaved).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : ""}</>}
