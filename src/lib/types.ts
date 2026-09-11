@@ -276,6 +276,7 @@ export interface Booking {
   cityTaxExempt?: boolean; // esente tassa di soggiorno
   cityTaxPaid?: boolean; // tassa di soggiorno incassata
   depositPaid?: boolean; // caparra ricevuta
+  parking?: boolean; // l'ospite ha prenotato il parcheggio (seleziona i codici "con parcheggio" nella guida)
   paid?: number; // € già incassati (acconto/saldo)
   commissionPct?: number; // % di commissione OTA specifica di questa prenotazione
   webCheckin?: boolean; // l'ospite ha completato il check-in online

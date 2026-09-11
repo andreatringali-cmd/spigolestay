@@ -51,7 +51,7 @@ interface Form {
   adults: number; children: number;
   unitId: string | null;
   total: number; cleaningFee: number; commissionPct: number; paid: number;
-  cityTaxExempt: boolean; cityTaxPaid: boolean; depositPaid: boolean;
+  cityTaxExempt: boolean; cityTaxPaid: boolean; depositPaid: boolean; parking: boolean;
   note: string;
   lastName: string; firstName: string; email: string; phone: string; country: string;
 }
@@ -92,7 +92,7 @@ export default function BookingDrawer() {
       total: booking.total ?? 0, cleaningFee: booking.cleaningFee ?? 35,
       commissionPct: booking.commissionPct ?? Math.round(CHANNELS[booking.channel].commission * 100),
       paid: booking.paid ?? 0,
-      cityTaxExempt: !!booking.cityTaxExempt, cityTaxPaid: !!booking.cityTaxPaid, depositPaid: !!booking.depositPaid,
+      cityTaxExempt: !!booking.cityTaxExempt, cityTaxPaid: !!booking.cityTaxPaid, depositPaid: !!booking.depositPaid, parking: !!booking.parking,
       note: booking.note ?? "",
       lastName: g?.lastName ?? (g?.fullName ? g.fullName.split(" ").slice(1).join(" ") : ""),
       firstName: g?.firstName ?? (g?.fullName ? g.fullName.split(" ")[0] : ""),
@@ -394,6 +394,7 @@ export default function BookingDrawer() {
           <span className="text-right font-mono text-sm text-txt">{eur(taxV)}</span>
         </div>
         {booking.depositPaid && <Row label={t("Caparra")} value={t("ricevuta ✓")} />}
+        {booking.parking && <Row label={t("Parcheggio")} value={t("prenotato ✓")} />}
         <div className="mt-1 rounded-xl bg-wash px-3 py-2.5">
           <div className="flex items-baseline justify-between gap-4">
             <span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span>
@@ -493,7 +494,7 @@ export default function BookingDrawer() {
       checkIn: form.checkIn, checkOut: form.checkOut, channel: form.channel, status: form.status,
       adults: form.adults, children: form.children, unitId: form.unitId,
       total: form.total, cleaningFee: form.cleaningFee, commissionPct: form.commissionPct, paid: form.paid,
-      cityTaxExempt: form.cityTaxExempt, cityTaxPaid: form.cityTaxPaid, depositPaid: form.depositPaid,
+      cityTaxExempt: form.cityTaxExempt, cityTaxPaid: form.cityTaxPaid, depositPaid: form.depositPaid, parking: form.parking,
       note: form.note.trim() || undefined,
     });
     updateGuest(booking.guestId, {
@@ -579,6 +580,7 @@ export default function BookingDrawer() {
           </div>
         </div>
         <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={form.depositPaid} onChange={(e) => set({ depositPaid: e.target.checked })} /> {t("Caparra ricevuta")}</label>
+        <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={form.parking} onChange={(e) => set({ parking: e.target.checked })} /> {t("Parcheggio prenotato")}</label>
         <div className="grid grid-cols-2 gap-2">
           <Field label={`${t("Acconto incassato")} (€)`}><input type="number" min={0} className={inputCls} value={form.paid} onChange={(e) => set({ paid: Math.max(0, +e.target.value) })} /></Field>
           <div className="flex flex-col justify-end">
