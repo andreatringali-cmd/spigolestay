@@ -494,7 +494,11 @@ export default function GuidaOspitiPage() {
   const secReady = (s: GSection) => { const op = (s.id === "wifi" && !!(guide.wifiNetwork || guide.wifiPassword)) || (s.id === "contacts" && !!(guide.phone || guide.whatsapp || guide.phoneGreta)) || (s.id === "review" && !!guide.reviewUrl); return !s.hidden && (sectionFilled(s) || op); };
   const structReady = !!(guide.name && guide.address);
   const homeReady = !content.home.hidden && !!(content.home.welcomeTitle?.trim() || content.home.welcomeSub?.trim() || content.home.welcome.join("").trim());
-  const ReadyDot = ({ ok }: { ok: boolean }) => (<span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide" style={ok ? { backgroundColor: "var(--ok)", color: "#fff" } : { backgroundColor: "color-mix(in srgb, var(--err) 14%, transparent)", color: "var(--err)" }}>{ok ? "attiva" : "non attiva"}</span>);
+  const ReadyDot = ({ ok }: { ok: boolean }) => (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: ok ? "color-mix(in srgb, var(--ok) 13%, transparent)" : "color-mix(in srgb, var(--err) 13%, transparent)", color: ok ? "var(--ok)" : "var(--err)" }}>
+      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ok ? "var(--ok)" : "var(--err)" }} />{ok ? "attiva" : "non attiva"}
+    </span>
+  );
 
   // Traduzione automatica multilingua (base italiano → EN/FR/DE/ES)
   const [tr, setTr] = useState<{ running: boolean; lang: string; done: number; total: number; ok?: boolean; err?: string }>({ running: false, lang: "", done: 0, total: 0 });
@@ -806,15 +810,12 @@ export default function GuidaOspitiPage() {
         <div className="space-y-4">
         {(<>
           <SectionTitle>Sezioni della guida ({content.sections.length})</SectionTitle>
-          <Card>
-            <button onClick={() => setOpenStruct((o) => !o)} className="group flex w-full min-w-0 items-center gap-3 text-left">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[17px]" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)" }}>🏠</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[15px] font-semibold text-txt">Struttura e contatti</span>
-                {!openStruct && <span className="block truncate text-[11px] text-faint">Nome, indirizzo, telefono, social · dalle Impostazioni struttura</span>}
-              </span>
+          <div className="anim-in rounded-xl border border-line bg-surface p-3.5 shadow-sm">
+            <button onClick={() => setOpenStruct((o) => !o)} className="group flex w-full min-w-0 items-center gap-2.5 text-left">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[15px]" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)" }}>🏠</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-txt">Struttura e contatti</span>
               <ReadyDot ok={structReady} />
-              <span className="shrink-0 text-lg text-faint transition-transform duration-200 group-hover:text-txt" style={{ transform: openStruct ? "rotate(90deg)" : "none" }}>›</span>
+              <span className="shrink-0 text-faint transition-colors group-hover:text-txt"><Icon name="chevron" size={15} style={{ transform: openStruct ? "rotate(90deg)" : "none", transition: "transform .2s" }} /></span>
             </button>
             {openStruct && (<>
               <div className="mt-3 grid grid-cols-2 gap-3">
@@ -834,20 +835,16 @@ export default function GuidaOspitiPage() {
               <a href={`/strutture/${sid}`} className="flex items-center justify-center gap-1.5 self-end rounded-lg border border-line px-3 py-2.5 text-sm font-semibold text-focus transition hover:bg-wash">✎ Modifica i dati della struttura →</a>
               </div>
             </>)}
-          </Card>
-          <Card>
+          </div>
+          <div className="anim-in rounded-xl border border-line bg-surface p-3.5 shadow-sm">
             <div className="flex items-center gap-2">
-              <button onClick={() => setOpenHome((o) => !o)} className="group flex min-w-0 flex-1 items-center gap-3 text-left">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[17px]" style={{ backgroundColor: content.home.hidden ? "var(--wash)" : "color-mix(in srgb, var(--focus) 10%, transparent)" }}>👋</span>
-                <span className="min-w-0 flex-1">
-                  <span className={`block truncate text-[15px] font-semibold ${content.home.hidden ? "text-faint line-through" : "text-txt"}`}>Home · benvenuto</span>
-                  {!openHome && <span className="block truncate text-[11px] text-faint">Titolo, sottotitolo e messaggio di benvenuto</span>}
-                </span>
+              <button onClick={() => setOpenHome((o) => !o)} className="group flex min-w-0 flex-1 items-center gap-2.5 text-left">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[15px]" style={{ backgroundColor: content.home.hidden ? "var(--wash)" : "color-mix(in srgb, var(--focus) 10%, transparent)", filter: content.home.hidden ? "grayscale(1) opacity(0.6)" : undefined }}>👋</span>
+                <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${content.home.hidden ? "text-faint line-through" : "text-txt"}`}>Home · benvenuto</span>
                 <ReadyDot ok={homeReady} />
-                {content.home.hidden && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">nascosta</span>}
-                <span className="shrink-0 text-lg text-faint transition-transform duration-200 group-hover:text-txt" style={{ transform: openHome ? "rotate(90deg)" : "none" }}>›</span>
+                <span className="shrink-0 text-faint transition-colors group-hover:text-txt"><Icon name="chevron" size={15} style={{ transform: openHome ? "rotate(90deg)" : "none", transition: "transform .2s" }} /></span>
               </button>
-              <button onClick={() => setHome({ hidden: !content.home.hidden })} title={content.home.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">{content.home.hidden ? "Mostra" : "Nascondi"}</button>
+              <button onClick={() => setHome({ hidden: !content.home.hidden })} title={content.home.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg p-1.5 text-dim transition hover:bg-wash hover:text-txt"><Icon name={content.home.hidden ? "eyeOff" : "eye"} size={16} /></button>
             </div>
             {openHome && (
               <div className="mt-3 space-y-3 border-t border-line pt-3">
@@ -856,21 +853,17 @@ export default function GuidaOspitiPage() {
                 <F label="Messaggio (una riga per paragrafo)"><textarea value={content.home.welcome.join("\n")} maxLength={LIM.welcome} onChange={(e) => setHome({ welcome: e.target.value.split("\n") })} rows={7} className={fldTA} /></F>
               </div>
             )}
-          </Card>
+          </div>
           {orderedSections.map(({ s, si }) => { const open = openSec === s.id; const func = FUNC_SECTIONS.includes(s.id); const custom = !SECTION_ORDER.includes(s.id); const opFilled = (s.id === "wifi" && !!(guide.wifiNetwork || guide.wifiPassword)) || (s.id === "contacts" && !!(guide.phone || guide.whatsapp || guide.phoneGreta)) || (s.id === "review" && !!guide.reviewUrl); const autoHidden = !s.hidden && !sectionFilled(s) && !opFilled; return (
-            <Card key={s.id}>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setOpenSec(open ? null : s.id)} className="group flex min-w-0 flex-1 items-center gap-3 text-left">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[17px]" style={{ backgroundColor: s.hidden ? "var(--wash)" : "color-mix(in srgb, var(--focus) 10%, transparent)", filter: s.hidden ? "grayscale(1) opacity(0.6)" : undefined }}>{SEC_EMOJI[s.id] || "📄"}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className={`block truncate text-[15px] font-semibold ${s.hidden ? "text-faint line-through" : "text-txt"}`}>{s.title || s.id}</span>
-                    {!open && s.sub && <span className="block truncate text-[11px] text-faint">{s.sub}</span>}
-                  </span>
+            <div key={s.id} className="anim-in rounded-xl border border-line bg-surface p-3.5 shadow-sm">
+              <div className="flex items-center gap-1">
+                <button onClick={() => setOpenSec(open ? null : s.id)} className="group flex min-w-0 flex-1 items-center gap-2.5 text-left">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[15px]" style={{ backgroundColor: s.hidden ? "var(--wash)" : "color-mix(in srgb, var(--focus) 10%, transparent)", filter: s.hidden ? "grayscale(1) opacity(0.6)" : undefined }}>{SEC_EMOJI[s.id] || "📄"}</span>
+                  <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${s.hidden ? "text-faint line-through" : "text-txt"}`}>{s.title || s.id}</span>
                   <ReadyDot ok={secReady(s)} />
-                  {s.hidden && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">nascosta</span>}
-                  <span className="shrink-0 text-lg text-faint transition-transform duration-200 group-hover:text-txt" style={{ transform: open ? "rotate(90deg)" : "none" }}>›</span>
+                  <span className="shrink-0 text-faint transition-colors group-hover:text-txt"><Icon name="chevron" size={15} style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .2s" }} /></span>
                 </button>
-                <button onClick={() => toggleHidden(si)} title={s.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">{s.hidden ? "Mostra" : "Nascondi"}</button>
+                <button onClick={() => toggleHidden(si)} title={s.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg p-1.5 text-dim transition hover:bg-wash hover:text-txt"><Icon name={s.hidden ? "eyeOff" : "eye"} size={16} /></button>
                 {custom && <button onClick={() => removeSection(si)} title="Elimina sezione personalizzata" className="shrink-0 px-1 text-faint hover:text-[color:var(--err)]">✕</button>}
               </div>
               {open && (() => {
@@ -1065,7 +1058,7 @@ export default function GuidaOspitiPage() {
                   ); })()}
                 </div>
                 ); })()}
-            </Card>
+            </div>
           ); })}
           <button onClick={addSection} className="w-full rounded-lg px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Aggiungi sezione</button>
         </>)}
