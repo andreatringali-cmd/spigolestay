@@ -660,18 +660,18 @@ export default function GuidaOspitiPage() {
     const dd = (s: string) => s.slice(8, 10) + "/" + s.slice(5, 7);
     const hasCodes = !!unitCodesK(b.unitId || undefined).replace(/-/g, "");
     return (
-      <div key={b.id} className="rounded-lg border border-line bg-paper p-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <div key={b.id} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-paper p-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 12%, transparent)", color: "var(--focus)" }}>{room || "?"}</div>
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-txt">{name || "Ospite"}</div>
-            <div className="text-[11px] text-faint">Camera {room || "—"} · {dd(b.checkIn)}–{dd(b.checkOut)} {hasCodes ? <span style={{ color: "var(--ok)" }}>· codici ✓</span> : <span style={{ color: "var(--warn)" }}>· imposta i codici camera</span>}</div>
+            <div className="text-[11px] text-faint">Camera {room || "—"} · {dd(b.checkIn)}–{dd(b.checkOut)}{hasCodes ? "" : <span style={{ color: "var(--warn)" }}> · ⚠ imposta i codici</span>}</div>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <a href={wa ? `https://wa.me/${wa}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={13} /> Invia</a>
-            <button onClick={() => navigator.clipboard?.writeText(link)} title="Copia link" className="rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-dim hover:bg-wash"><Icon name="copy" size={13} /></button>
-            <a href={link} target="_blank" rel="noreferrer" title="Apri la guida" className="rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-dim hover:bg-wash">↗</a>
-            <button onClick={() => printCard(link, room)} title="Stampa QR" className="rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-dim hover:bg-wash">🖨️</button>
-          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <a href={wa ? `https://wa.me/${wa}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold text-white shadow-sm hover:opacity-90" style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={15} /> Invia</a>
+          <button onClick={() => navigator.clipboard?.writeText(link)} title="Copia link" className="rounded-lg border border-line px-2 py-2 text-xs font-medium text-dim hover:bg-wash"><Icon name="copy" size={14} /></button>
+          <button onClick={() => printCard(link, room)} title="Stampa QR per la camera" className="rounded-lg border border-line px-2 py-2 text-xs font-medium text-dim hover:bg-wash">🖨️</button>
         </div>
       </div>
     );
@@ -1074,82 +1074,88 @@ export default function GuidaOspitiPage() {
           <p className="mt-2 text-[11px] text-faint">{pvMode === "tv" ? "Anteprima della vista TV (Smart TV in camera): si naviga col telecomando. " : "Anteprima della guida sul telefono dell'ospite. "}Si aggiorna in tempo reale mentre compili. Cambia lingua qui sopra per vedere le traduzioni; “Schermo intero” apre la vista completa per la demo.</p>
         </div>
       </div>
-        {/* In fondo alla pagina: generatore link e vista TV */}
-          {/* Codici e istruzioni per camera (punto 2) */}
+        {/* In fondo alla pagina: invio guida agli arrivi + impostazioni codici */}
+          {/* AZIONE DI OGNI GIORNO: invia la guida agli arrivi */}
           <Card>
-            <SectionTitle>Codici per camera</SectionTitle>
-            <p className="mt-0.5 text-[11px] text-faint">I codici NON vengono salvati nella guida pubblica: viaggiano solo nel link personale dell&apos;ospite. Impostali una volta per camera e ogni arrivo userà quelli giusti.</p>
-            {structUnits.length > 0 ? (
-              <div className="mt-2 space-y-2">
-                {structUnits.map((u) => { const a = roomAccess[u.id] || {}; return (
-                  <div key={u.id} className="rounded-lg border border-line bg-paper p-2.5">
-                    <div className="mb-1.5 text-sm font-semibold text-txt">{u.name}{u.code ? <span className="ml-1 font-normal text-faint">· {u.code}</span> : null}</div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <input value={a.gate || ""} onChange={(e) => setUnitAccess(u.id, { gate: e.target.value })} placeholder="Cancello/portone" className="rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
-                      <input value={a.door || ""} onChange={(e) => setUnitAccess(u.id, { door: e.target.value })} placeholder="Porta/cassetta" className="rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
-                      <input value={a.door2 || ""} onChange={(e) => setUnitAccess(u.id, { door2: e.target.value })} placeholder="Codice 2 (facolt.)" className="rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
-                    </div>
-                  </div>
-                ); })}
-              </div>
-            ) : <p className="mt-2 text-xs text-faint">Aggiungi le camere nella sezione <b className="text-dim">Camere</b> per impostarne i codici.</p>}
-          </Card>
+            <SectionTitle>Invia la guida agli arrivi</SectionTitle>
+            <p className="mt-0.5 mb-3 text-xs text-dim">Tutto è già impostato. Premi <b className="text-txt">Invia</b> accanto all&apos;ospite: parte su WhatsApp la guida con la <b className="text-txt">sua camera</b> e i <b className="text-txt">suoi codici</b>. Non devi compilare nulla.</p>
 
-          {/* Invia la guida agli arrivi (punto 3) */}
-          <Card>
-            <SectionTitle>Invia la guida agli ospiti</SectionTitle>
-            <div className="mt-1">
-              <F label="Messaggio che accompagna la guida — usa {nome} e {link}">
-                <textarea value={guide.inviteMsg ?? DEFAULT_MSG} maxLength={600} onChange={(e) => set({ inviteMsg: e.target.value })} rows={4} className={`${fld} resize-y`} />
-              </F>
-              <p className="mt-1 text-[11px] text-faint">È l&apos;unico testo da personalizzare: parte insieme alla guida. <b className="text-dim">{"{nome}"}</b> = nome ospite · <b className="text-dim">{"{link}"}</b> = link della guida (se lo togli, viene aggiunto in fondo).</p>
+            {/* Arrivi di oggi */}
+            <div className="mb-1.5 flex items-center gap-2">
+              <span className="text-sm font-semibold text-txt">Oggi</span>
+              <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-faint">{todayArrivals.length} {todayArrivals.length === 1 ? "arrivo" : "arrivi"}</span>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-4">
-              <label className="flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={parking} onChange={(e) => setParking(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Parcheggio</label>
-              <label className="flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={taxFixed} onChange={(e) => setTaxFixed(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Tassa fissa</label>
-              <label className="flex items-center gap-2 text-sm text-dim">Portale documenti <input value={docs} onChange={(e) => setDocs(e.target.value)} placeholder="https://… (facolt.)" className="w-48 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus" /></label>
-            </div>
+            {todayArrivals.length > 0
+              ? <div className="space-y-2">{todayArrivals.map(arrivalRow)}</div>
+              : <p className="rounded-lg bg-wash px-3 py-2.5 text-xs text-faint">Nessun arrivo oggi per questa struttura.</p>}
 
-            {/* Arrivi di oggi: camera automatica, link diverso per ogni prenotazione */}
-            <div className="mt-3">
-              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Arrivi di oggi ({todayArrivals.length})</div>
-              {todayArrivals.length > 0 ? <div className="space-y-2">{todayArrivals.map(arrivalRow)}</div> : <p className="text-xs text-faint">Nessun arrivo oggi per questa struttura.</p>}
-            </div>
             {nextArrivals.length > 0 && (
               <details className="mt-3">
-                <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-faint">Prossimi arrivi ({nextArrivals.length})</summary>
+                <summary className="cursor-pointer list-none text-sm font-semibold text-dim hover:text-txt">▸ Prossimi arrivi ({nextArrivals.length})</summary>
                 <div className="mt-2 space-y-2">{nextArrivals.map(arrivalRow)}</div>
               </details>
             )}
 
-            {/* Ospite senza prenotazione (manuale) */}
-            <details className="mt-3">
-              <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-faint">Ospite senza prenotazione (manuale)</summary>
-              <div className="mt-2 space-y-2">
-                <div className="grid grid-cols-2 gap-3">
-                  <F label="Nome ospite"><input value={guestName} onChange={(e) => setGuestName(e.target.value)} className={fld} placeholder="es. Mario Rossi" /></F>
-                  <F label="Camera/e (es. 4 o 2,3)"><input value={rooms} onChange={(e) => setRooms(e.target.value)} className={fld} placeholder="numero camera" /></F>
+            {/* Personalizza il messaggio (uno solo) */}
+            <details className="mt-4 border-t border-line pt-3">
+              <summary className="cursor-pointer list-none text-sm font-semibold text-dim hover:text-txt">✎ Personalizza il messaggio</summary>
+              <div className="mt-2">
+                <textarea value={guide.inviteMsg ?? DEFAULT_MSG} maxLength={600} onChange={(e) => set({ inviteMsg: e.target.value })} rows={4} className={`${fld} resize-y`} />
+                <p className="mt-1 text-[11px] text-faint">Parte insieme alla guida. <b className="text-dim">{"{nome}"}</b> = nome dell&apos;ospite · <b className="text-dim">{"{link}"}</b> = link della guida.</p>
+              </div>
+            </details>
+
+            {/* Opzioni avanzate + ospite senza prenotazione */}
+            <details className="mt-2">
+              <summary className="cursor-pointer list-none text-sm font-semibold text-dim hover:text-txt">⚙ Opzioni avanzate</summary>
+              <div className="mt-2 space-y-3">
+                <div className="flex flex-wrap items-center gap-4">
+                  <label className="flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={parking} onChange={(e) => setParking(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Includi parcheggio</label>
+                  <label className="flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={taxFixed} onChange={(e) => setTaxFixed(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Tassa di soggiorno fissa</label>
+                  <label className="flex items-center gap-2 text-sm text-dim">Portale documenti <input value={docs} onChange={(e) => setDocs(e.target.value)} placeholder="https://… (facolt.)" className="w-48 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus" /></label>
                 </div>
-                {structUnits.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {structUnits.map((u) => (<button key={u.id} onClick={() => setRooms((r) => { const set2 = new Set(r.split(",").map((x) => x.trim()).filter(Boolean)); const n = (u.code || u.name); set2.has(n) ? set2.delete(n) : set2.add(n); return [...set2].join(","); })} className="rounded-full border border-line px-2.5 py-1 text-xs text-dim hover:bg-wash">{u.name}</button>))}
+                <div className="rounded-lg border border-line bg-paper p-2.5">
+                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-faint">Ospite senza prenotazione</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <F label="Nome ospite"><input value={guestName} onChange={(e) => setGuestName(e.target.value)} className={fld} placeholder="es. Mario Rossi" /></F>
+                    <F label="Camera/e"><input value={rooms} onChange={(e) => setRooms(e.target.value)} className={fld} placeholder="es. 4 o 2,3" /></F>
                   </div>
-                )}
-                <div className="grid grid-cols-3 gap-2">
-                  <input value={gate} onChange={(e) => setGate(e.target.value)} placeholder="Cancello" className="rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
-                  <input value={door} onChange={(e) => setDoor(e.target.value)} placeholder="Porta/cassetta" className="rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
-                  <input value={door2} onChange={(e) => setDoor2(e.target.value)} placeholder="Codice 2" className="rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
-                </div>
-                <div className="min-w-0 rounded-lg border border-line bg-paper p-2.5">
-                  <div className="break-all font-mono text-xs text-txt">{guestLink}</div>
+                  {structUnits.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {structUnits.map((u) => (<button key={u.id} onClick={() => setRooms((r) => { const set2 = new Set(r.split(",").map((x) => x.trim()).filter(Boolean)); const n = (u.code || u.name); set2.has(n) ? set2.delete(n) : set2.add(n); return [...set2].join(","); })} className="rounded-full border border-line px-2.5 py-1 text-xs text-dim hover:bg-wash">{u.name}</button>))}
+                    </div>
+                  )}
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <button onClick={() => navigator.clipboard?.writeText(guestLink)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash"><Icon name="copy" size={14} /> Copia</button>
-                    <a href={`https://wa.me/?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={14} /> WhatsApp</a>
+                    <a href={`https://wa.me/?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={14} /> Invia</a>
+                    <button onClick={() => navigator.clipboard?.writeText(guestLink)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash"><Icon name="copy" size={14} /> Copia link</button>
                     <button onClick={() => printCard(guestLink, rooms)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">🖨️ Stampa QR</button>
                   </div>
                 </div>
               </div>
             </details>
+          </Card>
+
+          {/* IMPOSTAZIONE UNA-TANTUM: codici di accesso per camera */}
+          <Card>
+            <div className="flex items-center gap-2">
+              <SectionTitle>Codici di accesso per camera</SectionTitle>
+              <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-faint">imposti una volta</span>
+            </div>
+            <p className="mt-0.5 text-[11px] text-faint">Scrivi i codici di ogni camera: entrano in automatico nel link di ogni ospite. Per sicurezza non vengono mai salvati nella guida pubblica.</p>
+            {structUnits.length > 0 ? (
+              <div className="mt-3 space-y-3">
+                {structUnits.map((u) => { const a = roomAccess[u.id] || {}; return (
+                  <div key={u.id} className="rounded-lg border border-line bg-paper p-3">
+                    <div className="mb-2 text-sm font-semibold text-txt">{u.name}{u.code ? <span className="ml-1 font-normal text-faint">· {u.code}</span> : null}</div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className="block text-[10px] font-medium text-faint">Cancello/portone<input value={a.gate || ""} onChange={(e) => setUnitAccess(u.id, { gate: e.target.value })} placeholder="—" className="mt-0.5 w-full rounded border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
+                      <label className="block text-[10px] font-medium text-faint">Porta/cassetta<input value={a.door || ""} onChange={(e) => setUnitAccess(u.id, { door: e.target.value })} placeholder="—" className="mt-0.5 w-full rounded border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
+                      <label className="block text-[10px] font-medium text-faint">Codice 2 (facolt.)<input value={a.door2 || ""} onChange={(e) => setUnitAccess(u.id, { door2: e.target.value })} placeholder="—" className="mt-0.5 w-full rounded border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
+                    </div>
+                  </div>
+                ); })}
+              </div>
+            ) : <p className="mt-2 text-xs text-faint">Aggiungi le camere nella sezione <b className="text-dim">Camere</b> per impostarne i codici.</p>}
           </Card>
 
           {/* Traduzione automatica multilingua */}
