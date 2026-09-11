@@ -95,6 +95,16 @@ export async function createRoomType(propertyId: string, r: SyncRoom) {
   });
 }
 
+// ── ARI: aggiornamento disponibilità e prezzi ──
+export interface AvailValue { property_id: string; room_type_id: string; date?: string; date_from?: string; date_to?: string; availability: number }
+export interface RateValue { property_id: string; rate_plan_id: string; date?: string; date_from?: string; date_to?: string; rate: string }
+export async function pushAvailability(values: AvailValue[]) {
+  return channex("/availability", { method: "POST", body: JSON.stringify({ values }) });
+}
+export async function pushRates(values: RateValue[]) {
+  return channex("/restrictions", { method: "POST", body: JSON.stringify({ values }) });
+}
+
 export async function createRatePlan(propertyId: string, roomTypeId: string, opts: { title?: string; occupancy: number; rate: number; currency?: string }) {
   return channex<Created>("/rate_plans", {
     method: "POST",

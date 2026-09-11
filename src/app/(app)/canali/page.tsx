@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
+import { effectiveBase } from "@/lib/pricing";
+import { addDays, isWeekend, toISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -41,7 +43,7 @@ function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?
 }
 
 export default function CanaliPage() {
-  const { structures, roomTypes, units, bookings, activeStructureId } = useData();
+  const { structures, roomTypes, units, bookings, rateOverrides, activeStructureId } = useData();
   const ask = useConfirm();
   const { t } = useLang();
   const relTime = (ts: number) => {
@@ -71,8 +73,9 @@ export default function CanaliPage() {
   const [configuring, setConfiguring] = useState<OtaKey | null>(null);
   const [view, setView] = useState<"card" | "list">("list");
   // Sincronizzazione reale verso Channex (staging): crea property + camere + tariffe da Xenora.
-  const [chxMap, setChxMap] = useState<Record<string, { propertyId: string; at: string }>>({});
+  const [chxMap, setChxMap] = useState<Record<string, { propertyId: string; rooms?: Record<string, { roomTypeId: string; ratePlanId?: string }>; at: string }>>({});
   const [chxSync, setChxSync] = useState<{ running: boolean; msg?: string; ok?: boolean }>({ running: false });
+  const [ariSync, setAriSync] = useState<{ running: boolean; msg?: string; ok?: boolean }>({ running: false });
   useEffect(() => { try { const m = localStorage.getItem("spigolestay:channexmap"); if (m) setChxMap(JSON.parse(m)); } catch {} }, []);
   const syncToChannex = async () => {
     const sid = effStructure;
@@ -81,6 +84,7 @@ export default function CanaliPage() {
     const rts = roomTypes.filter((rt) => rt.structureId === sid);
     if (rts.length === 0) { setChxSync({ running: false, ok: false, msg: "Nessuna tipologia in questa struttura." }); return; }
     const rooms = rts.map((rt) => ({
+      xid: rt.id,
       title: rt.name,
       count: Math.max(1, units.filter((u) => u.roomTypeId === rt.id && !u.outOfService).length),
       occAdults: rt.maxOccupancy ?? rt.beds ?? 2,
@@ -100,7 +104,9 @@ export default function CanaliPage() {
       const j = await res.json();
       if (!j.ok) { setChxSync({ running: false, ok: false, msg: `Errore: ${j.error || j.step || "sync fallita"}` }); return; }
       const okRooms = (j.rooms || []).filter((r: { ok: boolean }) => r.ok).length;
-      const next = { ...chxMap, [sid]: { propertyId: j.propertyId, at: new Date().toISOString() } };
+      const roomMap: Record<string, { roomTypeId: string; ratePlanId?: string }> = {};
+      (j.rooms || []).forEach((r: { xid?: string; roomTypeId?: string; ratePlanId?: string; ok: boolean }) => { if (r.ok && r.xid && r.roomTypeId) roomMap[r.xid] = { roomTypeId: r.roomTypeId, ratePlanId: r.ratePlanId }; });
+      const next = { ...chxMap, [sid]: { propertyId: j.propertyId, rooms: roomMap, at: new Date().toISOString() } };
       setChxMap(next); try { localStorage.setItem("spigolestay:channexmap", JSON.stringify(next)); } catch {}
       setChxSync({ running: false, ok: true, msg: `Struttura creata su Channex ✓ · ${okRooms}/${rooms.length} camere` });
       saveLog([{ id: uid(), ts: Date.now(), text: `${t("Struttura sincronizzata su Channex")} — ${st.name}`, color: "var(--ok)" }, ...log]);
@@ -108,6 +114,45 @@ export default function CanaliPage() {
       setChxSync({ running: false, ok: false, msg: e instanceof Error ? e.message : "errore di rete" });
     }
   };
+
+  // Invia disponibilità e prezzi dei prossimi 60 giorni a Channex (che li spinge alle OTA).
+  const pushAri = async () => {
+    const sid = effStructure;
+    const map = chxMap[sid];
+    if (!map?.rooms) { setAriSync({ running: false, ok: false, msg: "Prima sincronizza la struttura su Channex." }); return; }
+    const rts = roomTypes.filter((rt) => rt.structureId === sid && map.rooms![rt.id]);
+    if (rts.length === 0) { setAriSync({ running: false, ok: false, msg: "Nessuna camera mappata." }); return; }
+    let weekendPct = 25; try { weekendPct = JSON.parse(localStorage.getItem("spigolestay:pricerules") || "{}").weekendPct ?? 25; } catch {}
+    const DAYS = 60;
+    const base0 = new Date();
+    const availability: { property_id: string; room_type_id: string; date: string; availability: number }[] = [];
+    const rates: { property_id: string; rate_plan_id: string; date: string; rate: string }[] = [];
+    for (const rt of rts) {
+      const mp = map.rooms![rt.id];
+      const totalUnits = Math.max(1, units.filter((u) => u.roomTypeId === rt.id && !u.outOfService).length);
+      for (let d = 0; d < DAYS; d++) {
+        const dt = addDays(base0, d);
+        const iso = toISO(dt);
+        const occupied = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.roomTypeId === rt.id && b.checkIn <= iso && iso < b.checkOut).length;
+        availability.push({ property_id: map.propertyId, room_type_id: mp.roomTypeId, date: iso, availability: Math.max(0, totalUnits - occupied) });
+        if (mp.ratePlanId) {
+          const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(effectiveBase(rt, roomTypes) * (isWeekend(dt) ? 1 + weekendPct / 100 : 1));
+          rates.push({ property_id: map.propertyId, rate_plan_id: mp.ratePlanId, date: iso, rate: Math.max(0, raw).toFixed(2) });
+        }
+      }
+    }
+    setAriSync({ running: true, msg: "Invio disponibilità e prezzi…" });
+    try {
+      const res = await fetch("/api/channex/ari", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ availability, rates }) });
+      const j = await res.json();
+      if (!j.ok) { setAriSync({ running: false, ok: false, msg: `Errore: ${j.availability?.error || j.rates?.error || j.error || "invio fallito"}` }); return; }
+      setAriSync({ running: false, ok: true, msg: `Inviati ✓ · ${j.availability.sent} disponibilità · ${j.rates.sent} prezzi (60 giorni)` });
+      saveLog([{ id: uid(), ts: Date.now(), text: `${t("Disponibilità e prezzi inviati a Channex")} — ${structures.find((s) => s.id === sid)?.name ?? ""}`, color: "var(--ok)" }, ...log]);
+    } catch (e) {
+      setAriSync({ running: false, ok: false, msg: e instanceof Error ? e.message : "errore di rete" });
+    }
+  };
+
   const getConn = (k: string): Conn => conn[k] ?? { connected: false, auto: false };
   const patchConn = (k: OtaKey, patch: Partial<Conn>) => saveConn({ ...conn, [k]: { ...getConn(k), ...patch } });
   // Prezzo inviato all'OTA = prezzo base con l'UNICA correzione del canale (uguale per tutte le tipologie).
@@ -173,8 +218,12 @@ export default function CanaliPage() {
                   : t("Crea la struttura su Channex (property + camere + tariffe) partendo dai dati già inseriti in Xenora.")}
             </div>
             {chxSync.msg && <div className="mt-1 text-[11px] font-semibold" style={{ color: chxSync.ok === false ? "var(--err)" : chxSync.ok ? "var(--ok)" : "var(--dim)" }}>{chxSync.msg}</div>}
+            {ariSync.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: ariSync.ok === false ? "var(--err)" : ariSync.ok ? "var(--ok)" : "var(--dim)" }}>{ariSync.msg}</div>}
           </div>
-          <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{chxSync.running ? t("Sincronizzo…") : chxMap[effStructure] ? t("Ri-sincronizza") : t("Sincronizza con Channex")}</button>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {chxMap[effStructure] && <button onClick={pushAri} disabled={ariSync.running} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{ariSync.running ? t("Invio…") : "↑ " + t("Prezzi & disponibilità")}</button>}
+            <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{chxSync.running ? t("Sincronizzo…") : chxMap[effStructure] ? t("Ri-sincronizza") : t("Sincronizza con Channex")}</button>
+          </div>
         </div>
       </Card>
 
