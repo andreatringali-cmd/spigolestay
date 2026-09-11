@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
+import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
@@ -758,6 +759,19 @@ export default function GuidaOspitiPage() {
   // Anteprima in tempo reale: ogni modifica è già scritta in localStorage da set(); qui,
   // con un piccolo debounce, ricarichiamo l'iframe per rispecchiare subito ciò che compili.
   const guideSig = JSON.stringify(all[sid] ?? null);
+  // Pubblicazione automatica sul server: a ogni modifica (con debounce) carica la guida della
+  // struttura su Supabase (public_guides), così gli ospiti che aprono il link vedono la guida reale.
+  // I codici NON sono nel record guida (stanno in roomAccess, separati) → non vengono mai pubblicati.
+  useEffect(() => {
+    if (!loaded || !supabase || !sid) return;
+    const g = all[sid];
+    if (!g) return;
+    const t = setTimeout(() => {
+      supabase!.from("public_guides").upsert({ id: sid, data: g, updated_at: new Date().toISOString() }).then(undefined, () => {});
+    }, 4000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guideSig, loaded, sid]);
   useEffect(() => {
     const t = setTimeout(() => reloadPreview(), 350);
     return () => clearTimeout(t);
