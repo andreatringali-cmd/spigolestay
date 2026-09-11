@@ -859,7 +859,7 @@ export default function CalendarGrid() {
               <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: `var(${CHANNELS[c].cssVar})` }} />
               <span>{CHANNELS[c].label}</span>
               {conn === true && <span title="Collegato" className="font-bold leading-none text-[color:var(--ok)]">✓</span>}
-              {conn === false && <span className="text-[11px] font-semibold text-[color:var(--err)]" title="Canale non collegato">· non collegato</span>}
+              {conn === false && <span title="Canale non collegato" className="font-bold leading-none text-[color:var(--err)]">✗</span>}
             </div>
           );
         })}

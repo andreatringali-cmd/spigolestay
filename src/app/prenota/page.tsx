@@ -55,7 +55,8 @@ function Engine() {
     const raw = (qp("ages") || "").split(",").map((x) => Number(x)).filter((x) => !isNaN(x));
     return Array.from({ length: n }, (_, i) => (raw[i] ?? 8));
   });
-  const setChildrenN = (n: number) => { setChildren(n); setChildAges((prev) => { const next = prev.slice(0, n); while (next.length < n) next.push(8); return next; }); };
+  const [wantsCot, setWantsCot] = useState(false);
+  const setChildrenN = (n: number) => { setChildren(n); if (n === 0) setWantsCot(false); setChildAges((prev) => { const next = prev.slice(0, n); while (next.length < n) next.push(8); return next; }); };
   const nights = nightsBetween(checkIn, checkOut);
 
   const [step, setStep] = useState<"rooms" | "checkout" | "done">("rooms");
@@ -131,7 +132,7 @@ function Engine() {
       gid = addGuest({ firstName: guest.firstName.trim(), lastName: guest.lastName.trim(), email: guest.email.trim(), phone: guest.phone.trim(), country: guest.country });
     }
     const chosenExtras = extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => `${extraQty[x.id]}× ${x.name}`);
-    const note = [`Sito diretto · ${selPlan?.name}`, appliedPromo ? `Promo ${appliedPromo.code} (−${appliedPromo.pct}%)` : "", chosenExtras.length ? `Extra: ${chosenExtras.join(", ")}` : "", guest.arrival !== "Non lo so" ? `Arrivo ~${guest.arrival}` : "", guest.requests.trim()].filter(Boolean).join(" · ");
+    const note = [`Sito diretto · ${selPlan?.name}`, appliedPromo ? `Promo ${appliedPromo.code} (−${appliedPromo.pct}%)` : "", chosenExtras.length ? `Extra: ${chosenExtras.join(", ")}` : "", wantsCot ? "🍼 Culla richiesta" : "", guest.arrival !== "Non lo so" ? `Arrivo ~${guest.arrival}` : "", guest.requests.trim()].filter(Boolean).join(" · ");
     addBooking({ structureId, roomTypeId: selRt.id, unitId: unit?.id ?? null, guestId: gid, channel: "direct", status: "confirmed", checkIn, checkOut, adults, children, childAges: childAges.length ? childAges : undefined, total: accommodation, cleaningFee: 0, paid: deposit, cityTaxPaid: false, note });
     addActivity("booking", `Prenotazione dal sito — ${guest.firstName} ${guest.lastName}`);
     setCode(`SPG-${new Date().getFullYear()}-${Math.abs([...(gid + checkIn)].reduce((a, c) => a + c.charCodeAt(0), 0)) % 100000}`);
@@ -241,6 +242,9 @@ function Engine() {
               </label>
             ))}
           </div>
+          <label className="mt-2 flex w-fit items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs font-medium text-txt">
+            <input type="checkbox" checked={wantsCot} onChange={(e) => setWantsCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Culla per il bimbo <span className="font-normal text-faint">(gratuita, su richiesta)</span>
+          </label>
         </div>
       )}
       <div className="mt-2 text-xs text-dim">{nights} {nights === 1 ? "notte" : "notti"} · {adults} adulti{children ? ` · ${children} bambini` : ""}</div>

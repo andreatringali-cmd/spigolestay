@@ -295,6 +295,7 @@ export default function PuliziePage() {
           : <span className="text-faint">{t("nessuna partenza")}</span>}
       </div>
       {!r.arr && !r.dep && r.stay && <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5"><span className="font-semibold text-dim">{t("In soggiorno:")}</span><span className="font-medium text-txt">{guestName(r.stay.guestId)}</span>{pax(r.stay, "both")}</div>}
+      {(r.arr ?? r.stay)?.note && <div className="flex items-start gap-1.5 rounded-lg px-2 py-1 text-[11px]" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)", color: "var(--txt)" }}><span>🗒</span><span><b className="text-focus">{t("Nota ospite:")}</b> {(r.arr ?? r.stay)!.note}</span></div>}
     </div>
   );
 
@@ -757,6 +758,7 @@ function RoomCard({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle
         {r.dep && <GuestLine dir="out" label={t("Parte")} name={guestName(r.dep.guestId)} b={r.dep} dog={hasDog(r.dep.guestId)} />}
         {r.arr && <GuestLine dir="in" label={t("Arriva")} name={guestName(r.arr.guestId)} b={r.arr} dog={hasDog(r.arr.guestId)} />}
         {!r.dep && !r.arr && r.stay && <GuestLine dir="stay" label={t("In casa")} name={guestName(r.stay.guestId)} b={r.stay} dog={hasDog(r.stay.guestId)} />}
+        {(r.arr ?? r.stay)?.note && <div className="flex items-start gap-1 rounded-lg px-1.5 py-1 text-[11px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)", color: "var(--txt)" }}><span>🗒</span><span><b className="text-focus">{t("Nota ospite:")}</b> {(r.arr ?? r.stay)!.note}</span></div>}
       </div>
 
       {/* Note + azioni */}
