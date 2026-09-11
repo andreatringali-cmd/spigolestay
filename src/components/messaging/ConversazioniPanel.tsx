@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
+import { buildGuestLink } from "@/lib/guestlink";
 import { playSound } from "@/lib/sound";
 import { useLang } from "@/lib/i18n";
 import { CHANNELS, type Booking, type Guest } from "@/lib/types";
@@ -122,7 +123,13 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
 
   // ── Segnaposto e modelli ──
   const langOf = (g?: Guest): Lang => (["it", "en", "fr", "de", "es"].includes(g?.language ?? "") ? (g!.language as Lang) : "it");
-  const guideUrlFor = (b: Booking) => ((getStructure(b.structureId)?.name ?? "").toLowerCase().includes("central perk") ? `${GUIDE_BASE}/?p=centralperk` : GUIDE_BASE);
+  // Link della guida NUOVA, costruito dalla prenotazione: struttura + camera + codici (per camera,
+  // filtrati dal parcheggio) + nome ospite. Legge i codici impostati per quella camera.
+  const guideUrlFor = (b: Booking) => {
+    const unit = getUnit(b.unitId);
+    const gu = guests.find((x) => x.id === b.guestId);
+    return buildGuestLink({ structureId: b.structureId, unitId: b.unitId, unitCode: unit?.code || unit?.name || "", guestName: gu?.fullName || "", parking: !!b.parking });
+  };
   const checkinUrlFor = (b: Booking) => `${typeof window !== "undefined" ? window.location.origin : ""}/checkin?b=${encodeURIComponent(b.id)}`;
   const nightsOf = (b: Booking) => Math.max(1, Math.round((new Date(b.checkOut).getTime() - new Date(b.checkIn).getTime()) / 86400000));
   const fmtLong = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "long" });
