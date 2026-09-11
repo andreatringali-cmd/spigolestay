@@ -41,7 +41,7 @@ function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?
 }
 
 export default function CanaliPage() {
-  const { structures, roomTypes, bookings, activeStructureId } = useData();
+  const { structures, roomTypes, units, bookings, activeStructureId } = useData();
   const ask = useConfirm();
   const { t } = useLang();
   const relTime = (ts: number) => {
@@ -70,6 +70,44 @@ export default function CanaliPage() {
 
   const [configuring, setConfiguring] = useState<OtaKey | null>(null);
   const [view, setView] = useState<"card" | "list">("list");
+  // Sincronizzazione reale verso Channex (staging): crea property + camere + tariffe da Xenora.
+  const [chxMap, setChxMap] = useState<Record<string, { propertyId: string; at: string }>>({});
+  const [chxSync, setChxSync] = useState<{ running: boolean; msg?: string; ok?: boolean }>({ running: false });
+  useEffect(() => { try { const m = localStorage.getItem("spigolestay:channexmap"); if (m) setChxMap(JSON.parse(m)); } catch {} }, []);
+  const syncToChannex = async () => {
+    const sid = effStructure;
+    const st = structures.find((s) => s.id === sid);
+    if (!st) { setChxSync({ running: false, ok: false, msg: "Seleziona una struttura specifica (non 'Tutte')." }); return; }
+    const rts = roomTypes.filter((rt) => rt.structureId === sid);
+    if (rts.length === 0) { setChxSync({ running: false, ok: false, msg: "Nessuna tipologia in questa struttura." }); return; }
+    const rooms = rts.map((rt) => ({
+      title: rt.name,
+      count: Math.max(1, units.filter((u) => u.roomTypeId === rt.id && !u.outOfService).length),
+      occAdults: rt.maxOccupancy ?? rt.beds ?? 2,
+      defaultOccupancy: rt.beds ?? 2,
+      rate: rt.basePrice ?? 0,
+    }));
+    const structure = {
+      title: st.name, currency: "EUR", country: "IT",
+      city: st.city || undefined, address: [st.address, st.streetNumber].filter(Boolean).join(" ") || undefined,
+      email: st.email || undefined, phone: st.phone || undefined,
+      latitude: st.lat ? String(st.lat) : undefined, longitude: st.lng ? String(st.lng) : undefined,
+      logo_url: st.logo || undefined, website: st.website || undefined,
+    };
+    setChxSync({ running: true, msg: "Creazione su Channex in corso…" });
+    try {
+      const res = await fetch("/api/channex/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ structure, rooms }) });
+      const j = await res.json();
+      if (!j.ok) { setChxSync({ running: false, ok: false, msg: `Errore: ${j.error || j.step || "sync fallita"}` }); return; }
+      const okRooms = (j.rooms || []).filter((r: { ok: boolean }) => r.ok).length;
+      const next = { ...chxMap, [sid]: { propertyId: j.propertyId, at: new Date().toISOString() } };
+      setChxMap(next); try { localStorage.setItem("spigolestay:channexmap", JSON.stringify(next)); } catch {}
+      setChxSync({ running: false, ok: true, msg: `Struttura creata su Channex ✓ · ${okRooms}/${rooms.length} camere` });
+      saveLog([{ id: uid(), ts: Date.now(), text: `${t("Struttura sincronizzata su Channex")} — ${st.name}`, color: "var(--ok)" }, ...log]);
+    } catch (e) {
+      setChxSync({ running: false, ok: false, msg: e instanceof Error ? e.message : "errore di rete" });
+    }
+  };
   const getConn = (k: string): Conn => conn[k] ?? { connected: false, auto: false };
   const patchConn = (k: OtaKey, patch: Partial<Conn>) => saveConn({ ...conn, [k]: { ...getConn(k), ...patch } });
   // Prezzo inviato all'OTA = prezzo base con l'UNICA correzione del canale (uguale per tutte le tipologie).
@@ -120,6 +158,25 @@ export default function CanaliPage() {
           </div>
         }
       />
+
+      {/* Sincronizzazione REALE verso Channex (staging) */}
+      <Card className="mb-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: chxMap[effStructure] ? "var(--ok)" : "var(--focus)" }}><Icon name="share" size={16} /></span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold text-txt">{t("Connessione Channex")} <span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">staging</span></div>
+            <div className="text-xs text-dim">
+              {effStructure === "all"
+                ? t("Seleziona una struttura in alto per sincronizzarla con Channex.")
+                : chxMap[effStructure]
+                  ? <>{t("Struttura collegata a Channex")} · <span className="font-mono text-[11px]">{chxMap[effStructure].propertyId.slice(0, 8)}…</span></>
+                  : t("Crea la struttura su Channex (property + camere + tariffe) partendo dai dati già inseriti in Xenora.")}
+            </div>
+            {chxSync.msg && <div className="mt-1 text-[11px] font-semibold" style={{ color: chxSync.ok === false ? "var(--err)" : chxSync.ok ? "var(--ok)" : "var(--dim)" }}>{chxSync.msg}</div>}
+          </div>
+          <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{chxSync.running ? t("Sincronizzo…") : chxMap[effStructure] ? t("Ri-sincronizza") : t("Sincronizza con Channex")}</button>
+        </div>
+      </Card>
 
       {/* Sincronizzazione iCal reale (sola lettura) */}
       <IcalSyncPanel />

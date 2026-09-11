@@ -51,3 +51,59 @@ export async function channex<T = unknown>(path: string, init?: RequestInit): Pr
 export async function listProperties() {
   return channex<{ data: { id: string; attributes?: { title?: string } }[] }>("/properties");
 }
+
+type Created = { data?: { id?: string } };
+
+// ── Creazione (usata dalla sincronizzazione Xenora → Channex) ──
+export interface SyncProperty {
+  title: string; currency?: string; country?: string; city?: string; address?: string;
+  email?: string; phone?: string; latitude?: string; longitude?: string; logo_url?: string; website?: string;
+}
+export async function createProperty(p: SyncProperty) {
+  return channex<Created>("/properties", {
+    method: "POST",
+    body: JSON.stringify({ property: {
+      title: p.title,
+      currency: p.currency || "EUR",
+      country: p.country || "IT",
+      timezone: "Europe/Rome",
+      property_type: "hotel",
+      city: p.city || undefined, address: p.address || undefined,
+      email: p.email || undefined, phone: p.phone || undefined,
+      latitude: p.latitude || undefined, longitude: p.longitude || undefined,
+      logo_url: p.logo_url || undefined, website: p.website || undefined,
+    } }),
+  });
+}
+
+export interface SyncRoom { title: string; count: number; occAdults: number; occChildren?: number; defaultOccupancy?: number }
+export async function createRoomType(propertyId: string, r: SyncRoom) {
+  return channex<Created>("/room_types", {
+    method: "POST",
+    body: JSON.stringify({ room_type: {
+      property_id: propertyId,
+      title: r.title,
+      count_of_rooms: Math.max(1, r.count),
+      occ_adults: Math.max(1, r.occAdults),
+      occ_children: r.occChildren ?? 0,
+      occ_infants: 0,
+      default_occupancy: r.defaultOccupancy ?? Math.max(1, r.occAdults),
+      room_kind: "room",
+    } }),
+  });
+}
+
+export async function createRatePlan(propertyId: string, roomTypeId: string, opts: { title?: string; occupancy: number; rate: number; currency?: string }) {
+  return channex<Created>("/rate_plans", {
+    method: "POST",
+    body: JSON.stringify({ rate_plan: {
+      title: opts.title || "Standard",
+      property_id: propertyId,
+      room_type_id: roomTypeId,
+      currency: opts.currency || "EUR",
+      sell_mode: "per_room",
+      rate_mode: "manual",
+      options: [{ occupancy: Math.max(1, opts.occupancy), is_primary: true, rate: Math.max(0, Math.round(opts.rate)) }],
+    } }),
+  });
+}
