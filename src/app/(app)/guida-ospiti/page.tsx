@@ -1007,6 +1007,27 @@ export default function GuidaOspitiPage() {
                       </div>
                     </div>
                   )}
+                  {/* Codici di accesso per camera: qui, nel check-in (compaiono sotto i passaggi) */}
+                  {isCheckin && (
+                    <div>
+                      <div className="mb-0.5 text-xs font-medium text-dim">Codici di accesso per camera</div>
+                      <p className="mb-1.5 text-[11px] text-faint">Impostali una volta per camera: entrano nel link di ogni ospite e compaiono sotto i passaggi qui sopra. Non finiscono mai nella guida pubblica.</p>
+                      {structUnits.length > 0 ? (
+                        <div className="grid gap-2.5 sm:grid-cols-2">
+                          {structUnits.map((u) => { const n = codesOf(u.id).filter((c) => c.value.trim()).length; return (
+                            <button key={u.id} onClick={() => setCodesUnit(u.id)} className="flex items-center gap-2.5 rounded-xl border border-line bg-paper p-3 text-left transition hover:border-focus hover:bg-wash">
+                              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 12%, transparent)", color: "var(--focus)" }}>{u.code || (u.name || "?").slice(0, 2)}</span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-semibold text-txt">{u.name}</span>
+                                <span className="block text-[11px]" style={{ color: n ? "var(--ok)" : "var(--faint)" }}>{n ? `${n} ${n === 1 ? "codice" : "codici"} ✓` : "imposta codici"}</span>
+                              </span>
+                              <span className="shrink-0 text-faint">›</span>
+                            </button>
+                          ); })}
+                        </div>
+                      ) : <p className="text-xs text-faint">Aggiungi le camere nella sezione <b className="text-dim">Camere</b> per impostarne i codici.</p>}
+                    </div>
+                  )}
                   {/* Foto della camera: nel check-in vanno DOPO i passaggi (come nell'app) */}
                   {isCheckin && galleryUI}
                   {/* SERVIZI CAMERA (griglia iconcine): solo check-in */}
@@ -1119,31 +1140,7 @@ export default function GuidaOspitiPage() {
           )}
         </div>
       </div>
-        {/* In fondo alla pagina: invio guida agli arrivi + impostazioni codici */}
-          {/* IMPOSTAZIONE UNA-TANTUM: codici di accesso per camera */}
-          <Card className="mt-6">
-            <div className="flex items-center gap-2">
-              <SectionTitle>Codici di accesso per camera</SectionTitle>
-              <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-faint">imposti una volta</span>
-            </div>
-            <p className="mt-0.5 text-[11px] text-faint">Scrivi i codici di ogni camera: entrano in automatico nel link di ogni ospite. Per sicurezza non vengono mai salvati nella guida pubblica.</p>
-            {structUnits.length > 0 ? (
-              <div className="mt-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-                {structUnits.map((u) => { const n = codesOf(u.id).filter((c) => c.value.trim()).length; return (
-                  <button key={u.id} onClick={() => setCodesUnit(u.id)} className="flex items-center gap-2.5 rounded-xl border border-line bg-paper p-3 text-left transition hover:border-focus hover:bg-wash">
-                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 12%, transparent)", color: "var(--focus)" }}>{u.code || (u.name || "?").slice(0, 2)}</div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-txt">{u.name}</div>
-                      <div className="text-[11px]" style={{ color: n ? "var(--ok)" : "var(--faint)" }}>{n ? `${n} ${n === 1 ? "codice" : "codici"} ✓` : "imposta codici"}</div>
-                    </div>
-                    <span className="text-faint">›</span>
-                  </button>
-                ); })}
-              </div>
-            ) : <p className="mt-2 text-xs text-faint">Aggiungi le camere nella sezione <b className="text-dim">Camere</b> per impostarne i codici.</p>}
-          </Card>
-
-          {/* Scheda codici della camera (si apre al clic su una card) */}
+          {/* Scheda codici della camera (si apre al clic su una card dentro il check-in) */}
           {codesUnit && (() => {
             const u = structUnits.find((x) => x.id === codesUnit); if (!u) return null;
             const codes = codesOf(u.id);
