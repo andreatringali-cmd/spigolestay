@@ -36,6 +36,8 @@ interface GSection {
 // Ordine fisso delle sezioni nell'editor: identico a come la guida ospiti le mostra
 // (vedi public/guida/js/content.js). Le sezioni non in elenco (personalizzate) vanno in fondo.
 const SECTION_ORDER = ["checkin", "breakfast", "wifi", "attractions", "restaurants", "excursions", "taxi", "info", "faq", "extras", "contacts", "review"];
+// Emoji per l'header delle sezioni (identità visiva quando la card è chiusa).
+const SEC_EMOJI: Record<string, string> = { checkin: "🔑", breakfast: "☕", wifi: "📶", attractions: "🏛️", restaurants: "🍽️", excursions: "🏖️", taxi: "🚕", info: "ℹ️", faq: "❓", extras: "✨", contacts: "📞", review: "⭐" };
 // Operative "pure": i contenuti arrivano dai dati struttura, quindi non contano come "vuote".
 const FUNC_IDS = new Set(["wifi", "contacts", "review"]);
 // Una sezione è "compilata" se ha almeno un contenuto reale (altrimenti la guida la nasconde da sola).
@@ -840,11 +842,15 @@ export default function GuidaOspitiPage() {
           <SectionTitle>Sezioni della guida ({content.sections.length})</SectionTitle>
           <Card>
             <div className="flex items-center gap-2">
-              <button onClick={() => setOpenHome((o) => !o)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                <span className="text-faint">{openHome ? "▾" : "▸"}</span>
-                <span className={`truncate font-semibold ${content.home.hidden ? "text-faint line-through" : "text-txt"}`}>Home · benvenuto</span>
+              <button onClick={() => setOpenHome((o) => !o)} className="group flex min-w-0 flex-1 items-center gap-3 text-left">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[17px]" style={{ backgroundColor: content.home.hidden ? "var(--wash)" : "color-mix(in srgb, var(--focus) 10%, transparent)" }}>👋</span>
+                <span className="min-w-0 flex-1">
+                  <span className={`block truncate text-[15px] font-semibold ${content.home.hidden ? "text-faint line-through" : "text-txt"}`}>Home · benvenuto</span>
+                  {!openHome && <span className="block truncate text-[11px] text-faint">Titolo, sottotitolo e messaggio di benvenuto</span>}
+                </span>
                 <ReadyDot ok={homeReady} />
                 {content.home.hidden && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">nascosta</span>}
+                <span className="shrink-0 text-lg text-faint transition-transform duration-200 group-hover:text-txt" style={{ transform: openHome ? "rotate(90deg)" : "none" }}>›</span>
               </button>
               <button onClick={() => setHome({ hidden: !content.home.hidden })} title={content.home.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">{content.home.hidden ? "Mostra" : "Nascondi"}</button>
             </div>
@@ -859,11 +865,15 @@ export default function GuidaOspitiPage() {
           {orderedSections.map(({ s, si }) => { const open = openSec === s.id; const func = FUNC_SECTIONS.includes(s.id); const custom = !SECTION_ORDER.includes(s.id); const opFilled = (s.id === "wifi" && !!(guide.wifiNetwork || guide.wifiPassword)) || (s.id === "contacts" && !!(guide.phone || guide.whatsapp || guide.phoneGreta)) || (s.id === "review" && !!guide.reviewUrl); const autoHidden = !s.hidden && !sectionFilled(s) && !opFilled; return (
             <Card key={s.id}>
               <div className="flex items-center gap-2">
-                <button onClick={() => setOpenSec(open ? null : s.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                  <span className="text-faint">{open ? "▾" : "▸"}</span>
-                  <span className={`truncate font-semibold ${s.hidden ? "text-faint line-through" : "text-txt"}`}>{s.title || s.id}</span>
+                <button onClick={() => setOpenSec(open ? null : s.id)} className="group flex min-w-0 flex-1 items-center gap-3 text-left">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[17px]" style={{ backgroundColor: s.hidden ? "var(--wash)" : "color-mix(in srgb, var(--focus) 10%, transparent)", filter: s.hidden ? "grayscale(1) opacity(0.6)" : undefined }}>{SEC_EMOJI[s.id] || "📄"}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`block truncate text-[15px] font-semibold ${s.hidden ? "text-faint line-through" : "text-txt"}`}>{s.title || s.id}</span>
+                    {!open && s.sub && <span className="block truncate text-[11px] text-faint">{s.sub}</span>}
+                  </span>
                   <ReadyDot ok={secReady(s)} />
                   {s.hidden && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">nascosta</span>}
+                  <span className="shrink-0 text-lg text-faint transition-transform duration-200 group-hover:text-txt" style={{ transform: open ? "rotate(90deg)" : "none" }}>›</span>
                 </button>
                 <button onClick={() => toggleHidden(si)} title={s.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">{s.hidden ? "Mostra" : "Nascondi"}</button>
                 {custom && <button onClick={() => removeSection(si)} title="Elimina sezione personalizzata" className="shrink-0 px-1 text-faint hover:text-[color:var(--err)]">✕</button>}
