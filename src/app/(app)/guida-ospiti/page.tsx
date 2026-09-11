@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import QRCode from "qrcode";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
@@ -10,6 +11,8 @@ interface Guide {
   id: string; guideName: string; guideLogo: string; name: string; city: string; address: string;
   phone: string; phoneGreta: string; whatsapp: string; email: string; mapsUrl: string;
   wifiNetwork: string; wifiPassword: string; checkinTime: string; checkoutTime: string;
+  wifiQr?: string; wifiQrFor?: string; // QR WiFi generato (data URL) + credenziali per cui è stato creato
+  inviteMsg?: string; // messaggio di benvenuto che accompagna la guida (WhatsApp)
   reviewUrl: string; bookingUrl: string; taxiPhone: string;
   social: { instagram: string; facebook: string; website: string };
   roomTypes: Record<string, string>;
@@ -403,6 +406,32 @@ export default function GuidaOspitiPage() {
   const setTv = (patch: Partial<NonNullable<Guide["tv"]>>) => set({ tv: { ...tv, ...patch } });
   const toggleTvSection = (id: string) => { const s = new Set(tv.sections); if (s.has(id)) s.delete(id); else s.add(id); setTv({ sections: [...s] }); };
 
+  // ---- QR WiFi: generato in locale (offline) e incorporato nella guida (campo wifiQr) ----
+  // Formato standard "WIFI:" che i telefoni riconoscono per collegarsi senza digitare la password.
+  const wifiEsc = (v: string) => v.replace(/([\\;,:"])/g, "\\$1");
+  const wifiPayload = (ssid: string, pw: string) => `WIFI:T:${pw ? "WPA" : "nopass"};S:${wifiEsc(ssid)};P:${wifiEsc(pw)};;`;
+  // Chiave = credenziali per cui il QR è stato creato: se cambiano, si rigenera da solo.
+  const wifiKey = (ssid: string, pw: string) => ssid + " " + pw;
+  const makeWifiQr = async (ssid: string, pw: string) =>
+    QRCode.toDataURL(wifiPayload(ssid, pw), { margin: 1, width: 360, errorCorrectionLevel: "M", color: { dark: "#14424F", light: "#ffffff" } });
+  const genWifiQr = async () => {
+    const ssid = (guide.wifiNetwork || "").trim(); if (!ssid) return;
+    const pw = (guide.wifiPassword || "").trim();
+    try { const url = await makeWifiQr(ssid, pw); set({ wifiQr: url, wifiQrFor: wifiKey(ssid, pw) }); } catch {}
+  };
+  // Rigenerazione automatica quando cambiano rete/password (senza toccare il registro attività).
+  useEffect(() => {
+    if (!loaded) return;
+    const ssid = (guide.wifiNetwork || "").trim();
+    const pw = (guide.wifiPassword || "").trim();
+    if (!ssid) return;
+    if (guide.wifiQr && guide.wifiQrFor === wifiKey(ssid, pw)) return; // già aggiornato
+    let cancelled = false;
+    makeWifiQr(ssid, pw).then((url) => { if (!cancelled) persist({ ...all, [sid]: { ...guide, wifiQr: url, wifiQrFor: wifiKey(ssid, pw), id: sid } }); }).catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guide.wifiNetwork, guide.wifiPassword, loaded, sid]);
+
   // Dati che appartengono alla STRUTTURA (non alla guida): arrivano dalle Impostazioni struttura,
   // qui si mostrano in sola lettura. Vengono anche scritti nel record guida così anteprima e link li usano.
   const structFields = useMemo<Partial<Guide>>(() => {
@@ -536,29 +565,22 @@ export default function GuidaOspitiPage() {
   const [taxFixed, setTaxFixed] = useState(false);
   const [guestName, setGuestName] = useState("");
 
+  // Codici e istruzioni PER CAMERA (mai nella guida pubblica: viaggiano solo nel link ospite).
+  // Mappa unitId → { gate, door, door2 }. Salvata a parte, sincronizzata col prefisso spigolestay:.
+  type RoomAccess = { gate?: string; door?: string; door2?: string };
+  const [roomAccess, setRoomAccess] = useState<Record<string, RoomAccess>>({});
+  useEffect(() => { try { setRoomAccess(JSON.parse(localStorage.getItem("spigolestay:roomaccess") || "{}")); } catch {} }, []);
+  const setUnitAccess = (uid: string, patch: RoomAccess) => {
+    setRoomAccess((prev) => { const next = { ...prev, [uid]: { ...prev[uid], ...patch } }; try { localStorage.setItem("spigolestay:roomaccess", JSON.stringify(next)); } catch {} return next; });
+  };
+  const unitCodesK = (uid?: string) => { const a = uid ? roomAccess[uid] : undefined; return [a?.gate || "", a?.door || "", a?.door2 || ""].join("-").replace(/-+$/g, ""); };
+
   // Collegamento con le prenotazioni: le prossime/attuali di questa struttura.
   const todayISO = new Date().toISOString().slice(0, 10);
   const upcoming = useMemo(() =>
     bookings.filter((b) => b.structureId === sid && b.checkOut >= todayISO && b.status !== "cancelled")
       .sort((a, b) => a.checkIn.localeCompare(b.checkIn)),
     [bookings, sid, todayISO]);
-  const [bkId, setBkId] = useState("");
-  const pickBooking = (id: string) => {
-    setBkId(id);
-    const b = upcoming.find((x) => x.id === id);
-    if (!b) { setGuestName(""); return; }
-    const u = getUnit(b.unitId); const rt = roomTypes.find((r) => r.id === b.roomTypeId);
-    setRooms(u?.code || u?.name || rt?.name || "");
-    const g = getGuest(b.guestId);
-    setGuestName(g ? `${g.firstName ?? ""} ${g.lastName ?? ""}`.trim() : "");
-  };
-  const bkLabel = (b: typeof upcoming[number]) => {
-    const g = getGuest(b.guestId); const u = getUnit(b.unitId); const rt = roomTypes.find((r) => r.id === b.roomTypeId);
-    const nm = g ? `${g.firstName ?? ""} ${g.lastName ?? ""}`.trim() : "Ospite";
-    const d = (s: string) => s.slice(8, 10) + "/" + s.slice(5, 7);
-    return `${nm} · ${u?.code || u?.name || rt?.name || "—"} · ${d(b.checkIn)}–${d(b.checkOut)}`;
-  };
-
   const guestLink = useMemo(() => {
     const base = typeof window !== "undefined" ? window.location.origin : "";
     const p = new URLSearchParams();
@@ -573,14 +595,40 @@ export default function GuidaOspitiPage() {
     return `${base}/guida/index.html?${p.toString()}`;
   }, [sid, rooms, gate, door, door2, parking, docs, taxFixed, guestName]);
 
-  // Messaggio WhatsApp precompilato per l'ospite.
-  const waMsg = useMemo(() => {
-    const first = guestName.trim().split(/\s+/)[0];
-    return `Ciao${first ? " " + first : ""}! 👋\nEcco la vostra guida di ${guide.name || "benvenuto"}: al suo interno trovate check-in, WiFi, consigli sulla città e i nostri contatti.\n\n${guestLink}\n\nA presto!`;
-  }, [guestName, guide.name, guestLink]);
-  // Cartolina QR da stampare per la camera.
-  const printCard = () => {
-    const qr = `https://api.qrserver.com/v1/create-qr-code/?size=520x520&data=${encodeURIComponent(guestLink)}`;
+  // ---- Arrivi & invio automatico (punti 2+3) ----
+  const base = typeof window !== "undefined" ? window.location.origin : "";
+  // Costruisce il link ospite per una camera specifica, coi codici PER CAMERA salvati.
+  const linkFor = (opts: { room?: string; unitId?: string; guestName?: string }) => {
+    const p = new URLSearchParams();
+    p.set("p", sid);
+    if (opts.room?.trim()) p.set("c", opts.room.trim());
+    const k = unitCodesK(opts.unitId);
+    if (k.replace(/-/g, "")) p.set("k", k);
+    p.set("pk", parking ? "1" : "0");
+    if (docs.trim()) p.set("d", docs.trim());
+    if (taxFixed) p.set("tax", "fixed");
+    if (opts.guestName?.trim()) p.set("g", opts.guestName.trim());
+    return `${base}/guida/index.html?${p.toString()}`;
+  };
+  // Messaggio unico personalizzabile ({nome} e {link}); se manca {link}, lo appendo.
+  const DEFAULT_MSG = "Ciao {nome}! 👋\nEcco la vostra guida di benvenuto: trovate check-in, WiFi, consigli sulla città e i nostri contatti.\n\n{link}\n\nA presto!";
+  const msgTemplate = (guide.inviteMsg && guide.inviteMsg.trim()) ? guide.inviteMsg : DEFAULT_MSG;
+  const msgFor = (name: string, link: string) => {
+    const first = (name || "").trim().split(/\s+/)[0] || "";
+    let out = msgTemplate.replace(/\{nome\}/g, first).replace(/\{link\}/g, link);
+    if (!msgTemplate.includes("{link}")) out = out.trimEnd() + "\n\n" + link;
+    return out;
+  };
+  const bkRoom = (b: typeof upcoming[number]) => { const u = getUnit(b.unitId); const rt = roomTypes.find((r) => r.id === b.roomTypeId); return u?.code || u?.name || rt?.name || ""; };
+  const bkGuestName = (b: typeof upcoming[number]) => { const g = getGuest(b.guestId); return g ? `${g.firstName ?? ""} ${g.lastName ?? ""}`.trim() : ""; };
+  const todayArrivals = useMemo(() => bookings.filter((b) => b.structureId === sid && b.checkIn === todayISO && b.status !== "cancelled").sort((a, b) => bkRoom(a).localeCompare(bkRoom(b))), [bookings, sid, todayISO]); // eslint-disable-line react-hooks/exhaustive-deps
+  const nextArrivals = useMemo(() => upcoming.filter((b) => b.checkIn > todayISO), [upcoming, todayISO]);
+
+  // Messaggio WhatsApp precompilato per l'ospite (generatore manuale).
+  const waMsg = useMemo(() => msgFor(guestName, guestLink), [guestName, guestLink, msgTemplate]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Cartolina QR da stampare per la camera (link + etichetta camera facoltativa).
+  const printCard = (link: string, roomLabel?: string) => {
+    const qr = `https://api.qrserver.com/v1/create-qr-code/?size=520x520&data=${encodeURIComponent(link)}`;
     const w = window.open("", "_blank", "width=520,height=720");
     if (!w) return;
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Guida ospiti · QR</title>
@@ -594,12 +642,39 @@ export default function GuidaOspitiPage() {
       <body><div class="card">
       ${guide.guideLogo ? `<img class="logo" src="${guide.guideLogo}" onerror="this.style.display='none'">` : ""}
       <h1>${`Guida - ${guide.name || ""}`.replace(/</g, "")}</h1>
-      <p class="city">${(guide.city || "").replace(/</g, "")}${rooms ? " · Camera " + rooms.replace(/</g, "") : ""}</p>
+      <p class="city">${(guide.city || "").replace(/</g, "")}${roomLabel ? " · Camera " + roomLabel.replace(/</g, "") : ""}</p>
       <img class="qr" src="${qr}">
       <h2>Inquadra per la guida</h2>
       <p class="sub">Check-in, WiFi, consigli e contatti · IT · EN · FR · DE · ES</p>
       </div><script>onload=function(){setTimeout(function(){print()},400)}<\/script></body></html>`);
     w.document.close();
+  };
+
+  // Riga "arrivo": camera automatica, link e messaggio personali per quella prenotazione.
+  const arrivalRow = (b: typeof upcoming[number]) => {
+    const room = bkRoom(b); const name = bkGuestName(b);
+    const link = linkFor({ room, unitId: b.unitId || undefined, guestName: name });
+    const msg = msgFor(name, link);
+    const g = getGuest(b.guestId);
+    const wa = (g?.phone || "").replace(/[^\d]/g, "");
+    const dd = (s: string) => s.slice(8, 10) + "/" + s.slice(5, 7);
+    const hasCodes = !!unitCodesK(b.unitId || undefined).replace(/-/g, "");
+    return (
+      <div key={b.id} className="rounded-lg border border-line bg-paper p-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-txt">{name || "Ospite"}</div>
+            <div className="text-[11px] text-faint">Camera {room || "—"} · {dd(b.checkIn)}–{dd(b.checkOut)} {hasCodes ? <span style={{ color: "var(--ok)" }}>· codici ✓</span> : <span style={{ color: "var(--warn)" }}>· imposta i codici camera</span>}</div>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <a href={wa ? `https://wa.me/${wa}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={13} /> Invia</a>
+            <button onClick={() => navigator.clipboard?.writeText(link)} title="Copia link" className="rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-dim hover:bg-wash"><Icon name="copy" size={13} /></button>
+            <a href={link} target="_blank" rel="noreferrer" title="Apri la guida" className="rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-dim hover:bg-wash">↗</a>
+            <button onClick={() => printCard(link, room)} title="Stampa QR" className="rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-dim hover:bg-wash">🖨️</button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const tvUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/guida/tv.html?p=${encodeURIComponent(sid)}`;
@@ -788,9 +863,28 @@ export default function GuidaOspitiPage() {
                   </div>
                   {/* Credenziali WiFi: qui, così stanno con la loro sezione (niente doppioni). */}
                   {s.id === "wifi" && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <F label="Rete WiFi"><input value={guide.wifiNetwork} onChange={(e) => set({ wifiNetwork: e.target.value })} placeholder="Nome rete" className={fld} /></F>
-                      <F label="Password WiFi"><input value={guide.wifiPassword} onChange={(e) => set({ wifiPassword: e.target.value })} placeholder="Password" className={fld} /></F>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <F label="Rete WiFi"><input value={guide.wifiNetwork} onChange={(e) => set({ wifiNetwork: e.target.value })} placeholder="Nome rete" className={fld} /></F>
+                        <F label="Password WiFi"><input value={guide.wifiPassword} onChange={(e) => set({ wifiPassword: e.target.value })} placeholder="Password" className={fld} /></F>
+                      </div>
+                      {(guide.wifiNetwork || "").trim() ? (
+                        <div className="flex items-center gap-3 rounded-lg border border-line bg-paper p-2.5">
+                          {guide.wifiQr
+                            ? <img src={guide.wifiQr} alt="QR WiFi" className="h-24 w-24 shrink-0 rounded-lg border border-line bg-white p-1" />
+                            : <div className="grid h-24 w-24 shrink-0 place-items-center rounded-lg border border-dashed border-line text-[11px] text-faint">Genero…</div>}
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-txt">QR WiFi</div>
+                            <p className="mt-0.5 text-[11px] text-faint">L&apos;ospite lo inquadra e si collega senza digitare la password. Si aggiorna da solo quando cambi rete o password.</p>
+                            <div className="mt-1.5 flex flex-wrap gap-2">
+                              <button onClick={genWifiQr} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">↻ Rigenera QR</button>
+                              {guide.wifiQr && <a href={guide.wifiQr} download={`wifi-${(guide.wifiNetwork || "qr").replace(/[^a-z0-9]+/gi, "-")}.png`} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">⬇ Scarica</a>}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-faint">Inserisci rete e password: genero automaticamente il QR da far scansionare all&apos;ospite.</p>
+                      )}
                     </div>
                   )}
                   {/* Orari check-in / check-out: qui, nella sezione Arrivo (si scelgono con l'orologio). */}
@@ -981,54 +1075,81 @@ export default function GuidaOspitiPage() {
         </div>
       </div>
         {/* In fondo alla pagina: generatore link e vista TV */}
-          {/* Generatore link ospite */}
+          {/* Codici e istruzioni per camera (punto 2) */}
           <Card>
-            <SectionTitle>Genera e invia il link ospite</SectionTitle>
-            {/* Collega alla prenotazione: camera, nome e date già pronti */}
-            <div className="mb-3 rounded-lg border border-line bg-paper p-2.5">
-              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Da una prenotazione</div>
-              {upcoming.length > 0 ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <select value={bkId} onChange={(e) => pickBooking(e.target.value)} className={`${fld} flex-1`}>
-                    <option value="">— scegli l&apos;ospite in arrivo —</option>
-                    {upcoming.map((b) => <option key={b.id} value={b.id}>{bkLabel(b)}</option>)}
-                  </select>
-                  {bkId && <button onClick={() => { setBkId(""); setGuestName(""); setRooms(""); }} className="rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-dim hover:bg-wash">Azzera</button>}
-                </div>
-              ) : <p className="text-xs text-faint">Nessuna prenotazione in arrivo per questa struttura: compila i campi manualmente qui sotto.</p>}
+            <SectionTitle>Codici per camera</SectionTitle>
+            <p className="mt-0.5 text-[11px] text-faint">I codici NON vengono salvati nella guida pubblica: viaggiano solo nel link personale dell&apos;ospite. Impostali una volta per camera e ogni arrivo userà quelli giusti.</p>
+            {structUnits.length > 0 ? (
+              <div className="mt-2 space-y-2">
+                {structUnits.map((u) => { const a = roomAccess[u.id] || {}; return (
+                  <div key={u.id} className="rounded-lg border border-line bg-paper p-2.5">
+                    <div className="mb-1.5 text-sm font-semibold text-txt">{u.name}{u.code ? <span className="ml-1 font-normal text-faint">· {u.code}</span> : null}</div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <input value={a.gate || ""} onChange={(e) => setUnitAccess(u.id, { gate: e.target.value })} placeholder="Cancello/portone" className="rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
+                      <input value={a.door || ""} onChange={(e) => setUnitAccess(u.id, { door: e.target.value })} placeholder="Porta/cassetta" className="rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
+                      <input value={a.door2 || ""} onChange={(e) => setUnitAccess(u.id, { door2: e.target.value })} placeholder="Codice 2 (facolt.)" className="rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
+                    </div>
+                  </div>
+                ); })}
+              </div>
+            ) : <p className="mt-2 text-xs text-faint">Aggiungi le camere nella sezione <b className="text-dim">Camere</b> per impostarne i codici.</p>}
+          </Card>
+
+          {/* Invia la guida agli arrivi (punto 3) */}
+          <Card>
+            <SectionTitle>Invia la guida agli ospiti</SectionTitle>
+            <div className="mt-1">
+              <F label="Messaggio che accompagna la guida — usa {nome} e {link}">
+                <textarea value={guide.inviteMsg ?? DEFAULT_MSG} maxLength={600} onChange={(e) => set({ inviteMsg: e.target.value })} rows={4} className={`${fld} resize-y`} />
+              </F>
+              <p className="mt-1 text-[11px] text-faint">È l&apos;unico testo da personalizzare: parte insieme alla guida. <b className="text-dim">{"{nome}"}</b> = nome ospite · <b className="text-dim">{"{link}"}</b> = link della guida (se lo togli, viene aggiunto in fondo).</p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <F label="Nome ospite (saluto in guida)"><input value={guestName} onChange={(e) => setGuestName(e.target.value)} className={fld} placeholder="es. Mario Rossi" /></F>
-              <F label="Camera/e (es. 4 o 2,3)"><input value={rooms} onChange={(e) => setRooms(e.target.value)} className={fld} placeholder="numero camera" /></F>
-              <F label="Codice cancello"><input value={gate} onChange={(e) => setGate(e.target.value)} className={fld} /></F>
-              <F label="Codice porta/cassetta"><input value={door} onChange={(e) => setDoor(e.target.value)} className={fld} /></F>
-              <F label="Codice 2 (facolt.)"><input value={door2} onChange={(e) => setDoor2(e.target.value)} className={fld} /></F>
-              <F label="Portale documenti (URL)"><input value={docs} onChange={(e) => setDocs(e.target.value)} className={fld} placeholder="https://…" /></F>
-            </div>
-            <div className="mt-2 flex items-center gap-4">
+            <div className="mt-2 flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={parking} onChange={(e) => setParking(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Parcheggio</label>
               <label className="flex items-center gap-2 text-sm text-dim"><input type="checkbox" checked={taxFixed} onChange={(e) => setTaxFixed(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Tassa fissa</label>
+              <label className="flex items-center gap-2 text-sm text-dim">Portale documenti <input value={docs} onChange={(e) => setDocs(e.target.value)} placeholder="https://… (facolt.)" className="w-48 rounded border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus" /></label>
             </div>
-            {structUnits.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {structUnits.map((u) => (<button key={u.id} onClick={() => setRooms((r) => { const set2 = new Set(r.split(",").map((x) => x.trim()).filter(Boolean)); const n = (u.code || u.name); set2.has(n) ? set2.delete(n) : set2.add(n); return [...set2].join(","); })} className="rounded-full border border-line px-2.5 py-1 text-xs text-dim hover:bg-wash">{u.name}</button>))}
-              </div>
+
+            {/* Arrivi di oggi: camera automatica, link diverso per ogni prenotazione */}
+            <div className="mt-3">
+              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Arrivi di oggi ({todayArrivals.length})</div>
+              {todayArrivals.length > 0 ? <div className="space-y-2">{todayArrivals.map(arrivalRow)}</div> : <p className="text-xs text-faint">Nessun arrivo oggi per questa struttura.</p>}
+            </div>
+            {nextArrivals.length > 0 && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-faint">Prossimi arrivi ({nextArrivals.length})</summary>
+                <div className="mt-2 space-y-2">{nextArrivals.map(arrivalRow)}</div>
+              </details>
             )}
-            <div className="mt-3 flex gap-3">
-              <div className="min-w-0 flex-1 rounded-lg border border-line bg-paper p-2.5">
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-faint">Link (i codici viaggiano nel link, non nel DB pubblico)</div>
-                <div className="break-all font-mono text-xs text-txt">{guestLink}</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button onClick={() => navigator.clipboard?.writeText(guestLink)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash"><Icon name="copy" size={14} /> Copia link</button>
-                  <a href={`https://wa.me/?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={14} /> Invia su WhatsApp</a>
-                  <a href={guestLink} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">Apri ↗</a>
+
+            {/* Ospite senza prenotazione (manuale) */}
+            <details className="mt-3">
+              <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-faint">Ospite senza prenotazione (manuale)</summary>
+              <div className="mt-2 space-y-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <F label="Nome ospite"><input value={guestName} onChange={(e) => setGuestName(e.target.value)} className={fld} placeholder="es. Mario Rossi" /></F>
+                  <F label="Camera/e (es. 4 o 2,3)"><input value={rooms} onChange={(e) => setRooms(e.target.value)} className={fld} placeholder="numero camera" /></F>
+                </div>
+                {structUnits.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {structUnits.map((u) => (<button key={u.id} onClick={() => setRooms((r) => { const set2 = new Set(r.split(",").map((x) => x.trim()).filter(Boolean)); const n = (u.code || u.name); set2.has(n) ? set2.delete(n) : set2.add(n); return [...set2].join(","); })} className="rounded-full border border-line px-2.5 py-1 text-xs text-dim hover:bg-wash">{u.name}</button>))}
+                  </div>
+                )}
+                <div className="grid grid-cols-3 gap-2">
+                  <input value={gate} onChange={(e) => setGate(e.target.value)} placeholder="Cancello" className="rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
+                  <input value={door} onChange={(e) => setDoor(e.target.value)} placeholder="Porta/cassetta" className="rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
+                  <input value={door2} onChange={(e) => setDoor2(e.target.value)} placeholder="Codice 2" className="rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
+                </div>
+                <div className="min-w-0 rounded-lg border border-line bg-paper p-2.5">
+                  <div className="break-all font-mono text-xs text-txt">{guestLink}</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button onClick={() => navigator.clipboard?.writeText(guestLink)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash"><Icon name="copy" size={14} /> Copia</button>
+                    <a href={`https://wa.me/?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={14} /> WhatsApp</a>
+                    <button onClick={() => printCard(guestLink, rooms)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">🖨️ Stampa QR</button>
+                  </div>
                 </div>
               </div>
-              <div className="flex w-28 shrink-0 flex-col items-center gap-1.5">
-                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(guestLink)}`} alt="QR link ospite" className="h-24 w-24 rounded-lg border border-line bg-white p-1" />
-                <button onClick={printCard} className="w-full rounded-lg border border-line px-2 py-1.5 text-xs font-semibold text-dim hover:bg-wash">🖨️ Stampa QR</button>
-              </div>
-            </div>
+            </details>
           </Card>
 
           {/* Traduzione automatica multilingua */}

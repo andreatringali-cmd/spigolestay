@@ -691,9 +691,10 @@
   }
 
   function renderWifi(t) {
-    var qr = P.wifiQr || "assets/wifi-qr.png";
-    return '<div class="wifi-slider">' +
-      '<div class="wifi-panel wifi-card">' +
+    // Il QR viene generato e incorporato dall'editor (P.wifiQr). Se non c'è, mostriamo solo le
+    // credenziali (niente immagine segnaposto): il pannello QR e i puntini appaiono solo col QR.
+    var qr = P.wifiQr || "";
+    var creds = '<div class="wifi-panel wifi-card">' +
         '<div class="wifi-title">wifi</div>' +
         '<div class="wifi-cols">' +
           '<div class="wifi-col"><div class="wifi-label">' + esc(t.ui.wifiNetwork) + "</div>" +
@@ -702,7 +703,9 @@
           '<div class="wifi-value">' + esc(P.wifiPassword) + "</div>" +
           '<button class="copy-btn" id="copyWifi">' + esc(t.ui.copy) + "</button></div>" +
         "</div>" +
-      "</div>" +
+      "</div>";
+    if (!qr) return '<div class="wifi-slider">' + creds + "</div>";
+    return '<div class="wifi-slider">' + creds +
       '<div class="wifi-panel wifi-qr">' +
         '<img src="' + esc(qr) + '" alt="QR WiFi">' +
         "<p>" + esc(t.ui.wifiQrCaption || "Scan me") + "</p>" +
