@@ -499,6 +499,12 @@ export default function GuidaOspitiPage() {
       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ok ? "var(--ok)" : "var(--err)" }} />{ok ? "attiva" : "non attiva"}
     </span>
   );
+  // Interruttore on/off (concept 5): on = sezione mostrata; verde quando è davvero attiva (compilata).
+  const Toggle = ({ on, active, onClick, title }: { on: boolean; active: boolean; onClick: (e: React.MouseEvent) => void; title?: string }) => (
+    <button type="button" role="switch" aria-checked={on} title={title} onClick={onClick} className="relative inline-block h-6 w-10 shrink-0 rounded-full transition-colors" style={{ backgroundColor: active ? "var(--ok)" : "var(--line)" }}>
+      <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all" style={{ left: on ? "18px" : "2px" }} />
+    </button>
+  );
 
   // Traduzione automatica multilingua (base italiano → EN/FR/DE/ES)
   const [tr, setTr] = useState<{ running: boolean; lang: string; done: number; total: number; ok?: boolean; err?: string }>({ running: false, lang: "", done: 0, total: 0 });
@@ -810,14 +816,14 @@ export default function GuidaOspitiPage() {
         <div className="space-y-4">
         {(<>
           <SectionTitle>Sezioni della guida ({content.sections.length})</SectionTitle>
-          <div className="anim-in rounded-xl border border-line bg-surface p-3.5 shadow-sm">
-            <button onClick={() => setOpenStruct((o) => !o)} className="group flex w-full min-w-0 items-center gap-2.5 text-left">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[15px]" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)" }}>🏠</span>
+          <div className="anim-in overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+            <button onClick={() => setOpenStruct((o) => !o)} className="flex w-full min-w-0 items-center gap-2.5 px-4 py-2.5 text-left">
+              <span className="text-[16px] leading-none">🏠</span>
               <span className="min-w-0 flex-1 truncate text-sm font-semibold text-txt">Struttura e contatti</span>
-              <ReadyDot ok={structReady} />
+              <span className="shrink-0 text-[11px] text-faint">dati struttura</span>
             </button>
-            {openStruct && (<>
-              <div className="mt-3 grid grid-cols-2 gap-3">
+            {openStruct && (
+              <div className="grid grid-cols-2 gap-3 border-t border-line px-4 pb-4 pt-3">
               <F label="Nome guida"><input value={`Guida - ${guide.name}`} disabled readOnly className={fldRO} /></F>
               <F label="Nome struttura"><input value={guide.name} disabled readOnly className={fldRO} /></F>
               <F label="Città"><input value={guide.city} disabled readOnly className={fldRO} /></F>
@@ -833,19 +839,18 @@ export default function GuidaOspitiPage() {
               <F label="Sito web"><input value={guide.social.website} disabled readOnly className={fldRO} /></F>
               <a href={`/strutture/${sid}`} className="flex items-center justify-center gap-1.5 self-end rounded-lg border border-line px-3 py-2.5 text-sm font-semibold text-focus transition hover:bg-wash">✎ Modifica i dati della struttura →</a>
               </div>
-            </>)}
+            )}
           </div>
-          <div className="anim-in rounded-xl border border-line bg-surface p-3.5 shadow-sm">
-            <div className="flex items-center gap-2">
-              <button onClick={() => setOpenHome((o) => !o)} className="group flex min-w-0 flex-1 items-center gap-2.5 text-left">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[15px]" style={{ backgroundColor: content.home.hidden ? "var(--wash)" : "color-mix(in srgb, var(--focus) 10%, transparent)", filter: content.home.hidden ? "grayscale(1) opacity(0.6)" : undefined }}>👋</span>
+          <div className="anim-in overflow-hidden rounded-2xl border border-line bg-surface shadow-sm" style={{ opacity: content.home.hidden ? 0.7 : 1 }}>
+            <div className="flex items-center gap-2 px-4 py-2.5">
+              <button onClick={() => setOpenHome((o) => !o)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+                <span className="text-[16px] leading-none" style={{ filter: content.home.hidden ? "grayscale(1)" : undefined }}>👋</span>
                 <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${content.home.hidden ? "text-faint line-through" : "text-txt"}`}>Home · benvenuto</span>
-                <ReadyDot ok={homeReady} />
               </button>
-              <button onClick={() => setHome({ hidden: !content.home.hidden })} title={content.home.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg p-1.5 text-dim transition hover:bg-wash hover:text-txt"><Icon name={content.home.hidden ? "eyeOff" : "eye"} size={16} /></button>
+              <Toggle on={!content.home.hidden} active={homeReady} onClick={(e) => { e.stopPropagation(); setHome({ hidden: !content.home.hidden }); }} title={content.home.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} />
             </div>
             {openHome && (
-              <div className="mt-3 space-y-3 border-t border-line pt-3">
+              <div className="space-y-3 border-t border-line px-4 pb-4 pt-3">
                 <F label="Titolo di benvenuto"><input value={content.home.welcomeTitle} maxLength={LIM.wtitle} onChange={(e) => setHome({ welcomeTitle: e.target.value })} className={fld} /></F>
                 <F label="Sottotitolo"><input value={content.home.welcomeSub ?? ""} maxLength={LIM.wsub} onChange={(e) => setHome({ welcomeSub: e.target.value })} className={fld} /></F>
                 <F label="Messaggio (una riga per paragrafo)"><textarea value={content.home.welcome.join("\n")} maxLength={LIM.welcome} onChange={(e) => setHome({ welcome: e.target.value.split("\n") })} rows={7} className={fldTA} /></F>
@@ -853,15 +858,14 @@ export default function GuidaOspitiPage() {
             )}
           </div>
           {orderedSections.map(({ s, si }) => { const open = openSec === s.id; const func = FUNC_SECTIONS.includes(s.id); const custom = !SECTION_ORDER.includes(s.id); const opFilled = (s.id === "wifi" && !!(guide.wifiNetwork || guide.wifiPassword)) || (s.id === "contacts" && !!(guide.phone || guide.whatsapp || guide.phoneGreta)) || (s.id === "review" && !!guide.reviewUrl); const autoHidden = !s.hidden && !sectionFilled(s) && !opFilled; return (
-            <div key={s.id} className="anim-in rounded-xl border border-line bg-surface p-3.5 shadow-sm">
-              <div className="flex items-center gap-1">
-                <button onClick={() => setOpenSec(open ? null : s.id)} className="group flex min-w-0 flex-1 items-center gap-2.5 text-left">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[15px]" style={{ backgroundColor: s.hidden ? "var(--wash)" : "color-mix(in srgb, var(--focus) 10%, transparent)", filter: s.hidden ? "grayscale(1) opacity(0.6)" : undefined }}>{SEC_EMOJI[s.id] || "📄"}</span>
+            <div key={s.id} className="anim-in overflow-hidden rounded-2xl border border-line bg-surface shadow-sm" style={{ opacity: s.hidden ? 0.7 : 1 }}>
+              <div className="flex items-center gap-2 px-4 py-2.5">
+                <button onClick={() => setOpenSec(open ? null : s.id)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+                  <span className="text-[16px] leading-none" style={{ filter: s.hidden ? "grayscale(1)" : undefined }}>{SEC_EMOJI[s.id] || "📄"}</span>
                   <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${s.hidden ? "text-faint line-through" : "text-txt"}`}>{s.title || s.id}</span>
-                  <ReadyDot ok={secReady(s)} />
                 </button>
-                <button onClick={() => toggleHidden(si)} title={s.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg p-1.5 text-dim transition hover:bg-wash hover:text-txt"><Icon name={s.hidden ? "eyeOff" : "eye"} size={16} /></button>
                 {custom && <button onClick={() => removeSection(si)} title="Elimina sezione personalizzata" className="shrink-0 px-1 text-faint hover:text-[color:var(--err)]">✕</button>}
+                <Toggle on={!s.hidden} active={secReady(s)} onClick={(e) => { e.stopPropagation(); toggleHidden(si); }} title={s.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} />
               </div>
               {open && (() => {
                 // L'ordine dei campi rispecchia l'ordine con cui la guida mostra la sezione.
@@ -878,7 +882,7 @@ export default function GuidaOspitiPage() {
                   </div>
                 ) : null;
                 return (
-                <div className="mt-3 space-y-3 border-t border-line pt-3">
+                <div className="space-y-3 border-t border-line px-4 pb-4 pt-3">
                   {autoHidden && <p className="rounded-lg bg-wash px-2.5 py-1.5 text-[11px] text-dim">✍️ Compila i campi qui sotto (passaggi, blocchi, foto, pulsanti…): la sezione comparirà nella guida ospiti solo quando ha un contenuto.</p>}
                   <div className="grid grid-cols-2 gap-3">
                     <F label="Titolo"><input value={s.title} maxLength={LIM.title} onChange={(e) => updSection(si, { title: e.target.value })} className={fld} /></F>
