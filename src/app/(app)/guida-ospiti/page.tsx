@@ -815,7 +815,6 @@ export default function GuidaOspitiPage() {
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[15px]" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)" }}>🏠</span>
               <span className="min-w-0 flex-1 truncate text-sm font-semibold text-txt">Struttura e contatti</span>
               <ReadyDot ok={structReady} />
-              <span className="shrink-0 text-faint transition-colors group-hover:text-txt"><Icon name="chevron" size={15} style={{ transform: openStruct ? "rotate(90deg)" : "none", transition: "transform .2s" }} /></span>
             </button>
             {openStruct && (<>
               <div className="mt-3 grid grid-cols-2 gap-3">
@@ -842,7 +841,6 @@ export default function GuidaOspitiPage() {
                 <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[15px]" style={{ backgroundColor: content.home.hidden ? "var(--wash)" : "color-mix(in srgb, var(--focus) 10%, transparent)", filter: content.home.hidden ? "grayscale(1) opacity(0.6)" : undefined }}>👋</span>
                 <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${content.home.hidden ? "text-faint line-through" : "text-txt"}`}>Home · benvenuto</span>
                 <ReadyDot ok={homeReady} />
-                <span className="shrink-0 text-faint transition-colors group-hover:text-txt"><Icon name="chevron" size={15} style={{ transform: openHome ? "rotate(90deg)" : "none", transition: "transform .2s" }} /></span>
               </button>
               <button onClick={() => setHome({ hidden: !content.home.hidden })} title={content.home.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg p-1.5 text-dim transition hover:bg-wash hover:text-txt"><Icon name={content.home.hidden ? "eyeOff" : "eye"} size={16} /></button>
             </div>
@@ -861,7 +859,6 @@ export default function GuidaOspitiPage() {
                   <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[15px]" style={{ backgroundColor: s.hidden ? "var(--wash)" : "color-mix(in srgb, var(--focus) 10%, transparent)", filter: s.hidden ? "grayscale(1) opacity(0.6)" : undefined }}>{SEC_EMOJI[s.id] || "📄"}</span>
                   <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${s.hidden ? "text-faint line-through" : "text-txt"}`}>{s.title || s.id}</span>
                   <ReadyDot ok={secReady(s)} />
-                  <span className="shrink-0 text-faint transition-colors group-hover:text-txt"><Icon name="chevron" size={15} style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .2s" }} /></span>
                 </button>
                 <button onClick={() => toggleHidden(si)} title={s.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg p-1.5 text-dim transition hover:bg-wash hover:text-txt"><Icon name={s.hidden ? "eyeOff" : "eye"} size={16} /></button>
                 {custom && <button onClick={() => removeSection(si)} title="Elimina sezione personalizzata" className="shrink-0 px-1 text-faint hover:text-[color:var(--err)]">✕</button>}
