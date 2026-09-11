@@ -173,14 +173,6 @@ export default function CanaliPage() {
   const toggleAuto = (k: OtaKey) => { const cur = getConn(k); saveConn({ ...conn, [k]: { ...cur, auto: !cur.auto } }); };
 
   const connectedOtas = OTAS.filter((o) => getConn(o.key).connected);
-  const syncNow = () => {
-    const now = new Date().toISOString();
-    const next = { ...conn };
-    connectedOtas.forEach((o) => { next[o.key] = { ...getConn(o.key), lastSync: now }; });
-    saveConn(next);
-    saveLog([...connectedOtas.map((o) => ({ id: uid(), ts: Date.now(), text: `${t("Tariffe e disponibilità inviate a")} ${o.label}`, color: o.color })), ...log]);
-  };
-
   const types = roomTypes.filter((rt) => effStructure === "all" || rt.structureId === effStructure);
   const mappedTypes = types.filter((rt) => OTAS.some((o) => getConn(o.key).connected && getMap(rt.id, o.key).on)).length;
   const lastSyncTs = useMemo(() => { const ts = OTAS.map((o) => getConn(o.key).lastSync).filter(Boolean).map((s) => new Date(s!).getTime()); return ts.length ? Math.max(...ts) : null; }, [conn]);
@@ -192,15 +184,12 @@ export default function CanaliPage() {
         title="Channel Manager"
         subtitle={t("Connessioni ai portali, mappatura camere e sincronizzazione prezzi/disponibilità")}
         actions={
-          <div className="flex items-center gap-2">
-            {activeStructureId === "all" && (
-              <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
-                <option value="all">{t("Tutte le strutture")}</option>
-                {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            )}
-            <button onClick={syncNow} disabled={connectedOtas.length === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">↻ {t("Sincronizza ora")}</button>
-          </div>
+          activeStructureId === "all" ? (
+            <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+              <option value="all">{t("Tutte le strutture")}</option>
+              {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          ) : null
         }
       />
 
@@ -313,7 +302,7 @@ export default function CanaliPage() {
           <SectionTitle>{t("Registro sincronizzazioni")}</SectionTitle>
           {log.length > 0 && <button onClick={async () => { if (await ask({ message: t("Svuotare il registro sincronizzazioni?"), danger: true, confirmLabel: t("Svuota") })) saveLog([]); }} className="text-xs font-medium text-dim hover:text-txt">{t("Pulisci")}</button>}
         </div>
-        {log.length === 0 ? <p className="text-sm text-faint">{t("Nessuna sincronizzazione ancora. Premi «Sincronizza ora».")}</p> : (
+        {log.length === 0 ? <p className="text-sm text-faint">{t("Nessuna sincronizzazione ancora.")}</p> : (
           <div className="flex flex-col divide-y divide-[color:var(--line)]">
             {log.slice(0, 15).map((l) => (
               <div key={l.id} className="flex items-center gap-2.5 py-2 text-sm">
