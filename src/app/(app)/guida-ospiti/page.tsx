@@ -788,11 +788,12 @@ export default function GuidaOspitiPage() {
         {(<>
           <div className="grid gap-4">
           <Card>
-            <div className="flex items-center justify-between">
-              <SectionTitle>Struttura e contatti</SectionTitle>
-              <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-faint">🔒 dalle Impostazioni struttura</span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+            <details>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5"><span className="text-faint transition-transform">▸</span><SectionTitle>Struttura e contatti</SectionTitle></span>
+                <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-faint">🔒 dalle Impostazioni struttura</span>
+              </summary>
+              <div className="mt-3 grid grid-cols-2 gap-3">
               <F label="Nome guida"><input value={`Guida - ${guide.name}`} disabled readOnly className={fldRO} /></F>
               <F label="Nome struttura"><input value={guide.name} disabled readOnly className={fldRO} /></F>
               <F label="Città"><input value={guide.city} disabled readOnly className={fldRO} /></F>
@@ -806,7 +807,8 @@ export default function GuidaOspitiPage() {
               <F label="Instagram"><input value={guide.social.instagram} disabled readOnly className={fldRO} /></F>
               <F label="Facebook"><input value={guide.social.facebook} disabled readOnly className={fldRO} /></F>
               <F label="Sito web"><input value={guide.social.website} disabled readOnly className={fldRO} /></F>
-            </div>
+              </div>
+            </details>
           </Card>
 
 
@@ -816,17 +818,20 @@ export default function GuidaOspitiPage() {
 
         {(<>
           <Card>
-            <SectionTitle>Home · benvenuto</SectionTitle>
-            <F label="Titolo di benvenuto"><input value={content.home.welcomeTitle} maxLength={LIM.wtitle} onChange={(e) => setHome({ welcomeTitle: e.target.value })} className={fld} /></F>
-            <div className="mt-3"><F label="Sottotitolo"><input value={content.home.welcomeSub ?? ""} maxLength={LIM.wsub} onChange={(e) => setHome({ welcomeSub: e.target.value })} className={fld} /></F></div>
-            <div className="mt-3"><F label="Messaggio (una riga per paragrafo)"><textarea value={content.home.welcome.join("\n")} maxLength={LIM.welcome} onChange={(e) => setHome({ welcome: e.target.value.split("\n") })} rows={3} className={`${fld} resize-y`} /></F></div>
+            <details open>
+              <summary className="flex cursor-pointer list-none items-center gap-1.5">
+                <span className="text-faint">▸</span><SectionTitle>Home · benvenuto</SectionTitle>
+              </summary>
+              <div className="mt-3">
+                <F label="Titolo di benvenuto"><input value={content.home.welcomeTitle} maxLength={LIM.wtitle} onChange={(e) => setHome({ welcomeTitle: e.target.value })} className={fld} /></F>
+                <div className="mt-3"><F label="Sottotitolo"><input value={content.home.welcomeSub ?? ""} maxLength={LIM.wsub} onChange={(e) => setHome({ welcomeSub: e.target.value })} className={fld} /></F></div>
+                <div className="mt-3"><F label="Messaggio (una riga per paragrafo)"><textarea value={content.home.welcome.join("\n")} maxLength={LIM.welcome} onChange={(e) => setHome({ welcome: e.target.value.split("\n") })} rows={7} className={`${fld} resize-y min-h-[9rem] text-[15px] leading-relaxed`} /></F></div>
+              </div>
+            </details>
           </Card>
 
 
-          <div className="flex items-center justify-between">
-            <SectionTitle>Sezioni della guida ({content.sections.length})</SectionTitle>
-            <button onClick={addSection} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash">+ Sezione</button>
-          </div>
+          <SectionTitle>Sezioni della guida ({content.sections.length})</SectionTitle>
           {orderedSections.map(({ s, si }) => { const open = openSec === s.id; const func = FUNC_SECTIONS.includes(s.id); const custom = !SECTION_ORDER.includes(s.id); const opFilled = (s.id === "wifi" && !!(guide.wifiNetwork || guide.wifiPassword)) || (s.id === "contacts" && !!(guide.phone || guide.whatsapp || guide.phoneGreta)) || (s.id === "review" && !!guide.reviewUrl); const autoHidden = !s.hidden && !sectionFilled(s) && !opFilled; return (
             <Card key={s.id}>
               <div className="flex items-center gap-2">
@@ -1034,6 +1039,7 @@ export default function GuidaOspitiPage() {
                 ); })()}
             </Card>
           ); })}
+          <button onClick={addSection} className="w-full rounded-lg border border-dashed border-line px-3 py-2.5 text-sm font-semibold text-focus hover:bg-wash">+ Aggiungi sezione</button>
           <p className="text-[11px] text-faint">I testi valgono per tutte le lingue (nella lingua in cui scrivi); la traduzione automatica multilingua è la fase successiva. Le stringhe dell&apos;interfaccia (Indietro, WiFi…) sono già tradotte IT/EN/FR/DE/ES.</p>
         </>)}
         </div>
