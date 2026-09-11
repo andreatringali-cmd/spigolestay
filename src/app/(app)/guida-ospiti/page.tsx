@@ -603,13 +603,30 @@ export default function GuidaOspitiPage() {
 
   // Codici e istruzioni PER CAMERA (mai nella guida pubblica: viaggiano solo nel link ospite).
   // Mappa unitId → { gate, door, door2 }. Salvata a parte, sincronizzata col prefisso spigolestay:.
-  type RoomAccess = { gate?: string; door?: string; door2?: string };
-  const [roomAccess, setRoomAccess] = useState<Record<string, RoomAccess>>({});
-  useEffect(() => { try { setRoomAccess(JSON.parse(localStorage.getItem("spigolestay:roomaccess") || "{}")); } catch {} }, []);
-  const setUnitAccess = (uid: string, patch: RoomAccess) => {
-    setRoomAccess((prev) => { const next = { ...prev, [uid]: { ...prev[uid], ...patch } }; try { localStorage.setItem("spigolestay:roomaccess", JSON.stringify(next)); } catch {} return next; });
-  };
-  const unitCodesK = (uid?: string) => { const a = uid ? roomAccess[uid] : undefined; return [a?.gate || "", a?.door || "", a?.door2 || ""].join("-").replace(/-+$/g, ""); };
+  type RoomCode = { label: string; value: string };
+  const DEFAULT_CODES: RoomCode[] = [{ label: "Cancello", value: "" }, { label: "Portone", value: "" }, { label: "Porta", value: "" }];
+  const [roomAccess, setRoomAccess] = useState<Record<string, RoomCode[]>>({});
+  useEffect(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("spigolestay:roomaccess") || "{}") as Record<string, unknown>;
+      const migrated: Record<string, RoomCode[]> = {};
+      for (const k of Object.keys(raw)) {
+        const v = raw[k];
+        if (Array.isArray(v)) { migrated[k] = v as RoomCode[]; continue; }
+        if (v && typeof v === "object") { // vecchio formato { gate, door, door2 } → lista con nomi
+          const o = v as { gate?: string; door?: string; door2?: string };
+          const arr: RoomCode[] = [{ label: "Cancello", value: o.gate || "" }, { label: "Portone", value: o.door || "" }];
+          if (o.door2) arr.push({ label: "Porta", value: o.door2 });
+          migrated[k] = arr;
+        }
+      }
+      setRoomAccess(migrated);
+    } catch {}
+  }, []);
+  const codesOf = (uid?: string): RoomCode[] => (uid && roomAccess[uid]) ? roomAccess[uid] : DEFAULT_CODES.map((c) => ({ ...c }));
+  const setUnitCodes = (uid: string, codes: RoomCode[]) => { const next = { ...roomAccess, [uid]: codes }; setRoomAccess(next); try { localStorage.setItem("spigolestay:roomaccess", JSON.stringify(next)); } catch {} };
+  // I primi 3 codici viaggiano nel link ospite (posizioni cancello-porta-porta2 del motore guida).
+  const unitCodesK = (uid?: string) => codesOf(uid).slice(0, 3).map((c) => c.value.trim()).join("-").replace(/-+$/g, "");
 
   // Collegamento con le prenotazioni: le prossime/attuali di questa struttura.
   const todayISO = new Date().toISOString().slice(0, 10);
@@ -1112,7 +1129,7 @@ export default function GuidaOspitiPage() {
             <p className="mt-0.5 text-[11px] text-faint">Scrivi i codici di ogni camera: entrano in automatico nel link di ogni ospite. Per sicurezza non vengono mai salvati nella guida pubblica.</p>
             {structUnits.length > 0 ? (
               <div className="mt-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-                {structUnits.map((u) => { const a = roomAccess[u.id] || {}; const n = [a.gate, a.door, a.door2].filter(Boolean).length; return (
+                {structUnits.map((u) => { const n = codesOf(u.id).filter((c) => c.value.trim()).length; return (
                   <button key={u.id} onClick={() => setCodesUnit(u.id)} className="flex items-center gap-2.5 rounded-xl border border-line bg-paper p-3 text-left transition hover:border-focus hover:bg-wash">
                     <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 12%, transparent)", color: "var(--focus)" }}>{u.code || (u.name || "?").slice(0, 2)}</div>
                     <div className="min-w-0 flex-1">
@@ -1128,7 +1145,11 @@ export default function GuidaOspitiPage() {
 
           {/* Scheda codici della camera (si apre al clic su una card) */}
           {codesUnit && (() => {
-            const u = structUnits.find((x) => x.id === codesUnit); if (!u) return null; const a = roomAccess[u.id] || {};
+            const u = structUnits.find((x) => x.id === codesUnit); if (!u) return null;
+            const codes = codesOf(u.id);
+            const upd = (i: number, patch: Partial<RoomCode>) => setUnitCodes(u.id, codes.map((c, j) => (j === i ? { ...c, ...patch } : c)));
+            const add = () => setUnitCodes(u.id, [...codes, { label: "Nuovo codice", value: "" }]);
+            const rm = (i: number) => setUnitCodes(u.id, codes.filter((_, j) => j !== i));
             return (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setCodesUnit(null)}>
                 <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -1139,14 +1160,18 @@ export default function GuidaOspitiPage() {
                     </div>
                     <button onClick={() => setCodesUnit(null)} className="text-lg text-faint hover:text-txt">✕</button>
                   </div>
-                  <p className="mb-3 text-[11px] text-faint">Codici di accesso di questa camera. Entrano in automatico nel link dell&apos;ospite; non vengono mai salvati nella guida pubblica.</p>
-                  <div className="space-y-3">
-                    {([["Cancello/portone", "gate"], ["Porta/cassetta", "door"], ["Codice 2 (facoltativo)", "door2"]] as [string, "gate" | "door" | "door2"][]).map(([lbl, key]) => (
-                      <label key={key} className="block text-xs font-medium text-dim">{lbl}
-                        <input value={a[key] || ""} onChange={(e) => setUnitAccess(u.id, { [key]: e.target.value })} placeholder="—" className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-[15px] text-txt outline-none focus:border-focus" />
-                      </label>
+                  <p className="mb-3 text-[11px] text-faint">Dai un nome a ogni codice (Cancello, Portone, Porta…) e scrivi il valore. Entrano in automatico nel link dell&apos;ospite; non vengono mai salvati nella guida pubblica.</p>
+                  <div className="space-y-2">
+                    {codes.map((c, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input value={c.label} onChange={(e) => upd(i, { label: e.target.value })} placeholder="Nome" className="w-28 shrink-0 rounded-lg border border-line bg-paper px-2.5 py-2 text-sm font-medium text-txt outline-none focus:border-focus" />
+                        <input value={c.value} onChange={(e) => upd(i, { value: e.target.value })} placeholder="Codice" className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-[15px] text-txt outline-none focus:border-focus" />
+                        <button onClick={() => rm(i)} title="Rimuovi" className="shrink-0 rounded-lg p-1.5 text-faint transition hover:bg-wash hover:text-[color:var(--err)]">✕</button>
+                      </div>
                     ))}
                   </div>
+                  <button onClick={add} className="mt-2 text-xs font-semibold text-focus hover:underline">+ Aggiungi codice</button>
+                  {codes.length > 3 && <p className="mt-2 text-[11px]" style={{ color: "var(--warn)" }}>Nota: nella guida arrivano i primi 3 codici (il motore ne mostra fino a 3 sotto i passaggi di check-in).</p>}
                   <button onClick={() => setCodesUnit(null)} className="mt-4 w-full rounded-lg py-2.5 text-sm font-semibold text-white transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>Fatto</button>
                 </div>
               </div>
