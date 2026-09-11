@@ -27,7 +27,7 @@
   // struttura, quindi non contano mai come "vuote".
   var nzTop = function (x) { return !!(x && String(x).trim()); };
   var WELCOME = { it: "Benvenuti", en: "Welcome", fr: "Bienvenue", de: "Willkommen", es: "Bienvenidos" };
-  var homeFilled = function (h) { return h && (nzTop(h.welcomeTitle) || nzTop(h.welcomeSub) || (h.welcome && h.welcome.join && nzTop(h.welcome.join("")))); };
+  var homeFilled = function (h) { return h && !h.hidden && (nzTop(h.welcomeTitle) || nzTop(h.welcomeSub) || (h.welcome && h.welcome.join && nzTop(h.welcome.join("")))); };
   var FUNCSEC = { wifi: 1, contacts: 1, review: 1 };
   function secFilled(s) {
     if (s.hidden) return false;

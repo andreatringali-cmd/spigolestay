@@ -57,7 +57,7 @@ const ACT_KINDS: { k: string; label: string; type: string; icon: string }[] = [
 const kindOf = (a: GAction) => (a.type === "wa" ? "wa" : a.type === "tel" ? "tel" : a.type === "mail" ? "mail" : a.icon === "pin" ? "map" : "link");
 // Limiti caratteri calibrati sull'esempio Spigolehouse: mantengono la grafica impeccabile.
 const LIM = { guideName: 40, name: 60, wtitle: 30, wsub: 70, welcome: 420, title: 45, sub: 70, intro: 260, h: 55, p: 950, alabel: 34, ln: 44, lsub: 56, ltel: 22 };
-interface GContent { home: { welcomeTitle: string; welcomeSub?: string; welcome: string[] }; sections: GSection[] }
+interface GContent { home: { welcomeTitle: string; welcomeSub?: string; welcome: string[]; hidden?: boolean }; sections: GSection[] }
 const ICON_OPTS = ["key", "wifi", "coffee", "temple", "pizza", "beach", "taxi", "info", "sparkle", "star", "phone", "bed", "pin", "calendar"];
 // wifi/contacts/review restano operative "pure" (credenziali e contatti automatici dai dati struttura).
 const FUNC_SECTIONS = ["wifi", "contacts", "review"];
@@ -470,6 +470,8 @@ export default function GuidaOspitiPage() {
 
   const [tab, setTab] = useState<"setup" | "content">("setup");
   const [openSec, setOpenSec] = useState<string | null>(null);
+  const [openStruct, setOpenStruct] = useState(false); // "Struttura e contatti" (chiusa di default)
+  const [openHome, setOpenHome] = useState(false);      // "Home · benvenuto" (chiusa di default)
   const content: GContent = guide.content ?? EMPTY_CONTENT;
   const setContent = (c: GContent) => set({ content: c });
   // "Contenuti pronti" = l'host ha scritto davvero qualcosa (non basta lo scaffold vuoto).
@@ -752,9 +754,15 @@ export default function GuidaOspitiPage() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <span className="font-semibold text-faint">Pronta:</span>
-          {([["Struttura", !!(guide.name && guide.address)], ["Contatti", !!(guide.whatsapp || guide.phone)], ["WiFi", !!(guide.wifiNetwork && guide.wifiPassword)], ["Contenuti", hasRealContent], ["Traduzioni", hasTranslations]] as [string, boolean][]).map(([lbl, ok]) => (
-            <span key={lbl} className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${ok ? "text-white" : "bg-wash text-faint"}`} style={ok ? { backgroundColor: "var(--ok)" } : undefined}>{ok ? "✓" : "○"} {lbl}</span>
-          ))}
+          {(() => {
+            const short: Record<string, string> = { checkin: "Check-in", breakfast: "Colazione", wifi: "WiFi", attractions: "Esplora", restaurants: "Ristoranti", excursions: "Mare", taxi: "Taxi", info: "Info", faq: "FAQ", extras: "Extra", contacts: "Contatti", review: "Recensioni" };
+            const homeReady = !content.home.hidden && !!(content.home.welcomeTitle?.trim() || content.home.welcomeSub?.trim() || content.home.welcome.join("").trim());
+            const secReady = (s: GSection) => { const op = (s.id === "wifi" && !!(guide.wifiNetwork || guide.wifiPassword)) || (s.id === "contacts" && !!(guide.phone || guide.whatsapp || guide.phoneGreta)) || (s.id === "review" && !!guide.reviewUrl); return !s.hidden && (sectionFilled(s) || op); };
+            const chips: [string, boolean][] = [["Struttura", !!(guide.name && guide.address)], ["Home", homeReady], ...orderedSections.map(({ s }) => [short[s.id] || s.title, secReady(s)] as [string, boolean]), ["Traduzioni", hasTranslations]];
+            return chips.map(([lbl, ok], i) => (
+              <span key={lbl + i} className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${ok ? "text-white" : "bg-wash text-faint"}`} style={ok ? { backgroundColor: "var(--ok)" } : undefined}>{ok ? "✓" : "○"} {lbl}</span>
+            ));
+          })()}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold text-txt">Anteprima live</span>
@@ -788,11 +796,12 @@ export default function GuidaOspitiPage() {
         {(<>
           <div className="grid gap-4">
           <Card>
-            <details>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5"><span className="text-faint transition-transform">▸</span><SectionTitle>Struttura e contatti</SectionTitle></span>
-                <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-faint">🔒 dalle Impostazioni struttura</span>
-              </summary>
+            <button onClick={() => setOpenStruct((o) => !o)} className="flex w-full items-center gap-2 text-left">
+              <span className="text-faint">{openStruct ? "▾" : "▸"}</span>
+              <span className="flex-1 font-semibold text-txt">Struttura e contatti</span>
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-wash px-2.5 py-1 text-[10px] font-medium text-dim"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> dalle Impostazioni struttura</span>
+            </button>
+            {openStruct && (
               <div className="mt-3 grid grid-cols-2 gap-3">
               <F label="Nome guida"><input value={`Guida - ${guide.name}`} disabled readOnly className={fldRO} /></F>
               <F label="Nome struttura"><input value={guide.name} disabled readOnly className={fldRO} /></F>
@@ -808,7 +817,7 @@ export default function GuidaOspitiPage() {
               <F label="Facebook"><input value={guide.social.facebook} disabled readOnly className={fldRO} /></F>
               <F label="Sito web"><input value={guide.social.website} disabled readOnly className={fldRO} /></F>
               </div>
-            </details>
+            )}
           </Card>
 
 
@@ -817,21 +826,24 @@ export default function GuidaOspitiPage() {
         </>)}
 
         {(<>
-          <Card>
-            <details>
-              <summary className="flex cursor-pointer list-none items-center gap-1.5">
-                <span className="text-faint">▸</span><SectionTitle>Home · benvenuto</SectionTitle>
-              </summary>
-              <div className="mt-3">
-                <F label="Titolo di benvenuto"><input value={content.home.welcomeTitle} maxLength={LIM.wtitle} onChange={(e) => setHome({ welcomeTitle: e.target.value })} className={fld} /></F>
-                <div className="mt-3"><F label="Sottotitolo"><input value={content.home.welcomeSub ?? ""} maxLength={LIM.wsub} onChange={(e) => setHome({ welcomeSub: e.target.value })} className={fld} /></F></div>
-                <div className="mt-3"><F label="Messaggio (una riga per paragrafo)"><textarea value={content.home.welcome.join("\n")} maxLength={LIM.welcome} onChange={(e) => setHome({ welcome: e.target.value.split("\n") })} rows={7} className={`${fld} resize-y min-h-[9rem] text-[15px] leading-relaxed`} /></F></div>
-              </div>
-            </details>
-          </Card>
-
-
           <SectionTitle>Sezioni della guida ({content.sections.length})</SectionTitle>
+          <Card>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setOpenHome((o) => !o)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                <span className="text-faint">{openHome ? "▾" : "▸"}</span>
+                <span className={`truncate font-semibold ${content.home.hidden ? "text-faint line-through" : "text-txt"}`}>Home · benvenuto</span>
+                {content.home.hidden && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">nascosta</span>}
+              </button>
+              <button onClick={() => setHome({ hidden: !content.home.hidden })} title={content.home.hidden ? "Mostra nella guida ospiti" : "Nascondi dalla guida ospiti"} className="shrink-0 rounded-lg border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">{content.home.hidden ? "Mostra" : "Nascondi"}</button>
+            </div>
+            {openHome && (
+              <div className="mt-3 space-y-3 border-t border-line pt-3">
+                <F label="Titolo di benvenuto"><input value={content.home.welcomeTitle} maxLength={LIM.wtitle} onChange={(e) => setHome({ welcomeTitle: e.target.value })} className={fld} /></F>
+                <F label="Sottotitolo"><input value={content.home.welcomeSub ?? ""} maxLength={LIM.wsub} onChange={(e) => setHome({ welcomeSub: e.target.value })} className={fld} /></F>
+                <F label="Messaggio (una riga per paragrafo)"><textarea value={content.home.welcome.join("\n")} maxLength={LIM.welcome} onChange={(e) => setHome({ welcome: e.target.value.split("\n") })} rows={7} className={`${fld} resize-y min-h-[9rem] text-[15px] leading-relaxed`} /></F>
+              </div>
+            )}
+          </Card>
           {orderedSections.map(({ s, si }) => { const open = openSec === s.id; const func = FUNC_SECTIONS.includes(s.id); const custom = !SECTION_ORDER.includes(s.id); const opFilled = (s.id === "wifi" && !!(guide.wifiNetwork || guide.wifiPassword)) || (s.id === "contacts" && !!(guide.phone || guide.whatsapp || guide.phoneGreta)) || (s.id === "review" && !!guide.reviewUrl); const autoHidden = !s.hidden && !sectionFilled(s) && !opFilled; return (
             <Card key={s.id}>
               <div className="flex items-center gap-2">
@@ -1056,13 +1068,16 @@ export default function GuidaOspitiPage() {
                 { url: previewUrl, lab: "Le tue modifiche", live: true },
               ].map((ph) => (
                 <div key={ph.lab} className="min-w-0 flex-1">
+                  <div className="mb-2 flex items-center justify-center gap-1.5">
+                    <span className={`text-xs font-semibold ${ph.live ? "text-focus" : "text-faint"}`}>{ph.lab}</span>
+                    {ph.live && savedThis && <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "var(--ok)" }}><span className="inline-block h-1.5 w-1.5 rounded-full bg-white" /> Live</span>}
+                  </div>
                   <div className="relative mx-auto rounded-[2rem] border border-line bg-[#111318] px-1.5 pb-1.5 pt-4 shadow-xl">
                     <div className="absolute left-1/2 top-1.5 z-10 h-1 w-10 -translate-x-1/2 rounded-full bg-white/25" />
                     <div className="overflow-hidden rounded-[1.6rem] bg-black" style={{ aspectRatio: "390 / 844", maxHeight: "80vh" }}>
                       <iframe ref={ph.live ? previewRef : undefined} key={ph.lab + previewKey} src={ph.url} title={"Anteprima · " + ph.lab} style={{ border: 0 }} className="h-full w-full" />
                     </div>
                   </div>
-                  <p className="mt-1.5 text-center text-[11px] font-semibold text-faint">{ph.lab}{ph.live && savedThis ? " · live" : ""}</p>
                 </div>
               ))}
             </div>
@@ -1077,7 +1092,6 @@ export default function GuidaOspitiPage() {
               <p className="mt-2 text-center text-[11px] font-medium text-faint">Smart TV in camera · usa “Schermo intero” per la demo</p>
             </div>
           )}
-          <p className="mt-2 text-[11px] text-faint">{pvMode === "tv" ? "Anteprima della vista TV (Smart TV in camera): si naviga col telecomando. " : "Anteprima della guida sul telefono dell'ospite. "}Si aggiorna in tempo reale mentre compili. Cambia lingua qui sopra per vedere le traduzioni; “Schermo intero” apre la vista completa per la demo.</p>
         </div>
       </div>
         {/* In fondo alla pagina: invio guida agli arrivi + impostazioni codici */}
