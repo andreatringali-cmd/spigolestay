@@ -1106,7 +1106,7 @@ export default function GuidaOspitiPage() {
       </div>
         {/* In fondo alla pagina: invio guida agli arrivi + impostazioni codici */}
           {/* IMPOSTAZIONE UNA-TANTUM: codici di accesso per camera */}
-          <Card>
+          <Card className="mt-6">
             <div className="flex items-center gap-2">
               <SectionTitle>Codici di accesso per camera</SectionTitle>
               <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-faint">imposti una volta</span>
