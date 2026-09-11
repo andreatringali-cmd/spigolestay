@@ -831,8 +831,8 @@ export default function GuidaOspitiPage() {
               <F label="Instagram"><input value={guide.social.instagram} disabled readOnly className={fldRO} /></F>
               <F label="Facebook"><input value={guide.social.facebook} disabled readOnly className={fldRO} /></F>
               <F label="Sito web"><input value={guide.social.website} disabled readOnly className={fldRO} /></F>
+              <a href={`/strutture/${sid}`} className="flex items-center justify-center gap-1.5 self-end rounded-lg border border-line px-3 py-2.5 text-sm font-semibold text-focus transition hover:bg-wash">✎ Modifica i dati della struttura →</a>
               </div>
-              <a href={`/strutture/${sid}`} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-focus hover:bg-wash">✎ Modifica i dati della struttura →</a>
             </>)}
           </Card>
           <Card>
