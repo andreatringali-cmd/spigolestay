@@ -320,6 +320,8 @@ const compressImage = (file: File, maxDim: number, quality: number, fmt: string 
 const fld = "w-full rounded-lg border border-line bg-paper px-3.5 py-2.5 text-[15px] text-txt outline-none focus:border-focus";
 // Textarea "alto" standard: stessa altezza per tutti i campi di testo lunghi (come il messaggio Home).
 const fldTA = "w-full resize-y rounded-lg border border-line bg-paper px-3.5 py-2.5 text-[15px] leading-relaxed text-txt outline-none focus:border-focus min-h-[9rem]";
+// Ripulisce i dati dai caratteri NUL ( ): il tipo jsonb di Postgres li rifiuta (errore 22P05).
+const stripNul = (o: unknown) => { try { return JSON.parse(JSON.stringify(o).replace(/ /g, "")); } catch { return o; } };
 // Campo in sola lettura: il dato arriva dalle Impostazioni struttura, qui non si modifica.
 const fldRO = "w-full rounded-lg border border-line bg-wash px-3.5 py-2.5 text-[15px] text-dim outline-none cursor-not-allowed";
 const F = ({ label, children }: { label: string; children: React.ReactNode }) => (<label className="block text-xs font-medium text-dim">{label}<div className="mt-1">{children}</div></label>);
@@ -416,7 +418,8 @@ export default function GuidaOspitiPage() {
   const wifiEsc = (v: string) => v.replace(/([\\;,:"])/g, "\\$1");
   const wifiPayload = (ssid: string, pw: string) => `WIFI:T:${pw ? "WPA" : "nopass"};S:${wifiEsc(ssid)};P:${wifiEsc(pw)};;`;
   // Chiave = credenziali per cui il QR è stato creato: se cambiano, si rigenera da solo.
-  const wifiKey = (ssid: string, pw: string) => ssid + " " + pw;
+  // (Niente NUL  : il jsonb di Postgres lo rifiuta quando pubblichiamo la guida.)
+  const wifiKey = (ssid: string, pw: string) => JSON.stringify([ssid, pw]);
   const makeWifiQr = async (ssid: string, pw: string) =>
     QRCode.toDataURL(wifiPayload(ssid, pw), { margin: 1, width: 360, errorCorrectionLevel: "M", color: { dark: "#14424F", light: "#ffffff" } });
   const genWifiQr = async () => {
@@ -767,7 +770,7 @@ export default function GuidaOspitiPage() {
     const g = all[sid];
     if (!g) return;
     const t = setTimeout(() => {
-      supabase!.from("public_guides").upsert({ id: sid, data: g, updated_at: new Date().toISOString() }).then(undefined, () => {});
+      supabase!.from("public_guides").upsert({ id: sid, data: stripNul(g), updated_at: new Date().toISOString() }).then(undefined, () => {});
     }, 4000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -829,7 +832,7 @@ export default function GuidaOspitiPage() {
             <option value="es">🇪🇸 Español</option>
           </select>
           <a href={previewUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">Schermo intero ↗</a>
-          <button onClick={() => { savedSigRef.current = sigRef.current; setLastSaved(Date.now()); refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 1500); if (supabase && sid && all[sid]) supabase.from("public_guides").upsert({ id: sid, data: all[sid], updated_at: new Date().toISOString() }).then(undefined, () => {}); }} title="Salvataggio automatico attivo · clicca per salvare e pubblicare subito" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1 text-xs font-semibold text-dim hover:bg-wash">
+          <button onClick={() => { savedSigRef.current = sigRef.current; setLastSaved(Date.now()); refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 1500); if (supabase && sid && all[sid]) supabase.from("public_guides").upsert({ id: sid, data: stripNul(all[sid]), updated_at: new Date().toISOString() }).then(undefined, () => {}); }} title="Salvataggio automatico attivo · clicca per salvare e pubblicare subito" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1 text-xs font-semibold text-dim hover:bg-wash">
             {savedTick
               ? <span className="flex items-center gap-1" style={{ color: "var(--ok)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Salvato</span>
               : <>💾 Salvataggio automatico{lastSaved ? ` · ${new Date(lastSaved).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : ""}</>}
