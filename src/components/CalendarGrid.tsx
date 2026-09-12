@@ -380,6 +380,7 @@ export default function CalendarGrid() {
 
   function onBarPointerDown(e: React.PointerEvent, bId: string) {
     e.preventDefault();
+    try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch {}
     dragRef.current = { id: bId, startX: e.clientX, startY: e.clientY, moved: false };
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
@@ -654,7 +655,7 @@ export default function CalendarGrid() {
                 onPointerDown={(e) => onBarPointerDown(e, b.id)}
                 title={`${blocked ? `Fuori servizio${b.note ? ` · ${b.note}` : ""}` : `${guestName(b.guestId)} · ${pax} ospiti${b.total ? ` · €${Math.round(b.total)}` : ""}`} · ${b.checkIn} → ${b.checkOut}${tentative ? " · opzione" : ""}`}
                 className={`absolute overflow-hidden ${sotto ? "flex cursor-grab flex-col justify-end active:cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
-                style={{ left: g.left + 1, width: g.width - 2, top: 1, height: rowH - 2, opacity: dragging ? 0.35 : tentative ? 0.72 : 1, pointerEvents: dragView ? "none" : "auto" }}
+                style={{ left: g.left + 1, width: g.width - 2, top: 1, height: rowH - 2, opacity: dragging ? 0.35 : tentative ? 0.72 : 1, pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
               >
                 {sotto ? (
                   <>
@@ -1320,7 +1321,7 @@ export default function CalendarGrid() {
                         onPointerDown={(e) => onBarPointerDown(e, b.id)}
                         title={`${guestName(b.guestId)} · da assegnare`}
                         className="absolute flex cursor-grab items-center overflow-hidden border-2 border-dashed px-2 text-xs font-semibold active:cursor-grabbing"
-                        style={{ left: g.left, width: g.width, top: 0, height: rowH, borderColor: `var(${meta.cssVar})`, color: `var(${meta.cssVar})`, background: "color-mix(in srgb, var(--surface) 85%, transparent)", opacity: dragging ? 0.35 : 1, pointerEvents: dragView ? "none" : "auto" }}
+                        style={{ left: g.left, width: g.width, top: 0, height: rowH, borderColor: `var(${meta.cssVar})`, color: `var(${meta.cssVar})`, background: "color-mix(in srgb, var(--surface) 85%, transparent)", opacity: dragging ? 0.35 : 1, pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
                       >
                         <span className="truncate">{guestName(b.guestId)}</span>
                       </div>
