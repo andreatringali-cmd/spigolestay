@@ -239,8 +239,8 @@ export default function NuovaPrenotazionePage() {
               </div>
             )}
             <div className="ml-auto flex items-center gap-5 text-dim">
-              <label className="flex items-center gap-2"><Toggle on={group} onClick={() => setGroup((v) => !v)} /> Gruppo</label>
               <label className="flex items-center gap-2"><Toggle on={onlyAvail} onClick={() => setOnlyAvail((v) => !v)} /> Solo disponibili</label>
+              <label className="flex items-center gap-2"><Toggle on={group} onClick={() => setGroup((v) => !v)} /> Gruppo</label>
             </div>
             {group && <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Nome gruppo" className={`${inp} basis-full sm:max-w-xs`} />}
           </div>
