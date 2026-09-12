@@ -820,9 +820,16 @@ export default function GuidaOspitiPage() {
         ))}
       </div>
 
-      {/* Riga filtri: a sinistra lo stato "Pronta", a destra i controlli dell'anteprima */}
+      {/* Riga filtri: a sinistra la struttura che stai modificando, a destra i controlli dell'anteprima */}
       <div className="mb-4 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-dim">
+            <span className="text-faint">🏠 Struttura:</span>
+            <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-txt outline-none focus:border-focus">
+              {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
           <button onClick={refresh} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">↻ Aggiorna</button>
           <select value={pvLang} onChange={(e) => setPvLang(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-dim outline-none focus:border-focus">
             <option value="it">🇮🇹 Italiano</option>
@@ -837,6 +844,7 @@ export default function GuidaOspitiPage() {
               ? <span className="flex items-center gap-1" style={{ color: "var(--ok)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Salvato</span>
               : <>💾 Salvataggio automatico{lastSaved ? ` · ${new Date(lastSaved).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : ""}</>}
           </button>
+          </div>
         </div>
       </div>
 
