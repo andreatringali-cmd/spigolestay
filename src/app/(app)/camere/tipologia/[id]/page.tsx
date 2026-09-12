@@ -42,6 +42,8 @@ export default function TipologiaSchedaPage() {
   const set = <K extends keyof RoomType>(k: K, v: RoomType[K]) => setF((p) => ({ ...p, [k]: v }));
   const num = (v: string) => (v === "" ? undefined : Number(v));
   const [lang, setLang] = useState("it");
+  const [nameOpen, setNameOpen] = useState(false);
+  const nameSuggestions = ROOM_TYPE_OPTIONS.filter((o) => { const s = (f.name ?? "").trim().toLowerCase(); return !s || (o.toLowerCase().includes(s) && o.toLowerCase() !== s); });
 
   const structure = structures.find((s) => s.id === structureId);
   const nUnits = existing ? units.filter((u) => u.roomTypeId === existing.id).length : 0;
@@ -129,7 +131,16 @@ export default function TipologiaSchedaPage() {
               <div><div className="text-[11px] text-faint">{t("Colore (calendario e camere)")}</div><div className="mt-1 flex gap-1.5">{AV_COLORS.map((c) => <button key={c} onClick={() => set("color", c)} className={`h-5 w-5 rounded-full border-2 ${f.color === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div></div>
               {!isNew && <span className="ml-auto rounded-full bg-wash px-2.5 py-1 text-xs text-dim">{nUnits} {t("camere di questa tipologia")}</span>}
             </div>
-            <label className={lbl}>{t("Nome tipologia")} *<input value={f.name ?? ""} onChange={(e) => set("name", e.target.value)} list="rto" className={`${inp} mt-1`} placeholder={t("Es. Camera Matrimoniale Deluxe")} /><datalist id="rto">{ROOM_TYPE_OPTIONS.map((o) => <option key={o} value={o} />)}</datalist></label>
+            <label className={lbl}>{t("Nome tipologia")} *
+              <div className="relative mt-1">
+                <input value={f.name ?? ""} onChange={(e) => set("name", e.target.value)} onFocus={() => setNameOpen(true)} onBlur={() => setTimeout(() => setNameOpen(false), 120)} autoComplete="off" className={inp} placeholder={t("Es. Camera Matrimoniale Deluxe")} />
+                {nameOpen && nameSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-lg">
+                    {nameSuggestions.map((o) => <button key={o} type="button" onMouseDown={(e) => { e.preventDefault(); set("name", o); setNameOpen(false); }} className="block w-full truncate rounded-lg px-3 py-2 text-left text-sm text-txt hover:bg-wash">{o}</button>)}
+                  </div>
+                )}
+              </div>
+            </label>
             <label className={`${lbl} mt-3`}>{t("Descrizione breve")}<textarea value={f.description ?? ""} onChange={(e) => set("description", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={t("Sintesi mostrata nei listini interni…")} /></label>
           </Card>
 
