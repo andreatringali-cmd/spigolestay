@@ -282,7 +282,7 @@ export default function StatistichePage() {
             <table className="w-full table-fixed border-t-2 border-line text-sm">
               <RepCols />
               <tbody>
-                <tr><td colSpan={11} className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "#2C8A8A" }}>{t("Totali")}</td></tr>
+                <tr><td colSpan={11} className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "var(--focus)" }}>{t("Totali")}</td></tr>
                 {([["Somma storico", totStorico, "var(--dim)"], ["Somma previsione", totPrevis, "var(--ok)"], ["Totale", totAll, "var(--txt)"]] as const).map(([lab, tt, col], i) => (
                   <tr key={lab} className={`border-t border-line ${i === 2 ? "bg-wash font-bold" : "font-medium"}`}>
                     <td className="truncate px-3 py-2" colSpan={2} style={{ color: col }}>{t(lab)}</td>

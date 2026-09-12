@@ -35,7 +35,6 @@ const INSIGHT_CARDS = [
 
 const MIN_CELL = 34;  // larghezza minima cella (sotto questa, scroll orizzontale)
 const ROW_H = 26;
-const LABEL_W = 212;
 
 // Festivi nazionali (giorno fisso). Sabato = arancio, Domenica/festivo = rosso.
 const HOLIDAYS = new Set(["01-01", "01-06", "04-25", "05-01", "06-02", "08-15", "11-01", "12-08", "12-25", "12-26"]);
@@ -84,6 +83,10 @@ export default function CalendarGrid() {
   useEffect(() => { const h = (e: MouseEvent) => { if (monthRef.current && !monthRef.current.contains(e.target as Node)) setMonthOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
   const monthList = useMemo(() => { const base = new Date(); const first = new Date(base.getFullYear(), base.getMonth() - 2, 1); return Array.from({ length: 18 }, (_, i) => { const d = new Date(first.getFullYear(), first.getMonth() + i, 1); return { y: d.getFullYear(), m: d.getMonth(), label: d.toLocaleDateString("it-IT", { month: "long", year: "numeric" }) }; }); }, []);
   const rowH = vw.dense ? 31 : 42;
+  // Su cellulare la colonna con i nomi camera è molto più stretta, così si vede più calendario.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => { const f = () => setIsMobile(window.innerWidth < 640); f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
+  const LABEL_W = isMobile ? 104 : 212;
   // Stile etichetta barra: "dentro" (nome nella barra) o "sotto" (barra sottile + nome sotto).
   const [barStyle, setBarStyle] = useState<"dentro" | "sotto">("dentro");
   useEffect(() => { try { const s = localStorage.getItem("spigolestay:calbars"); if (s === "sotto" || s === "dentro") setBarStyle(s); } catch {} }, []);

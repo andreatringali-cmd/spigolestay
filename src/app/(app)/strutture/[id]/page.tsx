@@ -235,7 +235,7 @@ export default function StrutturaSchedaPage() {
               <label className={lbl}>{t("Tipo")}<select value={f.type ?? ""} onChange={(e) => set("type", e.target.value)} className={`${inp} mt-1`}>{STRUCTURE_TYPES.map((st) => <option key={st} value={st}>{t(st)}</option>)}</select></label>
               <label className={lbl}>{t("Gruppo / Network")}<input value={f.groupName} onChange={(e) => set("groupName", e.target.value)} list="grp" className={`${inp} mt-1`} placeholder={t("Es. Spigole")} /><datalist id="grp">{groups.map((g) => <option key={g} value={g} />)}</datalist></label>
             </div>
-            <label className={`${lbl} mt-3`}>{t("Descrizione")}<textarea value={f.description ?? ""} onChange={(e) => set("description", e.target.value)} rows={3} className={`${inp} mt-1 resize-y`} placeholder={t("Breve descrizione per il sito e il motore di prenotazione…")} /></label>
+            <label className={`${lbl} mt-3`}>{t("Descrizione")}<textarea value={f.description ?? ""} onChange={(e) => set("description", e.target.value)} rows={5} className={`${inp} mt-1 min-h-[7rem] resize-y`} placeholder={t("Breve descrizione per il sito e il motore di prenotazione…")} /></label>
           </Card>
 
           {/* Contatti */}
