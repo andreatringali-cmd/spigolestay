@@ -18,6 +18,7 @@ export default function UpsellingPage() {
   const guest = (id: string) => guests.find((g) => g.id === id);
 
   const [editId, setEditId] = useState<string | null>(null);
+  const [q, setQ] = useState("");
   const [offerFor, setOfferFor] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [localCat, setLocalCat] = useState<string>(structures[0]?.id ?? "");
@@ -45,6 +46,7 @@ export default function UpsellingPage() {
 
   const extrasOf = (structId: string) => (structures.find((s) => s.id === structId)?.extras ?? []).filter(isActive);
   const activeCat = catExtras.filter(isActive);
+  const shownExtras = catExtras.filter((e) => { const s = q.trim().toLowerCase(); return !s || e.name.toLowerCase().includes(s) || (e.desc ?? "").toLowerCase().includes(s); });
 
   const arrivals = useMemo(() => bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.checkIn >= today && (activeStructureId === "all" || b.structureId === activeStructureId)).sort((a, b) => a.checkIn.localeCompare(b.checkIn)).slice(0, 30), [bookings, today, activeStructureId]);
 
@@ -80,29 +82,32 @@ export default function UpsellingPage() {
         ))}
       </div>
 
+      {/* Riga filtri: cerca extra · struttura · aggiungi extra (a destra) */}
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
+        <div className="relative min-w-[160px] flex-1 sm:max-w-xs">
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><Icon name="search" size={14} /></span>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca extra…" className="w-full rounded-lg border border-line bg-paper py-1.5 pl-8 pr-3 text-sm text-txt outline-none focus:border-focus" />
+        </div>
+        {activeStructureId === "all" && structures.length > 0 && (
+          <select value={catId} onChange={(e) => setLocalCat(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-dim outline-none focus:border-focus">
+            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        )}
+        <button onClick={addExtra} disabled={!catId} className="ml-auto rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>+ Aggiungi extra</button>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
         {/* Catalogo (unico, dalla scheda struttura) */}
         <Card className="flex flex-col">
-          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-            <SectionTitle>Catalogo extra ({catExtras.length})</SectionTitle>
-            <button onClick={addExtra} disabled={!catId} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-40">+ Extra</button>
-          </div>
-          {activeStructureId === "all" ? (
-            <label className="mb-2 flex items-center gap-2 text-xs text-dim">Struttura
-              <select value={catId} onChange={(e) => setLocalCat(e.target.value)} className="rounded-lg border border-line bg-surface px-2 py-1 text-xs text-txt outline-none focus:border-focus">
-                {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </label>
-          ) : (
-            <p className="mb-2 text-[11px] text-faint">Extra di <b className="text-dim">{catStruct?.name}</b> · stesso elenco usato dal motore prenotazioni.</p>
-          )}
+          <SectionTitle>Catalogo extra ({catExtras.length})</SectionTitle>
+          <p className="mb-2 mt-0.5 text-[11px] text-faint">Extra di <b className="text-dim">{catStruct?.name}</b> · stesso elenco usato dal motore prenotazioni.</p>
           <div className="flex-1 space-y-2 overflow-y-auto" style={{ maxHeight: 460 }}>
-            {catExtras.length === 0 && (
+            {shownExtras.length === 0 && (
               <div className="rounded-lg border border-dashed border-line py-6 text-center text-sm text-faint">
-                Nessun extra per questa struttura.
+                {q.trim() ? "Nessun extra trovato." : "Nessun extra per questa struttura."}
               </div>
             )}
-            {catExtras.map((e) => (
+            {shownExtras.map((e) => (
               <div key={e.id} className={`rounded-lg border p-2.5 ${isActive(e) ? "border-line bg-paper" : "border-line bg-wash opacity-60"}`}>
                 {editId === e.id ? (
                   <div className="space-y-1.5">
@@ -146,9 +151,9 @@ export default function UpsellingPage() {
                       <div className="flex flex-wrap gap-1.5">
                         {bExtras.map((e) => { const on = picked.has(e.id); return (<button key={e.id} onClick={() => setPicked((p) => { const n = new Set(p); if (n.has(e.id)) n.delete(e.id); else n.add(e.id); return n; })} className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{e.name} · {eur(e.price)}</button>); })}
                       </div>
-                      <div className="mt-2 flex gap-2">
-                        <button onClick={() => sendOffer(b.id, "wa")} disabled={!g?.phone || picked.size === 0} className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={13} /> WhatsApp</button>
-                        <button onClick={() => sendOffer(b.id, "email")} disabled={!g?.email || picked.size === 0} className="flex items-center gap-1 rounded-lg bg-focus px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40"><Icon name="mail" size={13} /> Email</button>
+                      <div className="mt-3 flex gap-2 border-t border-line pt-3">
+                        <button onClick={() => sendOffer(b.id, "wa")} disabled={!g?.phone || picked.size === 0} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={14} /> WhatsApp</button>
+                        <button onClick={() => sendOffer(b.id, "email")} disabled={!g?.email || picked.size === 0} className="flex items-center gap-1.5 rounded-lg bg-focus px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40"><Icon name="mail" size={14} /> Email</button>
                       </div>
                     </div>
                   )}
