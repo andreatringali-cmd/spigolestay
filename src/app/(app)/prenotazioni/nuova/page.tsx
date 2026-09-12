@@ -218,11 +218,10 @@ export default function NuovaPrenotazionePage() {
               {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           )}
-          <div className="inline-flex rounded-lg border border-line p-0.5">
-            {([["prenotazione", "Prenotazione"], ["preventivo", "Preventivo"]] as const).map(([m, lab]) => (
-              <button key={m} onClick={() => setMode(m)} className={`rounded-md px-3 py-1 text-xs font-semibold transition ${mode === m ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>
-            ))}
-          </div>
+          <select value={mode} onChange={(e) => setMode(e.target.value as "prenotazione" | "preventivo")} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
+            <option value="prenotazione">Prenotazione</option>
+            <option value="preventivo">Preventivo</option>
+          </select>
           <label className="flex items-center gap-2 text-dim"><Toggle on={onlyAvail} onClick={() => setOnlyAvail((v) => !v)} /> Solo disponibili</label>
           <label className="flex items-center gap-2 text-dim"><Toggle on={group} onClick={() => setGroup((v) => !v)} /> Gruppo</label>
           {group && <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Nome gruppo" className={`${inp} basis-full sm:max-w-xs`} />}
