@@ -56,12 +56,18 @@ export default function NuovaPrenotazionePage() {
   const nightsN = Math.max(1, nights(checkIn, checkOut));
   const party = adults + children;
 
-  // Camere della tipologia libere per le date scelte (stessa logica del calendario):
-  // esclude quelle fuori servizio in permanenza e quelle con una prenotazione o un fuori
-  // servizio (barra "blocked") che si sovrappone alle notti richieste. Le cancellate non contano.
-  const availUnits = (rt: RoomType) => units.filter((u) => u.roomTypeId === rt.id && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn));
-  // Totale camere reali della tipologia (fuori servizio permanenti escluse): serve a mostrare "libere su totale".
-  const unitsOfType = (rt: RoomType) => units.filter((u) => u.roomTypeId === rt.id && !u.outOfService).length;
+  // Le tariffe derivate (es. "Matrimoniale uso singola") non hanno camere proprie: condividono
+  // il pool della tipologia madre. Risalgo alla tipologia che possiede le camere fisiche.
+  const poolRootId = (rt: RoomType): string => {
+    let cur: RoomType | undefined = rt; const seen = new Set<string>();
+    while (cur?.deriveFrom && cur?.deriveInherit && !seen.has(cur.id)) { seen.add(cur.id); const p = roomTypes.find((x) => x.id === cur!.deriveFrom); if (!p) break; cur = p; }
+    return cur?.id ?? rt.id;
+  };
+  // Camere fisiche libere del pool per le date scelte (stessa logica del calendario):
+  // esclude fuori servizio permanenti e camere con prenotazione/blocco sovrapposto. Le cancellate non contano.
+  const availUnits = (rt: RoomType) => { const root = poolRootId(rt); return units.filter((u) => u.roomTypeId === root && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn)); };
+  // Totale camere reali del pool (fuori servizio permanenti escluse): serve a mostrare "libere su totale".
+  const unitsOfType = (rt: RoomType) => { const root = poolRootId(rt); return units.filter((u) => u.roomTypeId === root && !u.outOfService).length; };
   const dayPrice = (rt: RoomType, iso: string) => { const base = effBase(rt, roomTypes); const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(base * (isWeekend(iso) ? 1 + weekendPct / 100 : 1)); return Math.max(0, Math.round(raw)); };
   const stayPrice = (rt: RoomType) => { let s = 0; for (let i = 0; i < nightsN; i++) s += dayPrice(rt, shiftISO(checkIn, i)); return s; };
   const cap = (rt: RoomType) => rt.maxOccupancy ?? rt.beds ?? 2;
@@ -97,7 +103,8 @@ export default function NuovaPrenotazionePage() {
     const guestId = addGuest({ lastName: lastName.trim() || undefined, firstName: firstName.trim() || undefined, email: email.trim() || undefined, phone: phone.trim() || undefined });
     const groupId = isGroup ? ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now())) : undefined;
     const flat: { rt: RoomType; unitId: string | null }[] = [];
-    selected.forEach((rt) => { const free = availUnits(rt); const q = Math.min(qty[rt.id] ?? 0, free.length); for (let k = 0; k < q; k++) flat.push({ rt, unitId: free[k]?.id ?? null }); });
+    const usedUnitIds = new Set<string>(); // evita di assegnare la stessa camera fisica a madre e derivata
+    selected.forEach((rt) => { const free = availUnits(rt).filter((u) => !usedUnitIds.has(u.id)); const q = Math.min(qty[rt.id] ?? 0, free.length); for (let k = 0; k < q; k++) { const u = free[k]; if (u) usedUnitIds.add(u.id); flat.push({ rt, unitId: u?.id ?? null }); } });
     const nR = Math.max(1, flat.length);
     const dist = (tot: number, i: number) => Math.floor(tot / nR) + (i < tot % nR ? 1 : 0);
     let ci = 0; // cursore per distribuire le età dei bambini tra le camere del gruppo
@@ -242,11 +249,15 @@ export default function NuovaPrenotazionePage() {
                           const av = availUnits(rt).length;
                           const q = qty[rt.id] ?? 0;
                           const fits = cap(rt) >= party;
+                          const isDerived = !!rt.deriveFrom && !!rt.deriveInherit;
+                          const rootId = poolRootId(rt);
+                          const poolSel = selected.filter((x) => poolRootId(x) === rootId).reduce((a, x) => a + (qty[x.id] ?? 0), 0);
+                          const canAdd = poolSel < av;
                           return (
                             <tr key={rt.id} className={q > 0 ? "bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]" : ""}>
                               <td className="px-4 py-3">
-                                <div className="font-semibold text-txt">{rt.name}</div>
-                                <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-dim"><Icon name="cup" size={12} /> BB · Flessibile 7 gg{!fits && <span className="text-[color:var(--warn)]">· capienza {cap(rt)} &lt; {party} ospiti</span>}</div>
+                                <div className="flex items-center gap-1.5 font-semibold text-txt">{rt.name}{isDerived && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>↳ derivata</span>}</div>
+                                <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-dim"><Icon name="cup" size={12} /> BB · Flessibile 7 gg{isDerived && <span className="text-faint">· stesse camere della madre</span>}{!fits && <span className="text-[color:var(--warn)]">· capienza {cap(rt)} &lt; {party} ospiti</span>}</div>
                               </td>
                               <td className="px-3 py-3 text-center"><span className="inline-flex items-center gap-[1px] text-dim">{Array.from({ length: Math.min(cap(rt), 5) }).map((_, i) => <Person key={i} />)}</span></td>
                               <td className="px-3 py-3 text-center"><span className="inline-grid h-6 w-6 place-items-center rounded-full text-[color:var(--ok)]" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)" }}><Icon name="check" size={13} /></span></td>
@@ -256,7 +267,7 @@ export default function NuovaPrenotazionePage() {
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button disabled={q <= 0} onClick={() => setQ(rt.id, q - 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line text-lg leading-none text-dim hover:bg-wash disabled:opacity-30">−</button>
                                   <span className={`w-6 text-center text-sm font-bold ${q > 0 ? "text-[color:var(--focus)]" : "text-dim"}`}>{q}</span>
-                                  <button disabled={q >= av} onClick={() => setQ(rt.id, q + 1)} className={`flex h-8 w-8 items-center justify-center rounded-lg border text-lg leading-none disabled:opacity-30 ${q > 0 ? "border-focus bg-focus text-white hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
+                                  <button disabled={!canAdd} onClick={() => setQ(rt.id, q + 1)} className={`flex h-8 w-8 items-center justify-center rounded-lg border text-lg leading-none disabled:opacity-30 ${q > 0 ? "border-focus bg-focus text-white hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
                                 </div>
                               </td>
                             </tr>
