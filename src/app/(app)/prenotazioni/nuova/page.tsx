@@ -75,7 +75,9 @@ export default function NuovaPrenotazionePage() {
   const linePrice = (rt: RoomType) => priceOv[rt.id] ?? stayPrice(rt);
   const setQ = (rtId: string, n: number) => setQty((q) => ({ ...q, [rtId]: Math.max(0, n) }));
 
-  const orderedStructs = structFilter === "all" ? structures : structures.filter((s) => s.id === structFilter);
+  // Se in alto è selezionata una struttura (locked), i risultati la rispettano sempre, a prescindere dal filtro interno.
+  const effFilter = locked ? activeStructureId : structFilter;
+  const orderedStructs = effFilter === "all" ? structures : structures.filter((s) => s.id === effFilter);
   const rowsOf = (sId: string) => roomTypes.filter((rt) => rt.structureId === sId).filter((rt) => (onlyAvail ? availUnits(rt).length > 0 : true));
   const totalTypes = orderedStructs.reduce((a, s) => a + rowsOf(s.id).length, 0);
 
@@ -107,7 +109,7 @@ export default function NuovaPrenotazionePage() {
     // In modalità Preventivo la disponibilità verificata porta alla pagina Preventivi (con i dati precompilati).
     if (mode === "preventivo") {
       const p = new URLSearchParams({ ci: checkIn, co: checkOut, ad: String(adults), ch: String(children) });
-      if (structFilter !== "all") p.set("s", structFilter);
+      if (effFilter !== "all") p.set("s", effFilter);
       router.push(`/preventivi?${p.toString()}`);
       return;
     }
