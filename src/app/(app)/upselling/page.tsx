@@ -20,6 +20,7 @@ export default function UpsellingPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [offerFor, setOfferFor] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [localCat, setLocalCat] = useState<string>(structures[0]?.id ?? "");
 
@@ -61,13 +62,15 @@ export default function UpsellingPage() {
     const list = extrasOf(b.structureId).filter((e) => picked.has(e.id)).map((e) => `• ${e.name} — ${eur(e.price)} ${PER_LABEL[e.per]}${e.desc ? ` (${e.desc})` : ""}`).join("\n");
     return `Ciao ${first},\nper rendere ancora più speciale il tuo soggiorno dal ${fmt(b.checkIn)}, possiamo aggiungere:\n\n${list}\n\nRispondi a questo messaggio per prenotarli, ci pensiamo noi!\n\nA presto,\n${st?.name ?? ""}`;
   };
-  const sendOffer = (bookingId: string, via: "email" | "wa") => {
+  const sendOffer = async (bookingId: string, via: "email" | "wa" | "copy") => {
     const b = bookings.find((x) => x.id === bookingId); if (!b) return;
     const g = guest(b.guestId); const msg = offerMsg(bookingId);
-    if (via === "wa" && g?.phone) window.open(`https://wa.me/${g.phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
+    if (via === "copy") { try { await navigator.clipboard.writeText(msg); } catch {} }
+    else if (via === "wa") window.open(`https://wa.me/${(g?.phone ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
     else if (g?.email) window.open(`mailto:${g.email}?subject=${encodeURIComponent("Servizi extra per il tuo soggiorno")}&body=${encodeURIComponent(msg)}`, "_blank");
-    addActivity("message", `Proposta extra inviata${g?.fullName ? " — " + g.fullName : ""} (${via === "wa" ? "WhatsApp" : "email"})`);
-    setOfferFor(null); setPicked(new Set());
+    const label = via === "wa" ? "WhatsApp" : via === "email" ? "email" : "testo copiato";
+    addActivity("message", `Proposta extra inviata${g?.fullName ? " — " + g.fullName : ""} (${label})`);
+    setShareOpen(false); setOfferFor(null); setPicked(new Set());
   };
 
   const inp = "w-full rounded border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus";
@@ -139,21 +142,37 @@ export default function UpsellingPage() {
             {arrivals.map((b) => {
               const g = guest(b.guestId);
               const bExtras = extrasOf(b.structureId);
+              const open = offerFor === b.id;
+              const noExtras = bExtras.length === 0;
               return (
-                <div key={b.id} className="rounded-lg border border-line bg-paper p-2.5">
-                  <div className="flex items-center gap-2">
+                <div key={b.id} className={`rounded-lg border bg-paper transition ${open ? "border-focus" : "border-line"}`}>
+                  <button
+                    onClick={() => { if (noExtras) return; const willOpen = !open; setShareOpen(false); setOfferFor(willOpen ? b.id : null); if (willOpen) setPicked(new Set(bExtras.slice(0, 3).map((e) => e.id))); }}
+                    disabled={noExtras}
+                    title={noExtras ? "Nessun extra attivo per questa struttura" : undefined}
+                    className="flex w-full items-center gap-2 p-2.5 text-left disabled:opacity-50"
+                  >
                     <div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold text-txt">{g?.fullName || "Ospite"}</div><div className="text-[11px] text-faint">{structures.find((s) => s.id === b.structureId)?.name} · arrivo {fmt(b.checkIn)}</div></div>
-                    <button onClick={() => { setOfferFor(offerFor === b.id ? null : b.id); setPicked(new Set(bExtras.slice(0, 3).map((e) => e.id))); }} disabled={bExtras.length === 0} title={bExtras.length === 0 ? "Nessun extra attivo per questa struttura" : undefined} className="shrink-0 rounded-lg bg-focus px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">Proponi extra</button>
-                  </div>
-                  {offerFor === b.id && (
-                    <div className="mt-2 border-t border-line pt-2">
+                    {!noExtras && <span className={`shrink-0 text-faint transition-transform ${open ? "rotate-90" : ""}`} aria-hidden>▸</span>}
+                  </button>
+                  {open && (
+                    <div className="border-t border-line p-2.5 pt-2">
                       <div className="mb-1.5 text-[11px] font-medium text-dim">Scegli gli extra da proporre:</div>
                       <div className="flex flex-wrap gap-1.5">
                         {bExtras.map((e) => { const on = picked.has(e.id); return (<button key={e.id} onClick={() => setPicked((p) => { const n = new Set(p); if (n.has(e.id)) n.delete(e.id); else n.add(e.id); return n; })} className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{e.name} · {eur(e.price)}</button>); })}
                       </div>
-                      <div className="mt-3 flex gap-2 border-t border-line pt-3">
-                        <button onClick={() => sendOffer(b.id, "wa")} disabled={!g?.phone || picked.size === 0} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={14} /> WhatsApp</button>
-                        <button onClick={() => sendOffer(b.id, "email")} disabled={!g?.email || picked.size === 0} className="flex items-center gap-1.5 rounded-lg bg-focus px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40"><Icon name="mail" size={14} /> Email</button>
+                      <div className="relative mt-3 border-t border-line pt-3">
+                        <button onClick={() => setShareOpen((v) => !v)} disabled={picked.size === 0} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}><Icon name="share" size={14} /> Condividi</button>
+                        {shareOpen && picked.size > 0 && (
+                          <>
+                            <button aria-label="Chiudi" onClick={() => setShareOpen(false)} className="fixed inset-0 z-20 cursor-default" />
+                            <div className="absolute left-0 z-30 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-lg">
+                              <button onClick={() => sendOffer(b.id, "wa")} disabled={!g?.phone} title={!g?.phone ? "Nessun numero per questo ospite" : undefined} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash disabled:opacity-40"><Icon name="chat" size={15} /> WhatsApp</button>
+                              <button onClick={() => sendOffer(b.id, "email")} disabled={!g?.email} title={!g?.email ? "Nessuna email per questo ospite" : undefined} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash disabled:opacity-40"><Icon name="mail" size={15} /> Email</button>
+                              <button onClick={() => sendOffer(b.id, "copy")} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> Copia testo</button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
