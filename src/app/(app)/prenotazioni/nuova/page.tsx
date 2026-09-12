@@ -49,6 +49,7 @@ export default function NuovaPrenotazionePage() {
   const [phone, setPhone] = useState("");
   const [channel, setChannel] = useState<Channel>("direct");
   const [parking, setParking] = useState(false);
+  const [parkingPrice, setParkingPrice] = useState("");
   const [deposit, setDeposit] = useState("");
   const [sendConfirm, setSendConfirm] = useState(true);
   const [err, setErr] = useState("");
@@ -91,6 +92,14 @@ export default function NuovaPrenotazionePage() {
   const grandWithExtras = grandTotal + extrasTotal;
   const chosenExtras = availExtras.filter((e) => (extraQty[e.id] ?? 0) > 0).map((e) => { const q = extraQty[e.id] ?? 0; return { name: q > 1 ? `${e.name} ×${q}` : e.name, price: e.price * q }; });
   const setExtraQ = (id: string, n: number) => setExtraQty((m) => ({ ...m, [id]: Math.max(0, n) }));
+  // Parcheggio: 0 = incluso, >0 = voce a pagamento che entra nel voucher.
+  const parkingPriceN = parking ? Math.max(0, Number(parkingPrice) || 0) : 0;
+  // Extra salvati sulla prenotazione: servizi scelti + parcheggio se a pagamento.
+  const bookingExtras = [...chosenExtras, ...(parkingPriceN > 0 ? [{ name: "Parcheggio", price: parkingPriceN }] : [])];
+  // Tassa di soggiorno e totale finale del voucher (camere + extra + parcheggio + tassa).
+  const taxStruct = getStructure(selected[0]?.structureId);
+  const cityTax = cityTaxOf(taxStruct, adults, nightsN, grandTotal);
+  const grandFinal = grandWithExtras + parkingPriceN + cityTax;
 
   const doSearch = () => {
     if (checkOut <= checkIn) { setErr("Il check-out deve essere dopo il check-in"); return; }
@@ -114,7 +123,7 @@ export default function NuovaPrenotazionePage() {
       const ages = childAges.slice(ci, ci + kids); ci += kids;
       const roomCribs = nR > 1 ? Math.min(dist(cribs, i), kids) : cribs;
       const depositN = Math.max(0, Number(deposit) || 0);
-      const created = addBooking({ groupId, structureId: r.rt.structureId, roomTypeId: r.rt.id, unitId: r.unitId, guestId, channel, status: "confirmed", checkIn, checkOut, adults: nR > 1 ? dist(adults, i) : adults, children: kids, childAges: ages.length ? ages : undefined, cribs: roomCribs || undefined, parking: parking || undefined, paid: i === 0 && depositN > 0 ? depositN : undefined, total: linePrice(r.rt) || undefined, extras: i === 0 && chosenExtras.length ? chosenExtras : undefined, note: isGroup && groupName.trim() ? groupName.trim() : undefined });
+      const created = addBooking({ groupId, structureId: r.rt.structureId, roomTypeId: r.rt.id, unitId: r.unitId, guestId, channel, status: "confirmed", checkIn, checkOut, adults: nR > 1 ? dist(adults, i) : adults, children: kids, childAges: ages.length ? ages : undefined, cribs: roomCribs || undefined, parking: parking || undefined, paid: i === 0 && depositN > 0 ? depositN : undefined, total: linePrice(r.rt) || undefined, extras: i === 0 && bookingExtras.length ? bookingExtras : undefined, note: isGroup && groupName.trim() ? groupName.trim() : undefined });
       if (i === 0) primary = created;
     });
     // Conferma all'ospite (voucher via email). Uso i dati appena inseriti per evitare i ritardi dello stato.
@@ -123,6 +132,38 @@ export default function NuovaPrenotazionePage() {
       sendVoucher(primary, { getStructure, getGuest: () => guestObj, getRoomType, getUnit });
     }
     router.push("/prenotazioni");
+  };
+
+  // Stampa / salva PDF del voucher con i dati correnti (senza creare la prenotazione).
+  const printVoucher = () => {
+    const st = taxStruct;
+    const depositN = Math.max(0, Number(deposit) || 0);
+    const saldo = Math.max(0, grandFinal - depositN);
+    const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] || c));
+    const rows: string[] = [];
+    selected.forEach((rt) => rows.push(`<tr><td>${qty[rt.id]}× ${esc(rt.name)}</td><td class="r">${eur(linePrice(rt) * (qty[rt.id] ?? 0))}</td></tr>`));
+    chosenExtras.forEach((e) => rows.push(`<tr><td>${esc(e.name)}</td><td class="r">${eur(e.price)}</td></tr>`));
+    rows.push(`<tr><td>Colazione</td><td class="r">inclusa</td></tr>`);
+    rows.push(`<tr><td>Parcheggio</td><td class="r">${parking ? (parkingPriceN > 0 ? eur(parkingPriceN) : "incluso") : "non richiesto"}</td></tr>`);
+    if (cityTax > 0) rows.push(`<tr><td>Tassa di soggiorno</td><td class="r">${eur(cityTax)}</td></tr>`);
+    const guestName = `${firstName} ${lastName}`.trim() || "Ospite";
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Voucher ${esc(guestName)}</title><style>
+      body{font-family:system-ui,Arial,sans-serif;color:#1a1a1a;max-width:640px;margin:32px auto;padding:0 20px}
+      h1{font-size:20px;margin:0 0 2px} .mut{color:#777;font-size:13px}
+      .box{border:1px solid #ddd;border-radius:12px;padding:16px;margin-top:16px}
+      table{width:100%;border-collapse:collapse;font-size:14px} td{padding:6px 0;border-bottom:1px solid #eee}
+      .r{text-align:right} .tot{font-size:18px;font-weight:800} .head{background:${st?.photoColor || "#1f6f78"};color:#fff;padding:16px;border-radius:12px}
+    </style></head><body>
+      <div class="head"><h1>${esc(st?.name || "Struttura")}</h1><div>Voucher di prenotazione · ${esc(guestName)}</div></div>
+      <div class="box"><div class="mut">${fmtDay(checkIn)} → ${fmtDay(checkOut)} · ${nightsN} ${nightsN === 1 ? "notte" : "notti"} · ${adults} ${adults === 1 ? "adulto" : "adulti"}${children > 0 ? `, ${children} bambini` : ""}</div>
+      <table>${rows.join("")}
+      <tr><td class="tot">Totale</td><td class="r tot">${eur(grandFinal)}</td></tr>
+      ${depositN > 0 ? `<tr><td>Acconto versato</td><td class="r">${eur(depositN)}</td></tr><tr><td>Saldo in struttura</td><td class="r">${eur(saldo)}</td></tr>` : ""}
+      </table></div>
+      <p class="mut">${[st?.address, st?.phone, st?.email].filter(Boolean).map(esc).join(" · ")}</p>
+      <script>window.onload=function(){window.print()}</script>
+    </body></html>`;
+    const w = window.open("", "_blank"); if (w) { w.document.write(html); w.document.close(); }
   };
 
   const Toggle = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
@@ -294,9 +335,6 @@ export default function NuovaPrenotazionePage() {
 
       {/* ─────────── Step 3 · Personalizza (layout mini-sito: dati a sx, riepilogo/voucher a dx) ─────────── */}
       {phase === "details" && totalRooms > 0 && (() => {
-        const taxStruct = getStructure(selected[0]?.structureId);
-        const cityTax = cityTaxOf(taxStruct, adults, nightsN, grandTotal);
-        const grandFinal = grandWithExtras + cityTax;
         const depositN = Math.max(0, Number(deposit) || 0);
         const saldo = Math.max(0, grandFinal - depositN);
         return (
@@ -317,6 +355,7 @@ export default function NuovaPrenotazionePage() {
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-line pt-3">
                   <label className="flex items-center gap-2 text-sm text-txt"><Toggle on={parking} onClick={() => setParking((v) => !v)} /> Parcheggio</label>
+                  {parking && <label className="flex items-center gap-2 text-sm text-txt">Prezzo parcheggio <span className="flex items-center gap-1">€ <input type="number" min={0} value={parkingPrice} onChange={(e) => setParkingPrice(e.target.value)} placeholder="0 = incluso" className="w-28 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></span></label>}
                   <label className="flex items-center gap-2 text-sm text-txt">Acconto <span className="flex items-center gap-1">€ <input type="number" min={0} value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="0" className="w-24 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></span></label>
                   <label className={`flex items-center gap-2 text-sm ${email.trim() ? "text-txt" : "text-faint"}`} title={email.trim() ? undefined : "Inserisci l'email dell'ospite per inviare il voucher"}><Toggle on={sendConfirm && !!email.trim()} onClick={() => setSendConfirm((v) => !v)} /> Invia il voucher di conferma via email</label>
                 </div>
@@ -380,13 +419,14 @@ export default function NuovaPrenotazionePage() {
                     <div key={i} className="flex items-baseline justify-between gap-3"><span className="text-dim">{e.name}</span><span className="shrink-0 font-mono text-dim">{eur(e.price)}</span></div>
                   ))}
                   <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Colazione</span><span className="shrink-0 text-[color:var(--ok)]">inclusa</span></div>
-                  <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Parcheggio</span><span className="shrink-0 text-[color:var(--ok)]">{parking ? "incluso" : "non richiesto"}</span></div>
+                  <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Parcheggio</span>{parking ? (parkingPriceN > 0 ? <span className="shrink-0 font-mono text-dim">{eur(parkingPriceN)}</span> : <span className="shrink-0 text-[color:var(--ok)]">incluso</span>) : <span className="shrink-0 text-faint">non richiesto</span>}</div>
                   {cityTax > 0 && <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Tassa di soggiorno{taxStruct?.cityTaxMode !== "percent" ? ` (${adults}×${Math.min(nightsN, taxStruct?.cityTaxMaxNights ?? 3)})` : ""}</span><span className="shrink-0 font-mono text-dim">{eur(cityTax)}</span></div>}
                 </div>
                 <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2"><span className="font-semibold text-txt">Totale</span><span className="font-mono text-xl font-extrabold text-txt">{eur(grandFinal)}</span></div>
                 {depositN > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">Acconto adesso</span><span className="font-mono font-semibold text-txt">{eur(depositN)}</span></div>}
                 {depositN > 0 && saldo > 0 && <div className="mt-0.5 flex items-baseline justify-between text-xs"><span className="text-dim">Saldo in struttura</span><span className="font-mono font-semibold text-txt">{eur(saldo)}</span></div>}
                 <button onClick={confirm} className="mt-3 w-full rounded-lg bg-focus px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90">{isGroup ? "Crea gruppo" : "Crea prenotazione"}</button>
+                <button onClick={printVoucher} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line px-5 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Stampa voucher / PDF</button>
                 {err && <div className="mt-2 text-center text-sm font-medium text-[color:var(--err)]">{err}</div>}
                 <p className="mt-2 text-center text-[11px] text-faint">{sendConfirm && email.trim() ? "Alla conferma parte il voucher via email all'ospite." : "Tassa di soggiorno, commissioni e fattura si gestiscono dalla scheda."}</p>
               </Card>
