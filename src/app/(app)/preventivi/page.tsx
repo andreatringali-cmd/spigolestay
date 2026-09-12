@@ -702,7 +702,6 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               </>)}
             </div>
           </div>
-          <p className="mt-2 text-xs text-faint">{t("All'invio (PDF/email/WhatsApp) il preventivo viene salvato in automatico nella scheda «Archivio».")}</p>
         </Card>
       </div>
       )}
