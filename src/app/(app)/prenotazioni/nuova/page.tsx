@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel, type RoomType, type Booking, type Guest } from "@/lib/types";
 import { sendVoucher } from "@/lib/mailer";
@@ -182,12 +181,9 @@ export default function NuovaPrenotazionePage() {
   return (
     <div>
       {/* Titolo compatto */}
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-xl font-bold text-txt">Aggiungi prenotazione</h1>
-          <p className="text-xs text-dim">Cerca la disponibilità e componi la prenotazione, anche di gruppo</p>
-        </div>
-        <Link href="/prenotazioni" className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">← Prenotazioni</Link>
+      <div className="mb-3">
+        <h1 className="font-display text-xl font-bold text-txt">Aggiungi prenotazione</h1>
+        <p className="text-xs text-dim">Cerca la disponibilità e componi la prenotazione, anche di gruppo</p>
       </div>
 
       {/* Indicatore di step 1-2-3 */}
