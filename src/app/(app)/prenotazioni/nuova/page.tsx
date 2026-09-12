@@ -38,6 +38,7 @@ export default function NuovaPrenotazionePage() {
   const [groupName, setGroupName] = useState("");
   const [structFilter, setStructFilter] = useState<string>(locked ? activeStructureId : "all");
   const [phase, setPhase] = useState<"search" | "rooms" | "details">("search");
+  const [mode, setMode] = useState<"prenotazione" | "preventivo">("prenotazione");
   const [extraQty, setExtraQty] = useState<Record<string, number>>({});
 
   // ── Selezione + intestatario ──
@@ -103,7 +104,15 @@ export default function NuovaPrenotazionePage() {
 
   const doSearch = () => {
     if (checkOut <= checkIn) { setErr("Il check-out deve essere dopo il check-in"); return; }
-    setErr(""); setPhase("rooms");
+    setErr("");
+    // In modalità Preventivo la disponibilità verificata porta alla pagina Preventivi (con i dati precompilati).
+    if (mode === "preventivo") {
+      const p = new URLSearchParams({ ci: checkIn, co: checkOut, ad: String(adults), ch: String(children) });
+      if (structFilter !== "all") p.set("s", structFilter);
+      router.push(`/preventivi?${p.toString()}`);
+      return;
+    }
+    setPhase("rooms");
   };
 
   const confirm = () => {
@@ -201,57 +210,52 @@ export default function NuovaPrenotazionePage() {
       {/* ─────────── Step 1 · Disponibilità ─────────── */}
       {phase === "search" && (
         <Card className="mb-5">
-          {/* Date e ospiti */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <FieldL label="Arrivo"><input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className={inp} /></FieldL>
-            <FieldL label="Partenza"><input type="date" value={checkOut} min={shiftISO(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className={inp} /></FieldL>
-            <FieldL label="Adulti"><input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, +e.target.value))} className={inp} /></FieldL>
-            <FieldL label="Bambini"><input type="number" min={0} value={children} onChange={(e) => setChildrenN(Math.max(0, +e.target.value))} className={inp} /></FieldL>
-          </div>
-
-          {/* Età bambini + culle */}
-          {children > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line pt-3">
-              <span className="text-xs font-medium text-dim">Età bambini</span>
-              {childAges.map((age, i) => (
-                <div key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2 py-1">
-                  <span className="text-[11px] text-faint">{i + 1}°</span>
-                  <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, Number(e.target.value))) : a)))} className="w-12 rounded border border-line bg-surface px-1 py-0.5 text-sm text-txt outline-none focus:border-focus" />
-                </div>
+          {/* Controlli: struttura · preventivo/prenotazione · solo disponibili · gruppo */}
+          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line pb-3 text-sm">
+            <select value={structFilter} onChange={(e) => setStructFilter(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
+              <option value="all">Tutte le strutture</option>
+              {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <div className="inline-flex rounded-lg border border-line p-0.5">
+              {([["prenotazione", "Prenotazione"], ["preventivo", "Preventivo"]] as const).map(([m, lab]) => (
+                <button key={m} onClick={() => setMode(m)} className={`rounded-md px-3 py-1 text-xs font-semibold transition ${mode === m ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>
               ))}
-              <span className="ml-2 flex items-center gap-2 text-sm text-dim">Culle
-                <button onClick={() => setCribs((v) => Math.max(0, v - 1))} disabled={cribs <= 0} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30">−</button>
-                <span className="w-4 text-center text-sm font-semibold tabular-nums text-txt">{cribs}</span>
-                <button onClick={() => setCribs((v) => Math.min(children, v + 1))} disabled={cribs >= children} className="flex h-7 w-7 items-center justify-center rounded-lg border border-focus bg-focus text-base leading-none text-white hover:opacity-90 disabled:opacity-30">+</button>
-              </span>
             </div>
-          )}
-
-          {/* Strutture a sinistra · gruppo e solo disponibili a destra */}
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-3 text-sm">
-            {!locked && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                {[{ id: "all", name: "Tutte" }, ...structures].map((s) => (
-                  <button key={s.id} onClick={() => setStructFilter(s.id)} className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition ${structFilter === s.id ? "border-focus bg-focus text-white" : "border-line text-dim hover:bg-wash"}`}>
-                    {s.id !== "all" && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: structColor(s.id) }} />}{s.name}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="ml-auto flex items-center gap-5 text-dim">
-              <label className="flex items-center gap-2"><Toggle on={onlyAvail} onClick={() => setOnlyAvail((v) => !v)} /> Solo disponibili</label>
-              <label className="flex items-center gap-2"><Toggle on={group} onClick={() => setGroup((v) => !v)} /> Gruppo</label>
-            </div>
+            <label className="flex items-center gap-2 text-dim"><Toggle on={onlyAvail} onClick={() => setOnlyAvail((v) => !v)} /> Solo disponibili</label>
+            <label className="flex items-center gap-2 text-dim"><Toggle on={group} onClick={() => setGroup((v) => !v)} /> Gruppo</label>
             {group && <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Nome gruppo" className={`${inp} basis-full sm:max-w-xs`} />}
           </div>
 
-          {err && phase === "search" && <div className="mt-3 text-sm font-medium text-[color:var(--err)]">{err}</div>}
-
-          {/* Azione */}
-          <div className="mt-4 flex items-center gap-3 border-t border-line pt-4">
-            <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-3 py-1 text-xs font-bold text-[color:var(--focus)]">{nightsN} {nightsN === 1 ? "notte" : "notti"}</span>
-            <button onClick={doSearch} className="ml-auto flex items-center justify-center gap-2 rounded-lg bg-focus px-6 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"><Icon name="search" size={16} /> Cerca disponibilità</button>
+          {/* Date, ospiti e azione (in linea) */}
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex min-w-[140px] flex-1 flex-col gap-1.5 text-xs font-medium text-dim">Arrivo<input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className={inp} /></label>
+            <label className="flex min-w-[140px] flex-1 flex-col gap-1.5 text-xs font-medium text-dim">Partenza<input type="date" value={checkOut} min={shiftISO(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className={inp} /></label>
+            <label className="flex w-[88px] flex-col gap-1.5 text-xs font-medium text-dim">Adulti<input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, +e.target.value))} className={inp} /></label>
+            <label className="flex w-[88px] flex-col gap-1.5 text-xs font-medium text-dim">Bambini<input type="number" min={0} value={children} onChange={(e) => setChildrenN(Math.max(0, +e.target.value))} className={inp} /></label>
+            <button onClick={doSearch} className="rounded-lg bg-focus px-6 py-2 text-sm font-semibold text-white transition hover:opacity-90" style={{ height: 38 }}>Verifica disponibilità</button>
           </div>
+
+          {/* Età dei bambini */}
+          {children > 0 && (
+            <div className="mt-3 border-t border-line pt-3">
+              <div className="mb-2 text-xs font-medium text-dim">Età dei bambini <span className="font-normal text-faint">(per la tassa di soggiorno e la sistemazione)</span></div>
+              <div className="flex flex-wrap items-center gap-2">
+                {childAges.map((age, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5">
+                    <span className="text-xs text-faint">Bimbo {i + 1}</span>
+                    <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, Number(e.target.value))) : a)))} className="w-12 rounded border border-line bg-surface px-1 py-0.5 text-sm text-txt outline-none focus:border-focus" />
+                  </div>
+                ))}
+                <span className="ml-2 flex items-center gap-2 text-sm text-dim">Culle
+                  <button onClick={() => setCribs((v) => Math.max(0, v - 1))} disabled={cribs <= 0} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30">−</button>
+                  <span className="w-4 text-center text-sm font-semibold tabular-nums text-txt">{cribs}</span>
+                  <button onClick={() => setCribs((v) => Math.min(children, v + 1))} disabled={cribs >= children} className="flex h-7 w-7 items-center justify-center rounded-lg border border-focus bg-focus text-base leading-none text-white hover:opacity-90 disabled:opacity-30">+</button>
+                </span>
+              </div>
+            </div>
+          )}
+
+          {err && phase === "search" && <div className="mt-3 text-sm font-medium text-[color:var(--err)]">{err}</div>}
         </Card>
       )}
 
