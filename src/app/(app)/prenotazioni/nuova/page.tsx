@@ -46,6 +46,8 @@ export default function NuovaPrenotazionePage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [channel, setChannel] = useState<Channel>("direct");
+  const [parking, setParking] = useState(false);
+  const [deposit, setDeposit] = useState("");
   const [err, setErr] = useState("");
 
   const nightsN = Math.max(1, nights(checkIn, checkOut));
@@ -92,7 +94,8 @@ export default function NuovaPrenotazionePage() {
       const kids = nR > 1 ? dist(children, i) : children;
       const ages = childAges.slice(ci, ci + kids); ci += kids;
       const roomCribs = nR > 1 ? Math.min(dist(cribs, i), kids) : cribs;
-      addBooking({ groupId, structureId: r.rt.structureId, roomTypeId: r.rt.id, unitId: r.unitId, guestId, channel, status: "confirmed", checkIn, checkOut, adults: nR > 1 ? dist(adults, i) : adults, children: kids, childAges: ages.length ? ages : undefined, cribs: roomCribs || undefined, total: linePrice(r.rt) || undefined, note: isGroup && groupName.trim() ? groupName.trim() : undefined });
+      const depositN = Math.max(0, Number(deposit) || 0);
+      addBooking({ groupId, structureId: r.rt.structureId, roomTypeId: r.rt.id, unitId: r.unitId, guestId, channel, status: "confirmed", checkIn, checkOut, adults: nR > 1 ? dist(adults, i) : adults, children: kids, childAges: ages.length ? ages : undefined, cribs: roomCribs || undefined, parking: parking || undefined, paid: i === 0 && depositN > 0 ? depositN : undefined, total: linePrice(r.rt) || undefined, note: isGroup && groupName.trim() ? groupName.trim() : undefined });
     });
     router.push("/prenotazioni");
   };
@@ -303,6 +306,13 @@ export default function NuovaPrenotazionePage() {
             <FieldL label="Canale"><select value={channel} onChange={(e) => setChannel(e.target.value as Channel)} className={inp}>{CHANNEL_OPTS.map((c) => (<option key={c} value={c}>{CHANNELS[c].label}</option>))}</select></FieldL>
             <FieldL label="Email"><input value={email} onChange={(e) => setEmail(e.target.value)} className={inp} placeholder="opzionale" /></FieldL>
             <FieldL label="Telefono"><input value={phone} onChange={(e) => setPhone(e.target.value)} className={inp} placeholder="opzionale" /></FieldL>
+          </div>
+
+          {/* Dettagli facoltativi decisi al momento · il resto si gestisce dalla scheda prenotazione */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-line bg-paper p-3">
+            <label className="flex items-center gap-2 text-sm text-txt"><Toggle on={parking} onClick={() => setParking((v) => !v)} /> Parcheggio</label>
+            <label className="flex items-center gap-2 text-sm text-txt">Acconto <span className="flex items-center gap-1">€ <input type="number" min={0} value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="0" className="w-24 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></span></label>
+            <span className="text-[11px] text-faint">Extra, tassa di soggiorno, commissioni e fattura si aggiungono dalla scheda della prenotazione.</span>
           </div>
 
           <div className="mt-4 flex items-center justify-end gap-3 border-t border-line pt-4">
