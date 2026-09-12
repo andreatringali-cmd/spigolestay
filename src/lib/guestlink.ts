@@ -39,6 +39,41 @@ export function guideMessage(structureId: string, opts: { name?: string; link: s
   return out.replace(/\n?—\s*$/,"").trimEnd(); // se la firma {struttura} è vuota, togli il trattino finale
 }
 
+// Codici (etichetta + valore) di una camera, filtrati per parcheggio — per il link di gruppo.
+export function codesListForRoom(unitId: string | null | undefined, hasParking: boolean): { l: string; v: string }[] {
+  let codes: RoomCode[] = [];
+  try {
+    const ra = JSON.parse(localStorage.getItem("spigolestay:roomaccess") || "{}");
+    const raw = unitId ? ra[unitId] : null;
+    if (Array.isArray(raw)) codes = raw as RoomCode[];
+  } catch { /* niente codici */ }
+  return codes
+    .filter((c) => (c.cond === "parking" ? hasParking : c.cond === "noparking" ? !hasParking : true))
+    .map((c) => ({ l: (c.label || "").trim(), v: (c.value || "").trim() }))
+    .filter((c) => c.v);
+}
+
+// Link UNICO per una prenotazione di GRUPPO (2+ camere): mostra tutte le camere e, nella guida,
+// i codici di ciascuna camera (parametro kr). Un solo link da mandare all'unico numero del gruppo.
+export function buildGroupGuestLink(opts: {
+  structureId: string;
+  guestName?: string;
+  rooms: { unitId?: string | null; unitCode?: string; parking?: boolean }[];
+}): string {
+  const base = typeof window !== "undefined" ? window.location.origin : "";
+  const p = new URLSearchParams();
+  p.set("p", opts.structureId);
+  const roomCodes = opts.rooms.map((r) => (r.unitCode || "").trim()).filter(Boolean);
+  if (roomCodes.length) p.set("c", roomCodes.join(","));
+  const kr = opts.rooms
+    .filter((r) => (r.unitCode || "").trim())
+    .map((r) => ({ r: (r.unitCode || "").trim(), c: codesListForRoom(r.unitId, !!r.parking) }));
+  if (kr.some((x) => x.c.length)) p.set("kr", JSON.stringify(kr));
+  p.set("pk", opts.rooms.some((r) => r.parking) ? "1" : "0");
+  if (opts.guestName?.trim()) p.set("g", opts.guestName.trim());
+  return `${base}/guida/index.html?${p.toString()}`;
+}
+
 export function buildGuestLink(opts: {
   structureId: string;
   unitId?: string | null;

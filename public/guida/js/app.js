@@ -17,12 +17,13 @@
     var params = new URLSearchParams(location.search);
     // Nomi brevi (c/pk) con i vecchi (camera/tipo/park) come ripiego:
     // i link già in mano agli ospiti devono continuare a funzionare.
-    var hasGuest = ["c", "camera", "k", "pk", "park", "p", "d", "tax", "g"].some(function (x) { return params.has(x); });
+    var hasGuest = ["c", "camera", "k", "kr", "pk", "park", "p", "d", "tax", "g"].some(function (x) { return params.has(x); });
     if (hasGuest) {
       var guest = {
         room: params.get("c") || params.get("camera") || "",
         type: params.get("tipo") || "",
         k: params.get("k") || "",
+        kr: params.get("kr") || "", // codici PER CAMERA (prenotazioni di gruppo): JSON [{r,c:[{l,v}]}]
         park: params.has("pk") ? params.get("pk") : (params.has("park") ? params.get("park") : ""),
         p: params.get("p") || "",
         d: params.get("d") || "",    // portale documenti Octorate, uno per prenotazione
@@ -63,6 +64,10 @@
         if (codes[0]) P.gateCode = codes[0];
         if (codes[1]) P.doorCode = codes[1];
         if (codes[2]) P.doorCode2 = codes[2];
+      }
+      // kr = codici PER CAMERA (prenotazione di gruppo, 2+ camere in un unico link).
+      if (saved.kr) {
+        try { var rc = JSON.parse(saved.kr); if (Array.isArray(rc) && rc.length) P.roomCodesList = rc; } catch (e) {}
       }
     }
   })();
@@ -579,6 +584,25 @@
         P.roomNum = allNum; P.roomNums = allNums; P.roomPlural = allPlural;
       });
       html += "</ol>";
+    }
+
+    // Codici PER CAMERA (prenotazione di gruppo, 2+ camere in un unico link): un riquadro con
+    // i codici di ciascuna camera. Compare solo nella sezione Arrivo/Check-in.
+    if (s.id === "checkin" && P.roomCodesList && P.roomCodesList.length) {
+      var rcTitle = (t.ui && t.ui.roomCodesTitle) || "I codici delle vostre camere";
+      var rcWord = (t.ui && t.ui.roomWord) || "Camera";
+      html += '<div style="margin-top:18px;border:1px solid rgba(0,0,0,.08);border-radius:14px;padding:14px 16px;background:#fff">';
+      html += '<div style="font-weight:700;margin-bottom:6px;font-size:15px">' + esc(rcTitle) + "</div>";
+      P.roomCodesList.forEach(function (rc) {
+        var codes = (rc.c || []).filter(function (x) { return x && x.v; });
+        if (!codes.length) return;
+        html += '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid rgba(0,0,0,.06)">';
+        html += '<span style="font-weight:700;min-width:70px;color:#B04A2C">' + esc(rcWord + " " + (rc.r || "")) + "</span>";
+        html += '<span style="display:flex;flex-wrap:wrap;gap:6px">';
+        html += codes.map(function (x) { return '<span style="display:inline-flex;gap:6px;align-items:baseline;background:#f4efe9;border-radius:8px;padding:3px 9px;font-size:15px"><span style="color:#8a8177;font-size:12px">' + esc(x.l || "") + "</span><b>" + esc(x.v) + "</b></span>"; }).join("");
+        html += "</span></div>";
+      });
+      html += "</div>";
     }
 
     // Galleria foto subito dopo i passaggi (flag gallery = camere da PROPERTY.roomPhotos)

@@ -6,7 +6,7 @@ import { useData } from "@/lib/store";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import { bookingCode } from "@/lib/bookingCode";
 import { sendVoucher } from "@/lib/mailer";
-import { buildGuestLink, guideMessage } from "@/lib/guestlink";
+import { buildGuestLink, buildGroupGuestLink, guideMessage } from "@/lib/guestlink";
 import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
 import { nights, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
@@ -441,7 +441,10 @@ export default function BookingDrawer() {
         })()}
         {/* Invia la guida ospite: link con camera + codici (per camera, filtrati dal parcheggio) */}
         {(() => {
-          const gLink = buildGuestLink({ structureId: booking.structureId, unitId: booking.unitId, unitCode: unitV?.code || unitV?.name || "", guestName: guest?.fullName || "", parking: !!booking.parking });
+          const groupBk = booking.groupId ? bookings.filter((x) => x.groupId === booking.groupId) : [booking];
+          const gLink = groupBk.length > 1
+            ? buildGroupGuestLink({ structureId: booking.structureId, guestName: guest?.fullName || "", rooms: groupBk.map((bb) => ({ unitId: bb.unitId, unitCode: getUnit(bb.unitId)?.code || getUnit(bb.unitId)?.name || "", parking: !!bb.parking })) })
+            : buildGuestLink({ structureId: booking.structureId, unitId: booking.unitId, unitCode: unitV?.code || unitV?.name || "", guestName: guest?.fullName || "", parking: !!booking.parking });
           const gWa = encodeURIComponent(guideMessage(booking.structureId, { name: guest?.fullName || "", link: gLink, structureName: structure?.name || "" }));
           return (
             <div className="mt-2 border-t border-line pt-3">

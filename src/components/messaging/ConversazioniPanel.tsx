@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
-import { buildGuestLink } from "@/lib/guestlink";
+import { buildGuestLink, buildGroupGuestLink } from "@/lib/guestlink";
 import { playSound } from "@/lib/sound";
 import { useLang } from "@/lib/i18n";
 import { CHANNELS, type Booking, type Guest } from "@/lib/types";
@@ -126,8 +126,12 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   // Link della guida NUOVA, costruito dalla prenotazione: struttura + camera + codici (per camera,
   // filtrati dal parcheggio) + nome ospite. Legge i codici impostati per quella camera.
   const guideUrlFor = (b: Booking) => {
-    const unit = getUnit(b.unitId);
     const gu = guests.find((x) => x.id === b.guestId);
+    const groupBk = b.groupId ? bookings.filter((x) => x.groupId === b.groupId) : [b];
+    if (groupBk.length > 1) {
+      return buildGroupGuestLink({ structureId: b.structureId, guestName: gu?.fullName || "", rooms: groupBk.map((bb) => ({ unitId: bb.unitId, unitCode: getUnit(bb.unitId)?.code || getUnit(bb.unitId)?.name || "", parking: !!bb.parking })) });
+    }
+    const unit = getUnit(b.unitId);
     return buildGuestLink({ structureId: b.structureId, unitId: b.unitId, unitCode: unit?.code || unit?.name || "", guestName: gu?.fullName || "", parking: !!b.parking });
   };
   const checkinUrlFor = (b: Booking) => `${typeof window !== "undefined" ? window.location.origin : ""}/checkin?b=${encodeURIComponent(b.id)}`;
