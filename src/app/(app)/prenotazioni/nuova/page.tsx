@@ -145,36 +145,92 @@ export default function NuovaPrenotazionePage() {
     router.push("/prenotazioni");
   };
 
-  // Stampa / salva PDF del voucher con i dati correnti (senza creare la prenotazione).
+  // Stampa / salva PDF del voucher (carta intestata A4, stesso stile del preventivo) con i dati correnti.
   const printVoucher = () => {
     const st = taxStruct;
+    const w = window.open("", "_blank", "width=820,height=1000");
+    if (!w) return;
+    const esc = (v: string) => (v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const accent = st?.photoColor || "#0F6E56";
     const depositN = Math.max(0, Number(deposit) || 0);
     const saldo = Math.max(0, grandFinal - depositN);
-    const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] || c));
-    const rows: string[] = [];
-    selected.forEach((rt) => rows.push(`<tr><td>${qty[rt.id]}× ${esc(rt.name)}</td><td class="r">${eur(linePrice(rt) * (qty[rt.id] ?? 0))}</td></tr>`));
-    chosenExtras.forEach((e) => rows.push(`<tr><td>${esc(e.name)}</td><td class="r">${eur(e.price)}</td></tr>`));
-    rows.push(`<tr><td>Colazione</td><td class="r">inclusa</td></tr>`);
-    rows.push(`<tr><td>Parcheggio</td><td class="r">${parking ? (parkingPriceN > 0 ? eur(parkingPriceN) : "incluso") : "non richiesto"}</td></tr>`);
-    if (cityTax > 0) rows.push(`<tr><td>Tassa di soggiorno</td><td class="r">${eur(cityTax)}</td></tr>`);
+    const nWord = nightsN === 1 ? "notte" : "notti";
+    const structureName = st?.name || "La tua struttura";
+    const stAddress = [st?.address, st?.streetNumber, st?.city].filter(Boolean).join(" ");
+    const stContacts = [st?.phone, st?.email, st?.website].filter(Boolean).join("  ·  ");
     const guestName = `${firstName} ${lastName}`.trim() || "Ospite";
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Voucher ${esc(guestName)}</title><style>
-      body{font-family:system-ui,Arial,sans-serif;color:#1a1a1a;max-width:640px;margin:32px auto;padding:0 20px}
-      h1{font-size:20px;margin:0 0 2px} .mut{color:#777;font-size:13px}
-      .box{border:1px solid #ddd;border-radius:12px;padding:16px;margin-top:16px}
-      table{width:100%;border-collapse:collapse;font-size:14px} td{padding:6px 0;border-bottom:1px solid #eee}
-      .r{text-align:right} .tot{font-size:18px;font-weight:800} .head{background:${st?.photoColor || "#1f6f78"};color:#fff;padding:16px;border-radius:12px}
-    </style></head><body>
-      <div class="head"><h1>${esc(st?.name || "Struttura")}</h1><div>Voucher di prenotazione · ${esc(guestName)}</div></div>
-      <div class="box"><div class="mut">${fmtDay(checkIn)} → ${fmtDay(checkOut)} · ${nightsN} ${nightsN === 1 ? "notte" : "notti"} · ${adults} ${adults === 1 ? "adulto" : "adulti"}${children > 0 ? `, ${children} bambini` : ""}</div>
-      <table>${rows.join("")}
-      <tr><td class="tot">Totale</td><td class="r tot">${eur(grandFinal)}</td></tr>
-      ${depositN > 0 ? `<tr><td>Acconto versato</td><td class="r">${eur(depositN)}</td></tr><tr><td>Saldo in struttura</td><td class="r">${eur(saldo)}</td></tr>` : ""}
-      </table></div>
-      <p class="mut">${[st?.address, st?.phone, st?.email].filter((x): x is string => !!x).map(esc).join(" · ")}</p>
-      <script>window.onload=function(){window.print()}</script>
-    </body></html>`;
-    const w = window.open("", "_blank"); if (w) { w.document.write(html); w.document.close(); }
+    const todayStr = new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" });
+    const logoHtml = st?.logo
+      ? `<img src="${st.logo}" alt="" class="logoimg">`
+      : `<div class="logo" style="background:${accent}">${esc(structureName.slice(0, 1).toUpperCase())}</div>`;
+    const periodCards = ([["Check-in", fmtDay(checkIn)], ["Check-out", fmtDay(checkOut)], ["Durata", `${nightsN} ${nWord}`], ["Ospiti", `${adults}${children > 0 ? ` + ${children}` : ""}`]] as [string, string][])
+      .map(([k, v]) => `<div class="pc"><div class="pk">${esc(k)}</div><div class="pv">${esc(v)}</div></div>`).join("");
+    const rows: string[] = [];
+    selected.forEach((rt) => rows.push(`<tr><td>${qty[rt.id]}× ${esc(rt.name)} <span class="mut">· ${eur(linePrice(rt))} × ${nightsN} ${nWord}</span></td><td class="r"><b>${eur(linePrice(rt) * (qty[rt.id] ?? 0))}</b></td></tr>`));
+    chosenExtras.forEach((e) => rows.push(`<tr><td>${esc(e.name)}</td><td class="r mut">${eur(e.price)}</td></tr>`));
+    rows.push(`<tr><td>Colazione</td><td class="r mut">inclusa</td></tr>`);
+    if (parking) rows.push(`<tr><td>Parcheggio</td><td class="r mut">${parkingPriceN > 0 ? eur(parkingPriceN) : "incluso"}</td></tr>`);
+    if (cityTax > 0) rows.push(`<tr><td>Tassa di soggiorno <span class="mut">(${adults} ${adults === 1 ? "persona" : "persone"})</span></td><td class="r">${eur(cityTax)}</td></tr>`);
+    const accText = depositN <= 0
+      ? `Nessun acconto richiesto: saldo di ${eur(grandFinal)} in struttura.`
+      : saldo <= 0
+        ? `Soggiorno saldato per intero: ${eur(grandFinal)}.`
+        : `Acconto di ${eur(depositN)} versato; saldo di ${eur(saldo)} da regolare in struttura.`;
+    const html = `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Conferma prenotazione · ${esc(structureName)}</title><style>
+@page{size:A4;margin:0}
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+html,body{margin:0;padding:0;background:#f1efec}
+body{font-family:'Helvetica Neue',Arial,Helvetica,sans-serif;color:#2b2b2b;font-size:12.5px;line-height:1.5}
+.sheet{width:210mm;min-height:297mm;margin:0 auto;background:#fff;padding:20mm 18mm 16mm;position:relative}
+.bar{position:absolute;top:0;left:0;right:0;height:7px;background:${accent}}
+.head{display:flex;align-items:center;gap:16px;border-bottom:1px solid #ece7df;padding-bottom:18px}
+.logo{width:60px;height:60px;border-radius:14px;color:#fff;font-weight:800;font-size:30px;display:flex;align-items:center;justify-content:center}
+.logoimg{width:60px;height:60px;object-fit:contain;border-radius:14px;background:#fff;border:1px solid #ece7df}
+.brand{font-size:24px;font-weight:800;letter-spacing:-.4px}
+.sub{color:#726b62;font-size:11.5px;margin-top:3px}
+.qbadge{margin-left:auto;text-align:right}
+.qlabel{font-size:9.5px;letter-spacing:.12em;color:#726b62;text-transform:uppercase;font-weight:700}
+.qno{font-size:15px;font-weight:800;color:${accent}}
+.qdate{font-size:11px;color:#726b62}
+h2{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#9a9186;font-weight:700;margin:26px 0 10px}
+.hi{font-size:15px;margin:22px 0 4px}
+.lead{color:#726b62;margin:0 0 4px;font-size:12.5px}
+.period{display:flex;gap:12px;margin-top:6px}
+.pc{flex:1;border:1px solid #ece7df;border-radius:10px;padding:11px 13px}
+.pk{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#9a9186;font-weight:700}
+.pv{font-size:15px;font-weight:700;margin-top:3px}
+table{width:100%;border-collapse:collapse}
+td{padding:9px 2px;border-bottom:1px solid #f0ebe3;font-size:13px}
+td.r{text-align:right;white-space:nowrap}
+.mut{color:#9a9186;font-weight:400}
+.total{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding:14px 16px;border-radius:10px;background:${accent}14}
+.total .tl{font-size:12px;font-weight:700;letter-spacing:.04em}
+.total .tv{font-size:20px;font-weight:800;color:${accent}}
+.cond{font-size:12.5px;line-height:1.55;margin:2px 0}
+.note{margin-top:14px;font-style:italic;color:#726b62;font-size:12px}
+.closing{margin-top:20px;font-size:13px}
+.sign{margin-top:2px;font-weight:700}
+.foot{position:absolute;left:18mm;right:18mm;bottom:12mm;border-top:1px solid #ece7df;padding-top:10px;color:#b3a99c;font-size:10px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+</style></head><body><div class="sheet"><div class="bar"></div>
+<div class="head">${logoHtml}<div style="min-width:0"><div class="brand">${esc(structureName)}</div>${stAddress ? `<div class="sub">${esc(stAddress)}</div>` : ""}${stContacts ? `<div class="sub" style="margin-top:1px">${esc(stContacts)}</div>` : ""}</div>
+<div class="qbadge"><div class="qlabel">Conferma prenotazione</div><div class="qno">${esc(guestName)}</div><div class="qdate">${todayStr}</div></div></div>
+<p class="hi">Gentile <b>${esc(guestName)}</b>,</p>
+<p class="lead">confermiamo la tua prenotazione. Ecco il riepilogo.</p>
+<h2>Soggiorno</h2>
+<div class="period">${periodCards}</div>
+<h2>Riepilogo</h2>
+<table>${rows.join("")}</table>
+<div class="total"><span class="tl">Totale</span><span class="tv">${eur(grandFinal)}</span></div>
+<h2>Condizioni</h2>
+<p class="cond">${esc(accText)}</p>
+${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
+<p class="closing">Ti aspettiamo! Per qualsiasi necessità siamo a disposizione.</p>
+<p class="sign">${esc(structureName)}</p>
+<div class="foot"><span>${[esc(structureName), esc(stAddress), esc(stContacts)].filter(Boolean).join("  ·  ")}</span><span>${todayStr}</span></div>
+</div><script>window.onload=function(){window.print()}</script></body></html>`;
+    w.document.write(html);
+    w.document.close();
+    w.focus();
   };
 
   const Toggle = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
