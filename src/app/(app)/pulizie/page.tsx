@@ -362,8 +362,16 @@ export default function PuliziePage() {
             <div className="order-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm lg:order-2">
               <div className="ml-auto flex items-center gap-2">
                 <button disabled={empty} onClick={() => persistStock(stock.map((p) => (scopeIds.includes(p.structureId) && statusOf(p) !== "ok" ? { ...p, qty: p.min + 2 } : p)))} className="whitespace-nowrap rounded-lg border border-line px-3 py-2 text-sm font-semibold text-[color:var(--ok)] hover:bg-wash disabled:opacity-40 disabled:hover:bg-transparent">{t("Tutto riassortito")}</button>
-                <button disabled={empty} onClick={copyShop} className="whitespace-nowrap rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash disabled:opacity-40">{t("Copia")}</button>
-                <button disabled={empty} onClick={shareShop} className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>{t("Condividi")}</button>
+                <div ref={shareRef} className="relative">
+                  <button disabled={empty} onClick={() => setShareOpen((v) => !v)} className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
+                  {shareOpen && (
+                    <div className="absolute right-0 z-30 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-lg">
+                      <button onClick={() => { shareShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="chat" size={15} /> WhatsApp</button>
+                      <button onClick={() => { emailShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="mail" size={15} /> Email</button>
+                      <button onClick={() => { copyShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ); })()}

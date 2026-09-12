@@ -9,6 +9,7 @@ import ScrollStrip from "@/components/ScrollStrip";
 import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, promoMailto, DEFAULT_PROMOS } from "@/lib/promos";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { useConfirm } from "@/components/ConfirmProvider";
+import VarLegend, { PROMO_VARS } from "@/components/VarLegend";
 
 // Canali OTA (a commissione): sono i candidati da riportare al diretto.
 const OTA_CHANNELS: Channel[] = ["booking", "airbnb", "expedia"];
@@ -182,7 +183,8 @@ export default function PromozioniPage() {
             <label className="col-span-2 block text-xs font-medium text-dim">Scadenza offerta <span className="font-normal text-faint">· ultimo giorno per prenotare</span><input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={`${inp} mt-1`} /></label>
             <label className="block text-xs font-medium text-dim">Valida per soggiorni dal<input type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} className={`${inp} mt-1`} /></label>
             <label className="block text-xs font-medium text-dim">al<input type="date" value={validTo} min={validFrom || undefined} onChange={(e) => setValidTo(e.target.value)} className={`${inp} mt-1`} /></label>
-            <label className="col-span-2 block text-xs font-medium text-dim">Messaggio <span className="font-normal text-faint">· {"{nome}"} {"{sconto}"} {"{codice}"} {"{scadenza}"} {"{struttura}"} {"{contatti}"}</span><textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} className={`${inp} mt-1 resize-y`} /></label>
+            <label className="col-span-2 block text-xs font-medium text-dim">Messaggio<textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} className={`${inp} mt-1 resize-y`} /></label>
+            <div className="col-span-2"><VarLegend vars={PROMO_VARS} onInsert={(tk) => setBody((b) => `${b}${tk}`)} /></div>
           </div>
           <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
             {editId && <button onClick={resetEditor} className="mr-auto rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">Annulla modifica</button>}

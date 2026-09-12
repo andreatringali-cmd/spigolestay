@@ -5,6 +5,7 @@ import { Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
+import VarLegend, { MSG_VARS } from "@/components/VarLegend";
 
 type Lang = "it" | "en" | "fr" | "de" | "es";
 type Trigger = "manual" | "before_arrival" | "on_arrival" | "after_arrival" | "on_checkout" | "after_checkout";
@@ -12,7 +13,6 @@ const LANGS: [Lang, string][] = [["it", "Italiano"], ["en", "English"], ["fr", "
 const TRIGGERS: [Trigger, string][] = [["manual", "Manuale"], ["before_arrival", "Giorni prima dell'arrivo"], ["on_arrival", "Il giorno del check-in"], ["after_arrival", "Giorni dopo l'arrivo"], ["on_checkout", "Il giorno del check-out"], ["after_checkout", "Giorni dopo il check-out"]];
 // I trigger "il giorno di…" non usano il conteggio giorni (sono ancorati esattamente a check-in/check-out).
 const needsDays = (t: Trigger) => t === "before_arrival" || t === "after_arrival" || t === "after_checkout";
-const VARS = ["{ospite}", "{struttura}", "{camera}", "{checkin}", "{checkout}", "{codice_accesso}", "{saldo}", "{notti}", "{link_guida}", "{link_checkin}"];
 const LINKABLE: [string, string][] = [["", "Nessuna"], ["selfcheckin", "Self check-in"], ["guida", "Guida ospiti"], ["info", "Info e codici d'ingresso"], ["checkout", "Messaggio di check-out"], ["recensione", "Richiesta recensione"]];
 
 interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; trigger: Trigger; days: number; time: string; active: boolean; srcId?: string }
@@ -99,7 +99,7 @@ export default function ModelliPanel() {
                 {LANGS.map(([l, n]) => (<button key={l} onClick={() => setEditLang(l)} className={`rounded-md px-2 py-1 text-xs font-medium ${editLang === l ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{n.slice(0, 3)}</button>))}
               </div>
               <textarea value={editing.texts[editLang]} onChange={(e) => setEditing({ ...editing, texts: { ...editing.texts, [editLang]: e.target.value } })} rows={5} className="w-full resize-none rounded-lg border border-line bg-paper p-3 text-sm text-txt outline-none focus:border-focus" placeholder={`${t("Testo in")} ${LANGS.find(([l]) => l === editLang)?.[1]}…`} />
-              <div className="mt-2 flex flex-wrap items-center gap-1"><span className="mr-1 text-[11px] text-faint">{t("Inserisci:")}</span>{VARS.map((v) => <button key={v} onClick={() => insertVar(v)} className="rounded-full border border-line px-2 py-0.5 text-[11px] text-dim hover:bg-wash">{v}</button>)}</div>
+              <div className="mt-2"><VarLegend vars={MSG_VARS} onInsert={insertVar} /></div>
             </div>
 
             <div className="mt-4 rounded-lg border border-line p-3">
