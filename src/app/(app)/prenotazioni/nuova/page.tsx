@@ -197,9 +197,9 @@ export default function NuovaPrenotazionePage() {
           const state = order[phase] === i ? "current" : order[phase] > i ? "done" : "todo";
           return (
             <div key={ph} className="flex items-center gap-2">
-              {i > 0 && <span className={`h-px w-5 ${order[phase] >= i ? "bg-focus" : "bg-line"}`} />}
-              <button type="button" disabled={order[phase] < i} onClick={() => setPhase(ph)} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 transition ${state === "current" ? "bg-focus text-white" : state === "done" ? "text-focus hover:bg-wash" : "text-faint"}`}>
-                <span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] ${state === "current" ? "bg-white/25" : state === "done" ? "bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)]" : "bg-wash"}`}>{state === "done" ? "✓" : n}</span>
+              {i > 0 && <span className="h-px w-5" style={{ backgroundColor: order[phase] >= i ? "var(--ok)" : "var(--line)" }} />}
+              <button type="button" disabled={order[phase] < i} onClick={() => setPhase(ph)} className="flex items-center gap-1.5 rounded-full px-2.5 py-1 transition hover:bg-wash" style={state === "current" ? { backgroundColor: "var(--ok)", color: "#fff" } : state === "done" ? { color: "var(--ok)" } : { color: "var(--faint)" }}>
+                <span className="grid h-5 w-5 place-items-center rounded-full text-[10px]" style={state === "current" ? { backgroundColor: "rgba(255,255,255,.25)" } : state === "done" ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)" } : { backgroundColor: "var(--wash)" }}>{state === "done" ? "✓" : n}</span>
                 <span className="hidden sm:inline">{lab}</span>
               </button>
             </div>
