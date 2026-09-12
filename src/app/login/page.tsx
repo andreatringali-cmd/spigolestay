@@ -50,6 +50,7 @@ export default function LoginPage() {
         if (error) { setErr(traduci(error.message)); return; }
         router.push("/");
       } else {
+        if (pwd.length < 8) { setErr("La password deve avere almeno 8 caratteri."); return; }
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: pwd,
@@ -89,7 +90,7 @@ export default function LoginPage() {
     e.preventDefault();
     setErr(null); setInfo(null);
     if (!supabase) return;
-    if (pwd.length < 6) { setErr("La password deve avere almeno 6 caratteri."); return; }
+    if (pwd.length < 8) { setErr("La password deve avere almeno 8 caratteri."); return; }
     setBusy(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: pwd });
@@ -167,10 +168,10 @@ export default function LoginPage() {
                 <label className="block">
                   <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Nuova password</span>
                   <div className="relative">
-                    <input type={show ? "text" : "password"} required minLength={6} value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="••••••••" className={`${fld} pr-16`} disabled={busy} autoFocus />
+                    <input type={show ? "text" : "password"} required minLength={8} value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="••••••••" className={`${fld} pr-16`} disabled={busy} autoFocus />
                     <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[11px] font-semibold text-[#6b6459] hover:text-[#1f1b16]">{show ? "Nascondi" : "Mostra"}</button>
                   </div>
-                  <span className="mt-1 block text-[11px] text-[#9a9186]">Almeno 6 caratteri.</span>
+                  <span className="mt-1 block text-[11px] text-[#9a9186]">Almeno 8 caratteri, meglio con lettere e numeri.</span>
                 </label>
                 {err && <div className="mt-4 rounded-lg border border-[#f0c2c2] bg-[#fdf1f1] px-3 py-2.5 text-[13px] font-medium text-[#c0392b]">{err}</div>}
                 <button type="submit" disabled={busy} className={`mt-5 ${primaryBtn}`}>{busy ? "Attendi…" : "Salva password"}</button>
@@ -203,10 +204,10 @@ export default function LoginPage() {
                 <label className="block">
                   <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Password</span>
                   <div className="relative">
-                    <input type={show ? "text" : "password"} required minLength={6} value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="••••••••" className={`${fld} pr-16`} disabled={busy} />
+                    <input type={show ? "text" : "password"} required minLength={mode === "signup" ? 8 : 6} value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="••••••••" className={`${fld} pr-16`} disabled={busy} />
                     <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[11px] font-semibold text-[#6b6459] hover:text-[#1f1b16]">{show ? "Nascondi" : "Mostra"}</button>
                   </div>
-                  {mode === "signup" && <span className="mt-1 block text-[11px] text-[#9a9186]">Almeno 6 caratteri.</span>}
+                  {mode === "signup" && <span className="mt-1 block text-[11px] text-[#9a9186]">Almeno 8 caratteri, meglio con lettere e numeri.</span>}
                 </label>
 
                 <div className="mt-3 flex items-center justify-between gap-2">
