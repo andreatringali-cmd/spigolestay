@@ -8,6 +8,7 @@ import Icon from "@/components/Icon";
 import ScrollStrip from "@/components/ScrollStrip";
 import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, promoMailto, DEFAULT_PROMOS } from "@/lib/promos";
 import { CHANNELS, type Channel } from "@/lib/types";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 // Canali OTA (a commissione): sono i candidati da riportare al diretto.
 const OTA_CHANNELS: Channel[] = ["booking", "airbnb", "expedia"];
@@ -36,6 +37,7 @@ const daysAgo = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime(
 
 export default function PromozioniPage() {
   const { guests, bookings, structures } = useData();
+  const ask = useConfirm();
   const today = toISO(new Date());
   const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
@@ -78,7 +80,11 @@ export default function PromozioniPage() {
   };
   const editPromo = (p: Promo) => { setEditId(p.id); setName(p.name); setSubject(p.subject); setDiscount(p.discountPct ?? 0); setCode(p.code ?? ""); setValidUntil(p.validUntil ?? ""); setValidFrom(p.validFrom ?? ""); setValidTo(p.validTo ?? ""); setBody(p.body); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
   const dupPromo = (p: Promo) => persistPromos([{ ...p, id: newPromoId(), name: `${p.name} (copia)`, createdAt: today }, ...promos]);
-  const delPromo = (id: string) => { persistPromos(promos.filter((p) => p.id !== id)); if (editId === id) resetEditor(); };
+  const delPromo = async (id: string) => {
+    const p = promos.find((x) => x.id === id);
+    if (!(await ask({ title: "Elimina promo", message: `Eliminare la promo${p ? ` "${p.name}"` : ""}? L'operazione non è reversibile.`, danger: true, confirmLabel: "Elimina" }))) return;
+    persistPromos(promos.filter((x) => x.id !== id)); if (editId === id) resetEditor();
+  };
 
   const contactsOf = (s?: { phone?: string; email?: string; website?: string }) => [s?.phone, s?.email, s?.website].filter(Boolean).join(" · ");
   const defaultStruct = structures[0];
