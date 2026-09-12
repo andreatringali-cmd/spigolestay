@@ -17,6 +17,16 @@ export interface MsgTemplateSeed {
 
 export const DEFAULT_TEMPLATES: MsgTemplateSeed[] = [
   {
+    id: "seed-benvenuto-guida", name: "Benvenuto e guida", trigger: "before_arrival", days: 1, time: "10:00", active: true,
+    texts: {
+      it: "Buongiorno {ospite}, siamo lieti di accogliervi a {struttura}! 🌿\nA seguire la guida che vi permetterà di accedere alla struttura e vivere al meglio il soggiorno: check-in, Wi-Fi, consigli utili e i nostri contatti.\n\n👉 {link_guida}\n\nRestiamo a disposizione per qualsiasi cosa. A presto!\n— {struttura}",
+      en: "Hello {ospite}, we're delighted to welcome you to {struttura}! 🌿\nHere is the guide that will let you access the property and make the most of your stay: check-in, Wi-Fi, useful tips and our contacts.\n\n👉 {link_guida}\n\nWe're here for anything you need. See you soon!\n— {struttura}",
+      fr: "Bonjour {ospite}, nous sommes ravis de vous accueillir à {struttura} ! 🌿\nVoici le guide qui vous permettra d'accéder au logement et de profiter au mieux de votre séjour : arrivée, Wi-Fi, conseils utiles et nos contacts.\n\n👉 {link_guida}\n\nNous restons à votre disposition. À bientôt !\n— {struttura}",
+      de: "Guten Tag {ospite}, wir freuen uns, Sie in {struttura} begrüßen zu dürfen! 🌿\nHier der Guide für den Zugang zur Unterkunft und einen perfekten Aufenthalt: Check-in, WLAN, nützliche Tipps und unsere Kontakte.\n\n👉 {link_guida}\n\nBei Fragen sind wir für Sie da. Bis bald!\n— {struttura}",
+      es: "¡Buenos días {ospite}, estamos encantados de recibirte en {struttura}! 🌿\nA continuación la guía que te permitirá acceder al alojamiento y disfrutar al máximo tu estancia: check-in, Wi-Fi, consejos útiles y nuestros contactos.\n\n👉 {link_guida}\n\nQuedamos a tu disposición para cualquier cosa. ¡Hasta pronto!\n— {struttura}",
+    },
+  },
+  {
     id: "seed-welcome", name: "Benvenuto pre-arrivo", trigger: "before_arrival", days: 2, time: "10:00", active: true,
     texts: {
       it: "Ciao {ospite}, benvenuto/a! Tra pochi giorni ti aspettiamo a {struttura}. Il check-in è {checkin}. Per qualsiasi cosa scrivici pure qui, a presto! 👋",

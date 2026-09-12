@@ -21,6 +21,24 @@ export function unitCodesForBooking(unitId: string | null | undefined, hasParkin
     .replace(/-+$/g, "");
 }
 
+// Messaggio di benvenuto che accompagna il link della guida.
+// Legge il testo personalizzato della struttura (guide.inviteMsg) da localStorage; altrimenti usa un default.
+// Segnaposto: {nome} = nome ospite, {link} = link guida, {struttura} = nome struttura.
+export const DEFAULT_INVITE_MSG = "Buongiorno {nome}, siamo lieti di accogliervi! 🌿\nA seguire trovate la guida che vi permetterà di accedere alla struttura e vivere al meglio il soggiorno (check-in, WiFi, consigli e contatti):\n\n👉 {link}\n\nPer qualsiasi cosa siamo a disposizione. A presto!\n— {struttura}";
+
+export function guideMessage(structureId: string, opts: { name?: string; link: string; structureName?: string }): string {
+  let tpl = DEFAULT_INVITE_MSG;
+  try {
+    const guides = JSON.parse(localStorage.getItem("spigolestay:guides") || "{}");
+    const g = guides[structureId];
+    if (g && typeof g.inviteMsg === "string" && g.inviteMsg.trim()) tpl = g.inviteMsg;
+  } catch { /* usa il default */ }
+  const first = (opts.name || "").trim().split(/\s+/)[0] || "";
+  let out = tpl.replace(/\{nome\}/g, first).replace(/\{struttura\}/g, opts.structureName || "").replace(/\{link\}/g, opts.link);
+  if (!tpl.includes("{link}")) out = out.trimEnd() + "\n\n" + opts.link;
+  return out.replace(/\n?—\s*$/,"").trimEnd(); // se la firma {struttura} è vuota, togli il trattino finale
+}
+
 export function buildGuestLink(opts: {
   structureId: string;
   unitId?: string | null;

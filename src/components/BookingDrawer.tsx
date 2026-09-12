@@ -6,6 +6,7 @@ import { useData } from "@/lib/store";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import { bookingCode } from "@/lib/bookingCode";
 import { sendVoucher } from "@/lib/mailer";
+import { buildGuestLink, guideMessage } from "@/lib/guestlink";
 import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
 import { nights, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
@@ -435,6 +436,21 @@ export default function BookingDrawer() {
             <div className="flex gap-2 pt-0.5">
               {phoneDigits && <a href={`https://wa.me/${phoneDigits}?text=${waText}`} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-white" style={{ backgroundColor: "#25D366" }}>{t("Invia link WhatsApp")}</a>}
               <button onClick={() => navigator.clipboard?.writeText(link)} className="flex-1 rounded-lg border border-line py-2 text-center text-xs font-semibold text-txt hover:bg-wash">{t("Copia link")}</button>
+            </div>
+          );
+        })()}
+        {/* Invia la guida ospite: link con camera + codici (per camera, filtrati dal parcheggio) */}
+        {(() => {
+          const gLink = buildGuestLink({ structureId: booking.structureId, unitId: booking.unitId, unitCode: unitV?.code || unitV?.name || "", guestName: guest?.fullName || "", parking: !!booking.parking });
+          const gWa = encodeURIComponent(guideMessage(booking.structureId, { name: guest?.fullName || "", link: gLink, structureName: structure?.name || "" }));
+          return (
+            <div className="mt-2 border-t border-line pt-3">
+              <div className="mb-1 flex items-center gap-1.5 text-sm text-dim">📖 {t("Guida ospiti")}{!unitV && <span className="text-[11px]" style={{ color: "var(--warn)" }}>· {t("assegna la camera per i codici")}</span>}</div>
+              <div className="flex gap-2">
+                {phoneDigits && <a href={`https://wa.me/${phoneDigits}?text=${gWa}`} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-white" style={{ backgroundColor: "#25D366" }}>{t("Invia guida")}</a>}
+                <button onClick={() => navigator.clipboard?.writeText(gLink)} className="flex-1 rounded-lg border border-line py-2 text-center text-xs font-semibold text-txt hover:bg-wash">{t("Copia link")}</button>
+                <a href={gLink} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-line px-3 py-2 text-center text-xs font-semibold text-txt hover:bg-wash">↗</a>
+              </div>
             </div>
           );
         })()}
