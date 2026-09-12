@@ -360,9 +360,47 @@ export default function NuovaPrenotazionePage() {
             <span className="w-full text-[11px] text-faint">Tassa di soggiorno, commissioni e fattura si aggiungono dalla scheda della prenotazione.</span>
           </div>
 
+          {/* Riepilogo dettagliato (è di fatto il contenuto del voucher) */}
+          {(() => {
+            const taxStruct = getStructure(selected[0]?.structureId);
+            const cityTax = cityTaxOf(taxStruct, adults, nightsN, grandTotal);
+            const grandFinal = grandWithExtras + cityTax;
+            const depositN = Math.max(0, Number(deposit) || 0);
+            const saldo = Math.max(0, grandFinal - depositN);
+            return (
+              <div className="mt-4 rounded-xl border border-line bg-wash p-4">
+                <div className="mb-2 flex items-center justify-between"><span className="text-[11px] font-bold uppercase tracking-wide text-faint">Riepilogo</span><span className="text-[11px] text-faint">{fmtDay(checkIn)} → {fmtDay(checkOut)} · {nightsN} {nightsN === 1 ? "notte" : "notti"} · {adults} {adults === 1 ? "adulto" : "adulti"}{children > 0 ? `, ${children} ${children === 1 ? "bambino" : "bambini"}` : ""}</span></div>
+                <div className="space-y-1 text-sm">
+                  {selected.map((rt) => (
+                    <div key={rt.id} className="flex items-baseline justify-between gap-3">
+                      <span className="text-txt">{qty[rt.id]}× {rt.name}</span>
+                      <span className="shrink-0 font-mono text-txt">{eur(linePrice(rt) * (qty[rt.id] ?? 0))}</span>
+                    </div>
+                  ))}
+                  {chosenExtras.map((e, i) => (
+                    <div key={i} className="flex items-baseline justify-between gap-3">
+                      <span className="text-dim">{e.name}</span>
+                      <span className="shrink-0 font-mono text-dim">{eur(e.price)}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Colazione</span><span className="shrink-0 text-[color:var(--ok)]">inclusa</span></div>
+                  <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Parcheggio</span><span className="shrink-0 text-[color:var(--ok)]">{parking ? "incluso" : "non richiesto"}</span></div>
+                  {cityTax > 0 && (
+                    <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Tassa di soggiorno{taxStruct?.cityTaxMode !== "percent" ? ` (${adults}×${Math.min(nightsN, taxStruct?.cityTaxMaxNights ?? 3)})` : ""}</span><span className="shrink-0 font-mono text-dim">{eur(cityTax)}</span></div>
+                  )}
+                </div>
+                <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2">
+                  <span className="font-semibold text-txt">Totale · {nightsN} {nightsN === 1 ? "notte" : "notti"}</span>
+                  <span className="font-mono text-xl font-extrabold text-txt">{eur(grandFinal)}</span>
+                </div>
+                {depositN > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">Acconto adesso</span><span className="font-mono font-semibold text-txt">{eur(depositN)}</span></div>}
+                {depositN > 0 && saldo > 0 && <div className="mt-0.5 flex items-baseline justify-between text-xs"><span className="text-dim">Saldo in struttura</span><span className="font-mono font-semibold text-txt">{eur(saldo)}</span></div>}
+              </div>
+            );
+          })()}
+
           <div className="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-line pt-4">
             {err && <span className="mr-auto text-sm font-medium text-[color:var(--err)]">{err}</span>}
-            <span className="text-sm text-dim">{extrasTotal > 0 ? <>Camere {eur(grandTotal)} + extra {eur(extrasTotal)} · </> : null}<b className="text-txt">Totale {eur(grandWithExtras)}</b></span>
             <button onClick={confirm} className="rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90">{isGroup ? "Crea gruppo" : "Crea prenotazione"}</button>
           </div>
         </Card>
@@ -374,6 +412,15 @@ export default function NuovaPrenotazionePage() {
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
 const barInp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm font-semibold text-txt outline-none focus:border-focus";
+
+// Tassa di soggiorno secondo le impostazioni struttura (fissa €/persona/notte con tetto notti, o % del soggiorno).
+function cityTaxOf(structure: { cityTax?: boolean; cityTaxMode?: "fixed" | "percent"; cityTaxAmount?: number; cityTaxMaxNights?: number; cityTaxPercent?: number } | undefined, adults: number, n: number, accommodation: number) {
+  if (!structure?.cityTax) return 0;
+  if (structure.cityTaxMode === "percent") return Math.round((accommodation || 0) * (structure.cityTaxPercent ?? 0) / 100);
+  const rate = structure.cityTaxAmount ?? 2;
+  const maxN = structure.cityTaxMaxNights ?? 3;
+  return Math.round(adults * Math.min(n, maxN) * rate);
+}
 
 function FieldL({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block text-xs font-medium text-dim">{label}<div className="mt-1">{children}</div></label>;
