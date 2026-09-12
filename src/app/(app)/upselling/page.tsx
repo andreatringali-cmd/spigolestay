@@ -162,7 +162,6 @@ export default function UpsellingPage() {
             })}
             {arrivals.length === 0 && <div className="py-8 text-center text-sm text-faint">Nessun arrivo in programma.</div>}
           </div>
-          <p className="mt-2 text-[11px] text-faint">Proponi 2–3 extra pochi giorni prima dell'arrivo: è il momento in cui gli ospiti dicono sì più spesso.</p>
         </Card>
       </div>
     </div>
