@@ -108,16 +108,19 @@ export default function NewBookingModal() {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button aria-label={t("Chiudi")} onClick={closeNewBooking} className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
       <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3 border-b border-line bg-paper px-5 py-4">
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-focus text-white"><CalIcon /></span>
+        {/* Header — banda colorata in stile widget */}
+        <div className="flex items-center justify-between gap-3 px-5 py-4 text-white" style={{ background: "linear-gradient(135deg, var(--focus), color-mix(in srgb, var(--focus) 62%, #000))" }}>
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/20 text-white"><CalIcon /></span>
             <div>
-              <h2 className="font-display text-base font-bold leading-tight text-txt">{t("Aggiungi prenotazione")}</h2>
-              <p className="text-[11px] text-dim">{step === "search" ? t("Cerca la disponibilità per le date e gli ospiti") : t("Scegli le camere disponibili")}</p>
+              <h2 className="font-display text-base font-bold leading-tight">{t("Aggiungi prenotazione")}</h2>
+              <p className="text-[11px] text-white/80">{step === "search" ? t("Cerca la disponibilità per le date e gli ospiti") : t("Scegli le camere disponibili")}</p>
             </div>
           </div>
-          <button onClick={closeNewBooking} className="rounded-md px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+          <div className="flex items-center gap-2.5">
+            <span className="hidden items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-bold sm:flex">{step === "search" ? "1 · Date" : "2 · Camere"}</span>
+            <button onClick={closeNewBooking} className="rounded-md px-2 py-1 text-white/80 transition hover:bg-white/15 hover:text-white">✕</button>
+          </div>
         </div>
 
         {/* ─────────── STEP 1 · RICERCA ─────────── */}
@@ -279,8 +282,8 @@ export default function NewBookingModal() {
             <>
               <span className="text-xs text-faint">{totalAvail > 0 ? `${totalAvail} ${t("tipologie disponibili")}` : ""}</span>
               <div className="flex gap-2">
-                <button onClick={closeNewBooking} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
-                <button onClick={goResults} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90"><SearchIcon /> {t("Cerca disponibilità")}</button>
+                <button onClick={closeNewBooking} className="rounded-lg border border-line px-3 py-2.5 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
+                <button onClick={goResults} className="flex items-center gap-1.5 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90"><SearchIcon /> {t("Cerca disponibilità")}</button>
               </div>
             </>
           ) : (
@@ -288,7 +291,7 @@ export default function NewBookingModal() {
               <div className="text-sm text-dim">
                 {totalRooms > 0 ? (<>{totalRooms} {totalRooms === 1 ? t("camera") : t("camere")} · <b className="text-txt">€ {totalPrice}</b> <span className="text-faint">· {nightsN} {nightsN === 1 ? t("notte") : t("notti")}</span></>) : t("Nessuna camera selezionata")}
               </div>
-              <button onClick={submit} disabled={totalRooms < 1} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{isGroup ? t("Crea gruppo") : t("Crea prenotazione")}</button>
+              <button onClick={submit} disabled={totalRooms < 1} className="rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:opacity-50">{isGroup ? t("Crea gruppo") : t("Crea prenotazione")}</button>
             </>
           )}
         </div>
