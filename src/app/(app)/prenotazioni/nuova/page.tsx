@@ -203,10 +203,10 @@ export default function NuovaPrenotazionePage() {
       <div className="mb-5 rounded-2xl border border-line bg-surface p-2.5 shadow-sm">
         {/* Riga 1 · date (compatte) + ospiti, con età bambini/culle a destra */}
         <div className="flex flex-wrap items-end gap-2">
-          <label className="block text-[11px] font-medium text-dim">Arrivo<input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className={`${fld} mt-1.5 w-[150px]`} /></label>
-          <label className="block text-[11px] font-medium text-dim">Partenza<input type="date" value={checkOut} min={shiftISO(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className={`${fld} mt-1.5 w-[150px]`} /></label>
-          <label className="block text-[11px] font-medium text-dim">Adulti<input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, +e.target.value))} className={`${fld} mt-1.5 w-[72px]`} /></label>
-          <label className="block text-[11px] font-medium text-dim">Bambini<input type="number" min={0} value={children} onChange={(e) => setChildrenN(Math.max(0, +e.target.value))} className={`${fld} mt-1.5 w-[72px]`} /></label>
+          <label className="flex flex-col gap-2 text-[11px] font-medium text-dim">Arrivo<input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className={`${fld} w-[150px]`} /></label>
+          <label className="flex flex-col gap-2 text-[11px] font-medium text-dim">Partenza<input type="date" value={checkOut} min={shiftISO(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className={`${fld} w-[150px]`} /></label>
+          <label className="flex flex-col gap-2 text-[11px] font-medium text-dim">Adulti<input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, +e.target.value))} className={`${fld} w-[72px]`} /></label>
+          <label className="flex flex-col gap-2 text-[11px] font-medium text-dim">Bambini<input type="number" min={0} value={children} onChange={(e) => setChildrenN(Math.max(0, +e.target.value))} className={`${fld} w-[72px]`} /></label>
           <span className="mb-2 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2.5 py-1 text-xs font-bold text-[color:var(--focus)]">{nightsN} {nightsN === 1 ? "notte" : "notti"}</span>
           {children > 0 && (
             <div className="mb-1.5 flex basis-full flex-wrap items-center gap-x-2.5 gap-y-1.5">
