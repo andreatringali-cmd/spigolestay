@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Icon from "@/components/Icon";
 import { useData } from "@/lib/store";
 import { nights, parseISO, toISO, shiftISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
@@ -126,6 +127,7 @@ export default function PreventiviPage() {
   const [cot, setCot] = useState(false);       // culla (mostrata solo con bambini)
   const [cotPrice, setCotPrice] = useState(0); // € a notte per la culla (0 = inclusa)
   const [extrasPage, setExtrasPage] = useState(true); // 2ª pagina PDF con i servizi extra
+  const [shareOpen, setShareOpen] = useState(false); // menu Condividi (email/WhatsApp/copia)
   const [tab, setTab] = useState<"nuovo" | "archivio">("nuovo"); // sezione: editor o archivio
   const [note, setNote] = useState("");
   const [lang, setLang] = useState<Lang>("it");
@@ -686,11 +688,19 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             />
             </div>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <button onClick={printPdf} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Scarica / stampa PDF")}</button>
-            <a href={mailLink} onClick={save} className={`rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash ${email ? "" : "pointer-events-none opacity-40"}`}>{t("Invia email")}</a>
-            <a href={waLink} onClick={save} target="_blank" rel="noreferrer" className={`rounded-lg px-3 py-2 text-sm font-semibold text-white ${phone ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
-            <button onClick={() => navigator.clipboard?.writeText(outMsg)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">{t("Copia testo")}</button>
+            <div className="relative">
+              <button onClick={() => setShareOpen((v) => !v)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}><Icon name="share" size={15} /> {t("Condividi")}</button>
+              {shareOpen && (<>
+                <button aria-label={t("Chiudi")} onClick={() => setShareOpen(false)} className="fixed inset-0 z-20 cursor-default" />
+                <div className="absolute left-0 top-full z-30 mt-1 w-48 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
+                  <button onClick={() => { if (!email) return; save(); window.open(mailLink); setShareOpen(false); }} disabled={!email} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash disabled:opacity-40"><Icon name="mail" size={15} /> {t("Invia email")}</button>
+                  <button onClick={() => { if (!phone) return; save(); window.open(waLink, "_blank"); setShareOpen(false); }} disabled={!phone} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash disabled:opacity-40"><Icon name="chat" size={15} /> WhatsApp</button>
+                  <button onClick={() => { navigator.clipboard?.writeText(outMsg); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia testo")}</button>
+                </div>
+              </>)}
+            </div>
           </div>
           <p className="mt-2 text-xs text-faint">{t("All'invio (PDF/email/WhatsApp) il preventivo viene salvato in automatico nella scheda «Archivio».")}</p>
         </Card>
