@@ -292,119 +292,109 @@ export default function NuovaPrenotazionePage() {
         </>
       )}
 
-      {/* ─────────── Step 3 · Personalizza ─────────── */}
-      {phase === "details" && totalRooms > 0 && (
-        <Card className="mb-10">
+      {/* ─────────── Step 3 · Personalizza (layout mini-sito: dati a sx, riepilogo/voucher a dx) ─────────── */}
+      {phase === "details" && totalRooms > 0 && (() => {
+        const taxStruct = getStructure(selected[0]?.structureId);
+        const cityTax = cityTaxOf(taxStruct, adults, nightsN, grandTotal);
+        const grandFinal = grandWithExtras + cityTax;
+        const depositN = Math.max(0, Number(deposit) || 0);
+        const saldo = Math.max(0, grandFinal - depositN);
+        return (
+        <div className="mb-10">
           <button onClick={() => setPhase("rooms")} className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-focus hover:underline">← Torna alle camere</button>
-          <div className="mb-3 flex items-center gap-2">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-focus text-white"><Icon name="cart" size={16} /></span>
-            <h3 className="font-display text-base font-bold text-txt">Le tue scelte</h3>
-            <span className="text-xs text-faint">· {totalRooms} {totalRooms === 1 ? "camera" : "camere"}{isGroup ? " · gruppo ⛓" : ""}</span>
-            {party > totalCap && <span className="ml-auto rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>Posti insufficienti: {totalCap}/{party}</span>}
-          </div>
-          <div className="overflow-x-auto rounded-xl border border-line">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead><tr className="bg-wash text-left text-[11px] font-semibold uppercase tracking-wide text-dim"><th className="px-4 py-2.5">Camera</th><th className="px-3 py-2.5 text-center">Qtà</th><th className="px-3 py-2.5 text-right">Prezzo/camera</th><th className="px-4 py-2.5 text-right">Subtotale</th><th className="px-3 py-2.5"></th></tr></thead>
-              <tbody className="divide-y divide-[color:var(--line)]">
-                {selected.map((rt) => {
-                  const st = structures.find((x) => x.id === rt.structureId);
-                  return (
-                    <tr key={rt.id}>
-                      <td className="px-4 py-2.5"><span className="font-semibold text-txt">{rt.name}</span> <span className="text-faint">· {st?.name}</span></td>
-                      <td className="px-3 py-2.5 text-center font-bold text-txt">{qty[rt.id]}</td>
-                      <td className="px-3 py-2.5 text-right"><span className="inline-flex items-center gap-1">€ <input type="number" min={0} value={linePrice(rt)} onChange={(e) => setPriceOv((o) => ({ ...o, [rt.id]: Math.max(0, Number(e.target.value)) }))} className="w-20 rounded border border-line bg-paper px-1.5 py-1 text-right text-sm text-txt outline-none focus:border-focus" /></span></td>
-                      <td className="px-4 py-2.5 text-right font-bold text-txt">{eur(linePrice(rt) * (qty[rt.id] ?? 0))}</td>
-                      <td className="px-3 py-2.5 text-right"><button onClick={() => setQ(rt.id, 0)} title="Rimuovi" className="text-faint hover:text-[color:var(--err)]">✕</button></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot><tr className="border-t-2 border-line"><td className="px-4 py-3 font-semibold text-txt" colSpan={3}>Camere · {nightsN} {nightsN === 1 ? "notte" : "notti"}</td><td className="px-4 py-3 text-right font-bold text-txt">{eur(grandTotal)}</td><td /></tr></tfoot>
-            </table>
-          </div>
+          <div className="grid items-start gap-4 lg:grid-cols-[1fr_340px]">
+            {/* Colonna sinistra · inserimento dati */}
+            <div className="space-y-4">
+              {/* Dettagli ospite */}
+              <Card>
+                <h3 className="mb-3 font-display text-base font-bold text-txt">Dettagli ospite</h3>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <FieldL label="Cognome *"><input value={lastName} onChange={(e) => setLastName(e.target.value)} className={inp} placeholder="Cognome" /></FieldL>
+                  <FieldL label="Nome"><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inp} placeholder="Nome" /></FieldL>
+                  <FieldL label="Canale"><select value={channel} onChange={(e) => setChannel(e.target.value as Channel)} className={inp}>{CHANNEL_OPTS.map((c) => (<option key={c} value={c}>{CHANNELS[c].label}</option>))}</select></FieldL>
+                  <FieldL label="Email"><input value={email} onChange={(e) => setEmail(e.target.value)} className={inp} placeholder="per il voucher" /></FieldL>
+                  <FieldL label="Telefono"><input value={phone} onChange={(e) => setPhone(e.target.value)} className={inp} placeholder="opzionale" /></FieldL>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-line pt-3">
+                  <label className="flex items-center gap-2 text-sm text-txt"><Toggle on={parking} onClick={() => setParking((v) => !v)} /> Parcheggio</label>
+                  <label className="flex items-center gap-2 text-sm text-txt">Acconto <span className="flex items-center gap-1">€ <input type="number" min={0} value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="0" className="w-24 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></span></label>
+                  <label className={`flex items-center gap-2 text-sm ${email.trim() ? "text-txt" : "text-faint"}`} title={email.trim() ? undefined : "Inserisci l'email dell'ospite per inviare il voucher"}><Toggle on={sendConfirm && !!email.trim()} onClick={() => setSendConfirm((v) => !v)} /> Invia il voucher di conferma via email</label>
+                </div>
+              </Card>
 
-          {/* Extra / servizi (dal catalogo della struttura) */}
-          {availExtras.length > 0 && (
-            <div className="mt-4">
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-faint">Extra e servizi</div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {availExtras.map((e) => { const q = extraQty[e.id] ?? 0; return (
-                  <div key={e.id} className={`flex items-center gap-3 rounded-xl border p-2.5 transition ${q > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)]" : "border-line"}`}>
-                    <div className="min-w-0 flex-1"><div className="text-sm font-semibold text-txt">{e.name}{e.structName ? <span className="font-normal text-faint"> · {e.structName}</span> : ""}</div>{e.desc && <div className="truncate text-[11px] text-faint">{e.desc}</div>}</div>
-                    <span className="shrink-0 font-mono text-sm font-bold text-txt">{eur(e.price)}</span>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <button disabled={q <= 0} onClick={() => setExtraQ(e.id, q - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30">−</button>
-                      <span className={`w-5 text-center text-sm font-bold ${q > 0 ? "text-[color:var(--focus)]" : "text-dim"}`}>{q}</span>
-                      <button onClick={() => setExtraQ(e.id, q + 1)} className={`flex h-7 w-7 items-center justify-center rounded-lg border text-base leading-none ${q > 0 ? "border-focus bg-focus text-white hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
-                    </div>
+              {/* Prezzo camere (modificabile per sconti/tariffe) */}
+              <Card>
+                <div className="mb-2 flex items-center gap-2"><h3 className="font-display text-base font-bold text-txt">Camere e prezzo</h3><span className="text-xs text-faint">· modificabile per sconti</span>{party > totalCap && <span className="ml-auto rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>Posti insufficienti: {totalCap}/{party}</span>}</div>
+                <div className="overflow-x-auto rounded-xl border border-line">
+                  <table className="w-full min-w-[520px] text-sm">
+                    <thead><tr className="bg-wash text-left text-[11px] font-semibold uppercase tracking-wide text-dim"><th className="px-4 py-2.5">Camera</th><th className="px-3 py-2.5 text-center">Qtà</th><th className="px-3 py-2.5 text-right">Prezzo/camera</th><th className="px-4 py-2.5 text-right">Subtotale</th><th className="px-3 py-2.5"></th></tr></thead>
+                    <tbody className="divide-y divide-[color:var(--line)]">
+                      {selected.map((rt) => {
+                        const st = structures.find((x) => x.id === rt.structureId);
+                        return (
+                          <tr key={rt.id}>
+                            <td className="px-4 py-2.5"><span className="font-semibold text-txt">{rt.name}</span> <span className="text-faint">· {st?.name}</span></td>
+                            <td className="px-3 py-2.5 text-center font-bold text-txt">{qty[rt.id]}</td>
+                            <td className="px-3 py-2.5 text-right"><span className="inline-flex items-center gap-1">€ <input type="number" min={0} value={linePrice(rt)} onChange={(e) => setPriceOv((o) => ({ ...o, [rt.id]: Math.max(0, Number(e.target.value)) }))} className="w-20 rounded border border-line bg-paper px-1.5 py-1 text-right text-sm text-txt outline-none focus:border-focus" /></span></td>
+                            <td className="px-4 py-2.5 text-right font-bold text-txt">{eur(linePrice(rt) * (qty[rt.id] ?? 0))}</td>
+                            <td className="px-3 py-2.5 text-right"><button onClick={() => setQ(rt.id, 0)} title="Rimuovi" className="text-faint hover:text-[color:var(--err)]">✕</button></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+
+              {/* Servizi extra */}
+              {availExtras.length > 0 && (
+                <Card>
+                  <h3 className="mb-1 font-display text-base font-bold text-txt">Servizi extra</h3>
+                  <p className="mb-2 text-xs text-dim">Migliora il soggiorno aggiungendo i servizi.</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {availExtras.map((e) => { const q = extraQty[e.id] ?? 0; return (
+                      <div key={e.id} className={`flex items-center gap-3 rounded-xl border p-2.5 transition ${q > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)]" : "border-line"}`}>
+                        <div className="min-w-0 flex-1"><div className="text-sm font-semibold text-txt">{e.name}{e.structName ? <span className="font-normal text-faint"> · {e.structName}</span> : ""}</div>{e.desc && <div className="truncate text-[11px] text-faint">{e.desc}</div>}<div className="text-[11px] text-faint">{eur(e.price)}</div></div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <button disabled={q <= 0} onClick={() => setExtraQ(e.id, q - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30">−</button>
+                          <span className={`w-5 text-center text-sm font-bold ${q > 0 ? "text-[color:var(--focus)]" : "text-dim"}`}>{q}</span>
+                          <button onClick={() => setExtraQ(e.id, q + 1)} className={`flex h-7 w-7 items-center justify-center rounded-lg border text-base leading-none ${q > 0 ? "border-focus bg-focus text-white hover:opacity-90" : "border-line text-dim hover:bg-wash"}`}>+</button>
+                        </div>
+                      </div>
+                    ); })}
                   </div>
-                ); })}
-              </div>
+                </Card>
+              )}
             </div>
-          )}
 
-          {/* Intestatario */}
-          <div className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4 sm:grid-cols-3">
-            <FieldL label="Cognome *"><input value={lastName} onChange={(e) => setLastName(e.target.value)} className={inp} placeholder="Cognome" /></FieldL>
-            <FieldL label="Nome"><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inp} placeholder="Nome" /></FieldL>
-            <FieldL label="Canale"><select value={channel} onChange={(e) => setChannel(e.target.value as Channel)} className={inp}>{CHANNEL_OPTS.map((c) => (<option key={c} value={c}>{CHANNELS[c].label}</option>))}</select></FieldL>
-            <FieldL label="Email"><input value={email} onChange={(e) => setEmail(e.target.value)} className={inp} placeholder="opzionale" /></FieldL>
-            <FieldL label="Telefono"><input value={phone} onChange={(e) => setPhone(e.target.value)} className={inp} placeholder="opzionale" /></FieldL>
-          </div>
-
-          {/* Dettagli facoltativi decisi al momento · il resto si gestisce dalla scheda prenotazione */}
-          <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-line bg-paper p-3">
-            <label className="flex items-center gap-2 text-sm text-txt"><Toggle on={parking} onClick={() => setParking((v) => !v)} /> Parcheggio</label>
-            <label className="flex items-center gap-2 text-sm text-txt">Acconto <span className="flex items-center gap-1">€ <input type="number" min={0} value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="0" className="w-24 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></span></label>
-            <label className={`flex items-center gap-2 text-sm ${email.trim() ? "text-txt" : "text-faint"}`} title={email.trim() ? undefined : "Inserisci l'email dell'ospite per inviare la conferma"}><Toggle on={sendConfirm && !!email.trim()} onClick={() => setSendConfirm((v) => !v)} /> Invia conferma via email all'ospite</label>
-            <span className="w-full text-[11px] text-faint">Tassa di soggiorno, commissioni e fattura si aggiungono dalla scheda della prenotazione.</span>
-          </div>
-
-          {/* Riepilogo dettagliato (è di fatto il contenuto del voucher) */}
-          {(() => {
-            const taxStruct = getStructure(selected[0]?.structureId);
-            const cityTax = cityTaxOf(taxStruct, adults, nightsN, grandTotal);
-            const grandFinal = grandWithExtras + cityTax;
-            const depositN = Math.max(0, Number(deposit) || 0);
-            const saldo = Math.max(0, grandFinal - depositN);
-            return (
-              <div className="mt-4 rounded-xl border border-line bg-wash p-4">
-                <div className="mb-2 flex items-center justify-between"><span className="text-[11px] font-bold uppercase tracking-wide text-faint">Riepilogo</span><span className="text-[11px] text-faint">{fmtDay(checkIn)} → {fmtDay(checkOut)} · {nightsN} {nightsN === 1 ? "notte" : "notti"} · {adults} {adults === 1 ? "adulto" : "adulti"}{children > 0 ? `, ${children} ${children === 1 ? "bambino" : "bambini"}` : ""}</span></div>
-                <div className="space-y-1 text-sm">
+            {/* Colonna destra · riepilogo/voucher sticky */}
+            <div className="lg:sticky lg:top-20">
+              <Card>
+                <div className="mb-2 text-[11px] text-faint">{fmtDay(checkIn)} → {fmtDay(checkOut)}</div>
+                <div className="mb-2 text-xs text-dim">{nightsN} {nightsN === 1 ? "notte" : "notti"} · {adults} {adults === 1 ? "adulto" : "adulti"}{children > 0 ? `, ${children} ${children === 1 ? "bambino" : "bambini"}` : ""}{isGroup ? " · gruppo ⛓" : ""}</div>
+                <div className="space-y-1 border-t border-line pt-2 text-sm">
                   {selected.map((rt) => (
-                    <div key={rt.id} className="flex items-baseline justify-between gap-3">
-                      <span className="text-txt">{qty[rt.id]}× {rt.name}</span>
-                      <span className="shrink-0 font-mono text-txt">{eur(linePrice(rt) * (qty[rt.id] ?? 0))}</span>
-                    </div>
+                    <div key={rt.id} className="flex items-baseline justify-between gap-3"><span className="text-txt">{qty[rt.id]}× {rt.name}</span><span className="shrink-0 font-mono text-txt">{eur(linePrice(rt) * (qty[rt.id] ?? 0))}</span></div>
                   ))}
                   {chosenExtras.map((e, i) => (
-                    <div key={i} className="flex items-baseline justify-between gap-3">
-                      <span className="text-dim">{e.name}</span>
-                      <span className="shrink-0 font-mono text-dim">{eur(e.price)}</span>
-                    </div>
+                    <div key={i} className="flex items-baseline justify-between gap-3"><span className="text-dim">{e.name}</span><span className="shrink-0 font-mono text-dim">{eur(e.price)}</span></div>
                   ))}
                   <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Colazione</span><span className="shrink-0 text-[color:var(--ok)]">inclusa</span></div>
                   <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Parcheggio</span><span className="shrink-0 text-[color:var(--ok)]">{parking ? "incluso" : "non richiesto"}</span></div>
-                  {cityTax > 0 && (
-                    <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Tassa di soggiorno{taxStruct?.cityTaxMode !== "percent" ? ` (${adults}×${Math.min(nightsN, taxStruct?.cityTaxMaxNights ?? 3)})` : ""}</span><span className="shrink-0 font-mono text-dim">{eur(cityTax)}</span></div>
-                  )}
+                  {cityTax > 0 && <div className="flex items-baseline justify-between gap-3"><span className="text-dim">Tassa di soggiorno{taxStruct?.cityTaxMode !== "percent" ? ` (${adults}×${Math.min(nightsN, taxStruct?.cityTaxMaxNights ?? 3)})` : ""}</span><span className="shrink-0 font-mono text-dim">{eur(cityTax)}</span></div>}
                 </div>
-                <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2">
-                  <span className="font-semibold text-txt">Totale · {nightsN} {nightsN === 1 ? "notte" : "notti"}</span>
-                  <span className="font-mono text-xl font-extrabold text-txt">{eur(grandFinal)}</span>
-                </div>
+                <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2"><span className="font-semibold text-txt">Totale</span><span className="font-mono text-xl font-extrabold text-txt">{eur(grandFinal)}</span></div>
                 {depositN > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">Acconto adesso</span><span className="font-mono font-semibold text-txt">{eur(depositN)}</span></div>}
                 {depositN > 0 && saldo > 0 && <div className="mt-0.5 flex items-baseline justify-between text-xs"><span className="text-dim">Saldo in struttura</span><span className="font-mono font-semibold text-txt">{eur(saldo)}</span></div>}
-              </div>
-            );
-          })()}
-
-          <div className="mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-line pt-4">
-            {err && <span className="mr-auto text-sm font-medium text-[color:var(--err)]">{err}</span>}
-            <button onClick={confirm} className="rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90">{isGroup ? "Crea gruppo" : "Crea prenotazione"}</button>
+                <button onClick={confirm} className="mt-3 w-full rounded-lg bg-focus px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90">{isGroup ? "Crea gruppo" : "Crea prenotazione"}</button>
+                {err && <div className="mt-2 text-center text-sm font-medium text-[color:var(--err)]">{err}</div>}
+                <p className="mt-2 text-center text-[11px] text-faint">{sendConfirm && email.trim() ? "Alla conferma parte il voucher via email all'ospite." : "Tassa di soggiorno, commissioni e fattura si gestiscono dalla scheda."}</p>
+              </Card>
+            </div>
           </div>
-        </Card>
-      )}
+        </div>
+        );
+      })()}
     </div>
   );
 }
