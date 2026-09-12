@@ -285,7 +285,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const prefix = `XEN-${year}-`;
         const maxN = bookings.reduce((mx, x) => (x.code?.startsWith(prefix) ? Math.max(mx, Number(x.code.slice(prefix.length)) || 0) : mx), 0);
         const code = b.code ?? `${prefix}${String(maxN + 1).padStart(4, "0")}`;
-        setBookings((prev) => [...prev, { id: uid(), ...b, code }]);
+        // "Prenotata il" = oggi di default (se non fornita, es. import/iCal la passano esplicita).
+        setBookings((prev) => [...prev, { id: uid(), bookedOn: new Date().toISOString().slice(0, 10), ...b, code }]);
         const gName = guests.find((g) => g.id === b.guestId)?.fullName;
         if (b.channel === "blocked") logAct("block", `Fuori servizio${b.note ? " — " + b.note : ""}`);
         else logAct("booking", `Nuova prenotazione${gName ? " — " + gName : ""} · ${b.channel}`);
