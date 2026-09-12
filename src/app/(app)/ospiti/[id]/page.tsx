@@ -20,6 +20,30 @@ function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?
 }
 const nights = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000));
 
+// Prefissi internazionali: il numero va salvato in formato internazionale (+39 …),
+// altrimenti WhatsApp (wa.me) non riconosce il numero e il link non si apre.
+const DIAL_CODES: [string, string][] = [
+  ["+39", "🇮🇹 Italia"], ["+41", "🇨🇭 Svizzera"], ["+44", "🇬🇧 Regno Unito"], ["+33", "🇫🇷 Francia"],
+  ["+49", "🇩🇪 Germania"], ["+34", "🇪🇸 Spagna"], ["+43", "🇦🇹 Austria"], ["+32", "🇧🇪 Belgio"],
+  ["+31", "🇳🇱 Paesi Bassi"], ["+351", "🇵🇹 Portogallo"], ["+353", "🇮🇪 Irlanda"], ["+30", "🇬🇷 Grecia"],
+  ["+45", "🇩🇰 Danimarca"], ["+46", "🇸🇪 Svezia"], ["+47", "🇳🇴 Norvegia"], ["+358", "🇫🇮 Finlandia"],
+  ["+48", "🇵🇱 Polonia"], ["+420", "🇨🇿 Rep. Ceca"], ["+36", "🇭🇺 Ungheria"], ["+40", "🇷🇴 Romania"],
+  ["+1", "🇺🇸 USA / Canada"], ["+7", "🇷🇺 Russia"], ["+380", "🇺🇦 Ucraina"], ["+90", "🇹🇷 Turchia"],
+  ["+61", "🇦🇺 Australia"], ["+81", "🇯🇵 Giappone"], ["+86", "🇨🇳 Cina"], ["+55", "🇧🇷 Brasile"],
+];
+const DIALS_BY_LEN = DIAL_CODES.map((d) => d[0]).sort((a, b) => b.length - a.length);
+function parsePhone(raw?: string): { dial: string; local: string } {
+  const s = (raw ?? "").trim();
+  if (!s) return { dial: "+39", local: "" };
+  const norm = s.startsWith("00") ? "+" + s.slice(2) : s;
+  if (norm.startsWith("+")) {
+    for (const d of DIALS_BY_LEN) if (norm.startsWith(d)) return { dial: d, local: norm.slice(d.length).trim() };
+    return { dial: "+39", local: norm.replace(/^\+/, "").trim() };
+  }
+  return { dial: "+39", local: s };
+}
+const combinePhone = (dial: string, local: string) => { const loc = local.trim(); return loc ? `${dial} ${loc}` : ""; };
+
 export default function OspiteSchedaPage() {
   const router = useRouter();
   const { t } = useLang();
@@ -31,6 +55,13 @@ export default function OspiteSchedaPage() {
   const existing = guests.find((g) => g.id === params.id);
   const [g, setG] = useState<Guest>(() => existing ?? { id: "", fullName: "", firstName: "", lastName: "", language: "it", tags: [] });
   const set = <K extends keyof Guest>(k: K, v: Guest[K]) => setG((p) => ({ ...p, [k]: v }));
+  // Telefono scomposto in prefisso + numero; salvo sempre il formato internazionale in g.phone.
+  const [dial, setDial] = useState(() => parsePhone(existing?.phone).dial);
+  const [localPhone, setLocalPhone] = useState(() => parsePhone(existing?.phone).local);
+  const setDialCode = (d: string) => { setDial(d); set("phone", combinePhone(d, localPhone)); };
+  const setLocalPhoneVal = (v: string) => { setLocalPhone(v); set("phone", combinePhone(dial, v)); };
+  // All'apertura normalizza un numero già salvato senza prefisso (così il link WhatsApp funziona).
+  useEffect(() => { const p = parsePhone(existing?.phone); const c = combinePhone(p.dial, p.local); if (c && c !== existing?.phone) set("phone", c); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const toggleTag = (t: string) => setG((p) => { const cur = p.tags ?? []; return { ...p, tags: cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t] }; });
 
   const list = existing ? bookings.filter((b) => b.guestId === existing.id).sort((a, b) => (a.checkIn < b.checkIn ? 1 : -1)) : [];
@@ -138,8 +169,15 @@ export default function OspiteSchedaPage() {
             <SectionTitle>{t("Contatti")}</SectionTitle>
             <div className="grid grid-cols-2 gap-3">
               <label className={`${lbl} col-span-2`}>{t("Email")}<input value={g.email ?? ""} onChange={(e) => set("email", e.target.value)} className={`${inp} mt-1`} /></label>
-              <label className={lbl}>{t("Telefono")}<input value={g.phone ?? ""} onChange={(e) => set("phone", e.target.value)} className={`${inp} mt-1`} placeholder="+39…" /></label>
-              <label className={lbl}>{t("Paese")}<input value={g.country ?? ""} onChange={(e) => set("country", e.target.value)} className={`${inp} mt-1`} /></label>
+              <label className={`${lbl} col-span-2`}>{t("Telefono")} <span className="font-normal text-faint">· {t("prefisso + numero (serve a WhatsApp)")}</span>
+                <div className="mt-1 flex gap-1.5">
+                  <select value={dial} onChange={(e) => setDialCode(e.target.value)} className="w-[7.5rem] shrink-0 rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">
+                    {DIAL_CODES.map(([code, label]) => <option key={code} value={code}>{label} {code}</option>)}
+                  </select>
+                  <input value={localPhone} onChange={(e) => setLocalPhoneVal(e.target.value)} inputMode="tel" className={inp} placeholder="333 1234567" />
+                </div>
+              </label>
+              <label className={`${lbl} col-span-2`}>{t("Paese")}<input value={g.country ?? ""} onChange={(e) => set("country", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={`${lbl} col-span-2`}>{t("Lingua")}<select value={g.language ?? "it"} onChange={(e) => set("language", e.target.value)} className={`${inp} mt-1`}>{USER_LANGS.map((l) => <option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}</select></label>
             </div>
           </Card>
