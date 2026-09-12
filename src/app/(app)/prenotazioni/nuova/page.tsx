@@ -160,12 +160,11 @@ export default function NuovaPrenotazionePage() {
       {/* ─────────── Step 1 · Barra di ricerca compatta (stile widget del sito) ─────────── */}
       {phase === "search" && (
       <div className="mb-5 rounded-2xl border border-line bg-surface p-3 shadow-sm">
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_88px_88px_auto]">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_88px_88px]">
           <label className="block text-[11px] font-medium text-dim">Arrivo<input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className={`${barInp} mt-0.5`} /></label>
           <label className="block text-[11px] font-medium text-dim">Partenza<input type="date" value={checkOut} min={shiftISO(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className={`${barInp} mt-0.5`} /></label>
           <label className="block text-[11px] font-medium text-dim">Adulti<input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, +e.target.value))} className={`${barInp} mt-0.5`} /></label>
           <label className="block text-[11px] font-medium text-dim">Bambini<input type="number" min={0} value={children} onChange={(e) => setChildrenN(Math.max(0, +e.target.value))} className={`${barInp} mt-0.5`} /></label>
-          <button onClick={doSearch} className="mt-auto flex items-center justify-center gap-2 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90"><Icon name="search" size={15} /> Cerca disponibilità</button>
         </div>
 
         {/* Riga opzioni compatta */}
@@ -204,6 +203,11 @@ export default function NuovaPrenotazionePage() {
         )}
 
         {err && phase === "search" && <div className="mt-2 text-sm font-medium text-[color:var(--err)]">{err}</div>}
+
+        {/* Cerca disponibilità · ultimo step, dopo aver inserito tutti i dati */}
+        <div className="mt-3 border-t border-line pt-3">
+          <button onClick={doSearch} className="flex w-full items-center justify-center gap-2 rounded-lg bg-focus px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90"><Icon name="search" size={16} /> Cerca disponibilità</button>
+        </div>
       </div>
       )}
 
