@@ -4,16 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { toISO, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
-import { DEFAULT_EXTRAS, type ExtraService } from "@/lib/types";
+import { DEFAULT_EXTRAS, CHANNELS, type ExtraService } from "@/lib/types";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
 
 const PER_LABEL: Record<string, string> = { stay: "a soggiorno", night: "a notte", person: "a persona", day: "a giornata" };
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
+const nightsBetween = (a: string, b: string) => Math.max(0, Math.round((parseISO(b).getTime() - parseISO(a).getTime()) / 86400000));
 const isActive = (e: ExtraService) => e.active !== false;
 
 export default function UpsellingPage() {
-  const { bookings, guests, structures, activeStructureId, updateStructure, addActivity } = useData();
+  const { bookings, guests, structures, roomTypes, getUnit, activeStructureId, updateStructure, addActivity } = useData();
   const today = toISO(new Date());
   const guest = (id: string) => guests.find((g) => g.id === id);
 
@@ -144,33 +145,47 @@ export default function UpsellingPage() {
               const bExtras = extrasOf(b.structureId);
               const open = offerFor === b.id;
               const noExtras = bExtras.length === 0;
+              const unit = getUnit(b.unitId);
+              const rtName = unit ? roomTypes.find((r) => r.id === unit.roomTypeId)?.name : roomTypes.find((r) => r.id === b.roomTypeId)?.name;
+              const roomLabel = [rtName, unit?.name].filter(Boolean).join(" · ");
+              const nn = nightsBetween(b.checkIn, b.checkOut);
+              const pax = (b.adults ?? 0) + (b.children ?? 0);
+              const ch = CHANNELS[b.channel];
+              const initials = (g?.fullName || "?").split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("");
               return (
-                <div key={b.id} className={`rounded-lg border bg-paper transition ${open ? "border-focus" : "border-line"}`}>
+                <div key={b.id} className={`overflow-hidden rounded-xl border bg-paper shadow-sm transition ${open ? "border-focus ring-1 ring-[color:color-mix(in_srgb,var(--focus)_35%,transparent)]" : "border-line"}`}>
                   <button
                     onClick={() => { if (noExtras) return; const willOpen = !open; setShareOpen(false); setOfferFor(willOpen ? b.id : null); if (willOpen) setPicked(new Set(bExtras.slice(0, 3).map((e) => e.id))); }}
                     disabled={noExtras}
                     title={noExtras ? "Nessun extra attivo per questa struttura" : undefined}
-                    className="flex w-full items-center gap-2 p-2.5 text-left disabled:opacity-50"
+                    className="flex w-full items-center gap-3 p-3 text-left transition hover:bg-wash disabled:opacity-60 disabled:hover:bg-transparent"
                   >
-                    <div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold text-txt">{g?.fullName || "Ospite"}</div><div className="text-[11px] text-faint">{structures.find((s) => s.id === b.structureId)?.name} · arrivo {fmt(b.checkIn)}</div></div>
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: ch ? `var(${ch.cssVar})` : "var(--focus)" }}>{initials || "?"}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5"><span className="truncate text-sm font-semibold text-txt">{g?.fullName || "Ospite"}</span>{ch && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, var(${ch.cssVar}) 16%, transparent)`, color: `var(${ch.cssVar})` }}>{ch.label}</span>}</div>
+                      <div className="mt-0.5 truncate text-[11px] text-faint">{[structures.find((s) => s.id === b.structureId)?.name, roomLabel].filter(Boolean).join(" · ")}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-dim">
+                        <span className="inline-flex items-center gap-1"><Icon name="calendar" size={12} /> {fmt(b.checkIn)} → {fmt(b.checkOut)}</span>
+                        <span>· {nn} {nn === 1 ? "notte" : "notti"}</span>
+                        <span className="inline-flex items-center gap-1">· <Icon name="users" size={12} /> {pax}</span>
+                        {typeof b.total === "number" && <span>· <b className="font-mono font-semibold text-txt">{eur(b.total)}</b></span>}
+                      </div>
+                    </div>
                     {!noExtras && <span className={`shrink-0 text-faint transition-transform ${open ? "rotate-90" : ""}`} aria-hidden>▸</span>}
                   </button>
                   {open && (
-                    <div className="border-t border-line p-2.5 pt-2">
-                      <div className="mb-1.5 text-[11px] font-medium text-dim">Scegli gli extra da proporre:</div>
+                    <div className="border-t border-line bg-wash/40 p-3 pt-2.5">
+                      <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Extra da proporre</div>
                       <div className="flex flex-wrap gap-1.5">
-                        {bExtras.map((e) => { const on = picked.has(e.id); return (<button key={e.id} onClick={() => setPicked((p) => { const n = new Set(p); if (n.has(e.id)) n.delete(e.id); else n.add(e.id); return n; })} className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{e.name} · {eur(e.price)}</button>); })}
+                        {bExtras.map((e) => { const on = picked.has(e.id); return (<button key={e.id} onClick={() => setPicked((p) => { const n = new Set(p); if (n.has(e.id)) n.delete(e.id); else n.add(e.id); return n; })} className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] font-medium text-focus" : "border-line text-dim hover:bg-surface"}`}>{on ? "✓ " : ""}{e.name} · {eur(e.price)}</button>); })}
                       </div>
-                      <div className="relative mt-3 border-t border-line pt-3">
-                        <button onClick={() => setShareOpen((v) => !v)} disabled={picked.size === 0} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}><Icon name="share" size={14} /> Condividi</button>
+                      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                        <button onClick={() => setShareOpen((v) => !v)} disabled={picked.size === 0} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}><Icon name="share" size={14} /> Condividi{picked.size > 0 ? ` (${picked.size})` : ""} {shareOpen ? "▾" : "▸"}</button>
                         {shareOpen && picked.size > 0 && (
                           <>
-                            <button aria-label="Chiudi" onClick={() => setShareOpen(false)} className="fixed inset-0 z-20 cursor-default" />
-                            <div className="absolute left-0 z-30 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-lg">
-                              <button onClick={() => sendOffer(b.id, "wa")} disabled={!g?.phone} title={!g?.phone ? "Nessun numero per questo ospite" : undefined} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash disabled:opacity-40"><Icon name="chat" size={15} /> WhatsApp</button>
-                              <button onClick={() => sendOffer(b.id, "email")} disabled={!g?.email} title={!g?.email ? "Nessuna email per questo ospite" : undefined} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash disabled:opacity-40"><Icon name="mail" size={15} /> Email</button>
-                              <button onClick={() => sendOffer(b.id, "copy")} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> Copia testo</button>
-                            </div>
+                            <button onClick={() => sendOffer(b.id, "wa")} disabled={!g?.phone} title={!g?.phone ? "Nessun numero per questo ospite" : undefined} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-medium text-txt transition hover:bg-paper disabled:opacity-40"><Icon name="chat" size={14} /> WhatsApp</button>
+                            <button onClick={() => sendOffer(b.id, "email")} disabled={!g?.email} title={!g?.email ? "Nessuna email per questo ospite" : undefined} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-medium text-txt transition hover:bg-paper disabled:opacity-40"><Icon name="mail" size={14} /> Email</button>
+                            <button onClick={() => sendOffer(b.id, "copy")} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-medium text-txt transition hover:bg-paper"><Icon name="copy" size={14} /> Copia</button>
                           </>
                         )}
                       </div>
