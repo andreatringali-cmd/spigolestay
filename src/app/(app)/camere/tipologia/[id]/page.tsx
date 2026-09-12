@@ -31,12 +31,14 @@ export default function TipologiaSchedaPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const sp = useSearchParams();
-  const { structures, roomTypes, units, bookings, addRoomType, updateRoomType, deleteRoomType, addUnit, updateUnit, deleteUnit, addActivity } = useData();
+  const { structures, roomTypes, units, bookings, activeStructureId, addRoomType, updateRoomType, deleteRoomType, addUnit, updateUnit, deleteUnit, addActivity } = useData();
   const { t } = useLang();
   const ask = useConfirm();
   const isNew = params.id === "nuovo";
   const existing = roomTypes.find((rt) => rt.id === params.id);
-  const structureId = isNew ? sp.get("s") ?? structures[0]?.id ?? "" : existing?.structureId ?? "";
+  // Per una nuova tipologia la struttura è selezionabile (evita di prendere in silenzio la prima quando il globale è "Tutte").
+  const [newStructId, setNewStructId] = useState(() => sp.get("s") ?? (activeStructureId !== "all" ? activeStructureId : structures[0]?.id) ?? "");
+  const structureId = isNew ? newStructId : existing?.structureId ?? "";
 
   const [f, setF] = useState<Partial<RoomType>>(() => (isNew ? blankType(structureId) : { ...blankType(structureId), ...existing }));
   const set = <K extends keyof RoomType>(k: K, v: RoomType[K]) => setF((p) => ({ ...p, [k]: v }));
@@ -136,6 +138,13 @@ export default function TipologiaSchedaPage() {
         <div className="flex flex-col gap-4">
           <Card>
             <SectionTitle>{t("Generale")}</SectionTitle>
+            {isNew && structures.length > 1 && (
+              <label className={`${lbl} mb-3`}>{t("Struttura")}
+                <select value={newStructId} onChange={(e) => { setNewStructId(e.target.value); set("structureId", e.target.value); }} className={`${inp} mt-1`}>
+                  {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </label>
+            )}
             <div className="mb-3 flex items-center gap-3">
               <div className="h-11 w-11 shrink-0 rounded-lg" style={{ backgroundColor: f.color }} />
               <div><div className="text-[11px] text-faint">{t("Colore (calendario e camere)")}</div><div className="mt-1 flex gap-1.5">{AV_COLORS.map((c) => <button key={c} onClick={() => set("color", c)} className={`h-5 w-5 rounded-full border-2 ${f.color === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div></div>
