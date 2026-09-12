@@ -160,7 +160,7 @@ export default function NuovaPrenotazionePage() {
       <tr><td class="tot">Totale</td><td class="r tot">${eur(grandFinal)}</td></tr>
       ${depositN > 0 ? `<tr><td>Acconto versato</td><td class="r">${eur(depositN)}</td></tr><tr><td>Saldo in struttura</td><td class="r">${eur(saldo)}</td></tr>` : ""}
       </table></div>
-      <p class="mut">${[st?.address, st?.phone, st?.email].filter(Boolean).map(esc).join(" · ")}</p>
+      <p class="mut">${[st?.address, st?.phone, st?.email].filter((x): x is string => !!x).map(esc).join(" · ")}</p>
       <script>window.onload=function(){window.print()}</script>
     </body></html>`;
     const w = window.open("", "_blank"); if (w) { w.document.write(html); w.document.close(); }
