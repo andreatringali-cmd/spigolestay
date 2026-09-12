@@ -159,42 +159,25 @@ export default function NuovaPrenotazionePage() {
 
       {/* ─────────── Step 1 · Barra di ricerca compatta (stile widget del sito) ─────────── */}
       {phase === "search" && (
-      <div className="mb-5 rounded-2xl border border-line bg-surface p-3 shadow-sm">
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_88px_88px]">
+      <div className="mb-5 rounded-2xl border border-line bg-surface p-2.5 shadow-sm">
+        <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_88px_88px]">
           <label className="block text-[11px] font-medium text-dim">Arrivo<input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className={`${barInp} mt-0.5`} /></label>
           <label className="block text-[11px] font-medium text-dim">Partenza<input type="date" value={checkOut} min={shiftISO(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className={`${barInp} mt-0.5`} /></label>
           <label className="block text-[11px] font-medium text-dim">Adulti<input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, +e.target.value))} className={`${barInp} mt-0.5`} /></label>
           <label className="block text-[11px] font-medium text-dim">Bambini<input type="number" min={0} value={children} onChange={(e) => setChildrenN(Math.max(0, +e.target.value))} className={`${barInp} mt-0.5`} /></label>
         </div>
 
-        {/* Riga opzioni compatta */}
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-2 text-sm">
-          <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2.5 py-1 text-xs font-bold text-[color:var(--focus)]">{nightsN} {nightsN === 1 ? "notte" : "notti"}</span>
-          <label className="flex items-center gap-2 text-dim"><Toggle on={onlyAvail} onClick={() => setOnlyAvail((v) => !v)} /> Solo disponibili</label>
-          <label className="flex items-center gap-2 text-dim"><Toggle on={group} onClick={() => setGroup((v) => !v)} /> Gruppo</label>
-          {group && <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Nome gruppo" className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />}
-          {!locked && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {[{ id: "all", name: "Tutte" }, ...structures].map((s) => (
-                <button key={s.id} onClick={() => setStructFilter(s.id)} className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition ${structFilter === s.id ? "border-focus bg-focus text-white" : "border-line text-dim hover:bg-wash"}`}>
-                  {s.id !== "all" && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: structColor(s.id) }} />}{s.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Età bambini + culle (solo se ci sono bambini) */}
+        {/* Età bambini + culle (solo se ci sono bambini) — subito dopo i campi */}
         {children > 0 && (
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-2">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line pt-1.5">
             <span className="text-[11px] font-medium text-dim">Età bambini:</span>
             {childAges.map((age, i) => (
-              <div key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2 py-1">
+              <div key={i} className="flex items-center gap-1 rounded-lg border border-line bg-paper px-1.5 py-0.5">
                 <span className="text-[11px] text-faint">{i + 1}°</span>
-                <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, Number(e.target.value))) : a)))} className="w-12 rounded border border-line bg-surface px-1 py-0.5 text-sm text-txt outline-none focus:border-focus" />
+                <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, Number(e.target.value))) : a)))} className="w-11 rounded border border-line bg-surface px-1 py-0.5 text-sm text-txt outline-none focus:border-focus" />
               </div>
             ))}
-            <label className="ml-2 flex items-center gap-1.5 text-sm text-dim">Culle
+            <label className="ml-1 flex items-center gap-1.5 text-sm text-dim">Culle
               <button onClick={() => setCribs((v) => Math.max(0, v - 1))} disabled={cribs <= 0} className="flex h-7 w-7 items-center justify-center rounded-full border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30">−</button>
               <span className="w-4 text-center text-sm font-bold tabular-nums text-txt">{cribs}</span>
               <button onClick={() => setCribs((v) => Math.min(children, v + 1))} disabled={cribs >= children} className="flex h-7 w-7 items-center justify-center rounded-full border border-focus bg-focus text-base leading-none text-white hover:opacity-90 disabled:opacity-30">+</button>
@@ -202,11 +185,28 @@ export default function NuovaPrenotazionePage() {
           </div>
         )}
 
-        {err && phase === "search" && <div className="mt-2 text-sm font-medium text-[color:var(--err)]">{err}</div>}
+        {/* Riga opzioni compatta */}
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line pt-1.5 text-sm">
+          <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2.5 py-0.5 text-xs font-bold text-[color:var(--focus)]">{nightsN} {nightsN === 1 ? "notte" : "notti"}</span>
+          <label className="flex items-center gap-2 text-dim"><Toggle on={onlyAvail} onClick={() => setOnlyAvail((v) => !v)} /> Solo disponibili</label>
+          <label className="flex items-center gap-2 text-dim"><Toggle on={group} onClick={() => setGroup((v) => !v)} /> Gruppo</label>
+          {group && <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Nome gruppo" className="rounded-lg border border-line bg-paper px-2.5 py-1 text-sm text-txt outline-none focus:border-focus" />}
+          {!locked && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[{ id: "all", name: "Tutte" }, ...structures].map((s) => (
+                <button key={s.id} onClick={() => setStructFilter(s.id)} className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold transition ${structFilter === s.id ? "border-focus bg-focus text-white" : "border-line text-dim hover:bg-wash"}`}>
+                  {s.id !== "all" && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: structColor(s.id) }} />}{s.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {err && phase === "search" && <div className="mt-1.5 text-sm font-medium text-[color:var(--err)]">{err}</div>}
 
         {/* Cerca disponibilità · ultimo step, dopo aver inserito tutti i dati */}
-        <div className="mt-3 border-t border-line pt-3">
-          <button onClick={doSearch} className="flex w-full items-center justify-center gap-2 rounded-lg bg-focus px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90"><Icon name="search" size={16} /> Cerca disponibilità</button>
+        <div className="mt-2.5 border-t border-line pt-2.5">
+          <button onClick={doSearch} className="flex w-full items-center justify-center gap-2 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90"><Icon name="search" size={16} /> Cerca disponibilità</button>
         </div>
       </div>
       )}
