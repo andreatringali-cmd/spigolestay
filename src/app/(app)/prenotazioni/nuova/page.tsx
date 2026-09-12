@@ -168,7 +168,8 @@ export default function NuovaPrenotazionePage() {
     const logoHtml = st?.logo
       ? `<img src="${st.logo}" alt="" class="logoimg">`
       : `<div class="logo" style="background:${accent}">${esc(structureName.slice(0, 1).toUpperCase())}</div>`;
-    const periodCards = ([["Check-in", fmtDay(checkIn)], ["Check-out", fmtDay(checkOut)], ["Durata", `${nightsN} ${nWord}`], ["Ospiti", `${adults}${children > 0 ? ` + ${children}` : ""}`]] as [string, string][])
+    const dmy = (iso: string) => { try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }); } catch { return iso; } };
+    const periodCards = ([["Check-in", dmy(checkIn)], ["Check-out", dmy(checkOut)], ["Durata", `${nightsN} ${nWord}`], ["Ospiti", `${adults}${children > 0 ? ` + ${children}` : ""}`]] as [string, string][])
       .map(([k, v]) => `<div class="pc"><div class="pk">${esc(k)}</div><div class="pv">${esc(v)}</div></div>`).join("");
     const rows: string[] = [];
     selected.forEach((rt) => rows.push(`<tr><td>${qty[rt.id]}× ${esc(rt.name)} <span class="mut">· ${eur(linePrice(rt))} × ${nightsN} ${nWord}</span></td><td class="r"><b>${eur(linePrice(rt) * (qty[rt.id] ?? 0))}</b></td></tr>`));
@@ -203,7 +204,7 @@ h2{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#9a9186;
 .period{display:flex;gap:12px;margin-top:6px}
 .pc{flex:1;border:1px solid #ece7df;border-radius:10px;padding:11px 13px}
 .pk{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#9a9186;font-weight:700}
-.pv{font-size:15px;font-weight:700;margin-top:3px}
+.pv{font-size:15px;font-weight:700;margin-top:3px;white-space:nowrap}
 table{width:100%;border-collapse:collapse}
 td{padding:9px 2px;border-bottom:1px solid #f0ebe3;font-size:13px}
 td.r{text-align:right;white-space:nowrap}

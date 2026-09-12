@@ -333,7 +333,8 @@ export default function PreventiviPage() {
       ? `<img src="${structure.logo}" alt="" class="logoimg">`
       : `<div class="logo" style="background:${accent}">${esc((structureName || "S").slice(0, 1).toUpperCase())}</div>`;
 
-    const periodCards = ([[L.ci, fmt(checkIn)], [L.co, fmt(checkOut)], [L.durata, `${n} ${nWord}`]] as [string, string][])
+    const dmy = (iso: string) => { try { return parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }); } catch { return iso; } };
+    const periodCards = ([[L.ci, dmy(checkIn)], [L.co, dmy(checkOut)], [L.durata, `${n} ${nWord}`]] as [string, string][])
       .map(([k, v]) => `<div class="pc"><div class="pk">${esc(k)}</div><div class="pv">${esc(v)}</div></div>`).join("");
     const sumRows: string[] = mergedLines.map((l) => `<tr><td>${l.qty} ${esc(rtName(l.roomTypeId) || L.room)} <span class="mut">· ${eur(l.price)} ${esc(L.aNotte)} × ${n} ${nWord}</span></td><td class="r"><b>${eur(l.qty * l.price * n)}</b></td></tr>`);
     if (breakfast) sumRows.push(`<tr><td>${esc(L.colazione)}</td><td class="r mut">${esc(bkTxt)}</td></tr>`);
@@ -381,7 +382,7 @@ h2{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#9a9186;
 .period{display:flex;gap:12px;margin-top:6px}
 .pc{flex:1;border:1px solid #ece7df;border-radius:10px;padding:11px 13px}
 .pk{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#9a9186;font-weight:700}
-.pv{font-size:15px;font-weight:700;margin-top:3px}
+.pv{font-size:15px;font-weight:700;margin-top:3px;white-space:nowrap}
 table{width:100%;border-collapse:collapse}
 td{padding:9px 2px;border-bottom:1px solid #f0ebe3;font-size:13px}
 td.r{text-align:right;white-space:nowrap}
