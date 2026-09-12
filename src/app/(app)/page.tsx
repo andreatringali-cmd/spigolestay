@@ -46,7 +46,7 @@ const INHOUSE_TASKS = [
   { id: "upsell", label: "Proposta servizi extra / esperienze" },
 ];
 // Grafici mostrati di default (in ordine). Gli altri sono opzionali (dal selettore).
-const DEFAULT_CHART_KEYS = ["rooms", "ch-mix", "prov-day", "occ-gauge", "occ-trend", "rev-day"];
+const DEFAULT_CHART_KEYS = ["occ-gauge", "occ-str", "guests-str", "ch-mix", "occ-trend", "rev-day", "prov-day", "rooms"];
 
 // Azioni pulizia del giorno (stessa semantica della pagina Pulizie).
 const CLEAN_ACT: Record<string, { label: string; color: string }> = {
@@ -66,10 +66,10 @@ export default function Dashboard() {
   // Personalizzazione grafici Dashboard: quali nascondere (persistito nel browser). Minimo 4 visibili.
   const MIN_CHARTS = 4;
   const [hiddenCharts, setHiddenCharts] = useState<Set<string> | null>(null); // null = non ancora inizializzato
-  const persistHidden = (next: Set<string>) => { setHiddenCharts(next); try { localStorage.setItem("spigolestay:dashcharts:v5", JSON.stringify([...next])); } catch {} };
+  const persistHidden = (next: Set<string>) => { setHiddenCharts(next); try { localStorage.setItem("spigolestay:dashcharts:v6", JSON.stringify([...next])); } catch {} };
   // Ordine dei grafici (riordino via drag&drop), persistito.
   const [chartOrder, setChartOrder] = useState<string[]>([]);
-  const persistChartOrder = (o: string[]) => { setChartOrder(o); try { localStorage.setItem("spigolestay:dashchartorder:v2", JSON.stringify(o)); } catch {} };
+  const persistChartOrder = (o: string[]) => { setChartOrder(o); try { localStorage.setItem("spigolestay:dashchartorder:v3", JSON.stringify(o)); } catch {} };
   const [chartWarn, setChartWarn] = useState("");
   const [chartMenuOpen, setChartMenuOpen] = useState(false);
   const chartMenuRef = useRef<HTMLDivElement>(null);
@@ -163,7 +163,7 @@ export default function Dashboard() {
   const occByStructureDay = structuresToShow.map((s, i) => {
     const su = scopedUnits.filter((u) => u.structureId === s.id);
     const occ = scoped.filter((b) => b.unitId && su.some((u) => u.id === b.unitId) && b.checkIn <= date && date < b.checkOut).length;
-    return { label: s.name, value: occ, color: PALETTE[i % PALETTE.length] };
+    return { label: s.name, value: occ, color: s.photoColor ?? PALETTE[i % PALETTE.length] };
   }).filter((x) => x.value > 0);
 
   // Andamento 7 giorni a partire dalla data selezionata
@@ -190,7 +190,7 @@ export default function Dashboard() {
     { label: t("Libere"), value: Math.max(0, scopedUnits.length - occRooms), color: "var(--line)" },
   ].filter((x) => x.value > 0);
   const bsOfStruct = (s: { id: string }) => { const su = scopedUnits.filter((u) => u.structureId === s.id); return daySet.filter((b) => b.unitId && su.some((u) => u.id === b.unitId)); };
-  const guestsByStruct = structuresToShow.map((s, i) => ({ label: s.name, value: bsOfStruct(s).reduce((a, b) => a + b.adults + b.children, 0), color: PALETTE[i % PALETTE.length] })).filter((x) => x.value > 0);
+  const guestsByStruct = structuresToShow.map((s, i) => ({ label: s.name, value: bsOfStruct(s).reduce((a, b) => a + b.adults + b.children, 0), color: s.photoColor ?? PALETTE[i % PALETTE.length] })).filter((x) => x.value > 0);
   const revByStructDay = structuresToShow.map((s) => ({ label: s.name, value: Math.round(bsOfStruct(s).reduce((a, b) => a + nightly(b), 0)), color: "var(--ok)", fmt: eur })).filter((x) => x.value > 0);
   const countryDay: Record<string, number> = {};
   daySet.forEach((b) => { const c = guests.find((g) => g.id === b.guestId)?.country ?? "—"; countryDay[c] = (countryDay[c] || 0) + 1; });
@@ -213,8 +213,8 @@ export default function Dashboard() {
   // Di default sono VISIBILI i grafici principali; restano nascosti solo gli opzionali.
   const defaultHidden = () => new Set(dashCharts.map((c) => c.key).filter((k) => !DEFAULT_CHART_KEYS.includes(k)));
   useEffect(() => {
-    try { const r = localStorage.getItem("spigolestay:dashcharts:v5"); if (r) setHiddenCharts(new Set(JSON.parse(r))); else setHiddenCharts(defaultHidden()); } catch { setHiddenCharts(defaultHidden()); }
-    try { const o = localStorage.getItem("spigolestay:dashchartorder:v2"); if (o) setChartOrder(JSON.parse(o)); } catch {}
+    try { const r = localStorage.getItem("spigolestay:dashcharts:v6"); if (r) setHiddenCharts(new Set(JSON.parse(r))); else setHiddenCharts(defaultHidden()); } catch { setHiddenCharts(defaultHidden()); }
+    try { const o = localStorage.getItem("spigolestay:dashchartorder:v3"); if (o) setChartOrder(JSON.parse(o)); } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const hidden = hiddenCharts ?? defaultHidden();
