@@ -55,7 +55,7 @@ function Engine() {
     const raw = (qp("ages") || "").split(",").map((x) => Number(x)).filter((x) => !isNaN(x));
     return Array.from({ length: n }, (_, i) => (raw[i] ?? 8));
   });
-  const [wantsCot, setWantsCot] = useState(false);
+  const [wantsCot, setWantsCot] = useState(() => qp("cot") === "1");
   const setChildrenN = (n: number) => { setChildren(n); if (n === 0) setWantsCot(false); setChildAges((prev) => { const next = prev.slice(0, n); while (next.length < n) next.push(8); return next; }); };
   const nights = nightsBetween(checkIn, checkOut);
 

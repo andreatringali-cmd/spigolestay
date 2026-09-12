@@ -22,6 +22,8 @@ const SITE_DICT: Record<string, Record<string, string>> = {
   "Bambini": { en: "Children", fr: "Enfants", de: "Kinder", es: "Niños" },
   "Verifica disponibilità": { en: "Check availability", fr: "Vérifier la disponibilité", de: "Verfügbarkeit prüfen", es: "Ver disponibilidad" },
   "Età dei bambini": { en: "Children's age", fr: "Âge des enfants", de: "Alter der Kinder", es: "Edad de los niños" },
+  "Culla per il bimbo": { en: "Cot for the baby", fr: "Lit bébé", de: "Babybett", es: "Cuna para el bebé" },
+  "gratuita, su richiesta": { en: "free, on request", fr: "gratuit, sur demande", de: "kostenlos, auf Anfrage", es: "gratis, bajo petición" },
   "Chi siamo": { en: "About us", fr: "À propos", de: "Über uns", es: "Quiénes somos" },
   "Le nostre camere": { en: "Our rooms", fr: "Nos chambres", de: "Unsere Zimmer", es: "Nuestras habitaciones" },
   "letti": { en: "beds", fr: "lits", de: "Betten", es: "camas" },
@@ -128,10 +130,11 @@ function Site() {
   const [ad, setAd] = useState(2);
   const [ch, setCh] = useState(0);
   const [childAges, setChildAges] = useState<number[]>([]);
-  const setChN = (n: number) => { setCh(n); setChildAges((prev) => { const next = prev.slice(0, n); while (next.length < n) next.push(8); return next; }); };
+  const [wantsCot, setWantsCot] = useState(false);
+  const setChN = (n: number) => { setCh(n); if (n === 0) setWantsCot(false); setChildAges((prev) => { const next = prev.slice(0, n); while (next.length < n) next.push(8); return next; }); };
 
   const types = roomTypes.filter((rt) => rt.structureId === sid);
-  const go = (extra = "") => { window.location.href = `/prenota?s=${sid}&ci=${ci}&co=${co}&ad=${ad}&ch=${ch}${ch > 0 ? `&ages=${childAges.join(",")}` : ""}${extra}`; };
+  const go = (extra = "") => { window.location.href = `/prenota?s=${sid}&ci=${ci}&co=${co}&ad=${ad}&ch=${ch}${ch > 0 ? `&ages=${childAges.join(",")}` : ""}${wantsCot ? "&cot=1" : ""}${extra}`; };
 
   // Galleria: foto delle tipologie + foto delle singole camere, con etichetta della tipologia.
   const gallery = useMemo(() => {
@@ -208,6 +211,7 @@ function Site() {
                     </label>
                   ))}
                 </div>
+                <label className="mt-2 flex items-center gap-2 text-xs text-dim"><input type="checkbox" checked={wantsCot} onChange={(e) => setWantsCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {T("Culla per il bimbo")} <span className="text-faint">({T("gratuita, su richiesta")})</span></label>
               </div>
             )}
           </div>

@@ -212,10 +212,12 @@ export default function NuovaPrenotazionePage() {
         <Card className="mb-5">
           {/* Controlli: struttura · preventivo/prenotazione · solo disponibili · gruppo */}
           <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line pb-3 text-sm">
-            <select value={structFilter} onChange={(e) => setStructFilter(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
-              <option value="all">Tutte le strutture</option>
-              {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            {!locked && (
+              <select value={structFilter} onChange={(e) => setStructFilter(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
+                <option value="all">Tutte le strutture</option>
+                {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            )}
             <div className="inline-flex rounded-lg border border-line p-0.5">
               {([["prenotazione", "Prenotazione"], ["preventivo", "Preventivo"]] as const).map(([m, lab]) => (
                 <button key={m} onClick={() => setMode(m)} className={`rounded-md px-3 py-1 text-xs font-semibold transition ${mode === m ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>

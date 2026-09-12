@@ -131,7 +131,7 @@ export default function NewBookingModal() {
               <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-faint">{t("Soggiorno")}</div>
               <div className="flex flex-wrap items-end gap-3">
                 <label className="flex-1 text-[11px] font-medium text-dim">{t("Check-in")}
-                  <input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-txt outline-none focus:border-focus" />
+                  <input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-txt outline-none focus:border-focus" />
                 </label>
                 <div className="grid h-11 w-9 shrink-0 place-items-center text-faint">→</div>
                 <label className="flex-1 text-[11px] font-medium text-dim">{t("Check-out")}

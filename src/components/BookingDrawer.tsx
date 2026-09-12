@@ -8,7 +8,7 @@ import { bookingCode } from "@/lib/bookingCode";
 import { sendVoucher } from "@/lib/mailer";
 import { buildGuestLink, buildGroupGuestLink, guideMessage } from "@/lib/guestlink";
 import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
-import { nights, parseISO } from "@/lib/dates";
+import { nights, parseISO, shiftISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { buildFatturaPA } from "@/lib/fatturapa";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -553,8 +553,8 @@ export default function BookingDrawer() {
           </select>
         </Field>
         <div className="grid grid-cols-2 gap-2">
-          <Field label={t("Check-in")}><input type="date" className={inputCls} value={form.checkIn} onChange={(e) => set({ checkIn: e.target.value })} /></Field>
-          <Field label={t("Check-out")}><input type="date" className={inputCls} value={form.checkOut} onChange={(e) => set({ checkOut: e.target.value })} /></Field>
+          <Field label={t("Check-in")}><input type="date" className={inputCls} value={form.checkIn} onChange={(e) => set(e.target.value >= form.checkOut ? { checkIn: e.target.value, checkOut: shiftISO(e.target.value, 1) } : { checkIn: e.target.value })} /></Field>
+          <Field label={t("Check-out")}><input type="date" className={inputCls} value={form.checkOut} min={shiftISO(form.checkIn, 1)} onChange={(e) => set({ checkOut: e.target.value })} /></Field>
         </div>
         <div className="text-xs text-dim">{t("Durata")}: <b className="font-mono text-txt">{nEdit}</b> {nEdit === 1 ? t("notte") : t("notti")}</div>
         <div className="grid grid-cols-2 gap-2">
