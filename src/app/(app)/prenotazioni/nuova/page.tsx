@@ -29,6 +29,9 @@ export default function NuovaPrenotazionePage() {
   const [checkOut, setCheckOut] = useState(shiftISO(today, 1));
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
+  const [childAges, setChildAges] = useState<number[]>([]);
+  const [cribs, setCribs] = useState(0);
+  const setChildrenN = (n: number) => { setChildren(n); setChildAges((prev) => { const next = prev.slice(0, n); while (next.length < n) next.push(8); return next; }); if (cribs > n) setCribs(n); };
   const [onlyAvail, setOnlyAvail] = useState(true);
   const [group, setGroup] = useState(false);
   const [groupName, setGroupName] = useState("");
@@ -84,7 +87,13 @@ export default function NuovaPrenotazionePage() {
     selected.forEach((rt) => { const free = availUnits(rt); const q = Math.min(qty[rt.id] ?? 0, free.length); for (let k = 0; k < q; k++) flat.push({ rt, unitId: free[k]?.id ?? null }); });
     const nR = Math.max(1, flat.length);
     const dist = (tot: number, i: number) => Math.floor(tot / nR) + (i < tot % nR ? 1 : 0);
-    flat.forEach((r, i) => addBooking({ groupId, structureId: r.rt.structureId, roomTypeId: r.rt.id, unitId: r.unitId, guestId, channel, status: "confirmed", checkIn, checkOut, adults: nR > 1 ? dist(adults, i) : adults, children: nR > 1 ? dist(children, i) : children, total: linePrice(r.rt) || undefined, note: isGroup && groupName.trim() ? groupName.trim() : undefined }));
+    let ci = 0; // cursore per distribuire le età dei bambini tra le camere del gruppo
+    flat.forEach((r, i) => {
+      const kids = nR > 1 ? dist(children, i) : children;
+      const ages = childAges.slice(ci, ci + kids); ci += kids;
+      const roomCribs = nR > 1 ? Math.min(dist(cribs, i), kids) : cribs;
+      addBooking({ groupId, structureId: r.rt.structureId, roomTypeId: r.rt.id, unitId: r.unitId, guestId, channel, status: "confirmed", checkIn, checkOut, adults: nR > 1 ? dist(adults, i) : adults, children: kids, childAges: ages.length ? ages : undefined, cribs: roomCribs || undefined, total: linePrice(r.rt) || undefined, note: isGroup && groupName.trim() ? groupName.trim() : undefined });
+    });
     router.push("/prenotazioni");
   };
 
@@ -93,7 +102,7 @@ export default function NuovaPrenotazionePage() {
   );
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div>
       {/* ─────────── Criteri di ricerca · card in stile widget ─────────── */}
       <div className="mb-5 overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
         {/* Header a banda colorata */}
@@ -109,6 +118,7 @@ export default function NuovaPrenotazionePage() {
         </div>
 
         <div className="space-y-4 p-5">
+          <div className="grid gap-4 md:grid-cols-2">
           {/* Soggiorno */}
           <div className="rounded-2xl border border-line bg-paper p-4">
             <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-faint">Soggiorno</div>
@@ -129,8 +139,33 @@ export default function NuovaPrenotazionePage() {
             <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-faint">Ospiti</div>
             <div className="grid grid-cols-2 gap-3">
               <Stepper label="Adulti" sub="14 anni +" value={adults} min={1} onChange={setAdults} />
-              <Stepper label="Bambini" sub="0–13 anni" value={children} min={0} onChange={setChildren} />
+              <Stepper label="Bambini" sub="0–13 anni" value={children} min={0} onChange={setChildrenN} />
             </div>
+            {children > 0 && (
+              <div className="mt-3 space-y-3 rounded-xl border border-line bg-surface p-3">
+                <div>
+                  <div className="mb-1.5 text-[11px] font-medium text-dim">Età dei bambini <span className="text-faint">(per la tassa di soggiorno)</span></div>
+                  <div className="flex flex-wrap gap-2">
+                    {childAges.map((age, i) => (
+                      <div key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5">
+                        <span className="text-[11px] text-faint">Bimbo {i + 1}</span>
+                        <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, Number(e.target.value))) : a)))} className="w-14 rounded border border-line bg-surface px-1.5 py-0.5 text-sm text-txt outline-none focus:border-focus" />
+                        <span className="text-[11px] text-faint">anni</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-line pt-2.5">
+                  <div><div className="text-sm font-semibold text-txt">Culla / lettino</div><div className="text-[10px] text-faint">Quante ne servono</div></div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setCribs((v) => Math.max(0, v - 1))} disabled={cribs <= 0} className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-lg leading-none text-dim hover:bg-wash disabled:opacity-30">−</button>
+                    <span className="w-5 text-center text-base font-bold tabular-nums text-txt">{cribs}</span>
+                    <button onClick={() => setCribs((v) => Math.min(children, v + 1))} disabled={cribs >= children} className="flex h-8 w-8 items-center justify-center rounded-full border border-focus bg-focus text-lg leading-none text-white hover:opacity-90 disabled:opacity-30">+</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           </div>
 
           {/* Opzioni + struttura */}
