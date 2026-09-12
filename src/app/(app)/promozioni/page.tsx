@@ -7,11 +7,25 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
 import ScrollStrip from "@/components/ScrollStrip";
 import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, promoMailto, DEFAULT_PROMOS } from "@/lib/promos";
+import { CHANNELS, type Channel } from "@/lib/types";
 
-type Segment = "consenso" | "abituali" | "lapsed" | "tutti";
+// Canali OTA (a commissione): sono i candidati da riportare al diretto.
+const OTA_CHANNELS: Channel[] = ["booking", "airbnb", "expedia"];
+const isOta = (c: Channel) => OTA_CHANNELS.includes(c);
+// Promo preimpostata "Riprenota diretto": per gli ex ospiti OTA → prenotare senza commissioni.
+const RIPRENOTA_PROMO: Promo = {
+  id: "promo-riprenota", name: "Riprenota diretto", subject: "Torna a trovarci — prezzo diretto, senza intermediari",
+  description: "Per gli ex ospiti arrivati da OTA: riprenotano diretto e tu risparmi la commissione.",
+  discountPct: 10, code: "RITORNO10",
+  features: ["Miglior prezzo prenotando diretto", "Nessun intermediario", "Self check-in", "Assistenza diretta con noi"],
+  body: "Ciao {nome},\n\nè stato un piacere ospitarti a {struttura}! Se pensi di tornare a Siracusa, prenotando DIRETTO con noi hai il {sconto}% di sconto con il codice {codice} — stesso servizio, senza intermediari.\n\nScrivici o prenota qui: {contatti}\n\nA presto! — {struttura}",
+};
+
+type Segment = "ota" | "consenso" | "abituali" | "lapsed" | "tutti";
 interface SendLog { id: string; promoName: string; date: string; recipients: number; segment: Segment; }
 
 const SEGMENTS: { key: Segment; label: string; desc: string }[] = [
+  { key: "ota", label: "Arrivati da OTA", desc: "Prenotarono via Booking/Airbnb — riportali al diretto" },
   { key: "lapsed", label: "Da ricontattare", desc: "Non tornano da oltre 10 mesi" },
   { key: "abituali", label: "Ospiti abituali", desc: "Più di un soggiorno" },
   { key: "consenso", label: "Con consenso marketing", desc: "Hanno dato il consenso" },
@@ -34,6 +48,8 @@ export default function PromozioniPage() {
       const seeded = localStorage.getItem("spigolestay:promosseeded") === "1";
       if (!seeded) { if (list.length === 0) { list = DEFAULT_PROMOS; savePromos(list); } localStorage.setItem("spigolestay:promosseeded", "1"); }
     } catch {}
+    // Assicura la promo "Riprenota diretto" (anche per chi ha già una libreria salvata).
+    if (!list.some((p) => p.id === RIPRENOTA_PROMO.id)) { list = [RIPRENOTA_PROMO, ...list]; savePromos(list); }
     setPromos(list);
     try { const r = localStorage.getItem("spigolestay:promolog"); if (r) setLogs(JSON.parse(r)); } catch {}
   }, []);
@@ -80,6 +96,7 @@ export default function PromozioniPage() {
       const list = bookings.filter((b) => b.guestId === g.id && b.status !== "cancelled" && b.channel !== "blocked");
       const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), "");
       switch (segment) {
+        case "ota": return list.some((b) => isOta(b.channel));
         case "consenso": return !!g.marketingConsent;
         case "abituali": return list.length > 1;
         case "lapsed": return !!last && daysAgo(last) > 300;
@@ -87,6 +104,11 @@ export default function PromozioniPage() {
       }
     });
   }, [guests, bookings, segment, structureId]);
+
+  // Commissioni pagate alle OTA sullo storico: quanto potresti risparmiare riportando questi ospiti al diretto.
+  const otaCommission = useMemo(() => bookings
+    .filter((b) => b.status !== "cancelled" && isOta(b.channel))
+    .reduce((a, b) => a + (b.total ?? 0) * (b.commissionPct != null ? b.commissionPct / 100 : (CHANNELS[b.channel]?.commission ?? 0.15)), 0), [bookings]);
 
   const usedThisYear = logs.filter((l) => new Date(l.date).getFullYear() === new Date().getFullYear()).length;
   const limitReached = usedThisYear >= 4;
@@ -104,8 +126,8 @@ export default function PromozioniPage() {
     <div>
       <PageHeader title="Promozioni" subtitle="Crea le tue promo, salvale e inviale quando vuoi · max 4 invii l'anno" />
 
-      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        {([["Promo salvate", String(promos.length)], ["Invii quest'anno", `${usedThisYear}/4`], ["Destinatari 'da ricontattare'", String(guests.filter((g) => { if (!g.email) return false; const list = bookings.filter((b) => b.guestId === g.id && b.status !== "cancelled"); const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), ""); return !!last && daysAgo(last) > 300; }).length)], ["Ospiti con email", String(guests.filter((g) => g.email).length)]] as [string, string][]).map(([lab, val]) => (
+      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+        {([["Commissioni OTA (storico)", `€ ${Math.round(otaCommission).toLocaleString("it-IT")}`], ["Promo salvate", String(promos.length)], ["Invii quest'anno", `${usedThisYear}/4`], ["Destinatari 'da ricontattare'", String(guests.filter((g) => { if (!g.email) return false; const list = bookings.filter((b) => b.guestId === g.id && b.status !== "cancelled"); const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), ""); return !!last && daysAgo(last) > 300; }).length)], ["Ospiti con email", String(guests.filter((g) => g.email).length)]] as [string, string][]).map(([lab, val]) => (
           <div key={lab} className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm">
             <div className="text-[10px] font-medium uppercase tracking-wide text-faint">{lab}</div>
             <div className="font-mono text-lg font-bold leading-tight text-txt">{val}</div>
@@ -131,7 +153,7 @@ export default function PromozioniPage() {
                 {p.description && <p className="mt-1 text-xs text-dim">{p.description}</p>}
                 <p className="mt-1.5 line-clamp-2 flex-1 text-xs text-dim">{p.body}</p>
                 <div className="mt-2 flex items-center gap-1 border-t border-line pt-2">
-                  <button onClick={() => setSending(p)} className="flex items-center gap-1 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-white hover:opacity-90"><Icon name="mail" size={13} /> Invia</button>
+                  <button onClick={() => { setSending(p); setSegment(p.id === "promo-riprenota" ? "ota" : "lapsed"); }} className="flex items-center gap-1 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-white hover:opacity-90"><Icon name="mail" size={13} /> Invia</button>
                   <button onClick={() => editPromo(p)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash">Modifica</button>
                   <button onClick={() => dupPromo(p)} title="Duplica" className="rounded-lg border border-line px-2 py-1.5 text-xs text-dim hover:bg-wash"><Icon name="copy" size={13} /></button>
                   <button onClick={() => delPromo(p.id)} title="Elimina" className="ml-auto rounded-lg px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)]">✕</button>
