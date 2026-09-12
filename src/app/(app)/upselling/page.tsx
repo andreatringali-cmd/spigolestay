@@ -100,7 +100,7 @@ export default function UpsellingPage() {
         {/* Catalogo (unico, dalla scheda struttura) */}
         <Card className="flex flex-col">
           <SectionTitle>Catalogo extra ({catExtras.length})</SectionTitle>
-          <p className="mb-2 mt-0.5 text-[11px] text-faint">Extra di <b className="text-dim">{catStruct?.name}</b> · stesso elenco usato dal motore prenotazioni.</p>
+          <div className="mb-2" />
           <div className="flex-1 space-y-2 overflow-y-auto" style={{ maxHeight: 460 }}>
             {shownExtras.length === 0 && (
               <div className="rounded-lg border border-dashed border-line py-6 text-center text-sm text-faint">
