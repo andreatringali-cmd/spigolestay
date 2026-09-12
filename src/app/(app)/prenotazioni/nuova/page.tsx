@@ -51,6 +51,7 @@ export default function NuovaPrenotazionePage() {
   const [parking, setParking] = useState(false);
   const [parkingPrice, setParkingPrice] = useState("");
   const [deposit, setDeposit] = useState("");
+  const [note, setNote] = useState("");
   const [sendConfirm, setSendConfirm] = useState(true);
   const [err, setErr] = useState("");
 
@@ -133,7 +134,7 @@ export default function NuovaPrenotazionePage() {
       const ages = childAges.slice(ci, ci + kids); ci += kids;
       const roomCribs = nR > 1 ? Math.min(dist(cribs, i), kids) : cribs;
       const depositN = Math.max(0, Number(deposit) || 0);
-      const created = addBooking({ groupId, structureId: r.rt.structureId, roomTypeId: r.rt.id, unitId: r.unitId, guestId, channel, status: "confirmed", checkIn, checkOut, adults: nR > 1 ? dist(adults, i) : adults, children: kids, childAges: ages.length ? ages : undefined, cribs: roomCribs || undefined, parking: parking || undefined, paid: i === 0 && depositN > 0 ? depositN : undefined, total: linePrice(r.rt) || undefined, extras: i === 0 && bookingExtras.length ? bookingExtras : undefined, note: isGroup && groupName.trim() ? groupName.trim() : undefined });
+      const created = addBooking({ groupId, structureId: r.rt.structureId, roomTypeId: r.rt.id, unitId: r.unitId, guestId, channel, status: "confirmed", checkIn, checkOut, adults: nR > 1 ? dist(adults, i) : adults, children: kids, childAges: ages.length ? ages : undefined, cribs: roomCribs || undefined, parking: parking || undefined, paid: i === 0 && depositN > 0 ? depositN : undefined, total: linePrice(r.rt) || undefined, extras: i === 0 && bookingExtras.length ? bookingExtras : undefined, note: [isGroup && groupName.trim() ? groupName.trim() : "", note.trim()].filter(Boolean).join(" · ") || undefined });
       if (i === 0) primary = created;
     });
     // Conferma all'ospite (voucher via email). Uso i dati appena inseriti per evitare i ritardi dello stato.
@@ -360,6 +361,7 @@ export default function NuovaPrenotazionePage() {
                   <FieldL label="Canale"><select value={channel} onChange={(e) => setChannel(e.target.value as Channel)} className={inp}>{CHANNEL_OPTS.map((c) => (<option key={c} value={c}>{CHANNELS[c].label}</option>))}</select></FieldL>
                   <FieldL label="Email"><input value={email} onChange={(e) => setEmail(e.target.value)} className={inp} placeholder="per il voucher" /></FieldL>
                   <FieldL label="Telefono"><input value={phone} onChange={(e) => setPhone(e.target.value)} className={inp} placeholder="opzionale" /></FieldL>
+                  <label className="col-span-2 block text-xs font-medium text-dim sm:col-span-3">Note<textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder="Richieste, orari, preferenze… (le ritrovi nella scheda)" /></label>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-line pt-3">
                   <label className="flex items-center gap-2 text-sm text-txt"><Toggle on={parking} onClick={() => setParking((v) => !v)} /> Parcheggio</label>
