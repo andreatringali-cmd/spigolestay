@@ -209,25 +209,26 @@ export default function NuovaPrenotazionePage() {
 
       {/* ─────────── Step 1 · Disponibilità ─────────── */}
       {phase === "search" && (
-        <Card className="mb-5">
-          {/* Controlli: struttura · preventivo/prenotazione · solo disponibili · gruppo */}
-          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line pb-3 text-sm">
-            {!locked && (
-              <select value={structFilter} onChange={(e) => setStructFilter(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
-                <option value="all">Tutte le strutture</option>
-                {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            )}
-            <div className="inline-flex rounded-lg border border-line p-0.5">
-              {([["prenotazione", "Prenotazione"], ["preventivo", "Preventivo"]] as const).map(([m, lab]) => (
-                <button key={m} onClick={() => setMode(m)} className={`rounded-md px-3 py-1 text-xs font-semibold transition ${mode === m ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>
-              ))}
-            </div>
-            <label className="flex items-center gap-2 text-dim"><Toggle on={onlyAvail} onClick={() => setOnlyAvail((v) => !v)} /> Solo disponibili</label>
-            <label className="flex items-center gap-2 text-dim"><Toggle on={group} onClick={() => setGroup((v) => !v)} /> Gruppo</label>
-            {group && <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Nome gruppo" className={`${inp} basis-full sm:max-w-xs`} />}
+      <>
+        {/* Barra controlli · separata dal corpo sottostante */}
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-sm shadow-sm">
+          {!locked && (
+            <select value={structFilter} onChange={(e) => setStructFilter(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
+              <option value="all">Tutte le strutture</option>
+              {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          )}
+          <div className="inline-flex rounded-lg border border-line p-0.5">
+            {([["prenotazione", "Prenotazione"], ["preventivo", "Preventivo"]] as const).map(([m, lab]) => (
+              <button key={m} onClick={() => setMode(m)} className={`rounded-md px-3 py-1 text-xs font-semibold transition ${mode === m ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>
+            ))}
           </div>
+          <label className="flex items-center gap-2 text-dim"><Toggle on={onlyAvail} onClick={() => setOnlyAvail((v) => !v)} /> Solo disponibili</label>
+          <label className="flex items-center gap-2 text-dim"><Toggle on={group} onClick={() => setGroup((v) => !v)} /> Gruppo</label>
+          {group && <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Nome gruppo" className={`${inp} basis-full sm:max-w-xs`} />}
+        </div>
 
+        <Card className="mb-5">
           {/* Date, ospiti e azione (in linea) */}
           <div className="flex flex-wrap items-end gap-3">
             <label className="flex min-w-[140px] flex-1 flex-col gap-1.5 text-xs font-medium text-dim">Arrivo<input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className={inp} /></label>
@@ -259,6 +260,7 @@ export default function NuovaPrenotazionePage() {
 
           {err && phase === "search" && <div className="mt-3 text-sm font-medium text-[color:var(--err)]">{err}</div>}
         </Card>
+      </>
       )}
 
       {/* ─────────── Step 2 · Scegli la camera ─────────── */}
