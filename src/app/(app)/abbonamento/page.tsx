@@ -131,7 +131,8 @@ export default function AbbonamentoPage() {
   const netMonth = Math.round(perMonth / 1.22);
   const vatMonth = perMonth - netMonth;
 
-  const suggested = useMemo(() => (TIERS.find((tr) => nStruct <= tr.structures) ?? TIERS[TIERS.length - 1]).key, [nStruct]);
+  // Il piano consigliato è sempre Pro (il più equilibrato per la maggior parte delle strutture).
+  const suggested = "pro";
 
   return (
     <div>
