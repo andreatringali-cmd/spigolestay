@@ -69,7 +69,7 @@ interface DataContextValue {
   updateGuest: (id: string, patch: Partial<Guest>) => void;
   deleteGuest: (id: string) => void;
   mergeGuests: (keepId: string, dropIds: string[]) => void; // accorpa doppioni: sposta le prenotazioni e rimuove le voci duplicate
-  addBooking: (b: Omit<Booking, "id">) => void;
+  addBooking: (b: Omit<Booking, "id">) => Booking;
   updateBooking: (id: string, patch: Partial<Booking>) => void;
   moveBooking: (id: string, to: { unitId: string; checkIn: string; checkOut: string }) => void;
   deleteBooking: (id: string) => void;
@@ -286,10 +286,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const maxN = bookings.reduce((mx, x) => (x.code?.startsWith(prefix) ? Math.max(mx, Number(x.code.slice(prefix.length)) || 0) : mx), 0);
         const code = b.code ?? `${prefix}${String(maxN + 1).padStart(4, "0")}`;
         // "Prenotata il" = oggi di default (se non fornita, es. import/iCal la passano esplicita).
-        setBookings((prev) => [...prev, { id: uid(), bookedOn: new Date().toISOString().slice(0, 10), ...b, code }]);
+        const rec: Booking = { id: uid(), bookedOn: new Date().toISOString().slice(0, 10), ...b, code };
+        setBookings((prev) => [...prev, rec]);
         const gName = guests.find((g) => g.id === b.guestId)?.fullName;
         if (b.channel === "blocked") logAct("block", `Fuori servizio${b.note ? " — " + b.note : ""}`);
         else logAct("booking", `Nuova prenotazione${gName ? " — " + gName : ""} · ${b.channel}`);
+        return rec;
       },
       updateBooking: (id, patch) => {
         setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
