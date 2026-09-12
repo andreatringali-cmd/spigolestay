@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
-import { useConfirm } from "@/components/ConfirmProvider";
 import { AV_COLORS, initials } from "@/lib/users";
 import { useLang } from "@/lib/i18n";
 import { PageHeader } from "@/components/ui";
@@ -21,7 +20,6 @@ export default function OspitiPage() {
   const router = useRouter();
   const { t } = useLang();
   const { guests, bookings, structures, activeStructureId, mergeGuests, updateGuest } = useData();
-  const ask = useConfirm();
   // Rileva doppioni: stessa email, oppure stesso nome completo.
   const dupGroups = useMemo(() => {
     const nrm = (s?: string) => (s ?? "").trim().toLowerCase();
@@ -30,9 +28,10 @@ export default function OspitiPage() {
     return [...byKey.values()].filter((a) => a.length > 1);
   }, [guests]);
   const dupCount = dupGroups.reduce((a, g) => a + g.length - 1, 0);
-  const mergeDuplicates = async () => {
-    if (!dupCount) return;
-    if (!(await ask({ title: t("Unisci duplicati"), message: `${t("Trovati")} ${dupCount} ${t("ospiti duplicati. Li unisco in un'unica voce spostando tutte le prenotazioni nello storico?")}`, confirmLabel: t("Unisci") }))) return;
+  // Unisce i doppioni in automatico: all'apertura e ogni volta che ne compaiono di nuovi
+  // (es. dopo un import). Tiene la voce con più prenotazioni e completa i campi mancanti.
+  useEffect(() => {
+    if (dupCount === 0) return;
     const fields = ["email", "phone", "country", "firstName", "lastName", "birthDate", "birthPlace", "citizenship", "docType", "docNumber", "docPlace", "address"] as const;
     dupGroups.forEach((group) => {
       const bookCount = (id: string) => bookings.filter((b) => b.guestId === id).length;
@@ -42,7 +41,8 @@ export default function OspitiPage() {
       updateGuest(keeper.id, merged);
       mergeGuests(keeper.id, group.filter((g) => g.id !== keeper.id).map((g) => g.id));
     });
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dupCount]);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "stays", dir: "desc" });
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -124,7 +124,6 @@ export default function OspitiPage() {
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca per nome, email o paese…")} className="w-full max-w-sm rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {dupCount > 0 && <button onClick={mergeDuplicates} className="rounded-lg border px-3 py-2 text-sm font-semibold text-txt hover:opacity-90" style={{ borderColor: "color-mix(in srgb, var(--warn) 50%, var(--line))", backgroundColor: "color-mix(in srgb, var(--warn) 10%, transparent)" }}>⤳ {t("Unisci duplicati")} ({dupCount})</button>}
           <button onClick={() => router.push("/promozioni")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">✉ {t("Promozioni")}</button>
           <button onClick={() => router.push("/ospiti/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ {t("Nuovo ospite")}</button>
         </div>
