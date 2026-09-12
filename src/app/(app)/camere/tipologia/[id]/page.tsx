@@ -55,12 +55,22 @@ export default function TipologiaSchedaPage() {
   const delSpace = (i: number) => setF((p) => ({ ...p, composition: (p.composition ?? []).filter((_, x) => x !== i) }));
   const toggleShared = (i: number) => setF((p) => ({ ...p, composition: (p.composition ?? []).map((c, x) => (x === i ? { ...c, shared: !c.shared } : c)) }));
 
+  const [newRoomCount, setNewRoomCount] = useState("1");
   const valid = !!f.name?.trim();
   const save = () => {
     if (!valid) return;
     const patch: Partial<RoomType> = { ...f };
     delete (patch as { id?: string }).id;
-    if (isNew) { const id = addRoomType({ structureId, name: f.name!.trim(), beds: f.beds ?? 1, basePrice: f.basePrice ?? 0 }); updateRoomType(id, patch); }
+    if (isNew) {
+      const id = addRoomType({ structureId, name: f.name!.trim(), beds: f.beds ?? 1, basePrice: f.basePrice ?? 0 });
+      updateRoomType(id, patch);
+      // Crea subito le camere richieste per questa tipologia (numerate 1..N, rinominabili poi da «Camere»).
+      const cnt = Math.max(0, Number(newRoomCount) || 0);
+      const prefix = f.name!.trim().replace(/\s+/g, "").slice(0, 3).toUpperCase();
+      const inherit = [...(f.amenities ?? [])];
+      for (let i = 1; i <= cnt; i++) { const uid = addUnit({ structureId, roomTypeId: id, name: String(i) }); updateUnit(uid, { code: `${prefix}${i}`, amenities: inherit }); }
+      addActivity("config", `Nuova tipologia — ${f.name!.trim()}${cnt ? ` (${cnt} camere)` : ""}`);
+    }
     else { updateRoomType(params.id, patch); addActivity("config", `Tipologia modificata — ${f.name!.trim()}`); }
     router.push("/camere");
   };
@@ -143,6 +153,16 @@ export default function TipologiaSchedaPage() {
             </label>
             <label className={`${lbl} mt-3`}>{t("Descrizione breve")}<textarea value={f.description ?? ""} onChange={(e) => set("description", e.target.value)} rows={2} className={`${inp} mt-1 resize-y`} placeholder={t("Sintesi mostrata nei listini interni…")} /></label>
           </Card>
+
+          {isNew && (
+            <Card>
+              <SectionTitle>{t("Camere di questa tipologia")}</SectionTitle>
+              <p className="mb-2 text-xs text-dim">{t("Quante camere hai di questa tipologia? Le creo in automatico al salvataggio (numerate, rinominabili poi da «Camere»).")}</p>
+              <label className={lbl}>{t("Numero camere")}
+                <input type="number" min={0} value={newRoomCount} onChange={(e) => setNewRoomCount(e.target.value.replace(/\D/g, ""))} className={`${inp} mt-1 w-28`} />
+              </label>
+            </Card>
+          )}
 
           {!isNew && existing && (
             <Card>
