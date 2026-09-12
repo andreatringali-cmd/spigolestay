@@ -1676,7 +1676,7 @@ function MenuToggle({ label, on, onClick }: { label: string; on: boolean; onClic
 function StripRow({ label, gridW, children }: { label: string; gridW: number; children: React.ReactNode }) {
   return (
     <div className="flex border-b border-line bg-surface">
-      <div className="sticky left-0 z-10 flex shrink-0 items-center border-r border-line bg-surface px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-faint" style={{ width: LABEL_W, height: 26 }}>
+      <div className="sticky left-0 z-10 flex shrink-0 items-center border-r border-line bg-surface px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-faint" style={{ width: 212, height: 26 }}>
         {label}
       </div>
       <div className="flex" style={{ width: gridW, height: 26 }}>{children}</div>
