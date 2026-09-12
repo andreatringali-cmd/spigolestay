@@ -50,7 +50,7 @@ export default function MessaggiPage() {
           <button
             key={x.id}
             onClick={() => setTab(x.id)}
-            className={`flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-4 py-3 text-sm font-semibold shadow-sm transition ${tab === x.id ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line bg-surface text-dim hover:bg-wash hover:text-txt"}`}
+            className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border px-2 py-2.5 text-xs font-semibold shadow-sm transition sm:gap-2 sm:px-4 sm:py-3 sm:text-sm ${tab === x.id ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line bg-surface text-dim hover:bg-wash hover:text-txt"}`}
           >
             <span className="text-base">{x.icon}</span>{x.label}
             {x.id === "conversazioni" && unread > 0 && <span className="ml-1 inline-flex min-w-[1.1rem] justify-center rounded-full px-1 py-0.5 text-[10px] font-bold text-white" style={{ backgroundColor: "var(--ok)" }}>{unread}</span>}

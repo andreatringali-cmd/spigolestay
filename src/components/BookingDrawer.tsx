@@ -324,7 +324,7 @@ export default function BookingDrawer() {
     <>
       {/* Azioni rapide */}
       <div className="border-b border-line px-5 py-3">
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <button onClick={() => setQa(qa === "incasso" ? null : "incasso")} className={qaBtn} style={qa === "incasso" ? { borderColor: "var(--focus)", color: "var(--focus)" } : undefined}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /></svg>
             {t("Incasso")}

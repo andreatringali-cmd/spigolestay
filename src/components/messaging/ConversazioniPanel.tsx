@@ -207,8 +207,8 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
 
   return (
     <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-      {/* Elenco */}
-      <div className="flex h-[calc(100vh-13rem)] min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+      {/* Elenco (su cellulare: nascosto quando una conversazione/invii è aperta) */}
+      <div className={`${(current || showInvii) ? "hidden lg:flex" : "flex"} h-[calc(100vh-13rem)] min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm`}>
         <div className="border-b border-line p-2">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca ospite…")} className="w-full rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
         </div>
@@ -254,8 +254,8 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
         </button>
       </div>
 
-      {/* Thread + invii programmati */}
-      <div className="flex h-[calc(100vh-13rem)] min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+      {/* Thread + invii programmati (su cellulare: visibile solo quando selezioni una conversazione/invii) */}
+      <div className={`${(current || showInvii) ? "flex" : "hidden lg:flex"} h-[calc(100vh-13rem)] min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm`}>
         {!current ? (
           !showInvii ? (
             // Nessun ospite selezionato → placeholder pulito (gli invii si aprono col pulsante).
@@ -310,6 +310,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
           <>
             <div className="border-b border-line px-4 py-2.5">
               <div className="flex items-center gap-2.5">
+                <button onClick={() => setSel(null)} title={t("Torna alle conversazioni")} className="shrink-0 rounded-lg border border-line px-2 py-1 text-sm text-dim hover:bg-wash lg:hidden">←</button>
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-focus text-xs font-bold text-white">{initials(current.name)}</span>
                 <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2"><span className="shrink-0 text-sm font-semibold text-txt">{current.name}</span><span className="truncate text-[11px] text-faint">{[current.phone, current.email].filter(Boolean).join(" · ") || t("nessun contatto")}</span></div>
                 <button onClick={() => toggleArch(current.id)} title={isArch(current.id) ? t("Ripristina") : t("Archivia")} className="shrink-0 rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-dim hover:bg-wash">{isArch(current.id) ? `⬆ ${t("Ripristina")}` : `🗄 ${t("Archivia")}`}</button>

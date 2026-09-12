@@ -127,7 +127,7 @@ export default function WidgetPage() {
 
           <Card>
             <SectionTitle>{t("Valori predefiniti")}</SectionTitle>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className="block text-xs font-medium text-dim">{t("Anticipo (gg)")}<input type="number" min={0} value={c.leadDays} onChange={(e) => set("leadDays", +e.target.value)} className={`mt-1 ${inp}`} /></label>
               <label className="block text-xs font-medium text-dim">{t("Durata (notti)")}<input type="number" min={1} value={c.stayLen} onChange={(e) => set("stayLen", Math.max(1, +e.target.value))} className={`mt-1 ${inp}`} /></label>
               <label className="block text-xs font-medium text-dim">{t("Ospiti")}<input type="number" min={1} value={c.defGuests} onChange={(e) => set("defGuests", Math.max(1, +e.target.value))} className={`mt-1 ${inp}`} /></label>

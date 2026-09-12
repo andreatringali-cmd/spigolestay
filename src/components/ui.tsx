@@ -18,7 +18,7 @@ export function PageHeader({ title, subtitle, actions, hideHelp }: { title: stri
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`anim-in rounded-xl border border-line bg-surface p-5 shadow-sm transition-shadow hover:shadow-md ${className}`}>{children}</div>
+    <div className={`anim-in rounded-xl border border-line bg-surface p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5 ${className}`}>{children}</div>
   );
 }
 
