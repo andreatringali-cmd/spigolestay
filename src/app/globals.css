@@ -126,3 +126,15 @@ body {
   .anim-in, .anim-pop, .anim-grow, .stagger > * { animation: none !important; }
   .anim-grow { transform: none !important; }
 }
+
+/* Card piano attivo: superficie bianca con riflesso di luce che passa ogni tanto */
+.xn-active { position: relative; overflow: hidden; }
+.xn-active > * { position: relative; z-index: 1; }
+.xn-active::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 48%;
+  background: linear-gradient(100deg, transparent 0%, rgba(255,255,255,.55) 50%, transparent 100%);
+  transform: skewX(-16deg); pointer-events: none; z-index: 2;
+  animation: xnShine 7s ease-in-out infinite;
+}
+@keyframes xnShine { 0%, 82% { left: -60%; opacity: 0; } 86% { opacity: 1; } 100% { left: 130%; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .xn-active::after { animation: none; } }
