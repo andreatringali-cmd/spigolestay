@@ -10,6 +10,7 @@ import { shiftISO, toISO, nights } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { Card } from "@/components/ui";
 import Icon from "@/components/Icon";
+import QRCode from "qrcode";
 
 const CHANNEL_OPTS: Channel[] = ["direct", "booking", "airbnb", "expedia"];
 const isWeekend = (iso: string) => { const d = new Date(iso).getDay(); return d === 5 || d === 6 || d === 0; };
@@ -151,10 +152,13 @@ export default function NuovaPrenotazionePage() {
   const manageUrl = (b: Booking | null) => (b && typeof window !== "undefined") ? `${window.location.origin}/checkin?b=${b.id}` : "";
 
   // Stampa / salva PDF del voucher (carta intestata A4, stesso stile del preventivo) con i dati correnti.
-  const printVoucher = (mUrl?: string) => {
+  const printVoucher = async (mUrl?: string) => {
     const st = taxStruct;
     const w = window.open("", "_blank", "width=820,height=1000");
     if (!w) return;
+    w.document.write("<!doctype html><title>Voucher</title><body style='font-family:system-ui,sans-serif;color:#999;padding:28px'>Preparazione del voucher…</body>");
+    let qrImg = "";
+    if (mUrl) { try { qrImg = await QRCode.toDataURL(mUrl, { margin: 1, width: 240 }); } catch {} }
     const esc = (v: string) => (v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const accent = st?.photoColor || "#0F6E56";
     const depositN = Math.max(0, Number(deposit) || 0);
@@ -231,12 +235,13 @@ td.r{text-align:right;white-space:nowrap}
 <div class="total"><span class="tl">Totale</span><span class="tv">${eur(grandFinal)}</span></div>
 <h2>Condizioni</h2>
 <p class="cond">${esc(accText)}</p>
-${mUrl ? `<div class="pay"><div class="payt">Gestisci la tua prenotazione online</div><div>Carica i documenti, fai il self check-in e lasciaci le tue note:</div><div style="margin-top:3px"><a href="${esc(mUrl)}" style="color:${accent};font-weight:700;word-break:break-all">${esc(mUrl)}</a></div></div>` : ""}
+${mUrl ? `<div class="pay" style="display:flex;gap:14px;align-items:center"><div style="flex:1;min-width:0"><div class="payt">Gestisci la tua prenotazione online</div><div>Inquadra il QR o apri il link: documenti, self check-in, note e richieste.</div><div style="margin-top:4px"><a href="${esc(mUrl)}" style="color:${accent};font-weight:700;word-break:break-all">${esc(mUrl)}</a></div></div>${qrImg ? `<img src="${qrImg}" alt="QR" style="width:96px;height:96px;flex:none;border:1px solid #ece7df;border-radius:8px"/>` : ""}</div>` : ""}
 ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
 <p class="closing">Ti aspettiamo! Per qualsiasi necessità siamo a disposizione.</p>
 <p class="sign">${esc(structureName)}</p>
 <div class="foot"><span>${[esc(structureName), esc(stAddress), esc(stContacts)].filter(Boolean).join("  ·  ")}</span><span>${todayStr}</span></div>
 </div><script>window.onload=function(){window.print()}</script></body></html>`;
+    w.document.open();
     w.document.write(html);
     w.document.close();
     w.focus();
@@ -516,24 +521,36 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
         const url = manageUrl(created);
         const g = getGuest(created.guestId);
         const first = g?.firstName || (g?.fullName ? g.fullName.split(" ")[0] : "") || "";
-        const msg = `Ciao ${first}, ecco la tua prenotazione${created.code ? ` ${created.code}` : ""}. Gestiscila qui (documenti, self check-in e note): ${url}`;
+        const structName = taxStruct?.name || "la struttura";
+        const dmy = (iso: string) => { try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }); } catch { return iso; } };
+        // Messaggio di conferma completo: saluto, riepilogo e link di gestione.
+        const msg = [
+          `Ciao ${first},`,
+          `confermiamo la tua prenotazione${created.code ? ` ${created.code}` : ""} presso ${structName}.`,
+          ``,
+          `Check-in: ${dmy(checkIn)}`,
+          `Check-out: ${dmy(checkOut)} (${nightsN} ${nightsN === 1 ? "notte" : "notti"})`,
+          `Ospiti: ${adults} adulti${children > 0 ? `, ${children} bambini` : ""}`,
+          ...selected.map((rt) => `- ${qty[rt.id]}x ${rt.name}`),
+          `Totale: ${eur(grandFinal)}`,
+          ``,
+          `Gestisci la tua prenotazione qui (documenti, self check-in, note): ${url}`,
+          ``,
+          `A presto! ${structName}`,
+        ].join("\n");
         const wa = g?.phone ? `https://wa.me/${g.phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}` : "";
-        const mail = g?.email ? `mailto:${g.email}?subject=${encodeURIComponent("La tua prenotazione")}&body=${encodeURIComponent(msg)}` : "";
+        const mail = g?.email ? `mailto:${g.email}?subject=${encodeURIComponent(`Conferma prenotazione${created.code ? ` ${created.code}` : ""} · ${structName}`)}&body=${encodeURIComponent(msg)}` : "";
         return (
           <Card className="mx-auto mb-10 max-w-xl text-center">
             <div className="mx-auto mb-2 grid h-12 w-12 place-items-center rounded-full" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}><Icon name="check" size={24} /></div>
             <h3 className="font-display text-lg font-bold text-txt">{mode === "preventivo" ? "Opzione creata" : "Prenotazione creata"}</h3>
-            <p className="mt-1 text-sm text-dim">Invia all'ospite il link per <b className="text-txt">gestire la prenotazione</b>: caricare i documenti, fare il self check-in e lasciare note o richieste.</p>
+            <p className="mt-1 text-sm text-dim">Invia all'ospite la conferma con il <b className="text-txt">link per gestire la prenotazione</b>: documenti, self check-in e note. Il link è anche nel QR del voucher PDF.</p>
 
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-line bg-wash p-1.5">
-              <input readOnly value={url} className="min-w-0 flex-1 bg-transparent px-2 text-sm text-txt outline-none" />
-              <button onClick={async () => { try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} }} className="shrink-0 rounded-md bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{copied ? "Copiato ✓" : "Copia"}</button>
-            </div>
-
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
-              <a href={wa || undefined} target="_blank" rel="noreferrer" className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90 ${wa ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={15} /> WhatsApp</a>
-              <a href={mail || undefined} className={`flex items-center gap-1.5 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90 ${mail ? "" : "pointer-events-none opacity-40"}`}><Icon name="mail" size={15} /> Email</a>
-              <button onClick={() => printVoucher(url)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Stampa voucher</button>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <a href={wa || undefined} target="_blank" rel="noreferrer" className={`flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 ${wa ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={15} /> WhatsApp</a>
+              <a href={mail || undefined} className={`flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 ${mail ? "" : "pointer-events-none opacity-40"}`}><Icon name="mail" size={15} /> Email</a>
+              <button onClick={() => printVoucher(url)} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Voucher PDF (QR)</button>
+              <button onClick={async () => { try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} }} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="copy" size={15} /> {copied ? "Link copiato ✓" : "Copia link"}</button>
             </div>
 
             <div className="mt-4 border-t border-line pt-3">
