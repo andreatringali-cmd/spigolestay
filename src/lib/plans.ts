@@ -14,13 +14,13 @@ export const TIERS: Tier[] = [
 
 export interface Module { key: string; name: string; desc: string; href: string; core?: boolean }
 export const MODULES: Module[] = [
-  { key: "pms", name: "PMS", desc: "Prenotazioni, calendario, camere, ospiti, Alloggiati Web + ISTAT e tassa di soggiorno.", href: "/prenotazioni", core: true },
-  { key: "cm", name: "Channel Manager", desc: "Connessione OTA (Booking, Airbnb, Expedia…) con sincronizzazione prezzi e disponibilità.", href: "/canali" },
-  { key: "booking", name: "Booking Engine", desc: "Motore prenotazioni sul tuo sito, senza commissioni.", href: "/widget" },
+  { key: "pms", name: "PMS", desc: "Prenotazioni, calendario, tariffe, camere e strutture, ospiti, incassi, Alloggiati Web + ISTAT e tassa di soggiorno, utenti e registro attività.", href: "/prenotazioni", core: true },
+  { key: "cm", name: "Channel Manager", desc: "Connessione OTA (Booking, Airbnb, Expedia…) con sincronizzazione prezzi e disponibilità e mappatura camere.", href: "/canali" },
+  { key: "booking", name: "Booking Engine", desc: "Motore prenotazioni (widget) sul tuo sito, senza commissioni.", href: "/widget" },
   { key: "cassa", name: "Cassa · Prima Nota", desc: "Entrate/uscite, pagamenti ricorrenti, saldo per conto e analisi.", href: "/cassa" },
-  { key: "concierge", name: "Web Concierge", desc: "Check-in online, preventivi e offerte personalizzati, upsell.", href: "/preventivi" },
-  { key: "housekeeping", name: "Housekeeping", desc: "Planning pulizie giornaliero per camera, note e invio su WhatsApp.", href: "/pulizie" },
-  { key: "messaging", name: "Messaggi & automazioni", desc: "Messaggi automatici agli ospiti (WhatsApp/email): benvenuto, check-in, recensione.", href: "/messaggi" },
+  { key: "concierge", name: "Web Concierge", desc: "Guida ospiti multilingua (con QR WiFi e codici per camera), check-in online, preventivi e offerte, promozioni, upselling & extra, recensioni e assistente ricavi.", href: "/preventivi" },
+  { key: "housekeeping", name: "Housekeeping", desc: "Planning pulizie giornaliero per camera, note dell'ospite e invio su WhatsApp.", href: "/pulizie" },
+  { key: "messaging", name: "Messaggi & automazioni", desc: "Messaggi automatici agli ospiti (WhatsApp/email) con modelli e trigger: benvenuto e guida, check-in, recensione.", href: "/messaggi" },
   { key: "meta", name: "Meta Search", desc: "Connessione ai principali metasearch (Google, Trivago…).", href: "/metasearch" },
   { key: "bi", name: "Statistiche & BI", desc: "Report avanzati e statistiche sui tuoi dati.", href: "/statistiche" },
   { key: "site", name: "Sito web", desc: "Mini-sito integrato con il motore prenotazioni.", href: "/sito" },
