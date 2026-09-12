@@ -204,14 +204,14 @@ function Site() {
             {ch > 0 && (
               <div className="mt-2 w-full rounded-2xl bg-white/95 p-3 shadow-lg">
                 <div className="mb-1 text-[11px] font-medium text-dim">Età dei bambini <span className="text-faint">(per la tassa di soggiorno e la sistemazione)</span></div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {childAges.map((age, i) => (
                     <label key={i} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim">Bimbo {i + 1}
                       <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, +e.target.value)) : a)))} className="w-14 rounded border border-line bg-surface px-1.5 py-0.5 text-sm text-txt outline-none focus:border-focus" />
                     </label>
                   ))}
+                  <label className="ml-1 flex items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs text-dim"><input type="checkbox" checked={wantsCot} onChange={(e) => setWantsCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Culla <span className="text-faint">(gratuita, su richiesta)</span></label>
                 </div>
-                <label className="mt-2 flex items-center gap-2 text-xs text-dim"><input type="checkbox" checked={wantsCot} onChange={(e) => setWantsCot(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> {T("Culla per il bimbo")} <span className="text-faint">({T("gratuita, su richiesta")})</span></label>
               </div>
             )}
           </div>
