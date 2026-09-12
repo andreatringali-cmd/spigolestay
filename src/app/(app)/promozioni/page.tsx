@@ -7,7 +7,7 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
 import ScrollStrip from "@/components/ScrollStrip";
 import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, promoMailto, DEFAULT_PROMOS } from "@/lib/promos";
-import { CHANNELS, type Channel } from "@/lib/types";
+import { CHANNELS, GUEST_TAGS, type Channel } from "@/lib/types";
 import { useConfirm } from "@/components/ConfirmProvider";
 import VarLegend, { PROMO_VARS } from "@/components/VarLegend";
 
@@ -23,16 +23,22 @@ const RIPRENOTA_PROMO: Promo = {
   body: "Ciao {nome},\n\nè stato un piacere ospitarti a {struttura}! Se pensi di tornare a Siracusa, prenotando DIRETTO con noi hai il {sconto}% di sconto con il codice {codice} — stesso servizio, senza intermediari.\n\nScrivici o prenota qui: {contatti}\n\nA presto! — {struttura}",
 };
 
-type Segment = "ota" | "consenso" | "abituali" | "lapsed" | "tutti";
+// I segmenti "intelligenti" (calcolati dallo storico) + le categorie ospite (flag VIP e tag "tag:<nome>").
+type Segment = string;
 interface SendLog { id: string; promoName: string; date: string; recipients: number; segment: Segment; }
 
 const SEGMENTS: { key: Segment; label: string; desc: string }[] = [
   { key: "ota", label: "Arrivati da OTA", desc: "Prenotarono via Booking/Airbnb — riportali al diretto" },
   { key: "lapsed", label: "Da ricontattare", desc: "Non tornano da oltre 10 mesi" },
   { key: "abituali", label: "Ospiti abituali", desc: "Più di un soggiorno" },
+  { key: "vip", label: "Ospiti VIP", desc: "Contrassegnati come VIP nella scheda ospite" },
   { key: "consenso", label: "Con consenso marketing", desc: "Hanno dato il consenso" },
   { key: "tutti", label: "Tutti con email", desc: "Chiunque abbia un'email" },
 ];
+// Categorie ospite (tag della scheda): ogni tag diventa un destinatario selezionabile.
+const TAG_SEGMENTS: { key: Segment; label: string; desc: string }[] = GUEST_TAGS.map((tag) => ({ key: `tag:${tag}`, label: tag, desc: `Ospiti con la categoria «${tag}»` }));
+const ALL_SEGMENTS = [...SEGMENTS, ...TAG_SEGMENTS];
+const segMeta = (key: Segment) => ALL_SEGMENTS.find((s) => s.key === key);
 const fmtD = (iso: string) => { try { return parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" }); } catch { return iso; } };
 const daysAgo = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 
@@ -102,10 +108,12 @@ export default function PromozioniPage() {
       if (!g.email || !withStruct(g.id)) return false;
       const list = bookings.filter((b) => b.guestId === g.id && b.status !== "cancelled" && b.channel !== "blocked");
       const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), "");
+      if (segment.startsWith("tag:")) return (g.tags ?? []).includes(segment.slice(4));
       switch (segment) {
         case "ota": return list.some((b) => isOta(b.channel));
         case "consenso": return !!g.marketingConsent;
         case "abituali": return list.length > 1;
+        case "vip": return !!g.vip;
         case "lapsed": return !!last && daysAgo(last) > 300;
         default: return true;
       }
@@ -216,7 +224,7 @@ export default function PromozioniPage() {
               <tbody>{logs.map((l) => (
                 <tr key={l.id} className="border-b border-line last:border-0">
                   <td className="px-3 py-2 font-medium text-txt">{l.promoName}</td>
-                  <td className="px-3 py-2 text-dim">{SEGMENTS.find((s) => s.key === l.segment)?.label}</td>
+                  <td className="px-3 py-2 text-dim">{segMeta(l.segment)?.label ?? l.segment}</td>
                   <td className="px-3 py-2 font-mono text-txt">{l.recipients}</td>
                   <td className="px-3 py-2 text-dim">{fmtD(l.date)}</td>
                   <td className="px-3 py-2 text-right"><button onClick={() => persistLogs(logs.filter((x) => x.id !== l.id))} className="text-faint hover:text-[color:var(--err)]">✕</button></td>
@@ -234,9 +242,12 @@ export default function PromozioniPage() {
           <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">Invia «{sending.name}»</span><button onClick={() => setSending(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             {limitReached && <div className="mb-3 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "color-mix(in srgb, var(--warn) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--warn) 8%, transparent)", color: "var(--warn)" }}>Hai già inviato 4 promo quest'anno. Meglio non sovraccaricare gli ospiti.</div>}
-            <label className="block text-xs font-medium text-dim">Destinatari<select value={segment} onChange={(e) => setSegment(e.target.value as Segment)} className={`${inp} mt-1`}>{SEGMENTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select></label>
+            <label className="block text-xs font-medium text-dim">Destinatari<select value={segment} onChange={(e) => setSegment(e.target.value as Segment)} className={`${inp} mt-1`}>
+              <optgroup label="Segmenti">{SEGMENTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</optgroup>
+              <optgroup label="Per categoria">{TAG_SEGMENTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</optgroup>
+            </select></label>
             <label className="mt-3 block text-xs font-medium text-dim">Struttura<select value={structureId} onChange={(e) => setStructureId(e.target.value)} className={`${inp} mt-1`}><option value="all">Tutte le strutture</option>{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-            <div className="mt-2 text-xs text-faint">{SEGMENTS.find((s) => s.key === segment)?.desc} · <b className="text-dim">{audience.length} destinatari</b></div>
+            <div className="mt-2 text-xs text-faint">{segMeta(segment)?.desc} · <b className="text-dim">{audience.length} destinatari</b></div>
             <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
               <button onClick={() => setSending(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
               <button onClick={doSend} disabled={audience.length === 0 || limitReached} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"><Icon name="mail" size={14} /> Apri email ({audience.length})</button>
