@@ -255,7 +255,9 @@ export default function PuliziePage() {
     return lines.join("\n");
   };
   const shareWhatsApp = () => window.open(`https://wa.me/?text=${encodeURIComponent(buildPlanText())}`, "_blank", "noopener,noreferrer");
+  const emailPlan = () => window.open(`mailto:?subject=${encodeURIComponent(t("Planning pulizie"))}&body=${encodeURIComponent(buildPlanText())}`);
   const copyPlan = async () => { try { await navigator.clipboard.writeText(buildPlanText()); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} };
+  const [planShare, setPlanShare] = useState(false);
 
   const noteInput = (k: string) => (
     <input
@@ -498,9 +500,17 @@ export default function PuliziePage() {
           <Seg v="rows" icon="menu" title={t("Vista lista")} />
           <Seg v="cards" icon="grid" title={t("Vista card")} />
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <button onClick={copyPlan} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-dim hover:bg-wash">{copied ? t("Copiato ✓") : t("Copia")}</button>
-          <button onClick={shareWhatsApp} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>{t("Condividi")}</button>
+        <div className="relative ml-auto">
+          {copied && <span className="mr-2 text-xs font-medium text-[color:var(--ok)]">{t("Copiato ✓")}</span>}
+          <button onClick={() => setPlanShare((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
+          {planShare && (<>
+            <button aria-label={t("Chiudi")} onClick={() => setPlanShare(false)} className="fixed inset-0 z-20 cursor-default" />
+            <div className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
+              <button onClick={() => { shareWhatsApp(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="chat" size={15} /> WhatsApp</button>
+              <button onClick={() => { emailPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="mail" size={15} /> Email</button>
+              <button onClick={() => { copyPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
+            </div>
+          </>)}
         </div>
       </div>
 
