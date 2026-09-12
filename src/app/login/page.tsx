@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
+import Turnstile from "@/components/Turnstile";
+
+// Site key pubblica di Cloudflare Turnstile: se presente, mostra il captcha e invia il token a Supabase.
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 type Mode = "login" | "signup";
 type Provider = "google";
@@ -20,6 +24,9 @@ export default function LoginPage() {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [recovery, setRecovery] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0); // cambiando la key si rigenera il token (monouso)
+  const resetCaptcha = () => { setCaptchaToken(null); setCaptchaKey((k) => k + 1); };
 
   useEffect(() => {
     if (!supabaseEnabled || !supabase) return;
@@ -43,10 +50,11 @@ export default function LoginPage() {
     e.preventDefault();
     setErr(null); setInfo(null);
     if (!supabaseEnabled || !supabase) { router.push("/"); return; }
+    if (TURNSTILE_SITE_KEY && !captchaToken) { setErr("Completa la verifica di sicurezza qui sotto."); return; }
     setBusy(true);
     try {
       if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pwd });
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pwd, options: { captchaToken: captchaToken ?? undefined } });
         if (error) { setErr(traduci(error.message)); return; }
         router.push("/");
       } else {
@@ -54,7 +62,7 @@ export default function LoginPage() {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: pwd,
-          options: { data: { full_name: name.trim(), phone: phone.trim() }, emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined },
+          options: { data: { full_name: name.trim(), phone: phone.trim() }, emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined, captchaToken: captchaToken ?? undefined },
         });
         if (error) { setErr(traduci(error.message)); return; }
         if (data.session) router.push("/");
@@ -62,7 +70,7 @@ export default function LoginPage() {
       }
     } catch {
       setErr("Si è verificato un problema. Riprova tra poco.");
-    } finally { setBusy(false); }
+    } finally { setBusy(false); if (TURNSTILE_SITE_KEY) resetCaptcha(); }
   };
 
   const oauth = async (provider: Provider) => {
@@ -78,12 +86,13 @@ export default function LoginPage() {
     setErr(null); setInfo(null);
     if (!supabaseEnabled || !supabase) { setInfo("Nella versione dimostrativa l'accesso è libero: premi Accedi."); return; }
     if (!email.trim()) { setErr("Scrivi prima la tua email qui sopra, poi premi «Password dimenticata»."); return; }
+    if (TURNSTILE_SITE_KEY && !captchaToken) { setErr("Completa la verifica di sicurezza qui sotto."); return; }
     setBusy(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined });
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined, captchaToken: captchaToken ?? undefined });
       if (error) setErr(traduci(error.message));
       else setInfo("Ti abbiamo inviato un'email per reimpostare la password.");
-    } finally { setBusy(false); }
+    } finally { setBusy(false); if (TURNSTILE_SITE_KEY) resetCaptcha(); }
   };
 
   const updatePwd = async (e: React.FormEvent) => {
@@ -218,6 +227,8 @@ export default function LoginPage() {
                   {mode === "login" && <button type="button" onClick={resetPwd} className="text-[13px] font-medium text-[#2f6bb0] hover:underline" disabled={busy}>Password dimenticata?</button>}
                 </div>
 
+                {TURNSTILE_SITE_KEY && <Turnstile key={captchaKey} siteKey={TURNSTILE_SITE_KEY} onToken={setCaptchaToken} />}
+
                 {err && <div className="mt-4 rounded-lg border border-[#f0c2c2] bg-[#fdf1f1] px-3 py-2.5 text-[13px] font-medium text-[#c0392b]">{err}</div>}
                 {info && <div className="mt-4 rounded-lg border border-[#e2ded7] bg-[#f6f4f1] px-3 py-2.5 text-[13px] text-[#4a453d]">{info}</div>}
 
@@ -270,6 +281,7 @@ function traduci(msg: string): string {
   if (m.includes("password should be at least")) return "La password è troppo corta (minimo 6 caratteri).";
   if (m.includes("unable to validate email") || m.includes("invalid email")) return "L'indirizzo email non è valido.";
   if (m.includes("rate limit") || m.includes("too many")) return "Troppi tentativi. Attendi qualche minuto e riprova.";
+  if (m.includes("captcha")) return "Verifica di sicurezza non riuscita. Riprova.";
   if (m.includes("same password")) return "La nuova password non può essere uguale alla precedente.";
   return msg;
 }
