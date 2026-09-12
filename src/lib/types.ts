@@ -270,6 +270,7 @@ export interface Booking {
   children: number;
   childAges?: number[]; // età dei bambini (per esenzioni tassa di soggiorno: es. under 14 esenti)
   cribs?: number; // culle/lettini richiesti
+  guestRequests?: string; // note/richieste lasciate dall'ospite dal link di gestione (self check-in)
   total?: number; // € (soggiorno, per il prototipo)
   note?: string;
   extId?: string; // id esterno (es. UID iCal/Octorate) per import idempotente

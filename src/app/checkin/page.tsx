@@ -43,6 +43,7 @@ function Engine() {
 
   const [doc, setDoc] = useState<DocData | null>(null);
   const [arrival, setArrival] = useState("Non lo so");
+  const [guestReq, setGuestReq] = useState("");
   const [extras, setExtras] = useState<ReturnType<typeof emptyExtra>[]>([]);
   const [photoFront, setPhotoFront] = useState<string | undefined>();
   const [photoBack, setPhotoBack] = useState<string | undefined>();
@@ -58,6 +59,7 @@ function Engine() {
     if (booking && guest && !doc) {
       setDoc({ firstName: guest.firstName ?? guest.fullName.split(" ")[0] ?? "", lastName: guest.lastName ?? guest.fullName.split(" ").slice(1).join(" ") ?? "", sex: guest.sex ?? "", birthDate: guest.birthDate ?? "", birthPlace: guest.birthPlace ?? "", citizenship: guest.citizenship ?? guest.country ?? "", docType: guest.docType ?? DOC_TYPES[0], docNumber: guest.docNumber ?? "", docPlace: guest.docPlace ?? "" });
       setArrival(booking.arrivalTime ?? "Non lo so");
+      setGuestReq(booking.guestRequests ?? "");
       setPhotoFront(booking.docPhotoFront); setPhotoBack(booking.docPhotoBack); setSignature(booking.signature);
       const need = Math.max(0, (booking.adults ?? 1) - 1);
       setExtras(booking.extraGuests?.length ? booking.extraGuests.map((e) => ({ ...emptyExtra(), ...e })) : Array.from({ length: need }, emptyExtra));
@@ -73,7 +75,7 @@ function Engine() {
     if (!booking || !guest || !doc || !valid) return;
     updateGuest(guest.id, { firstName: doc.firstName.trim(), lastName: doc.lastName.trim(), fullName: `${doc.firstName} ${doc.lastName}`.trim(), sex: (doc.sex || undefined) as "M" | "F" | undefined, birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: doc.docNumber.trim(), docPlace: doc.docPlace });
     const cleanExtras = extras.filter((e) => e.firstName.trim() && e.lastName.trim());
-    updateBooking(booking.id, { webCheckin: true, arrivalTime: arrival, extraGuests: cleanExtras, docPhotoFront: photoFront, docPhotoBack: photoBack, signature });
+    updateBooking(booking.id, { webCheckin: true, arrivalTime: arrival, extraGuests: cleanExtras, docPhotoFront: photoFront, docPhotoBack: photoBack, signature, guestRequests: guestReq.trim() || undefined });
     // Avvisa il gestore via email (best-effort, non blocca la conferma all'ospite).
     void sendCheckinNotice(booking, { getStructure, getGuest, getRoomType, getUnit }, [{ ...doc }, ...cleanExtras], arrival);
     setDone(true); window.scrollTo(0, 0);
@@ -219,6 +221,7 @@ function Engine() {
         {/* Arrivo + consenso + invio */}
         <div className={`${box} p-4`}>
           <label className={lbl}>Orario di arrivo previsto<select value={arrival} onChange={(e) => setArrival(e.target.value)} className={`${field} mt-1`}>{["Non lo so", "12:00-14:00", "14:00-16:00", "16:00-18:00", "18:00-20:00", "dopo le 20:00"].map((o) => <option key={o} value={o}>{o}</option>)}</select></label>
+          <label className={lbl}>Note o richieste <span className="font-normal text-faint">(facoltative)</span><textarea value={guestReq} onChange={(e) => setGuestReq(e.target.value)} rows={3} className={`${field} mt-1 resize-y`} placeholder="Es. arriviamo in auto, culla, allergie, orari particolari…" /></label>
           <label className="mt-3 flex items-start gap-2 text-xs text-dim">
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[color:var(--focus)]" />
             <span>Confermo che i dati sono corretti e acconsento al trattamento dei dati personali e del documento ai fini della registrazione degli alloggiati (Questura) e degli adempimenti di legge.</span>

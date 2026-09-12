@@ -17,7 +17,7 @@ const fmtDay = (iso: string) => { try { return new Date(iso).toLocaleDateString(
 
 export default function NuovaPrenotazionePage() {
   const router = useRouter();
-  const { structures, roomTypes, units, bookings, rateOverrides, addGuest, addBooking, getStructure, getRoomType, getUnit, activeStructureId } = useData();
+  const { structures, roomTypes, units, bookings, rateOverrides, addGuest, addBooking, getStructure, getGuest, getRoomType, getUnit, activeStructureId } = useData();
   const weekendPct = useMemo(() => { try { const r = localStorage.getItem("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {} return 25; }, []);
 
   const locked = activeStructureId !== "all";
@@ -38,6 +38,8 @@ export default function NuovaPrenotazionePage() {
   const [structFilter, setStructFilter] = useState<string>(locked ? activeStructureId : "all");
   const [phase, setPhase] = useState<"search" | "rooms" | "details">("search");
   const [mode, setMode] = useState<"prenotazione" | "preventivo">("prenotazione");
+  const [created, setCreated] = useState<Booking | null>(null);
+  const [copied, setCopied] = useState(false);
   const [extraQty, setExtraQty] = useState<Record<string, number>>({});
 
   // ── Selezione + intestatario ──
@@ -142,11 +144,14 @@ export default function NuovaPrenotazionePage() {
       const guestObj = { id: guestId, fullName: `${firstName} ${lastName}`.trim(), firstName, lastName, email: email.trim(), phone: phone.trim() } as Guest;
       sendVoucher(primary, { getStructure, getGuest: () => guestObj, getRoomType, getUnit });
     }
-    router.push("/prenotazioni");
+    // Mostra il pannello di conferma con il link di gestione (self check-in) invece di uscire subito.
+    setCreated(primary ?? null);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
+  const manageUrl = (b: Booking | null) => (b && typeof window !== "undefined") ? `${window.location.origin}/checkin?b=${b.id}` : "";
 
   // Stampa / salva PDF del voucher (carta intestata A4, stesso stile del preventivo) con i dati correnti.
-  const printVoucher = () => {
+  const printVoucher = (mUrl?: string) => {
     const st = taxStruct;
     const w = window.open("", "_blank", "width=820,height=1000");
     if (!w) return;
@@ -207,6 +212,8 @@ td.r{text-align:right;white-space:nowrap}
 .total .tl{font-size:12px;font-weight:700;letter-spacing:.04em}
 .total .tv{font-size:20px;font-weight:800;color:${accent}}
 .cond{font-size:12.5px;line-height:1.55;margin:2px 0}
+.pay{margin-top:12px;border:1px solid #ece7df;border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.6}
+.payt{font-weight:700;margin-bottom:2px}
 .note{margin-top:14px;font-style:italic;color:#726b62;font-size:12px}
 .closing{margin-top:20px;font-size:13px}
 .sign{margin-top:2px;font-weight:700}
@@ -223,6 +230,7 @@ td.r{text-align:right;white-space:nowrap}
 <div class="total"><span class="tl">Totale</span><span class="tv">${eur(grandFinal)}</span></div>
 <h2>Condizioni</h2>
 <p class="cond">${esc(accText)}</p>
+${mUrl ? `<div class="pay"><div class="payt">Gestisci la tua prenotazione online</div><div>Carica i documenti, fai il self check-in e lasciaci le tue note:</div><div style="margin-top:3px"><a href="${esc(mUrl)}" style="color:${accent};font-weight:700;word-break:break-all">${esc(mUrl)}</a></div></div>` : ""}
 ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
 <p class="closing">Ti aspettiamo! Per qualsiasi necessità siamo a disposizione.</p>
 <p class="sign">${esc(structureName)}</p>
@@ -399,7 +407,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
       )}
 
       {/* ─────────── Step 3 · Personalizza (layout mini-sito: dati a sx, riepilogo/voucher a dx) ─────────── */}
-      {phase === "details" && totalRooms > 0 && (() => {
+      {phase === "details" && totalRooms > 0 && !created && (() => {
         const depositN = Math.max(0, Number(deposit) || 0);
         const saldo = Math.max(0, grandFinal - depositN);
         return (
@@ -492,13 +500,45 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                 {depositN > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">Acconto adesso</span><span className="font-mono font-semibold text-txt">{eur(depositN)}</span></div>}
                 {depositN > 0 && saldo > 0 && <div className="mt-0.5 flex items-baseline justify-between text-xs"><span className="text-dim">Saldo in struttura</span><span className="font-mono font-semibold text-txt">{eur(saldo)}</span></div>}
                 <button onClick={confirm} className="mt-3 w-full rounded-lg bg-focus px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90">{isGroup ? "Crea gruppo" : "Crea prenotazione"}</button>
-                <button onClick={printVoucher} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line px-5 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Stampa voucher / PDF</button>
+                <button onClick={() => printVoucher()} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line px-5 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Anteprima voucher / PDF</button>
                 {err && <div className="mt-2 text-center text-sm font-medium text-[color:var(--err)]">{err}</div>}
                 <p className="mt-2 text-center text-[11px] text-faint">{sendConfirm && email.trim() ? "Alla conferma parte il voucher via email all'ospite." : "Tassa di soggiorno, commissioni e fattura si gestiscono dalla scheda."}</p>
               </Card>
             </div>
           </div>
         </div>
+        );
+      })()}
+
+      {/* Conferma creata · link di gestione per l'ospite (self check-in, documenti, note) */}
+      {created && (() => {
+        const url = manageUrl(created);
+        const g = getGuest(created.guestId);
+        const first = g?.firstName || (g?.fullName ? g.fullName.split(" ")[0] : "") || "";
+        const msg = `Ciao ${first}, ecco la tua prenotazione${created.code ? ` ${created.code}` : ""}. Gestiscila qui (documenti, self check-in e note): ${url}`;
+        const wa = g?.phone ? `https://wa.me/${g.phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}` : "";
+        const mail = g?.email ? `mailto:${g.email}?subject=${encodeURIComponent("La tua prenotazione")}&body=${encodeURIComponent(msg)}` : "";
+        return (
+          <Card className="mx-auto mb-10 max-w-xl text-center">
+            <div className="mx-auto mb-2 grid h-12 w-12 place-items-center rounded-full" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}><Icon name="check" size={24} /></div>
+            <h3 className="font-display text-lg font-bold text-txt">{mode === "preventivo" ? "Opzione creata" : "Prenotazione creata"}</h3>
+            <p className="mt-1 text-sm text-dim">Invia all'ospite il link per <b className="text-txt">gestire la prenotazione</b>: caricare i documenti, fare il self check-in e lasciare note o richieste.</p>
+
+            <div className="mt-4 flex items-center gap-2 rounded-lg border border-line bg-wash p-1.5">
+              <input readOnly value={url} className="min-w-0 flex-1 bg-transparent px-2 text-sm text-txt outline-none" />
+              <button onClick={async () => { try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} }} className="shrink-0 rounded-md bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{copied ? "Copiato ✓" : "Copia"}</button>
+            </div>
+
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <a href={wa || undefined} target="_blank" rel="noreferrer" className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90 ${wa ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={15} /> WhatsApp</a>
+              <a href={mail || undefined} className={`flex items-center gap-1.5 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90 ${mail ? "" : "pointer-events-none opacity-40"}`}><Icon name="mail" size={15} /> Email</a>
+              <button onClick={() => printVoucher(url)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Stampa voucher</button>
+            </div>
+
+            <div className="mt-4 border-t border-line pt-3">
+              <button onClick={() => router.push("/prenotazioni")} className="text-sm font-semibold text-focus hover:underline">Vai alle prenotazioni →</button>
+            </div>
+          </Card>
         );
       })()}
     </div>
