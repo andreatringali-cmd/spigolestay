@@ -201,38 +201,34 @@ export default function NuovaPrenotazionePage() {
       {/* ─────────── Step 1 · Barra di ricerca compatta (stile widget del sito) ─────────── */}
       {phase === "search" && (
       <div className="mb-5 rounded-2xl border border-line bg-surface p-2.5 shadow-sm">
-        <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_88px_88px]">
-          <label className="block text-[11px] font-medium text-dim">Arrivo<input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className={`${barInp} mt-0.5`} /></label>
-          <label className="block text-[11px] font-medium text-dim">Partenza<input type="date" value={checkOut} min={shiftISO(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className={`${barInp} mt-0.5`} /></label>
-          <label className="block text-[11px] font-medium text-dim">Adulti<input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, +e.target.value))} className={`${barInp} mt-0.5`} /></label>
-          <label className="block text-[11px] font-medium text-dim">Bambini<input type="number" min={0} value={children} onChange={(e) => setChildrenN(Math.max(0, +e.target.value))} className={`${barInp} mt-0.5`} /></label>
+        {/* Riga 1 · date (compatte) + ospiti, con età bambini/culle a destra */}
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="block text-[11px] font-medium text-dim">Arrivo<input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className={`${fld} mt-0.5 w-[150px]`} /></label>
+          <label className="block text-[11px] font-medium text-dim">Partenza<input type="date" value={checkOut} min={shiftISO(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className={`${fld} mt-0.5 w-[150px]`} /></label>
+          <label className="block text-[11px] font-medium text-dim">Adulti<input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, +e.target.value))} className={`${fld} mt-0.5 w-[72px]`} /></label>
+          <label className="block text-[11px] font-medium text-dim">Bambini<input type="number" min={0} value={children} onChange={(e) => setChildrenN(Math.max(0, +e.target.value))} className={`${fld} mt-0.5 w-[72px]`} /></label>
+          <span className="mb-1.5 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2.5 py-1 text-xs font-bold text-[color:var(--focus)]">{nightsN} {nightsN === 1 ? "notte" : "notti"}</span>
+          {children > 0 && (
+            <div className="mb-1 ml-auto flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+              <span className="text-[11px] font-medium text-dim">Età bambini:</span>
+              {childAges.map((age, i) => (
+                <div key={i} className="flex items-center gap-1 rounded-lg border border-line bg-paper px-1.5 py-0.5">
+                  <span className="text-[11px] text-faint">{i + 1}°</span>
+                  <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, Number(e.target.value))) : a)))} className="w-11 rounded border border-line bg-surface px-1 py-0.5 text-sm text-txt outline-none focus:border-focus" />
+                </div>
+              ))}
+              <label className="ml-1 flex items-center gap-1.5 text-sm text-dim">Culle
+                <button onClick={() => setCribs((v) => Math.max(0, v - 1))} disabled={cribs <= 0} className="flex h-7 w-7 items-center justify-center rounded-full border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30">−</button>
+                <span className="w-4 text-center text-sm font-bold tabular-nums text-txt">{cribs}</span>
+                <button onClick={() => setCribs((v) => Math.min(children, v + 1))} disabled={cribs >= children} className="flex h-7 w-7 items-center justify-center rounded-full border border-focus bg-focus text-base leading-none text-white hover:opacity-90 disabled:opacity-30">+</button>
+              </label>
+            </div>
+          )}
         </div>
 
-        {/* Età bambini + culle (solo se ci sono bambini) — subito dopo i campi */}
-        {children > 0 && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line pt-1.5">
-            <span className="text-[11px] font-medium text-dim">Età bambini:</span>
-            {childAges.map((age, i) => (
-              <div key={i} className="flex items-center gap-1 rounded-lg border border-line bg-paper px-1.5 py-0.5">
-                <span className="text-[11px] text-faint">{i + 1}°</span>
-                <input type="number" min={0} max={17} value={age} onChange={(e) => setChildAges((prev) => prev.map((a, j) => (j === i ? Math.max(0, Math.min(17, Number(e.target.value))) : a)))} className="w-11 rounded border border-line bg-surface px-1 py-0.5 text-sm text-txt outline-none focus:border-focus" />
-              </div>
-            ))}
-            <label className="ml-1 flex items-center gap-1.5 text-sm text-dim">Culle
-              <button onClick={() => setCribs((v) => Math.max(0, v - 1))} disabled={cribs <= 0} className="flex h-7 w-7 items-center justify-center rounded-full border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30">−</button>
-              <span className="w-4 text-center text-sm font-bold tabular-nums text-txt">{cribs}</span>
-              <button onClick={() => setCribs((v) => Math.min(children, v + 1))} disabled={cribs >= children} className="flex h-7 w-7 items-center justify-center rounded-full border border-focus bg-focus text-base leading-none text-white hover:opacity-90 disabled:opacity-30">+</button>
-            </label>
-          </div>
-        )}
-
-        {/* Riga opzioni compatta */}
+        {/* Riga 2 · strutture a sinistra · gruppo e solo disponibili a destra */}
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line pt-1.5 text-sm">
-          <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2.5 py-0.5 text-xs font-bold text-[color:var(--focus)]">{nightsN} {nightsN === 1 ? "notte" : "notti"}</span>
-          <label className="flex items-center gap-2 text-dim"><Toggle on={onlyAvail} onClick={() => setOnlyAvail((v) => !v)} /> Solo disponibili</label>
-          <label className="flex items-center gap-2 text-dim"><Toggle on={group} onClick={() => setGroup((v) => !v)} /> Gruppo</label>
-          {group && <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Nome gruppo" className="rounded-lg border border-line bg-paper px-2.5 py-1 text-sm text-txt outline-none focus:border-focus" />}
-          {!locked && (
+          {!locked ? (
             <div className="flex flex-wrap items-center gap-1.5">
               {[{ id: "all", name: "Tutte" }, ...structures].map((s) => (
                 <button key={s.id} onClick={() => setStructFilter(s.id)} className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold transition ${structFilter === s.id ? "border-focus bg-focus text-white" : "border-line text-dim hover:bg-wash"}`}>
@@ -240,7 +236,12 @@ export default function NuovaPrenotazionePage() {
                 </button>
               ))}
             </div>
-          )}
+          ) : null}
+          <div className="ml-auto flex items-center gap-4">
+            <label className="flex items-center gap-2 text-dim"><Toggle on={group} onClick={() => setGroup((v) => !v)} /> Gruppo</label>
+            <label className="flex items-center gap-2 text-dim"><Toggle on={onlyAvail} onClick={() => setOnlyAvail((v) => !v)} /> Solo disponibili</label>
+          </div>
+          {group && <input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Nome gruppo" className="basis-full rounded-lg border border-line bg-paper px-2.5 py-1 text-sm text-txt outline-none focus:border-focus sm:max-w-xs" />}
         </div>
 
         {err && phase === "search" && <div className="mt-1.5 text-sm font-medium text-[color:var(--err)]">{err}</div>}
@@ -442,6 +443,7 @@ export default function NuovaPrenotazionePage() {
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
 const barInp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm font-semibold text-txt outline-none focus:border-focus";
+const fld = "rounded-lg border border-line bg-paper px-3 py-2 text-sm font-semibold text-txt outline-none focus:border-focus";
 
 // Tassa di soggiorno secondo le impostazioni struttura (fissa €/persona/notte con tetto notti, o % del soggiorno).
 function cityTaxOf(structure: { cityTax?: boolean; cityTaxMode?: "fixed" | "percent"; cityTaxAmount?: number; cityTaxMaxNights?: number; cityTaxPercent?: number } | undefined, adults: number, n: number, accommodation: number) {
