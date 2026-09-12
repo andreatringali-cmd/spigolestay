@@ -105,7 +105,7 @@ export default function NuovaPrenotazionePage() {
   );
 
   return (
-    <div>
+    <div className="mx-auto max-w-3xl">
       {/* ─────────── Criteri di ricerca · card in stile widget ─────────── */}
       <div className="mb-5 overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
         {/* Header a banda colorata */}
