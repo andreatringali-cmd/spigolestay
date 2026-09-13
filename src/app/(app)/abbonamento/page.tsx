@@ -22,12 +22,23 @@ export default function AbbonamentoPage() {
   const [refCode, setRefCode] = useState("");
   const [refCopied, setRefCopied] = useState(false);
   useEffect(() => {
+    // Codice invito UNICO e STABILE per utente: derivato dall'id/email dell'account
+    // (stesso codice su ogni dispositivo, diverso per ogni utente). Fallback casuale solo se non loggato.
+    const base = user?.id || user?.email || "";
+    if (base) {
+      let h = 0; for (let i = 0; i < base.length; i++) h = (h * 31 + base.charCodeAt(i)) >>> 0;
+      const alpha = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let n = h, code = "";
+      for (let i = 0; i < 6; i++) { code += alpha[n % alpha.length]; n = Math.floor(n / alpha.length); }
+      setRefCode("XEN-" + code);
+      return;
+    }
     try {
       let c = localStorage.getItem("spigolestay:refcode");
       if (!c) { c = "XEN-" + Math.random().toString(36).slice(2, 8).toUpperCase(); localStorage.setItem("spigolestay:refcode", c); }
       setRefCode(c);
     } catch {}
-  }, []);
+  }, [user?.id, user?.email]);
   const refLink = typeof window !== "undefined" ? `${window.location.origin}/abbonamento?ref=${refCode}` : "";
   const [refQr, setRefQr] = useState("");
   useEffect(() => {
@@ -169,12 +180,14 @@ export default function AbbonamentoPage() {
 
       {/* Piani */}
       <div className="grid gap-3 lg:grid-cols-4">
-        {TIERS.map((tr) => {
+        {TIERS.map((tr, tIdx) => {
           const on = tr.key === tier.key;
           const price = annual ? Math.round(tr.price * (1 - ANNUAL_OFF)) : tr.price;
           const adds = MODULES.filter((m) => !m.core && tr.includes.includes(m.key));
+          // Penombra crescente: i piani più alti hanno più profondità (evidenza).
+          const tierShadow = ["0 1px 3px rgba(0,0,0,.06)", "0 10px 26px -12px rgba(0,0,0,.22)", "0 20px 44px -14px rgba(0,0,0,.32)"][tIdx] || "0 1px 3px rgba(0,0,0,.06)";
           return (
-            <div key={tr.key} className={`flex flex-col rounded-xl border p-4 transition ${on ? "xn-active border-focus bg-surface ring-2 ring-[color:var(--focus)]" : "border-line hover:shadow-md"}`}>
+            <div key={tr.key} className={`flex flex-col rounded-xl border p-4 transition ${on ? "xn-active border-focus bg-surface ring-2 ring-[color:var(--focus)]" : "border-line"}`} style={on ? undefined : { boxShadow: tierShadow }}>
               <div className="flex items-center justify-between gap-2">
                 <span className="font-display text-lg font-bold text-txt">{tr.name}</span>
                 {on ? <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-2 py-0.5 text-[10px] font-bold uppercase text-focus">{t("Attivo")}</span>
