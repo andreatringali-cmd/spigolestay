@@ -76,13 +76,11 @@ const Ctx = createContext<AuthCtx | null>(null);
 
 function Splash({ label }: { label: string }) {
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, background: "#f7f4f0", color: "#5b5148", fontFamily: "system-ui, sans-serif" }}>
-      <div style={{ width: 46, height: 46, borderRadius: 14, display: "grid", placeItems: "center", color: "#fff", fontWeight: 800, fontSize: 22, background: "linear-gradient(135deg,#D97F57,#B04A2C)", boxShadow: "0 8px 24px rgba(176,74,44,.25)" }}>X</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-        <span style={{ width: 16, height: 16, border: "2px solid #d9cfc4", borderTopColor: "#B04A2C", borderRadius: "50%", display: "inline-block", animation: "xspin 0.7s linear infinite" }} />
-        {label}
-      </div>
-      <style>{`@keyframes xspin{to{transform:rotate(360deg)}}`}</style>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#ffffff" }}>
+      {/* Solo la farfalla Xenora che pulsa durante il caricamento */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/xenora-mark.png" alt={label || "Xenora"} width={72} height={72} style={{ width: 72, height: 72, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
+      <style>{`@keyframes xpulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1)}}`}</style>
     </div>
   );
 }
