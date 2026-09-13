@@ -277,8 +277,10 @@ export default function PreventiviPage() {
       setSaved((prev) => prev.filter((x) => x.id !== p.id));
     }
   };
+  const [editingId, setEditingId] = useState<string | null>(null);
   const loadQuote = (p: Preventivo) => {
     setTab("nuovo");
+    setEditingId(p.id);
     setFirstName(p.name.split(" ")[0] ?? ""); setLastName(p.name.split(" ").slice(1).join(" "));
     setEmail(p.email ?? ""); setPhone(p.phone ?? "");
     setStructureId(p.structureId);
@@ -321,12 +323,18 @@ export default function PreventiviPage() {
   // Salvataggio in archivio (con dedup dell'ultimo identico).
   const save = () => {
     if (!name.trim()) return;
+    const fields = { name: name.trim(), email: email.trim() || undefined, phone: phone.trim() || undefined, structure: structureName, structureId, roomTypeId: roomLines[0]?.roomTypeId ?? "", roomLines, checkIn, checkOut, adults, children, childAges, rooms: roomsTotal, taxPersons, price: roomLines[0]?.price ?? 0, parking, parkingPrice, breakfast, breakfastPrice, cot: wantsCot, cotPrice, extrasPage: extrasPage && structExtras.length > 0, acconto, note: note.trim() || undefined, lang, total };
+    // Modifica di un preventivo esistente (da "Modifica" in archivio): aggiorna in-place, niente duplicato.
+    if (editingId && saved.some((p) => p.id === editingId)) {
+      setSaved((prev) => prev.map((p) => (p.id === editingId ? { ...p, ...fields } : p)));
+      return;
+    }
     const dup = saved[0] && saved[0].name === name.trim() && saved[0].checkIn === checkIn && saved[0].checkOut === checkOut && saved[0].total === total;
     if (dup) return;
     const num = saved.filter((p) => new Date(p.createdAt).getFullYear() === curYear).reduce((m, p) => Math.max(m, p.number ?? 0), 0) + 1;
     addActivity("quote", `Preventivo n. ${num} inviato — ${name.trim()}`);
     setSaved((prev) => {
-      return [{ id: crypto.randomUUID(), number: num, name: name.trim(), email: email.trim() || undefined, phone: phone.trim() || undefined, structure: structureName, structureId, roomTypeId: roomLines[0]?.roomTypeId ?? "", roomLines, checkIn, checkOut, adults, children, childAges, rooms: roomsTotal, taxPersons, price: roomLines[0]?.price ?? 0, parking, parkingPrice, breakfast, breakfastPrice, cot: wantsCot, cotPrice, extrasPage: extrasPage && structExtras.length > 0, acconto, note: note.trim() || undefined, lang, total, createdAt: toISO(new Date()), status: "inviato" as const }, ...prev];
+      return [{ id: crypto.randomUUID(), number: num, ...fields, createdAt: toISO(new Date()), status: "inviato" as const }, ...prev];
     });
   };
 
@@ -479,19 +487,19 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
     }
     // Espande le righe camera in singole prenotazioni (fallback alla vecchia struttura a camera singola).
     const lines = (q.roomLines && q.roomLines.length) ? q.roomLines : [{ roomTypeId: q.roomTypeId, qty: q.rooms ?? 1, price: q.price }];
-    const flat: { roomTypeId: string }[] = [];
-    lines.forEach((l) => { for (let k = 0; k < Math.max(1, l.qty); k++) flat.push({ roomTypeId: l.roomTypeId }); });
+    const nn = Math.max(1, nights(q.checkIn, q.checkOut));
+    // Ogni camera porta il SUO prezzo × notti (non si divide il totale in parti uguali).
+    const flat: { roomTypeId: string; amount: number }[] = [];
+    lines.forEach((l) => { for (let k = 0; k < Math.max(1, l.qty); k++) flat.push({ roomTypeId: l.roomTypeId, amount: Math.round(l.price * nn) }); });
     const nRooms = Math.max(1, flat.length);
     // Più camere → prenotazione di gruppo: N prenotazioni collegate dallo stesso groupId.
     const groupId = nRooms > 1 ? ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now())) : undefined;
-    const depositTot = Math.round(q.total * pct / 100);
-    const split = (tot: number, i: number) => (i === nRooms - 1 ? tot - Math.floor(tot / nRooms) * (nRooms - 1) : Math.floor(tot / nRooms)); // l'ultima camera assorbe l'arrotondamento
     const dist = (tot: number, i: number) => Math.floor(tot / nRooms) + (i < tot % nRooms ? 1 : 0);
     let ci = 0;
     flat.forEach((r, i) => {
       const kidCount = nRooms > 1 ? dist(q.children, i) : q.children;
       const ages = (q.childAges ?? []).slice(ci, ci + kidCount); ci += kidCount;
-      addBooking({ groupId, structureId: q.structureId, roomTypeId: r.roomTypeId, unitId: null, guestId: gid, channel: "direct", status: "confirmed", checkIn: q.checkIn, checkOut: q.checkOut, adults: nRooms > 1 ? dist(q.adults, i) : q.adults, children: kidCount, childAges: ages.length ? ages : undefined, total: split(q.total, i), cleaningFee: 0, paid: collectDeposit ? split(depositTot, i) : 0 });
+      addBooking({ groupId, structureId: q.structureId, roomTypeId: r.roomTypeId, unitId: null, guestId: gid, channel: "direct", status: "confirmed", checkIn: q.checkIn, checkOut: q.checkOut, adults: nRooms > 1 ? dist(q.adults, i) : q.adults, children: kidCount, childAges: ages.length ? ages : undefined, total: r.amount, cleaningFee: 0, paid: collectDeposit ? Math.round(r.amount * pct / 100) : 0 });
     });
     setSaved((prev) => prev.map((x) => (x.id === q.id ? { ...x, status: "confermato" as const } : x)));
     setConfirming((c) => (c ? { ...c, q: { ...c.q, status: "confermato" } } : c));
