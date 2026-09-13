@@ -218,27 +218,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         const serverData = (data?.data ?? null) as Record<string, string> | null;
-        if (serverData && Object.keys(serverData).length > 0) {
-          // Ci sono dati sul server: portali nel browser e ricarica per far ripartire l'app pulita.
+        // Verifica se un blocco stato contiene DATI REALI (strutture/prenotazioni/ospiti),
+        // non solo chiavi vuote o di configurazione.
+        const hasRealData = (obj: Record<string, string> | null): boolean => {
+          try {
+            const raw = obj?.["spigolestay:data:v1"];
+            if (!raw) return false;
+            const d = JSON.parse(raw);
+            return (Array.isArray(d.structures) && d.structures.length > 0)
+              || (Array.isArray(d.bookings) && d.bookings.length > 0)
+              || (Array.isArray(d.guests) && d.guests.length > 0);
+          } catch { return false; }
+        };
+        const serverReal = hasRealData(serverData);
+        let localReal = false;
+        try { localReal = hasRealData({ "spigolestay:data:v1": localStorage.getItem("spigolestay:data:v1") ?? "" }); } catch {}
+
+        if (serverReal) {
+          // Il server ha DATI REALI: portali nel browser e ricarica per far ripartire l'app pulita.
+          restore(serverData!);
+          sessionStorage.setItem(flagKey, uid);
+          location.reload();
+          return;
+        }
+        // Il server NON ha dati reali. Se il browser ne ha, il LOCALE vince (mai sovrascriverlo con
+        // uno stato vuoto arrivato dal server): salviamo il locale sul server e proseguiamo.
+        const localHasData = localReal;
+        if (!localHasData && serverData && Object.keys(serverData).length > 0) {
+          // Né server né browser hanno dati reali, ma il server ha impostazioni/onboarding salvati:
+          // ripristinali così com'è (comportamento normale per un account senza prenotazioni).
           restore(serverData);
           sessionStorage.setItem(flagKey, uid);
           location.reload();
           return;
         }
-        // Nessuna riga/dati sul server. Attenzione: potrebbe essere un account DAVVERO nuovo,
-        // oppure una lettura vuota dovuta a un problema temporaneo. Non cancelliamo MAI dati reali.
-        // Se nel browser ci sono già dati dell'utente (strutture/prenotazioni), li consideriamo la
-        // fonte di verità e li RIPRISTINIAMO sul server, invece di azzerare tutto.
-        let localHasData = false;
-        try {
-          const raw = localStorage.getItem("spigolestay:data:v1");
-          if (raw) {
-            const d = JSON.parse(raw);
-            localHasData = (Array.isArray(d.structures) && d.structures.length > 0)
-              || (Array.isArray(d.bookings) && d.bookings.length > 0)
-              || (Array.isArray(d.guests) && d.guests.length > 0);
-          }
-        } catch {}
         if (localHasData) {
           // Recupero: dati presenti nel browser ma non sul server → salvali sul server e prosegui.
           const snap = snapshot();
