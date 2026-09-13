@@ -9,6 +9,7 @@ import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import { ROOMS_PER_STRUCT, ROOM_OVERAGE, ANNUAL_OFF, TIERS, MODULES, ADDON_PRICE } from "@/lib/plans";
 import QRCode from "qrcode";
+import { supabase } from "@/lib/supabase";
 
 export default function AbbonamentoPage() {
   const { t } = useLang();
@@ -40,6 +41,38 @@ export default function AbbonamentoPage() {
     } catch {}
   }, [user?.id, user?.email]);
   const refLink = typeof window !== "undefined" ? `${window.location.origin}/abbonamento?ref=${refCode}` : "";
+
+  // Collegamento invito ↔ invitante (server).
+  // 1) Registro il MIO codice su ref_codes (così l'invitante è rintracciabile dal codice).
+  // 2) Se sono arrivato con ?ref=CODICE di un altro utente, creo la riga referrals (invited→inviter),
+  //    così l'abbonamento dell'amico resta collegato a quello di chi ha invitato.
+  useEffect(() => {
+    const sb = supabase;
+    const uid = user?.id;
+    if (!uid || !refCode || !sb) return;
+    let cancel = false;
+    (async () => {
+      try {
+        // (1) upsert del proprio codice
+        await sb.from("ref_codes").upsert({ code: refCode, user_id: uid }, { onConflict: "code" });
+        // (2) cattura ?ref= in ingresso
+        const params = new URLSearchParams(window.location.search);
+        const incoming = (params.get("ref") || "").trim().toUpperCase();
+        if (!incoming || incoming === refCode) return;
+        // già collegato? evito doppioni
+        const { data: existing } = await sb.from("referrals").select("invited_id").eq("invited_id", uid).maybeSingle();
+        if (cancel || existing) return;
+        // risolvo l'invitante dal codice
+        const { data: rc } = await sb.from("ref_codes").select("user_id").eq("code", incoming).maybeSingle();
+        const inviterId = rc?.user_id;
+        if (cancel || !inviterId || inviterId === uid) return;
+        await sb.from("referrals").insert({ invited_id: uid, inviter_id: inviterId, code: incoming, status: "registered" });
+        try { localStorage.setItem("spigolestay:referredby", incoming); } catch {}
+      } catch { /* offline / non loggato: si riprova al prossimo accesso */ }
+    })();
+    return () => { cancel = true; };
+  }, [user?.id, refCode]);
+
   const [refQr, setRefQr] = useState("");
   useEffect(() => {
     if (!refLink) { setRefQr(""); return; }
