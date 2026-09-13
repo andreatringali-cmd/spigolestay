@@ -9,9 +9,9 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 
-interface Billing { businessName: string; vat: string; taxCode: string; address: string; sdi: string; pec: string; email: string }
+interface Billing { businessName: string; vat: string; taxCode: string; address: string; streetNumber: string; city: string; province: string; sdi: string; pec: string; email: string }
 const KEY = "spigolestay:billing";
-const empty: Billing = { businessName: "", vat: "", taxCode: "", address: "", sdi: "", pec: "", email: "" };
+const empty: Billing = { businessName: "", vat: "", taxCode: "", address: "", streetNumber: "", city: "", province: "", sdi: "", pec: "", email: "" };
 
 export default function PagamentoPage() {
   const { t } = useLang();
@@ -57,7 +57,7 @@ export default function PagamentoPage() {
   return (
     <div>
       <PageHeader title={t("Informazioni pagamento")} subtitle={t("Metodo di pagamento e dati di fatturazione del tuo abbonamento")}
-        actions={<button onClick={save} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{saved ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> {t("Salvato")}</> : <>💾 {t("Salva")}</>}</button>}
+        actions={<button onClick={save} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{saved ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> {t("Salvato")}</> : t("Salva")}</button>}
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -87,7 +87,10 @@ export default function PagamentoPage() {
             <label className={`${lbl} col-span-2`}>{t("Ragione sociale / Nome")}<input value={b.businessName} onChange={(e) => set("businessName", e.target.value)} className={`${inp} mt-1`} /></label>
             <label className={lbl}>{t("Partita IVA")}<input value={b.vat} onChange={(e) => set("vat", e.target.value)} className={`${inp} mt-1`} /></label>
             <label className={lbl}>{t("Codice fiscale")}<input value={b.taxCode} onChange={(e) => set("taxCode", e.target.value)} className={`${inp} mt-1`} /></label>
-            <label className={`${lbl} col-span-2`}>{t("Indirizzo di fatturazione")}<input value={b.address} onChange={(e) => set("address", e.target.value)} className={`${inp} mt-1`} /></label>
+            <label className={lbl}>{t("Indirizzo di fatturazione")}<input value={b.address} onChange={(e) => set("address", e.target.value)} className={`${inp} mt-1`} placeholder={t("Via/Piazza")} /></label>
+            <label className={lbl}>{t("Numero civico")}<input value={b.streetNumber} onChange={(e) => set("streetNumber", e.target.value)} className={`${inp} mt-1`} /></label>
+            <label className={lbl}>{t("Città")}<input value={b.city} onChange={(e) => set("city", e.target.value)} className={`${inp} mt-1`} /></label>
+            <label className={lbl}>{t("Provincia")}<input value={b.province} onChange={(e) => set("province", e.target.value.toUpperCase())} className={`${inp} mt-1`} placeholder={t("Es. SR")} maxLength={2} /></label>
             <label className={lbl}>{t("Codice SDI")}<input value={b.sdi} onChange={(e) => set("sdi", e.target.value)} className={`${inp} mt-1`} placeholder={t("Fatt. elettronica")} /></label>
             <label className={lbl}>PEC<input value={b.pec} onChange={(e) => set("pec", e.target.value)} className={`${inp} mt-1`} /></label>
             <label className={`${lbl} col-span-2`}>{t("Email per le fatture")}<input value={b.email} onChange={(e) => set("email", e.target.value)} className={`${inp} mt-1`} placeholder="nome@email.it" /></label>
