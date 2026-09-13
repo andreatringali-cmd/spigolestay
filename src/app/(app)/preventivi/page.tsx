@@ -820,7 +820,15 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
 
               <div className="mt-3 flex flex-nowrap items-center gap-1.5">
                 {!confirmed && <button onClick={() => confirmBooking(false)} className="whitespace-nowrap rounded-lg bg-focus px-2.5 py-2 text-xs font-semibold text-white hover:opacity-90">{t("Crea prenotazione")}</button>}
-                <a href={mail} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash">{t("Email")}</a>
+                <button onClick={async () => {
+                  if (!q.email) { window.alert(t("Email destinatario mancante")); return; }
+                  try {
+                    const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: q.email, subject: "Conferma prenotazione — " + q.structure, text: confMsg }) });
+                    const j = await r.json().catch(() => ({}));
+                    if (r.ok && j?.ok) window.alert(t("Email inviata a") + " " + q.email);
+                    else window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(q.email)}&su=${encodeURIComponent("Conferma prenotazione — " + q.structure)}&body=${encodeURIComponent(confMsg)}`, "_blank");
+                  } catch { window.open(mail); }
+                }} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash">{t("Email")}</button>
                 <a href={wa} target="_blank" rel="noreferrer" className={`whitespace-nowrap rounded-lg px-2.5 py-2 text-xs font-semibold text-white ${digits ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
                 <button onClick={() => navigator.clipboard?.writeText(confMsg)} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash">{t("Copia")}</button>
               </div>

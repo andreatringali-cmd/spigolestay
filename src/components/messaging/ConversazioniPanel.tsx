@@ -118,7 +118,18 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
 
   const digits = (current?.phone ?? "").replace(/\D/g, "");
   const sendWa = () => { if (!draft.trim()) return; add("out", draft, "WhatsApp"); if (digits) window.open(`https://wa.me/${digits}?text=${encodeURIComponent(draft)}`, "_blank", "noopener"); setDraft(""); };
-  const sendMail = () => { if (!draft.trim()) return; add("out", draft, "Email"); if (current?.email) window.open(`mailto:${current.email}?subject=${encodeURIComponent(t("Messaggio"))}&body=${encodeURIComponent(draft)}`, "_blank"); setDraft(""); };
+  const sendMail = async () => {
+    if (!draft.trim()) return;
+    if (!current?.email) { window.alert(t("L'ospite non ha un'email.")); return; }
+    const text = draft; const to = current.email;
+    add("out", draft, "Email"); setDraft("");
+    // Invio automatico dal server (Resend); ripiego Gmail se non configurato.
+    try {
+      const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to, subject: t("Messaggio"), text }) });
+      const j = await r.json().catch(() => ({}));
+      if (!(r.ok && j?.ok)) window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(t("Messaggio"))}&body=${encodeURIComponent(text)}`, "_blank");
+    } catch { window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(t("Messaggio"))}&body=${encodeURIComponent(text)}`, "_blank"); }
+  };
   const logIn = () => { const text = draft.trim() || window.prompt(t("Testo della risposta ricevuta dall'ospite:")) || ""; if (text.trim()) { add("in", text, "manuale"); setDraft(""); } };
 
   // ── Segnaposto e modelli ──

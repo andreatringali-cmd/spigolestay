@@ -504,7 +504,7 @@ export default function BookingDrawer() {
       </Section>
 
       <div className="border-t border-line px-5 py-3">
-        <button onClick={sendVoucherNow} disabled={voucher.sending || !guest?.email} title={!guest?.email ? t("L'ospite non ha un'email.") : undefined} className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#285f92" }}>
+        <button onClick={sendVoucherNow} disabled={voucher.sending} className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#285f92" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v14H4z" /><path d="m4 6 8 6 8-6" /></svg>
           {voucher.sending ? t("Invio…") : t("Invia voucher / conferma")}
         </button>
