@@ -206,6 +206,15 @@ const HELP: Record<string, Guide> = {
       { h: "Cosa puoi fare", items: ["Vedi Totale atteso, Incassato e In sospeso.", "Aggiorna l'importo incassato o clicca \"Salda\" per segnare il pagamento completo.", "Filtra per mostrare solo le prenotazioni con saldo aperto."] },
     ],
   },
+  "/abbonamento/pagamento": {
+    title: "Informazioni pagamento",
+    intro: "Qui gestisci come paghi l'abbonamento Xenora e i dati per le fatture. Non riguarda i pagamenti dei tuoi ospiti.",
+    sections: [
+      { h: "Metodo di pagamento", items: ["Aggiungi o cambi la carta (o l'addebito SEPA); il pagamento è gestito da Stripe in modo sicuro: i dati della carta non passano né vengono salvati dall'app.", "Apple Pay e Google Pay compaiono in automatico con la carta."] },
+      { h: "Dati di fatturazione", items: ["Ragione sociale/nome, P.IVA o codice fiscale, indirizzo completo (città, provincia, via, civico), Codice SDI e PEC per la fattura elettronica, ed email a cui ricevere le fatture.", "Premi «Salva» per memorizzarli: verranno usati per intestare le fatture (le trovi in «Fatture»)."] },
+      { h: "Rinnovo e pagamenti", items: ["Il canone si rinnova in automatico alla scadenza.", "Se un pagamento non va a buon fine ricevi un avviso e puoi regolarizzare dal portale Stripe."] },
+    ],
+  },
   "/tariffe": {
     title: "Tariffe",
     intro: "Piani tariffari, tariffe derivate e prezzi giorno per giorno.",
