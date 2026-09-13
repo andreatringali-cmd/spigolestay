@@ -450,6 +450,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
 
   // ── Conferma prenotazione dal preventivo (con anticipo 0/50/100%) ──
   const [confirming, setConfirming] = useState<{ q: Preventivo; pct: number } | null>(null);
+  const [confMail, setConfMail] = useState<{ ok?: boolean; sending?: boolean; msg?: string }>({});
   const CONF: Record<Lang, { hi: string; ok: string; struct: string; ci: string; co: string; nt: string; pax: string; tot: string; pay: string; dep: string; bal: string; atc: string; none: string; full: string; bye: string }> = {
     it: { hi: "Gentile", ok: "la sua prenotazione è confermata! ✅", struct: "Struttura", ci: "Check-in", co: "Check-out", nt: "Notti", pax: "Ospiti", tot: "Totale", pay: "Pagamento", dep: "Anticipo", bal: "Saldo", atc: "al check-in", none: "Nessun anticipo · saldo di", full: "Importo intero da versare", bye: "La aspettiamo!" },
     en: { hi: "Dear", ok: "your booking is confirmed! ✅", struct: "Property", ci: "Check-in", co: "Check-out", nt: "Nights", pax: "Guests", tot: "Total", pay: "Payment", dep: "Deposit", bal: "Balance", atc: "at check-in", none: "No deposit · balance of", full: "Full amount to be paid", bye: "See you soon!" },
@@ -785,7 +786,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                         <button onClick={() => loadQuote(p)} className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt">{t("Modifica")}</button>
                         {p.status === "confermato"
                           ? <span className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-semibold text-[color:var(--ok)]" style={{ borderColor: "color-mix(in srgb, var(--ok) 40%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 10%, transparent)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>{t("Prenotazione creata")}</span>
-                          : <button onClick={() => setConfirming({ q: p, pct: 50 })} className="rounded-md bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("Conferma")}</button>}
+                          : <button onClick={() => { setConfMail({}); setConfirming({ q: p, pct: 50 }); }} className="rounded-md bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t("Conferma")}</button>}
                         <button onClick={() => delQuote(p)} title={t("Elimina preventivo")} aria-label={t("Elimina preventivo")} className="rounded-md border border-line px-2 py-1.5 text-xs font-medium text-[color:var(--err)] hover:bg-wash">✕</button>
                       </div>
                     </td>
@@ -837,18 +838,20 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
 
               <div className="mt-3 flex flex-nowrap items-center gap-1.5">
                 {!confirmed && <button onClick={() => confirmBooking(false)} className="whitespace-nowrap rounded-lg bg-focus px-2.5 py-2 text-xs font-semibold text-white hover:opacity-90">{t("Crea prenotazione")}</button>}
-                <button onClick={async () => {
-                  if (!q.email) { window.alert(t("Email destinatario mancante")); return; }
+                <button disabled={confMail.sending} onClick={async () => {
+                  if (!q.email) { setConfMail({ ok: false, msg: t("Email destinatario mancante") }); return; }
+                  setConfMail({ sending: true, msg: t("Invio…") });
                   try {
                     const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: q.email, subject: "Conferma prenotazione — " + q.structure, text: confMsg }) });
                     const j = await r.json().catch(() => ({}));
-                    if (r.ok && j?.ok) window.alert(t("Email inviata a") + " " + q.email);
-                    else window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(q.email)}&su=${encodeURIComponent("Conferma prenotazione — " + q.structure)}&body=${encodeURIComponent(confMsg)}`, "_blank");
-                  } catch { window.open(mail); }
-                }} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash">{t("Email")}</button>
+                    if (r.ok && j?.ok) setConfMail({ ok: true, msg: t("Email inviata a") + " " + q.email });
+                    else { setConfMail({ ok: false, msg: j?.error || t("Invio non riuscito") }); window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(q.email)}&su=${encodeURIComponent("Conferma prenotazione — " + q.structure)}&body=${encodeURIComponent(confMsg)}`, "_blank"); }
+                  } catch (e) { setConfMail({ ok: false, msg: e instanceof Error ? e.message : t("Rete non disponibile") }); }
+                }} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash disabled:opacity-50">{confMail.sending ? t("Invio…") : t("Email")}</button>
                 <a href={wa} target="_blank" rel="noreferrer" className={`whitespace-nowrap rounded-lg px-2.5 py-2 text-xs font-semibold text-white ${digits ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
                 <button onClick={() => navigator.clipboard?.writeText(confMsg)} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash">{t("Copia")}</button>
               </div>
+              {confMail.msg && <div className={`mt-2 rounded-lg px-3 py-2 text-xs font-medium ${confMail.ok ? "text-[color:var(--ok)]" : confMail.sending ? "text-dim" : "text-[color:var(--err)]"}`} style={{ backgroundColor: confMail.ok ? "color-mix(in srgb, var(--ok) 12%, transparent)" : confMail.sending ? "var(--wash)" : "color-mix(in srgb, var(--err) 10%, transparent)" }}>{confMail.ok ? "✓ " : ""}{confMail.msg}</div>}
             </div>
           </div>
         );
