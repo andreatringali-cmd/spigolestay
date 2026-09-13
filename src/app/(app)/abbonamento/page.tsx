@@ -270,29 +270,44 @@ export default function AbbonamentoPage() {
       {/* Riepilogo + Invita un amico su 2 colonne */}
       <div className="mt-4 grid gap-4 lg:grid-cols-2 lg:items-stretch">
       {/* Invita un amico */}
-      <div className="rounded-2xl border p-5 lg:order-2" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 6%, transparent)" }}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="overflow-hidden rounded-2xl border p-5 lg:order-2" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 6%, transparent)" }}>
+        {/* Intestazione */}
+        <div className="flex items-center gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-xl" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)" }}>🎁</span>
           <div className="min-w-0">
-            <div className="flex items-center gap-2"><span className="text-xl">🎁</span><h3 className="font-display text-lg font-bold text-txt">{t("Invita un amico")}</h3></div>
-            <p className="mt-1 max-w-md text-sm text-dim">{t("Per ogni amico che si registra col tuo codice e si abbona (dopo la prova), ottieni 1 mese gratis. Nessun limite: più amici, più mesi gratis.")}</p>
-          </div>
-          <div className="rounded-lg border border-line bg-surface px-3 py-2 text-center">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{t("Il tuo codice")}</div>
-            <div className="font-mono text-lg font-bold text-txt">{refCode}</div>
+            <h3 className="font-display text-lg font-bold text-txt">{t("Invita un amico")}</h3>
+            <p className="text-sm font-semibold" style={{ color: "var(--focus)" }}>{t("1 mese gratis per ogni amico che si abbona")}</p>
           </div>
         </div>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-          {refQr && <img src={refQr} alt="QR" title={t("Fai scansionare questo QR all'amico")} className="h-28 w-28 shrink-0 self-center rounded-xl border border-line bg-white p-1.5 sm:self-auto" />}
+
+        <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+          {/* QR + codice */}
+          <div className="flex shrink-0 flex-col items-center gap-2">
+            {refQr && <img src={refQr} alt="QR" title={t("Fai scansionare questo QR all'amico")} className="h-32 w-32 rounded-xl border border-line bg-white p-2 shadow-sm" />}
+            <div className="xn-active w-full rounded-lg border border-focus bg-surface px-4 py-1.5 text-center ring-2 ring-[color:var(--focus)]">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{t("Il tuo codice")}</div>
+              <div className="font-mono text-lg font-bold text-txt">{refCode}</div>
+            </div>
+          </div>
+
+          {/* Testo + azioni + statistiche */}
           <div className="min-w-0 flex-1">
-            <div className="mb-1 text-[11px] text-faint">{t("L'amico scansiona il QR o apre il link:")}</div>
-            <div className="flex flex-wrap items-center gap-2">
-              <input readOnly value={refLink} className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none" />
-              <button onClick={() => { navigator.clipboard?.writeText(refLink); setRefCopied(true); window.setTimeout(() => setRefCopied(false), 1500); }} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{refCopied ? t("Copiato ✓") : t("Copia link")}</button>
-              <a href={`https://wa.me/?text=${encodeURIComponent(`Provo Xenora per gestire il mio B&B, dai un'occhiata: ${refLink}`)}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
+            <p className="text-sm text-dim">{t("L'amico si registra col tuo codice (scansiona il QR o apre il link). Ottieni il mese gratis quando, finita la prova, si abbona.")}</p>
+            <div className="mt-2 flex items-center gap-2">
+              <input readOnly value={refLink} className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-xs text-dim outline-none" />
+              <button onClick={() => { navigator.clipboard?.writeText(refLink); setRefCopied(true); window.setTimeout(() => setRefCopied(false), 1500); }} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{refCopied ? t("Copiato ✓") : t("Copia")}</button>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <a href={`https://wa.me/?text=${encodeURIComponent(`Provo Xenora per gestire il mio B&B, dai un'occhiata: ${refLink}`)}`} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</a>
+              <button onClick={() => window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent("Ti invito su Xenora")}&body=${encodeURIComponent(`Ciao! Uso Xenora per gestire il mio B&B (prenotazioni, channel manager, guida ospiti). Provalo con il mio invito: ${refLink}`)}`, "_blank", "noopener,noreferrer")} className="flex items-center justify-center gap-1.5 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90">✉ Email</button>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="rounded-lg border border-line bg-surface px-3 py-2 text-center"><div className="font-mono text-xl font-bold text-txt">0</div><div className="text-[10px] uppercase tracking-wide text-faint">{t("Amici iscritti")}</div></div>
+              <div className="rounded-lg border border-line bg-surface px-3 py-2 text-center"><div className="font-mono text-xl font-bold" style={{ color: "var(--focus)" }}>0</div><div className="text-[10px] uppercase tracking-wide text-faint">{t("Mesi gratis")}</div></div>
             </div>
           </div>
         </div>
-        <p className="mt-2 text-[11px] text-faint">{t("Amici iscritti: 0 · Mesi gratis maturati: 0 · Il mese gratis si attiva solo quando l'amico, finito il periodo di prova, si abbona e paga.")}</p>
+        <p className="mt-3 text-[11px] text-faint">{t("Il mese gratis si attiva solo quando l'amico, finito il periodo di prova, si abbona e paga.")}</p>
       </div>
 
       {/* Riepilogo abbonamento */}
