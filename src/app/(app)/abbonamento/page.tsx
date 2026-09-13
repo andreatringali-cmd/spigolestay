@@ -271,7 +271,7 @@ export default function AbbonamentoPage() {
       <div className="mt-4 grid gap-4 lg:grid-cols-2 lg:items-stretch">
       {/* Invita un amico · reward-hero */}
       <div className="overflow-hidden rounded-2xl border p-5 lg:order-2" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", background: "linear-gradient(135deg, color-mix(in srgb, var(--focus) 10%, var(--surface)), var(--surface))" }}>
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           {/* Messaggio + azioni */}
           <div className="min-w-0">
             <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--focus)" }}>{t("Programma invita & guadagna")}</div>
@@ -282,15 +282,28 @@ export default function AbbonamentoPage() {
               <button onClick={() => window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent("Ti invito su Xenora")}&body=${encodeURIComponent(`Ciao! Uso Xenora per gestire il mio B&B (prenotazioni, channel manager, guida ospiti). Provalo con il mio invito: ${refLink}`)}`, "_blank", "noopener,noreferrer")} className="flex items-center gap-1.5 rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-white transition hover:opacity-90">✉ Email</button>
               <button onClick={() => { navigator.clipboard?.writeText(refLink); setRefCopied(true); window.setTimeout(() => setRefCopied(false), 1500); }} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-txt transition hover:bg-wash">{refCopied ? t("Copiato ✓") : t("Copia link")}</button>
             </div>
-            <p className="mt-3 text-[11px] text-faint">{t("Amici iscritti: 0 · Mesi gratis maturati: 0")}</p>
           </div>
-          {/* QR + codice */}
+          {/* QR + codice + statistiche */}
           <div className="shrink-0 text-center">
             {refQr && <img src={refQr} alt="QR" title={t("Fai scansionare questo QR all'amico")} className="mx-auto h-28 w-28 rounded-xl border border-line bg-white p-2 shadow-sm" />}
             <div className="mt-2 inline-block rounded-lg border border-focus bg-surface px-3 py-1 text-center ring-1 ring-[color:var(--focus)]">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">{t("Codice")} </span><span className="font-mono text-sm font-bold text-txt">{refCode}</span>
             </div>
+            <div className="mt-3 flex justify-center gap-2">
+              <div className="rounded-lg border border-line bg-surface px-3 py-1.5 text-center"><div className="font-mono text-lg font-bold text-txt">0</div><div className="text-[9px] uppercase tracking-wide text-faint">{t("Amici")}</div></div>
+              <div className="rounded-lg border border-line bg-surface px-3 py-1.5 text-center"><div className="font-mono text-lg font-bold" style={{ color: "var(--focus)" }}>0</div><div className="text-[9px] uppercase tracking-wide text-faint">{t("Mesi gratis")}</div></div>
+            </div>
           </div>
+        </div>
+
+        {/* Come funziona · 3 passi */}
+        <div className="mt-5 grid grid-cols-1 gap-2 border-t border-line pt-4 sm:grid-cols-3" style={{ borderColor: "color-mix(in srgb, var(--focus) 20%, var(--line))" }}>
+          {([["📤", t("1. Condividi"), t("Manda il codice o il QR all'amico")], ["🧪", t("2. Prova gratis"), t("L'amico si registra e prova Xenora")], ["🎁", t("3. Mese gratis"), t("Quando si abbona, ricevi 1 mese")]] as [string, string, string][]).map(([ic, ti, de]) => (
+            <div key={ti} className="flex items-start gap-2.5 rounded-lg bg-surface/60 px-3 py-2">
+              <span className="text-lg leading-none" aria-hidden>{ic}</span>
+              <div><div className="text-xs font-semibold text-txt">{ti}</div><div className="text-[11px] leading-snug text-dim">{de}</div></div>
+            </div>
+          ))}
         </div>
       </div>
 
