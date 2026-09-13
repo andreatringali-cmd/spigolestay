@@ -107,7 +107,7 @@ async function send(to: string, subject: string, html: string, replyTo?: string)
 
 export async function POST(req: Request) {
   if (!KEY) return NextResponse.json({ ok: false, error: "RESEND_API_KEY non configurata" }, { status: 500 });
-  let body: { kind?: string; booking?: BookingPayload; checkinUrl?: string; guests?: CheckinGuest[]; arrival?: string; operatorEmail?: string };
+  let body: { kind?: string; booking?: BookingPayload; checkinUrl?: string; guests?: CheckinGuest[]; arrival?: string; operatorEmail?: string; to?: string; subject?: string; text?: string; accent?: string; replyTo?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "JSON non valido" }, { status: 400 }); }
   const b = body.booking || {};
   try {
@@ -122,6 +122,13 @@ export async function POST(req: Request) {
       if (!to) return NextResponse.json({ ok: false, error: "Email struttura mancante" }, { status: 400 });
       const subject = `Check-in online · ${b.code || ""} · ${b.guestName || ""}`.trim();
       const data = await send(to, subject, checkinHtml(b, body.guests || [], body.arrival), b.guestEmail);
+      return NextResponse.json({ ok: true, id: data?.id });
+    }
+    if (body.kind === "quote") {
+      if (!body.to) return NextResponse.json({ ok: false, error: "Email destinatario mancante" }, { status: 400 });
+      const subject = body.subject || "Preventivo";
+      const html = shell(subject, body.accent || "#285f92", `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>`);
+      const data = await send(body.to, subject, html, body.replyTo);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     return NextResponse.json({ ok: false, error: "kind sconosciuto" }, { status: 400 });

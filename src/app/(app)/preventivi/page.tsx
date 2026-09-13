@@ -304,7 +304,19 @@ export default function PreventiviPage() {
   const stSocials = ([["facebook", structure?.facebook], ["instagram", structure?.instagram], ["linkedin", structure?.linkedin]] as [string, string | undefined][])
     .filter(([, u]) => u && u.trim()).map(([k, u]) => ({ k, url: socialHref(u!) }));
   const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(outMsg)}` : "#";
-  const mailLink = `mailto:${email}?subject=${encodeURIComponent(`Preventivo ${structureName}`)}&body=${encodeURIComponent(outMsg)}`;
+  const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(`Preventivo ${structureName}`)}&body=${encodeURIComponent(outMsg)}`;
+  const [mailState, setMailState] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
+  // Invio del preventivo via server (Resend), come la conferma prenotazione: niente client di posta.
+  const sendQuoteEmail = async () => {
+    if (!email.trim()) { setMailState({ ok: false, msg: "Inserisci l'email del destinatario" }); return; }
+    save();
+    setMailState({ sending: true });
+    try {
+      const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: email.trim(), subject: `Preventivo ${structureName}`, text: outMsg, accent: structure?.photoColor, replyTo: structure?.email }) });
+      const j = await r.json().catch(() => ({}));
+      setMailState({ sending: false, ok: r.ok && j?.ok, msg: (r.ok && j?.ok) ? `Inviato a ${email.trim()}` : (j?.error || `Errore ${r.status}`) });
+    } catch (e) { setMailState({ sending: false, ok: false, msg: e instanceof Error ? e.message : "Rete non disponibile" }); }
+  };
 
   // Salvataggio in archivio (con dedup dell'ultimo identico).
   const save = () => {
@@ -698,12 +710,14 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               {shareOpen && (<>
                 <button aria-label={t("Chiudi")} onClick={() => setShareOpen(false)} className="fixed inset-0 z-20 cursor-default" />
                 <div className="absolute left-0 top-full z-30 mt-1 w-48 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
-                  <button onClick={() => { save(); window.location.href = mailLink; setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="mail" size={15} /> {t("Invia email")}</button>
+                  <button onClick={() => { setShareOpen(false); sendQuoteEmail(); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="mail" size={15} /> {t("Invia email")}</button>
+                  <button onClick={() => { save(); window.open(gmailLink, "_blank", "noopener,noreferrer"); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="mail" size={15} /> {t("Apri Gmail")}</button>
                   <button onClick={() => { if (!phone) return; save(); window.open(waLink, "_blank"); setShareOpen(false); }} disabled={!phone} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash disabled:opacity-40"><Icon name="chat" size={15} /> WhatsApp</button>
                   <button onClick={() => { navigator.clipboard?.writeText(outMsg); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia testo")}</button>
                 </div>
               </>)}
             </div>
+            {(mailState.sending || mailState.msg) && <span className={`text-xs ${mailState.sending ? "text-dim" : mailState.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{mailState.sending ? t("Invio…") : (mailState.ok ? "✓ " : "⚠ ") + mailState.msg}</span>}
           </div>
         </Card>
       </div>
