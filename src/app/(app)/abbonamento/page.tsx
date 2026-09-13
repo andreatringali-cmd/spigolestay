@@ -126,7 +126,7 @@ export default function AbbonamentoPage() {
             .then((d) => {
               if (d?.plan) choose(d.plan);
               if (d?.customerId) { try { localStorage.setItem("spigolestay:stripecustomer", d.customerId); } catch {} setStripeCustomer(d.customerId); }
-              setNotice("Abbonamento attivato ✅ Grazie! La prova di 7 giorni è iniziata.");
+              setNotice("Abbonamento attivato ✅ Grazie! La prova di 5 giorni è iniziata.");
             })
             .catch(() => setNotice("Pagamento ricevuto. Aggiornamento in corso…"));
         }
@@ -205,7 +205,7 @@ export default function AbbonamentoPage() {
       {/* Riga: info prova + struttura/camere (a sinistra) · toggle mensile/annuale (a destra) */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-faint">
-          <span className="font-bold" style={{ color: "var(--focus)" }}>{nStruct} {t("struttura/e")} · {rooms} {t("camere attive")}</span> · {t("Prova gratuita 7 giorni · nessun costo di attivazione · disdici quando vuoi")}
+          <span className="font-bold" style={{ color: "var(--focus)" }}>{nStruct} {t("struttura/e")} · {rooms} {t("camere attive")}</span> · {t("Prova gratuita 5 giorni · nessun costo di attivazione · disdici quando vuoi")}
         </p>
         <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface p-0.5 text-sm">
           <button onClick={() => setAnnual(false)} className={`rounded-md px-3 py-1 font-semibold transition ${!annual ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Mensile")}</button>
@@ -407,7 +407,7 @@ export default function AbbonamentoPage() {
               </div>
               <div className="mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-[12px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 9%, transparent)", color: "var(--dim)" }}>
                 <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: "var(--focus)" }}>i</span>
-                <span>{stripeCustomer ? t("Hai già una carta salvata: il nuovo piano si attiva dal prossimo rinnovo, senza nuovo pagamento. L'addebito aggiornato parte dal prossimo mese.") : t("Il piano si attiva con un pagamento (prova gratuita di 7 giorni). Puoi disdire quando vuoi.")}</span>
+                <span>{stripeCustomer ? t("Hai già una carta salvata: il nuovo piano si attiva dal prossimo rinnovo, senza nuovo pagamento. L'addebito aggiornato parte dal prossimo mese.") : t("Il piano si attiva con un pagamento (prova gratuita di 5 giorni). Puoi disdire quando vuoi.")}</span>
               </div>
               <p className="mt-2 text-[11px] text-faint">{t("I moduli attivi verranno riportati a quelli inclusi nel piano; gli eventuali add-on li riaggiungi dopo.")}</p>
               <div className="mt-4 flex gap-2">

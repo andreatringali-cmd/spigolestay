@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { planByKey, type StripePlan } from "@/lib/stripe-plans";
+import { TRIAL_DAYS } from "@/lib/plans";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
       customer_email: body?.email || undefined,
       client_reference_id: body?.userId || undefined,
       allow_promotion_codes: true,
-      subscription_data: { trial_period_days: 7, metadata: { userId: body?.userId || "", plan: plan.key } },
+      subscription_data: { trial_period_days: TRIAL_DAYS, metadata: { userId: body?.userId || "", plan: plan.key } },
       metadata: { userId: body?.userId || "", plan: plan.key },
       success_url: `${origin}/abbonamento?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/abbonamento?checkout=cancel`,
