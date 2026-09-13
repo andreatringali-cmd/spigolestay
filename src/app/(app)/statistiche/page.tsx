@@ -66,6 +66,8 @@ export default function StatistichePage() {
   const [rY, rM] = repMonth.split("-").map(Number); // rM 1-based
   const R = { from: `${repMonth}-01`, to: toISO(new Date(rY, rM, 1)), pfrom: toISO(new Date(rY, rM - 2, 1)), pto: toISO(new Date(rY, rM - 1, 1)), label: monthLabelOf(repMonth), cmp: t("mese prec.") };
   const daysBetween = (a: string, b: string) => Math.max(1, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000));
+  // Base di attribuzione del ricavo: per notte (competenza), all'arrivo (tutto al check-in), all'incasso (importi versati).
+  const [basis, setBasis] = useState<"notte" | "arrivo" | "incasso">("notte");
   const metrics = (from: string, to: string) => {
     if (!from || !to) return { revenue: 0, roomNights: 0, count: 0, occ: 0, adr: 0, revpar: 0 };
     const days = daysBetween(from, to);
@@ -74,9 +76,9 @@ export default function StatistichePage() {
       const s2 = b.checkIn > from ? b.checkIn : from;
       const e2 = b.checkOut < to ? b.checkOut : to;
       const nInP = Math.max(0, Math.round((new Date(e2).getTime() - new Date(s2).getTime()) / 86400000));
-      if (nInP <= 0) continue;
-      if (b.unitId) roomNights += nInP;
-      revenue += (b.total ?? 0) * (nInP / Math.max(1, nights(b.checkIn, b.checkOut)));
+      if (nInP > 0 && b.unitId) roomNights += nInP; // occupazione: sempre per notte (misura fisica)
+      if (basis === "notte") { if (nInP > 0) revenue += (b.total ?? 0) * (nInP / Math.max(1, nights(b.checkIn, b.checkOut))); }
+      else if (b.checkIn >= from && b.checkIn < to) revenue += basis === "incasso" ? (b.paid ?? 0) : (b.total ?? 0);
     }
     const arrivals = active.filter((b) => b.checkIn >= from && b.checkIn < to).length;
     const occ = scopedUnits.length ? roomNights / (scopedUnits.length * days) : 0;
@@ -188,6 +190,16 @@ export default function StatistichePage() {
   return (
     <div>
       <PageHeader title={t("Statistiche")} subtitle={t("Andamento e report previsionale del mese selezionato")} />
+
+      {/* Base di attribuzione dei ricavi */}
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-dim">{t("Ricavi calcolati")}:</span>
+        <div className="inline-flex rounded-lg border border-line p-0.5">
+          {([["notte", t("Per notte (competenza)")], ["arrivo", t("Per data di arrivo")], ["incasso", t("All'incasso")]] as const).map(([k, lab]) => (
+            <button key={k} onClick={() => setBasis(k)} className={`rounded-md px-2.5 py-1 font-semibold transition ${basis === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>
+          ))}
+        </div>
+      </div>
 
       {/* KPI del mese selezionato con confronto sul mese precedente */}
       <div className="mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">

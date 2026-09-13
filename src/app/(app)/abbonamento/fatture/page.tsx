@@ -139,7 +139,7 @@ td{padding:11px 8px;border-bottom:1px solid #f0ebe3}
       {trial?.inTrial && (
         <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border px-4 py-3 text-sm" style={{ borderColor: "color-mix(in srgb, var(--ok) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 10%, transparent)", color: "var(--dim)" }}>
           <span className="grid h-6 w-6 place-items-center rounded-full text-[12px] font-bold text-white" style={{ backgroundColor: "var(--ok)" }}>✓</span>
-          <span><b className="text-txt">{t("Prova gratuita in corso")}</b> — {t("hai")} {trial.daysLeft} {trial.daysLeft === 1 ? t("giorno") : t("giorni")} {t("di prova (fino al")} {fmtDay(trial.trialEnd)}). {t("Nessuna fattura durante la prova: la prima verrà emessa il")} <b className="text-txt">{fmtDay(trial.firstInvoice)}</b>.</span>
+          <span><b className="text-txt">{t("Prova gratuita in corso")}</b> — {t("hai")} {trial.daysLeft} {trial.daysLeft === 1 ? t("giorno") : t("giorni")} {t("di prova (fino al")} {fmtDay(trial.trialEnd)}). {t("Nessuna fattura durante la prova.")}</span>
         </div>
       )}
 
