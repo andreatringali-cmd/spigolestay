@@ -59,8 +59,8 @@ export default function PagamentoPage() {
     <div>
       <PageHeader title={t("Informazioni pagamento")} subtitle={t("Metodo di pagamento e dati di fatturazione del tuo abbonamento")}
         actions={<div className="flex items-center gap-2">
-          <button onClick={() => setShowHelp((v) => !v)} aria-label={t("Aiuto")} title={t("Cosa si fa in questa pagina")} className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">?</button>
           <button onClick={save} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{saved ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> {t("Salvato")}</> : t("Salva")}</button>
+          <button onClick={() => setShowHelp((v) => !v)} aria-label={t("Aiuto")} title={t("Cosa si fa in questa pagina")} className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">?</button>
         </div>}
       />
 
