@@ -72,6 +72,15 @@ export default function PagamentoPage() {
             </div>
           </div>
           <button onClick={addCard} disabled={busy} className="mt-3 w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60">{busy ? t("Attendi…") : (customer ? t("Gestisci carta su Stripe") : `＋ ${t("Aggiungi metodo di pagamento")}`)}</button>
+          <div className="mt-3 border-t border-line pt-3">
+            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Metodi accettati")}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {[t("Carta"), "Apple Pay", "Google Pay", t("Addebito SEPA")].map((m) => (
+                <span key={m} className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-dim">{m}</span>
+              ))}
+            </div>
+            <div className="mt-1.5 text-[11px] text-faint">{t("Bonifico bancario disponibile solo per il piano annuale, su fattura.")}</div>
+          </div>
           {notice && <div className="mt-2 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 12%, transparent)", color: "var(--dim)" }}>{notice}</div>}
           <div className="mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-[11px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 9%, transparent)", color: "var(--dim)" }}>
             <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: "var(--focus)" }}>i</span>
