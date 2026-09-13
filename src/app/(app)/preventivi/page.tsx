@@ -129,7 +129,6 @@ export default function PreventiviPage() {
   const [cot, setCot] = useState(false);       // culla (mostrata solo con bambini)
   const [cotPrice, setCotPrice] = useState(0); // € a notte per la culla (0 = inclusa)
   const [extrasPage, setExtrasPage] = useState(true); // 2ª pagina PDF con i servizi extra
-  const [shareOpen, setShareOpen] = useState(false); // menu Condividi (email/WhatsApp/copia)
   const [tab, setTab] = useState<"nuovo" | "archivio">("nuovo"); // sezione: editor o archivio
   const [note, setNote] = useState("");
   const [lang, setLang] = useState<Lang>("it");
@@ -306,7 +305,6 @@ export default function PreventiviPage() {
   const stSocials = ([["facebook", structure?.facebook], ["instagram", structure?.instagram], ["linkedin", structure?.linkedin]] as [string, string | undefined][])
     .filter(([, u]) => u && u.trim()).map(([k, u]) => ({ k, url: socialHref(u!) }));
   const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(outMsg)}` : "#";
-  const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(`Preventivo ${structureName}`)}&body=${encodeURIComponent(outMsg)}`;
   const [mailState, setMailState] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
   // Invio del preventivo via server (Resend), come la conferma prenotazione: niente client di posta.
   const sendQuoteEmail = async () => {
@@ -723,18 +721,9 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button onClick={printPdf} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Scarica / stampa PDF")}</button>
-            <div className="relative">
-              <button onClick={() => setShareOpen((v) => !v)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}><Icon name="share" size={15} /> {t("Condividi")}</button>
-              {shareOpen && (<>
-                <button aria-label={t("Chiudi")} onClick={() => setShareOpen(false)} className="fixed inset-0 z-20 cursor-default" />
-                <div className="absolute left-0 top-full z-30 mt-1 w-48 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
-                  <button onClick={() => { setShareOpen(false); sendQuoteEmail(); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="mail" size={15} /> {t("Invia email")}</button>
-                  <button onClick={() => { save(); window.open(gmailLink, "_blank", "noopener,noreferrer"); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="mail" size={15} /> {t("Apri Gmail")}</button>
-                  <button onClick={() => { if (!phone) return; save(); window.open(waLink, "_blank"); setShareOpen(false); }} disabled={!phone} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash disabled:opacity-40"><Icon name="chat" size={15} /> WhatsApp</button>
-                  <button onClick={() => { navigator.clipboard?.writeText(outMsg); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia testo")}</button>
-                </div>
-              </>)}
-            </div>
+            <button onClick={sendQuoteEmail} disabled={mailState.sending} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt transition hover:bg-wash disabled:opacity-50"><Icon name="mail" size={15} /> {mailState.sending ? t("Invio…") : t("Email")}</button>
+            <button onClick={() => { if (!phone) return; save(); window.open(waLink, "_blank"); }} disabled={!phone} title={!phone ? t("Nessun numero") : undefined} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt transition hover:bg-wash disabled:opacity-40"><Icon name="chat" size={15} /> WhatsApp</button>
+            <button onClick={() => navigator.clipboard?.writeText(outMsg)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt transition hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
             {(mailState.sending || mailState.msg) && <span className={`text-xs ${mailState.sending ? "text-dim" : mailState.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{mailState.sending ? t("Invio…") : (mailState.ok ? "✓ " : "⚠ ") + mailState.msg}</span>}
           </div>
         </Card>
