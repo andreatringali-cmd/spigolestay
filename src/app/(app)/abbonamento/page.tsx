@@ -343,7 +343,6 @@ export default function AbbonamentoPage() {
             <Link href="/abbonamento/pagamento" className="rounded-lg border border-line py-2 text-center text-sm font-semibold text-txt hover:bg-wash">{t("Informazioni pagamento")}</Link>
             <Link href="/abbonamento/fatture" className="rounded-lg border border-line py-2 text-center text-sm font-semibold text-txt hover:bg-wash">{t("Fatture")}</Link>
           </div>
-          <div className="mt-2 text-center text-[11px] text-faint">{t("Prossimo rinnovo:")} 01/10/2026</div>
         </Card>
       </div>
       </div>
