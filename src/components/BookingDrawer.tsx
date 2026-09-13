@@ -441,6 +441,19 @@ export default function BookingDrawer() {
             : <span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: "var(--wash)", color: "var(--dim)" }}>{t("Da compilare")}</span>}
         </div>
         {booking.arrivalTime && booking.arrivalTime !== "Non lo so" && <Row label={t("Arrivo previsto")} value={booking.arrivalTime} />}
+        {guest && (guest.docNumber || guest.birthDate || guest.citizenship) && (
+          <div className="mt-2 rounded-lg border border-line bg-paper p-2.5">
+            <div className="mb-1 text-xs font-semibold text-dim">{t("Dati ospite (documento)")}</div>
+            <div className="flex flex-col">
+              {(guest.firstName || guest.lastName || guest.fullName) && <Row label={t("Nominativo")} value={`${guest.firstName ?? ""} ${guest.lastName ?? ""}`.trim() || guest.fullName || "—"} />}
+              {guest.sex && <Row label={t("Sesso")} value={guest.sex === "M" ? "M" : "F"} />}
+              {(guest.birthDate || guest.birthPlace) && <Row label={t("Nascita")} value={[guest.birthDate ? fmtDate(guest.birthDate) : "", guest.birthPlace].filter(Boolean).join(" · ") || "—"} />}
+              {guest.citizenship && <Row label={t("Cittadinanza")} value={guest.citizenship} />}
+              {(guest.docType || guest.docNumber) && <Row label={t("Documento")} value={[guest.docType, guest.docNumber].filter(Boolean).join(" · ") || "—"} />}
+              {guest.docPlace && <Row label={t("Rilasciato da")} value={guest.docPlace} />}
+            </div>
+          </div>
+        )}
         {!booking.webCheckin && (() => {
           const origin = typeof window !== "undefined" ? window.location.origin : "";
           const link = `${origin}/checkin?b=${booking.id}`;
