@@ -65,6 +65,25 @@ function wipeLocalAccount() {
   } catch {}
 }
 
+// Uno stato contiene DATI REALI se ha almeno una struttura/prenotazione/ospite.
+function hasRealData(obj: Record<string, string> | null | undefined): boolean {
+  try {
+    const raw = obj?.["spigolestay:data:v1"];
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    return (Array.isArray(d.structures) && d.structures.length > 0)
+      || (Array.isArray(d.bookings) && d.bookings.length > 0)
+      || (Array.isArray(d.guests) && d.guests.length > 0);
+  } catch { return false; }
+}
+// Firma del contenuto sincronizzato (indipendente dall'ordine delle chiavi jsonb):
+// confronta i blocchi che contano per la sincronizzazione tra dispositivi.
+function syncSignature(obj: Record<string, string> | null | undefined): string {
+  if (!obj) return "";
+  const keys = ["spigolestay:data:v1", "spigolestay:users", "spigolestay:plan", "spigolestay:modules", "spigolestay:daynotes"];
+  return keys.map((k) => obj[k] ?? "").join("");
+}
+
 interface AuthCtx {
   user: User | null;
   session: Session | null;
@@ -93,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mfaChecked, setMfaChecked] = useState(false); // AAL verificato per la sessione corrente
   const [mfaNeeded, setMfaNeeded] = useState(false);    // il 2FA è attivo ma la sessione è a un fattore
   const pushTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastPushed = useRef<string>("");
+  const lastSynced = useRef<Record<string, string>>({}); // ultimo stato sincronizzato col server
 
   const stopPush = () => { if (pushTimer.current) { clearInterval(pushTimer.current); pushTimer.current = null; } };
 
@@ -185,11 +204,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Sicurezza: non inviare MAI uno stato "rotto" (senza il blocco dati) che sovrascriverebbe
           // il server. Se manca la chiave dati, l'app non è ancora idratata: salta questo ciclo.
           if (!("spigolestay:data:v1" in snap)) return;
-          const s = JSON.stringify(snap);
-          if (s === lastPushed.current) return;
-          lastPushed.current = s;
-          await supabase!.from("app_state").upsert({ user_id: userId, data: snap, updated_at: new Date().toISOString() });
-          void syncProfile(userId);
+          const localChanged = syncSignature(snap) !== syncSignature(lastSynced.current);
+          if (localChanged) {
+            // Ho modifiche locali → le invio al server.
+            lastSynced.current = { ...snap };
+            await supabase!.from("app_state").upsert({ user_id: userId, data: snap, updated_at: new Date().toISOString() });
+            void syncProfile(userId);
+            return;
+          }
+          // Nessuna modifica locale: controllo se un ALTRO dispositivo ha aggiornato il server.
+          const { data } = await supabase!.from("app_state").select("data").eq("user_id", userId).maybeSingle();
+          const serverData = (data?.data ?? null) as Record<string, string> | null;
+          if (serverData && hasRealData(serverData) && syncSignature(serverData) !== syncSignature(snap)) {
+            // Il server è cambiato altrove (es. dal telefono) → porto le modifiche su questo dispositivo.
+            restore(serverData);
+            lastSynced.current = serverData;
+            location.reload();
+          }
         } catch {}
       }, 4000);
     };
@@ -202,8 +233,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             const snap = snapshot();
             await supabase!.from("app_state").upsert({ user_id: uid, data: snap, updated_at: new Date().toISOString() });
-            lastPushed.current = JSON.stringify(snap);
-          } catch { lastPushed.current = ""; }
+            lastSynced.current = snap;
+          } catch { lastSynced.current = {}; }
           void syncProfile(uid);
           setHydrated(true);
           startPush(uid);
@@ -214,25 +245,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) {
           // Problema di rete/permessi: NON tocchiamo i dati locali, per non perderli.
           // Riprendiamo comunque il salvataggio periodico (che ritenterà a ogni ciclo).
-          lastPushed.current = JSON.stringify(snapshot());
+          lastSynced.current = snapshot();
           void syncProfile(uid);
           setHydrated(true);
           startPush(uid);
           return;
         }
         const serverData = (data?.data ?? null) as Record<string, string> | null;
-        // Verifica se un blocco stato contiene DATI REALI (strutture/prenotazioni/ospiti),
-        // non solo chiavi vuote o di configurazione.
-        const hasRealData = (obj: Record<string, string> | null): boolean => {
-          try {
-            const raw = obj?.["spigolestay:data:v1"];
-            if (!raw) return false;
-            const d = JSON.parse(raw);
-            return (Array.isArray(d.structures) && d.structures.length > 0)
-              || (Array.isArray(d.bookings) && d.bookings.length > 0)
-              || (Array.isArray(d.guests) && d.guests.length > 0);
-          } catch { return false; }
-        };
         const serverReal = hasRealData(serverData);
         let localReal = false;
         try { localReal = hasRealData({ "spigolestay:data:v1": localStorage.getItem("spigolestay:data:v1") ?? "" }); } catch {}
@@ -259,7 +278,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Recupero: dati presenti nel browser ma non sul server → salvali sul server e prosegui.
           const snap = snapshot();
           await supabase!.from("app_state").upsert({ user_id: uid, data: snap, updated_at: new Date().toISOString() });
-          lastPushed.current = JSON.stringify(snap);
+          lastSynced.current = snap;
           void syncProfile(uid);
           sessionStorage.setItem(flagKey, uid);
           setHydrated(true);
@@ -275,7 +294,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {}
         const snap = snapshot();
         await supabase!.from("app_state").upsert({ user_id: uid, data: snap, updated_at: new Date().toISOString() });
-        lastPushed.current = JSON.stringify(snap);
+        lastSynced.current = snap;
         await syncProfile(uid);
         sessionStorage.setItem(flagKey, uid);
         location.reload(); // riparte pulito → compare l'onboarding
