@@ -62,7 +62,7 @@ export default function PagamentoPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Metodo di pagamento */}
-        <Card>
+        <Card className="order-2">
           <SectionTitle>{t("Metodo di pagamento")}</SectionTitle>
           <div className="mt-2 flex items-center gap-3 rounded-xl border border-line bg-paper p-3">
             <div className="grid h-10 w-14 place-items-center rounded-md bg-wash text-dim"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg></div>
@@ -89,7 +89,7 @@ export default function PagamentoPage() {
         </Card>
 
         {/* Dati di fatturazione */}
-        <Card>
+        <Card className="order-1">
           <SectionTitle>{t("Dati di fatturazione")}</SectionTitle>
           <p className="mb-3 text-xs text-dim">{t("Usati per intestare le fatture dell'abbonamento.")}</p>
           <div className="grid grid-cols-2 gap-3">
