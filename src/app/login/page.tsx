@@ -162,7 +162,7 @@ export default function LoginPage() {
 
                 <label className="mb-3 block">
                   <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Email</span>
-                  <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus placeholder="tu@esempio.com" className={fld} disabled={busy} />
+                  <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus autoComplete={mode === "signup" ? "off" : "email"} placeholder="tu@esempio.com" className={fld} disabled={busy} />
                 </label>
 
                 <label className="block">
