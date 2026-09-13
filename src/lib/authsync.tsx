@@ -182,6 +182,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       pushTimer.current = setInterval(async () => {
         try {
           const snap = snapshot();
+          // Sicurezza: non inviare MAI uno stato "rotto" (senza il blocco dati) che sovrascriverebbe
+          // il server. Se manca la chiave dati, l'app non è ancora idratata: salta questo ciclo.
+          if (!("spigolestay:data:v1" in snap)) return;
           const s = JSON.stringify(snap);
           if (s === lastPushed.current) return;
           lastPushed.current = s;
