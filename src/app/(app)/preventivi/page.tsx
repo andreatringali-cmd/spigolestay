@@ -91,7 +91,7 @@ export default function PreventiviPage() {
   const [structureId, setStructureId] = useState(qp("s") || (lockedStructure ? activeStructureId : (structures[0]?.id ?? "")));
   const typesOf = roomTypes.filter((rt) => rt.structureId === structureId);
   const [checkIn, setCheckIn] = useState(qp("ci") || toISO(new Date()));
-  const [checkOut, setCheckOut] = useState(qp("co") || shiftISO(toISO(new Date()), 3));
+  const [checkOut, setCheckOut] = useState(qp("co") || shiftISO(qp("ci") || toISO(new Date()), 1));
   const [adults, setAdults] = useState(Number(qp("ad")) || 2);
   const [children, setChildren] = useState(Number(qp("ch")) || 0);
   const [childAges, setChildAges] = useState<number[]>(() => { const n = Number(qp("ch")) || 0; return Array.from({ length: n }, () => 8); }); // età dei bambini (per la tassa: sotto i 15 esenti)
