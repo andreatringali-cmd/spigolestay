@@ -2,7 +2,7 @@
 
 import { useState, type CSSProperties } from "react";
 import Link from "next/link";
-import Logo from "./Logo";
+import Image from "next/image";
 import Icon from "./Icon";
 import { NAV } from "./nav";
 import { useAccess } from "@/lib/access";
@@ -54,13 +54,7 @@ export default function Sidebar({
         {/* Header */}
         <div className="flex items-center gap-2.5 border-b border-line px-3 py-3.5">
           {!collapsed && (
-            <>
-              <Logo />
-              <div className="min-w-0">
-                <div className="truncate font-display text-base font-extrabold tracking-tight text-txt">Xenora</div>
-                <div className="text-[10px] text-dim">Digital Solution</div>
-              </div>
-            </>
+            <Image src="/xenora-logo.png" alt="Xenora" width={132} height={38} priority className="object-contain" style={{ height: 30, width: "auto" }} />
           )}
           <button
             onClick={onToggleCollapse}

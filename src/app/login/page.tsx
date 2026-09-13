@@ -116,63 +116,19 @@ export default function LoginPage() {
   const linkCls = "font-semibold text-[#2f6bb0] hover:underline";
 
   return (
-    <div className="flex min-h-screen bg-white text-[#1f1b16]">
-      {/* Colonna sinistra: pannello brand (nascosto su telefono) */}
-      <aside className="relative hidden w-2/5 flex-col justify-between overflow-hidden p-8 text-white md:flex lg:w-[34%]" style={{ background: "linear-gradient(155deg, #285f92 0%, #1f4a74 45%, #17324e 100%)" }}>
-        <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full" style={{ background: "radial-gradient(circle, rgba(217,127,87,0.28) 0%, rgba(217,127,87,0) 70%)" }} />
-        <div aria-hidden className="pointer-events-none absolute -bottom-28 -left-16 h-96 w-96 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 70%)" }} />
-
-        <div className="relative flex items-center gap-3">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/95 shadow-lg">
-            <Image src="/xenora-mark.png" alt="Xenora" width={38} height={38} priority className="object-contain" style={{ width: 38, height: 38 }} />
-          </div>
-          <div>
-            <div className="font-display text-xl font-extrabold tracking-tight">Xenora</div>
-            <div className="text-xs text-white/70">Channel Manager</div>
-          </div>
-        </div>
-
-        <div className="relative max-w-sm">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/12 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/85">La piattaforma all-in-one</span>
-          <h2 className="mt-3 font-display text-[28px] font-bold leading-tight">Tutta la tua struttura, in un solo posto.</h2>
-          <p className="mt-3 text-sm leading-relaxed text-white/80">Channel manager, prenotazioni dirette, guida ospiti, guida in TV e sito web: gestisci ogni cosa da un&apos;unica piattaforma, senza saltare da un programma all&apos;altro.</p>
-          <ul className="mt-5 space-y-2.5 text-[13px] leading-snug text-white/90">
-            {[
-              "Channel Manager: Booking, Airbnb, Expedia sempre sincronizzati",
-              "Motore prenotazioni sul tuo sito, senza commissioni",
-              "Guida ospiti digitale: Wi-Fi, codici e consigli",
-              "Guida in TV: benvenuto e info in camera sulla smart TV",
-              "Sito web integrato della struttura",
-              "Check-in online, Alloggiati Web, ISTAT e tassa di soggiorno",
-              "Pulizie, messaggi automatici e preventivi agli ospiti",
-              "Tariffe dinamiche, incassi e statistiche in tempo reale",
-            ].map((f) => (
-              <li key={f} className="flex items-start gap-2.5">
-                <span className="mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full bg-white/15">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                </span>
-                {f}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="relative text-xs text-white/50">© {new Date().getFullYear()} Xenora · Channel Manager</div>
-      </aside>
-
-      {/* Colonna destra: form */}
-      <main className="flex w-full flex-col items-center justify-center px-6 py-10 md:w-3/5 lg:w-[66%]">
+    <div className="flex min-h-screen items-center justify-center bg-white px-6 py-10 text-[#1f1b16]">
+      <main className="flex w-full flex-col items-center justify-center">
         <div className="w-full max-w-sm">
-          {/* Brand compatto (solo su telefono) */}
-          <div className="mb-7 flex flex-col items-center gap-1.5 text-center md:hidden">
-            <Image src="/xenora-logo.png" alt="Xenora" width={150} height={43} priority className="object-contain" style={{ width: 150, height: "auto" }} />
+          {/* Logo centrato */}
+          <div className="mb-8 flex flex-col items-center gap-1.5 text-center">
+            <Image src="/xenora-logo.png" alt="Xenora" width={180} height={51} priority className="object-contain" style={{ width: 180, height: "auto" }} />
             <div className="text-xs text-[#6b6459]">Channel Manager</div>
           </div>
 
           {recovery ? (
             <>
-              <h1 className="text-2xl font-bold tracking-tight">Imposta una nuova password</h1>
-              <p className="mt-1 text-sm text-[#6b6459]">Scegli la nuova password per il tuo account.</p>
+              <h1 className="text-center text-2xl font-bold tracking-tight">Imposta una nuova password</h1>
+              <p className="mt-1 text-center text-sm text-[#6b6459]">Scegli la nuova password per il tuo account.</p>
               <form onSubmit={updatePwd} className="mt-6">
                 <label className="block">
                   <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Nuova password</span>
@@ -188,8 +144,8 @@ export default function LoginPage() {
             </>
           ) : (
             <>
-              <h1 className="text-2xl font-bold tracking-tight">{mode === "login" ? "Accedi al tuo account" : "Crea il tuo account"}</h1>
-              <p className="mt-1 text-sm text-[#6b6459]">{mode === "login" ? "Bentornato. Inserisci le tue credenziali." : "Bastano pochi dati per iniziare."}</p>
+              <h1 className="text-center text-2xl font-bold tracking-tight">{mode === "login" ? "Accedi al tuo account" : "Crea il tuo account"}</h1>
+              <p className="mt-1 text-center text-sm text-[#6b6459]">{mode === "login" ? "Bentornato. Inserisci le tue credenziali." : "Bastano pochi dati per iniziare."}</p>
 
               <form onSubmit={submit} className="mt-6">
                 {mode === "signup" && (
