@@ -541,7 +541,9 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
           `A presto! ${structName}`,
         ].join("\n");
         const wa = g?.phone ? `https://wa.me/${g.phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}` : "";
-        const mailHref = `mailto:${g?.email ?? ""}?subject=${encodeURIComponent(`Conferma prenotazione${created.code ? ` ${created.code}` : ""} · ${structName}`)}&body=${encodeURIComponent(msg)}`;
+        const subj = `Conferma prenotazione${created.code ? ` ${created.code}` : ""} · ${structName}`;
+        const mailHref = `mailto:${g?.email ?? ""}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(msg)}`;
+        const gmailHref = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(g?.email ?? "")}&su=${encodeURIComponent(subj)}&body=${encodeURIComponent(msg)}`;
         return (
           <Card className="mx-auto mb-10 max-w-xl text-center">
             <div className="mx-auto mb-2 grid h-12 w-12 place-items-center rounded-full" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}><Icon name="check" size={24} /></div>
@@ -550,7 +552,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
 
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <a href={wa || undefined} target="_blank" rel="noreferrer" className={`flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 ${wa ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={15} /> WhatsApp</a>
-              <button onClick={() => { window.location.href = mailHref; }} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"><Icon name="mail" size={15} /> Email</button>
+              <button onClick={() => { const win = window.open(gmailHref, "_blank", "noopener,noreferrer"); if (!win) window.location.href = mailHref; }} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"><Icon name="mail" size={15} /> Email</button>
               <button onClick={() => printVoucher(url)} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Voucher PDF (QR)</button>
               <button onClick={async () => { try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} }} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="copy" size={15} /> {copied ? "Link copiato ✓" : "Copia link"}</button>
             </div>
