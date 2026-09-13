@@ -274,7 +274,7 @@ export default function AbbonamentoPage() {
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           {/* Messaggio + azioni */}
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--focus)" }}>{t("Programma invita & guadagna")}</div>
+            <SectionTitle>{t("Programma invita & guadagna")}</SectionTitle>
             <h3 className="mt-1 font-display text-3xl font-bold leading-tight text-txt sm:text-4xl">{t("Regala Xenora,")}<br /><span style={{ color: "var(--focus)" }}>{t("ottieni 1 mese gratis")}</span></h3>
             <p className="mt-1.5 max-w-sm text-sm text-dim">{t("Il mese gratis scatta quando l'amico, finita la prova, si abbona col tuo codice.")}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
