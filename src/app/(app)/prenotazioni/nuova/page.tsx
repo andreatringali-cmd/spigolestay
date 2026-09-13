@@ -52,6 +52,19 @@ export default function NuovaPrenotazionePage() {
   // ── Selezione + intestatario ──
   const [qty, setQty] = useState<Record<string, number>>({});
   const [priceOv, setPriceOv] = useState<Record<string, number>>({});
+  const [preferUnit, setPreferUnit] = useState<string | null>(null); // camera scelta dal calendario, da assegnare in conferma
+  // Precompila da parametri URL (click sul calendario): date, struttura, camera → salta ai dettagli con la camera già scelta.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const ci = p.get("ci"), co = p.get("co"), s = p.get("s"), u = p.get("u"), rt = p.get("rt"), ad = p.get("ad"), ch = p.get("ch");
+    if (ci) setCheckIn(ci);
+    if (co) setCheckOut(co); else if (ci) setCheckOut(shiftISO(ci, 1));
+    if (s) setStructFilter(s);
+    if (ad) setAdults(Math.max(1, +ad));
+    if (ch) setChildrenN(Math.max(0, +ch));
+    if (rt) { setQty({ [rt]: 1 }); setPreferUnit(u || null); setPhase("details"); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [lastName, setLastName] = useState("");
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
@@ -149,7 +162,7 @@ export default function NuovaPrenotazionePage() {
     const groupId = isGroup ? ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now())) : undefined;
     const flat: { rt: RoomType; unitId: string | null }[] = [];
     const usedUnitIds = new Set<string>(); // evita di assegnare la stessa camera fisica a madre e derivata
-    selected.forEach((rt) => { const free = availUnits(rt).filter((u) => !usedUnitIds.has(u.id)); const q = Math.min(qty[rt.id] ?? 0, free.length); for (let k = 0; k < q; k++) { const u = free[k]; if (u) usedUnitIds.add(u.id); flat.push({ rt, unitId: u?.id ?? null }); } });
+    selected.forEach((rt) => { const free = availUnits(rt).filter((u) => !usedUnitIds.has(u.id)); if (preferUnit) { const idx = free.findIndex((u) => u.id === preferUnit); if (idx > 0) { const [pu] = free.splice(idx, 1); free.unshift(pu); } } const q = Math.min(qty[rt.id] ?? 0, free.length); for (let k = 0; k < q; k++) { const u = free[k]; if (u) usedUnitIds.add(u.id); flat.push({ rt, unitId: u?.id ?? null }); } });
     const nR = Math.max(1, flat.length);
     const dist = (tot: number, i: number) => Math.floor(tot / nR) + (i < tot % nR ? 1 : 0);
     let ci = 0; // cursore per distribuire le età dei bambini tra le camere del gruppo

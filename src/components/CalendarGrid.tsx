@@ -1367,7 +1367,7 @@ export default function CalendarGrid() {
                 </button>
                 <button
                   disabled={noRate}
-                  onClick={noRate ? undefined : () => { const p = pick; setPick(null); router.push(`/prenotazioni/nuova?s=${p.structureId}&ci=${p.from}&co=${shiftISO(p.to, 1)}`); }}
+                  onClick={noRate ? undefined : () => { const p = pick; setPick(null); router.push(`/prenotazioni/nuova?s=${p.structureId}&ci=${p.from}&co=${shiftISO(p.to, 1)}&u=${p.unitId}&rt=${p.roomTypeId}`); }}
                   title={noRate ? "Tariffa a €0: imposta un prezzo per poter vendere queste date" : undefined}
                   className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${noRate ? "cursor-not-allowed border-line opacity-55" : "border-line bg-paper hover:border-focus hover:bg-wash"}`}
                 >
