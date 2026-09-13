@@ -519,14 +519,14 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             <Field label={t("Nome")}><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inp} placeholder={t("Nome")} /></Field>
             <Field label={t("Email")}><input value={email} onChange={(e) => setEmail(e.target.value)} className={inp} placeholder={t("opzionale")} /></Field>
             <Field label={t("Telefono")}><input value={phone} onChange={(e) => setPhone(e.target.value)} className={inp} placeholder="+39…" /></Field>
-            {!lockedStructure && (
+            {structures.length > 1 && (
               <Field label={t("Struttura")}>
                 <select value={structureId} onChange={(e) => { const sid = e.target.value; setStructureId(sid); const rt0 = roomTypes.find((r) => r.structureId === sid); setRoomLines(rt0 ? [{ roomTypeId: rt0.id, qty: 1, price: autoPrice(rt0.id) }] : []); }} className={inp}>
                   {structures.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
                 </select>
               </Field>
             )}
-            {!lockedStructure && <div className="hidden sm:block" />}
+            {structures.length > 1 && <div className="hidden sm:block" />}
             <Field label={t("Check-in")}><input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} className={inp} /></Field>
             <Field label={t("Check-out")}><input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} className={inp} /></Field>
             <Field label={t("Adulti")}><input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, Number(e.target.value)))} className={inp} /></Field>
