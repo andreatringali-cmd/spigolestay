@@ -4,7 +4,26 @@
 //        filtrati in base al parcheggio della prenotazione, primi 3 (cancello-porta-porta2).
 // I codici NON stanno nella guida pubblica: viaggiano solo nel link personale dell'ospite.
 
+import { supabase } from "@/lib/supabase";
+
 type RoomCode = { label?: string; value?: string; cond?: "always" | "parking" | "noparking" };
+
+// Accorcia il link della guida in `origin/g/<code>` salvando la parte lunga su Supabase.
+// Se Supabase non è disponibile o va in errore, ritorna il link originale (nessuna rottura).
+const SL_ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789";
+export async function shortenGuideLink(fullUrl: string): Promise<string> {
+  try {
+    if (!supabase || typeof window === "undefined") return fullUrl;
+    const u = new URL(fullUrl);
+    const target = u.pathname + u.search; // es. /guida/index.html?...
+    if (!target.startsWith("/guida/")) return fullUrl;
+    let code = "";
+    for (let i = 0; i < 6; i++) code += SL_ALPHABET[Math.floor(Math.random() * SL_ALPHABET.length)];
+    const { error } = await supabase.from("short_links").insert({ code, target });
+    if (error) return fullUrl;
+    return `${u.origin}/g/${code}`;
+  } catch { return fullUrl; }
+}
 
 export function unitCodesForBooking(unitId: string | null | undefined, hasParking: boolean): string {
   let codes: RoomCode[] = [];
