@@ -120,7 +120,7 @@ export default function LoginPage() {
       <main className="flex w-full flex-col items-center justify-center">
         <div className="w-full max-w-sm">
           {/* Logo allineato a sinistra, come i campi */}
-          <div className="mb-7 flex">
+          <div className="mb-3 mt-2 flex">
             <Image src="/xenora-logo.png" alt="Xenora" width={170} height={48} priority className="object-contain" style={{ width: 170, height: "auto" }} />
           </div>
 
@@ -202,7 +202,7 @@ export default function LoginPage() {
 
               <div className="mt-6 text-center text-sm text-[#4a453d]">
                 {mode === "login" ? (
-                  <>Non hai ancora un account? <button onClick={() => { setMode("signup"); setErr(null); setInfo(null); }} className={linkCls}>Crea un account</button></>
+                  <>Non hai ancora un account? <a href="https://www.xenoradigitalsolutions.it" target="_blank" rel="noreferrer" className={linkCls}>Contattaci</a></>
                 ) : (
                   <>Hai già un account? <button onClick={() => { setMode("login"); setErr(null); setInfo(null); }} className={linkCls}>Accedi</button></>
                 )}
