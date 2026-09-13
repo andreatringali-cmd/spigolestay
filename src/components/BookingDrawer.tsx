@@ -14,6 +14,7 @@ import { buildFatturaPA } from "@/lib/fatturapa";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import Icon from "@/components/Icon";
+import QRCode from "qrcode";
 
 const fmtDate = (iso: string) =>
   parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
@@ -75,6 +76,7 @@ export default function BookingDrawer() {
   const [form, setForm] = useState<Form | null>(null);
   const [saved, setSaved] = useState(false);
   const [voucher, setVoucher] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
+  const [checkinQr, setCheckinQr] = useState("");
   const [expanded, setExpanded] = useState(false); // false = anteprima, true = scheda intera
   const [qa, setQa] = useState<null | "incasso" | "extra">(null); // azione rapida aperta
   const [incassoAmt, setIncassoAmt] = useState("");
@@ -109,6 +111,15 @@ export default function BookingDrawer() {
     setSaved(false);
     loadForm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBookingId]);
+
+  // QR del link di gestione (self check-in) per la prenotazione aperta.
+  useEffect(() => {
+    if (!selectedBookingId || typeof window === "undefined") { setCheckinQr(""); return; }
+    const link = `${window.location.origin}/checkin?b=${selectedBookingId}`;
+    let alive = true;
+    QRCode.toDataURL(link, { margin: 1, width: 220 }).then((d) => { if (alive) setCheckinQr(d); }).catch(() => { if (alive) setCheckinQr(""); });
+    return () => { alive = false; };
   }, [selectedBookingId]);
 
   if (!booking) return null;
@@ -286,7 +297,7 @@ export default function BookingDrawer() {
     <div className="flex shrink-0 gap-1.5">
       <a href={phoneDigits ? `https://wa.me/${phoneDigits}?text=${waText}` : undefined} target="_blank" rel="noopener noreferrer" title="WhatsApp" className={`grid h-8 w-8 place-items-center rounded-lg text-white ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-30"}`} style={{ backgroundColor: "#25D366" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.8-4.3-.1-.2-1.1-1.5-1.1-2.9 0-1.3.7-2 1-2.3.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.4.6c-.1.2-.3.3-.1.6.1.3.7 1.1 1.5 1.8 1 .9 1.8 1.1 2.1 1.3.3.1.4.1.6-.1l.7-.9c.2-.2.4-.2.6-.1l1.9.9c.2.1.4.2.5.3.1.3.1.7-.1 1.4Z" /></svg></a>
       <a href={guest?.phone ? `tel:${guest.phone}` : undefined} title={t("Chiama")} className={`grid h-8 w-8 place-items-center rounded-lg bg-focus text-white ${guest?.phone ? "hover:opacity-90" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.5 2.1L8 9.5a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2Z" /></svg></a>
-      <a href={guest?.email ? `mailto:${guest.email}` : undefined} title="Email" className={`grid h-8 w-8 place-items-center rounded-lg border border-line text-dim ${guest?.email ? "hover:bg-wash hover:text-txt" : "pointer-events-none opacity-30"}`}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></a>
+      <a href={`mailto:${guest?.email ?? ""}`} title="Email" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></a>
     </div>
   );
 
@@ -433,9 +444,12 @@ export default function BookingDrawer() {
           const link = `${origin}/checkin?b=${booking.id}`;
           const waText = encodeURIComponent(`Buongiorno${guest?.fullName ? " " + guest.fullName.split(" ")[0] : ""}, per velocizzare l'arrivo a ${structure?.name ?? "Xenora"} completa il check-in online qui: ${link}`);
           return (
-            <div className="flex gap-2 pt-0.5">
-              {phoneDigits && <a href={`https://wa.me/${phoneDigits}?text=${waText}`} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-white" style={{ backgroundColor: "#25D366" }}>{t("Invia link WhatsApp")}</a>}
-              <button onClick={() => navigator.clipboard?.writeText(link)} className="flex-1 rounded-lg border border-line py-2 text-center text-xs font-semibold text-txt hover:bg-wash">{t("Copia link")}</button>
+            <div className="flex items-center gap-3 pt-0.5">
+              {checkinQr && <img src={checkinQr} alt="QR" title={t("Inquadra per gestire la prenotazione")} className="h-16 w-16 shrink-0 rounded-lg border border-line" />}
+              <div className="flex flex-1 flex-col gap-2">
+                {phoneDigits && <a href={`https://wa.me/${phoneDigits}?text=${waText}`} target="_blank" rel="noopener noreferrer" className="rounded-lg py-2 text-center text-xs font-semibold text-white" style={{ backgroundColor: "#25D366" }}>{t("Invia link WhatsApp")}</a>}
+                <button onClick={() => navigator.clipboard?.writeText(link)} className="rounded-lg border border-line py-2 text-center text-xs font-semibold text-txt hover:bg-wash">{t("Copia link")}</button>
+              </div>
             </div>
           );
         })()}
@@ -540,7 +554,7 @@ export default function BookingDrawer() {
         <div className="flex gap-2 pt-0.5">
           <ContactBtn href={form.phone.replace(/[^\d]/g, "") ? `https://wa.me/${form.phone.replace(/[^\d]/g, "")}?text=${encodeURIComponent(`Buongiorno${form.firstName ? " " + form.firstName : ""}, le scriviamo da ${structure?.name ?? "Xenora"} riguardo al soggiorno del ${fmtDate(form.checkIn)}.`)}` : undefined} label="WhatsApp" color="#25D366" missingTitle={t("Dato mancante")} />
           <ContactBtn href={form.phone ? `tel:${form.phone}` : undefined} label={t("Chiama")} color="var(--focus)" missingTitle={t("Dato mancante")} />
-          <ContactBtn href={form.email ? `mailto:${form.email}` : undefined} label={t("Email")} color="var(--dim)" missingTitle={t("Dato mancante")} />
+          <ContactBtn href={`mailto:${form.email ?? ""}`} label={t("Email")} color="var(--dim)" missingTitle={t("Dato mancante")} />
         </div>
       </Section>
 

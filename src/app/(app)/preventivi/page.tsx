@@ -81,20 +81,22 @@ export default function PreventiviPage() {
   const { structures, roomTypes, units, bookings, guests, rateOverrides, addGuest, updateGuest, addBooking, addActivity, activeStructureId } = useData();
   const lockedStructure = activeStructureId !== "all"; // struttura scelta in alto → niente scelta nel preventivo
 
+  // Parametri in arrivo dal wizard "Aggiungi prenotazione" (modalità Preventivo): precompilano il modulo.
+  const qp = (k: string) => { try { return new URLSearchParams(window.location.search).get(k) || ""; } catch { return ""; } };
   const [lastName, setLastName] = useState("");
   const [firstName, setFirstName] = useState("");
   const name = `${firstName} ${lastName}`.trim();
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [structureId, setStructureId] = useState(lockedStructure ? activeStructureId : (structures[0]?.id ?? ""));
+  const [structureId, setStructureId] = useState(qp("s") || (lockedStructure ? activeStructureId : (structures[0]?.id ?? "")));
   const typesOf = roomTypes.filter((rt) => rt.structureId === structureId);
-  const [checkIn, setCheckIn] = useState(toISO(new Date()));
-  const [checkOut, setCheckOut] = useState(shiftISO(toISO(new Date()), 3));
-  const [adults, setAdults] = useState(2);
-  const [children, setChildren] = useState(0);
-  const [childAges, setChildAges] = useState<number[]>([]); // età dei bambini (per la tassa: sotto i 15 esenti)
+  const [checkIn, setCheckIn] = useState(qp("ci") || toISO(new Date()));
+  const [checkOut, setCheckOut] = useState(qp("co") || shiftISO(toISO(new Date()), 3));
+  const [adults, setAdults] = useState(Number(qp("ad")) || 2);
+  const [children, setChildren] = useState(Number(qp("ch")) || 0);
+  const [childAges, setChildAges] = useState<number[]>(() => { const n = Number(qp("ch")) || 0; return Array.from({ length: n }, () => 8); }); // età dei bambini (per la tassa: sotto i 15 esenti)
   // Righe camera del preventivo (più tipologie nella struttura selezionata, ognuna con quantità e prezzo).
-  const [roomLines, setRoomLines] = useState<QuoteRoom[]>(() => { const sid = lockedStructure ? activeStructureId : (structures[0]?.id ?? ""); const rt0 = roomTypes.find((r) => r.structureId === sid); return rt0 ? [{ roomTypeId: rt0.id, qty: 1, price: rt0.basePrice }] : []; });
+  const [roomLines, setRoomLines] = useState<QuoteRoom[]>(() => { const sid = qp("s") || (lockedStructure ? activeStructureId : (structures[0]?.id ?? "")); const rt0 = roomTypes.find((r) => r.structureId === sid); return rt0 ? [{ roomTypeId: rt0.id, qty: 1, price: rt0.basePrice }] : []; });
   const rtName = (id: string) => roomTypes.find((r) => r.id === id)?.name ?? "";
   // Disponibilità reale di una tipologia nel periodo (camere fisiche non occupate).
   const availOf = (rtId: string) => units.filter((u) => u.roomTypeId === rtId && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn)).length;
@@ -302,7 +304,7 @@ export default function PreventiviPage() {
   const stSocials = ([["facebook", structure?.facebook], ["instagram", structure?.instagram], ["linkedin", structure?.linkedin]] as [string, string | undefined][])
     .filter(([, u]) => u && u.trim()).map(([k, u]) => ({ k, url: socialHref(u!) }));
   const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(outMsg)}` : "#";
-  const mailLink = email ? `mailto:${email}?subject=${encodeURIComponent(`Preventivo ${structureName}`)}&body=${encodeURIComponent(outMsg)}` : "#";
+  const mailLink = `mailto:${email}?subject=${encodeURIComponent(`Preventivo ${structureName}`)}&body=${encodeURIComponent(outMsg)}`;
 
   // Salvataggio in archivio (con dedup dell'ultimo identico).
   const save = () => {
@@ -696,7 +698,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               {shareOpen && (<>
                 <button aria-label={t("Chiudi")} onClick={() => setShareOpen(false)} className="fixed inset-0 z-20 cursor-default" />
                 <div className="absolute left-0 top-full z-30 mt-1 w-48 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
-                  <button onClick={() => { if (!email) return; save(); window.open(mailLink); setShareOpen(false); }} disabled={!email} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash disabled:opacity-40"><Icon name="mail" size={15} /> {t("Invia email")}</button>
+                  <button onClick={() => { save(); window.location.href = mailLink; setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="mail" size={15} /> {t("Invia email")}</button>
                   <button onClick={() => { if (!phone) return; save(); window.open(waLink, "_blank"); setShareOpen(false); }} disabled={!phone} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash disabled:opacity-40"><Icon name="chat" size={15} /> WhatsApp</button>
                   <button onClick={() => { navigator.clipboard?.writeText(outMsg); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia testo")}</button>
                 </div>
@@ -772,7 +774,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
         const confMsg = buildConfirm(q, pct);
         const digits = (q.phone ?? "").replace(/\D/g, "");
         const wa = digits ? `https://wa.me/${digits}?text=${encodeURIComponent(confMsg)}` : "#";
-        const mail = q.email ? `mailto:${q.email}?subject=${encodeURIComponent("Conferma prenotazione — " + q.structure)}&body=${encodeURIComponent(confMsg)}` : "#";
+        const mail = `mailto:${q.email ?? ""}?subject=${encodeURIComponent("Conferma prenotazione — " + q.structure)}&body=${encodeURIComponent(confMsg)}`;
         const confirmed = q.status === "confermato";
         return (
           <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[6vh]">
@@ -804,7 +806,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
 
               <div className="mt-3 flex flex-nowrap items-center gap-1.5">
                 {!confirmed && <button onClick={() => confirmBooking(false)} className="whitespace-nowrap rounded-lg bg-focus px-2.5 py-2 text-xs font-semibold text-white hover:opacity-90">{t("Crea prenotazione")}</button>}
-                <a href={mail} className={`whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash ${q.email ? "" : "pointer-events-none opacity-40"}`}>{t("Email")}</a>
+                <a href={mail} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash">{t("Email")}</a>
                 <a href={wa} target="_blank" rel="noreferrer" className={`whitespace-nowrap rounded-lg px-2.5 py-2 text-xs font-semibold text-white ${digits ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
                 <button onClick={() => navigator.clipboard?.writeText(confMsg)} className="whitespace-nowrap rounded-lg border border-line px-2.5 py-2 text-xs font-medium text-txt hover:bg-wash">{t("Copia")}</button>
               </div>

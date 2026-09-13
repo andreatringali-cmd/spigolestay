@@ -14,6 +14,8 @@ import QRCode from "qrcode";
 
 const CHANNEL_OPTS: Channel[] = ["direct", "booking", "airbnb", "expedia"];
 const isWeekend = (iso: string) => { const d = new Date(iso).getDay(); return d === 5 || d === 6 || d === 0; };
+// Normalizza il telefono in formato internazionale (default +39) così WhatsApp funziona sempre.
+const normPhone = (p: string): string | undefined => { const s = (p ?? "").trim(); if (!s) return undefined; if (s.startsWith("+")) return s; if (s.startsWith("00")) return "+" + s.slice(2); return `+39 ${s}`; };
 const fmtDay = (iso: string) => { try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; } };
 
 export default function NuovaPrenotazionePage() {
@@ -123,7 +125,7 @@ export default function NuovaPrenotazionePage() {
   const confirm = () => {
     if (totalRooms < 1) { setErr("Seleziona almeno una camera"); return; }
     if (!lastName.trim() && !firstName.trim()) { setErr("Inserisci nome o cognome dell'ospite"); return; }
-    const guestId = addGuest({ lastName: lastName.trim() || undefined, firstName: firstName.trim() || undefined, email: email.trim() || undefined, phone: phone.trim() || undefined });
+    const guestId = addGuest({ lastName: lastName.trim() || undefined, firstName: firstName.trim() || undefined, email: email.trim() || undefined, phone: normPhone(phone) });
     const groupId = isGroup ? ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now())) : undefined;
     const flat: { rt: RoomType; unitId: string | null }[] = [];
     const usedUnitIds = new Set<string>(); // evita di assegnare la stessa camera fisica a madre e derivata
