@@ -119,15 +119,15 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-white px-6 py-10 text-[#1f1b16]">
       <main className="flex w-full flex-col items-center justify-center">
         <div className="w-full max-w-sm">
-          {/* Logo centrato */}
-          <div className="mb-8 flex flex-col items-center text-center">
-            <Image src="/xenora-logo.png" alt="Xenora" width={180} height={51} priority className="object-contain" style={{ width: 180, height: "auto" }} />
+          {/* Logo allineato a sinistra, come i campi */}
+          <div className="mb-7 flex">
+            <Image src="/xenora-logo.png" alt="Xenora" width={170} height={48} priority className="object-contain" style={{ width: 170, height: "auto" }} />
           </div>
 
           {recovery ? (
             <>
-              <h1 className="text-center text-2xl font-bold tracking-tight">Imposta una nuova password</h1>
-              <p className="mt-1 text-center text-sm text-[#6b6459]">Scegli la nuova password per il tuo account.</p>
+              <h1 className="text-2xl font-bold tracking-tight">Imposta una nuova password</h1>
+              <p className="mt-1 text-sm text-[#6b6459]">Scegli la nuova password per il tuo account.</p>
               <form onSubmit={updatePwd} className="mt-6">
                 <label className="block">
                   <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Nuova password</span>
@@ -143,8 +143,8 @@ export default function LoginPage() {
             </>
           ) : (
             <>
-              <h1 className="text-center text-2xl font-bold tracking-tight">{mode === "login" ? "Accedi al tuo account" : "Crea il tuo account"}</h1>
-              <p className="mt-1 text-center text-sm text-[#6b6459]">{mode === "login" ? "Bentornato. Inserisci le tue credenziali." : "Bastano pochi dati per iniziare."}</p>
+              <h1 className="text-2xl font-bold tracking-tight">{mode === "login" ? "Accedi al tuo account" : "Crea il tuo account"}</h1>
+              <p className="mt-1 text-sm text-[#6b6459]">{mode === "login" ? "Bentornato. Inserisci le tue credenziali." : "Bastano pochi dati per iniziare."}</p>
 
               <form onSubmit={submit} className="mt-6">
                 {mode === "signup" && (
