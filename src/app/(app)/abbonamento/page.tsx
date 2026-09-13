@@ -8,6 +8,7 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import { ROOMS_PER_STRUCT, ROOM_OVERAGE, ANNUAL_OFF, TIERS, MODULES, ADDON_PRICE } from "@/lib/plans";
+import QRCode from "qrcode";
 
 export default function AbbonamentoPage() {
   const { t } = useLang();
@@ -28,6 +29,13 @@ export default function AbbonamentoPage() {
     } catch {}
   }, []);
   const refLink = typeof window !== "undefined" ? `${window.location.origin}/abbonamento?ref=${refCode}` : "";
+  const [refQr, setRefQr] = useState("");
+  useEffect(() => {
+    if (!refLink) { setRefQr(""); return; }
+    let alive = true;
+    QRCode.toDataURL(refLink, { margin: 1, width: 320 }).then((d) => { if (alive) setRefQr(d); }).catch(() => { if (alive) setRefQr(""); });
+    return () => { alive = false; };
+  }, [refLink]);
   const [active, setActive] = useState<Record<string, boolean>>({});
   const [pendingTier, setPendingTier] = useState<string | null>(null);
   const [pendingAddon, setPendingAddon] = useState<string | null>(null);
@@ -266,19 +274,25 @@ export default function AbbonamentoPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2"><span className="text-xl">🎁</span><h3 className="font-display text-lg font-bold text-txt">{t("Invita un amico")}</h3></div>
-            <p className="mt-1 max-w-md text-sm text-dim">{t("Per ogni amico che si abbona con il tuo codice, ottieni 1 mese gratis. Nessun limite: più amici inviti, più mesi gratis.")}</p>
+            <p className="mt-1 max-w-md text-sm text-dim">{t("Per ogni amico che si registra col tuo codice e si abbona (dopo la prova), ottieni 1 mese gratis. Nessun limite: più amici, più mesi gratis.")}</p>
           </div>
           <div className="rounded-lg border border-line bg-surface px-3 py-2 text-center">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{t("Il tuo codice")}</div>
             <div className="font-mono text-lg font-bold text-txt">{refCode}</div>
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <input readOnly value={refLink} className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none" />
-          <button onClick={() => { navigator.clipboard?.writeText(refLink); setRefCopied(true); window.setTimeout(() => setRefCopied(false), 1500); }} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{refCopied ? t("Copiato ✓") : t("Copia link")}</button>
-          <a href={`https://wa.me/?text=${encodeURIComponent(`Provo Xenora per gestire il mio B&B, dai un'occhiata: ${refLink}`)}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+          {refQr && <img src={refQr} alt="QR" title={t("Fai scansionare questo QR all'amico")} className="h-28 w-28 shrink-0 self-center rounded-xl border border-line bg-white p-1.5 sm:self-auto" />}
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 text-[11px] text-faint">{t("L'amico scansiona il QR o apre il link:")}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input readOnly value={refLink} className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none" />
+              <button onClick={() => { navigator.clipboard?.writeText(refLink); setRefCopied(true); window.setTimeout(() => setRefCopied(false), 1500); }} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{refCopied ? t("Copiato ✓") : t("Copia link")}</button>
+              <a href={`https://wa.me/?text=${encodeURIComponent(`Provo Xenora per gestire il mio B&B, dai un'occhiata: ${refLink}`)}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
+            </div>
+          </div>
         </div>
-        <p className="mt-2 text-[11px] text-faint">{t("Amici iscritti: 0 · Mesi gratis maturati: 0 · Il mese gratis si attiva quando l'amico completa il primo pagamento.")}</p>
+        <p className="mt-2 text-[11px] text-faint">{t("Amici iscritti: 0 · Mesi gratis maturati: 0 · Il mese gratis si attiva solo quando l'amico, finito il periodo di prova, si abbona e paga.")}</p>
       </div>
 
       {/* Riepilogo abbonamento */}
