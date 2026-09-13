@@ -275,7 +275,7 @@ export default function AbbonamentoPage() {
           {/* Messaggio + azioni */}
           <div className="min-w-0">
             <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--focus)" }}>{t("Programma invita & guadagna")}</div>
-            <h3 className="mt-1 font-display text-2xl font-bold leading-tight text-txt">{t("Regala Xenora,")}<br /><span style={{ color: "var(--focus)" }}>{t("ottieni 1 mese gratis")}</span></h3>
+            <h3 className="mt-1 font-display text-3xl font-bold leading-tight text-txt sm:text-4xl">{t("Regala Xenora,")}<br /><span style={{ color: "var(--focus)" }}>{t("ottieni 1 mese gratis")}</span></h3>
             <p className="mt-1.5 max-w-sm text-sm text-dim">{t("Il mese gratis scatta quando l'amico, finita la prova, si abbona col tuo codice.")}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <a href={`https://wa.me/?text=${encodeURIComponent(`Provo Xenora per gestire il mio B&B, dai un'occhiata: ${refLink}`)}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold text-white transition hover:opacity-90" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</a>
@@ -300,14 +300,12 @@ export default function AbbonamentoPage() {
           <SectionTitle>{t("Il tuo abbonamento")}</SectionTitle>
           <div className="mb-3 rounded-lg border border-line bg-wash p-3">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Piano attivo")}</div>
-            <div className="mt-0.5 flex flex-wrap items-center gap-2">
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="font-display text-base font-bold text-txt">{tier.name}{isCustom ? ` ${t("personalizzato")}` : ""}{annual ? ` · ${t("annuale")}` : ` · ${t("mensile")}`}</span>
               {isCustom && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>+{addedModules.length} {t("extra")}</span>}
+              <span className="text-[11px] text-dim">· {t("Prossimo rinnovo")}: <b className="font-semibold text-txt">{(() => { const d = new Date(); if (annual) d.setFullYear(d.getFullYear() + 1); else d.setMonth(d.getMonth() + 1, 1); return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }); })()}</b></span>
             </div>
             {isCustom && <div className="mt-2 flex flex-wrap gap-1">{addedModules.map((m) => <span key={m.key} className="rounded-md border px-1.5 py-0.5 text-[10px] font-medium" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, var(--line))", color: "var(--focus)" }}>{m.name}</span>)}</div>}
-            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-dim">
-              <span aria-hidden>🗓️</span>{t("Prossimo rinnovo")}: <b className="font-semibold text-txt">{(() => { const d = new Date(); if (annual) d.setFullYear(d.getFullYear() + 1); else d.setMonth(d.getMonth() + 1, 1); return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }); })()}</b>
-            </div>
           </div>
           <div className="flex justify-between text-sm"><span className="text-dim">{t("Piano")} {tier.name}</span><span className="font-mono text-txt">{eur(annual ? Math.round(tier.price * (1 - ANNUAL_OFF)) : tier.price)}</span></div>
           {addonsTotal > 0 && <div className="mt-1.5 flex justify-between text-sm"><span className="font-semibold text-[color:var(--focus)]">{t("Moduli aggiuntivi")} ({addedModules.length}) <span className="font-normal text-faint">· {t("non inclusi nel piano")}</span></span><span className="font-mono font-semibold text-[color:var(--focus)]">{eur(annual ? Math.round(addonsTotal * (1 - ANNUAL_OFF)) : addonsTotal)}</span></div>}

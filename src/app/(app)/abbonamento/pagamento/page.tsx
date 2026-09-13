@@ -19,6 +19,7 @@ export default function PagamentoPage() {
   const { user } = useAuth();
   const [b, setB] = useState<Billing>(empty);
   const [saved, setSaved] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [customer, setCustomer] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -57,8 +58,27 @@ export default function PagamentoPage() {
   return (
     <div>
       <PageHeader title={t("Informazioni pagamento")} subtitle={t("Metodo di pagamento e dati di fatturazione del tuo abbonamento")}
-        actions={<button onClick={save} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{saved ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> {t("Salvato")}</> : t("Salva")}</button>}
+        actions={<div className="flex items-center gap-2">
+          <button onClick={() => setShowHelp((v) => !v)} aria-label={t("Aiuto")} title={t("Cosa si fa in questa pagina")} className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">?</button>
+          <button onClick={save} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{saved ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> {t("Salvato")}</> : t("Salva")}</button>
+        </div>}
       />
+
+      {showHelp && (
+        <div className="mb-4 rounded-xl border border-line bg-surface p-4 text-sm shadow-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-display text-base font-bold text-txt">{t("Cosa si fa in questa pagina")}</span>
+            <button onClick={() => setShowHelp(false)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+          </div>
+          <p className="text-dim">{t("Qui gestisci come paghi l'abbonamento Xenora e i dati per le fatture. Non riguarda i pagamenti dei tuoi ospiti.")}</p>
+          <ul className="mt-2 list-disc space-y-1.5 pl-5 text-dim">
+            <li><b className="text-txt">{t("Metodo di pagamento")}</b>: {t("aggiungi o cambi la carta (o l'addebito SEPA). Il pagamento è gestito da Stripe in modo sicuro: i dati della carta non passano né vengono salvati dall'app. Apple/Google Pay compaiono in automatico con la carta.")}</li>
+            <li><b className="text-txt">{t("Dati di fatturazione")}</b>: {t("ragione sociale/nome, P.IVA o codice fiscale, indirizzo completo (città, provincia, via, civico), Codice SDI e PEC per la fattura elettronica, ed email a cui ricevere le fatture.")}</li>
+            <li><b className="text-txt">{t("Salva")}</b>: {t("memorizza i dati di fatturazione. Verranno usati per intestare le fatture dell'abbonamento (le trovi in «Fatture»).")}</li>
+            <li>{t("Il canone si rinnova in automatico alla scadenza; se un pagamento non va a buon fine ricevi un avviso e puoi regolarizzare dal portale Stripe.")}</li>
+          </ul>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Metodo di pagamento */}
@@ -91,7 +111,6 @@ export default function PagamentoPage() {
         {/* Dati di fatturazione */}
         <Card className="order-1">
           <SectionTitle>{t("Dati di fatturazione")}</SectionTitle>
-          <p className="mb-3 text-xs text-dim">{t("Usati per intestare le fatture dell'abbonamento.")}</p>
           <div className="grid grid-cols-2 gap-3">
             <label className={`${lbl} col-span-2`}>{t("Ragione sociale / Nome")}<input value={b.businessName} onChange={(e) => set("businessName", e.target.value)} className={`${inp} mt-1`} /></label>
             <label className={lbl}>{t("Partita IVA")}<input value={b.vat} onChange={(e) => set("vat", e.target.value)} className={`${inp} mt-1`} /></label>

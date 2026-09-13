@@ -3,7 +3,7 @@
 export const ROOMS_PER_STRUCT = 6;
 export const ROOM_OVERAGE = 4; // €/camera/mese oltre le incluse
 export const ANNUAL_OFF = 0.2; // −20% con fatturazione annuale
-export const ALL = ["pms", "cm", "booking", "cassa", "guide", "concierge", "housekeeping", "messaging", "meta", "bi", "site", "rms", "ratecheck", "team"];
+export const ALL = ["pms", "cm", "booking", "cassa", "guide", "checkin", "concierge", "housekeeping", "messaging", "meta", "bi", "site", "rms", "ratecheck", "team"];
 
 export interface Tier { key: string; name: string; price: number; structures: number; includes: string[]; tagline: string }
 export const TIERS: Tier[] = [
@@ -18,7 +18,8 @@ export const MODULES: Module[] = [
   { key: "cm", name: "Channel Manager", desc: "Connessione OTA (Booking, Airbnb, Expedia…) con sincronizzazione prezzi e disponibilità e mappatura camere.", href: "/canali" },
   { key: "booking", name: "Booking Engine", desc: "Motore prenotazioni (widget) sul tuo sito, senza commissioni.", href: "/widget" },
   { key: "cassa", name: "Cassa · Prima Nota", desc: "Entrate/uscite, pagamenti ricorrenti, saldo per conto e analisi.", href: "/cassa" },
-  { key: "guide", name: "Guida & Check-in", desc: "Guida ospiti multilingua (QR WiFi e codici per camera) e self check-in online con raccolta documenti.", href: "/guida-ospiti" },
+  { key: "guide", name: "Guida ospiti", desc: "Guida ospiti multilingua con QR WiFi e codici d'ingresso per camera, inviabile via WhatsApp/email.", href: "/guida-ospiti" },
+  { key: "checkin", name: "Self check-in online", desc: "Check-in online con raccolta documenti, firma e notifica: l'ospite compila prima dell'arrivo. Con affiancamento all'attivazione.", href: "/guida-ospiti" },
   { key: "concierge", name: "Vendite & Concierge", desc: "Preventivi e offerte, upselling & extra, promozioni, recensioni e assistente ricavi.", href: "/preventivi" },
   { key: "housekeeping", name: "Housekeeping", desc: "Planning pulizie giornaliero per camera, note dell'ospite e invio su WhatsApp.", href: "/pulizie" },
   { key: "messaging", name: "Messaggi & automazioni", desc: "Messaggi automatici agli ospiti (WhatsApp/email) con modelli e trigger: benvenuto e guida, check-in, recensione.", href: "/messaggi" },
@@ -31,7 +32,7 @@ export const MODULES: Module[] = [
 ];
 
 // Prezzo add-on (€/mese) per attivare un singolo modulo NON incluso nel piano.
-export const ADDON_PRICE: Record<string, number> = { cm: 0, booking: 0, cassa: 0, guide: 6, concierge: 9, housekeeping: 6, messaging: 7, meta: 6, bi: 8, site: 7, rms: 10, ratecheck: 9, team: 6 };
+export const ADDON_PRICE: Record<string, number> = { cm: 0, booking: 0, cassa: 0, guide: 6, checkin: 12, concierge: 9, housekeeping: 6, messaging: 7, meta: 6, bi: 8, site: 7, rms: 10, ratecheck: 9, team: 6 };
 
 export interface SubSummary {
   tier: Tier;

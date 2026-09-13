@@ -13,6 +13,7 @@ import { eur } from "@/lib/format";
 import { buildFatturaPA } from "@/lib/fatturapa";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
+import { useAccess } from "@/lib/access";
 import Icon from "@/components/Icon";
 import QRCode from "qrcode";
 
@@ -70,6 +71,7 @@ export default function BookingDrawer() {
   const router = useRouter();
   const ask = useConfirm();
   const { t } = useLang();
+  const { moduleOn } = useAccess();
   const booking = bookings.find((b) => b.id === selectedBookingId) ?? null;
 
   const [mode, setMode] = useState<"view" | "edit">("view");
@@ -445,6 +447,11 @@ export default function BookingDrawer() {
           const ciMsg = (u: string) => `Buongiorno${guest?.fullName ? " " + guest.fullName.split(" ")[0] : ""}, per velocizzare l'arrivo a ${structure?.name ?? "Xenora"} completa il check-in online qui: ${u}`;
           const sendCiWa = async () => { const s = await shortenLink(link); window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(ciMsg(s))}`, "_blank", "noopener,noreferrer"); };
           const copyCi = async () => { const s = await shortenLink(link); try { await navigator.clipboard.writeText(s); } catch {} };
+          if (!moduleOn("checkin")) return (
+            <div className="flex items-center gap-2 rounded-lg border border-line bg-wash px-3 py-2 text-[11px] text-dim">
+              🔒 {t("Self check-in online disponibile nel piano Ultimate.")} <a href="/abbonamento" className="font-semibold text-focus hover:underline">{t("Vedi i piani")}</a>
+            </div>
+          );
           return (
             <div className="flex items-center gap-3 pt-0.5">
               {checkinQr && <img src={checkinQr} alt="QR" title={t("Inquadra per gestire la prenotazione")} className="h-16 w-16 shrink-0 rounded-lg border border-line" />}
