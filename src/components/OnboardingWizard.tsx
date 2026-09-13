@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { STRUCTURE_TYPES, ROOM_TYPE_OPTIONS } from "@/lib/types";
 import { blankUser, fullPerms, USER_LANGS } from "@/lib/users";
 import { isOnboardingActive, markOnboarded } from "@/lib/onboarding";
@@ -149,7 +150,7 @@ export default function OnboardingWizard() {
       {/* Progress */}
       <div className="sticky top-0 z-10 border-b border-line bg-surface/90 backdrop-blur">
         <div className="mx-auto flex max-w-xl items-center gap-3 px-5 py-3">
-          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-[#D97F57] to-[#B04A2C] font-display text-sm font-black text-white shadow">X</div>
+          <Image src="/xenora-mark.png" alt="Xenora" width={34} height={34} priority className="shrink-0 object-contain" style={{ width: 34, height: 34 }} />
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-faint"><span>Configurazione</span><span>{step + 1} / {STEPS.length}</span></div>
             <div className="h-1.5 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full transition-all duration-300" style={{ width: `${((step + 1) / STEPS.length) * 100}%`, backgroundColor: "var(--focus)" }} /></div>
