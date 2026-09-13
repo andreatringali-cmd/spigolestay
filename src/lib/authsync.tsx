@@ -148,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!supabase) return;
       try {
         let plan = "", structNames = "", stripeCustomer = "";
-        let structCount = 0;
+        let structCount = 0, roomsCount = 0;
         try { plan = localStorage.getItem("spigolestay:plan") || localStorage.getItem("spigolestay:tier") || ""; } catch {}
         try { stripeCustomer = localStorage.getItem("spigolestay:stripecustomer") || ""; } catch {}
         try {
@@ -159,6 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               structCount = d.structures.length;
               structNames = d.structures.map((s: { name?: string }) => s.name).filter(Boolean).join(", ");
             }
+            if (Array.isArray(d.units)) roomsCount = d.units.filter((u: { outOfService?: boolean }) => !u.outOfService).length;
           }
         } catch {}
         const md = (authUser?.user_metadata ?? {}) as Record<string, unknown>;
@@ -169,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           phone: (md.phone as string) ?? null,
           plan: plan || null,
           structures_count: structCount,
+          rooms_count: roomsCount,
           structure_names: structNames || null,
           stripe_customer_id: stripeCustomer || null,
           last_active: new Date().toISOString(),
