@@ -282,9 +282,9 @@ export default function AbbonamentoPage() {
 
         <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
           {/* QR + codice */}
-          <div className="flex shrink-0 flex-col items-center gap-2">
+          <div className="flex shrink-0 flex-col items-center gap-4">
             {refQr && <img src={refQr} alt="QR" title={t("Fai scansionare questo QR all'amico")} className="h-32 w-32 rounded-xl border border-line bg-white p-2 shadow-sm" />}
-            <div className="xn-active w-full rounded-lg border border-focus bg-surface px-4 py-1.5 text-center ring-2 ring-[color:var(--focus)]">
+            <div className="xn-active w-full rounded-lg border border-focus bg-surface px-4 py-2 text-center ring-2 ring-[color:var(--focus)]">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{t("Il tuo codice")}</div>
               <div className="font-mono text-lg font-bold text-txt">{refCode}</div>
             </div>
