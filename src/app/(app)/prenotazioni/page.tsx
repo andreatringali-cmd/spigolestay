@@ -336,7 +336,7 @@ export default function PrenotazioniPage() {
               <div key={gid} className="rounded-xl border border-line bg-surface shadow-sm">
                 <button onClick={() => toggleGroup(gid)} className="block w-full p-3 text-left active:bg-wash">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate font-semibold text-txt">⛓ {guestName(b) || "—"}</span>
+                    <span className="flex min-w-0 items-center gap-1.5 font-semibold text-txt"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><span className="truncate">{guestName(b) || "—"}</span></span>
                     <span title={ch.label} className="inline-flex h-[20px] shrink-0 items-center rounded-md px-2 text-[10px] font-bold" style={{ backgroundColor: `var(${ch.cssVar})`, color: ch.text }}>{ch.label}</span>
                   </div>
                   <div className="mt-1 flex items-center gap-1.5 text-xs text-dim"><span className="font-mono">{fmt(b.checkIn)} → {fmt(b.checkOut)}</span><span className="text-faint">·</span><span>{nights(b.checkIn, b.checkOut)} {t("notti")}</span></div>
@@ -418,7 +418,7 @@ export default function PrenotazioniPage() {
               return (
                 <Fragment key={gid}>
                   <tr onClick={() => toggleGroup(gid)} className="cursor-pointer border-b border-line bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)] hover:bg-wash">
-                    <td className="px-3 py-2.5 font-mono text-xs text-dim">⛓ {bookingCode(b)}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-dim"><span className="inline-flex items-center gap-1.5"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }} title={t("Prenotazione di gruppo")}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span>{bookingCode(b)}</span></td>
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.bookedOn ? fmt(b.bookedOn) : "—"}</td>
                     {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
                     <td className="whitespace-nowrap px-3 py-2.5"><span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-2 py-0.5 text-[11px] font-semibold text-focus">{members.length} {t("camere")} {open ? "▾" : "▸"}</span></td>
