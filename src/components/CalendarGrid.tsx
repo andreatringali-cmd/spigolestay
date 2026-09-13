@@ -860,9 +860,8 @@ export default function CalendarGrid() {
         {(Object.keys(CHANNELS) as (keyof typeof CHANNELS)[]).filter((c) => c !== "blocked").map((c) => {
           const conn = chConnected(c);
           return (
-            <div key={c} className="flex items-center gap-1.5 text-xs text-dim">
-              <ChannelLogo channel={c} size={16} title={CHANNELS[c].label} />
-              <span>{CHANNELS[c].label}</span>
+            <div key={c} className="flex items-center gap-1 text-xs text-dim" title={CHANNELS[c].label}>
+              <ChannelLogo channel={c} size={24} title={CHANNELS[c].label} />
               {conn === true && <span title="Collegato" className="font-bold leading-none text-[color:var(--ok)]">✓</span>}
               {conn === false && <span title="Canale non collegato" className="font-bold leading-none text-[color:var(--err)]">✗</span>}
             </div>

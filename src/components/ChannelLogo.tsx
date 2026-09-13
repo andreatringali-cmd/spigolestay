@@ -15,7 +15,7 @@ export default function ChannelLogo({ channel, size = 14, title }: { channel: Ch
     case "airbnb":
       return <span className={cls} style={tileStyle} title={title ?? "Airbnb"}><svg width={size * 0.74} height={size * 0.74} viewBox="0 0 24 24" fill="#FF5A5F"><path d={BELO} /></svg></span>;
     case "expedia":
-      return <span className={cls} style={tileStyle} title={title ?? "Expedia / Vrbo"}><span style={{ color: "#1B3A6B", fontSize: size * 0.6, fontWeight: 900, lineHeight: 1 }}>E</span></span>;
+      return <span className={cls} style={{ ...tileStyle, backgroundColor: "#FDB92E" }} title={title ?? "Expedia / Vrbo"}><svg width={size * 0.62} height={size * 0.62} viewBox="0 0 24 24" fill="#122A5E"><path d="M2 21l20-9L2 3v6.5l13 2.5-13 2.5z" /></svg></span>;
     case "other":
       return <span className={cls} style={tileStyle} title={title ?? "Altro / OTA"}><span style={{ color: "#D62828", fontSize: size * 0.44, fontWeight: 900, lineHeight: 1, letterSpacing: "-0.04em" }}>OTA</span></span>;
     case "direct":
