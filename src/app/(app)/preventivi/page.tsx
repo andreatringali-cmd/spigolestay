@@ -544,8 +544,8 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               </Field>
             )}
             {structures.length > 1 && <div className="hidden sm:block" />}
-            <Field label={t("Check-in")}><input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} className={inp} /></Field>
-            <Field label={t("Check-out")}><input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} className={inp} /></Field>
+            <Field label={t("Check-in")}><input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className={inp} /></Field>
+            <Field label={t("Check-out")}><input type="date" value={checkOut} min={shiftISO(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className={inp} /></Field>
             <Field label={t("Adulti")}><input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, Number(e.target.value)))} className={inp} /></Field>
             <Field label={t("Bambini")}><input type="number" min={0} value={children} onChange={(e) => { const v = Math.max(0, Number(e.target.value)); setChildren(v); setChildAges((prev) => { const next = prev.slice(0, v); while (next.length < v) next.push(8); return next; }); }} className={inp} /></Field>
             {children > 0 && (

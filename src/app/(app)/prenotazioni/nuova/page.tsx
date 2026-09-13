@@ -27,19 +27,20 @@ export default function NuovaPrenotazionePage() {
   const locked = activeStructureId !== "all";
   const structColor = (sId: string) => structures.find((s) => s.id === sId)?.photoColor || "var(--focus)";
 
-  // ── Criteri di ricerca ──
+  // ── Criteri di ricerca ── (precompilati da eventuali parametri URL, es. click sul calendario)
+  const qp = (k: string) => { try { return new URLSearchParams(window.location.search).get(k) || ""; } catch { return ""; } };
   const today = toISO(new Date());
-  const [checkIn, setCheckIn] = useState(today);
-  const [checkOut, setCheckOut] = useState(shiftISO(today, 1));
-  const [adults, setAdults] = useState(2);
-  const [children, setChildren] = useState(0);
-  const [childAges, setChildAges] = useState<number[]>([]);
+  const [checkIn, setCheckIn] = useState(qp("ci") || today);
+  const [checkOut, setCheckOut] = useState(qp("co") || shiftISO(qp("ci") || today, 1));
+  const [adults, setAdults] = useState(Number(qp("ad")) || 2);
+  const [children, setChildren] = useState(Number(qp("ch")) || 0);
+  const [childAges, setChildAges] = useState<number[]>(() => { const n = Number(qp("ch")) || 0; return Array.from({ length: n }, () => 8); });
   const [cribs, setCribs] = useState(0);
   const setChildrenN = (n: number) => { setChildren(n); setChildAges((prev) => { const next = prev.slice(0, n); while (next.length < n) next.push(8); return next; }); if (cribs > n) setCribs(n); };
   const [onlyAvail, setOnlyAvail] = useState(true);
   const [group, setGroup] = useState(false);
   const [groupName, setGroupName] = useState("");
-  const [structFilter, setStructFilter] = useState<string>(locked ? activeStructureId : "all");
+  const [structFilter, setStructFilter] = useState<string>(qp("s") || (locked ? activeStructureId : "all"));
   const [phase, setPhase] = useState<"search" | "rooms" | "details">("search");
   const [mode, setMode] = useState<"prenotazione" | "preventivo">("prenotazione");
   const [created, setCreated] = useState<Booking | null>(null);

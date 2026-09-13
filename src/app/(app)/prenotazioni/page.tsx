@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/store";
 import { bookingCode } from "@/lib/bookingCode";
@@ -140,6 +140,45 @@ export default function PrenotazioniPage() {
     const c = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
     return sort.dir === "asc" ? c : -c;
   });
+
+  // Raggruppa in un'unica riga le prenotazioni con lo stesso groupId (prenotazione di più camere).
+  const [groupOpen, setGroupOpen] = useState<Set<string>>(() => new Set());
+  const toggleGroup = (gid: string) => setGroupOpen((s) => { const n = new Set(s); if (n.has(gid)) n.delete(gid); else n.add(gid); return n; });
+  const displayList = (() => {
+    const seen = new Set<string>();
+    const out: ({ kind: "single"; b: typeof sorted[number] } | { kind: "group"; gid: string; members: typeof sorted })[] = [];
+    for (const b of sorted) {
+      if (b.groupId) {
+        if (seen.has(b.groupId)) continue;
+        seen.add(b.groupId);
+        const members = sorted.filter((x) => x.groupId === b.groupId);
+        if (members.length > 1) { out.push({ kind: "group", gid: b.groupId, members }); continue; }
+      }
+      out.push({ kind: "single", b });
+    }
+    return out;
+  })();
+  const gSum = (ms: typeof sorted, f: (b: typeof sorted[number]) => number) => ms.reduce((a, b) => a + f(b), 0);
+  // Celle di una riga prenotazione (riusate per righe singole e per le camere di un gruppo).
+  const renderCells = (b: typeof sorted[number], indent = false) => {
+    const ch = CHANNELS[b.channel]; const alOk = alloggiatiOk(b); const pay = payStatus(b);
+    return (<>
+      <td className="px-3 py-2.5 font-mono text-xs text-dim">{bookingCode(b)}</td>
+      <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.bookedOn ? fmt(b.bookedOn) : "—"}</td>
+      {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
+      <td className={`whitespace-nowrap px-3 py-2.5 text-dim ${indent ? "pl-8" : ""}`}>{indent && <span className="text-faint">↳ </span>}{unitLabel(b) ?? <span className="italic font-medium text-[color:var(--err)]">{t("Da assegnare")}</span>}</td>
+      <td className="px-3 py-2.5"><span title={ch.label} className="inline-flex h-[22px] items-center rounded-md px-2 text-[10px] font-bold" style={{ backgroundColor: `var(${ch.cssVar})`, color: ch.text }}>{ch.label}</span></td>
+      <td className="px-3 py-2.5 font-medium text-txt">{guestName(b)}</td>
+      <td className="px-3 py-2.5 font-mono text-dim">{b.adults + b.children}</td>
+      <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>
+      <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkOut)}</td>
+      <td className="px-3 py-2.5 font-mono text-dim">{nights(b.checkIn, b.checkOut)}</td>
+      <td className="px-3 py-2.5 font-mono font-semibold text-txt">{b.total ? eur(b.total) : "—"}</td>
+      <td className="px-3 py-2.5 font-mono text-dim">{commissionOf(b) ? <>{eur(commissionOf(b))} <span className="text-faint">({commissionPctOf(b)}%)</span></> : "—"}</td>
+      <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{b.total ? eur(nettoOf(b)) : "—"}</td>
+      <td className="px-3 py-2.5"><div className="flex items-center gap-1.5"><StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--faint)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} /><StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} /></div></td>
+    </>);
+  };
 
   // Riepiloghi sui risultati filtrati (card + mini-grafico).
   const revenue = filtered.reduce((a, b) => a + (b.total ?? 0), 0);
@@ -290,7 +329,36 @@ export default function PrenotazioniPage() {
 
       {/* Telefono: lista a schede (la tabella qui sotto è nascosta) */}
       <div className="flex flex-col gap-2 md:hidden">
-        {sorted.map((b) => {
+        {displayList.map((item) => {
+          if (item.kind === "group") {
+            const { gid, members } = item; const b = members[0]; const ch = CHANNELS[b.channel]; const open = groupOpen.has(gid);
+            return (
+              <div key={gid} className="rounded-xl border border-line bg-surface shadow-sm">
+                <button onClick={() => toggleGroup(gid)} className="block w-full p-3 text-left active:bg-wash">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate font-semibold text-txt">⛓ {guestName(b) || "—"}</span>
+                    <span title={ch.label} className="inline-flex h-[20px] shrink-0 items-center rounded-md px-2 text-[10px] font-bold" style={{ backgroundColor: `var(${ch.cssVar})`, color: ch.text }}>{ch.label}</span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5 text-xs text-dim"><span className="font-mono">{fmt(b.checkIn)} → {fmt(b.checkOut)}</span><span className="text-faint">·</span><span>{nights(b.checkIn, b.checkOut)} {t("notti")}</span></div>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[11px] font-semibold text-focus">{members.length} {t("camere")} {open ? "▾" : "▸"}</span>
+                    <span className="shrink-0 font-mono font-semibold text-txt">{eur(gSum(members, (x) => x.total ?? 0))}</span>
+                  </div>
+                </button>
+                {open && (
+                  <div className="border-t border-line">
+                    {members.map((m) => (
+                      <button key={m.id} onClick={() => openBooking(m.id)} className="flex w-full items-center justify-between gap-2 border-b border-line px-3 py-2 text-left last:border-0 active:bg-wash">
+                        <span className="truncate text-xs text-dim">{unitLabel(m) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>} · {m.adults + m.children} {t("osp.")}</span>
+                        <span className="shrink-0 font-mono text-xs text-txt">{m.total ? eur(m.total) : "—"}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          }
+          const b = item.b;
           const ch = CHANNELS[b.channel]; const alOk = alloggiatiOk(b); const pay = payStatus(b);
           return (
             <button key={b.id} onClick={() => openBooking(b.id)} className="block w-full rounded-xl border border-line bg-surface p-3 text-left shadow-sm active:bg-wash">
@@ -340,32 +408,36 @@ export default function PrenotazioniPage() {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((b) => {
-              const ch = CHANNELS[b.channel];
+            {displayList.map((item) => {
+              if (item.kind === "single") {
+                const b = item.b;
+                return <tr key={b.id} onClick={() => openBooking(b.id)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">{renderCells(b)}</tr>;
+              }
+              const { gid, members } = item; const b = members[0]; const ch = CHANNELS[b.channel]; const open = groupOpen.has(gid);
+              const colSpan = activeStructureId === "all" ? 14 : 13;
               return (
-                <tr key={b.id} onClick={() => openBooking(b.id)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
-                  <td className="px-3 py-2.5 font-mono text-xs text-dim">{bookingCode(b)}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.bookedOn ? fmt(b.bookedOn) : "—"}</td>
-                  {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
-                  <td className="whitespace-nowrap px-3 py-2.5 text-dim">{unitLabel(b) ?? <span className="italic font-medium text-[color:var(--err)]">{t("Da assegnare")}</span>}</td>
-                  <td className="px-3 py-2.5"><span title={ch.label} className="inline-flex h-[22px] items-center rounded-md px-2 text-[10px] font-bold" style={{ backgroundColor: `var(${ch.cssVar})`, color: ch.text }}>{ch.label}</span></td>
-                  <td className="px-3 py-2.5 font-medium text-txt">{guestName(b)}</td>
-                  <td className="px-3 py-2.5 font-mono text-dim">{b.adults + b.children}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkOut)}</td>
-                  <td className="px-3 py-2.5 font-mono text-dim">{nights(b.checkIn, b.checkOut)}</td>
-                  <td className="px-3 py-2.5 font-mono font-semibold text-txt">{b.total ? eur(b.total) : "—"}</td>
-                  <td className="px-3 py-2.5 font-mono text-dim">{commissionOf(b) ? <>{eur(commissionOf(b))} <span className="text-faint">({commissionPctOf(b)}%)</span></> : "—"}</td>
-                  <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{b.total ? eur(nettoOf(b)) : "—"}</td>
-                  <td className="px-3 py-2.5">
-                    {(() => { const alOk = alloggiatiOk(b); const pay = payStatus(b); return (
-                      <div className="flex items-center gap-1.5">
-                        <StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--faint)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} />
-                        <StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} />
-                      </div>
-                    ); })()}
-                  </td>
-                </tr>
+                <Fragment key={gid}>
+                  <tr onClick={() => toggleGroup(gid)} className="cursor-pointer border-b border-line bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)] hover:bg-wash">
+                    <td className="px-3 py-2.5 font-mono text-xs text-dim">⛓ {bookingCode(b)}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.bookedOn ? fmt(b.bookedOn) : "—"}</td>
+                    {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
+                    <td className="whitespace-nowrap px-3 py-2.5"><span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-2 py-0.5 text-[11px] font-semibold text-focus">{members.length} {t("camere")} {open ? "▾" : "▸"}</span></td>
+                    <td className="px-3 py-2.5"><span title={ch.label} className="inline-flex h-[22px] items-center rounded-md px-2 text-[10px] font-bold" style={{ backgroundColor: `var(${ch.cssVar})`, color: ch.text }}>{ch.label}</span></td>
+                    <td className="px-3 py-2.5 font-medium text-txt">{guestName(b)}</td>
+                    <td className="px-3 py-2.5 font-mono text-dim">{gSum(members, (x) => x.adults + x.children)}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkOut)}</td>
+                    <td className="px-3 py-2.5 font-mono text-dim">{nights(b.checkIn, b.checkOut)}</td>
+                    <td className="px-3 py-2.5 font-mono font-semibold text-txt">{eur(gSum(members, (x) => x.total ?? 0))}</td>
+                    <td className="px-3 py-2.5 font-mono text-dim">{eur(gSum(members, (x) => commissionOf(x)))}</td>
+                    <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{eur(gSum(members, (x) => nettoOf(x)))}</td>
+                    <td className="px-3 py-2.5 text-[11px] text-faint">{t("gruppo")}</td>
+                  </tr>
+                  {open && members.map((m) => (
+                    <tr key={m.id} onClick={() => openBooking(m.id)} className="cursor-pointer border-b border-line bg-wash/40 hover:bg-wash">{renderCells(m, true)}</tr>
+                  ))}
+                  {open && <tr className="border-b border-line"><td colSpan={colSpan} className="px-3 py-0.5" /></tr>}
+                </Fragment>
               );
             })}
             {!filtered.length && (
