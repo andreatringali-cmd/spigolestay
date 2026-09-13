@@ -1,6 +1,24 @@
 // Configurazione piani/abbonamento — fonte unica condivisa tra la pagina Abbonamento e le Fatture.
 
+export const TRIAL_DAYS = 5; // giorni di prova gratuita dalla registrazione
 export const ROOMS_PER_STRUCT = 6;
+
+// Informazioni sulla prova gratuita: data registrazione, fine prova, se sei ancora in prova
+// e data della PRIMA fattura (= fine prova, quando parte il primo pagamento).
+export interface TrialInfo { signup: Date; trialEnd: Date; inTrial: boolean; firstInvoice: Date; daysLeft: number }
+export function trialInfo(): TrialInfo {
+  let signup = new Date();
+  try {
+    const raw = localStorage.getItem("spigolestay:signupdate");
+    if (raw) { const d = new Date(raw); if (!isNaN(+d)) signup = d; }
+    else localStorage.setItem("spigolestay:signupdate", signup.toISOString());
+  } catch {}
+  const trialEnd = new Date(signup); trialEnd.setDate(trialEnd.getDate() + TRIAL_DAYS);
+  const now = new Date();
+  const inTrial = now < trialEnd;
+  const daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / 86400000));
+  return { signup, trialEnd, inTrial, firstInvoice: trialEnd, daysLeft };
+}
 export const ROOM_OVERAGE = 4; // €/camera/mese oltre le incluse
 export const ANNUAL_OFF = 0.2; // −20% con fatturazione annuale
 export const ALL = ["pms", "cm", "booking", "cassa", "guide", "checkin", "concierge", "housekeeping", "messaging", "meta", "bi", "site", "rms", "ratecheck", "team"];

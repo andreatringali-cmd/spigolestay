@@ -9,7 +9,13 @@ export function isOnboardingActive(): boolean {
   try { return localStorage.getItem(ONBOARDED_KEY) !== "1"; } catch { return false; }
 }
 export function markOnboarded(): void {
-  try { localStorage.setItem(ONBOARDED_KEY, "1"); } catch {}
+  try {
+    localStorage.setItem(ONBOARDED_KEY, "1");
+    // Data di registrazione (inizio prova gratuita): impostata una sola volta, al primo completamento.
+    if (!localStorage.getItem("spigolestay:signupdate")) {
+      localStorage.setItem("spigolestay:signupdate", new Date().toISOString());
+    }
+  } catch {}
 }
 
 const EMPTY_DATA = { structures: [], roomTypes: [], units: [], guests: [], bookings: [], events: [], rateOverrides: {} };

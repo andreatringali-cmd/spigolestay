@@ -206,6 +206,16 @@ const HELP: Record<string, Guide> = {
       { h: "Cosa puoi fare", items: ["Vedi Totale atteso, Incassato e In sospeso.", "Aggiorna l'importo incassato o clicca \"Salda\" per segnare il pagamento completo.", "Filtra per mostrare solo le prenotazioni con saldo aperto."] },
     ],
   },
+  "/abbonamento/fatture": {
+    title: "Fatture",
+    intro: "L'archivio delle fatture del tuo abbonamento Xenora (non riguarda le prenotazioni degli ospiti). Durante la prova gratuita non c'è nessuna fattura: la prima viene emessa al termine della prova, quando parte il primo pagamento.",
+    sections: [
+      { h: "Cosa vedi in alto", items: ["Piano attivo (con eventuali moduli extra aggiunti), canone mensile con dettaglio imponibile + IVA 22%.", "«Prima fattura» durante la prova (data di fine prova) oppure «Prossimo rinnovo» quando l'abbonamento è attivo."] },
+      { h: "Quando arriva la prima fattura", items: ["Dalla registrazione hai alcuni giorni di prova gratuita: in questo periodo non viene emessa nessuna fattura.", "La prima fattura è datata al termine della prova, quando viene effettuato il primo pagamento; poi se ne genera una a ogni rinnovo (mensile o annuale)."] },
+      { h: "Storico e stato", items: ["Ogni riga mostra data, numero, descrizione, scadenza, imponibile, IVA, importo, metodo e stato (Pagata / Da pagare / Scaduta).", "Con l'icona stampante scarichi la singola fattura in PDF, intestata con i tuoi dati di fatturazione."] },
+      { h: "Dati e pagamento", items: ["L'intestazione usa i «Dati di fatturazione» impostati in «Informazioni pagamento».", "In produzione le fatture sono emesse elettronicamente (SDI) e il pagamento è gestito in modo sicuro da Stripe."] },
+    ],
+  },
   "/abbonamento/pagamento": {
     title: "Informazioni pagamento",
     intro: "Qui gestisci come paghi l'abbonamento Xenora e i dati per le fatture. Non riguarda i pagamenti dei tuoi ospiti.",

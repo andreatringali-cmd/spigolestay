@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
@@ -174,6 +173,11 @@ export default function AbbonamentoPage() {
   const isCustom = addedModules.length > 0;
   const addonsTotal = addedModules.reduce((a, m) => a + (ADDON_PRICE[m.key] || 0), 0);
 
+  // Moduli ordinati per fascia di sblocco: prima gli inclusi in Basic, poi Pro, poi Ultimate
+  // (così nella tabella "Cosa include ogni piano" i lucchetti scendono in ordine).
+  const firstTierIdx = (m: (typeof MODULES)[number]) => { if (m.core) return 0; const i = TIERS.findIndex((tr) => tr.includes.includes(m.key)); return i < 0 ? 99 : i; };
+  const modulesByPlan = [...MODULES].map((m, i) => ({ m, i })).sort((a, b) => firstTierIdx(a.m) - firstTierIdx(b.m) || a.i - b.i).map((x) => x.m);
+
   // Camere incluse e overage.
   const roomsIncluded = tier.structures * ROOMS_PER_STRUCT;
   const extraRooms = Math.max(0, rooms - roomsIncluded);
@@ -270,7 +274,7 @@ export default function AbbonamentoPage() {
               </tr>
             </thead>
             <tbody>
-              {MODULES.map((m) => (
+              {modulesByPlan.map((m) => (
                 <tr key={m.key} className="border-b border-line last:border-0">
                   <td className="px-2 py-2"><div className="text-sm font-medium text-txt">{t(m.name)}</div><div className="text-[11px] text-faint">{t(m.desc)}</div></td>
                   {TIERS.map((tr) => {
@@ -381,10 +385,6 @@ export default function AbbonamentoPage() {
           </div>
           {annual && <div className="mt-1 text-right text-[11px] text-[color:var(--ok)]">{t("fatturato annualmente")} ({eur(perMonth * 12)}/{t("anno")})</div>}
           {overStructures && <div className="mt-3 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}>{t("Hai")} {nStruct} {t("strutture: superi il piano")} {tier.name}. {t("Passa a un piano superiore o «Su misura».")}</div>}
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <Link href="/abbonamento/pagamento" className="rounded-lg border border-line py-2 text-center text-sm font-semibold text-txt hover:bg-wash">{t("Informazioni pagamento")}</Link>
-            <Link href="/abbonamento/fatture" className="rounded-lg border border-line py-2 text-center text-sm font-semibold text-txt hover:bg-wash">{t("Fatture")}</Link>
-          </div>
         </Card>
       </div>
       </div>

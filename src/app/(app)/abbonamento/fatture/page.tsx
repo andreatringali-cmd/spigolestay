@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { eur } from "@/lib/format";
 import { useLang } from "@/lib/i18n";
-import { readSubscription, type SubSummary } from "@/lib/plans";
+import { readSubscription, type SubSummary, trialInfo, type TrialInfo } from "@/lib/plans";
 
 const VAT = 0.22; // IVA 22%
 
@@ -18,7 +18,8 @@ const statusOf = (iv: Invoice): InvStatus => (iv.paidOn ? "paid" : (iv.due.getTi
 export default function FatturePage() {
   const { t } = useLang();
   const [sub, setSub] = useState<SubSummary | null>(null);
-  useEffect(() => { setSub(readSubscription()); }, []);
+  const [trial, setTrial] = useState<TrialInfo | null>(null);
+  useEffect(() => { setSub(readSubscription()); setTrial(trialInfo()); }, []);
   const planName = sub?.label ?? "Basic";   // es. "Basic personalizzato"
   const monthly = sub?.monthlyTotal ?? 0;   // piano + moduli extra
   const added = sub?.addedModules ?? [];    // moduli non inclusi nel piano
@@ -28,31 +29,43 @@ export default function FatturePage() {
   const fmtMonth = (d: Date) => d.toLocaleDateString("it-IT", { month: "long", year: "numeric" });
   const fmtDay = (d: Date | null) => (d ? d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
 
-  // Ultime 6 mensilità (dimostrative): la più recente "da incassare", le precedenti incassate.
+  // Fatture reali del ciclo: la PRIMA viene emessa alla fine della prova gratuita (primo pagamento),
+  // poi a ogni rinnovo mensile. Durante la prova NON esiste nessuna fattura.
   const invoices = useMemo<Invoice[]>(() => {
+    if (!trial || trial.inTrial) return []; // in prova: nessuna fattura
     const now = new Date();
-    const months: Date[] = [new Date(now.getFullYear(), now.getMonth(), 1)]; // solo l'ultima (mese corrente)
     const perYear: Record<number, number> = {};
-    const rows = months.map((d) => {
+    const rows: Invoice[] = [];
+    // Date di fatturazione: fine prova, poi ogni mese, fino a oggi.
+    const dates: Date[] = [];
+    const d0 = new Date(trial.trialEnd);
+    for (let i = 0; i < 60; i++) {
+      const d = new Date(d0.getFullYear(), d0.getMonth() + i, d0.getDate());
+      if (d > now) break;
+      dates.push(d);
+    }
+    dates.forEach((d, idx) => {
       const y = d.getFullYear();
       perYear[y] = (perYear[y] ?? 0) + 1;
       const amount = monthly;
       const net = Math.round((amount / (1 + VAT)) * 100) / 100;
       const tax = Math.round((amount - net) * 100) / 100;
-      const isCurrent = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      return {
+      const due = new Date(d.getFullYear(), d.getMonth() + 1, d.getDate());
+      const isLast = idx === dates.length - 1;
+      rows.push({
         date: d,
-        due: new Date(d.getFullYear(), d.getMonth() + 1, 1), // scadenza = rinnovo (1° del mese successivo)
+        due,
         number: `${String(perYear[y]).padStart(4, "0")}/${y}`,
-        description: `${t("Rinnovo abbonamento Xenora")} · ${t("Piano")} ${planName} · ${fmtMonth(d)}${added.length ? ` · +${added.length} ${t("moduli extra")}` : ""}`,
+        description: `${t("Abbonamento Xenora")} · ${t("Piano")} ${planName}${added.length ? ` · +${added.length} ${t("moduli extra")}` : ""}`,
         net, tax, amount,
         method: "Carta ••4242",
-        paidOn: isCurrent ? null : new Date(d.getFullYear(), d.getMonth(), 3),
-      } as Invoice;
+        // Pagamento automatico all'emissione; l'ultima è "da incassare" se ancora entro scadenza.
+        paidOn: isLast && due.getTime() > Date.now() ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate()),
+      });
     });
     return rows.reverse(); // più recente in alto
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthly, planName, added]);
+  }, [monthly, planName, added, trial]);
 
   const tot = invoices.reduce((a, iv) => ({ net: a.net + iv.net, tax: a.tax + iv.tax, amount: a.amount + iv.amount }), { net: 0, tax: 0, amount: 0 });
 
@@ -123,10 +136,17 @@ td{padding:11px 8px;border-bottom:1px solid #f0ebe3}
     <div>
       <PageHeader title={t("Fatture")} subtitle={t("Le fatture del tuo abbonamento Xenora")} />
 
+      {trial?.inTrial && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border px-4 py-3 text-sm" style={{ borderColor: "color-mix(in srgb, var(--ok) 35%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 10%, transparent)", color: "var(--dim)" }}>
+          <span className="grid h-6 w-6 place-items-center rounded-full text-[12px] font-bold text-white" style={{ backgroundColor: "var(--ok)" }}>✓</span>
+          <span><b className="text-txt">{t("Prova gratuita in corso")}</b> — {t("hai")} {trial.daysLeft} {trial.daysLeft === 1 ? t("giorno") : t("giorni")} {t("di prova (fino al")} {fmtDay(trial.trialEnd)}). {t("Nessuna fattura durante la prova: la prima verrà emessa il")} <b className="text-txt">{fmtDay(trial.firstInvoice)}</b>.</span>
+        </div>
+      )}
+
       <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         <Card className="!p-4"><div className="text-xs text-dim">{t("Piano attivo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{planName}</div>{added.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{added.map((m) => <span key={m.key} className="rounded-md border px-1.5 py-0.5 text-[10px] font-medium" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, var(--line))", color: "var(--focus)" }}>{m.name}</span>)}</div>}</Card>
         <Card className="!p-4"><div className="text-xs text-dim">{t("Canone mensile")}</div><div className="mt-0.5 font-mono text-lg font-bold text-txt">{eur(monthly)} <span className="text-[11px] font-normal text-faint">{t("IVA inclusa")}</span></div><div className="mt-0.5 text-[11px] text-faint">{t("Netto")} {eur(Math.round((monthly / (1 + VAT)) * 100) / 100)} + {t("IVA")} 22% {eur(Math.round((monthly - monthly / (1 + VAT)) * 100) / 100)}</div></Card>
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Prossimo rinnovo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{fmtDay(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1))}</div><div className="mt-0.5 text-[11px] text-faint">{t("Rinnovo il 1° di ogni mese")}</div></Card>
+        <Card className="!p-4"><div className="text-xs text-dim">{trial?.inTrial ? t("Prima fattura") : t("Prossimo rinnovo")}</div><div className="mt-0.5 text-lg font-bold text-txt">{fmtDay(trial?.inTrial ? trial.firstInvoice : (invoices[0] ? invoices[0].due : trial?.firstInvoice ?? new Date()))}</div><div className="mt-0.5 text-[11px] text-faint">{trial?.inTrial ? t("Al termine della prova gratuita") : t("Rinnovo mensile")}</div></Card>
       </div>
 
       <Card>
@@ -154,6 +174,9 @@ td{padding:11px 8px;border-bottom:1px solid #f0ebe3}
               </tr>
             </thead>
             <tbody>
+              {invoices.length === 0 && (
+                <tr><td colSpan={11} className="px-3 py-10 text-center text-sm text-faint">{trial?.inTrial ? t("Nessuna fattura durante la prova gratuita. La prima sarà emessa al termine della prova.") : t("Nessuna fattura ancora emessa.")}</td></tr>
+              )}
               {invoices.map((iv) => { const s = stMeta(statusOf(iv)); return (
                 <tr key={iv.number} className="border-b border-line last:border-0">
                   <td className="px-3 py-2.5 text-txt">{fmtDay(iv.date)}</td>
