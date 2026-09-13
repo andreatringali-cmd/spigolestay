@@ -321,6 +321,9 @@ export default function AbbonamentoPage() {
               {isCustom && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>+{addedModules.length} {t("extra")}</span>}
             </div>
             {isCustom && <div className="mt-2 flex flex-wrap gap-1">{addedModules.map((m) => <span key={m.key} className="rounded-md border px-1.5 py-0.5 text-[10px] font-medium" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, var(--line))", color: "var(--focus)" }}>{m.name}</span>)}</div>}
+            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-dim">
+              <span aria-hidden>🗓️</span>{t("Prossimo rinnovo")}: <b className="font-semibold text-txt">{(() => { const d = new Date(); if (annual) d.setFullYear(d.getFullYear() + 1); else d.setMonth(d.getMonth() + 1, 1); return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }); })()}</b>
+            </div>
           </div>
           <div className="flex justify-between text-sm"><span className="text-dim">{t("Piano")} {tier.name}</span><span className="font-mono text-txt">{eur(annual ? Math.round(tier.price * (1 - ANNUAL_OFF)) : tier.price)}</span></div>
           {addonsTotal > 0 && <div className="mt-1.5 flex justify-between text-sm"><span className="font-semibold text-[color:var(--focus)]">{t("Moduli aggiuntivi")} ({addedModules.length}) <span className="font-normal text-faint">· {t("non inclusi nel piano")}</span></span><span className="font-mono font-semibold text-[color:var(--focus)]">{eur(annual ? Math.round(addonsTotal * (1 - ANNUAL_OFF)) : addonsTotal)}</span></div>}
