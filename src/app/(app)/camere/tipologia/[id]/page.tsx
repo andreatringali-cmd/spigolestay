@@ -61,7 +61,7 @@ export default function TipologiaSchedaPage() {
   const valid = !!f.name?.trim();
   const save = () => {
     if (!valid) return;
-    const patch: Partial<RoomType> = { ...f };
+    const patch: Partial<RoomType> = { ...f, basePrice: f.basePrice ?? 0, beds: f.beds ?? 1 };
     delete (patch as { id?: string }).id;
     if (isNew) {
       const id = addRoomType({ structureId, name: f.name!.trim(), beds: f.beds ?? 1, basePrice: f.basePrice ?? 0 });
@@ -198,7 +198,7 @@ export default function TipologiaSchedaPage() {
               <label className={lbl}>{t("Neonati")}<input type="number" min={0} value={f.infants ?? ""} onChange={(e) => set("infants", num(e.target.value))} className={`${inp} mt-1`} /></label>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <label className={lbl}>{t("Posti letto")}<input type="number" min={1} value={f.beds ?? ""} onChange={(e) => set("beds", Number(e.target.value) || 0)} className={`${inp} mt-1`} /></label>
+              <label className={lbl}>{t("Posti letto")}<input type="number" min={1} value={f.beds ?? ""} onChange={(e) => set("beds", num(e.target.value) as number)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Letti extra")}<input type="number" min={0} value={f.extraBeds ?? ""} onChange={(e) => set("extraBeds", num(e.target.value))} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("€ letto extra")}<input type="number" min={0} value={f.extraBedPrice ?? ""} onChange={(e) => set("extraBedPrice", num(e.target.value))} className={`${inp} mt-1`} /></label>
             </div>
@@ -240,7 +240,7 @@ export default function TipologiaSchedaPage() {
           <Card>
             <SectionTitle>{t("Prezzo & disponibilità")}</SectionTitle>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <label className={lbl}>{t("Prezzo base €")}<input type="number" min={0} value={f.basePrice ?? ""} onChange={(e) => set("basePrice", Number(e.target.value) || 0)} className={`${inp} mt-1`} /></label>
+              <label className={lbl}>{t("Prezzo base €")}<input type="number" min={0} value={f.basePrice ?? ""} onChange={(e) => set("basePrice", num(e.target.value) as number)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Prezzo minimo €")}<input type="number" min={0} value={f.minPrice ?? ""} onChange={(e) => set("minPrice", num(e.target.value))} className={`${inp} mt-1`} placeholder="—" /></label>
               <label className={lbl}>{t("Notti minime")}<input type="number" min={1} value={f.minStay ?? ""} onChange={(e) => set("minStay", num(e.target.value))} className={`${inp} mt-1`} /></label>
             </div>

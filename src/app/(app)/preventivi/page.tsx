@@ -495,11 +495,20 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
     // Più camere → prenotazione di gruppo: N prenotazioni collegate dallo stesso groupId.
     const groupId = nRooms > 1 ? ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now())) : undefined;
     const dist = (tot: number, i: number) => Math.floor(tot / nRooms) + (i < tot % nRooms ? 1 : 0);
+    // Assegnazione automatica della camera: se c'è una unità libera della tipologia per quelle date, la assegno
+    // (calendario "vuoto"); se non ce n'è (servirebbero spostamenti), lascio da assegnare (unitId null).
+    const usedUnitIds = new Set<string>();
+    const freeUnitFor = (roomTypeId: string): string | null => {
+      const u = units.find((x) => x.roomTypeId === roomTypeId && !x.outOfService && !usedUnitIds.has(x.id)
+        && !bookings.some((b) => b.status !== "cancelled" && b.unitId === x.id && b.checkIn < q.checkOut && b.checkOut > q.checkIn));
+      if (u) { usedUnitIds.add(u.id); return u.id; }
+      return null;
+    };
     let ci = 0;
     flat.forEach((r, i) => {
       const kidCount = nRooms > 1 ? dist(q.children, i) : q.children;
       const ages = (q.childAges ?? []).slice(ci, ci + kidCount); ci += kidCount;
-      addBooking({ groupId, structureId: q.structureId, roomTypeId: r.roomTypeId, unitId: null, guestId: gid, channel: "direct", status: "confirmed", checkIn: q.checkIn, checkOut: q.checkOut, adults: nRooms > 1 ? dist(q.adults, i) : q.adults, children: kidCount, childAges: ages.length ? ages : undefined, total: r.amount, cleaningFee: 0, paid: collectDeposit ? Math.round(r.amount * pct / 100) : 0 });
+      addBooking({ groupId, structureId: q.structureId, roomTypeId: r.roomTypeId, unitId: freeUnitFor(r.roomTypeId), guestId: gid, channel: "direct", status: "confirmed", checkIn: q.checkIn, checkOut: q.checkOut, adults: nRooms > 1 ? dist(q.adults, i) : q.adults, children: kidCount, childAges: ages.length ? ages : undefined, total: r.amount, cleaningFee: 0, paid: collectDeposit ? Math.round(r.amount * pct / 100) : 0 });
     });
     setSaved((prev) => prev.map((x) => (x.id === q.id ? { ...x, status: "confermato" as const } : x)));
     setConfirming((c) => (c ? { ...c, q: { ...c.q, status: "confermato" } } : c));

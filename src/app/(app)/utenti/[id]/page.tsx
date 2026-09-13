@@ -216,14 +216,14 @@ export default function UserSchedaPage() {
           <Card>
             <SectionTitle>{t("Informazioni generali")}</SectionTitle>
             <div className="mb-3 flex items-center gap-3">
-              {avatar(56)}
+              <button type="button" onClick={() => fileRef.current?.click()} title={t("Carica foto")} className="group relative shrink-0 rounded-full">
+                {avatar(56)}
+                <span className="absolute inset-0 grid place-items-center rounded-full bg-black/45 text-base text-white opacity-0 transition group-hover:opacity-100">📷</span>
+              </button>
               <div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => fileRef.current?.click()} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-txt hover:bg-wash">🖼 {t("Seleziona immagine")}</button>
-                  {u.photo && <button onClick={() => set("photo", undefined)} className="text-xs font-medium text-faint hover:text-[color:var(--err)]">{t("Rimuovi foto")}</button>}
-                </div>
+                {u.photo && <button onClick={() => set("photo", undefined)} className="text-xs font-medium text-faint hover:text-[color:var(--err)]">{t("Rimuovi foto")}</button>}
                 <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif" hidden onChange={(e) => onFile(e.target.files?.[0])} />
-                <div className="mt-1 text-[11px] text-faint">{t("JPG, GIF o PNG · max 20 MB. In alternativa scegli un colore:")}</div>
+                <div className="mt-0.5 text-[11px] text-faint">{t("Clicca il tondino per caricare la foto. In alternativa scegli un colore:")}</div>
                 <div className="mt-1 flex gap-1.5">{AV_COLORS.map((c) => <button key={c} onClick={() => set("avatarColor", c)} className={`h-5 w-5 rounded-full border-2 ${u.avatarColor === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div>
               </div>
             </div>
