@@ -27,7 +27,16 @@ const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2
 export default function PrenotazioniPage() {
   const { t } = useLang();
   const { bookings, guests, units, roomTypes, structures, getUnit, getStructure, openBooking, openNewBooking, activeStructureId } = useData();
-  const guestName = (id: string) => guests.find((g) => g.id === id)?.fullName ?? "";
+  // Nome ospite: dal collegamento se presente, altrimenti dallo snapshot salvato sulla prenotazione
+  // (es. dopo l'eliminazione dell'anagrafica ospite il guestId resta vuoto ma primaryGuest conserva i dati).
+  const guestName = (b: { guestId: string; primaryGuest?: { firstName?: string; lastName?: string } }) => {
+    const g = guests.find((x) => x.id === b.guestId);
+    if (g?.fullName?.trim()) return g.fullName.trim();
+    if (g && (g.firstName || g.lastName)) return `${g.firstName ?? ""} ${g.lastName ?? ""}`.trim();
+    const p = b.primaryGuest;
+    if (p && (p.firstName || p.lastName)) return `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim();
+    return "";
+  };
   // Etichetta camera: tipologia + numero, senza la parola "Camera" (es. "Tripla · 2").
   const unitLabel = (b: { unitId: string | null }): string | null => {
     const u = getUnit(b.unitId);
@@ -86,7 +95,7 @@ export default function PrenotazioniPage() {
       if (!from && !to && b.checkOut < todayISO) return false;
       // Filtro globale struttura (selettore in alto a destra)
       if (activeStructureId !== "all" && b.structureId !== activeStructureId) return false;
-      if (term && !guestName(b.guestId).toLowerCase().includes(term) && !b.id.toLowerCase().includes(term) && !bookingCode(b).toLowerCase().includes(term)) return false;
+      if (term && !guestName(b).toLowerCase().includes(term) && !b.id.toLowerCase().includes(term) && !bookingCode(b).toLowerCase().includes(term)) return false;
       if (channel !== "all" && b.channel !== channel) return false;
       if (loc.startsWith("str:") && b.structureId !== loc.slice(4)) return false;
       if (loc.startsWith("unit:") && b.unitId !== loc.slice(5)) return false;
@@ -115,7 +124,7 @@ export default function PrenotazioniPage() {
       case "struttura": return getStructure(b.structureId)?.name ?? "";
       case "camera": return getUnit(b.unitId)?.name ?? "";
       case "canale": return CHANNELS[b.channel].label;
-      case "ospite": return guestName(b.guestId).toLowerCase();
+      case "ospite": return guestName(b).toLowerCase();
       case "pax": return b.adults + b.children;
       case "checkIn": return b.checkIn;
       case "checkOut": return b.checkOut;
@@ -205,7 +214,7 @@ export default function PrenotazioniPage() {
       [t("Codice"), t("Prenotata il"), t("Struttura"), t("Camera"), t("Canale"), t("Ospite"), t("N. ospiti"), t("Check-in"), t("Check-out"), t("Notti"), t("Totale €"), t("Commissioni €"), t("Netto €")],
       filtered.map((b) => [
         bookingCode(b), b.bookedOn ?? "", getStructure(b.structureId)?.name ?? "", getUnit(b.unitId)?.name ?? t("Da assegnare"),
-        CHANNELS[b.channel].label, guestName(b.guestId), b.adults + b.children,
+        CHANNELS[b.channel].label, guestName(b), b.adults + b.children,
         b.checkIn, b.checkOut, nights(b.checkIn, b.checkOut), b.total ?? 0, commissionOf(b), nettoOf(b),
       ])
     );
@@ -286,7 +295,7 @@ export default function PrenotazioniPage() {
           return (
             <button key={b.id} onClick={() => openBooking(b.id)} className="block w-full rounded-xl border border-line bg-surface p-3 text-left shadow-sm active:bg-wash">
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate font-semibold text-txt">{guestName(b.guestId) || "—"}</span>
+                <span className="truncate font-semibold text-txt">{guestName(b) || "—"}</span>
                 <span title={ch.label} className="inline-flex h-[20px] shrink-0 items-center rounded-md px-2 text-[10px] font-bold" style={{ backgroundColor: `var(${ch.cssVar})`, color: ch.text }}>{ch.label}</span>
               </div>
               <div className="mt-1 flex items-center gap-1.5 text-xs text-dim">
@@ -340,7 +349,7 @@ export default function PrenotazioniPage() {
                   {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
                   <td className="whitespace-nowrap px-3 py-2.5 text-dim">{unitLabel(b) ?? <span className="italic font-medium text-[color:var(--err)]">{t("Da assegnare")}</span>}</td>
                   <td className="px-3 py-2.5"><span title={ch.label} className="inline-flex h-[22px] items-center rounded-md px-2 text-[10px] font-bold" style={{ backgroundColor: `var(${ch.cssVar})`, color: ch.text }}>{ch.label}</span></td>
-                  <td className="px-3 py-2.5 font-medium text-txt">{guestName(b.guestId)}</td>
+                  <td className="px-3 py-2.5 font-medium text-txt">{guestName(b)}</td>
                   <td className="px-3 py-2.5 font-mono text-dim">{b.adults + b.children}</td>
                   <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>
                   <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkOut)}</td>
