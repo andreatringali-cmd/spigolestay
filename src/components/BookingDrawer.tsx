@@ -508,6 +508,25 @@ export default function BookingDrawer() {
             ))}
           </div>
         )}
+        {booking.guestRequests && (
+          <div className="mt-2 rounded-lg border border-line bg-wash p-2.5">
+            <div className="mb-0.5 text-xs font-semibold text-dim">📝 {t("Note / richieste dell'ospite")}</div>
+            <p className="whitespace-pre-wrap text-sm text-txt">{booking.guestRequests}</p>
+          </div>
+        )}
+        {booking.extraGuests && booking.extraGuests.length > 0 && (
+          <div className="mt-2">
+            <div className="mb-1 text-xs font-semibold text-dim">{t("Ospiti aggiuntivi")} ({booking.extraGuests.length})</div>
+            <div className="flex flex-col gap-1.5">
+              {booking.extraGuests.map((eg, i) => (
+                <div key={i} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm">
+                  <div className="font-medium text-txt">{[eg.firstName, eg.lastName].filter(Boolean).join(" ") || `${t("Ospite")} ${i + 2}`}</div>
+                  <div className="mt-0.5 text-[11px] text-dim">{[eg.birthDate, eg.birthPlace, eg.citizenship].filter(Boolean).join(" · ")}{(eg.docType || eg.docNumber) ? ` · ${[eg.docType, eg.docNumber].filter(Boolean).join(" ")}` : ""}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {booking.signature && (
           <div className="mt-2">
             <div className="mb-1 text-xs text-dim">{t("Firma ospite")}</div>
