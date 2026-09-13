@@ -1,7 +1,15 @@
-export default function Logo() {
+import Image from "next/image";
+
+export default function Logo({ size = 36, className = "" }: { size?: number; className?: string }) {
   return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[#4E86C7] to-[#274F86] font-display text-lg font-black text-white shadow">
-      X
-    </div>
+    <Image
+      src="/xenora-mark.png"
+      alt="Xenora"
+      width={size}
+      height={size}
+      priority
+      className={`object-contain ${className}`}
+      style={{ width: size, height: size }}
+    />
   );
 }

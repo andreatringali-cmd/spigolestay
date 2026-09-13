@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
 import Turnstile from "@/components/Turnstile";
 
@@ -122,7 +123,9 @@ export default function LoginPage() {
         <div aria-hidden className="pointer-events-none absolute -bottom-28 -left-16 h-96 w-96 rounded-full" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 70%)" }} />
 
         <div className="relative flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#D97F57] to-[#B04A2C] font-display text-xl font-black text-white shadow-lg">X</div>
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/95 shadow-lg">
+            <Image src="/xenora-mark.png" alt="Xenora" width={38} height={38} priority className="object-contain" style={{ width: 38, height: 38 }} />
+          </div>
           <div>
             <div className="font-display text-xl font-extrabold tracking-tight">Xenora</div>
             <div className="text-xs text-white/70">Channel Manager</div>
@@ -161,12 +164,9 @@ export default function LoginPage() {
       <main className="flex w-full flex-col items-center justify-center px-6 py-10 md:w-3/5 lg:w-[66%]">
         <div className="w-full max-w-sm">
           {/* Brand compatto (solo su telefono) */}
-          <div className="mb-7 flex flex-col items-center gap-2 text-center md:hidden">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#D97F57] to-[#B04A2C] font-display text-xl font-black text-white shadow-lg">X</div>
-            <div>
-              <div className="font-display text-xl font-extrabold tracking-tight text-[#1f1b16]">Xenora</div>
-              <div className="text-xs text-[#6b6459]">Channel Manager</div>
-            </div>
+          <div className="mb-7 flex flex-col items-center gap-1.5 text-center md:hidden">
+            <Image src="/xenora-logo.png" alt="Xenora" width={150} height={43} priority className="object-contain" style={{ width: 150, height: "auto" }} />
+            <div className="text-xs text-[#6b6459]">Channel Manager</div>
           </div>
 
           {recovery ? (

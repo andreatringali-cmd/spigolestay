@@ -187,7 +187,6 @@ td{padding:11px 8px;border-bottom:1px solid #f0ebe3}
             )}
           </table>
         </div>
-        <p className="mt-3 text-xs text-faint">{t("Elenco dimostrativo. In produzione le fatture sono emesse automaticamente a ogni rinnovo (Stripe + fattura elettronica) e scaricabili in PDF.")}</p>
       </Card>
     </div>
   );
