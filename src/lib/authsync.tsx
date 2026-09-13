@@ -225,8 +225,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           location.reload();
           return;
         }
-        // Nessuna riga sul server = ACCOUNT NUOVO. Deve partire da zero e vedere la procedura
-        // guidata: non deve ereditare dati rimasti nel browser da usi/altri account precedenti.
+        // Nessuna riga/dati sul server. Attenzione: potrebbe essere un account DAVVERO nuovo,
+        // oppure una lettura vuota dovuta a un problema temporaneo. Non cancelliamo MAI dati reali.
+        // Se nel browser ci sono già dati dell'utente (strutture/prenotazioni), li consideriamo la
+        // fonte di verità e li RIPRISTINIAMO sul server, invece di azzerare tutto.
+        let localHasData = false;
+        try {
+          const raw = localStorage.getItem("spigolestay:data:v1");
+          if (raw) {
+            const d = JSON.parse(raw);
+            localHasData = (Array.isArray(d.structures) && d.structures.length > 0)
+              || (Array.isArray(d.bookings) && d.bookings.length > 0)
+              || (Array.isArray(d.guests) && d.guests.length > 0);
+          }
+        } catch {}
+        if (localHasData) {
+          // Recupero: dati presenti nel browser ma non sul server → salvali sul server e prosegui.
+          const snap = snapshot();
+          await supabase!.from("app_state").upsert({ user_id: uid, data: snap, updated_at: new Date().toISOString() });
+          lastPushed.current = JSON.stringify(snap);
+          void syncProfile(uid);
+          sessionStorage.setItem(flagKey, uid);
+          setHydrated(true);
+          startPush(uid);
+          return;
+        }
+        // Account realmente nuovo (nessun dato né sul server né nel browser): procedura guidata.
         wipeLocalAccount();
         try {
           localStorage.setItem("spigolestay:forcereset:v1", "1"); // evita il wipe+reload automatico dello store
