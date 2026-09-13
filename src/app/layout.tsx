@@ -8,15 +8,15 @@ const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrai
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://xenora.it"),
-  title: "Xenora — Channel Manager",
-  description: "Channel manager multi-struttura per i B&B Spigole",
+  title: "Xenora — Gestionale e Channel Manager per B&B",
+  description: "Prenotazioni, canali, ospiti e incassi: tutta la tua struttura in un'unica piattaforma.",
   openGraph: {
-    title: "Il tuo soggiorno",
-    description: "Guida, check-in online e info utili",
-    images: [{ url: "/og", width: 1200, height: 630 }],
+    title: "Xenora",
+    description: "Prenotazioni, canali, ospiti e incassi in un'unica piattaforma.",
+    images: [{ url: "/og?t=Xenora&s=Gestionale%20per%20B%26B&c=%232f6bb0&n=Xenora", width: 1200, height: 630 }],
     type: "website",
   },
-  twitter: { card: "summary_large_image", images: ["/og"] },
+  twitter: { card: "summary_large_image", images: ["/og?t=Xenora&s=Gestionale%20per%20B%26B&c=%232f6bb0&n=Xenora"] },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

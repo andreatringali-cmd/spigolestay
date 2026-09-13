@@ -2,23 +2,46 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
 
-// Immagine Open Graph (anteprima link) generata al volo. Personalizzabile via query:
-//   /og?t=Titolo&s=Sottotitolo&c=%230F6E56&n=NomeStruttura
+// Immagine Open Graph (anteprima link) generata al volo, con il LOGO XENORA per intero.
+// Personalizzabile via query:
+//   /og?t=Titolo&s=Sottotitolo&c=%232f6bb0
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const brand = searchParams.get("n") || "Xenora";
-  const title = searchParams.get("t") || "Il tuo soggiorno";
-  const subtitle = searchParams.get("s") || "Guida, check-in online e info utili";
-  const color = searchParams.get("c") || "#0F6E56";
+  const { searchParams, origin } = new URL(req.url);
+  const title = searchParams.get("t") || "Xenora";
+  const subtitle = searchParams.get("s") || "Gestionale per B&B";
+  const color = searchParams.get("c") || "#2f6bb0";
+  const logo = `${origin}/xenora-logo.png`;
+
   return new ImageResponse(
     (
-      <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", padding: "90px", background: color, color: "#ffffff", fontFamily: "sans-serif" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 18, fontSize: 34, opacity: 0.9, marginBottom: 26 }}>
-          <div style={{ width: 46, height: 46, borderRadius: 12, background: "rgba(255,255,255,0.22)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 800 }}>{brand.slice(0, 1).toUpperCase()}</div>
-          {brand}
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          padding: "84px 90px",
+          background: "#ffffff",
+          fontFamily: "sans-serif",
+          position: "relative",
+        }}
+      >
+        {/* Barra d'accento in alto, nel colore della pagina */}
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 12, background: color }} />
+
+        {/* Logo intero */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logo} width={392} height={112} style={{ objectFit: "contain" }} alt="Xenora" />
+
+        {/* Titolo + sottotitolo della pagina */}
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <div style={{ fontSize: 78, fontWeight: 800, color: "#171922", lineHeight: 1.05, letterSpacing: "-0.02em" }}>{title}</div>
+          <div style={{ fontSize: 38, color: "#5b5f6b", marginTop: 20, lineHeight: 1.25 }}>{subtitle}</div>
         </div>
-        <div style={{ fontSize: 82, fontWeight: 800, lineHeight: 1.04 }}>{title}</div>
-        <div style={{ fontSize: 38, opacity: 0.92, marginTop: 24 }}>{subtitle}</div>
+
+        {/* Dominio */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 28, color: color, fontWeight: 700 }}>xenora.it</div>
       </div>
     ),
     { width: 1200, height: 630 },

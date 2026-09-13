@@ -40,7 +40,7 @@ export default function AbbonamentoPage() {
       setRefCode(c);
     } catch {}
   }, [user?.id, user?.email]);
-  const refLink = typeof window !== "undefined" ? `${window.location.origin}/abbonamento?ref=${refCode}` : "";
+  const refLink = typeof window !== "undefined" ? `${window.location.origin}/invito?ref=${refCode}` : "";
 
   // Collegamento invito ↔ invitante (server).
   // 1) Registro il MIO codice su ref_codes (così l'invitante è rintracciabile dal codice).
@@ -55,9 +55,10 @@ export default function AbbonamentoPage() {
       try {
         // (1) upsert del proprio codice
         await sb.from("ref_codes").upsert({ code: refCode, user_id: uid }, { onConflict: "code" });
-        // (2) cattura ?ref= in ingresso
+        // (2) cattura ?ref= in ingresso (o dal codice memorizzato dalla pagina /invito)
         const params = new URLSearchParams(window.location.search);
-        const incoming = (params.get("ref") || "").trim().toUpperCase();
+        let incoming = (params.get("ref") || "").trim().toUpperCase();
+        if (!incoming) { try { incoming = (localStorage.getItem("spigolestay:pendingref") || "").trim().toUpperCase(); } catch {} }
         if (!incoming || incoming === refCode) return;
         // già collegato? evito doppioni
         const { data: existing } = await sb.from("referrals").select("invited_id").eq("invited_id", uid).maybeSingle();
@@ -67,7 +68,7 @@ export default function AbbonamentoPage() {
         const inviterId = rc?.user_id;
         if (cancel || !inviterId || inviterId === uid) return;
         await sb.from("referrals").insert({ invited_id: uid, inviter_id: inviterId, code: incoming, status: "registered" });
-        try { localStorage.setItem("spigolestay:referredby", incoming); } catch {}
+        try { localStorage.setItem("spigolestay:referredby", incoming); localStorage.removeItem("spigolestay:pendingref"); } catch {}
       } catch { /* offline / non loggato: si riprova al prossimo accesso */ }
     })();
     return () => { cancel = true; };
