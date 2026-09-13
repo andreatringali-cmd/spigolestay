@@ -120,9 +120,8 @@ export default function LoginPage() {
       <main className="flex w-full flex-col items-center justify-center">
         <div className="w-full max-w-sm">
           {/* Logo centrato */}
-          <div className="mb-8 flex flex-col items-center gap-1.5 text-center">
+          <div className="mb-8 flex flex-col items-center text-center">
             <Image src="/xenora-logo.png" alt="Xenora" width={180} height={51} priority className="object-contain" style={{ width: 180, height: "auto" }} />
-            <div className="text-xs text-[#6b6459]">Channel Manager</div>
           </div>
 
           {recovery ? (
