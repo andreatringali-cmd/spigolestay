@@ -43,6 +43,7 @@ export default function NuovaPrenotazionePage() {
   const [mode, setMode] = useState<"prenotazione" | "preventivo">("prenotazione");
   const [created, setCreated] = useState<Booking | null>(null);
   const [copied, setCopied] = useState(false);
+  const [emailState, setEmailState] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
   const [extraQty, setExtraQty] = useState<Record<string, number>>({});
 
   // ── Selezione + intestatario ──
@@ -542,7 +543,6 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
         ].join("\n");
         const wa = g?.phone ? `https://wa.me/${g.phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}` : "";
         const subj = `Conferma prenotazione${created.code ? ` ${created.code}` : ""} · ${structName}`;
-        const mailHref = `mailto:${g?.email ?? ""}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(msg)}`;
         const gmailHref = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(g?.email ?? "")}&su=${encodeURIComponent(subj)}&body=${encodeURIComponent(msg)}`;
         return (
           <Card className="mx-auto mb-10 max-w-xl text-center">
@@ -552,10 +552,22 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
 
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <a href={wa || undefined} target="_blank" rel="noreferrer" className={`flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 ${wa ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={15} /> WhatsApp</a>
-              <button onClick={() => { const win = window.open(gmailHref, "_blank", "noopener,noreferrer"); if (!win) window.location.href = mailHref; }} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"><Icon name="mail" size={15} /> Email</button>
+              <button onClick={async () => {
+                if (!g?.email) { setEmailState({ ok: false, msg: "L'ospite non ha un'email" }); return; }
+                setEmailState({ sending: true });
+                const r = await sendVoucher(created, { getStructure, getGuest, getRoomType, getUnit });
+                setEmailState({ sending: false, ok: r.ok, msg: r.ok ? `Inviata a ${g.email}` : (r.error || "Errore invio") });
+              }} disabled={emailState.sending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"><Icon name="mail" size={15} /> {emailState.sending ? "Invio…" : "Invia email"}</button>
               <button onClick={() => printVoucher(url)} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Voucher PDF (QR)</button>
               <button onClick={async () => { try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} }} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="copy" size={15} /> {copied ? "Link copiato ✓" : "Copia link"}</button>
             </div>
+
+            {emailState.msg && (
+              <div className={`mt-2 text-xs ${emailState.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>
+                {emailState.ok ? "✓ " : "⚠ "}{emailState.msg}
+                {!emailState.ok && <> · <a href={gmailHref} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">apri Gmail</a></>}
+              </div>
+            )}
 
             <div className="mt-4 border-t border-line pt-3">
               <button onClick={() => router.push("/prenotazioni")} className="text-sm font-semibold text-focus hover:underline">Vai alle prenotazioni →</button>
