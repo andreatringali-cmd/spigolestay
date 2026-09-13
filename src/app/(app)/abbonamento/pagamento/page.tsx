@@ -6,7 +6,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
-import PageHelp from "@/components/PageHelp";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 
@@ -57,7 +56,7 @@ export default function PagamentoPage() {
 
   return (
     <div>
-      <PageHeader title={t("Informazioni pagamento")} subtitle={t("Metodo di pagamento e dati di fatturazione del tuo abbonamento")} hideHelp />
+      <PageHeader title={t("Informazioni pagamento")} subtitle={t("Metodo di pagamento e dati di fatturazione del tuo abbonamento")} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Metodo di pagamento */}
@@ -101,9 +100,8 @@ export default function PagamentoPage() {
             <label className={lbl}>{t("Codice SDI")}<input value={b.sdi} onChange={(e) => set("sdi", e.target.value)} className={`${inp} mt-1`} placeholder={t("Fatt. elettronica")} /></label>
             <label className={lbl}>PEC<input value={b.pec} onChange={(e) => set("pec", e.target.value)} className={`${inp} mt-1`} /></label>
             <label className={lbl}>{t("Email per le fatture")}<input value={b.email} onChange={(e) => set("email", e.target.value)} className={`${inp} mt-1`} placeholder="nome@email.it" /></label>
-            <div className="flex items-end gap-2">
-              <button onClick={save} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{saved ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> {t("Salvato")}</> : t("Salva")}</button>
-              <PageHelp />
+            <div className="flex items-end">
+              <button onClick={save} className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{saved ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> {t("Salvato")}</> : t("Salva")}</button>
             </div>
           </div>
         </Card>
