@@ -21,7 +21,7 @@ const fmtDay = (iso: string) => { try { return new Date(iso).toLocaleDateString(
 
 export default function NuovaPrenotazionePage() {
   const router = useRouter();
-  const { structures, roomTypes, units, bookings, rateOverrides, addGuest, addBooking, getStructure, getGuest, getRoomType, getUnit, activeStructureId } = useData();
+  const { structures, roomTypes, units, bookings, guests, rateOverrides, addGuest, updateGuest, addBooking, getStructure, getGuest, getRoomType, getUnit, activeStructureId } = useData();
   const weekendPct = useMemo(() => { try { const r = localStorage.getItem("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {} return 25; }, []);
 
   const locked = activeStructureId !== "all";
@@ -129,7 +129,23 @@ export default function NuovaPrenotazionePage() {
   const confirm = () => {
     if (totalRooms < 1) { setErr("Seleziona almeno una camera"); return; }
     if (!lastName.trim() && !firstName.trim()) { setErr("Inserisci nome o cognome dell'ospite"); return; }
-    const guestId = addGuest({ lastName: lastName.trim() || undefined, firstName: firstName.trim() || undefined, email: email.trim() || undefined, phone: normPhone(phone) });
+    // Riusa un'anagrafica ospite esistente (stessa email, o stesso nome con telefono compatibile) per non
+    // creare doppioni: così le prenotazioni della stessa persona restano un'unica conversazione/scheda ospite.
+    const fullName = `${firstName} ${lastName}`.trim();
+    const phoneN = normPhone(phone);
+    const norm = (s?: string) => (s ?? "").trim().toLowerCase();
+    const existing = guests.find((g) => {
+      if (norm(email) && norm(g.email) === norm(email)) return true;
+      if (norm(fullName) && norm(g.fullName) === norm(fullName) && (!norm(g.phone) || !norm(phoneN) || norm(g.phone) === norm(phoneN))) return true;
+      return false;
+    });
+    let guestId: string;
+    if (existing) {
+      guestId = existing.id;
+      updateGuest(existing.id, { firstName: existing.firstName || firstName.trim() || undefined, lastName: existing.lastName || lastName.trim() || undefined, fullName: existing.fullName || fullName, email: existing.email || email.trim() || undefined, phone: existing.phone || phoneN });
+    } else {
+      guestId = addGuest({ lastName: lastName.trim() || undefined, firstName: firstName.trim() || undefined, email: email.trim() || undefined, phone: phoneN });
+    }
     const groupId = isGroup ? ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now())) : undefined;
     const flat: { rt: RoomType; unitId: string | null }[] = [];
     const usedUnitIds = new Set<string>(); // evita di assegnare la stessa camera fisica a madre e derivata
