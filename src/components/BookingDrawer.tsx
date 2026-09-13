@@ -459,12 +459,24 @@ export default function BookingDrawer() {
           const gLink = groupBk.length > 1
             ? buildGroupGuestLink({ structureId: booking.structureId, guestName: guest?.fullName || "", rooms: groupBk.map((bb) => ({ unitId: bb.unitId, unitCode: getUnit(bb.unitId)?.code || getUnit(bb.unitId)?.name || "", parking: !!bb.parking })) })
             : buildGuestLink({ structureId: booking.structureId, unitId: booking.unitId, unitCode: unitV?.code || unitV?.name || "", guestName: guest?.fullName || "", parking: !!booking.parking });
-          const gWa = encodeURIComponent(guideMessage(booking.structureId, { name: guest?.fullName || "", link: gLink, structureName: structure?.name || "" }));
+          const gMsg = guideMessage(booking.structureId, { name: guest?.fullName || "", link: gLink, structureName: structure?.name || "" });
+          const gWa = encodeURIComponent(gMsg);
+          const sendGuideEmail = async () => {
+            if (!guest?.email) { window.alert(t("L'ospite non ha un'email.")); return; }
+            const to = guest.email;
+            try {
+              const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to, subject: `${t("La tua guida")} · ${structure?.name || "Xenora"}`, text: gMsg, accent: structure?.photoColor, replyTo: structure?.email }) });
+              const j = await r.json().catch(() => ({}));
+              if (r.ok && j?.ok) window.alert(`${t("Guida inviata a")} ${to}`);
+              else window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(`${t("La tua guida")} · ${structure?.name || "Xenora"}`)}&body=${encodeURIComponent(gMsg)}`, "_blank");
+            } catch { window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(`${t("La tua guida")} · ${structure?.name || "Xenora"}`)}&body=${encodeURIComponent(gMsg)}`, "_blank"); }
+          };
           return (
             <div className="mt-2 border-t border-line pt-3">
               <div className="mb-1 flex items-center gap-1.5 text-sm text-dim">📖 {t("Guida ospiti")}{!unitV && <span className="text-[11px]" style={{ color: "var(--warn)" }}>· {t("assegna la camera per i codici")}</span>}</div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {phoneDigits && <a href={`https://wa.me/${phoneDigits}?text=${gWa}`} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-white" style={{ backgroundColor: "#25D366" }}>{t("Invia guida")}</a>}
+                <button onClick={sendGuideEmail} className="flex-1 rounded-lg py-2 text-center text-xs font-semibold text-white" style={{ backgroundColor: "#285f92" }}>{t("Email")}</button>
                 <button onClick={() => navigator.clipboard?.writeText(gLink)} className="flex-1 rounded-lg border border-line py-2 text-center text-xs font-semibold text-txt hover:bg-wash">{t("Copia link")}</button>
                 <a href={gLink} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-line px-3 py-2 text-center text-xs font-semibold text-txt hover:bg-wash">↗</a>
               </div>
