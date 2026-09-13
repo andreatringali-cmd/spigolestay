@@ -19,7 +19,8 @@ export default function ChannelLogo({ channel, size = 14, title }: { channel: Ch
     case "other":
       return <span className={cls} style={tileStyle} title={title ?? "Altro / OTA"}><span style={{ color: "#D62828", fontSize: size * 0.44, fontWeight: 900, lineHeight: 1, letterSpacing: "-0.04em" }}>OTA</span></span>;
     case "direct":
-      return <span className={cls} style={tileStyle} title={title ?? "Diretta"}><svg width={size * 0.66} height={size * 0.66} viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l9-7 9 7" /><path d="M5.5 9.8V20h13V9.8" /></svg></span>;
+      /* eslint-disable-next-line @next/next/no-img-element */
+      return <span className={cls} style={tileStyle} title={title ?? "Diretta · Xenora"}><img src="/xenora-mark.png" alt="Xenora" width={size} height={size} style={{ width: size * 0.82, height: size * 0.82, objectFit: "contain" }} /></span>;
     default:
       return null;
   }

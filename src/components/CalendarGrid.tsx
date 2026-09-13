@@ -19,6 +19,7 @@ import {
 import { eur } from "@/lib/format";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import Icon from "@/components/Icon";
+import ChannelLogo from "@/components/ChannelLogo";
 import DateField from "@/components/DateField";
 
 // Card "Insights" del calendario (selettore mostra/nascondi).
@@ -860,7 +861,7 @@ export default function CalendarGrid() {
           const conn = chConnected(c);
           return (
             <div key={c} className="flex items-center gap-1.5 text-xs text-dim">
-              <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: `var(${CHANNELS[c].cssVar})` }} />
+              <ChannelLogo channel={c} size={16} title={CHANNELS[c].label} />
               <span>{CHANNELS[c].label}</span>
               {conn === true && <span title="Collegato" className="font-bold leading-none text-[color:var(--ok)]">✓</span>}
               {conn === false && <span title="Canale non collegato" className="font-bold leading-none text-[color:var(--err)]">✗</span>}
