@@ -6,7 +6,7 @@ import { useData } from "@/lib/store";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import { bookingCode } from "@/lib/bookingCode";
 import { sendVoucher } from "@/lib/mailer";
-import { buildGuestLink, buildGroupGuestLink, guideMessage, shortenGuideLink } from "@/lib/guestlink";
+import { buildGuestLink, buildGroupGuestLink, guideMessage, shortenGuideLink, shortenLink } from "@/lib/guestlink";
 import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
 import { nights, parseISO, shiftISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
@@ -442,13 +442,15 @@ export default function BookingDrawer() {
         {!booking.webCheckin && (() => {
           const origin = typeof window !== "undefined" ? window.location.origin : "";
           const link = `${origin}/checkin?b=${booking.id}`;
-          const waText = encodeURIComponent(`Buongiorno${guest?.fullName ? " " + guest.fullName.split(" ")[0] : ""}, per velocizzare l'arrivo a ${structure?.name ?? "Xenora"} completa il check-in online qui: ${link}`);
+          const ciMsg = (u: string) => `Buongiorno${guest?.fullName ? " " + guest.fullName.split(" ")[0] : ""}, per velocizzare l'arrivo a ${structure?.name ?? "Xenora"} completa il check-in online qui: ${u}`;
+          const sendCiWa = async () => { const s = await shortenLink(link); window.open(`https://wa.me/${phoneDigits}?text=${encodeURIComponent(ciMsg(s))}`, "_blank", "noopener,noreferrer"); };
+          const copyCi = async () => { const s = await shortenLink(link); try { await navigator.clipboard.writeText(s); } catch {} };
           return (
             <div className="flex items-center gap-3 pt-0.5">
               {checkinQr && <img src={checkinQr} alt="QR" title={t("Inquadra per gestire la prenotazione")} className="h-16 w-16 shrink-0 rounded-lg border border-line" />}
               <div className="flex flex-1 flex-col gap-2">
-                {phoneDigits && <a href={`https://wa.me/${phoneDigits}?text=${waText}`} target="_blank" rel="noopener noreferrer" className="rounded-lg py-2 text-center text-xs font-semibold text-white" style={{ backgroundColor: "#25D366" }}>{t("Invia link WhatsApp")}</a>}
-                <button onClick={() => navigator.clipboard?.writeText(link)} className="rounded-lg border border-line py-2 text-center text-xs font-semibold text-txt hover:bg-wash">{t("Copia link")}</button>
+                {phoneDigits && <button onClick={sendCiWa} className="rounded-lg py-2 text-center text-xs font-semibold text-white" style={{ backgroundColor: "#25D366" }}>{t("Invia link WhatsApp")}</button>}
+                <button onClick={copyCi} className="rounded-lg border border-line py-2 text-center text-xs font-semibold text-txt hover:bg-wash">{t("Copia link")}</button>
               </div>
             </div>
           );

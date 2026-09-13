@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
-import { buildGuestLink, buildGroupGuestLink } from "@/lib/guestlink";
+import { buildGuestLink, buildGroupGuestLink, shortenLink } from "@/lib/guestlink";
 import { playSound } from "@/lib/sound";
 import { useLang } from "@/lib/i18n";
 import { CHANNELS, type Booking, type Guest } from "@/lib/types";
@@ -170,14 +170,15 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     const raw = tpl.texts[lg] || tpl.texts.it || "";
     setDraft(current.b && g ? fillFor(raw, current.b, g) : raw);
   };
-  const insertGuide = () => {
+  const insertGuide = async () => {
     if (!current) return; const g = guests.find((x) => x.id === current.id); const lg = langOf(g);
-    const url = current.b ? guideUrlFor(current.b) : GUIDE_BASE;
+    const url = current.b ? await shortenLink(guideUrlFor(current.b)) : GUIDE_BASE;
     setDraft((d) => `${d.trim()}${d.trim() ? "\n\n" : ""}${GUIDE_MSG[lg](url)}`);
   };
-  const insertCheckin = () => {
+  const insertCheckin = async () => {
     if (!current || !current.b) return; const g = guests.find((x) => x.id === current.id); const lg = langOf(g);
-    setDraft((d) => `${d.trim()}${d.trim() ? "\n\n" : ""}${CHECKIN_MSG[lg](checkinUrlFor(current.b!))}`);
+    const url = await shortenLink(checkinUrlFor(current.b));
+    setDraft((d) => `${d.trim()}${d.trim() ? "\n\n" : ""}${CHECKIN_MSG[lg](url)}`);
   };
 
   // ── Coda invii automatici (calcolata sulle prenotazioni reali) ──

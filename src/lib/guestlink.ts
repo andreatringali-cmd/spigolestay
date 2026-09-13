@@ -8,15 +8,15 @@ import { supabase } from "@/lib/supabase";
 
 type RoomCode = { label?: string; value?: string; cond?: "always" | "parking" | "noparking" };
 
-// Accorcia il link della guida in `origin/g/<code>` salvando la parte lunga su Supabase.
-// Se Supabase non è disponibile o va in errore, ritorna il link originale (nessuna rottura).
+// Accorcia un link ospite (guida `/guida/...` o self check-in `/checkin...`) in `origin/g/<code>`
+// salvando la parte lunga su Supabase. Se Supabase non c'è o va in errore, ritorna il link originale.
 const SL_ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789";
-export async function shortenGuideLink(fullUrl: string): Promise<string> {
+export async function shortenLink(fullUrl: string): Promise<string> {
   try {
     if (!supabase || typeof window === "undefined") return fullUrl;
     const u = new URL(fullUrl);
-    const target = u.pathname + u.search; // es. /guida/index.html?...
-    if (!target.startsWith("/guida/")) return fullUrl;
+    const target = u.pathname + u.search; // es. /guida/index.html?... oppure /checkin?b=...
+    if (!target.startsWith("/guida/") && !target.startsWith("/checkin")) return fullUrl;
     let code = "";
     for (let i = 0; i < 6; i++) code += SL_ALPHABET[Math.floor(Math.random() * SL_ALPHABET.length)];
     const { error } = await supabase.from("short_links").insert({ code, target });
@@ -24,6 +24,8 @@ export async function shortenGuideLink(fullUrl: string): Promise<string> {
     return `${u.origin}/g/${code}`;
   } catch { return fullUrl; }
 }
+// Alias storico (guida).
+export const shortenGuideLink = shortenLink;
 
 export function unitCodesForBooking(unitId: string | null | undefined, hasParking: boolean): string {
   let codes: RoomCode[] = [];

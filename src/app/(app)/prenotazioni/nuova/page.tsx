@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel, type RoomType, type Booking, type Guest } from "@/lib/types";
 import { sendVoucher } from "@/lib/mailer";
+import { shortenLink } from "@/lib/guestlink";
 import { effBase } from "@/lib/pricing";
 import { shiftISO, toISO, nights } from "@/lib/dates";
 import { eur } from "@/lib/format";
@@ -42,6 +43,7 @@ export default function NuovaPrenotazionePage() {
   const [phase, setPhase] = useState<"search" | "rooms" | "details">("search");
   const [mode, setMode] = useState<"prenotazione" | "preventivo">("prenotazione");
   const [created, setCreated] = useState<Booking | null>(null);
+  const [manageShort, setManageShort] = useState("");
   const [copied, setCopied] = useState(false);
   const [emailState, setEmailState] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
   const [extraQty, setExtraQty] = useState<Record<string, number>>({});
@@ -153,6 +155,14 @@ export default function NuovaPrenotazionePage() {
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const manageUrl = (b: Booking | null) => (b && typeof window !== "undefined") ? `${window.location.origin}/checkin?b=${b.id}` : "";
+  // Alla creazione, genera un link di gestione corto (/g/<code>) per la condivisione.
+  useEffect(() => {
+    if (!created) { setManageShort(""); return; }
+    let alive = true;
+    shortenLink(manageUrl(created)).then((s) => { if (alive) setManageShort(s); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [created]);
 
   // Stampa / salva PDF del voucher (carta intestata A4, stesso stile del preventivo) con i dati correnti.
   const printVoucher = async (mUrl?: string) => {
@@ -521,7 +531,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
 
       {/* Conferma creata · link di gestione per l'ospite (self check-in, documenti, note) */}
       {created && (() => {
-        const url = manageUrl(created);
+        const url = manageShort || manageUrl(created);
         const g = getGuest(created.guestId);
         const first = g?.firstName || (g?.fullName ? g.fullName.split(" ")[0] : "") || "";
         const structName = taxStruct?.name || "la struttura";

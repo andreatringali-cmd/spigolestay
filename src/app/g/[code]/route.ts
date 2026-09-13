@@ -12,7 +12,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ code: string }>
   try {
     const { data } = await supabase.from("short_links").select("target").eq("code", code).maybeSingle();
     const target = data?.target;
-    if (target && target.startsWith("/guida/")) return NextResponse.redirect(new URL(target, req.url), 302);
+    if (target && (target.startsWith("/guida/") || target.startsWith("/checkin"))) return NextResponse.redirect(new URL(target, req.url), 302);
   } catch {}
   return NextResponse.redirect(fallback, 302);
 }

@@ -6,7 +6,7 @@ import { toISO, parseISO } from "@/lib/dates";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
 import ScrollStrip from "@/components/ScrollStrip";
-import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, promoMailto, DEFAULT_PROMOS } from "@/lib/promos";
+import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, DEFAULT_PROMOS } from "@/lib/promos";
 import { CHANNELS, GUEST_TAGS, type Channel } from "@/lib/types";
 import { useConfirm } from "@/components/ConfirmProvider";
 import VarLegend, { PROMO_VARS } from "@/components/VarLegend";
@@ -128,13 +128,29 @@ export default function PromozioniPage() {
   const usedThisYear = logs.filter((l) => new Date(l.date).getFullYear() === new Date().getFullYear()).length;
   const limitReached = usedThisYear >= 4;
 
-  const doSend = () => {
-    if (!sending || audience.length === 0 || limitReached) return;
-    const emails = audience.map((g) => g.email!).filter(Boolean);
+  const [promoSending, setPromoSending] = useState(false);
+  // Invio automatico dal server (Resend): una email personalizzata per ogni destinatario.
+  const doSend = async () => {
+    if (!sending || audience.length === 0 || limitReached || promoSending) return;
     const st = structureId === "all" ? structures[0] : structures.find((s) => s.id === structureId);
-    window.open(promoMailto(emails, sending, { struttura: st?.name, contatti: contactsOf(st) }), "_blank");
-    persistLogs([{ id: newPromoId(), promoName: sending.name, date: today, recipients: emails.length, segment }, ...logs]);
-    setSending(null);
+    const contatti = contactsOf(st);
+    const subject = sending.subject?.trim() || sending.name;
+    const scad = sending.validUntil ? new Date(sending.validUntil).toLocaleDateString("it-IT") : "";
+    setPromoSending(true);
+    let ok = 0, fail = 0;
+    for (const g of audience) {
+      if (!g.email) continue;
+      const body = applyPromo(sending.body, { nome: g.firstName || g.fullName?.split(" ")[0] || "", sconto: sending.discountPct, codice: sending.code, scadenza: scad, struttura: st?.name, contatti });
+      try {
+        const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: g.email, subject, text: body, accent: st?.photoColor, replyTo: st?.email }) });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j?.ok) ok++; else fail++;
+      } catch { fail++; }
+    }
+    setPromoSending(false);
+    if (ok > 0) persistLogs([{ id: newPromoId(), promoName: sending.name, date: today, recipients: ok, segment }, ...logs]);
+    window.alert(`Inviate ${ok} email${fail ? ` · ${fail} non riuscite (controlla email/limiti)` : ""}.`);
+    if (ok > 0) setSending(null);
   };
 
   return (
@@ -250,7 +266,7 @@ export default function PromozioniPage() {
             <div className="mt-2 text-xs text-faint">{segMeta(segment)?.desc} · <b className="text-dim">{audience.length} destinatari</b></div>
             <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
               <button onClick={() => setSending(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
-              <button onClick={doSend} disabled={audience.length === 0 || limitReached} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"><Icon name="mail" size={14} /> Apri email ({audience.length})</button>
+              <button onClick={doSend} disabled={audience.length === 0 || limitReached || promoSending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"><Icon name="mail" size={14} /> {promoSending ? "Invio in corso…" : `Invia ora (${audience.length})`}</button>
             </div>
           </div>
         </div>
