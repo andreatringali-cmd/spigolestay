@@ -13,10 +13,9 @@ const DAYS = 14;
 
 interface RatePlan { id: string; name: string; adjPct: number; refundable: boolean; board: string; minStay: number; enabled?: boolean }
 const DEFAULT_PLANS: RatePlan[] = [
-  { id: "std", name: "Standard", adjPct: 0, refundable: true, board: "Solo pernottamento", minStay: 1, enabled: true },
-  { id: "bb", name: "Colazione inclusa", adjPct: 8, refundable: true, board: "Colazione", minStay: 1, enabled: true },
-  { id: "nonref", name: "Non rimborsabile", adjPct: -10, refundable: false, board: "Solo pernottamento", minStay: 2, enabled: true },
-  { id: "flex", name: "Flessibile", adjPct: 5, refundable: true, board: "Solo pernottamento", minStay: 1, enabled: true },
+  { id: "flex", name: "Flessibile", adjPct: 0, refundable: true, board: "Colazione", minStay: 1, enabled: true },
+  { id: "nonref", name: "Non rimborsabile", adjPct: -10, refundable: false, board: "Colazione", minStay: 1, enabled: true },
+  { id: "long", name: "Lunga permanenza", adjPct: -12, refundable: true, board: "Colazione", minStay: 5, enabled: true },
 ];
 const PLANS_KEY = "spigolestay:rateplans";
 const RULES_KEY = "spigolestay:pricerules";
@@ -48,9 +47,15 @@ export default function TariffePage() {
   const { t } = useLang();
   const [plans, setPlans] = useState<RatePlan[]>(DEFAULT_PLANS);
   const [weekendPct, setWeekendPct] = useState(25);
-  const [planId, setPlanId] = useState("std");
+  const [planId, setPlanId] = useState("flex");
   useEffect(() => {
-    try { const p = localStorage.getItem(PLANS_KEY); if (p) setPlans(JSON.parse(p)); const r = localStorage.getItem(RULES_KEY); if (r) setWeekendPct(JSON.parse(r).weekendPct ?? 25); } catch {}
+    try {
+      const p = localStorage.getItem(PLANS_KEY);
+      const arr: RatePlan[] = p ? JSON.parse(p) : DEFAULT_PLANS;
+      setPlans(arr);
+      setPlanId((prev) => (arr.some((x) => x.id === prev) ? prev : arr[0]?.id ?? prev));
+      const r = localStorage.getItem(RULES_KEY); if (r) setWeekendPct(JSON.parse(r).weekendPct ?? 25);
+    } catch {}
   }, []);
   const saveWeekend = (v: number) => { setWeekendPct(v); try { localStorage.setItem(RULES_KEY, JSON.stringify({ weekendPct: v })); } catch {} };
 

@@ -17,7 +17,7 @@ const lbl = "block text-xs font-medium text-dim";
 const typeColor = (rt: RoomType, i: number) => rt.color ?? AV_COLORS[i % AV_COLORS.length];
 
 const PLANS_KEY = "spigolestay:rateplans";
-const DEFAULT_PLAN_NAMES = ["Standard", "Colazione inclusa", "Non rimborsabile", "Flessibile"];
+const DEFAULT_PLAN_NAMES = ["Flessibile", "Non rimborsabile", "Lunga permanenza"];
 function loadPlanNames(): string[] {
   try { const p = localStorage.getItem(PLANS_KEY); if (p) { const arr = JSON.parse(p) as { name: string }[]; const n = arr.map((x) => x.name).filter(Boolean); if (n.length) return n; } } catch {}
   return DEFAULT_PLAN_NAMES;

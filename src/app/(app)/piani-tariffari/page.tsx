@@ -26,13 +26,14 @@ interface RatePlan {
   roomTypeIds?: string[];       // tipologie a cui si applica (assente/vuoto = tutte)
   description?: string;
 }
+// Set consigliato per un B&B (colazione sempre inclusa): base flessibile a 0%, non rimborsabile scontato, lunga permanenza.
 const DEFAULT_PLANS: RatePlan[] = [
-  { id: "std", name: "Standard", adjPct: 0, refundable: true, board: "Solo pernottamento", minStay: 1, enabled: true, deposit: "none" },
-  { id: "bb", name: "Colazione inclusa", adjPct: 8, refundable: true, board: "Colazione", minStay: 1, enabled: true, deposit: "none" },
-  { id: "nonref", name: "Non rimborsabile", adjPct: -10, refundable: false, board: "Solo pernottamento", minStay: 2, enabled: true, deposit: "prepaid" },
-  { id: "flex", name: "Flessibile", adjPct: 5, refundable: true, board: "Solo pernottamento", minStay: 1, enabled: true, cancelDays: 7, deposit: "deposit", depositPct: 30 },
+  { id: "flex", name: "Flessibile", adjPct: 0, refundable: true, board: "Colazione", minStay: 1, enabled: true, cancelDays: 3, deposit: "none", description: "Cancellazione gratuita fino a 3 giorni prima dell'arrivo. Colazione inclusa." },
+  { id: "nonref", name: "Non rimborsabile", adjPct: -10, refundable: false, board: "Colazione", minStay: 1, enabled: true, deposit: "prepaid", description: "Tariffa scontata, pagamento immediato e non rimborsabile. Colazione inclusa." },
+  { id: "long", name: "Lunga permanenza", adjPct: -12, refundable: true, board: "Colazione", minStay: 5, enabled: true, cancelDays: 7, deposit: "deposit", depositPct: 30, description: "Sconto per soggiorni di almeno 5 notti. Colazione inclusa." },
 ];
 const PLANS_KEY = "spigolestay:rateplans";
+const SEED_KEY = "spigolestay:rateplans:seed"; // marca l'avvenuta prima impostazione dei piani consigliati
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `p-${Math.floor(performance.now() * 1000)}`);
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
@@ -74,7 +75,18 @@ export default function PianiTariffariPage() {
   const [view, setView] = useState<"list" | "cards">("list");
   const [editId, setEditId] = useState<string | null>(null);
   useEffect(() => {
-    try { const p = localStorage.getItem(PLANS_KEY); if (p) setPlans(JSON.parse(p)); const v = localStorage.getItem(VIEW_KEY); if (v === "list" || v === "cards") setView(v); } catch {}
+    try {
+      const v = localStorage.getItem(VIEW_KEY); if (v === "list" || v === "cards") setView(v);
+      const raw = localStorage.getItem(PLANS_KEY);
+      const seeded = localStorage.getItem(SEED_KEY);
+      const applyDefaults = () => { setPlans(DEFAULT_PLANS); localStorage.setItem(PLANS_KEY, JSON.stringify(DEFAULT_PLANS)); localStorage.setItem(SEED_KEY, "1"); };
+      if (!raw) { applyDefaults(); return; }
+      const arr: RatePlan[] = JSON.parse(raw);
+      const ids = arr.map((x) => x.id).sort().join(",");
+      // Se sono ancora i 4 piani "di fabbrica" originali e non ho mai seminato i consigliati, li sostituisco.
+      if (!seeded && ids === "bb,flex,nonref,std") applyDefaults();
+      else setPlans(arr);
+    } catch {}
   }, []);
   const savePlans = (next: RatePlan[]) => { setPlans(next); try { localStorage.setItem(PLANS_KEY, JSON.stringify(next)); } catch {} };
   const setView2 = (v: "list" | "cards") => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch {} };
