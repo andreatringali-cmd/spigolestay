@@ -623,7 +623,7 @@ export default function Dashboard() {
                     <button key={b.id} onClick={() => openBooking(b.id)} className="flex items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-wash">
                       <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: cancelled ? "var(--err)" : "var(--ok)" }}>{cancelled ? "✕" : "+"}</span>
                       <span className="min-w-0 flex-1 truncate text-sm text-txt">{guestName(b.guestId)}</span>
-                      {b.channel !== "blocked" && <ChannelLogo channel={b.channel} size={16} />}
+                      {b.channel !== "blocked" && <ChannelLogo channel={b.channel} size={18} />}
                       <span className="shrink-0 text-[11px] text-faint">{b.bookedOn ? fmt(b.bookedOn) : ""}</span>
                     </button>
                   );
