@@ -750,19 +750,23 @@ export default function CalendarGrid() {
             {gStrip.map((c) => {
               const inSel = editableAvail && sel?.kind === "avail" && sel.typeId === keyId && !!(selLo && selHi && c.iso >= selLo && c.iso <= selHi);
               const noRate = c.rate <= 0; // tariffa mancante → chiusa alla vendita (automatico)
-              const scarceCol = c.avail <= 0 ? "var(--err)" : c.avail <= 1 && cap > 1 ? "var(--warn)" : null;
+              // Riga disponibilità a colore pieno: verde = disponibile, arancione = 1 camera, rosso = pieno.
+              const full = c.avail <= 0;
+              const scarce = c.avail === 1 && cap > 1;
+              const availBg = full ? "var(--err)" : scarce ? "var(--warn)" : "var(--ok)";
+              const availText = scarce ? "#3a2600" : "#ffffff";
               return (
                 <div key={c.iso}
                   onClick={editableAvail ? () => clickAvail(keyId, c.iso) : undefined}
                   onMouseEnter={() => { if (editableAvail && sel?.kind === "avail" && sel.typeId === keyId) setSelHover(c.iso); }}
                   title={noRate ? "Tariffa mancante (€0): camera chiusa alla vendita. Imposta un prezzo per riaprirla." : editableAvail ? (sel?.kind === "avail" ? "Clicca il giorno finale" : `${c.avail} disponibili${c.closed ? ` · ${c.closed} chiuse alla vendita` : ""}. Clicca per chiudere/riaprire le vendite (poi clicca il giorno finale).`) : `${c.avail} disponibili (somma tipologie). Modifica nella vista Esplosa.`}
-                  className={`flex items-center justify-center border-r border-line ${editableAvail ? "cursor-pointer hover:bg-wash" : "cursor-default"}`}
-                  style={{ width: cellW, ...(inSel ? { backgroundColor: "color-mix(in srgb, var(--focus) 20%, transparent)" } : noRate ? { backgroundColor: "color-mix(in srgb, var(--err) 22%, transparent)" } : c.closed ? { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" } : {}) }}>
+                  className={`flex items-center justify-center border-r border-line ${editableAvail ? "cursor-pointer hover:opacity-90" : "cursor-default"}`}
+                  style={{ width: cellW, backgroundColor: inSel ? "color-mix(in srgb, var(--focus) 45%, var(--ok))" : noRate ? "var(--err)" : availBg }}>
                   {noRate ? (
-                    <span title="Chiusa · tariffa mancante" className="font-mono text-[11px] font-bold text-[color:var(--err)]">✕</span>
+                    <span title="Chiusa · tariffa mancante" className="font-mono text-[11px] font-bold" style={{ color: "#fff" }}>✕</span>
                   ) : (
-                    <span className="inline-flex min-w-[22px] items-center justify-center gap-0.5 rounded px-1 font-mono text-xs font-bold tabular-nums" style={scarceCol ? { backgroundColor: `color-mix(in srgb, ${scarceCol} 18%, transparent)`, color: scarceCol } : { color: "var(--dim)" }}>
-                      {c.closed ? <span title={`${c.closed} chiuse`} className="text-[9px] text-[color:var(--err)]">✕</span> : null}{c.avail}
+                    <span className="inline-flex items-center justify-center gap-0.5 font-mono text-xs font-bold tabular-nums" style={{ color: availText }}>
+                      {c.closed ? <span title={`${c.closed} chiuse`} className="text-[9px]" style={{ color: "#fff" }}>✕</span> : null}{c.avail}
                     </span>
                   )}
                 </div>
