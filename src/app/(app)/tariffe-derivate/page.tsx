@@ -63,9 +63,10 @@ export default function TariffeDerivatePage() {
   const { structures, roomTypes, units, activeStructureId, deleteRoomType } = useData();
   const ask = useConfirm();
   const [localS, setLocalS] = useState("all");
+  const [view, setView] = useState<"table" | "map">("table");
   const [derivModal, setDerivModal] = useState<null | { structureId: string; parentId?: string; editId?: string }>(null);
-  const [derivClosed, setDerivClosed] = useState<Set<string>>(new Set());
-  const toggleDeriv = (id: string) => setDerivClosed((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const [derivOpen, setDerivOpen] = useState<Set<string>>(new Set()); // vuoto = tutte chiuse all'apertura
+  const toggleDeriv = (id: string) => setDerivOpen((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const scoped = structures.filter((s) => (activeStructureId === "all" ? localS === "all" || s.id === localS : s.id === activeStructureId));
 
@@ -82,8 +83,17 @@ export default function TariffeDerivatePage() {
         ) : null}
       />
 
-      {/* Legenda */}
+      {/* Barra: vista Tabella / Mappa + legenda */}
       <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm">
+        <div className="inline-flex overflow-hidden rounded-lg border border-line">
+          <button onClick={() => setView("table")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${view === "table" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h18M3 12h18M3 19h18" /></svg>{t("Tabella")}
+          </button>
+          <button onClick={() => setView("map")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${view === "map" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="3" width="6" height="5" rx="1" /><rect x="3" y="16" width="6" height="5" rx="1" /><rect x="15" y="16" width="6" height="5" rx="1" /><path d="M12 8v4M12 12H6v4M12 12h6v4" /></svg>{t("Mappa")}
+          </button>
+        </div>
+        <span className="h-4 w-px bg-line" />
         <span className="font-semibold uppercase tracking-wide text-faint">{t("Legenda")}</span>
         <span className="flex items-center gap-1.5"><span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span> {t("tipologia con camere proprie")}</span>
         <span className="flex items-center gap-1.5"><span className="text-focus"><Catena /></span> {t("derivata: condivide le camere della madre")}</span>
@@ -108,6 +118,15 @@ export default function TariffeDerivatePage() {
 
               {types.length === 0 ? (
                 <Card><div className="py-6 text-center text-sm text-faint">{t("Nessuna tipologia in questa struttura. Creane una in")} <Link href="/camere" className="text-focus underline">{t("Camere")}</Link>.</div></Card>
+              ) : view === "map" ? (
+                <DerivMap
+                  types={types}
+                  sUnits={sUnits}
+                  onAdd={(pid) => setDerivModal({ structureId: s.id, parentId: pid })}
+                  onEdit={(id) => setDerivModal({ structureId: s.id, editId: id })}
+                  onOpenType={(id) => router.push(`/camere/tipologia/${id}`)}
+                  onDelete={async (id, name) => { if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${name}"?`, danger: true, confirmLabel: t("Elimina") })) deleteRoomType(id); }}
+                />
               ) : (
                 <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
                   <div className="overflow-x-auto">
@@ -129,7 +148,7 @@ export default function TariffeDerivatePage() {
                           const idx = types.findIndex((x) => x.id === rt.id);
                           const color = typeColor(rt, idx);
                           const kids = kidsOf(rt.id);
-                          const open = !derivClosed.has(rt.id);
+                          const open = derivOpen.has(rt.id);
                           const nCam = sUnits.filter((u) => u.roomTypeId === rt.id).length;
                           const mMin = effectiveMinStay(rt, roomTypes);
                           const mClosed = effectiveClosed(rt, roomTypes);
@@ -211,6 +230,85 @@ export default function TariffeDerivatePage() {
       </div>
 
       {derivModal && <DerivataModal structureId={derivModal.structureId} parentId={derivModal.parentId} editId={derivModal.editId} onClose={() => setDerivModal(null)} />}
+    </div>
+  );
+}
+
+// Vista Mappa: albero master → derivate con connettori etichettati con lo scarto (stile Octorate).
+function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
+  types: RoomType[];
+  sUnits: { roomTypeId: string }[];
+  onAdd: (parentId: string) => void;
+  onEdit: (id: string) => void;
+  onOpenType: (id: string) => void;
+  onDelete: (id: string, name: string) => void;
+}) {
+  const { roomTypes } = useData();
+  const { t } = useLang();
+  const kidsOf = (id: string) => types.filter((x) => x.deriveFrom === id);
+  const masters = types.filter((rt) => !rt.deriveFrom || !types.some((x) => x.id === rt.deriveFrom));
+
+  const Node = ({ rt, seen = new Set<string>() }: { rt: RoomType; seen?: Set<string> }) => {
+    if (seen.has(rt.id)) return null;
+    const ns = new Set(seen); ns.add(rt.id);
+    const kids = kidsOf(rt.id);
+    const derived = !!rt.deriveFrom;
+    const idx = types.findIndex((x) => x.id === rt.id);
+    const color = typeColor(rt, idx);
+    const nCam = sUnits.filter((u) => u.roomTypeId === rt.id).length;
+    return (
+      <div className="flex flex-col items-center">
+        <div className="w-[236px] overflow-hidden rounded-xl border bg-surface shadow-sm" style={{ borderColor: derived ? "var(--line)" : "color-mix(in srgb, var(--focus) 40%, var(--line))" }}>
+          <div className="h-1.5 w-full" style={{ backgroundColor: color }} />
+          <div className="p-3">
+            <div className="flex items-center justify-between gap-2">
+              <Occ n={rt.maxOccupancy ?? rt.beds} />
+              {derived
+                ? <span className="inline-flex items-center gap-1 text-[11px] text-focus" title={t("Condivide le camere della madre")}><Catena /> {t("derivata")}</span>
+                : <span className="text-[11px] text-faint">{nCam} {nCam === 1 ? t("camera") : t("camere")}</span>}
+            </div>
+            <div className="mt-1 truncate text-sm font-bold text-txt" title={rt.name}>{rt.name}</div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+              <span className="font-mono text-sm font-semibold text-txt">{eur(effectiveBase(rt, roomTypes))}</span>
+              {derived && rt.ratePlan && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[10px] text-dim">{rt.ratePlan}</span>}
+              {!derived && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span>}
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-1.5 text-xs">
+            <button onClick={() => onAdd(rt.id)} className="font-semibold text-focus hover:underline">＋ {t("Derivata")}</button>
+            {derived ? (
+              <span className="flex items-center gap-2.5">
+                <button onClick={() => onEdit(rt.id)} className="font-medium text-dim hover:underline">{t("Modifica")}</button>
+                <button onClick={() => onDelete(rt.id, rt.name)} title={t("Elimina")} className="font-medium text-[color:var(--err)] hover:underline">✕</button>
+              </span>
+            ) : (
+              <button onClick={() => onOpenType(rt.id)} className="font-medium text-dim hover:underline">{t("Modifica")}</button>
+            )}
+          </div>
+        </div>
+        {kids.length > 0 && (
+          <>
+            <div className="h-5 w-px bg-line" />
+            <div className="flex items-start gap-6">
+              {kids.map((k) => (
+                <div key={k.id} className="flex flex-col items-center">
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ backgroundColor: (k.deriveValue ?? 0) >= 0 ? "var(--ok)" : "var(--err)" }}>{scartoOf(k)}</span>
+                  <div className="h-3 w-px bg-line" />
+                  <Node rt={k} seen={ns} />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-line bg-[color:color-mix(in_srgb,var(--focus)_3%,var(--surface))] shadow-sm">
+      <div className="flex min-w-max items-start gap-10 p-5">
+        {masters.map((rt) => <Node key={rt.id} rt={rt} />)}
+      </div>
     </div>
   );
 }
@@ -314,14 +412,14 @@ function DerivataModal({ structureId, parentId, editId, onClose }: { structureId
           {/* Prezzo */}
           <div className="mt-3 rounded-lg border border-line p-3">
             <span className={lbl}>{t("Prezzo")} <span className="font-normal text-faint">· {t("rispetto alla madre")}</span></span>
-            <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              <select value={mode} onChange={(e) => setMode(e.target.value as "percent" | "amount")} className="rounded-lg border border-line bg-paper px-2.5 py-2 text-sm text-txt outline-none focus:border-focus">
-                <option value="percent">{t("Incremento/decremento %")}</option>
-                <option value="amount">{t("Incremento/decremento €")}</option>
+            <div className="mt-1.5 flex items-center gap-2">
+              <select value={mode} onChange={(e) => setMode(e.target.value as "percent" | "amount")} className="shrink-0 rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">
+                <option value="percent">{t("Variazione %")}</option>
+                <option value="amount">{t("Variazione €")}</option>
               </select>
-              <input type="number" value={value} onFocus={(e) => e.currentTarget.select()} onChange={(e) => setValue(Math.floor(Number(e.target.value)) || 0)} className="w-24 rounded-lg border border-line bg-paper px-2.5 py-2 text-sm text-txt outline-none focus:border-focus" />
-              <span className="text-sm text-dim">{mode === "percent" ? "%" : "€"}</span>
-              <span className="ml-auto text-sm text-dim">= <b className="font-mono text-base text-txt">{eur(preview)}</b>/{t("notte")}</span>
+              <input type="number" value={value} onFocus={(e) => e.currentTarget.select()} onChange={(e) => setValue(Math.floor(Number(e.target.value)) || 0)} className="w-20 shrink-0 rounded-lg border border-line bg-paper px-2.5 py-2 text-sm text-txt outline-none focus:border-focus" />
+              <span className="shrink-0 text-sm text-dim">{mode === "percent" ? "%" : "€"}</span>
+              <span className="ml-auto shrink-0 whitespace-nowrap text-sm text-dim">= <b className="font-mono text-base text-txt">{eur(preview)}</b>/{t("notte")}</span>
             </div>
             <p className="mt-1.5 text-[11px] text-faint">{t("Usa un valore negativo per una tariffa più bassa (es. −10% per uso singola o non rimborsabile).")}</p>
           </div>
