@@ -620,11 +620,16 @@ export default function CalendarGrid() {
     const cleanColor = !needsClean ? "var(--faint)" : cleanedToday ? "var(--ok)" : "var(--warn)";
     const cleanTitle = !needsClean ? "Nessuna pulizia oggi" : cleanedToday ? "Camera pulita oggi" : "Camera da pulire";
     const cleanEl = <span className="shrink-0" style={{ color: cleanColor }} title={cleanTitle}>{broom}</span>;
+    // Icona cambio lenzuola: dovuto ad arrivo/partenza o ogni N giorni (Frequenza cambio lenzuola).
+    const linenN = freqDays(unit.linenFreq);
+    const linenDue = !unit.outOfService && (arrToday || depToday || (!!stayNow && linenN > 0 && daysIn > 0 && daysIn % linenN === 0));
+    const linenEl = <span className="shrink-0" style={{ color: linenDue ? "var(--focus)" : "var(--faint)" }} title={linenDue ? "Cambio lenzuola oggi" : "Nessun cambio lenzuola oggi"}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8v10" /><path d="M3 14h18" /><path d="M21 18v-5a3 3 0 0 0-3-3H9v4" /><path d="M6 11.5h.01" /></svg></span>;
     return (
       <div key={unit.id} className="flex border-b border-line">
         <div className="sticky left-0 z-10 flex min-w-0 shrink-0 items-center gap-1.5 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: rowH }}>
           {statusEl}
           {cleanEl}
+          {linenEl}
           <button onClick={() => setRoomInfoId(unit.id)} title="Apri scheda camera" className={`min-w-0 flex-1 truncate whitespace-nowrap text-left text-[13px] font-medium hover:text-focus hover:underline ${unit.outOfService ? "text-faint line-through" : "text-txt"}`}>{unit.name}</button>
           {vw.group === "type" && <span className="shrink-0 rounded px-1 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, ${s.photoColor ?? "var(--faint)"} 20%, transparent)`, color: s.photoColor ?? "var(--dim)" }} title={s.name}>{initials(s.name)}</span>}
         </div>
