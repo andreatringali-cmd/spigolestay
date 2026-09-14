@@ -71,7 +71,7 @@ export default function PianiTariffariPage() {
   const ask = useConfirm();
   const { t } = useLang();
   const [plans, setPlans] = useState<RatePlan[]>(DEFAULT_PLANS);
-  const [view, setView] = useState<"list" | "cards">("list");
+  const [view, setView] = useState<"list" | "cards">("cards");
   const [editId, setEditId] = useState<string | null>(null);
   useEffect(() => {
     try {
@@ -115,12 +115,12 @@ export default function PianiTariffariPage() {
       {/* Barra: vista + legenda + aggiungi */}
       <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm">
         <div className="inline-flex overflow-hidden rounded-lg border border-line">
+          <button onClick={() => setView2("cards")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${view === "cards" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>{t("Schede")}
+          </button>
           <button onClick={() => setView2("list")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${view === "list" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h18M3 12h18M3 19h18" /></svg>{t("Elenco")}
           </button>
-          <button onClick={() => setView2("cards")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${view === "cards" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>{t("Schede")}
-        </button>
         </div>
         <span className="h-4 w-px bg-line" />
         <span className="flex items-center gap-1.5"><span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>+%</span> {t("aumento")}</span>
