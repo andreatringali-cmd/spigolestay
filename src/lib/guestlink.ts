@@ -16,7 +16,7 @@ export async function shortenLink(fullUrl: string): Promise<string> {
     if (!supabase || typeof window === "undefined") return fullUrl;
     const u = new URL(fullUrl);
     const target = u.pathname + u.search; // es. /guida/index.html?... oppure /checkin?b=...
-    if (!target.startsWith("/guida/") && !target.startsWith("/checkin")) return fullUrl;
+    if (!target.startsWith("/guida/") && !target.startsWith("/checkin") && !target.startsWith("/preventivo")) return fullUrl;
     let code = "";
     for (let i = 0; i < 6; i++) code += SL_ALPHABET[Math.floor(Math.random() * SL_ALPHABET.length)];
     const { error } = await supabase.from("short_links").insert({ code, target });
