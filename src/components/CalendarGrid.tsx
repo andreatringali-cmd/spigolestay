@@ -87,6 +87,7 @@ export default function CalendarGrid() {
   // Stato pulizie di oggi (dalla pagina Pulizie): chiave = `unitId:YYYY-MM-DD`.
   const [cleanDone, setCleanDone] = useState<Record<string, string>>({});
   useEffect(() => { try { const d = localStorage.getItem("spigolestay:pulizie:done"); if (d) setCleanDone(JSON.parse(d)); } catch {} }, []);
+  const [roomInfoId, setRoomInfoId] = useState<string | null>(null); // scheda camera in pannello (senza cambiare pagina)
   // Su cellulare la colonna con i nomi camera è molto più stretta, così si vede più calendario.
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => { const f = () => setIsMobile(window.innerWidth < 640); f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
@@ -597,16 +598,16 @@ export default function CalendarGrid() {
     const needsClean = !unit.outOfService && (arrToday || depToday || occNow);
     const cleanedToday = !!cleanDone[`${unit.id}:${todayIso}`];
     const broom = <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 4L9.5 14.5" /><path d="M13 8l3 3" /><path d="M9.5 14.5l-4.5 1 -1 4.5 4.5 -1 4.5 -1 -3.5 -3.5z" /><path d="M6 16l2 2" /></svg>;
-    const cleanEl = !needsClean ? null : cleanedToday
-      ? <span className="shrink-0" style={{ color: "var(--ok)" }} title="Camera pulita oggi">{broom}</span>
-      : <span className="shrink-0" style={{ color: "var(--warn)" }} title="Camera da pulire">{broom}</span>;
+    const cleanColor = !needsClean ? "var(--faint)" : cleanedToday ? "var(--ok)" : "var(--warn)";
+    const cleanTitle = !needsClean ? "Nessuna pulizia oggi" : cleanedToday ? "Camera pulita oggi" : "Camera da pulire";
+    const cleanEl = <span className="shrink-0" style={{ color: cleanColor }} title={cleanTitle}>{broom}</span>;
     return (
       <div key={unit.id} className="flex border-b border-line">
-        <div className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: rowH }}>
+        <div className="sticky left-0 z-10 flex min-w-0 shrink-0 items-center gap-1.5 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: rowH }}>
           {statusEl}
           {cleanEl}
-          <Link href={`/camere?u=${unit.id}`} title="Apri impostazioni camera" className={`truncate text-[13px] font-medium hover:text-focus hover:underline ${unit.outOfService ? "text-faint line-through" : "text-txt"}`}>{unit.name}</Link>
-          {vw.group === "type" && <span className="ml-auto shrink-0 rounded px-1 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, ${s.photoColor ?? "var(--faint)"} 20%, transparent)`, color: s.photoColor ?? "var(--dim)" }} title={s.name}>{initials(s.name)}</span>}
+          <button onClick={() => setRoomInfoId(unit.id)} title="Apri scheda camera" className={`min-w-0 flex-1 truncate whitespace-nowrap text-left text-[13px] font-medium hover:text-focus hover:underline ${unit.outOfService ? "text-faint line-through" : "text-txt"}`}>{unit.name}</button>
+          {vw.group === "type" && <span className="shrink-0 rounded px-1 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, ${s.photoColor ?? "var(--faint)"} 20%, transparent)`, color: s.photoColor ?? "var(--dim)" }} title={s.name}>{initials(s.name)}</span>}
         </div>
         <div className="relative" data-unit-id={unit.id} style={{ width: gridW, height: rowH }}>
           {days.map((d, i) => {
@@ -1552,6 +1553,61 @@ export default function CalendarGrid() {
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button onClick={() => setAvailEdit(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
                 <button onClick={saveAvail} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Applica</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Scheda camera in pannello (dal numero camera, senza cambiare pagina) */}
+      {roomInfoId && (() => {
+        const u = units.find((x) => x.id === roomInfoId); if (!u) return null;
+        const rt = roomTypes.find((x) => x.id === u.roomTypeId);
+        const st = structures.find((x) => x.id === u.structureId);
+        const ams: string[] = (u.amenities && u.amenities.length ? u.amenities : rt?.amenities) ?? [];
+        const tdy = toISO(new Date());
+        const ub = bookings.filter((b) => b.unitId === u.id && b.status !== "cancelled");
+        const inT = ub.some((b) => b.checkIn === tdy), outT = ub.some((b) => b.checkOut === tdy), occ = ub.some((b) => b.checkIn <= tdy && tdy < b.checkOut);
+        const cleaned = !!cleanDone[`${u.id}:${tdy}`];
+        const Row = ({ l, v }: { l: string; v?: React.ReactNode }) => (v || v === 0) ? <div className="flex justify-between gap-3 py-1.5 text-sm"><span className="text-dim">{l}</span><span className="text-right font-medium text-txt">{v}</span></div> : null;
+        const Pill = ({ c, children }: { c: string; children: React.ReactNode }) => <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${c} 15%, transparent)`, color: c }}>{children}</span>;
+        return (
+          <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[8vh]">
+            <button aria-label="Chiudi" onClick={() => setRoomInfoId(null)} className="absolute inset-0 bg-black/40" />
+            <div className="relative max-h-[84vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-display text-lg font-bold text-txt">{u.name}{u.code ? <span className="ml-2 font-mono text-xs font-normal text-faint">{u.code}</span> : null}</div>
+                  <div className="text-xs text-dim">{rt?.name ?? "—"}{st ? ` · ${st.name}` : ""}</div>
+                </div>
+                <button onClick={() => setRoomInfoId(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+              </div>
+              {u.outOfService && <div className="mb-2 rounded-lg px-3 py-2 text-xs font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}>Fuori servizio{u.oosReason ? ` · ${u.oosReason}` : ""}</div>}
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                <Pill c={occ ? "var(--err)" : "var(--ok)"}>{occ ? "Occupata oggi" : "Libera oggi"}</Pill>
+                {inT && <Pill c="var(--ok)">Arrivo oggi</Pill>}
+                {outT && <Pill c="var(--err)">Partenza oggi</Pill>}
+                {(inT || outT || occ) && <Pill c={cleaned ? "var(--ok)" : "var(--warn)"}>{cleaned ? "Pulita" : "Da pulire"}</Pill>}
+              </div>
+              {(u.photos ?? []).length > 0 && (
+                <div className="mb-3 flex gap-2 overflow-x-auto">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {(u.photos ?? []).slice(0, 6).map((p, i) => <img key={i} src={p} alt="" className="h-20 w-28 shrink-0 rounded-lg border border-line object-cover" />)}
+                </div>
+              )}
+              <div className="divide-y divide-[color:var(--line)]">
+                <Row l="Piano" v={u.floor} />
+                <Row l="Vista" v={u.view} />
+                <Row l="Posti letto" v={rt?.beds} />
+                <Row l="Ospiti max" v={rt?.maxOccupancy} />
+                <Row l="Configurazione letti" v={u.bedConfig ?? rt?.bedConfig} />
+                <Row l="Metri quadri" v={(u.size ?? rt?.size) ? `${u.size ?? rt?.size} m²` : ""} />
+              </div>
+              {ams.length > 0 && <div className="mt-3"><div className="mb-1 text-xs text-dim">Dotazioni</div><div className="flex flex-wrap gap-1">{ams.map((a) => <span key={a} className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{a}</span>)}</div></div>}
+              {u.notes && <div className="mt-3"><div className="text-xs text-dim">Note interne</div><div className="whitespace-pre-wrap text-sm text-txt">{u.notes}</div></div>}
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <Link href={`/camere?u=${u.id}`} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">Impostazioni ↗</Link>
+                <button onClick={() => setRoomInfoId(null)} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Chiudi</button>
               </div>
             </div>
           </div>
