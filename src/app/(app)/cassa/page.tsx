@@ -252,13 +252,23 @@ export default function CassaPage() {
   const maxTrend = Math.max(1, ...trend.flatMap((t) => [t.in, t.out]));
 
   // ---- Form nuovo movimento -------------------------------------------------
-  const [form, setForm] = useState<{ kind: Kind; date: string; cat: string; desc: string; amount: string; conto: string; struttura: string }>(() => ({ kind: "out", date: todayISO(), cat: "pulizie", desc: "", amount: "", conto: "contanti", struttura: activeStructureId }));
+  const [form, setForm] = useState<{ kind: Kind; date: string; cat: string; desc: string; amount: string; conto: string; struttura: string; repeat: "once" | "monthly" | "weekly" | "yearly" }>(() => ({ kind: "out", date: todayISO(), cat: "pulizie", desc: "", amount: "", conto: "contanti", struttura: activeStructureId, repeat: "once" }));
   const setKind = (k: Kind) => setForm((f) => ({ ...f, kind: k, cat: cats.find((c) => c.kind === k && !c.auto)!.key }));
   const add = () => {
     const amt = Math.round(parseFloat(form.amount.replace(",", ".")) || 0);
     if (amt <= 0) return;
-    save([{ id: uid(), date: form.date, kind: form.kind, cat: form.cat, desc: form.desc.trim() || catOf(form.cat)?.label || "", amount: amt, conto: form.conto, structureId: form.struttura }, ...manual]);
-    setForm((f) => ({ ...f, desc: "", amount: "" }));
+    const desc = form.desc.trim() || catOf(form.cat)?.label || "";
+    save([{ id: uid(), date: form.date, kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura }, ...manual]);
+    // Ricorrente: crea la regola che riparte dal periodo SUCCESSIVO (questo è già registrato come movimento).
+    if (form.repeat !== "once") {
+      const d = new Date(form.date);
+      if (form.repeat === "monthly") d.setMonth(d.getMonth() + 1);
+      else if (form.repeat === "weekly") d.setDate(d.getDate() + 7);
+      else d.setFullYear(d.getFullYear() + 1);
+      const nextStart = fmt(d.getFullYear(), d.getMonth(), d.getDate());
+      saveRules([...rules, { id: uid(), kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura, freq: form.repeat, day: parseInt(form.date.slice(8, 10)) || 1, start: nextStart, auto: true }]);
+    }
+    setForm((f) => ({ ...f, desc: "", amount: "", repeat: "once" }));
   };
   const del = async (id: string) => { if (!(await ask({ message: t("Eliminare questo movimento?"), danger: true, confirmLabel: t("Elimina") }))) return; save(manual.filter((m) => m.id !== id)); };
 
@@ -389,7 +399,16 @@ export default function CassaPage() {
             </div>
             <label className="mb-2 block"><span className="text-xs text-dim">{t("Struttura")}</span><select value={form.struttura} onChange={(e) => setForm((f) => ({ ...f, struttura: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus"><option value="all">{t("Tutte le strutture")}</option>{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Descrizione (facoltativa)")}</span><input value={form.desc} onChange={(e) => setForm((f) => ({ ...f, desc: e.target.value }))} placeholder={t("es. Bolletta Enel agosto")} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
-            <button onClick={add} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{t("Registra movimento")}</button>
+            <div className="mb-3">
+              <span className="text-xs text-dim">{t("Si ripete?")}</span>
+              <div className="mt-1 grid grid-cols-4 gap-1.5">
+                {([["once", "Solo una volta"], ["monthly", "Ogni mese"], ["weekly", "Ogni settimana"], ["yearly", "Ogni anno"]] as [typeof form.repeat, string][]).map(([v, lab]) => (
+                  <button key={v} type="button" onClick={() => setForm((f) => ({ ...f, repeat: v }))} className={`rounded-lg border px-1 py-1.5 text-[11px] font-semibold transition ${form.repeat === v ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(lab)}</button>
+                ))}
+              </div>
+              {form.repeat !== "once" && <p className="mt-1 text-[11px] text-faint">{t("Registro questo movimento oggi e creo un pagamento programmato che si ripete da solo.")}</p>}
+            </div>
+            <button onClick={add} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{form.repeat === "once" ? t("Registra movimento") : t("Registra e programma")}</button>
           </Card>
 
           {/* Pagamenti programmati */}
