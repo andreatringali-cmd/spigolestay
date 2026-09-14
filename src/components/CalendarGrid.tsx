@@ -586,19 +586,13 @@ export default function CalendarGrid() {
     const arrToday = uBookings.some((b) => nc(b) && b.checkIn === todayIso);
     const depToday = uBookings.some((b) => nc(b) && b.checkOut === todayIso);
     const occNow = uBookings.some((b) => nc(b) && b.checkIn <= todayIso && todayIso < b.checkOut);
-    const svgP = { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-    // Movimenti di oggi: verde IN (arrivo), rosso OUT (partenza); disponibile = cerchio verde vuoto.
+    const arrowP = { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+    // Sempre entrambe le icone: entrata verde se arrivo oggi, uscita rossa se partenza oggi; grigie se assenti.
+    const inArrow = <span className="shrink-0" style={{ color: arrToday ? "var(--ok)" : "var(--faint)" }} title={arrToday ? "Arrivo oggi" : "Nessun arrivo oggi"}><svg {...arrowP}><path d="M20 4v16" /><path d="M4 12h12" /><path d="M12 8l4 4-4 4" /></svg></span>;
+    const outArrow = <span className="shrink-0" style={{ color: depToday ? "var(--err)" : "var(--faint)" }} title={depToday ? "Partenza oggi" : "Nessuna partenza oggi"}><svg {...arrowP}><path d="M4 4v16" /><path d="M8 12h12" /><path d="M16 8l4 4-4 4" /></svg></span>;
     const statusEl = unit.outOfService
       ? <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full border text-[10px] font-bold leading-none text-dim" style={{ borderColor: "var(--dim)" }} title="Fuori servizio">!</span>
-      : (arrToday && depToday)
-      ? <span className="shrink-0" title="Arrivo e partenza oggi (turnover)"><svg {...svgP}><g stroke="var(--ok)"><path d="M4 9h11" /><path d="M12 6l3 3-3 3" /></g><g stroke="var(--err)"><path d="M20 15H9" /><path d="M12 12l-3 3 3 3" /></g></svg></span>
-      : depToday
-      ? <span className="shrink-0" style={{ color: "var(--err)" }} title="Partenza oggi (poi da pulire)"><svg {...svgP} stroke="currentColor"><path d="M4 4v16" /><path d="M8 12h12" /><path d="M16 8l4 4-4 4" /></svg></span>
-      : arrToday
-      ? <span className="shrink-0" style={{ color: "var(--ok)" }} title="Arrivo oggi"><svg {...svgP} stroke="currentColor"><path d="M20 4v16" /><path d="M4 12h12" /><path d="M12 8l4 4-4 4" /></svg></span>
-      : occNow
-      ? <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--dim)" }} title="Occupata" />
-      : <span className="h-2.5 w-2.5 shrink-0 rounded-full border-[1.5px]" style={{ borderColor: "var(--ok)" }} title="Libera oggi" />;
+      : <span className="flex shrink-0 items-center gap-0.5">{inArrow}{outArrow}</span>;
     // Icona pulizia collegata alla pagina Pulizie: pulita (verde) / da pulire (ambra). Solo se oggi serve.
     const needsClean = !unit.outOfService && (arrToday || depToday || occNow);
     const cleanedToday = !!cleanDone[`${unit.id}:${todayIso}`];
