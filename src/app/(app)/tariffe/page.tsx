@@ -77,61 +77,8 @@ export default function TariffePage() {
     return Math.max(0, Math.round(raw * (1 + (activePlan?.adjPct ?? 0) / 100)));
   };
 
-  // ── Mappa tariffe derivate (albero master → derivate) — qui si GESTISCONO le derivate ──
-  const childrenOf = (id: string) => types.filter((x) => x.deriveFrom === id);
+  // Scarto della derivata rispetto alla madre (mostrato come info nella lista prezzi base).
   const scarto = (rt: RoomType) => { const v = rt.deriveValue ?? 0; const sign = v >= 0 ? "+" : ""; return rt.deriveMode === "percent" ? `${sign}${v}%` : `${sign}${v} €`; };
-  const roots = types.filter((rt) => !rt.deriveFrom || !types.some((x) => x.id === rt.deriveFrom));
-  // Evita cicli: una tipologia non può derivare da una sua discendente.
-  const derivesFrom = (a: RoomType | undefined, targetId: string, guard = new Set<string>()): boolean => {
-    if (!a?.deriveFrom || guard.has(a.id)) return false; guard.add(a.id);
-    if (a.deriveFrom === targetId) return true;
-    return derivesFrom(types.find((x) => x.id === a.deriveFrom), targetId, guard);
-  };
-  const selCls = "rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-txt outline-none focus:border-focus";
-  const TypeNode = ({ rt, seen = new Set<string>() }: { rt: RoomType; seen?: Set<string> }) => {
-    if (seen.has(rt.id)) return null;
-    const nextSeen = new Set(seen); nextSeen.add(rt.id);
-    const kids = childrenOf(rt.id);
-    const derived = !!rt.deriveFrom;
-    const sources = types.filter((x) => x.id !== rt.id && !derivesFrom(x, rt.id));
-    return (
-      <div className="min-w-[230px]">
-        <div className="rounded-xl border bg-paper p-2.5 shadow-sm" style={{ borderColor: derived ? "var(--line)" : "color-mix(in srgb, var(--focus) 35%, var(--line))" }}>
-          <div className="flex items-center gap-2">
-            <span className="truncate font-semibold text-txt">{rt.name}</span>
-            <Occ n={rt.maxOccupancy ?? rt.beds} />
-            {!derived && <span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span>}
-            <span className="ml-auto font-mono text-sm font-bold text-txt">{eur(effectiveBase(rt, roomTypes))}</span>
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] text-dim">{t("Deriva da")}</span>
-            <select value={rt.deriveFrom ?? ""} onChange={(e) => updateRoomType(rt.id, e.target.value ? { deriveFrom: e.target.value, deriveMode: rt.deriveMode ?? "percent", deriveValue: rt.deriveValue ?? -10 } : { deriveFrom: undefined })} className={selCls}>
-              <option value="">{t("Indipendente")}</option>
-              {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-            {derived && (
-              <>
-                <select value={rt.deriveMode ?? "percent"} onChange={(e) => updateRoomType(rt.id, { deriveMode: e.target.value as "amount" | "percent" })} className={selCls}><option value="percent">±%</option><option value="amount">±€</option></select>
-                <input type="number" value={rt.deriveValue ?? 0} onChange={(e) => updateRoomType(rt.id, { deriveValue: Number(e.target.value) })} className="w-14 rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-txt outline-none focus:border-focus" />
-                <label className="flex items-center gap-1 text-[11px] text-dim" title={t("Eredita disponibilità e restrizioni dalla madre")}><input type="checkbox" checked={!!rt.deriveInherit} onChange={(e) => updateRoomType(rt.id, { deriveInherit: e.target.checked })} className="h-3.5 w-3.5 accent-[color:var(--focus)]" />{t("eredita")}</label>
-              </>
-            )}
-          </div>
-        </div>
-        {kids.length > 0 && (
-          <div className="mt-2 ml-3 flex flex-col gap-2 border-l-2 border-line pl-3">
-            {kids.map((k) => (
-              <div key={k.id} className="flex items-start gap-2">
-                <span className="mt-3 shrink-0 rounded-full bg-focus px-1.5 py-0.5 text-[10px] font-bold text-white">{scarto(k)}</span>
-                <TypeNode rt={k} seen={nextSeen} />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
 
   return (
     <div>
@@ -172,7 +119,7 @@ export default function TariffePage() {
       {/* ① Prezzi base & regole */}
       <section className="mb-7">
         <div className="mb-1 flex items-center gap-2"><StepDot n={1} /><SectionTitle>{t("Prezzi base & regole")}</SectionTitle></div>
-        <p className="mb-3 pl-8 text-xs text-dim">{t("Il prezzo di partenza di ogni tipologia. Imposta qui il prezzo delle tipologie indipendenti; le derivate (es. uso singola) si collegano dalla mappa qui sotto. Vale per i giorni che non forzi dal calendario.")}</p>
+        <p className="mb-3 pl-8 text-xs text-dim">{t("Il prezzo di partenza di ogni tipologia. Imposta qui il prezzo delle tipologie indipendenti; le derivate (es. uso singola) si creano dalla pagina Camere e seguono la madre. Vale per i giorni che non forzi dal calendario.")}</p>
         <Card>
           {/* Regola weekend */}
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-wash px-3 py-2 text-sm">
@@ -202,7 +149,7 @@ export default function TariffePage() {
                     {!derived ? (
                       <label className="flex items-center gap-1 text-xs text-dim">€<input type="number" min={0} value={rt.basePrice} onFocus={(e) => e.currentTarget.select()} onChange={(e) => { const v = e.target.value; updateRoomType(rt.id, { basePrice: v === "" ? 0 : Math.max(0, Number(v)) }); }} className={`${inp} w-20`} /></label>
                     ) : (
-                      <span className="text-[11px] text-faint">{t("da")} {srcName} · {t("gestisci nella mappa ↓")}</span>
+                      <span className="text-[11px] text-faint">{t("da")} {srcName} · {t("gestisci in Camere")}</span>
                     )}
                     <div className="ml-auto text-right">
                       <div className="font-mono text-base font-bold text-txt">{eur(eff)}</div>
@@ -221,12 +168,10 @@ export default function TariffePage() {
             {types.length === 0 && <div className="py-2 text-sm text-faint">{t("Nessuna tipologia.")}</div>}
           </div>
 
-          {/* Mappa derivate: solo se c'è almeno una derivata */}
-          {roots.length > 0 && (
-            <div className="mt-4 border-t border-line pt-3">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">{t("Mappa tariffe derivate")}</div>
-              <p className="mb-2 text-[11px] text-faint">{t("Qui colleghi le tariffe: scegli “Deriva da” su una tipologia per agganciarla a un'altra (es. Matrimoniale DUS ← Matrimoniale −10%). Le derivate compaiono annidate sotto la madre con lo scarto.")}</p>
-              <div className="overflow-x-auto"><div className="flex flex-wrap gap-6 pb-1">{roots.map((rt) => <TypeNode key={rt.id} rt={rt} />)}</div></div>
+          {types.some((rt) => rt.deriveFrom) && (
+            <div className="mt-4 flex items-center justify-between gap-2 rounded-lg border border-line bg-wash px-3 py-2 text-[11px] text-dim">
+              <span>{t("Le tariffe derivate (es. uso singola) si creano e si collegano dalla pagina")} <b className="text-txt">{t("Camere")}</b>.</span>
+              <a href="/camere" className="shrink-0 whitespace-nowrap font-semibold text-focus hover:underline">{t("Vai a Camere")} →</a>
             </div>
           )}
         </Card>

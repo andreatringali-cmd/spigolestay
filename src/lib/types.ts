@@ -143,6 +143,8 @@ export interface RoomType {
   deriveValue?: number; // valore con segno (es. -10 = −10€ / −10%)
   deriveRound?: boolean; // arrotonda il prezzo derivato (assente/true = sì)
   deriveInherit?: boolean; // eredita disponibilità/restrizioni dalla tipologia sorgente
+  ratePlan?: string;       // piano tariffario associato (es. "BB Flessibile", "Non rimborsabile") per le derivate
+  restrictionsInherit?: boolean; // la derivata eredita durata/restrizioni dalla madre
   // Restrizioni / disponibilità (a livello tipologia)
   salesClosed?: boolean; // vendite chiuse per questa tipologia
   // Dettaglio tipologia
