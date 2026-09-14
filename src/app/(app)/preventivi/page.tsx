@@ -305,7 +305,11 @@ export default function PreventiviPage() {
   const stLegal = [structure?.cin ? "CIN " + structure.cin : "", structure?.vat ? "P.IVA " + structure.vat : ""].filter(Boolean).join(" · ");
   const stSocials = ([["facebook", structure?.facebook], ["instagram", structure?.instagram], ["linkedin", structure?.linkedin]] as [string, string | undefined][])
     .filter(([, u]) => u && u.trim()).map(([k, u]) => ({ k, url: socialHref(u!) }));
-  const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(outMsg)}` : "#";
+  // Link pubblico "Conferma e paga": l'ospite apre, vede l'importo del preventivo e paga (Stripe).
+  const payData = { s: structureName, ci: checkIn, co: checkOut, ad: adults, ch: children, rooms: roomLines.map((l) => ({ name: roomTypes.find((rt) => rt.id === l.roomTypeId)?.name ?? "Camera", amount: Math.round((l as { amount?: number; price?: number }).amount ?? ((l as { price?: number }).price ?? 0) * n) })), tot: total, dep: deposit, gn: name.trim(), ge: email.trim(), oe: structure?.email ?? "", sid: structureId, rt: roomLines[0]?.roomTypeId ?? "", ref: quoteRef };
+  const payUrl = (() => { try { return `${typeof window !== "undefined" ? window.location.origin : ""}/preventivo?q=${btoa(encodeURIComponent(JSON.stringify(payData)))}`; } catch { return ""; } })();
+  const msgWithPay = `${outMsg}\n\nConferma e paga online: ${payUrl}`;
+  const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(msgWithPay)}` : "#";
   const [mailState, setMailState] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
   // Invio del preventivo via server (Resend), come la conferma prenotazione: niente client di posta.
   const sendQuoteEmail = async () => {
@@ -313,7 +317,7 @@ export default function PreventiviPage() {
     save();
     setMailState({ sending: true });
     try {
-      const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: email.trim(), subject: `Preventivo ${structureName}`, text: outMsg, accent: structure?.photoColor, replyTo: structure?.email }) });
+      const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: email.trim(), subject: `Preventivo ${structureName}`, text: msgWithPay, accent: structure?.photoColor, replyTo: structure?.email }) });
       const j = await r.json().catch(() => ({}));
       setMailState({ sending: false, ok: r.ok && j?.ok, msg: (r.ok && j?.ok) ? `Inviato a ${email.trim()}` : (j?.error || `Errore ${r.status}`) });
     } catch (e) { setMailState({ sending: false, ok: false, msg: e instanceof Error ? e.message : "Rete non disponibile" }); }
@@ -724,7 +728,8 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             <button onClick={printPdf} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Scarica / stampa PDF")}</button>
             <button onClick={sendQuoteEmail} disabled={mailState.sending} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt transition hover:bg-wash disabled:opacity-50"><Icon name="mail" size={15} /> {mailState.sending ? t("Invio…") : t("Email")}</button>
             <button onClick={() => { if (!phone) return; save(); window.open(waLink, "_blank"); }} disabled={!phone} title={!phone ? t("Nessun numero") : undefined} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt transition hover:bg-wash disabled:opacity-40"><Icon name="chat" size={15} /> WhatsApp</button>
-            <button onClick={() => navigator.clipboard?.writeText(outMsg)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt transition hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
+            <button onClick={() => navigator.clipboard?.writeText(msgWithPay)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt transition hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
+            <button onClick={() => { save(); navigator.clipboard?.writeText(payUrl); setMailState({ ok: true, msg: t("Link pagamento copiato") }); }} title={t("Link dove l'ospite conferma e paga")} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90" style={{ backgroundColor: "var(--focus)", borderColor: "var(--focus)" }}><Icon name="card" size={15} /> {t("Link pagamento")}</button>
             {(mailState.sending || mailState.msg) && <span className={`text-xs ${mailState.sending ? "text-dim" : mailState.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{mailState.sending ? t("Invio…") : (mailState.ok ? "✓ " : "⚠ ") + mailState.msg}</span>}
           </div>
         </Card>
