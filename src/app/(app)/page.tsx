@@ -15,6 +15,7 @@ import LineChart from "@/components/LineChart";
 import ColumnChart from "@/components/ColumnChart";
 import Bars from "@/components/Bars";
 import ChannelBars from "@/components/ChannelBars";
+import ChannelLogo from "@/components/ChannelLogo";
 import Gauge from "@/components/Gauge";
 import DensityChart from "@/components/DensityChart";
 import DateField from "@/components/DateField";
@@ -621,7 +622,8 @@ export default function Dashboard() {
                   return (
                     <button key={b.id} onClick={() => openBooking(b.id)} className="flex items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-wash">
                       <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: cancelled ? "var(--err)" : "var(--ok)" }}>{cancelled ? "✕" : "+"}</span>
-                      <span className="min-w-0 flex-1 truncate text-sm text-txt">{guestName(b.guestId)} <span className="text-faint">· {CHANNELS[b.channel].label}</span></span>
+                      <span className="min-w-0 flex-1 truncate text-sm text-txt">{guestName(b.guestId)}</span>
+                      {b.channel !== "blocked" && <ChannelLogo channel={b.channel} size={16} />}
                       <span className="shrink-0 text-[11px] text-faint">{b.bookedOn ? fmt(b.bookedOn) : ""}</span>
                     </button>
                   );
@@ -804,7 +806,7 @@ function MoveList({ items, empty, groupByStructure, structures, guestName, getUn
             <div className="flex shrink-0 items-center gap-1.5">
               <StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--faint)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} />
               <StatusIcon icon="card" color={PAY[pay][0]} title={PAY[pay][1]} />
-              <span title={ch.label} className="inline-flex h-[22px] items-center rounded-md px-2 text-[10px] font-bold" style={{ backgroundColor: `var(${ch.cssVar})`, color: ch.text }}>{ch.label}</span>
+              {b.channel !== "blocked" && <ChannelLogo channel={b.channel} size={18} title={ch.label} />}
             </div>
           </button>
         );
