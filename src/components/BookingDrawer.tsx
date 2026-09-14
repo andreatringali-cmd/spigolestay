@@ -127,6 +127,14 @@ export default function BookingDrawer() {
   if (!booking) return null;
 
   const guest = getGuest(booking.guestId);
+  // ── Memoria ospite (CRM): riconosci chi torna, con preferenze e VIP ──
+  const guestStays = guest ? bookings.filter((b) => b.guestId === guest.id && b.status !== "cancelled") : [];
+  const priorStays = guestStays.filter((b) => b.id !== booking.id);
+  const gTimes = guestStays.length;
+  const gReturning = priorStays.length >= 1;
+  const gTotalSpent = guestStays.reduce((a, b) => a + (b.total ?? 0), 0);
+  const gLastPrior = priorStays.map((b) => b.checkIn).sort().pop();
+  const gVip = !!guest?.vip || gTimes >= 3; // VIP manuale oppure automatico dal 3° soggiorno
   const structure = getStructure(booking.structureId);
   const roomType = getRoomType(booking.roomTypeId);
   const unitV = getUnit(booking.unitId);
@@ -310,6 +318,25 @@ export default function BookingDrawer() {
         <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Contatti")}</span>
         {contactIcons}
       </div>
+      {guest && (gReturning || gVip || !!guest.preferences?.trim() || (guest.tags ?? []).length > 0) && (
+        <div className="rounded-xl border p-3" style={{ borderColor: "color-mix(in srgb, var(--focus) 30%, var(--line))", backgroundColor: "color-mix(in srgb, var(--focus) 5%, transparent)" }}>
+          <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Memoria ospite")}</span>
+            {gVip && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}
+            {gReturning
+              ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>{t("Ospite di ritorno")} · {gTimes}ª {t("volta")}</span>
+              : <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-bold text-dim">{t("Primo soggiorno")}</span>}
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-dim">
+            <span>{gTimes} {gTimes === 1 ? t("soggiorno") : t("soggiorni")}</span>
+            <span>{t("Speso")} {eur(gTotalSpent)}</span>
+            {gLastPrior && <span>{t("Ultima volta")} {fmtDate(gLastPrior)}</span>}
+          </div>
+          {guest.preferences?.trim() && <div className="mt-1.5 text-sm text-txt"><span className="text-[11px] font-semibold text-dim">{t("Preferenze")}: </span>{guest.preferences}</div>}
+          {(guest.tags ?? []).length > 0 && <div className="mt-1.5 flex flex-wrap gap-1">{(guest.tags ?? []).map((tg) => <span key={tg} className="rounded-full bg-wash px-2 py-0.5 text-[10px] text-dim">{t(tg)}</span>)}</div>}
+          <button onClick={() => { closeBooking(); router.push(`/ospiti/${guest.id}`); }} className="mt-2 text-[11px] font-semibold text-focus hover:underline">{t("Apri scheda ospite")} →</button>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
         <div><div className="text-[11px] font-medium text-dim">{t("Camera")}</div><div className="truncate text-sm text-txt">{roomType?.name ?? "—"}{unitV?.name ? ` · ${unitV.name}` : ""}</div></div>
         <div><div className="text-[11px] font-medium text-dim">{t("Ospiti")}</div><div className="text-sm text-txt">{booking.adults} {t("adulti")}{booking.children ? ` · ${booking.children} ${t("bambini")}` : ""}</div></div>
