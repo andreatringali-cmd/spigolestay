@@ -198,6 +198,10 @@ export interface Unit {
   amenities?: string[];// dotazioni specifiche della camera
   bedConfig?: string;  // configurazione letti specifica (override tipologia)
   size?: number;       // mq specifici (override tipologia)
+  // Regole di servizio/pulizia (usate nella scheda camera del calendario)
+  linenFreq?: string;  // frequenza cambio lenzuola (es. "3 Giorni", "Ogni partenza")
+  tidyFreq?: string;   // frequenza rassetto (es. "1 Giorno")
+  serviceDays?: string[]; // giorni della settimana in cui si fa servizio ["Lu","Ma",…]
 }
 
 export interface Guest {

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type DragEvent as RDragEvent, typ
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
-import { CHANNELS, EVENT_COLORS } from "@/lib/types";
+import { CHANNELS, EVENT_COLORS, type Unit } from "@/lib/types";
 import {
   addDays,
   dayIndex,
@@ -21,6 +21,11 @@ import { sortUnitsByName } from "@/lib/sortUnits";
 import Icon from "@/components/Icon";
 import ChannelLogo from "@/components/ChannelLogo";
 import DateField from "@/components/DateField";
+
+// Scheda camera: opzioni frequenza servizio e giorni della settimana.
+const FREQ_OPTS = ["Ogni partenza", "1 Giorno", "2 Giorni", "3 Giorni", "4 Giorni", "5 Giorni", "7 Giorni"];
+const WEEK_DAYS = ["Lu", "Ma", "Me", "Gi", "Ve", "Sa", "Do"];
+const freqDays = (label?: string) => { const m = /^(\d+)/.exec(label ?? ""); return m ? parseInt(m[1], 10) : 0; }; // 0 = solo alla partenza
 
 // Card "Insights" del calendario (selettore mostra/nascondi).
 const INSIGHT_CARDS = [
@@ -66,7 +71,7 @@ interface DragView {
 }
 
 export default function CalendarGrid() {
-  const { structures, units, roomTypes, bookings, guests, events, rateOverrides, moveBooking, openBooking, addBooking, updateBooking, deleteBooking, addEvent, updateEvent, deleteEvent, setDayRates, clearDayRates, activeStructureId } = useData();
+  const { structures, units, roomTypes, bookings, guests, events, rateOverrides, moveBooking, openBooking, addBooking, updateBooking, deleteBooking, addEvent, updateEvent, deleteEvent, setDayRates, clearDayRates, activeStructureId, updateUnit, deleteUnit, addUnit } = useData();
   const router = useRouter();
 
   // Configurazione "Visualizza" (persistita): finestra giorni + righe mostrate + densità.
@@ -88,6 +93,15 @@ export default function CalendarGrid() {
   const [cleanDone, setCleanDone] = useState<Record<string, string>>({});
   useEffect(() => { try { const d = localStorage.getItem("spigolestay:pulizie:done"); if (d) setCleanDone(JSON.parse(d)); } catch {} }, []);
   const [roomInfoId, setRoomInfoId] = useState<string | null>(null); // scheda camera in pannello (senza cambiare pagina)
+  // Aggiorna lo stato pulizia di OGGI (accende/spegne la scopa nel calendario) e lo persiste per Pulizie.
+  const setCleanState = (unitId: string, cleaned: boolean) => {
+    setCleanDone((prev) => {
+      const next = { ...prev }; const key = `${unitId}:${toISO(new Date())}`;
+      if (cleaned) next[key] = new Date().toISOString(); else delete next[key];
+      try { localStorage.setItem("spigolestay:pulizie:done", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
   // Su cellulare la colonna con i nomi camera è molto più stretta, così si vede più calendario.
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => { const f = () => setIsMobile(window.innerWidth < 640); f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
@@ -586,7 +600,7 @@ export default function CalendarGrid() {
     const nc = (b: (typeof uBookings)[number]) => b.status !== "cancelled";
     const arrToday = uBookings.some((b) => nc(b) && b.checkIn === todayIso);
     const depToday = uBookings.some((b) => nc(b) && b.checkOut === todayIso);
-    const occNow = uBookings.some((b) => nc(b) && b.checkIn <= todayIso && todayIso < b.checkOut);
+    const stayNow = uBookings.find((b) => nc(b) && b.checkIn <= todayIso && todayIso < b.checkOut);
     const arrowP = { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
     // Sempre entrambe le icone: entrata verde se arrivo oggi, uscita rossa se partenza oggi; grigie se assenti.
     const inArrow = <span className="shrink-0" style={{ color: arrToday ? "var(--ok)" : "var(--faint)" }} title={arrToday ? "Arrivo oggi" : "Nessun arrivo oggi"}><svg {...arrowP}><path d="M20 4v16" /><path d="M4 12h12" /><path d="M12 8l4 4-4 4" /></svg></span>;
@@ -594,8 +608,13 @@ export default function CalendarGrid() {
     const statusEl = unit.outOfService
       ? <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full border text-[10px] font-bold leading-none text-dim" style={{ borderColor: "var(--dim)" }} title="Fuori servizio">!</span>
       : <span className="flex shrink-0 items-center gap-0.5">{inArrow}{outArrow}</span>;
-    // Icona pulizia collegata alla pagina Pulizie: pulita (verde) / da pulire (ambra). Solo se oggi serve.
-    const needsClean = !unit.outOfService && (arrToday || depToday || occNow);
+    // Pulizia guidata dalla scheda: turnover (arrivo/partenza), rassetto ogni N giorni durante il soggiorno, giorni di servizio.
+    const wdToday = ["Do", "Lu", "Ma", "Me", "Gi", "Ve", "Sa"][new Date().getDay()];
+    const svcToday = (unit.serviceDays ?? []).includes(wdToday);
+    const tidyN = freqDays(unit.tidyFreq);
+    const daysIn = stayNow ? Math.round((Date.parse(todayIso) - Date.parse(stayNow.checkIn)) / 86400000) : 0;
+    const midStayClean = !!stayNow && tidyN > 0 && daysIn > 0 && daysIn % tidyN === 0;
+    const needsClean = !unit.outOfService && (arrToday || depToday || midStayClean || svcToday);
     const cleanedToday = !!cleanDone[`${unit.id}:${todayIso}`];
     const broom = <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 4L9.5 14.5" /><path d="M13 8l3 3" /><path d="M9.5 14.5l-4.5 1 -1 4.5 4.5 -1 4.5 -1 -3.5 -3.5z" /><path d="M6 16l2 2" /></svg>;
     const cleanColor = !needsClean ? "var(--faint)" : cleanedToday ? "var(--ok)" : "var(--warn)";
@@ -1559,59 +1578,21 @@ export default function CalendarGrid() {
         );
       })()}
 
-      {/* Scheda camera in pannello (dal numero camera, senza cambiare pagina) */}
+      {/* Scheda camera modificabile (dal numero camera, senza cambiare pagina) */}
       {roomInfoId && (() => {
         const u = units.find((x) => x.id === roomInfoId); if (!u) return null;
-        const rt = roomTypes.find((x) => x.id === u.roomTypeId);
-        const st = structures.find((x) => x.id === u.structureId);
-        const ams: string[] = (u.amenities && u.amenities.length ? u.amenities : rt?.amenities) ?? [];
-        const tdy = toISO(new Date());
-        const ub = bookings.filter((b) => b.unitId === u.id && b.status !== "cancelled");
-        const inT = ub.some((b) => b.checkIn === tdy), outT = ub.some((b) => b.checkOut === tdy), occ = ub.some((b) => b.checkIn <= tdy && tdy < b.checkOut);
-        const cleaned = !!cleanDone[`${u.id}:${tdy}`];
-        const Row = ({ l, v }: { l: string; v?: React.ReactNode }) => (v || v === 0) ? <div className="flex justify-between gap-3 py-1.5 text-sm"><span className="text-dim">{l}</span><span className="text-right font-medium text-txt">{v}</span></div> : null;
-        const Pill = ({ c, children }: { c: string; children: React.ReactNode }) => <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${c} 15%, transparent)`, color: c }}>{children}</span>;
-        return (
-          <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[8vh]">
-            <button aria-label="Chiudi" onClick={() => setRoomInfoId(null)} className="absolute inset-0 bg-black/40" />
-            <div className="relative max-h-[84vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-              <div className="mb-2 flex items-start justify-between gap-2">
-                <div>
-                  <div className="font-display text-lg font-bold text-txt">{u.name}{u.code ? <span className="ml-2 font-mono text-xs font-normal text-faint">{u.code}</span> : null}</div>
-                  <div className="text-xs text-dim">{rt?.name ?? "—"}{st ? ` · ${st.name}` : ""}</div>
-                </div>
-                <button onClick={() => setRoomInfoId(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
-              </div>
-              {u.outOfService && <div className="mb-2 rounded-lg px-3 py-2 text-xs font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}>Fuori servizio{u.oosReason ? ` · ${u.oosReason}` : ""}</div>}
-              <div className="mb-3 flex flex-wrap gap-1.5">
-                <Pill c={occ ? "var(--err)" : "var(--ok)"}>{occ ? "Occupata oggi" : "Libera oggi"}</Pill>
-                {inT && <Pill c="var(--ok)">Arrivo oggi</Pill>}
-                {outT && <Pill c="var(--err)">Partenza oggi</Pill>}
-                {(inT || outT || occ) && <Pill c={cleaned ? "var(--ok)" : "var(--warn)"}>{cleaned ? "Pulita" : "Da pulire"}</Pill>}
-              </div>
-              {(u.photos ?? []).length > 0 && (
-                <div className="mb-3 flex gap-2 overflow-x-auto">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {(u.photos ?? []).slice(0, 6).map((p, i) => <img key={i} src={p} alt="" className="h-20 w-28 shrink-0 rounded-lg border border-line object-cover" />)}
-                </div>
-              )}
-              <div className="divide-y divide-[color:var(--line)]">
-                <Row l="Piano" v={u.floor} />
-                <Row l="Vista" v={u.view} />
-                <Row l="Posti letto" v={rt?.beds} />
-                <Row l="Ospiti max" v={rt?.maxOccupancy} />
-                <Row l="Configurazione letti" v={u.bedConfig ?? rt?.bedConfig} />
-                <Row l="Metri quadri" v={(u.size ?? rt?.size) ? `${u.size ?? rt?.size} m²` : ""} />
-              </div>
-              {ams.length > 0 && <div className="mt-3"><div className="mb-1 text-xs text-dim">Dotazioni</div><div className="flex flex-wrap gap-1">{ams.map((a) => <span key={a} className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{a}</span>)}</div></div>}
-              {u.notes && <div className="mt-3"><div className="text-xs text-dim">Note interne</div><div className="whitespace-pre-wrap text-sm text-txt">{u.notes}</div></div>}
-              <div className="mt-4 flex items-center justify-end gap-2">
-                <Link href={`/camere?u=${u.id}`} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">Impostazioni ↗</Link>
-                <button onClick={() => setRoomInfoId(null)} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Chiudi</button>
-              </div>
-            </div>
-          </div>
-        );
+        return <RoomSettingsModal
+          key={u.id}
+          unit={u}
+          typeName={roomTypes.find((x) => x.id === u.roomTypeId)?.name ?? "—"}
+          lastCleanIso={Object.entries(cleanDone).filter(([k]) => k.startsWith(`${u.id}:`)).map(([, v]) => v).sort().pop()}
+          cleanedToday={!!cleanDone[`${u.id}:${toISO(new Date())}`]}
+          onSaveClean={setCleanState}
+          updateUnit={updateUnit}
+          deleteUnit={(id) => { deleteUnit(id); }}
+          addUnit={addUnit}
+          onClose={() => setRoomInfoId(null)}
+        />;
       })()}
 
       {/* Conferma correzione prezzo — Copilota (prezzo singolo) */}
@@ -1753,6 +1734,72 @@ function MenuToggle({ label, on, onClick }: { label: string; on: boolean; onClic
         <span className="absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all" style={{ left: on ? "14px" : "2px" }} />
       </span>
     </button>
+  );
+}
+
+const RS_ROW = "grid grid-cols-[145px_1fr] items-center gap-3 py-1.5";
+const RS_FLD = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+function RoomSettingsModal({ unit, typeName, lastCleanIso, cleanedToday, onSaveClean, updateUnit, deleteUnit, addUnit, onClose }: {
+  unit: Unit; typeName: string; lastCleanIso?: string; cleanedToday: boolean;
+  onSaveClean: (unitId: string, cleaned: boolean) => void;
+  updateUnit: (id: string, patch: Partial<Unit>) => void;
+  deleteUnit: (id: string) => void;
+  addUnit: (u: { structureId: string; roomTypeId: string; name: string }) => string;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(unit.name);
+  const [order, setOrder] = useState<string>(String(unit.order ?? 0));
+  const [linen, setLinen] = useState(unit.linenFreq ?? "3 Giorni");
+  const [tidy, setTidy] = useState(unit.tidyFreq ?? "1 Giorno");
+  const [days, setDays] = useState<string[]>(unit.serviceDays ?? []);
+  const [clean, setClean] = useState(cleanedToday ? "Pulita" : "Da pulire");
+  const [notes, setNotes] = useState(unit.notes ?? "");
+  const toggleDay = (d: string) => setDays((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d]));
+  const idShort = (unit.id || "").replace(/[^0-9]/g, "").slice(-6) || unit.id.slice(-4);
+  const lastCleanTxt = lastCleanIso ? (() => { try { const d = new Date(lastCleanIso); return `${d.toLocaleDateString("it-IT")} ${d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`; } catch { return "—"; } })() : "—";
+  const save = () => {
+    updateUnit(unit.id, { name: name.trim() || unit.name, order: Math.floor(Number(order)) || 0, linenFreq: linen, tidyFreq: tidy, serviceDays: days, notes });
+    onSaveClean(unit.id, clean === "Pulita");
+    onClose();
+  };
+  const copy = () => {
+    const id = addUnit({ structureId: unit.structureId, roomTypeId: unit.roomTypeId, name: `${name} copia` });
+    updateUnit(id, { floor: unit.floor, view: unit.view, linenFreq: linen, tidyFreq: tidy, serviceDays: days, amenities: unit.amenities, bedConfig: unit.bedConfig, size: unit.size, notes });
+    onClose();
+  };
+  const del = () => { if (typeof window !== "undefined" && window.confirm(`Eliminare la camera "${unit.name}"?`)) { deleteUnit(unit.id); onClose(); } };
+  return (
+    <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[6vh]">
+      <button aria-label="Chiudi" onClick={onClose} className="absolute inset-0 bg-black/40" />
+      <div className="relative max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="font-display text-lg font-bold text-txt">Scheda camera</span>
+          <button onClick={onClose} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
+        </div>
+        <div className="divide-y divide-[color:var(--line)]">
+          <div className={RS_ROW}><span className="text-sm text-dim">Id</span><span className="font-mono text-sm text-faint">{idShort}</span></div>
+          <div className={RS_ROW}><span className="text-sm text-dim">Tipologia</span><span className="text-sm text-txt">{typeName}</span></div>
+          <div className={RS_ROW}><span className="text-sm text-dim">Nome *</span><input value={name} onChange={(e) => setName(e.target.value)} className={RS_FLD} /></div>
+          <div className={RS_ROW}><span className="text-sm text-dim">Ordinamento *</span><input type="number" value={order} onFocus={(e) => e.currentTarget.select()} onChange={(e) => setOrder(e.target.value)} className={RS_FLD} /></div>
+          <div className={RS_ROW}><span className="text-sm text-dim">Frequenza cambio lenzuola</span><select value={linen} onChange={(e) => setLinen(e.target.value)} className={RS_FLD}>{FREQ_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}</select></div>
+          <div className={RS_ROW}><span className="text-sm text-dim">Frequenza rassetto</span><select value={tidy} onChange={(e) => setTidy(e.target.value)} className={RS_FLD}>{FREQ_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}</select></div>
+          <div className={RS_ROW}><span className="text-sm text-dim">Giorni servizio</span>
+            <div className="inline-flex overflow-hidden rounded-lg border border-line">
+              {WEEK_DAYS.map((d) => { const on = days.includes(d); return <button key={d} onClick={() => toggleDay(d)} className="border-r border-line px-2.5 py-1.5 text-xs font-semibold last:border-r-0" style={on ? { backgroundColor: "var(--focus)", color: "#fff" } : { color: "var(--dim)" }}>{d}</button>; })}
+            </div>
+          </div>
+          <div className={RS_ROW}><span className="text-sm text-dim">Stato pulizia</span><select value={clean} onChange={(e) => setClean(e.target.value)} className={RS_FLD}><option value="Da pulire">Da pulire</option><option value="Pulita">Pulita</option></select></div>
+          <div className={RS_ROW}><span className="text-sm text-dim">Data ultima pulizia</span><span className="text-sm text-dim">{lastCleanTxt}</span></div>
+        </div>
+        <div className="mt-3"><span className="text-sm text-dim">Note interne</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={`${RS_FLD} mt-1 resize-y`} /></div>
+        <div className="mt-4 flex items-center gap-2">
+          <button onClick={onClose} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Chiudi</button>
+          <button onClick={del} className="rounded-lg px-3 py-2 text-sm font-medium text-white" style={{ backgroundColor: "var(--err)" }}>Elimina</button>
+          <button onClick={copy} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">Copia</button>
+          <button onClick={save} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Salva</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
