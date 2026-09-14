@@ -85,6 +85,12 @@ function Engine() {
 
   const types = roomTypes.filter((rt) => rt.structureId === structureId && !effectiveClosed(rt, roomTypes));
   const availUnits = (rt: RoomType) => units.filter((u) => u.roomTypeId === rt.id && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn));
+  // Le tariffe derivate condividono le camere fisiche della tipologia madre: risalgo alla radice per la disponibilità.
+  const rootType = (rt: RoomType): RoomType => { let cur = rt; const seen = new Set<string>(); while (cur.deriveFrom && !seen.has(cur.id)) { seen.add(cur.id); const p = roomTypes.find((x) => x.id === cur.deriveFrom); if (!p) break; cur = p; } return cur; };
+  const availUnitsFor = (rt: RoomType) => availUnits(rootType(rt));
+  const descendantsOf = (id: string): RoomType[] => { const out: RoomType[] = []; const walk = (pid: string) => types.filter((x) => x.deriveFrom === pid).forEach((c) => { out.push(c); walk(c.id); }); walk(id); return out; };
+  // Solo le tipologie "madre" fanno da camera nel mini-sito; le derivate compaiono come opzioni sotto la madre.
+  const masters = types.filter((rt) => !rt.deriveFrom || !types.some((x) => x.id === rt.deriveFrom));
 
   const dayPrice = (rt: RoomType, iso: string, plan: Plan) => {
     const base = effectiveBase(rt, roomTypes);
@@ -114,7 +120,7 @@ function Engine() {
 
   const confirm = () => {
     if (!selRt || !guestValid) return;
-    const unit = availUnits(selRt)[0];
+    const unit = availUnitsFor(selRt)[0]; // le derivate usano le camere della tipologia madre
     // Evita doppioni in anagrafica: riusa l'ospite esistente (stessa email, o stesso nome con telefono compatibile).
     const norm = (s?: string) => (s ?? "").trim().toLowerCase();
     const full = `${guest.firstName.trim()} ${guest.lastName.trim()}`.trim();
@@ -296,13 +302,20 @@ function Engine() {
               {promoErr && <span className="text-sm text-[color:var(--err)]">{promoErr}</span>}
             </div>
             <div className="flex flex-col gap-3">
-              {types.map((rt) => {
-                const free = availUnits(rt).length;
-                // Solo i piani applicabili a questa tipologia/date/durata (intervallo temporale, notti minime, camere ammesse).
-                const rtPlans = plans.filter((p) => planApplies(p, { roomTypeId: rt.id, checkIn, nights }));
-                const cheapest = rtPlans.reduce((min, p) => Math.min(min, stayPrice(rt, p)), Infinity);
-                const tooSmall = (rt.maxOccupancy ?? rt.beds) < adults + children;
-                const noRate = !Number.isFinite(cheapest) || cheapest <= 0; // nessuna tariffa/piano → non vendibile
+              {masters.map((rt) => {
+                const free = availUnitsFor(rt).length;
+                const pax = adults + children;
+                // Varianti = madre + tariffe derivate; ognuna con i suoi piani applicabili.
+                const variants = [rt, ...descendantsOf(rt.id)].map((v) => ({
+                  v,
+                  fits: (v.maxOccupancy ?? v.beds) >= pax,
+                  offers: plans.filter((p) => planApplies(p, { roomTypeId: v.id, checkIn, nights })).map((p) => ({ p, price: stayPrice(v, p) })).filter((x) => x.price > 0),
+                })).filter((x) => x.offers.length > 0);
+                const sellable = variants.filter((x) => x.fits);
+                const hasDeriv = variants.length > 1;
+                const cheapest = sellable.reduce((min, x) => Math.min(min, ...x.offers.map((o) => o.price)), Infinity);
+                const tooSmall = variants.length > 0 && sellable.length === 0; // esistono tariffe ma nessuna adatta agli ospiti
+                const noRate = variants.length === 0;
                 return (
                   <div key={rt.id} className={`${box} overflow-hidden`}>
                     <div className="flex flex-col gap-3 p-4 sm:flex-row">
@@ -323,19 +336,31 @@ function Engine() {
                           </div>
                           <div className="text-right">
                             <div className="text-[11px] text-faint">da</div>
-                            <div className="font-mono text-xl font-bold text-txt">{noRate ? "—" : eur(cheapest)}</div>
+                            <div className="font-mono text-xl font-bold text-txt">{Number.isFinite(cheapest) ? eur(cheapest) : "—"}</div>
                             <div className="text-[11px] text-faint">{nights} {nights === 1 ? "notte" : "notti"}</div>
                           </div>
                         </div>
-                        {/* Piani */}
+                        {/* Opzioni: varianti (madre + derivate) × piani */}
                         {free > 0 && !tooSmall && !noRate ? (
-                          <div className="mt-3 flex flex-col gap-1.5">
-                            {rtPlans.map((p) => (
-                              <div key={p.id} className="flex items-center justify-between rounded-lg border border-line px-3 py-2">
-                                <div><span className="text-sm font-medium text-txt">{p.name}</span> <span className="text-[11px] text-faint">· {p.board} · {cancelText(p)}{planDepositPct(p) === 0 ? " · nessun anticipo" : planDepositPct(p) === 100 ? " · prepagato" : ` · acconto ${planDepositPct(p)}%`}</span></div>
-                                <div className="flex items-center gap-3">
-                                  <span className="font-mono text-sm font-bold text-txt">{eur(stayPrice(rt, p))}</span>
-                                  <button onClick={() => { setSel({ rtId: rt.id, planId: p.id }); setStep("checkout"); window.scrollTo(0, 0); }} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">Scegli</button>
+                          <div className="mt-3 flex flex-col gap-2.5">
+                            {sellable.map(({ v, offers }) => (
+                              <div key={v.id} className="overflow-hidden rounded-lg border border-line">
+                                {hasDeriv && (
+                                  <div className="flex items-center justify-between gap-2 bg-wash px-3 py-1.5">
+                                    <span className="text-xs font-semibold text-txt">{v.deriveFrom ? v.name : "Standard"} <span className="font-normal text-faint">· fino a {v.maxOccupancy ?? v.beds} ospiti</span></span>
+                                    {v.deriveFrom && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>variante</span>}
+                                  </div>
+                                )}
+                                <div className="flex flex-col divide-y divide-[color:var(--line)]">
+                                  {offers.map(({ p, price }) => (
+                                    <div key={p.id} className="flex items-center justify-between px-3 py-2">
+                                      <div><span className="text-sm font-medium text-txt">{p.name}</span> <span className="text-[11px] text-faint">· {p.board} · {cancelText(p)}{planDepositPct(p) === 0 ? " · nessun anticipo" : planDepositPct(p) === 100 ? " · prepagato" : ` · acconto ${planDepositPct(p)}%`}</span></div>
+                                      <div className="flex items-center gap-3">
+                                        <span className="font-mono text-sm font-bold text-txt">{eur(price)}</span>
+                                        <button onClick={() => { setSel({ rtId: v.id, planId: p.id }); setStep("checkout"); window.scrollTo(0, 0); }} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">Scegli</button>
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
                             ))}
