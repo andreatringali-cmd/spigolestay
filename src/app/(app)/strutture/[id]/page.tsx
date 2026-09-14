@@ -439,6 +439,28 @@ export default function StrutturaSchedaPage() {
             </div>
           </Card>
 
+          {/* Booking Engine & servizi extra */}
+          <Card>
+            <div className="mb-2 flex items-center justify-between">
+              <SectionTitle>{t("Motore prenotazioni & servizi extra")}</SectionTitle>
+              {!isNew && <a href={`/prenota?s=${params.id}`} target="_blank" rel="noreferrer" className="text-xs font-medium text-focus hover:underline">{t("Apri motore")} ↗</a>}
+            </div>
+            <div className="mb-2 rounded-lg border border-line bg-paper p-2.5">
+              <div className="flex items-center justify-between">
+                <label className={lbl}>{t("Acconto richiesto alla prenotazione diretta")}</label>
+                <Toggle on={deposit.on} onClick={() => updateDeposit({ on: !deposit.on })} />
+              </div>
+              {deposit.on && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-xs text-dim">{t("Percentuale")}</span>
+                  <span className="flex items-center gap-1"><input type="number" min={0} max={100} value={deposit.pct} onChange={(e) => updateDeposit({ pct: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} className={`${inp} w-20`} /><span className="text-dim">%</span></span>
+                </div>
+              )}
+              <p className="mt-1.5 text-[11px] text-faint">{t("Voce unica: vale per tutte le strutture. Mostrata all'ospite alla prenotazione diretta.")}</p>
+            </div>
+            <p className="mt-3 text-[11px] text-faint">{t("I servizi extra si gestiscono in «Upselling & extra»; l'ospite li sceglie durante la prenotazione.")}</p>
+          </Card>
+
           {/* Pagamenti */}
           <Card>
             <SectionTitle>{t("Pagamenti & incassi")}</SectionTitle>
@@ -462,28 +484,6 @@ export default function StrutturaSchedaPage() {
                 {stripeSt.msg && <p className="mt-1 text-[11px]" style={{ color: "var(--err)" }}>{stripeSt.msg}</p>}
               </div>
             )}
-          </Card>
-
-          {/* Booking Engine & servizi extra */}
-          <Card>
-            <div className="mb-2 flex items-center justify-between">
-              <SectionTitle>{t("Motore prenotazioni & servizi extra")}</SectionTitle>
-              {!isNew && <a href={`/prenota?s=${params.id}`} target="_blank" rel="noreferrer" className="text-xs font-medium text-focus hover:underline">{t("Apri motore")} ↗</a>}
-            </div>
-            <div className="mb-2 rounded-lg border border-line bg-paper p-2.5">
-              <div className="flex items-center justify-between">
-                <label className={lbl}>{t("Acconto richiesto alla prenotazione diretta")}</label>
-                <Toggle on={deposit.on} onClick={() => updateDeposit({ on: !deposit.on })} />
-              </div>
-              {deposit.on && (
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-xs text-dim">{t("Percentuale")}</span>
-                  <span className="flex items-center gap-1"><input type="number" min={0} max={100} value={deposit.pct} onChange={(e) => updateDeposit({ pct: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} className={`${inp} w-20`} /><span className="text-dim">%</span></span>
-                </div>
-              )}
-              <p className="mt-1.5 text-[11px] text-faint">{t("Voce unica: vale per tutte le strutture. Mostrata all'ospite alla prenotazione diretta.")}</p>
-            </div>
-            <p className="mt-3 text-[11px] text-faint">{t("I servizi extra si gestiscono in «Upselling & extra»; l'ospite li sceglie durante la prenotazione.")}</p>
           </Card>
         </div>
       </div>
