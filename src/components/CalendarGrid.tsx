@@ -579,7 +579,7 @@ export default function CalendarGrid() {
     const ghost = dragView && dragView.targetUnitId === unit.id ? dragView : null;
     // Stato di OGGI: verde = disponibile, rosso = occupata, "!" = fuori servizio.
     const todayIso = toISO(new Date());
-    const occNow = uBookings.some((b) => b.channel !== "cancelled" && b.status !== "cancelled" && b.checkIn <= todayIso && todayIso < b.checkOut);
+    const occNow = uBookings.some((b) => b.status !== "cancelled" && b.checkIn <= todayIso && todayIso < b.checkOut);
     return (
       <div key={unit.id} className="flex border-b border-line">
         <div className="sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: rowH }}>
