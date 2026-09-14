@@ -618,9 +618,12 @@ export default function PuliziePage() {
                             <div className="w-24 shrink-0"><div className={`font-display text-base font-bold ${isDone ? "text-dim line-through" : "text-txt"}`}>{r.unit.name}</div></div>
                             <div className="w-32 shrink-0"><span className="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white" style={{ backgroundColor: a.color }}>{t(a.label)}</span></div>
                             <div className="min-w-0 flex-1 basis-64 text-sm">{details(r)}<div className="mt-2">{noteInput(k)}</div></div>
-                            {clickable && (
-                              <button onClick={() => toggleDone(k)} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs ${isDone ? "border-[color:var(--ok)] bg-[color:var(--ok)] text-white" : "border-line text-faint hover:border-[color:var(--ok)]"}`}>{isDone ? "✓" : ""}</button>
-                            )}
+                            <div className="flex shrink-0 items-center gap-2">
+                              {clickable && (
+                                <button onClick={() => toggleDone(k)} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition ${isDone ? "bg-[color:var(--ok)] text-white" : "border border-line text-dim hover:border-[color:var(--ok)] hover:text-[color:var(--ok)]"}`}>{isDone ? <><span>✓</span> {t("Fatta")}{doneTime(k) ? ` · ${doneTime(k)}` : ""}</> : t("Segna come fatta")}</button>
+                              )}
+                              <button onClick={() => setIssueDraft({ unitId: r.unit.id, unitName: r.unit.name, structureName: r.structure.name, type: "guasto", note: "", photo: undefined })} title={t("Segnala un problema")} className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition ${roomHasIssue(r.unit.id) ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:border-[color:var(--err)] hover:text-[color:var(--err)]"}`}><Icon name="alertTriangle" size={15} /></button>
+                            </div>
                           </div>
                         </div>
                       );
