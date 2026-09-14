@@ -206,7 +206,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!("spigolestay:data:v1" in snap)) return;
           const localChanged = syncSignature(snap) !== syncSignature(lastSynced.current);
           if (localChanged) {
-            // Ho modifiche locali → le invio al server.
+            // PROTEZIONE ANTI-PERDITA: se il locale è vuoto ma il server ha dati reali, NON sovrascrivere.
+            // Recupera invece i dati dal server (evita di cancellare tutto dopo un logout/onboarding).
+            if (!hasRealData(snap)) {
+              const { data: sd } = await supabase!.from("app_state").select("data").eq("user_id", userId).maybeSingle();
+              const serverData = (sd?.data ?? null) as Record<string, string> | null;
+              if (serverData && hasRealData(serverData)) { restore(serverData); lastSynced.current = serverData; location.reload(); return; }
+            }
+            // Ho modifiche locali (valide) → le invio al server.
             lastSynced.current = { ...snap };
             await supabase!.from("app_state").upsert({ user_id: userId, data: snap, updated_at: new Date().toISOString() });
             void syncProfile(userId);
@@ -228,12 +235,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         if (sessionStorage.getItem(flagKey) === uid) {
-          // Già reidratato in questa scheda: salva SUBITO lo stato corrente sul server, così ciò
-          // che è stato fatto prima di un reload (es. onboarding) viene salvato anche senza logout.
+          // Già reidratato in questa scheda: salva lo stato corrente sul server SOLO se ha dati reali.
+          // PROTEZIONE ANTI-PERDITA: se il locale è vuoto (es. dopo un reload/onboarding sul vuoto), non
+          // sovrascrivere il server; anzi, se il server ha dati reali li recuperiamo qui.
           try {
             const snap = snapshot();
-            await supabase!.from("app_state").upsert({ user_id: uid, data: snap, updated_at: new Date().toISOString() });
-            lastSynced.current = snap;
+            if (hasRealData(snap)) {
+              await supabase!.from("app_state").upsert({ user_id: uid, data: snap, updated_at: new Date().toISOString() });
+              lastSynced.current = snap;
+            } else {
+              const { data: sd } = await supabase!.from("app_state").select("data").eq("user_id", uid).maybeSingle();
+              const serverData = (sd?.data ?? null) as Record<string, string> | null;
+              if (serverData && hasRealData(serverData)) {
+                restore(serverData);
+                lastSynced.current = serverData;
+                location.reload();
+                return;
+              }
+              lastSynced.current = snap;
+            }
           } catch { lastSynced.current = {}; }
           void syncProfile(uid);
           setHydrated(true);
