@@ -12,9 +12,10 @@ type QData = {
   dep?: number;      // acconto € (0 = paga intero)
   gn?: string; ge?: string; // ospite nome/email
   oe?: string;       // email proprietario
-  sid?: string; rt?: string; // riferimenti (per futuro webhook)
+  sid?: string; rt?: string; // riferimenti (per la conferma lato struttura)
   ref?: string;      // codice preventivo
   acct?: string;     // account Stripe Connect della struttura (incassa il proprietario)
+  uid?: string;      // id utente del proprietario (destinatario della prenotazione)
 };
 
 const fmtDate = (iso?: string) => { if (!iso) return "—"; try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; } };
@@ -28,12 +29,18 @@ export default function PreventivoPubblico() {
     try {
       const sp = new URLSearchParams(window.location.search);
       const q = sp.get("q");
-      if (q) setData(JSON.parse(decodeURIComponent(atob(q))));
+      let parsed: QData | null = null;
+      if (q) { parsed = JSON.parse(decodeURIComponent(atob(q))); setData(parsed); }
       const paid = sp.get("paid"), sid = sp.get("session_id");
       if (paid === "1" && sid) {
         setState("paid");
-        fetch(`/api/stripe/session?id=${encodeURIComponent(sid)}`).then((r) => r.json()).then((j) => {
-          if (j?.paymentStatus && j.paymentStatus !== "paid") setState("view");
+        // Registra la prenotazione lato struttura (crea la prenotazione e conferma il preventivo).
+        // La route verifica su Stripe che il pagamento sia reale prima di scrivere qualsiasi cosa.
+        fetch("/api/stripe/quote/confirm", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sid, acct: parsed?.acct ?? "" }),
+        }).then((r) => r.json()).then((j) => {
+          if (j?.error === "not_paid") setState("view");
         }).catch(() => {});
       }
     } catch { setMsg("Link non valido."); }
@@ -57,7 +64,7 @@ export default function PreventivoPubblico() {
           successUrl: url,
           cancelUrl: url,
           acct: data.acct ?? "",
-          metadata: { sid: data.sid ?? "", rt: data.rt ?? "", ci: data.ci ?? "", co: data.co ?? "", ad: data.ad ?? "", ch: data.ch ?? "", tot: data.tot ?? "", dep: payAmount, gn: data.gn ?? "", ge: data.ge ?? "", oe: data.oe ?? "", ref: data.ref ?? "" },
+          metadata: { sid: data.sid ?? "", rt: data.rt ?? "", ci: data.ci ?? "", co: data.co ?? "", ad: data.ad ?? "", ch: data.ch ?? "", tot: data.tot ?? "", dep: payAmount, gn: data.gn ?? "", ge: data.ge ?? "", oe: data.oe ?? "", ref: data.ref ?? "", uid: data.uid ?? "" },
         }),
       });
       if (res.status === 503) { setState("noconfig"); return; }

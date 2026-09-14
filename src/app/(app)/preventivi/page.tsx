@@ -11,6 +11,7 @@ import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } fro
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
+import { useAuth } from "@/lib/authsync";
 
 type Lang = "it" | "en" | "fr" | "de" | "es";
 const LANGS: [Lang, string][] = [["it", "Italiano"], ["en", "English"], ["fr", "Français"], ["de", "Deutsch"], ["es", "Español"]];
@@ -81,6 +82,7 @@ export default function PreventiviPage() {
   const { t } = useLang();
   const ask = useConfirm();
   const { structures, roomTypes, units, bookings, guests, rateOverrides, addGuest, updateGuest, addBooking, addActivity, activeStructureId } = useData();
+  const { user } = useAuth();
   const lockedStructure = activeStructureId !== "all"; // struttura scelta in alto → niente scelta nel preventivo
 
   // Parametri in arrivo dal wizard "Aggiungi prenotazione" (modalità Preventivo): precompilano il modulo.
@@ -160,6 +162,24 @@ export default function PreventiviPage() {
   const loaded = useRef(false);
   useEffect(() => { if (!loaded.current) return; try { localStorage.setItem("spigolestay:preventivi", JSON.stringify(saved)); } catch {} }, [saved]);
   useEffect(() => { try { const raw = localStorage.getItem("spigolestay:preventivi"); if (raw) setSaved(JSON.parse(raw)); } catch {} }, []);
+  // Riconciliazione: se esiste una prenotazione nata dal pagamento online del preventivo, segnalo confermato.
+  useEffect(() => {
+    setSaved((prev) => {
+      let changed = false;
+      const next = prev.map((p) => {
+        if (p.status === "confermato") return p;
+        const ref = `${p.number}/${new Date(p.createdAt).getFullYear()}`;
+        const hit = bookings.some((b) => b.status !== "cancelled" && (
+          (typeof b.extId === "string" && b.extId.startsWith("stripe:") && b.structureId === p.structureId && b.checkIn === p.checkIn && b.checkOut === p.checkOut)
+          || (typeof b.note === "string" && b.note.includes(`n. ${ref}`))
+        ));
+        if (hit) { changed = true; return { ...p, status: "confermato" as const }; }
+        return p;
+      });
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings]);
   useEffect(() => { loaded.current = true; }, []);
 
   // Pre-riempimento da un link (es. dal calendario: struttura, camera, date).
@@ -307,7 +327,7 @@ export default function PreventiviPage() {
   const stSocials = ([["facebook", structure?.facebook], ["instagram", structure?.instagram], ["linkedin", structure?.linkedin]] as [string, string | undefined][])
     .filter(([, u]) => u && u.trim()).map(([k, u]) => ({ k, url: socialHref(u!) }));
   // Link pubblico "Conferma e paga": l'ospite apre, vede l'importo del preventivo e paga (Stripe).
-  const payData = { s: structureName, ci: checkIn, co: checkOut, ad: adults, ch: children, rooms: roomLines.map((l) => ({ name: roomTypes.find((rt) => rt.id === l.roomTypeId)?.name ?? "Camera", amount: Math.round((l as { amount?: number; price?: number }).amount ?? ((l as { price?: number }).price ?? 0) * n) })), tot: total, dep: deposit, gn: name.trim(), ge: email.trim(), oe: structure?.email ?? "", sid: structureId, rt: roomLines[0]?.roomTypeId ?? "", ref: quoteRef, acct: structure?.stripeAccount ?? "" };
+  const payData = { s: structureName, ci: checkIn, co: checkOut, ad: adults, ch: children, rooms: roomLines.map((l) => ({ name: roomTypes.find((rt) => rt.id === l.roomTypeId)?.name ?? "Camera", amount: Math.round((l as { amount?: number; price?: number }).amount ?? ((l as { price?: number }).price ?? 0) * n) })), tot: total, dep: deposit, gn: name.trim(), ge: email.trim(), oe: structure?.email ?? "", sid: structureId, rt: roomLines[0]?.roomTypeId ?? "", ref: quoteRef, acct: structure?.stripeAccount ?? "", uid: user?.id ?? "" };
   const payUrl = (() => { try { return `${typeof window !== "undefined" ? window.location.origin : ""}/preventivo?q=${btoa(encodeURIComponent(JSON.stringify(payData)))}`; } catch { return ""; } })();
   // Accorcia il link (Supabase short_links → /g/<code>) per non mandare URL lunghissimi.
   const payShortRef = useRef<Record<string, string>>({});
@@ -320,7 +340,8 @@ export default function PreventiviPage() {
     save();
     setMailState({ sending: true });
     try {
-      const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: email.trim(), subject: `Preventivo ${structureName}`, text: shareMsg(await getPayLink()), accent: structure?.photoColor, replyTo: structure?.email }) });
+      const payLink = await getPayLink();
+      const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: email.trim(), subject: `Preventivo ${structureName}`, text: outMsg, ctaUrl: payLink, ctaLabel: "Conferma e paga online →", accent: structure?.photoColor, replyTo: structure?.email }) });
       const j = await r.json().catch(() => ({}));
       setMailState({ sending: false, ok: r.ok && j?.ok, msg: (r.ok && j?.ok) ? `Inviato a ${email.trim()}` : (j?.error || `Errore ${r.status}`) });
     } catch (e) { setMailState({ sending: false, ok: false, msg: e instanceof Error ? e.message : "Rete non disponibile" }); }

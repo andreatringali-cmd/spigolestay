@@ -107,7 +107,7 @@ async function send(to: string, subject: string, html: string, replyTo?: string)
 
 export async function POST(req: Request) {
   if (!KEY) return NextResponse.json({ ok: false, error: "RESEND_API_KEY non configurata" }, { status: 500 });
-  let body: { kind?: string; booking?: BookingPayload; checkinUrl?: string; guests?: CheckinGuest[]; arrival?: string; operatorEmail?: string; to?: string; subject?: string; text?: string; accent?: string; replyTo?: string };
+  let body: { kind?: string; booking?: BookingPayload; checkinUrl?: string; guests?: CheckinGuest[]; arrival?: string; operatorEmail?: string; to?: string; subject?: string; text?: string; accent?: string; replyTo?: string; ctaUrl?: string; ctaLabel?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "JSON non valido" }, { status: 400 }); }
   const b = body.booking || {};
   try {
@@ -127,7 +127,15 @@ export async function POST(req: Request) {
     if (body.kind === "quote") {
       if (!body.to) return NextResponse.json({ ok: false, error: "Email destinatario mancante" }, { status: 400 });
       const subject = body.subject || "Preventivo";
-      const html = shell(subject, body.accent || "#285f92", `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>`);
+      const accent = body.accent || "#285f92";
+      // Pulsante di azione (Conferma e paga): l'URL viaggia dentro il bottone, non come testo lungo.
+      const cta = body.ctaUrl
+        ? `<div style="margin:22px 0 6px;">
+             <a href="${esc(body.ctaUrl)}" style="display:block;text-align:center;background:${accent};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:10px;">${esc(body.ctaLabel || "Conferma e paga online →")}</a>
+           </div>
+           <p style="margin:8px 0 0;font-size:12px;color:#9aa1ac;text-align:center;">Pagamento sicuro con Stripe · carta, PayPal, Klarna e altri metodi.</p>`
+        : "";
+      const html = shell(subject, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>${cta}`);
       const data = await send(body.to, subject, html, body.replyTo);
       return NextResponse.json({ ok: true, id: data?.id });
     }
