@@ -1,0 +1,157 @@
+<title>Rete città Xenora</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1f2430; --dim:#5b6472; --faint:#8b93a1;
+    --line:#e6e9ee; --brand:#285f92; --brand-soft:#eaf1f8;
+    --ok:#0e9f6e; --ok-soft:#e6f6ef; --warn:#c67a00; --warn-soft:#fbf1e0;
+    --accent:#7c3aed; --accent-soft:#f0e9fb;
+    --shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0e1116; --panel:#161b22; --ink:#e8ecf2; --dim:#a4adba; --faint:#7b8494;
+      --line:#242b35; --brand:#5aa0e0; --brand-soft:#16263a; --ok:#37d39a; --ok-soft:#12241d;
+      --warn:#e0a24a; --warn-soft:#2a2113; --accent:#a985f0; --accent-soft:#1e1730;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1116; --panel:#161b22; --ink:#e8ecf2; --dim:#a4adba; --faint:#7b8494;
+    --line:#242b35; --brand:#5aa0e0; --brand-soft:#16263a; --ok:#37d39a; --ok-soft:#12241d;
+    --warn:#e0a24a; --warn-soft:#2a2113; --accent:#a985f0; --accent-soft:#1e1730;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:920px;margin:0 auto;padding-block:36px;padding-left:20px;padding-right:20px}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
+  h1{font-size:clamp(26px,5vw,38px);line-height:1.1;margin:.35em 0 .25em;font-weight:800;letter-spacing:-.02em;text-wrap:balance}
+  .lede{font-size:17px;color:var(--dim);max-width:62ch;margin:0}
+  .brandrow{display:flex;align-items:center;gap:10px}
+  .mark{width:30px;height:30px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:800}
+  .brandname{font-weight:700;letter-spacing:.02em}
+  section{margin-top:34px}
+  h2{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:0 0 14px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+  .card{padding:18px}
+  /* reciprocity */
+  .recip{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:center}
+  @media(max-width:680px){.recip{grid-template-columns:1fr}}
+  .recip .side{padding:16px;border-radius:14px;border:1px solid var(--line);background:var(--panel)}
+  .recip .side h3{margin:0 0 8px;font-size:15px}
+  .recip .mid{text-align:center;color:var(--accent);font-weight:800;font-size:14px}
+  .recip .mid .sym{font-size:26px;display:block;line-height:1}
+  .toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;margin-top:8px;font-size:13.5px}
+  .sw{width:34px;height:20px;border-radius:999px;background:var(--ok);position:relative;flex:none}
+  .sw.off{background:var(--faint)}
+  .sw::after{content:"";position:absolute;top:2px;left:16px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s}
+  .sw.off::after{left:2px}
+  .muted{color:var(--faint)}
+  /* metrics */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:680px){.grid3{grid-template-columns:1fr 1fr}}
+  @media(max-width:440px){.grid3{grid-template-columns:1fr}}
+  .metric{padding:14px;border-radius:12px;border:1px solid var(--line);background:var(--panel)}
+  .metric .v{font-size:22px;font-weight:800;letter-spacing:-.02em}
+  .metric .l{font-size:12.5px;color:var(--dim);margin-top:2px}
+  .metric .you{font-size:11.5px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:var(--faint)}
+  .bar{height:6px;border-radius:999px;background:var(--brand-soft);margin-top:6px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--brand);border-radius:999px}
+  .demo{font-size:11px;color:var(--faint);margin-top:10px}
+  /* privacy */
+  ul.clean{margin:0;padding:0;list-style:none}
+  ul.clean li{position:relative;padding:6px 0 6px 22px;font-size:14px;color:var(--dim);border-top:1px solid var(--line)}
+  ul.clean li:first-child{border-top:0}
+  ul.clean li::before{content:"";position:absolute;left:2px;top:12px;width:8px;height:8px;border-radius:50%;background:var(--ok)}
+  ul.clean li b{color:var(--ink);font-weight:650}
+  /* phases */
+  .phases{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:680px){.phases{grid-template-columns:1fr}}
+  .ph{padding:16px;border-radius:14px;border:1px solid var(--line);background:var(--panel)}
+  .ph .tag{font-size:11px;font-weight:800;letter-spacing:.05em;color:var(--accent);text-transform:uppercase}
+  .ph h3{margin:6px 0 4px;font-size:15.5px}
+  .ph p{margin:0;font-size:13.5px;color:var(--dim)}
+  .note{margin-top:14px;padding:14px 16px;border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 12px 12px 0;font-size:13.5px;color:var(--ink)}
+  .note b{font-weight:750}
+  footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px}
+</style>
+
+<div class="wrap">
+  <div class="brandrow"><div class="mark">X</div><div class="brandname">Xenora</div></div>
+
+  <div class="eyebrow">Rete città · intelligence di mercato</div>
+  <h1>La rete dei B&amp;B della tua città</h1>
+  <p class="lede">Ogni struttura vede come sta andando la propria città — occupazione, prezzi, domanda — in forma <b>anonima e aggregata</b>. Più strutture partecipano, più i dati sono precisi e più funzionano i <b>prezzi dinamici</b>.</p>
+
+  <section>
+    <h2>Il meccanismo · dai per ricevere</h2>
+    <div class="panel card">
+      <div class="recip">
+        <div class="side">
+          <h3>Tu condividi</h3>
+          <div class="toggle"><span>Occupazione</span><span class="sw"></span></div>
+          <div class="toggle"><span>Prezzo medio / RevPAR</span><span class="sw"></span></div>
+          <div class="toggle"><span>Domanda futura</span><span class="sw off"></span></div>
+          <p class="demo">Ogni dato ha una spunta on/off. Sempre anonimo.</p>
+        </div>
+        <div class="mid"><span class="sym">⇄</span>reciprocità</div>
+        <div class="side">
+          <h3>Tu ricevi</h3>
+          <div class="toggle"><span>Occupazione città</span><span class="muted">visibile ✓</span></div>
+          <div class="toggle"><span>Fascia prezzi città</span><span class="muted">visibile ✓</span></div>
+          <div class="toggle"><span>Domanda futura città</span><span class="muted">oscurato</span></div>
+          <p class="demo">Vedi un dato solo se lo condividi anche tu.</p>
+        </div>
+      </div>
+      <div class="note"><b>Perché conviene a tutti:</b> la stessa spunta governa dare e ricevere. Così nessuno prende senza dare, il pool resta ricco e i prezzi dinamici funzionano meglio — per tutta la città.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Cosa vedi · esempio</h2>
+    <div class="grid3">
+      <div class="metric">
+        <div class="v">78%</div><div class="l">Occupazione media città</div>
+        <div class="bar"><i style="width:62%"></i></div>
+        <div class="you">Tu: 62% · sotto la media</div>
+      </div>
+      <div class="metric">
+        <div class="v">94 €</div><div class="l">ADR medio (prezzo/notte)</div>
+        <div class="bar"><i style="width:80%"></i></div>
+        <div class="you">Tu: 82 € · margine di crescita</div>
+      </div>
+      <div class="metric">
+        <div class="v">73 €</div><div class="l">RevPAR città</div>
+        <div class="bar"><i style="width:70%"></i></div>
+        <div class="you">Tu: 51 € · da migliorare</div>
+      </div>
+    </div>
+    <p class="demo">Numeri d'esempio, a scopo illustrativo. Nella versione reale sono calcolati sui dati veri e anonimi delle strutture della città.</p>
+  </section>
+
+  <section>
+    <h2>Privacy &amp; regole</h2>
+    <div class="panel card">
+      <ul class="clean">
+        <li><b>Sempre anonimo e aggregato:</b> mai la singola struttura riconoscibile.</li>
+        <li><b>Soglia minima:</b> un dato compare solo se lo condividono almeno N strutture (altrimenti “dati insufficienti”).</li>
+        <li><b>Opt-in totale:</b> partecipi solo se vuoi, e scegli metrica per metrica.</li>
+        <li><b>Solo storico e domanda aggregata</b>, non i prezzi futuri del vicino — per rispettare le regole di concorrenza.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Il percorso</h2>
+    <div class="phases">
+      <div class="ph"><div class="tag">v1 · oggi fattibile</div><h3>Polso del mercato</h3><p>Occupazione e prezzi medi della città, con confronto “tu vs media” sullo storico.</p></div>
+      <div class="ph"><div class="tag">v2</div><h3>Domanda futura</h3><p>Quanto è già piena la città per ogni data + accelerazione delle prenotazioni (pickup).</p></div>
+      <div class="ph"><div class="tag">v3</div><h3>Prezzi dinamici locali</h3><p>“La città il 15/8 è al 92%, tu al 55% → alza a X €.” Prezzo basato sulla domanda <b>vera</b>, non stimata.</p></div>
+    </div>
+    <div class="note"><b>Il vantaggio competitivo:</b> altri strumenti <i>stimano</i> la domanda; qui la <b>misuri</b> dai B&amp;B reali della tua città. È il motore che sostituisce servizi di dynamic pricing da centinaia di euro al mese.</div>
+  </section>
+
+  <footer>
+    Anteprima concettuale della “Rete città” di Xenora · intelligence di mercato anonima tra gli abbonati della stessa città, con reciprocità e soglia di anonimato.
+  </footer>
+</div>

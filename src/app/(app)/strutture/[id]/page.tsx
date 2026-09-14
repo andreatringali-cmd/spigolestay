@@ -333,12 +333,6 @@ export default function StrutturaSchedaPage() {
                 </div>
               </label>
             )}
-            {/* Anteprima mappa */}
-            <div className="mt-3 overflow-hidden rounded-lg border border-line" style={{ height: 220 }}>
-              {mapEmbed
-                ? <iframe title={t("Mappa struttura")} src={mapEmbed} width="100%" height="100%" style={{ border: 0 }} loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
-                : <div className="grid h-full place-items-center text-center text-xs text-faint">{t("Inserisci indirizzo o coordinate")}<br />{t("per vedere la posizione sulla mappa")}</div>}
-            </div>
           </Card>
 
           {/* Servizi */}
@@ -352,6 +346,16 @@ export default function StrutturaSchedaPage() {
             <div className="mt-3 flex gap-2">
               <input value={newSvc} onChange={(e) => setNewSvc(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSvc(); } }} placeholder={t("Aggiungi un servizio…")} className={inp} />
               <button type="button" onClick={addSvc} disabled={!newSvc.trim()} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Aggiungi")}</button>
+            </div>
+          </Card>
+
+          {/* Mappa (sotto Servizi & dotazioni) */}
+          <Card>
+            <SectionTitle>{t("Posizione sulla mappa")}</SectionTitle>
+            <div className="mt-1 overflow-hidden rounded-lg border border-line" style={{ height: 220 }}>
+              {mapEmbed
+                ? <iframe title={t("Mappa struttura")} src={mapEmbed} width="100%" height="100%" style={{ border: 0 }} loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+                : <div className="grid h-full place-items-center text-center text-xs text-faint">{t("Inserisci indirizzo o coordinate")}<br />{t("per vedere la posizione sulla mappa")}</div>}
             </div>
           </Card>
         </div>

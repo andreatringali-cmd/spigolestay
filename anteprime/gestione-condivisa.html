@@ -1,0 +1,171 @@
+<title>Gestione condivisa Xenora</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1f2430; --dim:#5b6472; --faint:#8b93a1;
+    --line:#e6e9ee; --brand:#285f92; --brand-soft:#eaf1f8;
+    --ok:#0e9f6e; --ok-soft:#e6f6ef; --warn:#c67a00; --warn-soft:#fbf1e0; --shadow:0 1px 2px rgba(20,30,50,.06),0 8px 24px rgba(20,30,50,.05);
+  }
+  :root:not([data-theme="light"]){}
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0e1116; --panel:#161b22; --ink:#e8ecf2; --dim:#a4adba; --faint:#7b8494;
+      --line:#242b35; --brand:#5aa0e0; --brand-soft:#16263a; --ok:#37d39a; --ok-soft:#12241d;
+      --warn:#e0a24a; --warn-soft:#2a2113; --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1116; --panel:#161b22; --ink:#e8ecf2; --dim:#a4adba; --faint:#7b8494;
+    --line:#242b35; --brand:#5aa0e0; --brand-soft:#16263a; --ok:#37d39a; --ok-soft:#12241d;
+    --warn:#e0a24a; --warn-soft:#2a2113; --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:920px;margin:0 auto;padding-block:36px;padding-left:20px;padding-right:20px}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--brand)}
+  h1{font-size:clamp(26px,5vw,38px);line-height:1.1;margin:.35em 0 .25em;font-weight:800;letter-spacing:-.02em;text-wrap:balance}
+  .lede{font-size:17px;color:var(--dim);max-width:60ch;margin:0}
+  .brandrow{display:flex;align-items:center;gap:10px}
+  .mark{width:30px;height:30px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:800}
+  .brandname{font-weight:700;letter-spacing:.02em}
+  section{margin-top:34px}
+  h2{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:0 0 14px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+  /* flow */
+  .flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:stretch;gap:10px}
+  .step{padding:18px 16px;border-radius:16px;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow)}
+  .step .n{width:26px;height:26px;border-radius:50%;background:var(--brand-soft);color:var(--brand);font-weight:800;font-size:13px;display:grid;place-items:center;margin-bottom:10px}
+  .step h3{margin:0 0 4px;font-size:16px;font-weight:700}
+  .step p{margin:0;font-size:13.5px;color:var(--dim)}
+  .arrow{align-self:center;color:var(--faint);font-size:22px;font-weight:700}
+  @media(max-width:680px){
+    .flow{grid-template-columns:1fr}
+    .arrow{transform:rotate(90deg);justify-self:center;padding:2px 0}
+  }
+  /* whosees */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr}}
+  .card{padding:18px}
+  .card h3{margin:0 0 10px;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+  .tag.share{background:var(--ok-soft);color:var(--ok)}
+  .tag.priv{background:var(--warn-soft);color:var(--warn)}
+  ul.clean{margin:0;padding:0;list-style:none}
+  ul.clean li{position:relative;padding:6px 0 6px 22px;font-size:14px;color:var(--dim);border-top:1px solid var(--line)}
+  ul.clean li:first-child{border-top:0}
+  ul.clean li::before{content:"";position:absolute;left:2px;top:12px;width:8px;height:8px;border-radius:50%;background:var(--brand)}
+  ul.clean li b{color:var(--ink);font-weight:650}
+  /* data model */
+  .stores{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:680px){.stores{grid-template-columns:1fr}}
+  .store{padding:16px;border-radius:14px;border:1px solid var(--line)}
+  .store.personal{background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--warn-soft) 40%,transparent))}
+  .store.shared{background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--brand-soft) 55%,transparent))}
+  .store .lab{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+  .chip{display:inline-block;margin:6px 6px 0 0;padding:5px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--line);font-size:12.5px;font-weight:600}
+  .note{margin-top:14px;padding:14px 16px;border-left:3px solid var(--ok);background:var(--ok-soft);border-radius:0 12px 12px 0;font-size:13.5px;color:var(--ink)}
+  .note b{font-weight:750}
+  .safe{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:680px){.safe{grid-template-columns:1fr}}
+  .safe .s{padding:14px;border-radius:12px;border:1px solid var(--line);background:var(--panel)}
+  .safe .s .h{font-weight:700;font-size:14px;margin:0 0 4px}
+  .safe .s p{margin:0;font-size:13px;color:var(--dim)}
+  footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);color:var(--faint);font-size:12.5px}
+  .k+ b{color:var(--ink)}
+</style>
+
+<div class="wrap">
+  <div class="brandrow">
+    <div class="mark">X</div><div class="brandname">Xenora</div>
+  </div>
+
+  <div class="eyebrow">Gestione condivisa</div>
+  <h1>Gestire insieme una struttura in società</h1>
+  <p class="lede">Ognuno tiene le proprie strutture private nel proprio account. Una struttura in comune con un socio si condivide con un invito: la vedete e la gestite <b>entrambi</b>, in tempo reale.</p>
+
+  <section>
+    <h2>Come funziona · 3 passi</h2>
+    <div class="flow">
+      <div class="step">
+        <div class="n">1</div>
+        <h3>Invito via email</h3>
+        <p>Dalla scheda della struttura scrivi l'email del socio e premi <b>“Invita un socio”</b>. Gli arriva un'email con un pulsante.</p>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="n">2</div>
+        <h3>Il socio accetta</h3>
+        <p>Apre l'email, accede con la <b>sua</b> email invitata e conferma. Nessuno scambio di password.</p>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="n">3</div>
+        <h3>Gestione insieme</h3>
+        <p>La struttura compare nell'account del socio. Da lì <b>entrambi</b> vedete e modificate calendario, tariffe e prenotazioni.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Chi vede cosa</h2>
+    <div class="grid2">
+      <div class="panel card">
+        <h3>Struttura in comune <span class="tag share">condivisa</span></h3>
+        <ul class="clean">
+          <li>Visibile e modificabile da <b>entrambi i soci</b></li>
+          <li>Calendario, tariffe, prenotazioni, pulizie: <b>sempre allineati</b></li>
+          <li>Le modifiche di uno si vedono subito dall'altro</li>
+        </ul>
+      </div>
+      <div class="panel card">
+        <h3>Le tue altre strutture <span class="tag priv">private</span></h3>
+        <ul class="clean">
+          <li>Restano <b>solo tue</b>: il socio non le vede</li>
+          <li>Nessun dato personale viene mai condiviso</li>
+          <li>Un menù in alto sceglie la struttura, con la vista <b>“Tutte”</b> che unisce i numeri</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Dove vivono i dati (per il consulente)</h2>
+    <div class="panel card">
+      <div class="stores">
+        <div class="store personal">
+          <div class="lab">Archivio personale · per ogni utente</div>
+          <div style="margin-top:6px">
+            <span class="chip">Le tue strutture private</span>
+            <span class="chip">Camere</span>
+            <span class="chip">Prenotazioni</span>
+            <span class="chip">Impostazioni</span>
+          </div>
+          <p style="margin:12px 0 0;font-size:13px;color:var(--dim)">Accessibile <b>solo</b> dal titolare dell'account.</p>
+        </div>
+        <div class="store shared">
+          <div class="lab">Archivio condiviso · per organizzazione</div>
+          <div style="margin-top:6px">
+            <span class="chip">Struttura in comune</span>
+            <span class="chip">Camere</span>
+            <span class="chip">Prenotazioni</span>
+            <span class="chip">Tariffe &amp; piani</span>
+          </div>
+          <p style="margin:12px 0 0;font-size:13px;color:var(--dim)">Accessibile <b>solo ai membri</b> di quella società (regole di sicurezza a livello di database).</p>
+        </div>
+      </div>
+      <div class="note"><b>Separazione netta:</b> il gestionale mostra un'unica vista comoda (le tue + la comune), ma sotto i dati restano in due archivi distinti. Ciò che è privato non entra mai in quello condiviso, e viceversa.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Sicurezza dei dati · 3 protezioni</h2>
+    <div class="safe">
+      <div class="s"><p class="h">🛡️ Blocco svuotamenti</p><p>Il database rifiuta qualsiasi scrittura che cancellerebbe dati reali. Vale sia per l'archivio personale sia per quello condiviso.</p></div>
+      <div class="s"><p class="h">🔀 Fusione, non sovrascrittura</p><p>Con due persone che lavorano insieme, le modifiche si <b>uniscono</b> per elemento: una copia vecchia non può cancellare il lavoro di una più recente.</p></div>
+      <div class="s"><p class="h">🕘 Storico &amp; backup</p><p>Ogni versione precedente è conservata (recupero possibile) e ognuno può esportare un backup dei dati in un file.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    Anteprima concettuale della funzione “Gestione condivisa” di Xenora · pensata per co-gestire una struttura in società mantenendo private le altre.
+  </footer>
+</div>
