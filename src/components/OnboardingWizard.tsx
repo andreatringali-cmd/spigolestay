@@ -49,7 +49,12 @@ type Cam = { name: string; count: string; beds: string };
 
 export default function OnboardingWizard() {
   const [active, setActive] = useState(false);
-  useEffect(() => { setActive(isOnboardingActive()); }, []);
+  const [hasData, setHasData] = useState(false); // utente di ritorno con dati già presenti
+  useEffect(() => {
+    setActive(isOnboardingActive());
+    try { const d = JSON.parse(localStorage.getItem("spigolestay:data:v1") || "{}"); setHasData(Array.isArray(d.structures) && d.structures.length > 0); } catch {}
+  }, []);
+  const skipOnboarding = () => { markOnboarded(); setActive(false); };
   const { enabled: authEnabled, signOut } = useAuth();
 
   const [step, setStep] = useState(0);
@@ -155,6 +160,11 @@ export default function OnboardingWizard() {
             <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-faint"><span>Configurazione</span><span>{step + 1} / {STEPS.length}</span></div>
             <div className="h-1.5 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full transition-all duration-300" style={{ width: `${((step + 1) / STEPS.length) * 100}%`, backgroundColor: "var(--focus)" }} /></div>
           </div>
+          {hasData && (
+            <button onClick={skipOnboarding} title="Salta la configurazione: hai già i tuoi dati" className="flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold text-white transition hover:opacity-90" style={{ backgroundColor: "var(--focus)", borderColor: "var(--focus)" }}>
+              Ho già configurato →
+            </button>
+          )}
           {authEnabled && (
             <button onClick={() => void signOut()} title="Esci e torna all'accesso" className="flex shrink-0 items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim transition hover:bg-wash">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
