@@ -91,7 +91,8 @@ export default function CalendarGrid() {
   const rowH = vw.dense ? 31 : 42;
   // Stato pulizie di oggi (dalla pagina Pulizie): chiave = `unitId:YYYY-MM-DD`.
   const [cleanDone, setCleanDone] = useState<Record<string, string>>({});
-  useEffect(() => { try { const d = localStorage.getItem("spigolestay:pulizie:done"); if (d) setCleanDone(JSON.parse(d)); } catch {} }, []);
+  const [linenDone, setLinenDone] = useState<Record<string, string>>({});
+  useEffect(() => { try { const d = localStorage.getItem("spigolestay:pulizie:done"); if (d) setCleanDone(JSON.parse(d)); const l = localStorage.getItem("spigolestay:pulizie:linen"); if (l) setLinenDone(JSON.parse(l)); } catch {} }, []);
   const [roomInfoId, setRoomInfoId] = useState<string | null>(null); // scheda camera in pannello (senza cambiare pagina)
   // Aggiorna lo stato pulizia di OGGI (accende/spegne la scopa nel calendario) e lo persiste per Pulizie.
   const setCleanState = (unitId: string, cleaned: boolean) => {
@@ -99,6 +100,15 @@ export default function CalendarGrid() {
       const next = { ...prev }; const key = `${unitId}:${toISO(new Date())}`;
       if (cleaned) next[key] = new Date().toISOString(); else delete next[key];
       try { localStorage.setItem("spigolestay:pulizie:done", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+  // Stato cambio lenzuola di OGGI (icona lenzuola verde quando fatto).
+  const setLinenState = (unitId: string, done: boolean) => {
+    setLinenDone((prev) => {
+      const next = { ...prev }; const key = `${unitId}:${toISO(new Date())}`;
+      if (done) next[key] = new Date().toISOString(); else delete next[key];
+      try { localStorage.setItem("spigolestay:pulizie:linen", JSON.stringify(next)); } catch {}
       return next;
     });
   };
@@ -623,7 +633,10 @@ export default function CalendarGrid() {
     // Icona cambio lenzuola: dovuto ad arrivo/partenza o ogni N giorni (Frequenza cambio lenzuola).
     const linenN = freqDays(unit.linenFreq);
     const linenDue = !unit.outOfService && (arrToday || depToday || (!!stayNow && linenN > 0 && daysIn > 0 && daysIn % linenN === 0));
-    const linenEl = <span className="shrink-0" style={{ color: linenDue ? "var(--focus)" : "var(--faint)" }} title={linenDue ? "Cambio lenzuola oggi" : "Nessun cambio lenzuola oggi"}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8v10" /><path d="M3 14h18" /><path d="M21 18v-5a3 3 0 0 0-3-3H9v4" /><path d="M6 11.5h.01" /></svg></span>;
+    const linenDoneToday = !!linenDone[`${unit.id}:${todayIso}`];
+    const linenColor = !linenDue ? "var(--faint)" : linenDoneToday ? "var(--ok)" : "var(--focus)";
+    const linenTitle = !linenDue ? "Nessun cambio lenzuola oggi" : linenDoneToday ? "Lenzuola cambiate oggi" : "Lenzuola da cambiare";
+    const linenEl = <span className="shrink-0" style={{ color: linenColor }} title={linenTitle}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8v10" /><path d="M3 14h18" /><path d="M21 18v-5a3 3 0 0 0-3-3H9v4" /><path d="M6 11.5h.01" /></svg></span>;
     return (
       <div key={unit.id} className="flex border-b border-line">
         <div className="sticky left-0 z-10 flex min-w-0 shrink-0 items-center gap-1.5 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: rowH }}>
@@ -1593,6 +1606,9 @@ export default function CalendarGrid() {
           lastCleanIso={Object.entries(cleanDone).filter(([k]) => k.startsWith(`${u.id}:`)).map(([, v]) => v).sort().pop()}
           cleanedToday={!!cleanDone[`${u.id}:${toISO(new Date())}`]}
           onSaveClean={setCleanState}
+          lastLinenIso={Object.entries(linenDone).filter(([k]) => k.startsWith(`${u.id}:`)).map(([, v]) => v).sort().pop()}
+          linenDoneToday={!!linenDone[`${u.id}:${toISO(new Date())}`]}
+          onSaveLinen={setLinenState}
           updateUnit={updateUnit}
           deleteUnit={(id) => { deleteUnit(id); }}
           addUnit={addUnit}
@@ -1744,9 +1760,11 @@ function MenuToggle({ label, on, onClick }: { label: string; on: boolean; onClic
 
 const RS_ROW = "grid grid-cols-[145px_1fr] items-center gap-3 py-1.5";
 const RS_FLD = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
-function RoomSettingsModal({ unit, typeName, lastCleanIso, cleanedToday, onSaveClean, updateUnit, deleteUnit, addUnit, onClose }: {
+function RoomSettingsModal({ unit, typeName, lastCleanIso, cleanedToday, onSaveClean, lastLinenIso, linenDoneToday, onSaveLinen, updateUnit, deleteUnit, addUnit, onClose }: {
   unit: Unit; typeName: string; lastCleanIso?: string; cleanedToday: boolean;
   onSaveClean: (unitId: string, cleaned: boolean) => void;
+  lastLinenIso?: string; linenDoneToday: boolean;
+  onSaveLinen: (unitId: string, done: boolean) => void;
   updateUnit: (id: string, patch: Partial<Unit>) => void;
   deleteUnit: (id: string) => void;
   addUnit: (u: { structureId: string; roomTypeId: string; name: string }) => string;
@@ -1758,13 +1776,17 @@ function RoomSettingsModal({ unit, typeName, lastCleanIso, cleanedToday, onSaveC
   const [tidy, setTidy] = useState(unit.tidyFreq ?? "1 Giorno");
   const [days, setDays] = useState<string[]>(unit.serviceDays ?? []);
   const [clean, setClean] = useState(cleanedToday ? "Pulita" : "Da pulire");
+  const [linenSt, setLinenSt] = useState(linenDoneToday ? "Cambiate" : "Da cambiare");
   const [notes, setNotes] = useState(unit.notes ?? "");
   const toggleDay = (d: string) => setDays((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d]));
   const idShort = (unit.id || "").replace(/[^0-9]/g, "").slice(-6) || unit.id.slice(-4);
-  const lastCleanTxt = lastCleanIso ? (() => { try { const d = new Date(lastCleanIso); return `${d.toLocaleDateString("it-IT")} ${d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`; } catch { return "—"; } })() : "—";
+  const fmtDt = (iso?: string) => iso ? (() => { try { const d = new Date(iso); return `${d.toLocaleDateString("it-IT")} ${d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`; } catch { return "—"; } })() : "—";
+  const lastCleanTxt = fmtDt(lastCleanIso);
+  const lastLinenTxt = fmtDt(lastLinenIso);
   const save = () => {
     updateUnit(unit.id, { name: name.trim() || unit.name, order: Math.floor(Number(order)) || 0, linenFreq: linen, tidyFreq: tidy, serviceDays: days, notes });
     onSaveClean(unit.id, clean === "Pulita");
+    onSaveLinen(unit.id, linenSt === "Cambiate");
     onClose();
   };
   const copy = () => {
@@ -1795,6 +1817,8 @@ function RoomSettingsModal({ unit, typeName, lastCleanIso, cleanedToday, onSaveC
           </div>
           <div className={RS_ROW}><span className="text-sm text-dim">Stato pulizia</span><select value={clean} onChange={(e) => setClean(e.target.value)} className={RS_FLD}><option value="Da pulire">Da pulire</option><option value="Pulita">Pulita</option></select></div>
           <div className={RS_ROW}><span className="text-sm text-dim">Data ultima pulizia</span><span className="text-sm text-dim">{lastCleanTxt}</span></div>
+          <div className={RS_ROW}><span className="text-sm text-dim">Stato lenzuola</span><select value={linenSt} onChange={(e) => setLinenSt(e.target.value)} className={RS_FLD}><option value="Da cambiare">Da cambiare</option><option value="Cambiate">Cambiate</option></select></div>
+          <div className={RS_ROW}><span className="text-sm text-dim">Ultimo cambio lenzuola</span><span className="text-sm text-dim">{lastLinenTxt}</span></div>
         </div>
         <div className="mt-3"><span className="text-sm text-dim">Note interne</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={`${RS_FLD} mt-1 resize-y`} /></div>
         <div className="mt-4 flex items-center gap-2">
