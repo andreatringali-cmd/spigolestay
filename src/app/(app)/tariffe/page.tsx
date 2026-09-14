@@ -5,6 +5,7 @@ import { useData } from "@/lib/store";
 import { addDays, isWeekend, toISO, weekdayShort } from "@/lib/dates";
 import type { RoomType } from "@/lib/types";
 import { effectiveBase, effectiveMinStay, effectiveClosed } from "@/lib/pricing";
+import { AV_COLORS } from "@/lib/users";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
@@ -77,6 +78,8 @@ export default function TariffePage() {
   const childrenOf = (id: string) => types.filter((x) => x.deriveFrom === id);
   const descendantsOf = (id: string): RoomType[] => { const out: RoomType[] = []; const walk = (pid: string) => childrenOf(pid).forEach((c) => { out.push(c); walk(c.id); }); walk(id); return out; };
   const roots = types.filter((rt) => !rt.deriveFrom || !types.some((x) => x.id === rt.deriveFrom));
+  // Colore identità della camera (come nel calendario): colore tipologia o palette per indice.
+  const typeColor = (rt: RoomType) => rt.color ?? AV_COLORS[Math.max(0, types.findIndex((x) => x.id === rt.id)) % AV_COLORS.length];
   const Chevron = ({ open }: { open: boolean }) => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-faint transition-transform" style={{ transform: open ? "rotate(90deg)" : "none" }}><polyline points="9 18 15 12 9 6" /></svg>;
 
   // Riga tabella "Prezzi base" (madre o derivata)
@@ -96,6 +99,7 @@ export default function TariffePage() {
             {!derived && (kids.length > 0
               ? <button onClick={() => toggleMaster(rt.id)} title={isOpen ? t("Comprimi") : t("Espandi")} className="shrink-0"><Chevron open={isOpen} /></button>
               : <span className="inline-block w-3 shrink-0" />)}
+            <span className="h-5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: typeColor(rt) }} />
             <span className="font-semibold text-txt">{rt.name}</span>
             <Occ n={rt.maxOccupancy ?? rt.beds} />
             {derived
@@ -122,7 +126,7 @@ export default function TariffePage() {
   // Riga tabella "Anteprima prezzi" (madre o derivata)
   const prevRow = (rt: RoomType) => {
     const base = effectiveBase(rt, roomTypes);
-    const color = rt.color ?? "var(--focus)";
+    const color = typeColor(rt);
     const derived = !!rt.deriveFrom;
     const kids = childrenOf(rt.id);
     const isOpen = openMasters.has(rt.id);
