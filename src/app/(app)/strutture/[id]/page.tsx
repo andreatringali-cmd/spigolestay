@@ -49,6 +49,30 @@ export default function StrutturaSchedaPage() {
   const existing = structures.find((s) => s.id === params.id);
   const [f, setF] = useState<Structure>(() => (isNew ? blankStructure() : { ...blankStructure(), ...existing }));
   const set = <K extends keyof Structure>(k: K, v: Structure[K]) => setF((p) => ({ ...p, [k]: v }));
+  // Stripe Connect: collega il Stripe del proprietario di questa struttura (incassa lui).
+  const [stripeSt, setStripeSt] = useState<{ loading?: boolean; enabled?: boolean; msg?: string }>({});
+  const verifyStripe = async (acct: string) => { try { const r = await fetch(`/api/stripe/connect?id=${encodeURIComponent(acct)}`); const j = await r.json(); setStripeSt({ enabled: !!j?.chargesEnabled }); } catch {} };
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const acct = sp.get("acct");
+      if (sp.get("stripe") === "done" && acct && !isNew) { updateStructure(params.id as string, { stripeAccount: acct }); setF((p) => ({ ...p, stripeAccount: acct })); verifyStripe(acct); }
+      else if (existing?.stripeAccount) verifyStripe(existing.stripeAccount);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const connectStripe = async () => {
+    if (isNew) { setStripeSt({ msg: t("Salva prima la struttura.") }); return; }
+    setStripeSt({ loading: true });
+    try {
+      const r = await fetch("/api/stripe/connect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ structureId: params.id, accountId: f.stripeAccount || undefined, returnUrl: `${window.location.origin}/strutture/${params.id}` }) });
+      if (r.status === 503) { setStripeSt({ msg: t("Stripe non ancora configurato (manca la chiave piattaforma).") }); return; }
+      const j = await r.json();
+      if (j?.accountId) updateStructure(params.id as string, { stripeAccount: j.accountId });
+      if (j?.url) { window.location.href = j.url; return; }
+      setStripeSt({ msg: j?.message || t("Errore") });
+    } catch { setStripeSt({ loading: false, msg: t("Rete non disponibile") }); }
+  };
   const num = (v: string) => (v === "" ? undefined : Number(v.replace(",", ".")));
 
   // La pagina può montarsi PRIMA che lo store abbia caricato i dati: quando la struttura diventa
@@ -428,6 +452,16 @@ export default function StrutturaSchedaPage() {
               <label className={lbl}>{t("Valuta")}<select value={f.currency ?? "EUR"} onChange={(e) => set("currency", e.target.value)} className={`${inp} mt-1`}><option value="EUR">{t("€ Euro")}</option><option value="USD">{t("$ Dollaro")}</option><option value="GBP">{t("£ Sterlina")}</option></select></label>
               <label className={`${lbl} col-span-2`}>{t("Lingua predefinita")}<select value={f.language ?? "it"} onChange={(e) => set("language", e.target.value)} className={`${inp} mt-1`}>{USER_LANGS.map((l) => <option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}</select></label>
             </div>
+            {!isNew && (
+              <div className="mt-3 rounded-lg border border-line bg-paper p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div><div className="text-sm font-semibold text-txt">{t("Pagamenti online (Stripe)")}</div><div className="text-[11px] text-faint">{t("Gli ospiti pagano preventivi e prenotazioni; l'incasso arriva sul tuo Stripe.")}</div></div>
+                  {f.stripeAccount && <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: stripeSt.enabled ? "color-mix(in srgb, var(--ok) 15%, transparent)" : "color-mix(in srgb, var(--warn) 15%, transparent)", color: stripeSt.enabled ? "var(--ok)" : "var(--warn)" }}>{stripeSt.enabled ? t("Collegato ✓") : t("Da completare")}</span>}
+                </div>
+                <button onClick={connectStripe} disabled={stripeSt.loading} className="mt-2 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{stripeSt.loading ? t("Attendi…") : f.stripeAccount ? (stripeSt.enabled ? t("Gestisci su Stripe") : t("Completa collegamento")) : t("Collega Stripe")}</button>
+                {stripeSt.msg && <p className="mt-1 text-[11px]" style={{ color: "var(--err)" }}>{stripeSt.msg}</p>}
+              </div>
+            )}
           </Card>
 
           {/* Booking Engine & servizi extra */}

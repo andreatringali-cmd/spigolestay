@@ -88,6 +88,8 @@ export interface Structure {
   // Pagamenti
   iban?: string;
   ibanHolder?: string;
+  stripeAccount?: string;      // id account Stripe Connect collegato (acct_…) — l'incasso va a questo account
+  stripeChargesEnabled?: boolean; // onboarding completato e pagamenti abilitati
   payMethods?: string[];   // contanti, carta, bonifico, PayPal
   currency?: string;
   language?: string;

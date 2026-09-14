@@ -14,6 +14,7 @@ type QData = {
   oe?: string;       // email proprietario
   sid?: string; rt?: string; // riferimenti (per futuro webhook)
   ref?: string;      // codice preventivo
+  acct?: string;     // account Stripe Connect della struttura (incassa il proprietario)
 };
 
 const fmtDate = (iso?: string) => { if (!iso) return "—"; try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; } };
@@ -55,6 +56,7 @@ export default function PreventivoPubblico() {
           email: data.ge,
           successUrl: url,
           cancelUrl: url,
+          acct: data.acct ?? "",
           metadata: { sid: data.sid ?? "", rt: data.rt ?? "", ci: data.ci ?? "", co: data.co ?? "", ad: data.ad ?? "", ch: data.ch ?? "", tot: data.tot ?? "", dep: payAmount, gn: data.gn ?? "", ge: data.ge ?? "", oe: data.oe ?? "", ref: data.ref ?? "" },
         }),
       });

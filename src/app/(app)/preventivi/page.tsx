@@ -306,7 +306,7 @@ export default function PreventiviPage() {
   const stSocials = ([["facebook", structure?.facebook], ["instagram", structure?.instagram], ["linkedin", structure?.linkedin]] as [string, string | undefined][])
     .filter(([, u]) => u && u.trim()).map(([k, u]) => ({ k, url: socialHref(u!) }));
   // Link pubblico "Conferma e paga": l'ospite apre, vede l'importo del preventivo e paga (Stripe).
-  const payData = { s: structureName, ci: checkIn, co: checkOut, ad: adults, ch: children, rooms: roomLines.map((l) => ({ name: roomTypes.find((rt) => rt.id === l.roomTypeId)?.name ?? "Camera", amount: Math.round((l as { amount?: number; price?: number }).amount ?? ((l as { price?: number }).price ?? 0) * n) })), tot: total, dep: deposit, gn: name.trim(), ge: email.trim(), oe: structure?.email ?? "", sid: structureId, rt: roomLines[0]?.roomTypeId ?? "", ref: quoteRef };
+  const payData = { s: structureName, ci: checkIn, co: checkOut, ad: adults, ch: children, rooms: roomLines.map((l) => ({ name: roomTypes.find((rt) => rt.id === l.roomTypeId)?.name ?? "Camera", amount: Math.round((l as { amount?: number; price?: number }).amount ?? ((l as { price?: number }).price ?? 0) * n) })), tot: total, dep: deposit, gn: name.trim(), ge: email.trim(), oe: structure?.email ?? "", sid: structureId, rt: roomLines[0]?.roomTypeId ?? "", ref: quoteRef, acct: structure?.stripeAccount ?? "" };
   const payUrl = (() => { try { return `${typeof window !== "undefined" ? window.location.origin : ""}/preventivo?q=${btoa(encodeURIComponent(JSON.stringify(payData)))}`; } catch { return ""; } })();
   const msgWithPay = `${outMsg}\n\nConferma e paga online: ${payUrl}`;
   const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(msgWithPay)}` : "#";
