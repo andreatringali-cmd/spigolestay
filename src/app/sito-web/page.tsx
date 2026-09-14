@@ -133,7 +133,8 @@ function Site() {
   const [wantsCot, setWantsCot] = useState(false);
   const setChN = (n: number) => { setCh(n); if (n === 0) setWantsCot(false); setChildAges((prev) => { const next = prev.slice(0, n); while (next.length < n) next.push(8); return next; }); };
 
-  const types = roomTypes.filter((rt) => rt.structureId === sid);
+  // Home: solo le camere "madri". Le tariffe derivate (es. uso singola) compaiono come opzioni in "Verifica disponibilità".
+  const types = roomTypes.filter((rt) => rt.structureId === sid && !rt.deriveFrom);
   const go = (extra = "") => { window.location.href = `/prenota?s=${sid}&ci=${ci}&co=${co}&ad=${ad}&ch=${ch}${ch > 0 ? `&ages=${childAges.join(",")}` : ""}${wantsCot ? "&cot=1" : ""}${extra}`; };
 
   // Galleria: foto delle tipologie + foto delle singole camere, con etichetta della tipologia.
