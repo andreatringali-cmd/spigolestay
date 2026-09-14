@@ -302,7 +302,7 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
                   <div key={k.id} className="flex flex-col items-center px-3">
                     {/* connettore squadrato: bus orizzontale + discesa verticale */}
                     <div className="relative h-4 w-full">
-                      {!single && <div className="absolute top-0" style={{ height: 3, backgroundColor: CONN, left: first ? "50%" : 0, right: last ? "50%" : 0 }} />}
+                      {!single && <div className="absolute top-0" style={{ height: 3, backgroundColor: CONN, left: first ? "50%" : "-0.75rem", right: last ? "50%" : "-0.75rem" }} />}
                       <div className="absolute top-0 left-1/2 h-4 -translate-x-1/2" style={{ width: 3, backgroundColor: CONN }} />
                     </div>
                     <span className="relative z-10 rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow-sm" style={{ backgroundColor: (k.deriveValue ?? 0) >= 0 ? "var(--ok)" : "var(--err)" }}>{scartoOf(k)}</span>
