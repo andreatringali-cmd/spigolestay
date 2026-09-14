@@ -173,8 +173,35 @@ function Site() {
 
   const field = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
+  // Dati strutturati (schema.org) per Google: aiuta a mostrare il sito diretto con risultati ricchi e a posizionarlo.
+  const minPrice = types.length ? Math.min(...types.map((rt) => effectiveBase(rt, roomTypes))) : undefined;
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "LodgingBusiness",
+    name,
+    ...(structure?.description ? { description: structure.description } : {}),
+    ...(structure?.phone ? { telephone: structure.phone } : {}),
+    ...(structure?.email ? { email: structure.email } : {}),
+    ...(structure?.website ? { url: structure.website } : {}),
+    ...(gallery.length ? { image: gallery.map((g) => g.src).slice(0, 8) } : {}),
+    ...(minPrice ? { priceRange: `€${minPrice}+` } : {}),
+    address: {
+      "@type": "PostalAddress",
+      ...(structure?.address ? { streetAddress: [structure.address, structure.streetNumber].filter(Boolean).join(" ") } : {}),
+      ...(structure?.city ? { addressLocality: structure.city } : {}),
+      ...(structure?.postalCode ? { postalCode: structure.postalCode } : {}),
+      ...(structure?.province ? { addressRegion: structure.province } : {}),
+      addressCountry: structure?.country || "IT",
+    },
+    ...(structure?.lat != null && structure?.lng != null ? { geo: { "@type": "GeoCoordinates", latitude: structure.lat, longitude: structure.lng } } : {}),
+    ...((structure?.services ?? []).length ? { amenityFeature: (structure!.services ?? []).map((sv) => ({ "@type": "LocationFeatureSpecification", name: sv, value: true })) } : {}),
+    ...(structure?.checkInFrom ? { checkinTime: structure.checkInFrom } : {}),
+    ...(structure?.checkOutBy ? { checkoutTime: structure.checkOutBy } : {}),
+  };
+
   return (
     <div className="flex min-h-full flex-col bg-wash pb-16 md:pb-0">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <style>{`.xreveal{opacity:0;transform:translateY(22px);transition:opacity .6s ease,transform .6s ease}.xreveal.xin{opacity:1;transform:none}@media(prefers-reduced-motion:reduce){.xreveal{opacity:1;transform:none;transition:none}}`}</style>
       {/* Top bar */}
       <div className="border-b border-line bg-surface">
