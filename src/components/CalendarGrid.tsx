@@ -577,12 +577,15 @@ export default function CalendarGrid() {
   const unitRow = (unit: (typeof units)[number], s: (typeof structures)[number]) => {
     const uBookings = bookings.filter((b) => b.unitId === unit.id);
     const ghost = dragView && dragView.targetUnitId === unit.id ? dragView : null;
-    const occNow = uBookings.some((b) => b.checkIn <= toISO(start) && toISO(start) < b.checkOut);
-    const dot = unit.outOfService ? "var(--faint)" : occNow ? "var(--err)" : "var(--ok)";
+    // Stato di OGGI: verde = disponibile, rosso = occupata, "!" = fuori servizio.
+    const todayIso = toISO(new Date());
+    const occNow = uBookings.some((b) => b.channel !== "cancelled" && b.status !== "cancelled" && b.checkIn <= todayIso && todayIso < b.checkOut);
     return (
       <div key={unit.id} className="flex border-b border-line">
         <div className="sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: rowH }}>
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: dot }} title={unit.outOfService ? "Fuori servizio" : occNow ? "Occupata" : "Libera"} />
+          {unit.outOfService
+            ? <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold leading-none text-white" style={{ backgroundColor: "var(--warn)" }} title="Fuori servizio">!</span>
+            : <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: occNow ? "var(--err)" : "var(--ok)" }} title={occNow ? "Oggi occupata" : "Oggi disponibile"} />}
           <Link href={`/camere?u=${unit.id}`} title="Apri impostazioni camera" className={`truncate text-[13px] font-medium hover:text-focus hover:underline ${unit.outOfService ? "text-faint line-through" : "text-txt"}`}>{unit.name}</Link>
           {vw.group === "type" && <span className="ml-auto shrink-0 rounded px-1 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, ${s.photoColor ?? "var(--faint)"} 20%, transparent)`, color: s.photoColor ?? "var(--dim)" }} title={s.name}>{initials(s.name)}</span>}
         </div>
