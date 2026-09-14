@@ -402,7 +402,7 @@ export default function GuidaOspitiPage() {
   };
 
   const struct = structures.find((s) => s.id === sid);
-  const guide = all[sid] ?? emptyGuide(sid, struct?.name ?? "", struct?.city ?? "Siracusa");
+  const guide = all[sid] ?? emptyGuide(sid, struct?.name ?? "", struct?.city ?? "");
   const set = (patch: Partial<Guide>) => {
     // Prima modifica manuale di questa guida nella sessione → una voce nel registro attività.
     if (loaded && !loggedGuideSids.current.has(sid)) { loggedGuideSids.current.add(sid); addActivity("config", `Guida ospiti aggiornata${struct?.name ? " — " + struct.name : ""}`); }
@@ -468,11 +468,16 @@ export default function GuidaOspitiPage() {
   useEffect(() => {
     if (!loaded) return;
     const cur = all[sid];
-    const base = cur ?? emptyGuide(sid, struct?.name ?? "", struct?.city ?? "Siracusa");
+    const base = cur ?? emptyGuide(sid, struct?.name ?? "", struct?.city ?? "");
     // Lo scaffold delle sezioni è sempre presente: così le operative (contatti, WiFi, recensioni)
     // compaiono da sole appena la struttura ha i dati, senza che l'host scriva nulla.
     const merged = { ...base, ...structFields, content: base.content ?? EMPTY_CONTENT, id: sid, social: { ...base.social, ...(structFields.social ?? {}) } };
-    if (JSON.stringify(cur ?? null) !== JSON.stringify(merged)) persist({ ...all, [sid]: merged });
+    if (JSON.stringify(cur ?? null) !== JSON.stringify(merged)) {
+      persist({ ...all, [sid]: merged });
+      // Prima creazione del record guida: ricarico l'anteprima così mostra la guida (vuota) dell'host
+      // e non l'ESEMPIO Siracusa (il motore ricade sull'esempio solo se manca del tutto il record).
+      if (!cur) setPreviewKey((k) => k + 1);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sid, structFields, loaded]);
 
