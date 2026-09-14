@@ -84,6 +84,9 @@ export default function CalendarGrid() {
   useEffect(() => { const h = (e: MouseEvent) => { if (monthRef.current && !monthRef.current.contains(e.target as Node)) setMonthOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
   const monthList = useMemo(() => { const base = new Date(); const first = new Date(base.getFullYear(), base.getMonth() - 2, 1); return Array.from({ length: 18 }, (_, i) => { const d = new Date(first.getFullYear(), first.getMonth() + i, 1); return { y: d.getFullYear(), m: d.getMonth(), label: d.toLocaleDateString("it-IT", { month: "long", year: "numeric" }) }; }); }, []);
   const rowH = vw.dense ? 31 : 42;
+  // Stato pulizie di oggi (dalla pagina Pulizie): chiave = `unitId:YYYY-MM-DD`.
+  const [cleanDone, setCleanDone] = useState<Record<string, string>>({});
+  useEffect(() => { try { const d = localStorage.getItem("spigolestay:pulizie:done"); if (d) setCleanDone(JSON.parse(d)); } catch {} }, []);
   // Su cellulare la colonna con i nomi camera è molto più stretta, così si vede più calendario.
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => { const f = () => setIsMobile(window.innerWidth < 640); f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
@@ -583,22 +586,30 @@ export default function CalendarGrid() {
     const arrToday = uBookings.some((b) => nc(b) && b.checkIn === todayIso);
     const depToday = uBookings.some((b) => nc(b) && b.checkOut === todayIso);
     const occNow = uBookings.some((b) => nc(b) && b.checkIn <= todayIso && todayIso < b.checkOut);
-    const svgP = { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+    const svgP = { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+    // Movimenti di oggi: verde IN (arrivo), rosso OUT (partenza); disponibile = cerchio verde vuoto.
     const statusEl = unit.outOfService
       ? <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full border text-[10px] font-bold leading-none text-dim" style={{ borderColor: "var(--dim)" }} title="Fuori servizio">!</span>
       : (arrToday && depToday)
-      ? <span className="shrink-0 text-dim" title="Arrivo e partenza oggi (turnover)"><svg {...svgP}><path d="M4 9h11" /><path d="M12 6l3 3-3 3" /><path d="M20 15H9" /><path d="M12 12l-3 3 3 3" /></svg></span>
+      ? <span className="shrink-0" title="Arrivo e partenza oggi (turnover)"><svg {...svgP}><g stroke="var(--ok)"><path d="M4 9h11" /><path d="M12 6l3 3-3 3" /></g><g stroke="var(--err)"><path d="M20 15H9" /><path d="M12 12l-3 3 3 3" /></g></svg></span>
       : depToday
-      ? <span className="shrink-0 text-dim" title="Partenza oggi (poi da pulire)"><svg {...svgP}><path d="M4 4v16" /><path d="M8 12h12" /><path d="M16 8l4 4-4 4" /></svg></span>
+      ? <span className="shrink-0" style={{ color: "var(--err)" }} title="Partenza oggi (poi da pulire)"><svg {...svgP} stroke="currentColor"><path d="M4 4v16" /><path d="M8 12h12" /><path d="M16 8l4 4-4 4" /></svg></span>
       : arrToday
-      ? <span className="shrink-0 text-dim" title="Arrivo oggi"><svg {...svgP}><path d="M20 4v16" /><path d="M4 12h12" /><path d="M12 8l4 4-4 4" /></svg></span>
+      ? <span className="shrink-0" style={{ color: "var(--ok)" }} title="Arrivo oggi"><svg {...svgP} stroke="currentColor"><path d="M20 4v16" /><path d="M4 12h12" /><path d="M12 8l4 4-4 4" /></svg></span>
       : occNow
       ? <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--dim)" }} title="Occupata" />
-      : <span className="h-2.5 w-2.5 shrink-0 rounded-full border-[1.5px]" style={{ borderColor: "var(--faint)" }} title="Libera oggi" />;
+      : <span className="h-2.5 w-2.5 shrink-0 rounded-full border-[1.5px]" style={{ borderColor: "var(--ok)" }} title="Libera oggi" />;
+    // Icona pulizia collegata alla pagina Pulizie: pulita (verde) / da pulire (ambra). Solo se oggi serve.
+    const needsClean = !unit.outOfService && (arrToday || depToday || occNow);
+    const cleanedToday = !!cleanDone[`${unit.id}:${todayIso}`];
+    const cleanEl = !needsClean ? null : cleanedToday
+      ? <span className="shrink-0" style={{ color: "var(--ok)" }} title="Camera pulita oggi"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l1.6 4.1L18 8.6l-3.4 2.4L15.6 15 12 12.6 8.4 15l1-4-3.4-2.4 4.4-.5z" /></svg></span>
+      : <span className="shrink-0" style={{ color: "var(--warn)" }} title="Camera da pulire"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.6 4.1L18 8.6l-3.4 2.4L15.6 15 12 12.6 8.4 15l1-4-3.4-2.4 4.4-.5z" /></svg></span>;
     return (
       <div key={unit.id} className="flex border-b border-line">
-        <div className="sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: rowH }}>
+        <div className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: rowH }}>
           {statusEl}
+          {cleanEl}
           <Link href={`/camere?u=${unit.id}`} title="Apri impostazioni camera" className={`truncate text-[13px] font-medium hover:text-focus hover:underline ${unit.outOfService ? "text-faint line-through" : "text-txt"}`}>{unit.name}</Link>
           {vw.group === "type" && <span className="ml-auto shrink-0 rounded px-1 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, ${s.photoColor ?? "var(--faint)"} 20%, transparent)`, color: s.photoColor ?? "var(--dim)" }} title={s.name}>{initials(s.name)}</span>}
         </div>
