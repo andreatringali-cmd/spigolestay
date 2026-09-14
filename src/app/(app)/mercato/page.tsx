@@ -223,10 +223,10 @@ export default function MercatoPage() {
                 const up = d.factor >= 1.03, down = d.factor <= 0.97;
                 const dt = new Date(d.date + "T00:00:00");
                 return (
-                  <div key={d.date} className="shrink-0 rounded-xl border p-2.5 text-center" style={{ width: 84, scrollSnapAlign: "start", borderColor: up ? "color-mix(in srgb,var(--ok) 45%,var(--line))" : down ? "color-mix(in srgb,var(--focus) 40%,var(--line))" : "var(--line)", background: up ? "color-mix(in srgb,var(--ok) 6%,var(--surface))" : down ? "color-mix(in srgb,var(--focus) 6%,var(--surface))" : "var(--surface)" }}>
+                  <div key={d.date} className="shrink-0 rounded-xl border p-2.5 text-center" style={{ width: 94, scrollSnapAlign: "start", borderColor: up ? "color-mix(in srgb,var(--ok) 45%,var(--line))" : down ? "color-mix(in srgb,var(--focus) 40%,var(--line))" : "var(--line)", background: up ? "color-mix(in srgb,var(--ok) 6%,var(--surface))" : down ? "color-mix(in srgb,var(--focus) 6%,var(--surface))" : "var(--surface)" }}>
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-dim">{dt.toLocaleDateString("it-IT", { weekday: "short" })}</div>
                     <div className="text-[10px] text-faint">{dt.toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</div>
-                    <div className="mt-1.5 font-mono text-lg font-bold text-txt">{eur(d.price)}</div>
+                    <div className="mt-1.5 whitespace-nowrap font-mono text-lg font-bold text-txt">{eur(d.price)}</div>
                     <div className="text-[11px] font-semibold" style={{ color: up ? "var(--ok)" : down ? "var(--focus)" : "var(--faint)" }}>{d.factor === 1 ? t("stabile") : `${d.factor > 1 ? "+" : ""}${Math.round((d.factor - 1) * 100)}%`}</div>
                     <div className="mt-1 text-[9px] leading-tight text-faint" style={{ minHeight: 22 }}>{d.reason}</div>
                   </div>
