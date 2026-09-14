@@ -856,7 +856,7 @@ export default function CalendarGrid() {
       </div>
 
       {/* Legenda OTA — sopra la riga filtri (invertita) · ✓ = collegato, sfumato = non collegato */}
-      <div className="order-[-1] flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
+      <div className="order-[-1] flex flex-wrap items-center gap-x-2.5 gap-y-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         {(Object.keys(CHANNELS) as (keyof typeof CHANNELS)[]).filter((c) => c !== "blocked").map((c) => {
           const conn = chConnected(c);
           return (
