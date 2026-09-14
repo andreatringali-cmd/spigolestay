@@ -21,36 +21,38 @@ export function trialInfo(): TrialInfo {
 }
 export const ROOM_OVERAGE = 4; // €/camera/mese oltre le incluse
 export const ANNUAL_OFF = 0.2; // −20% con fatturazione annuale
-export const ALL = ["pms", "cm", "booking", "cassa", "guide", "checkin", "concierge", "housekeeping", "messaging", "meta", "bi", "site", "rms", "ratecheck", "team"];
+export const ALL = ["pms", "cm", "booking", "cassa", "guide", "checkin", "concierge", "housekeeping", "messaging", "meta", "bi", "site", "rms", "ratecheck", "team", "sharing", "market"];
 
 export interface Tier { key: string; name: string; price: number; structures: number; includes: string[]; tagline: string }
 export const TIERS: Tier[] = [
   { key: "basic", name: "Basic", price: 29, structures: 1, includes: ["pms", "cm", "booking", "cassa", "guide"], tagline: "Per iniziare" },
-  { key: "pro", name: "Pro", price: 49, structures: 3, includes: ["pms", "cm", "booking", "cassa", "guide", "messaging", "housekeeping", "concierge", "bi", "meta", "team"], tagline: "In crescita" },
-  { key: "ultimate", name: "Ultimate", price: 89, structures: 8, includes: ALL, tagline: "Tutto incluso" },
+  { key: "pro", name: "Pro", price: 59, structures: 3, includes: ["pms", "cm", "booking", "cassa", "guide", "messaging", "housekeeping", "concierge", "bi", "meta", "team", "sharing", "market"], tagline: "In crescita" },
+  { key: "ultimate", name: "Ultimate", price: 99, structures: 8, includes: ALL, tagline: "Tutto incluso" },
 ];
 
 export interface Module { key: string; name: string; desc: string; href: string; core?: boolean }
 export const MODULES: Module[] = [
-  { key: "pms", name: "PMS", desc: "Prenotazioni, calendario, tariffe, camere e strutture, ospiti, incassi, Alloggiati Web + ISTAT e tassa di soggiorno, utenti e registro attività.", href: "/prenotazioni", core: true },
+  { key: "pms", name: "PMS", desc: "Prenotazioni, calendario, tariffe con piani tariffari e tariffe derivate, camere e strutture, ospiti con memoria & VIP, incassi, Alloggiati Web + ISTAT e tassa di soggiorno, utenti e registro attività.", href: "/prenotazioni", core: true },
   { key: "cm", name: "Channel Manager", desc: "Connessione OTA (Booking, Airbnb, Expedia…) con sincronizzazione prezzi e disponibilità e mappatura camere.", href: "/canali" },
   { key: "booking", name: "Booking Engine", desc: "Motore prenotazioni (widget) sul tuo sito, senza commissioni.", href: "/widget" },
   { key: "cassa", name: "Cassa · Prima Nota", desc: "Entrate/uscite, pagamenti ricorrenti, saldo per conto e analisi.", href: "/cassa" },
   { key: "guide", name: "Guida ospiti", desc: "Guida ospiti multilingua con QR WiFi e codici d'ingresso per camera, inviabile via WhatsApp/email.", href: "/guida-ospiti" },
   { key: "checkin", name: "Self check-in online", desc: "Check-in online con raccolta documenti, firma e notifica: l'ospite compila prima dell'arrivo. Con affiancamento all'attivazione.", href: "/guida-ospiti" },
-  { key: "concierge", name: "Vendite & Concierge", desc: "Preventivi e offerte, upselling & extra, promozioni, recensioni e assistente ricavi.", href: "/preventivi" },
+  { key: "concierge", name: "Vendite & Concierge", desc: "Preventivi con pagamento online (l'ospite conferma e paga con Stripe: carta/PayPal/Klarna…, e la prenotazione entra in calendario), upselling & extra, promozioni, recensione Google automatica al check-out e assistente ricavi.", href: "/preventivi" },
   { key: "housekeeping", name: "Housekeeping", desc: "Planning pulizie giornaliero per camera, note dell'ospite e invio su WhatsApp.", href: "/pulizie" },
   { key: "messaging", name: "Messaggi & automazioni", desc: "Messaggi automatici agli ospiti (WhatsApp/email) con modelli e trigger: benvenuto e guida, check-in, recensione.", href: "/messaggi" },
   { key: "meta", name: "Meta Search", desc: "Connessione ai principali metasearch (Google, Trivago…).", href: "/metasearch" },
   { key: "bi", name: "Statistiche & BI", desc: "Report avanzati e statistiche sui tuoi dati.", href: "/statistiche" },
   { key: "site", name: "Sito web", desc: "Mini-sito integrato con il motore prenotazioni.", href: "/sito" },
-  { key: "rms", name: "Revenue · prezzi dinamici", desc: "Suggerimenti di prezzo in base a occupazione ed eventi.", href: "/revenue" },
+  { key: "rms", name: "Revenue · prezzi dinamici", desc: "Suggerimenti di prezzo in base a occupazione ed eventi; in arrivo i prezzi dinamici locali basati sulla domanda reale della Rete città.", href: "/revenue" },
   { key: "ratecheck", name: "Rate checker", desc: "Confronto tariffe con i competitor.", href: "/rate-checker" },
   { key: "team", name: "Utenti & permessi", desc: "Multi-utente con permessi granulari, ruoli, turni e limiti operativi.", href: "/utenti" },
+  { key: "sharing", name: "Gestione condivisa (soci)", desc: "Co-gestisci una struttura in società: inviti un socio via email, entrambi gestite calendario, tariffe e prenotazioni; le tue altre strutture restano private. Vista 'Tutte' per l'aggregato.", href: "/strutture" },
+  { key: "market", name: "Rete città · intelligence di mercato", desc: "Confronta occupazione, prezzo medio (ADR) e RevPAR con la media anonima dei B&B della tua città. Reciprocità 'dai per ricevere' + soglia di anonimato. Base per i prezzi dinamici locali.", href: "/mercato" },
 ];
 
 // Prezzo add-on (€/mese) per attivare un singolo modulo NON incluso nel piano.
-export const ADDON_PRICE: Record<string, number> = { cm: 0, booking: 0, cassa: 0, guide: 6, checkin: 12, concierge: 9, housekeeping: 6, messaging: 7, meta: 6, bi: 8, site: 7, rms: 10, ratecheck: 9, team: 6 };
+export const ADDON_PRICE: Record<string, number> = { cm: 0, booking: 0, cassa: 0, guide: 6, checkin: 12, concierge: 9, housekeeping: 6, messaging: 7, meta: 6, bi: 8, site: 7, rms: 10, ratecheck: 9, team: 6, sharing: 6, market: 9 };
 
 export interface SubSummary {
   tier: Tier;

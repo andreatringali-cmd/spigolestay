@@ -24,7 +24,7 @@ export const NAV: NavItem[] = [
   { label: "Assistente ricavi", href: "/assistente-ricavi", group: "Report", icon: "sparkles", perm: "webconcierge", module: "concierge" },
   { label: "Recensioni", href: "/recensioni", group: "Report", icon: "chat", perm: "webconcierge", module: "concierge" },
   { label: "Statistiche", href: "/statistiche", group: "Report", icon: "chart", perm: "statistiche", module: "pms" },
-  { label: "Rete città", href: "/mercato", group: "Report", icon: "share", perm: "statistiche", module: "pms" },
+  { label: "Rete città", href: "/mercato", group: "Report", icon: "share", perm: "statistiche", module: "market" },
   { label: "Revenue", href: "/revenue", group: "Report", icon: "tag", perm: "revenue", module: "rms" },
   { label: "Rate checker", href: "/rate-checker", group: "Report", icon: "search", perm: "ratechecker", module: "ratecheck" },
 
