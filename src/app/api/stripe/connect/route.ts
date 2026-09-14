@@ -22,10 +22,10 @@ export async function POST(req: Request) {
     if (!acct) {
       const account = await stripe.v2.core.accounts.create({
         contact_email: email,
-        dashboard: "express", // dashboard Express ospitata da Stripe per il proprietario
+        dashboard: "full", // configurazione tipo "Standard": dashboard Stripe completa per il proprietario
         identity: { country: "IT", entity_type: "individual" },
         configuration: { merchant: { capabilities: { card_payments: { requested: true } } } },
-        // Il proprietario (connected account) si fa carico di commissioni e perdite: Stripe le recupera dal suo conto.
+        // Standard: Stripe gestisce commissioni e perdite sul conto del proprietario.
         defaults: { responsibilities: { fees_collector: "stripe", losses_collector: "stripe" } },
         include: ["configuration.merchant"],
         metadata: { structureId },
