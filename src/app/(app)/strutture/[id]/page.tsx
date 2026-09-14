@@ -13,6 +13,7 @@ import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/authsync";
+import { supabase } from "@/lib/supabase";
 import { loadDeposit, saveDeposit, type DepositCfg } from "@/lib/deposit";
 
 function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
@@ -72,6 +73,26 @@ export default function StrutturaSchedaPage() {
       if (j?.url) { window.location.href = j.url; return; }
       setStripeSt({ msg: j?.message || t("Errore") });
     } catch { setStripeSt({ loading: false, msg: t("Rete non disponibile") }); }
+  };
+  // Gestione condivisa: invita un socio a co-gestire questa struttura.
+  const [socio, setSocio] = useState<{ email: string; loading?: boolean; ok?: boolean; msg?: string }>({ email: "" });
+  const inviteSocio = async () => {
+    if (isNew) { setSocio((s) => ({ ...s, msg: t("Salva prima la struttura.") })); return; }
+    const email = socio.email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setSocio((s) => ({ ...s, ok: false, msg: t("Inserisci un'email valida") })); return; }
+    setSocio((s) => ({ ...s, loading: true, msg: undefined }));
+    try {
+      const token = (await supabase?.auth.getSession())?.data.session?.access_token;
+      if (!token) { setSocio((s) => ({ ...s, loading: false, ok: false, msg: t("Devi essere connesso") })); return; }
+      const r = await fetch("/api/org/invite", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ structureId: params.id, email }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j?.ok) {
+        if (j.orgId) { updateStructure(params.id as string, { orgId: j.orgId }); setF((p) => ({ ...p, orgId: j.orgId })); }
+        setSocio({ email: "", ok: true, msg: j.emailSent ? t("Invito inviato via email a") + " " + email : t("Invito creato (email non inviata: verifica la configurazione)") });
+      } else {
+        setSocio((s) => ({ ...s, loading: false, ok: false, msg: j?.error === "self_invite" ? t("Non puoi invitare te stesso") : (j?.message || t("Errore nell'invio dell'invito")) }));
+      }
+    } catch { setSocio((s) => ({ ...s, loading: false, ok: false, msg: t("Rete non disponibile") })); }
   };
   const num = (v: string) => (v === "" ? undefined : Number(v.replace(",", ".")));
 
@@ -485,6 +506,32 @@ export default function StrutturaSchedaPage() {
               </div>
             )}
           </Card>
+
+          {/* Gestione condivisa (socio) */}
+          {!isNew && (
+            <Card>
+              <SectionTitle>{t("Gestione condivisa")}</SectionTitle>
+              <p className="mb-3 text-xs text-dim">{t("Invita un socio a co-gestire questa struttura: la vedrete e modificherete entrambi (calendario, tariffe, prenotazioni). Le tue altre strutture restano private.")}</p>
+              {f.orgId ? (
+                <div className="rounded-lg border border-line bg-paper p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)", color: "var(--ok)" }}>{t("Condivisa ✓")}</span>
+                    <span className="text-xs text-dim">{t("Questa struttura è in gestione condivisa.")}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <input value={socio.email} onChange={(e) => setSocio((s) => ({ ...s, email: e.target.value }))} placeholder={t("email di un altro socio")} className={`${inp} flex-1`} type="email" />
+                    <button onClick={inviteSocio} disabled={socio.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{socio.loading ? t("Invio…") : t("Invita ancora")}</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className={`${lbl} flex-1`}>{t("Email del socio")}<input value={socio.email} onChange={(e) => setSocio((s) => ({ ...s, email: e.target.value }))} placeholder="socio@esempio.it" className={`${inp} mt-1`} type="email" /></label>
+                  <button onClick={inviteSocio} disabled={socio.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{socio.loading ? t("Invio…") : t("Invita un socio")}</button>
+                </div>
+              )}
+              {socio.msg && <p className="mt-2 text-[11px]" style={{ color: socio.ok ? "var(--ok)" : "var(--err)" }}>{socio.msg}</p>}
+            </Card>
+          )}
         </div>
       </div>
     </div>
