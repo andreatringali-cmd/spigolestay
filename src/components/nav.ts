@@ -34,8 +34,10 @@ export const NAV: NavItem[] = [
   { label: "Alloggiati", href: "/alloggiati", group: "Anagrafiche", icon: "id", perm: "alloggiati", module: "pms" },
   { label: "Tassa soggiorno", href: "/tassa-soggiorno", group: "Anagrafiche", icon: "receipt", perm: "tassa", module: "pms" },
 
-  // Distribuzione: dove sei prenotabile e a quali prezzi.
+  // Distribuzione: cosa vendi e a quali prezzi (catena del prezzo: base → piani → derivate).
   { label: "Tariffe", href: "/tariffe", group: "Distribuzione", icon: "tag", perm: "tariffe", module: "pms" },
+  { label: "Piani tariffari", href: "/piani-tariffari", group: "Distribuzione", icon: "tag", perm: "tariffe", module: "pms" },
+  { label: "Tariffe derivate", href: "/tariffe-derivate", group: "Distribuzione", icon: "tag", perm: "tariffe", module: "pms" },
   { label: "Canali", href: "/canali", group: "Distribuzione", icon: "share", perm: "canali", module: "cm" },
   { label: "Meta Search", href: "/metasearch", group: "Distribuzione", icon: "search", perm: "canali", module: "meta" },
   { label: "Widget sito", href: "/widget", group: "Distribuzione", icon: "eye", perm: "sito", module: "booking" },
@@ -44,7 +46,6 @@ export const NAV: NavItem[] = [
   { label: "Utenti", href: "/utenti", group: "Configurazione", icon: "users", perm: "utenti", module: "pms" },
   { label: "Strutture", href: "/strutture", group: "Configurazione", icon: "building", perm: "impostazioni", module: "pms" },
   { label: "Camere", href: "/camere", group: "Configurazione", icon: "bed", perm: "camere", module: "pms" },
-  { label: "Tariffe derivate", href: "/tariffe-derivate", group: "Configurazione", icon: "tag", perm: "camere", module: "pms" },
   { label: "Guida ospiti", href: "/guida-ospiti", group: "Configurazione", icon: "share", perm: "webconcierge", module: "guide" },
   { label: "Registro attività", href: "/registro", group: "Configurazione", icon: "clipboard", perm: "impostazioni", module: "pms" },
   { label: "Impostazioni", href: "/impostazioni", group: "Configurazione", icon: "settings", perm: "impostazioni", module: "pms" },

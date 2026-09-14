@@ -7,11 +7,9 @@ import type { RoomType } from "@/lib/types";
 import { effectiveBase, effectiveMinStay, effectiveClosed } from "@/lib/pricing";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
-import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 
 const DAYS = 14;
-const BOARDS = ["Solo pernottamento", "Colazione", "Mezza pensione", "Pensione completa"];
 
 interface RatePlan { id: string; name: string; adjPct: number; refundable: boolean; board: string; minStay: number; enabled?: boolean }
 const DEFAULT_PLANS: RatePlan[] = [
@@ -22,7 +20,6 @@ const DEFAULT_PLANS: RatePlan[] = [
 ];
 const PLANS_KEY = "spigolestay:rateplans";
 const RULES_KEY = "spigolestay:pricerules";
-const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `p-${Math.floor(performance.now() * 1000)}`);
 
 const inp = "rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus";
 
@@ -48,7 +45,6 @@ export default function TariffePage() {
   const [localStructure, setLocalStructure] = useState<string>("all");
   const effStructure = activeStructureId !== "all" ? activeStructureId : localStructure;
 
-  const ask = useConfirm();
   const { t } = useLang();
   const [plans, setPlans] = useState<RatePlan[]>(DEFAULT_PLANS);
   const [weekendPct, setWeekendPct] = useState(25);
@@ -56,17 +52,12 @@ export default function TariffePage() {
   useEffect(() => {
     try { const p = localStorage.getItem(PLANS_KEY); if (p) setPlans(JSON.parse(p)); const r = localStorage.getItem(RULES_KEY); if (r) setWeekendPct(JSON.parse(r).weekendPct ?? 25); } catch {}
   }, []);
-  const savePlans = (next: RatePlan[]) => { setPlans(next); try { localStorage.setItem(PLANS_KEY, JSON.stringify(next)); } catch {} };
   const saveWeekend = (v: number) => { setWeekendPct(v); try { localStorage.setItem(RULES_KEY, JSON.stringify({ weekendPct: v })); } catch {} };
-  const setPlan = (id: string, patch: Partial<RatePlan>) => savePlans(plans.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-  const addPlan = () => savePlans([...plans, { id: uid(), name: "Nuovo piano", adjPct: 0, refundable: true, board: "Solo pernottamento", minStay: 1, enabled: true }]);
-  const delPlan = async (id: string) => { if (!(await ask({ message: t("Eliminare questo piano tariffario?"), danger: true, confirmLabel: t("Elimina") }))) return; savePlans(plans.filter((p) => p.id !== id)); };
 
   const start = new Date();
   const s = new Date(start.getFullYear(), start.getMonth(), start.getDate());
   const days = Array.from({ length: DAYS }, (_, i) => addDays(s, i));
   const types = roomTypes.filter((rt) => effStructure === "all" || rt.structureId === effStructure);
-  const refBase = types.length ? effectiveBase(types[0], roomTypes) : 100;
   const activePlan = plans.find((p) => p.id === planId) ?? plans[0];
 
   // Prezzo del giorno per una tipologia: override calendario → base derivata → +weekend, poi piano.
@@ -177,56 +168,14 @@ export default function TariffePage() {
         </Card>
       </section>
 
-      {/* ② Piani tariffari */}
-      <section className="mb-7">
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2"><StepDot n={2} /><SectionTitle>{t("Piani tariffari")}</SectionTitle></div>
-          <button onClick={addPlan} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Nuovo piano")}</button>
-        </div>
-        <p className="mb-3 pl-8 text-xs text-dim">{t("La stessa camera, più modi di venderla. Ogni piano parte dal prezzo del giorno e applica uno scarto. Lo scegli quando crei un preventivo o una prenotazione.")}</p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {plans.map((p) => {
-            const on = p.enabled !== false;
-            const price = Math.round(refBase * (1 + p.adjPct / 100));
-            const isDefault = DEFAULT_PLANS.some((d) => d.id === p.id);
-            return (
-              <div key={p.id} className={`relative flex flex-col rounded-2xl border p-3.5 shadow-sm transition ${on ? "bg-surface" : "bg-wash opacity-80"}`} style={on ? { borderColor: "color-mix(in srgb, var(--focus) 38%, var(--line))" } : { borderColor: "var(--line)" }}>
-                <div className="flex items-start gap-2">
-                  <input value={p.name} onChange={(e) => setPlan(p.id, { name: e.target.value })} className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm font-bold text-txt outline-none hover:border-line focus:border-focus" />
-                  {!isDefault && <button onClick={() => delPlan(p.id)} title={t("Elimina")} className="rounded p-1 text-faint hover:text-[color:var(--err)]">✕</button>}
-                </div>
-                <div className="mt-1 flex items-end gap-2">
-                  <span className="font-mono text-2xl font-bold leading-none text-txt">{eur(price)}</span>
-                  <span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: p.adjPct === 0 ? "var(--wash)" : `color-mix(in srgb, ${p.adjPct > 0 ? "var(--ok)" : "var(--err)"} 16%, transparent)`, color: p.adjPct === 0 ? "var(--dim)" : p.adjPct > 0 ? "var(--ok)" : "var(--err)" }}>{p.adjPct > 0 ? "+" : ""}{p.adjPct}%</span>
-                </div>
-                <div className="text-[10px] text-faint">{t("su")} {eur(refBase)} {t("base")} · {t("esempio")}</div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px]">
-                  <select value={p.board} onChange={(e) => setPlan(p.id, { board: e.target.value })} className="rounded-full border border-line bg-paper px-2 py-1 text-[11px] text-dim outline-none focus:border-focus">{BOARDS.map((b) => <option key={b} value={b}>{t(b)}</option>)}</select>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-wash px-2 py-1 text-dim">{t("min")}<input type="number" min={1} value={p.minStay} onChange={(e) => setPlan(p.id, { minStay: Number(e.target.value) })} className="w-8 bg-transparent text-center font-semibold text-txt outline-none" />{t("notti")}</span>
-                  <button onClick={() => setPlan(p.id, { refundable: !p.refundable })} className="rounded-full px-2 py-1 font-medium" style={{ backgroundColor: `color-mix(in srgb, ${p.refundable ? "var(--ok)" : "var(--err)"} 14%, transparent)`, color: p.refundable ? "var(--ok)" : "var(--err)" }}>{p.refundable ? t("Rimborsabile") : t("Non rimborsabile")}</button>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between border-t border-line pt-2.5">
-                  <label className="flex items-center gap-1 text-[11px] text-dim">{t("Scarto")}<input type="number" value={p.adjPct} onChange={(e) => setPlan(p.id, { adjPct: Number(e.target.value) })} className={`${inp} w-16 py-1`} />%</label>
-                  <button onClick={() => setPlan(p.id, { enabled: !on })} className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: on ? "var(--ok)" : "var(--faint)" }}>
-                    <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: on ? "var(--ok)" : "var(--faint)" }} />{on ? t("Attivo") : t("Sospeso")}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-          <button onClick={addPlan} className="flex min-h-[160px] flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-line text-dim transition hover:border-focus hover:text-focus">
-            <span className="text-2xl">＋</span><span className="text-sm font-semibold">{t("Nuovo piano")}</span>
-          </button>
-        </div>
-      </section>
-
-      {/* ③ Anteprima prezzi */}
+      {/* ② Anteprima prezzi */}
       <section>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2"><StepDot n={3} /><SectionTitle>{t("Anteprima prezzi")}</SectionTitle></div>
-          <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-txt outline-none focus:border-focus">{plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.adjPct >= 0 ? "+" : ""}{p.adjPct}%)</option>)}</select>
+          <div className="flex items-center gap-2"><StepDot n={2} /><SectionTitle>{t("Anteprima prezzi")}</SectionTitle></div>
+          <div className="flex items-center gap-2">
+            <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-txt outline-none focus:border-focus">{plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.adjPct >= 0 ? "+" : ""}{p.adjPct}%)</option>)}</select>
+            <a href="/piani-tariffari" className="whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-focus hover:bg-wash">{t("Gestisci piani")} →</a>
+          </div>
         </div>
         <p className="mb-3 pl-8 text-xs text-dim">{t("Cosa vedrebbe l'ospite, giorno per giorno, con il piano scelto. In")} <b className="text-focus">{t("evidenza")}</b> {t("i prezzi forzati dal calendario.")}</p>
         <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
