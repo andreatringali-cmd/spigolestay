@@ -23,6 +23,8 @@ function loadPlanNames(): string[] {
   return DEFAULT_PLAN_NAMES;
 }
 const scartoOf = (rt: RoomType) => { const v = rt.deriveValue ?? 0; const sign = v >= 0 ? "+" : ""; return rt.deriveMode === "amount" ? `${sign}${v} €` : `${sign}${v}%`; };
+// Colore dei connettori della mappa (via di mezzo: accento smorzato)
+const CONN = "color-mix(in srgb, var(--focus) 55%, var(--line))";
 
 // Iconcine ospiti (occupazione della tariffa)
 function Occ({ n }: { n: number }) {
@@ -290,19 +292,27 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
           </div>
         </div>
         {kids.length > 0 && (
-          <>
-            <div className="h-5 w-1 rounded-full" style={{ backgroundColor: "var(--focus)" }} />
-            <div className="flex items-start gap-6">
-              {kids.map((k) => (
-                <div key={k.id} className="flex flex-col items-center">
-                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow-sm" style={{ backgroundColor: (k.deriveValue ?? 0) >= 0 ? "var(--ok)" : "var(--err)" }}>{scartoOf(k)}</span>
-                  <div className="h-3 w-1 rounded-full" style={{ backgroundColor: "var(--focus)" }} />
-                  <svg width="16" height="9" viewBox="0 0 16 9" fill="none" className="-mt-0.5" style={{ color: "var(--focus)" }}><path d="M2 2l6 5 6-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  <Node rt={k} seen={ns} />
-                </div>
-              ))}
+          <div className="flex flex-col items-center">
+            {/* tronco dal genitore al bus orizzontale */}
+            <div className="h-4" style={{ width: 3, backgroundColor: CONN }} />
+            <div className="flex items-start">
+              {kids.map((k, i) => {
+                const first = i === 0, last = i === kids.length - 1, single = kids.length === 1;
+                return (
+                  <div key={k.id} className="flex flex-col items-center px-3">
+                    {/* connettore squadrato: bus orizzontale + discesa verticale */}
+                    <div className="relative h-4 w-full">
+                      {!single && <div className="absolute top-0" style={{ height: 3, backgroundColor: CONN, left: first ? "50%" : 0, right: last ? "50%" : 0 }} />}
+                      <div className="absolute top-0 left-1/2 h-4 -translate-x-1/2" style={{ width: 3, backgroundColor: CONN }} />
+                    </div>
+                    <span className="relative z-10 rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow-sm" style={{ backgroundColor: (k.deriveValue ?? 0) >= 0 ? "var(--ok)" : "var(--err)" }}>{scartoOf(k)}</span>
+                    <div className="h-2" style={{ width: 3, backgroundColor: CONN }} />
+                    <Node rt={k} seen={ns} />
+                  </div>
+                );
+              })}
             </div>
-          </>
+          </div>
         )}
       </div>
     );
