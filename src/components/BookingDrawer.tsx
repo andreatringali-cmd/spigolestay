@@ -135,6 +135,9 @@ export default function BookingDrawer() {
   const gTotalSpent = guestStays.reduce((a, b) => a + (b.total ?? 0), 0);
   const gLastPrior = priorStays.map((b) => b.checkIn).sort().pop();
   const gVip = !!guest?.vip || gTimes >= 3; // VIP manuale oppure automatico dal 3° soggiorno
+  // ── Recensione Google dopo il check-out ──
+  const departed = booking.checkOut <= new Date().toISOString().slice(0, 10);
+  const reviewUrl = (() => { try { return JSON.parse(localStorage.getItem("spigolestay:guides") || "{}")?.[booking.structureId]?.reviewUrl || ""; } catch { return ""; } })();
   const structure = getStructure(booking.structureId);
   const roomType = getRoomType(booking.roomTypeId);
   const unitV = getUnit(booking.unitId);
@@ -357,6 +360,28 @@ export default function BookingDrawer() {
             </div>
           : <button onClick={() => setQa("incasso")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-focus hover:bg-wash">💶 {t("Registra incasso")}</button>
       )}
+      {departed && (() => {
+        const first = guest?.fullName?.split(" ")[0] ?? "";
+        const rmsg = `Grazie ${first} per aver soggiornato da ${structure?.name ?? "noi"}! Se ti sei trovato bene, ci lasceresti una recensione su Google? Ci aiuta tantissimo. ${reviewUrl}`.trim();
+        const rwa = phoneDigits ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(rmsg)}` : "";
+        return (
+          <div className="rounded-xl border p-3" style={{ borderColor: "color-mix(in srgb, var(--ok) 32%, var(--line))", backgroundColor: "color-mix(in srgb, var(--ok) 6%, transparent)" }}>
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-faint">⭐ {t("Recensione Google")}</div>
+            {reviewUrl ? (
+              <>
+                <p className="mb-2 text-[13px] text-dim">{t("Ospite in partenza: chiedi ora una recensione, aumenta il ranking.")}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  <a href={rwa || undefined} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white ${phoneDigits ? "hover:opacity-90" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}>WhatsApp</a>
+                  <a href={guest?.email ? `mailto:${guest.email}?subject=${encodeURIComponent("Grazie del soggiorno!")}&body=${encodeURIComponent(rmsg)}` : undefined} className={`flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-txt hover:bg-wash ${guest?.email ? "" : "pointer-events-none opacity-40"}`}>Email</a>
+                  <button onClick={() => navigator.clipboard?.writeText(rmsg)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-txt hover:bg-wash">{t("Copia")}</button>
+                </div>
+              </>
+            ) : (
+              <p className="text-[13px] text-dim">{t("Aggiungi il link recensioni Google nella")} <button onClick={() => { closeBooking(); router.push("/guida-ospiti"); }} className="font-semibold text-focus hover:underline">{t("Guida ospiti")}</button> {t("per chiedere le recensioni con un tap.")}</p>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 
