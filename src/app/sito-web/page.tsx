@@ -191,8 +191,8 @@ function Site() {
 
       {/* Hero + ricerca */}
       {cfg.hero && (
-        <div className="relative overflow-hidden px-4 py-14 text-white" style={{ background: cfg.heroBg ? `linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), url(${cfg.heroBg}) center/cover no-repeat` : `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 45%, #000))` }}>
-          <div className="mx-auto max-w-7xl">
+        <div className="relative flex min-h-[360px] items-center overflow-hidden px-4 py-14 text-white" style={{ background: cfg.heroBg ? `linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), url(${cfg.heroBg}) center/cover no-repeat` : `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 45%, #000))` }}>
+          <div className="mx-auto w-full max-w-7xl">
             <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{name}</h1>
             {cfg.tagline && <p className="mt-2 max-w-xl text-white/90">{cfg.tagline}</p>}
             <div className="mt-6 grid w-full gap-2 rounded-2xl bg-white/95 p-3 shadow-lg sm:grid-cols-5">

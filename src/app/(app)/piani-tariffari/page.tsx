@@ -9,7 +9,6 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 
 const BOARDS = ["Solo pernottamento", "Colazione", "Mezza pensione", "Pensione completa"];
-const BOARD_ICON: Record<string, string> = { "Solo pernottamento": "🛏️", "Colazione": "☕", "Mezza pensione": "🍽️", "Pensione completa": "🍷" };
 const DEPOSITS = [
   { id: "none", label: "Nessun anticipo" },
   { id: "deposit", label: "Acconto alla prenotazione" },
@@ -157,11 +156,11 @@ export default function PianiTariffariPage() {
                         <div className="font-semibold text-txt">{p.name}</div>
                         <div className="text-[10px] text-faint">{fmtRange(p, t)}</div>
                       </td>
-                      <td className="px-3 py-2.5 text-dim"><span className="mr-1">{BOARD_ICON[p.board] ?? "🛏️"}</span>{t(p.board)}</td>
+                      <td className="px-3 py-2.5 text-dim">{t(p.board)}</td>
                       <td className="px-3 py-2.5"><span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: p.adjPct === 0 ? "var(--wash)" : `color-mix(in srgb, ${p.adjPct > 0 ? "var(--ok)" : "var(--err)"} 16%, transparent)`, color: p.adjPct === 0 ? "var(--dim)" : p.adjPct > 0 ? "var(--ok)" : "var(--err)" }}>{p.adjPct > 0 ? "+" : ""}{p.adjPct}%</span></td>
                       <td className="px-3 py-2.5 text-center font-mono text-dim">{p.minStay}</td>
                       <td className="px-3 py-2.5"><span className="text-xs font-medium" style={{ color: p.refundable ? "var(--ok)" : "var(--err)" }}>{cancelLabel(p, t)}</span></td>
-                      <td className="px-3 py-2.5 text-xs text-dim">💳 {depositLabel(p, t)}</td>
+                      <td className="px-3 py-2.5 text-xs text-dim">{depositLabel(p, t)}</td>
                       <td className="px-3 py-2.5 text-xs text-dim">{nRooms ? `${nRooms} ${t("tipologie")}` : t("Tutte")}</td>
                       <td className="px-3 py-2.5"><button onClick={(e) => { e.stopPropagation(); setPlan(p.id, { enabled: !on }); }} className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: on ? "var(--ok)" : "var(--faint)" }}><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: on ? "var(--ok)" : "var(--faint)" }} />{on ? t("Attivo") : t("Sospeso")}</button></td>
                       <td className="px-3 py-2.5">
@@ -190,9 +189,9 @@ export default function PianiTariffariPage() {
                 <div className="mt-1 font-mono text-2xl font-bold leading-none text-txt">{eur(price)}</div>
                 <div className="text-[10px] text-faint">{t("su")} {eur(refBase)} {t("base")} · {t("esempio")}</div>
                 <div className="mt-2.5 flex flex-wrap gap-1.5 text-[11px]">
-                  <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{BOARD_ICON[p.board] ?? "🛏️"} {t(p.board)}</span>
+                  <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{t(p.board)}</span>
                   <span className="rounded-full px-2 py-0.5 font-medium" style={{ backgroundColor: `color-mix(in srgb, ${p.refundable ? "var(--ok)" : "var(--err)"} 14%, transparent)`, color: p.refundable ? "var(--ok)" : "var(--err)" }}>{cancelLabel(p, t)}</span>
-                  <span className="rounded-full bg-wash px-2 py-0.5 text-dim">💳 {depositLabel(p, t)}</span>
+                  <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{depositLabel(p, t)}</span>
                   <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{t("min")} {p.minStay} {t("notti")}</span>
                 </div>
                 <div className="mt-3 flex items-center justify-between border-t border-line pt-2.5 text-xs">
