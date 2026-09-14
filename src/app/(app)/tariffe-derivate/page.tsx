@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import type { RoomType } from "@/lib/types";
 import { AV_COLORS } from "@/lib/users";
-import { effectiveBase } from "@/lib/pricing";
+import { effectiveBase, effectiveMinStay, effectiveClosed } from "@/lib/pricing";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -111,7 +111,7 @@ export default function TariffeDerivatePage() {
               ) : (
                 <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[760px] text-sm">
+                    <table className="w-full min-w-[920px] text-sm">
                       <thead>
                         <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
                           <th className="px-3 py-2.5 font-semibold">{t("Nome")}</th>
@@ -119,6 +119,8 @@ export default function TariffeDerivatePage() {
                           <th className="px-3 py-2.5 text-center font-semibold">{t("Ospiti")}</th>
                           <th className="px-3 py-2.5 font-semibold">{t("Tariffa")}</th>
                           <th className="px-3 py-2.5 font-semibold">{t("Piano")}</th>
+                          <th className="px-3 py-2.5 text-center font-semibold">{t("Notti min.")}</th>
+                          <th className="px-3 py-2.5 font-semibold">{t("Stato")}</th>
                           <th className="px-3 py-2.5 font-semibold"></th>
                         </tr>
                       </thead>
@@ -129,6 +131,8 @@ export default function TariffeDerivatePage() {
                           const kids = kidsOf(rt.id);
                           const open = !derivClosed.has(rt.id);
                           const nCam = sUnits.filter((u) => u.roomTypeId === rt.id).length;
+                          const mMin = effectiveMinStay(rt, roomTypes);
+                          const mClosed = effectiveClosed(rt, roomTypes);
                           return (
                             <Fragment key={rt.id}>
                               <tr className="border-b border-line last:border-0">
@@ -148,6 +152,10 @@ export default function TariffeDerivatePage() {
                                 <td className="px-3 py-2.5 text-center"><Occ n={rt.maxOccupancy ?? rt.beds} /></td>
                                 <td className="px-3 py-2.5 font-mono text-dim">{eur(effectiveBase(rt, roomTypes))}<span className="text-[10px] text-faint">{t("/notte")}</span></td>
                                 <td className="px-3 py-2.5 text-xs text-faint">—</td>
+                                <td className="px-3 py-2.5 text-center font-mono text-dim">{Math.max(1, mMin || 1)}</td>
+                                <td className="px-3 py-2.5">{mClosed
+                                  ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 15%, transparent)", color: "var(--err)" }}>{t("Chiusa")}</span>
+                                  : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)", color: "var(--ok)" }}>{t("In vendita")}</span>}</td>
                                 <td className="px-3 py-2.5">
                                   <div className="flex items-center justify-end gap-1.5">
                                     <button onClick={() => setDerivModal({ structureId: s.id, parentId: rt.id })} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-wash">＋ {t("Derivata")}</button>
@@ -155,7 +163,7 @@ export default function TariffeDerivatePage() {
                                   </div>
                                 </td>
                               </tr>
-                              {open && kids.map((k) => (
+                              {open && kids.map((k) => { const kMin = effectiveMinStay(k, roomTypes); const kClosed = effectiveClosed(k, roomTypes); return (
                                 <tr key={k.id} className="border-b border-line bg-[color:color-mix(in_srgb,var(--focus)_4%,transparent)] last:border-0">
                                   <td className="px-3 py-2.5">
                                     <div className="flex min-w-0 items-center gap-2 pl-6">
@@ -170,6 +178,16 @@ export default function TariffeDerivatePage() {
                                     <span className="font-mono text-dim">{eur(effectiveBase(k, roomTypes))}</span>
                                   </td>
                                   <td className="px-3 py-2.5">{k.ratePlan ? <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{k.ratePlan}</span> : <span className="text-xs text-faint">—</span>}</td>
+                                  <td className="px-3 py-2.5 text-center">
+                                    <span className="font-mono text-dim">{Math.max(1, kMin || 1)}</span>
+                                    {k.restrictionsInherit && <span className="ml-1 text-focus" title={t("Ereditate dalla madre")}><Catena /></span>}
+                                  </td>
+                                  <td className="px-3 py-2.5">
+                                    {kClosed
+                                      ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 15%, transparent)", color: "var(--err)" }}>{t("Chiusa")}</span>
+                                      : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)", color: "var(--ok)" }}>{t("In vendita")}</span>}
+                                    {k.deriveInherit && <span className="ml-1 align-middle text-focus" title={t("Disponibilità ereditata dalla madre")}><Catena /></span>}
+                                  </td>
                                   <td className="px-3 py-2.5">
                                     <div className="flex items-center justify-end gap-1.5">
                                       <button onClick={() => setDerivModal({ structureId: s.id, editId: k.id })} className="rounded-md border border-line px-2 py-1 text-[11px] font-medium text-dim hover:bg-wash">{t("Modifica")}</button>
@@ -177,7 +195,7 @@ export default function TariffeDerivatePage() {
                                     </div>
                                   </td>
                                 </tr>
-                              ))}
+                              ); })}
                             </Fragment>
                           );
                         })}
