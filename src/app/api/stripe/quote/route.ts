@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     if (body?.metadata && typeof body.metadata === "object") {
       for (const [k, v] of Object.entries(body.metadata)) meta[k.slice(0, 40)] = String(v ?? "").slice(0, 480);
     }
-    const acct = typeof body?.acct === "string" && body.acct.startsWith("acct_") ? body.acct : "";
+    const acct = typeof body?.acct === "string" && body.acct.trim() ? body.acct.trim() : "";
     const stripe = new Stripe(key);
     const origin = req.headers.get("origin") || new URL(req.url).origin;
     const success = String(body?.successUrl || `${origin}/preventivo`);
