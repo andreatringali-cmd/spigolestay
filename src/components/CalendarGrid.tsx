@@ -596,9 +596,10 @@ export default function CalendarGrid() {
     // Icona pulizia collegata alla pagina Pulizie: pulita (verde) / da pulire (ambra). Solo se oggi serve.
     const needsClean = !unit.outOfService && (arrToday || depToday || occNow);
     const cleanedToday = !!cleanDone[`${unit.id}:${todayIso}`];
+    const broom = <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 4L9.5 14.5" /><path d="M13 8l3 3" /><path d="M9.5 14.5l-4.5 1 -1 4.5 4.5 -1 4.5 -1 -3.5 -3.5z" /><path d="M6 16l2 2" /></svg>;
     const cleanEl = !needsClean ? null : cleanedToday
-      ? <span className="shrink-0" style={{ color: "var(--ok)" }} title="Camera pulita oggi"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l1.6 4.1L18 8.6l-3.4 2.4L15.6 15 12 12.6 8.4 15l1-4-3.4-2.4 4.4-.5z" /></svg></span>
-      : <span className="shrink-0" style={{ color: "var(--warn)" }} title="Camera da pulire"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.6 4.1L18 8.6l-3.4 2.4L15.6 15 12 12.6 8.4 15l1-4-3.4-2.4 4.4-.5z" /></svg></span>;
+      ? <span className="shrink-0" style={{ color: "var(--ok)" }} title="Camera pulita oggi">{broom}</span>
+      : <span className="shrink-0" style={{ color: "var(--warn)" }} title="Camera da pulire">{broom}</span>;
     return (
       <div key={unit.id} className="flex border-b border-line">
         <div className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: rowH }}>
