@@ -63,7 +63,7 @@ export default function TariffeDerivatePage() {
   const { structures, roomTypes, units, activeStructureId, deleteRoomType } = useData();
   const ask = useConfirm();
   const [localS, setLocalS] = useState("all");
-  const [view, setView] = useState<"table" | "map">("table");
+  const [view, setView] = useState<"table" | "map">("map");
   const [derivModal, setDerivModal] = useState<null | { structureId: string; parentId?: string; editId?: string }>(null);
   const [derivOpen, setDerivOpen] = useState<Set<string>>(new Set()); // vuoto = tutte chiuse all'apertura
   const toggleDeriv = (id: string) => setDerivOpen((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -86,11 +86,11 @@ export default function TariffeDerivatePage() {
       {/* Barra: vista Tabella / Mappa + legenda */}
       <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm">
         <div className="inline-flex overflow-hidden rounded-lg border border-line">
-          <button onClick={() => setView("table")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${view === "table" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h18M3 12h18M3 19h18" /></svg>{t("Tabella")}
-          </button>
           <button onClick={() => setView("map")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${view === "map" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="3" width="6" height="5" rx="1" /><rect x="3" y="16" width="6" height="5" rx="1" /><rect x="15" y="16" width="6" height="5" rx="1" /><path d="M12 8v4M12 12H6v4M12 12h6v4" /></svg>{t("Mappa")}
+          </button>
+          <button onClick={() => setView("table")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${view === "table" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h18M3 12h18M3 19h18" /></svg>{t("Tabella")}
           </button>
         </div>
         <span className="h-4 w-px bg-line" />
@@ -98,6 +98,9 @@ export default function TariffeDerivatePage() {
         <span className="flex items-center gap-1.5"><span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span> {t("tipologia con camere proprie")}</span>
         <span className="flex items-center gap-1.5"><span className="text-focus"><Catena /></span> {t("derivata: condivide le camere della madre")}</span>
         <span className="flex items-center gap-1.5"><span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 15%, transparent)", color: "var(--err)" }}>−10%</span> {t("scarto sul prezzo della madre")}</span>
+        {scoped.length === 1 && (
+          <button onClick={() => setDerivModal({ structureId: scoped[0].id })} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Crea tariffa derivata")}</button>
+        )}
       </div>
 
       {scoped.length === 0 && <Card><div className="py-8 text-center text-sm text-faint">{t("Nessuna struttura. Creane una in")} <Link href="/strutture" className="text-focus underline">{t("Strutture")}</Link>.</div></Card>}
@@ -113,7 +116,7 @@ export default function TariffeDerivatePage() {
             <div key={s.id}>
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="font-display text-lg font-bold text-txt">{s.name}</div>
-                <button onClick={() => setDerivModal({ structureId: s.id })} disabled={masters.length === 0} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">＋ {t("Crea tariffa derivata")}</button>
+                {scoped.length > 1 && <button onClick={() => setDerivModal({ structureId: s.id })} disabled={masters.length === 0} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">＋ {t("Crea tariffa derivata")}</button>}
               </div>
 
               {types.length === 0 ? (
