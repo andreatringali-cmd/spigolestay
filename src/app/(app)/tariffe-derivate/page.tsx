@@ -288,12 +288,13 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
         </div>
         {kids.length > 0 && (
           <>
-            <div className="h-5 w-px bg-line" />
+            <div className="h-5 w-1 rounded-full" style={{ backgroundColor: "var(--focus)" }} />
             <div className="flex items-start gap-6">
               {kids.map((k) => (
                 <div key={k.id} className="flex flex-col items-center">
-                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ backgroundColor: (k.deriveValue ?? 0) >= 0 ? "var(--ok)" : "var(--err)" }}>{scartoOf(k)}</span>
-                  <div className="h-3 w-px bg-line" />
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow-sm" style={{ backgroundColor: (k.deriveValue ?? 0) >= 0 ? "var(--ok)" : "var(--err)" }}>{scartoOf(k)}</span>
+                  <div className="h-3 w-1 rounded-full" style={{ backgroundColor: "var(--focus)" }} />
+                  <svg width="16" height="9" viewBox="0 0 16 9" fill="none" className="-mt-0.5" style={{ color: "var(--focus)" }}><path d="M2 2l6 5 6-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   <Node rt={k} seen={ns} />
                 </div>
               ))}
