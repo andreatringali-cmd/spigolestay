@@ -204,13 +204,13 @@ export default function TariffeDerivatePage() {
                                   <td className="px-3 py-2.5">{k.ratePlan ? <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{k.ratePlan}</span> : <span className="text-xs text-faint">—</span>}</td>
                                   <td className="px-3 py-2.5 text-center">
                                     <span className="font-mono text-dim">{Math.max(1, kMin || 1)}</span>
-                                    {k.restrictionsInherit && <span className="ml-1 text-focus" title={t("Ereditate dalla madre")}><Catena /></span>}
+                                    {k.restrictionsInherit && <span className="ml-1 whitespace-nowrap rounded bg-wash px-1 py-0.5 text-[9px] font-medium text-faint" title={t("Valore ereditato dalla tipologia madre")}>{t("da madre")}</span>}
                                   </td>
                                   <td className="px-3 py-2.5">
                                     {kClosed
                                       ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 15%, transparent)", color: "var(--err)" }}>{t("Chiusa")}</span>
                                       : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)", color: "var(--ok)" }}>{t("In vendita")}</span>}
-                                    {k.deriveInherit && <span className="ml-1 align-middle text-focus" title={t("Disponibilità ereditata dalla madre")}><Catena /></span>}
+                                    {k.deriveInherit && <span className="ml-1 whitespace-nowrap rounded bg-wash px-1 py-0.5 text-[9px] font-medium text-faint" title={t("Disponibilità ereditata dalla tipologia madre")}>{t("da madre")}</span>}
                                   </td>
                                   <td className="px-3 py-2.5">
                                     <div className="flex items-center justify-end gap-1.5">
