@@ -152,7 +152,7 @@ export default function PianiTariffariPage() {
                   const on = p.enabled !== false;
                   const nRooms = p.roomTypeIds?.length;
                   return (
-                    <tr key={p.id} className="border-b border-line last:border-0 hover:bg-wash">
+                    <tr key={p.id} onClick={() => setEditId(p.id)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                       <td className="px-3 py-2.5">
                         <div className="font-semibold text-txt">{p.name}</div>
                         <div className="text-[10px] text-faint">{fmtRange(p, t)}</div>
@@ -163,11 +163,10 @@ export default function PianiTariffariPage() {
                       <td className="px-3 py-2.5"><span className="text-xs font-medium" style={{ color: p.refundable ? "var(--ok)" : "var(--err)" }}>{cancelLabel(p, t)}</span></td>
                       <td className="px-3 py-2.5 text-xs text-dim">💳 {depositLabel(p, t)}</td>
                       <td className="px-3 py-2.5 text-xs text-dim">{nRooms ? `${nRooms} ${t("tipologie")}` : t("Tutte")}</td>
-                      <td className="px-3 py-2.5"><button onClick={() => setPlan(p.id, { enabled: !on })} className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: on ? "var(--ok)" : "var(--faint)" }}><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: on ? "var(--ok)" : "var(--faint)" }} />{on ? t("Attivo") : t("Sospeso")}</button></td>
+                      <td className="px-3 py-2.5"><button onClick={(e) => { e.stopPropagation(); setPlan(p.id, { enabled: !on }); }} className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: on ? "var(--ok)" : "var(--faint)" }}><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: on ? "var(--ok)" : "var(--faint)" }} />{on ? t("Attivo") : t("Sospeso")}</button></td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button onClick={() => setEditId(p.id)} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-wash">{t("Dettagli")}</button>
-                          <button onClick={() => delPlan(p.id)} title={t("Elimina")} className="rounded-md border border-line px-2 py-1 text-[11px] font-medium text-[color:var(--err)] hover:bg-wash">✕</button>
+                          <button onClick={(e) => { e.stopPropagation(); delPlan(p.id); }} title={t("Elimina")} className="rounded-md border border-line px-2 py-1 text-[11px] font-medium text-[color:var(--err)] hover:bg-wash">✕</button>
                         </div>
                       </td>
                     </tr>

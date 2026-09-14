@@ -7,7 +7,7 @@ import { DEFAULT_EXTRAS } from "@/lib/types";
 import { getImages } from "@/lib/images";
 import { eur } from "@/lib/format";
 import { effectiveBase, effectiveClosed } from "@/lib/pricing";
-import { loadDeposit } from "@/lib/deposit";
+import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } from "@/lib/rate-plans";
 import { amenityIcon } from "@/lib/amenities";
 import { loadPromos } from "@/lib/promos";
 
@@ -17,11 +17,11 @@ const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate
 const nightsBetween = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000));
 const isWeekendISO = (iso: string) => { const day = new Date(iso).getDay(); return day === 5 || day === 6 || day === 0; };
 
-interface Plan { id: string; name: string; adjPct: number; refundable: boolean; board: string }
+type Plan = RatePlan;
 const DEFAULT_PLANS: Plan[] = [
-  { id: "std", name: "Standard", adjPct: 0, refundable: true, board: "Solo pernottamento" },
-  { id: "bb", name: "Colazione inclusa", adjPct: 8, refundable: true, board: "Colazione" },
-  { id: "nonref", name: "Non rimborsabile", adjPct: -10, refundable: false, board: "Solo pernottamento" },
+  { id: "flex", name: "Flessibile", adjPct: 0, refundable: true, board: "Colazione", minStay: 1, cancelDays: 3, deposit: "none" },
+  { id: "nonref", name: "Non rimborsabile", adjPct: -10, refundable: false, board: "Colazione", minStay: 1, deposit: "prepaid" },
+  { id: "long", name: "Lunga permanenza", adjPct: -12, refundable: true, board: "Colazione", minStay: 5, cancelDays: 7, deposit: "deposit", depositPct: 30 },
 ];
 
 const box = "rounded-xl border border-line bg-surface";
@@ -35,9 +35,8 @@ function Engine() {
   const { structures, roomTypes, units, bookings, guests, rateOverrides, addGuest, updateGuest, addBooking, addActivity, getStructure } = useData();
 
   // Config salvata (piani, weekend) — fallback ai default.
-  const plans = useMemo<Plan[]>(() => { try { const p = localStorage.getItem("spigolestay:rateplans"); if (p) return JSON.parse(p).filter((x: Plan) => x.id !== "flex"); } catch {} return DEFAULT_PLANS; }, []);
+  const plans = useMemo<Plan[]>(() => { const p = loadPlans(); return p.length ? p : DEFAULT_PLANS; }, []);
   const weekendPct = useMemo(() => { try { const r = localStorage.getItem("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {} return 25; }, []);
-  const depCfg = useMemo(() => loadDeposit(), []); // acconto: voce unica per tutte le strutture
   const promos = useMemo(() => { try { return loadPromos(); } catch { return []; } }, []);
 
   const qp = (k: string) => { try { return new URLSearchParams(window.location.search).get(k); } catch { return null; } };
@@ -108,7 +107,7 @@ function Engine() {
     : 0;
   const discount = appliedPromo ? Math.round(accommodation * appliedPromo.pct / 100) : 0;
   const total = accommodation + extrasTotal + cityTax - discount;
-  const depositPct = !depCfg.on ? 0 : (selPlan && !selPlan.refundable ? 100 : depCfg.pct);
+  const depositPct = selPlan ? planDepositPct(selPlan) : 0; // acconto secondo la politica di incasso del piano
   const deposit = Math.round(total * depositPct / 100);
 
   const guestValid = guest.firstName.trim() && guest.lastName.trim() && guest.email.trim() && guest.phone.trim() && privacy;
@@ -299,9 +298,11 @@ function Engine() {
             <div className="flex flex-col gap-3">
               {types.map((rt) => {
                 const free = availUnits(rt).length;
-                const cheapest = plans.reduce((min, p) => Math.min(min, stayPrice(rt, p)), Infinity);
+                // Solo i piani applicabili a questa tipologia/date/durata (intervallo temporale, notti minime, camere ammesse).
+                const rtPlans = plans.filter((p) => planApplies(p, { roomTypeId: rt.id, checkIn, nights }));
+                const cheapest = rtPlans.reduce((min, p) => Math.min(min, stayPrice(rt, p)), Infinity);
                 const tooSmall = (rt.maxOccupancy ?? rt.beds) < adults + children;
-                const noRate = !Number.isFinite(cheapest) || cheapest <= 0; // tariffa non impostata → non vendibile
+                const noRate = !Number.isFinite(cheapest) || cheapest <= 0; // nessuna tariffa/piano → non vendibile
                 return (
                   <div key={rt.id} className={`${box} overflow-hidden`}>
                     <div className="flex flex-col gap-3 p-4 sm:flex-row">
@@ -329,9 +330,9 @@ function Engine() {
                         {/* Piani */}
                         {free > 0 && !tooSmall && !noRate ? (
                           <div className="mt-3 flex flex-col gap-1.5">
-                            {plans.map((p) => (
+                            {rtPlans.map((p) => (
                               <div key={p.id} className="flex items-center justify-between rounded-lg border border-line px-3 py-2">
-                                <div><span className="text-sm font-medium text-txt">{p.name}</span> <span className="text-[11px] text-faint">· {p.board} · {p.refundable ? "cancellazione gratuita" : "non rimborsabile"}</span></div>
+                                <div><span className="text-sm font-medium text-txt">{p.name}</span> <span className="text-[11px] text-faint">· {p.board} · {cancelText(p)}{planDepositPct(p) === 0 ? " · nessun anticipo" : planDepositPct(p) === 100 ? " · prepagato" : ` · acconto ${planDepositPct(p)}%`}</span></div>
                                 <div className="flex items-center gap-3">
                                   <span className="font-mono text-sm font-bold text-txt">{eur(stayPrice(rt, p))}</span>
                                   <button onClick={() => { setSel({ rtId: rt.id, planId: p.id }); setStep("checkout"); window.scrollTo(0, 0); }} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">Scegli</button>
@@ -417,7 +418,7 @@ function Engine() {
                 <div className="my-2 border-t border-line" />
                 <div className="flex items-baseline justify-between"><span className="text-sm font-semibold text-txt">Totale</span><span className="font-mono text-xl font-bold text-txt">{eur(total)}</span></div>
                 {deposit > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">Acconto adesso</span><span className="font-mono font-semibold text-txt">{eur(deposit)}</span></div>}
-                <div className="mt-1 text-[11px]" style={{ color: selPlan.refundable ? "var(--ok)" : "var(--warn)" }}>{selPlan.refundable ? "Nessun costo se cancelli" : "Tariffa non rimborsabile"}</div>
+                <div className="mt-1 text-[11px]" style={{ color: selPlan.refundable ? "var(--ok)" : "var(--warn)" }}>{cancelText(selPlan)}</div>
                 <button onClick={confirm} disabled={!guestValid} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">Conferma prenotazione</button>
                 {!guestValid && <div className="mt-2 text-center text-[11px] text-faint">Compila nome, cognome, telefono, email e accetta la privacy.</div>}
               </div>

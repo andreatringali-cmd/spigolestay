@@ -6,6 +6,7 @@ import { useData } from "@/lib/store";
 import { nights, parseISO, toISO, shiftISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { loadDeposit } from "@/lib/deposit";
+import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } from "@/lib/rate-plans";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
@@ -102,9 +103,9 @@ export default function PreventiviPage() {
   const availOf = (rtId: string) => units.filter((u) => u.roomTypeId === rtId && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn)).length;
   const datesOk = !!(checkIn && checkOut && checkOut > checkIn);
   // Piani tariffari (definiti in Tariffe): scelti qui, applicano il loro scarto al prezzo del calendario.
-  const [plans, setPlans] = useState<{ id: string; name: string; adjPct: number; board: string; refundable: boolean; minStay: number; enabled?: boolean }[]>([]);
-  const [planId, setPlanId] = useState("std");
-  useEffect(() => { try { const p = localStorage.getItem("spigolestay:rateplans"); if (p) setPlans(JSON.parse(p)); } catch {} }, []);
+  const [plans, setPlans] = useState<RatePlan[]>([]);
+  const [planId, setPlanId] = useState("flex");
+  useEffect(() => { const p = loadPlans(); setPlans(p); setPlanId((prev) => (p.some((x) => x.id === prev) ? prev : p[0]?.id ?? prev)); }, []);
   const activePlan = plans.find((p) => p.id === planId);
   const planAdj = activePlan?.adjPct ?? 0;
   // Prezzo automatico dal calendario per una tipologia nel periodo, con lo scarto del piano scelto (poi modificabile).
@@ -576,17 +577,17 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               <div className="sm:col-span-2">
                 <div className="mb-1 text-xs font-medium text-dim">{t("Piano tariffario")} <span className="font-normal text-faint">({t("parte dal prezzo del calendario")})</span></div>
                 <div className="flex flex-wrap gap-2">
-                  {plans.filter((p) => p.enabled !== false).map((p) => {
+                  {plans.filter((p) => planApplies(p, { checkIn, nights: n })).map((p) => {
                     const on = p.id === planId;
                     return (
-                      <button key={p.id} type="button" onClick={() => setPlanId(p.id)} className={`rounded-lg border px-3 py-1.5 text-sm transition ${on ? "font-semibold" : "text-dim hover:bg-wash"}`} style={on ? { borderColor: "var(--focus)", backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)", color: "var(--focus)" } : { borderColor: "var(--line)" }}>
+                      <button key={p.id} type="button" onClick={() => { setPlanId(p.id); setAcconto(planDepositPct(p)); }} className={`rounded-lg border px-3 py-1.5 text-sm transition ${on ? "font-semibold" : "text-dim hover:bg-wash"}`} style={on ? { borderColor: "var(--focus)", backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)", color: "var(--focus)" } : { borderColor: "var(--line)" }}>
                         {p.name}{p.adjPct !== 0 && <span className="ml-1 text-[11px] font-bold">{p.adjPct > 0 ? "+" : ""}{p.adjPct}%</span>}
                       </button>
                     );
                   })}
                 </div>
                 {activePlan && (
-                  <p className="mt-1 text-[11px] text-faint">{t(activePlan.board)} · {activePlan.refundable ? t("rimborsabile") : t("non rimborsabile")}{activePlan.minStay > 1 ? ` · ${t("min")} ${activePlan.minStay} ${t("notti")}` : ""}</p>
+                  <p className="mt-1 text-[11px] text-faint">{t(activePlan.board)} · {cancelText(activePlan)}{activePlan.minStay > 1 ? ` · ${t("min")} ${activePlan.minStay} ${t("notti")}` : ""} · {planDepositPct(activePlan) === 0 ? t("nessun anticipo") : planDepositPct(activePlan) === 100 ? t("prepagato") : `${t("acconto")} ${planDepositPct(activePlan)}%`}</p>
                 )}
               </div>
             )}
