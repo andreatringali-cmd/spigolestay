@@ -169,68 +169,66 @@ export default function MercatoPage() {
   const revMax = Math.max(my.revpar, pulse?.revpar ?? 0, 1);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div>
       <PageHeader title={t("Rete città")} subtitle={`${city} · ${t("confronto anonimo con i B&B della tua città")}`} />
 
-      {/* ── HERO NÈTTARE ── */}
-      <div className="rounded-3xl border border-line p-6" style={{ background: "var(--surface)", boxShadow: "0 1px 2px rgba(0,0,0,.04), 0 18px 40px -22px rgba(0,0,0,.18)" }}>
-        <div className="flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-2xl border border-line text-xl" style={{ background: "color-mix(in srgb,var(--focus) 10%,transparent)" }}>🦋</span>
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-faint">{t("Motore prezzi dinamici")}</div>
-            <div className="font-display text-xl font-bold tracking-tight text-txt">Nèttare</div>
+      {/* riga 1: Nèttare + confronto città */}
+      <div className="mt-4 grid items-start gap-4 lg:grid-cols-5">
+        {/* HERO NÈTTARE */}
+        <div className="lg:col-span-3 rounded-2xl border border-line p-5" style={{ background: "var(--surface)", boxShadow: "0 1px 2px rgba(0,0,0,.04), 0 14px 34px -22px rgba(0,0,0,.16)" }}>
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 place-items-center rounded-xl border border-line text-lg" style={{ background: "color-mix(in srgb,var(--focus) 10%,transparent)" }}>🦋</span>
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-faint">{t("Motore prezzi dinamici")}</div>
+              <div className="font-display text-lg font-bold tracking-tight text-txt">Nèttare</div>
+            </div>
           </div>
+          <div className="mt-4 grid grid-cols-1 items-end gap-4 sm:grid-cols-[1.3fr_1fr]">
+            <div>
+              <div className="text-[11px] font-semibold text-faint">{t("Ricavo in più stimato")} · {FUTURE}gg</div>
+              <div className="font-mono text-4xl font-extrabold tracking-tight" style={{ color: potential > 0 ? "var(--ok)" : "var(--txt)" }}>{potential > 0 ? "+" : ""}{eur(potential)}</div>
+              <div className="mt-1 text-xs text-faint">{t("rispetto ai tuoi prezzi attuali")} · {t("base")} {eur(basePrice)}/{t("notte")}</div>
+            </div>
+            <div><Spark days={engine} /><div className="mt-1 text-right text-[11px] text-faint">{t("andamento prezzo consigliato")}</div></div>
+          </div>
+          <button onClick={applyPrices} className="mt-4 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 active:scale-95" style={{ background: "var(--focus)" }}>
+            {applied ? `✓ ${t("Prezzi applicati")}` : `${t("Applica ai prossimi")} ${FUTURE} ${t("giorni")}`}
+          </button>
+          <p className="mt-2 text-[11px] text-faint">{t("dai tuoi dati")}{cityHot || adrGap > 0.05 ? ` + ${t("segnali della Rete città")}` : ""} · {t("poi li ritocchi a mano")}</p>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 items-end gap-5 sm:grid-cols-[1.3fr_1fr]">
-          <div>
-            <div className="text-[11px] font-semibold text-faint">{t("Ricavo in più stimato")} · {FUTURE}gg</div>
-            <div className="font-mono text-5xl font-extrabold tracking-tight" style={{ color: potential > 0 ? "var(--ok)" : "var(--txt)" }}>{potential > 0 ? "+" : ""}{eur(potential)}</div>
-            <div className="mt-1 text-xs text-faint">{t("rispetto ai tuoi prezzi attuali")} · {t("base")} {eur(basePrice)}/{t("notte")}</div>
-          </div>
-          <div>
-            <Spark days={engine} />
-            <div className="mt-1 text-right text-[11px] text-faint">{t("andamento prezzo consigliato")}</div>
+        {/* TU VS CITTÀ */}
+        <div className="lg:col-span-2">
+          <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Come vai rispetto alla città")}</h3>
+          <p className="mb-2 mt-0.5 text-xs text-dim">{t("Barra piena = tu; trattino = media città (90gg).")}</p>
+          <div className="rounded-2xl border border-line px-4" style={{ background: "var(--surface)" }}>
+            <CmpRow label={t("Occupazione")} youStr={`${Math.round(my.occ * 100)}%`} cityStr={enough && consents.occupancy && pulse?.occupancy != null ? `${Math.round(pulse.occupancy * 100)}%` : null}
+              youW={my.occ} cityW={pulse?.occupancy ?? null} delta={pulse?.occupancy != null ? Math.round((my.occ - pulse.occupancy) * 100) : null} unit="pt" shared={consents.occupancy} enough={enough} t={t} />
+            <CmpRow label="ADR" youStr={my.adr ? eur(Math.round(my.adr)) : "—"} cityStr={enough && consents.adr && pulse?.adr != null ? eur(Math.round(pulse.adr)) : null}
+              youW={my.adr / adrMax} cityW={pulse?.adr != null ? pulse.adr / adrMax : null} delta={pulse?.adr != null ? Math.round(my.adr - pulse.adr) : null} unit="€" shared={consents.adr} enough={enough} t={t} />
+            <CmpRow label="RevPAR" youStr={my.revpar ? eur(Math.round(my.revpar)) : "—"} cityStr={enough && consents.adr && pulse?.revpar != null ? eur(Math.round(pulse.revpar)) : null}
+              youW={my.revpar / revMax} cityW={pulse?.revpar != null ? pulse.revpar / revMax : null} delta={pulse?.revpar != null ? Math.round(my.revpar - pulse.revpar) : null} unit="€" shared={consents.adr} enough={enough} t={t} last />
           </div>
         </div>
-
-        <button onClick={applyPrices} className="mt-6 inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 active:scale-95" style={{ background: "var(--focus)" }}>
-          {applied ? `✓ ${t("Prezzi applicati")}` : `${t("Applica ai prossimi")} ${FUTURE} ${t("giorni")}`}
-        </button>
-        <p className="mt-2 text-[11px] text-faint">{t("dai tuoi dati")}{cityHot || adrGap > 0.05 ? ` + ${t("segnali della Rete città")}` : ""} · {t("poi li ritocchi a mano quando vuoi")}</p>
       </div>
 
-      {/* ── TU VS CITTÀ ── */}
-      <section className="mt-8">
-        <h3 className="text-lg font-bold tracking-tight text-txt">{t("Come vai rispetto alla città")}</h3>
-        <p className="mb-4 mt-0.5 text-[13px] text-dim">{t("La barra piena sei tu; il trattino è la media della città (ultimi 90 giorni).")}</p>
-        <div className="rounded-2xl border border-line px-5" style={{ background: "var(--surface)" }}>
-          <CmpRow label={t("Occupazione")} youStr={`${Math.round(my.occ * 100)}%`} cityStr={enough && consents.occupancy && pulse?.occupancy != null ? `${Math.round(pulse.occupancy * 100)}%` : null}
-            youW={my.occ} cityW={pulse?.occupancy ?? null} delta={pulse?.occupancy != null ? Math.round((my.occ - pulse.occupancy) * 100) : null} unit="pt" shared={consents.occupancy} enough={enough} t={t} />
-          <CmpRow label={t("Prezzo medio (ADR)")} youStr={my.adr ? eur(Math.round(my.adr)) : "—"} cityStr={enough && consents.adr && pulse?.adr != null ? eur(Math.round(pulse.adr)) : null}
-            youW={my.adr / adrMax} cityW={pulse?.adr != null ? pulse.adr / adrMax : null} delta={pulse?.adr != null ? Math.round(my.adr - pulse.adr) : null} unit="€" shared={consents.adr} enough={enough} t={t} />
-          <CmpRow label="RevPAR" youStr={my.revpar ? eur(Math.round(my.revpar)) : "—"} cityStr={enough && consents.adr && pulse?.revpar != null ? eur(Math.round(pulse.revpar)) : null}
-            youW={my.revpar / revMax} cityW={pulse?.revpar != null ? pulse.revpar / revMax : null} delta={pulse?.revpar != null ? Math.round(my.revpar - pulse.revpar) : null} unit="€" shared={consents.adr} enough={enough} t={t} last />
-        </div>
-      </section>
-
       {/* ── PREZZI GIORNO PER GIORNO ── */}
-      <section className="mt-8">
-        <h3 className="text-lg font-bold tracking-tight text-txt">{t("Prezzo consigliato, giorno per giorno")}</h3>
-        <p className="mb-4 mt-0.5 text-[13px] text-dim">{t("Cosa chiedere a notte nei prossimi giorni.")} <span style={{ color: "var(--ok)" }}>{t("verde = alza")}</span> · <span style={{ color: "var(--focus)" }}>{t("blu = abbassa")}</span></p>
-        <div className="rounded-2xl border border-line p-4" style={{ background: "var(--surface)" }}>
+      <section className="mt-4">
+        <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Prezzo consigliato, giorno per giorno")}</h3>
+        <p className="mb-2 mt-0.5 text-xs text-dim">{t("Cosa chiedere a notte nei prossimi giorni.")} <span style={{ color: "var(--ok)" }}>{t("verde = alza")}</span> · <span style={{ color: "var(--focus)" }}>{t("blu = abbassa")}</span></p>
+        <div className="rounded-2xl border border-line p-3" style={{ background: "var(--surface)" }}>
           {engine.length ? (
-            <div className="flex gap-2.5 overflow-x-auto pb-2" style={{ scrollSnapType: "x mandatory" }}>
+            <div className="flex gap-2 overflow-x-auto pb-1.5" style={{ scrollSnapType: "x mandatory" }}>
               {engine.map((d) => {
                 const up = d.factor >= 1.03, down = d.factor <= 0.97;
                 const dt = new Date(d.date + "T00:00:00");
                 return (
-                  <div key={d.date} className="shrink-0 rounded-2xl border p-3 text-center" style={{ width: 104, scrollSnapAlign: "start", borderColor: up ? "color-mix(in srgb,var(--ok) 45%,var(--line))" : down ? "color-mix(in srgb,var(--focus) 40%,var(--line))" : "var(--line)", background: up ? "color-mix(in srgb,var(--ok) 6%,var(--surface))" : down ? "color-mix(in srgb,var(--focus) 6%,var(--surface))" : "var(--surface)" }}>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-dim">{dt.toLocaleDateString("it-IT", { weekday: "short" })}</div>
-                    <div className="text-[11px] text-faint">{dt.toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</div>
-                    <div className="mt-2 font-mono text-xl font-bold text-txt">{eur(d.price)}</div>
-                    <div className="text-[11.5px] font-semibold" style={{ color: up ? "var(--ok)" : down ? "var(--focus)" : "var(--faint)" }}>{d.factor === 1 ? t("stabile") : `${d.factor > 1 ? "+" : ""}${Math.round((d.factor - 1) * 100)}%`}</div>
-                    <div className="mt-1.5 text-[10px] leading-tight text-faint" style={{ minHeight: 24 }}>{d.reason}</div>
+                  <div key={d.date} className="shrink-0 rounded-xl border p-2.5 text-center" style={{ width: 84, scrollSnapAlign: "start", borderColor: up ? "color-mix(in srgb,var(--ok) 45%,var(--line))" : down ? "color-mix(in srgb,var(--focus) 40%,var(--line))" : "var(--line)", background: up ? "color-mix(in srgb,var(--ok) 6%,var(--surface))" : down ? "color-mix(in srgb,var(--focus) 6%,var(--surface))" : "var(--surface)" }}>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-dim">{dt.toLocaleDateString("it-IT", { weekday: "short" })}</div>
+                    <div className="text-[10px] text-faint">{dt.toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</div>
+                    <div className="mt-1.5 font-mono text-lg font-bold text-txt">{eur(d.price)}</div>
+                    <div className="text-[11px] font-semibold" style={{ color: up ? "var(--ok)" : down ? "var(--focus)" : "var(--faint)" }}>{d.factor === 1 ? t("stabile") : `${d.factor > 1 ? "+" : ""}${Math.round((d.factor - 1) * 100)}%`}</div>
+                    <div className="mt-1 text-[9px] leading-tight text-faint" style={{ minHeight: 22 }}>{d.reason}</div>
                   </div>
                 );
               })}
@@ -239,14 +237,16 @@ export default function MercatoPage() {
         </div>
       </section>
 
+      {/* riga 3: strutture + consensi */}
+      <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
       {/* ── STRUTTURE DELLA RETE ── */}
-      <section className="mt-8">
+      <section>
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold tracking-tight text-txt">{t("Le strutture della rete")} · {city}</h3>
+          <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Le strutture della rete")} · {city}</h3>
           <span className="inline-flex items-center gap-1.5 text-xs text-faint"><span className={`h-2 w-2 rounded-full ${loading ? "animate-pulse" : ""}`} style={{ background: enough ? "var(--ok)" : "var(--warn)" }} />{pulse?.n_structures ?? 0} {t("nella rete")}</span>
         </div>
-        <p className="mb-4 mt-0.5 text-[13px] text-dim">{t("Sono queste strutture, insieme, a formare le medie. Anonime; la tua è evidenziata.")}</p>
-        <div className="rounded-2xl border border-line px-5 py-4" style={{ background: "var(--surface)" }}>
+        <p className="mb-2 mt-0.5 text-xs text-dim">{t("Sono queste strutture, insieme, a formare le medie. Anonime; la tua è evidenziata.")}</p>
+        <div className="rounded-2xl border border-line px-4 py-3" style={{ background: "var(--surface)" }}>
           {breakdown.length ? (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[440px] border-collapse text-sm">
@@ -256,13 +256,13 @@ export default function MercatoPage() {
                 <tbody>
                   {breakdown.map((r) => (
                     <tr key={r.idx} style={r.is_me ? { background: "color-mix(in srgb,var(--focus) 6%,transparent)" } : undefined}>
-                      <td className="border-t border-line py-3">
+                      <td className="border-t border-line py-2.5">
                         <span className="inline-flex items-center gap-2">
                           <span className="inline-grid h-6 w-6 place-items-center rounded-lg text-[11px] font-bold" style={{ background: r.is_me ? "var(--focus)" : "var(--wash)", color: r.is_me ? "#fff" : "var(--dim)" }}>{r.is_me ? "★" : r.idx}</span>
                           <span className={r.is_me ? "font-semibold text-txt" : "text-dim"}>{r.is_me ? t("La tua struttura") : `${t("Struttura")} ${r.idx}`}</span>
                         </span>
                       </td>
-                      <td className="border-t border-line py-3">{r.occupancy != null ? (<span className="inline-flex items-center gap-2"><span className="inline-block h-1.5 w-16 overflow-hidden rounded-full" style={{ background: "var(--wash)" }}><span className="block h-full rounded-full" style={{ width: `${Math.round(r.occupancy * 100)}%`, background: r.is_me ? "var(--focus)" : "var(--dim)" }} /></span><span className="font-mono text-xs text-txt">{Math.round(r.occupancy * 100)}%</span></span>) : <span className="text-faint">—</span>}</td>
+                      <td className="border-t border-line py-2.5">{r.occupancy != null ? (<span className="inline-flex items-center gap-2"><span className="inline-block h-1.5 w-16 overflow-hidden rounded-full" style={{ background: "var(--wash)" }}><span className="block h-full rounded-full" style={{ width: `${Math.round(r.occupancy * 100)}%`, background: r.is_me ? "var(--focus)" : "var(--dim)" }} /></span><span className="font-mono text-xs text-txt">{Math.round(r.occupancy * 100)}%</span></span>) : <span className="text-faint">—</span>}</td>
                       <td className="border-t border-line py-3 text-right font-mono">{r.adr != null ? eur(Math.round(r.adr)) : <span className="text-faint">—</span>}</td>
                       <td className="border-t border-line py-3 text-right font-mono">{r.revpar != null ? eur(Math.round(r.revpar)) : <span className="text-faint">—</span>}</td>
                     </tr>
@@ -278,16 +278,17 @@ export default function MercatoPage() {
       </section>
 
       {/* ── COSA CONDIVIDI ── */}
-      <section className="mt-8 mb-2">
-        <h3 className="text-lg font-bold tracking-tight text-txt">{t("Cosa condividi")}</h3>
-        <p className="mb-4 mt-0.5 text-[13px] text-dim">{t("Dai per ricevere: vedi un dato della città solo se lo condividi anche tu. Sempre anonimo e aggregato.")}</p>
-        <div className="rounded-2xl border border-line px-5" style={{ background: "var(--surface)" }}>
+      <section>
+        <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Cosa condividi")}</h3>
+        <p className="mb-2 mt-0.5 text-xs text-dim">{t("Dai per ricevere: vedi un dato della città solo se lo condividi anche tu. Sempre anonimo e aggregato.")}</p>
+        <div className="rounded-2xl border border-line px-4" style={{ background: "var(--surface)" }}>
           <ToggleRow on={consents.occupancy} onClick={() => toggle("occupancy")} label={t("Occupazione")} hint={t("% camere vendute")} />
           <ToggleRow on={consents.adr} onClick={() => toggle("adr")} label={t("Prezzi (ADR / RevPAR)")} hint={t("prezzo medio e ricavo per camera")} />
           <ToggleRow on={consents.demand} onClick={() => toggle("demand")} label={t("Domanda futura")} hint={t("in arrivo")} disabled />
           <ToggleRow on={consents.channels} onClick={() => toggle("channels")} label={t("Mix canali")} hint={t("in arrivo")} disabled last />
         </div>
       </section>
+      </div>
     </div>
   );
 }
@@ -313,7 +314,7 @@ function CmpRow({ label, youStr, cityStr, youW, cityW, delta, unit, shared, enou
   const show = shared && enough && cityStr != null;
   const up = (delta ?? 0) >= 0;
   return (
-    <div className="grid items-center gap-4 py-4 sm:grid-cols-[130px_1fr_auto]" style={last ? undefined : { borderBottom: "1px solid var(--hair, color-mix(in srgb,var(--line) 60%,transparent))" }}>
+    <div className="grid items-center gap-3 py-3 sm:grid-cols-[84px_1fr_auto]" style={last ? undefined : { borderBottom: "1px solid var(--hair, color-mix(in srgb,var(--line) 60%,transparent))" }}>
       <div className="text-[13px] font-medium text-dim">{label}</div>
       <div className="relative h-2 rounded-full" style={{ background: "var(--wash)" }}>
         <div className="absolute left-0 top-0 h-2 rounded-full" style={{ width: `${clamp(youW, 0, 1) * 100}%`, background: "var(--focus)" }} />
@@ -330,7 +331,7 @@ function CmpRow({ label, youStr, cityStr, youW, cityW, delta, unit, shared, enou
 
 function ToggleRow({ on, onClick, label, hint, disabled, last }: { on: boolean; onClick: () => void; label: string; hint?: string; disabled?: boolean; last?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-3.5" style={last ? undefined : { borderBottom: "1px solid var(--hair, color-mix(in srgb,var(--line) 60%,transparent))" }}>
+    <div className="flex items-center justify-between gap-3 py-3" style={last ? undefined : { borderBottom: "1px solid var(--hair, color-mix(in srgb,var(--line) 60%,transparent))" }}>
       <div><div className="text-sm font-medium text-txt">{label}</div>{hint && <div className="text-[11px] text-faint">{hint}</div>}</div>
       <button type="button" disabled={disabled} onClick={onClick} aria-pressed={on} className="relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-40" style={{ backgroundColor: on ? "var(--ok)" : "var(--line)" }}>
         <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all" style={{ left: on ? 22 : 2 }} />
