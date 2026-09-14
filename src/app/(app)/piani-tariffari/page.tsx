@@ -86,7 +86,6 @@ export default function PianiTariffariPage() {
   const types = roomTypes.filter((rt) => effStructure === "all" || rt.structureId === effStructure);
   const refBase = types.length ? effectiveBase(types[0], roomTypes) : 100;
   const roomName = (id: string) => roomTypes.find((r) => r.id === id)?.name ?? "?";
-  const isDefault = (id: string) => DEFAULT_PLANS.some((d) => d.id === id);
   const editing = editId ? plans.find((p) => p.id === editId) ?? null : null;
 
   return (
@@ -156,7 +155,7 @@ export default function PianiTariffariPage() {
                       <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end gap-1.5">
                           <button onClick={() => setEditId(p.id)} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-wash">{t("Dettagli")}</button>
-                          {!isDefault(p.id) && <button onClick={() => delPlan(p.id)} title={t("Elimina")} className="rounded-md border border-line px-2 py-1 text-[11px] font-medium text-[color:var(--err)] hover:bg-wash">✕</button>}
+                          <button onClick={() => delPlan(p.id)} title={t("Elimina")} className="rounded-md border border-line px-2 py-1 text-[11px] font-medium text-[color:var(--err)] hover:bg-wash">✕</button>
                         </div>
                       </td>
                     </tr>
@@ -200,13 +199,13 @@ export default function PianiTariffariPage() {
 
       <p className="mt-4 text-xs text-faint">{t("Vedi l'effetto dei piani giorno per giorno nell'Anteprima prezzi della pagina")} <a href="/tariffe" className="font-semibold text-focus hover:underline">{t("Tariffe")}</a>.</p>
 
-      {editing && <PlanModal plan={editing} allTypes={types} roomName={roomName} isDefault={isDefault(editing.id)} onSave={(p) => { upsert(p); setEditId(null); }} onDelete={async () => { await delPlan(editing.id); setEditId(null); }} onClose={() => setEditId(null)} />}
+      {editing && <PlanModal plan={editing} allTypes={types} roomName={roomName} onSave={(p) => { upsert(p); setEditId(null); }} onDelete={async () => { await delPlan(editing.id); setEditId(null); }} onClose={() => setEditId(null)} />}
     </div>
   );
 }
 
-function PlanModal({ plan, allTypes, roomName, isDefault, onSave, onDelete, onClose }: {
-  plan: RatePlan; allTypes: { id: string; name: string }[]; roomName: (id: string) => string; isDefault: boolean;
+function PlanModal({ plan, allTypes, roomName, onSave, onDelete, onClose }: {
+  plan: RatePlan; allTypes: { id: string; name: string }[]; roomName: (id: string) => string;
   onSave: (p: RatePlan) => void; onDelete: () => void; onClose: () => void;
 }) {
   const { t } = useLang();
@@ -286,7 +285,7 @@ function PlanModal({ plan, allTypes, roomName, isDefault, onSave, onDelete, onCl
       </label>
 
       <div className="mt-4 flex items-center gap-2">
-        {!isDefault && <button onClick={onDelete} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>}
+        <button onClick={onDelete} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>
         <label className="ml-1 flex items-center gap-2 text-sm text-dim">{t("Attivo")}<Toggle on={f.enabled !== false} onClick={() => set("enabled", f.enabled === false)} color="var(--ok)" /></label>
         <button onClick={onClose} className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">{t("Annulla")}</button>
         <button onClick={() => onSave(f)} disabled={!f.name.trim()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
