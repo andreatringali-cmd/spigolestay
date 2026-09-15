@@ -33,6 +33,7 @@ export default function NuovaPrenotazionePage() {
   const [checkIn, setCheckIn] = useState(qp("ci") || today);
   const [checkOut, setCheckOut] = useState(qp("co") || shiftISO(qp("ci") || today, 1));
   const [adults, setAdults] = useState(Number(qp("ad")) || 2);
+  const [showOther, setShowOther] = useState<Record<string, boolean>>({}); // "altre soluzioni" (camere non adatte al n. ospiti) per struttura
   const [children, setChildren] = useState(Number(qp("ch")) || 0);
   const [childAges, setChildAges] = useState<number[]>(() => { const n = Number(qp("ch")) || 0; return Array.from({ length: n }, () => 8); });
   const [cribs, setCribs] = useState(0);
@@ -390,13 +391,18 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
               const rows = rowsOf(s.id);
               if (!rows.length) return null;
               const sc = structColor(s.id);
+              // Prima le soluzioni adatte al numero di ospiti; le altre (camere più piccole) a tendina.
+              const fit = rows.filter((rt) => cap(rt) >= party);
+              const other = rows.filter((rt) => cap(rt) < party);
+              const showOth = showOther[s.id] ?? false;
+              const visibleRows = fit.length ? (showOth ? [...fit, ...other] : fit) : rows;
               return (
                 <div key={s.id} className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
                   {/* intestazione struttura */}
                   <div className="flex items-center gap-2.5 px-4 py-3" style={{ borderBottom: `2px solid ${sc}` }}>
                     <span className="h-3 w-3 rounded-full" style={{ backgroundColor: sc }} />
                     <span className="text-base font-bold text-txt">{s.name}</span>
-                    <span className="text-xs text-faint">· {rows.length} {rows.length === 1 ? "tipologia" : "tipologie"}</span>
+                    <span className="text-xs text-faint">· {fit.length > 0 ? `${fit.length} per ${party} ${party === 1 ? "ospite" : "ospiti"}` : `${rows.length} ${rows.length === 1 ? "tipologia" : "tipologie"}`}</span>
                   </div>
                   {/* tabella camere */}
                   <div className="overflow-x-auto">
@@ -412,7 +418,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[color:var(--line)]">
-                        {rows.map((rt) => {
+                        {visibleRows.map((rt) => {
                           const av = availUnits(rt).length;
                           const q = qty[rt.id] ?? 0;
                           const fits = cap(rt) >= party;
@@ -443,6 +449,15 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                       </tbody>
                     </table>
                   </div>
+                  {fit.length > 0 && other.length > 0 && (
+                    <button onClick={() => setShowOther((v) => ({ ...v, [s.id]: !showOth }))} className="flex w-full items-center justify-center gap-1.5 border-t border-line py-2.5 text-xs font-semibold text-focus transition hover:bg-wash">
+                      {showOth ? `Nascondi altre soluzioni` : `Altre soluzioni (${other.length}) · camere per meno di ${party} ospiti`}
+                      <span style={{ transform: showOth ? "rotate(180deg)" : "none", transition: "transform .15s" }}>▾</span>
+                    </button>
+                  )}
+                  {fit.length === 0 && (
+                    <div className="border-t border-line bg-wash px-4 py-2.5 text-[11px] text-dim">Nessuna camera singola per {party} {party === 1 ? "ospite" : "ospiti"}: combina più camere qui sopra per raggiungere i posti.</div>
+                  )}
                 </div>
               );
             })}
