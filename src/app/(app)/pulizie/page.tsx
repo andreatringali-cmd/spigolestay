@@ -26,7 +26,7 @@ const ACT: Record<ActionKey, { label: string; color: string }> = {
   arrivo: { label: "Arrivo", color: "var(--ok)" },
   partenza: { label: "Partenza", color: "var(--err)" },
   riassetto: { label: "Riassetto", color: "var(--warn)" },
-  niente: { label: "Niente", color: "var(--faint)" },
+  niente: { label: "Niente", color: "var(--focus)" },
 };
 
 interface Issue { id: string; unitId: string; unitName: string; structureName: string; date: string; type: string; note: string; photo?: string; createdAt: string; resolved?: boolean; resolvedAt?: string }
@@ -56,7 +56,7 @@ export default function PuliziePage() {
   const { t } = useLang();
   const todayISO = toISO(new Date());
   const [date, setDate] = useState(todayISO);
-  const [view, setView] = useState<"rows" | "cards">("rows");
+  const [view, setView] = useState<"rows" | "cards">("cards");
   const [structFilter, setStructFilter] = useState("all");
   const [actionFilter, setActionFilter] = useState<"tutte" | "dafare" | "riassetto" | "partenze" | "arrivi">("tutte");
   const matchAction = (action: ActionKey) => {
@@ -505,8 +505,8 @@ export default function PuliziePage() {
         </div>
         <button onClick={() => setDate(todayISO)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt">{t("Oggi")}</button>
         <div className="flex items-center rounded-lg border border-line p-0.5">
-          <Seg v="rows" icon="menu" title={t("Vista lista")} />
           <Seg v="cards" icon="grid" title={t("Vista card")} />
+          <Seg v="rows" icon="menu" title={t("Vista lista")} />
         </div>
         <div className="relative ml-auto">
           {copied && <span className="mr-2 text-xs font-medium text-[color:var(--ok)]">{t("Copiato ✓")}</span>}
