@@ -423,19 +423,19 @@ export default function Dashboard() {
       <div className={`grid gap-4 ${gridCols}`}>
         {showInhouse && (
           <Card>
-            <ListHeader icon="bed" color="var(--ok)">{t("In struttura")} ({inHouse.length})</ListHeader>
+            <ListHeader icon="bed" color="var(--focus)">{t("In struttura")} ({inHouse.length})</ListHeader>
             <MoveList items={inHouse} empty={t("Nessun ospite presente")} {...listProps} />
           </Card>
         )}
         {showPart && (
           <Card>
-            <ListHeader icon="logout" color="var(--warn)">{t("Partenze")} ({departures.length})</ListHeader>
+            <ListHeader icon="logout" color="var(--err)">{t("Partenze")} ({departures.length})</ListHeader>
             <MoveList items={departures} empty={t("Nessuna partenza")} {...listProps} />
           </Card>
         )}
         {showArr && (
           <Card>
-            <ListHeader icon="login" color="var(--focus)">{t("Arrivi")} ({arrivals.length})</ListHeader>
+            <ListHeader icon="login" color="var(--ok)">{t("Arrivi")} ({arrivals.length})</ListHeader>
             <MoveList items={arrivals} empty={t("Nessun arrivo")} {...listProps} />
           </Card>
         )}
@@ -473,9 +473,9 @@ export default function Dashboard() {
               <span className={planningDone ? "text-faint line-through" : "font-medium text-txt"}>{t("Inviare il planning alla signora delle pulizie")}</span>
             </label>
             <div className="grid gap-4 lg:grid-cols-3">
-              <TodoGroup title={t("In struttura")} icon="bed" color="var(--ok)" items={todoStay} tasks={INHOUSE_TASKS} done={todoDone} onToggle={toggleTodo} autoOf={autoOf} guestName={guestName} getUnit={getUnit} getStructure={getStructure} multi={multi} openBooking={openBooking} />
-              <TodoGroup title={t("Partenze")} icon="logout" color="var(--warn)" items={todoDep} tasks={DEPARTURE_TASKS} done={todoDone} onToggle={toggleTodo} autoOf={autoOf} guestName={guestName} getUnit={getUnit} getStructure={getStructure} multi={multi} openBooking={openBooking} />
-              <TodoGroup title={t("Arrivi")} icon="login" color="var(--focus)" items={todoArr} tasks={ARRIVAL_TASKS} done={todoDone} onToggle={toggleTodo} autoOf={autoOf} guestName={guestName} getUnit={getUnit} getStructure={getStructure} multi={multi} openBooking={openBooking} />
+              <TodoGroup title={t("In struttura")} icon="bed" color="var(--focus)" items={todoStay} tasks={INHOUSE_TASKS} done={todoDone} onToggle={toggleTodo} autoOf={autoOf} guestName={guestName} getUnit={getUnit} getStructure={getStructure} multi={multi} openBooking={openBooking} />
+              <TodoGroup title={t("Partenze")} icon="logout" color="var(--err)" items={todoDep} tasks={DEPARTURE_TASKS} done={todoDone} onToggle={toggleTodo} autoOf={autoOf} guestName={guestName} getUnit={getUnit} getStructure={getStructure} multi={multi} openBooking={openBooking} />
+              <TodoGroup title={t("Arrivi")} icon="login" color="var(--ok)" items={todoArr} tasks={ARRIVAL_TASKS} done={todoDone} onToggle={toggleTodo} autoOf={autoOf} guestName={guestName} getUnit={getUnit} getStructure={getStructure} multi={multi} openBooking={openBooking} />
             </div>
           </div>
         );

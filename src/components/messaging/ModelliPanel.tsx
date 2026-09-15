@@ -51,11 +51,6 @@ export default function ModelliPanel() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[13px]" style={{ color: "var(--dim)" }}>{t("Crea i messaggi riutilizzabili e decidi se e quando inviarli in automatico.")}</p>
-        <button onClick={() => { setEditing(emptyTpl()); setEditLang("it"); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("+ Nuovo modello")}</button>
-      </div>
-
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <Card className="!p-4"><div className="text-xs text-dim">{t("Modelli")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{templates.length}</div></Card>
         <Card className="!p-4"><div className="text-xs text-dim">{t("Automatici attivi")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{activeAuto}</div></Card>
@@ -80,7 +75,11 @@ export default function ModelliPanel() {
             </div>
           </Card>
         ))}
-        {templates.length === 0 && <Card><div className="py-6 text-center text-sm text-faint">{t("Nessun modello. Creane uno con “+ Nuovo modello”.")}</div></Card>}
+        {/* Card "aggiungi" tratteggiata, stessa dimensione dei modelli */}
+        <button onClick={() => { setEditing(emptyTpl()); setEditLang("it"); }} className="flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line text-dim transition hover:border-focus hover:text-focus" style={{ background: "var(--surface)" }}>
+          <span className="grid h-11 w-11 place-items-center rounded-full border-2 border-current text-2xl font-light leading-none">+</span>
+          <span className="text-sm font-semibold">{t("Nuovo modello")}</span>
+        </button>
       </div>
 
       {/* Editor */}
