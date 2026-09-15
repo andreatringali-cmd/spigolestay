@@ -31,6 +31,8 @@ export default function ModelliPanel() {
   const { t } = useLang();
   const [templates, setTemplates] = useState<MsgTemplate[]>([]);
   const [ready, setReady] = useState(false);
+  const [search, setSearch] = useState("");
+  const [flt, setFlt] = useState<"all" | "auto" | "manual">("all");
   useEffect(() => {
     try {
       const r = localStorage.getItem("spigolestay:msgtemplates"); const parsed = r ? JSON.parse(r) : null;
@@ -48,6 +50,11 @@ export default function ModelliPanel() {
   const insertVar = (token: string) => setEditing((e) => (e ? { ...e, texts: { ...e.texts, [editLang]: `${e.texts[editLang] ?? ""}${token}` } } : e));
   const del = async (tpl: MsgTemplate) => { if (await ask({ title: t("Elimina modello"), message: `${t("Eliminare il modello")} "${tpl.name}"? ${t("L'operazione non è reversibile.")}`, danger: true, confirmLabel: t("Elimina") })) setTemplates((p) => p.filter((x) => x.id !== tpl.id)); };
   const activeAuto = templates.filter((t) => t.active && t.trigger !== "manual").length;
+  const isAuto = (tp: MsgTemplate) => tp.active && tp.trigger !== "manual";
+  const shown = templates.filter((tp) =>
+    (search.trim() === "" || tp.name.toLowerCase().includes(search.trim().toLowerCase())) &&
+    (flt === "all" || (flt === "auto" ? isAuto(tp) : !isAuto(tp)))
+  );
 
   return (
     <div>
@@ -58,8 +65,19 @@ export default function ModelliPanel() {
       </div>
 
       <SectionTitle>{t("I tuoi modelli")}</SectionTitle>
-      <div className="mt-2 grid gap-3 md:grid-cols-2">
-        {templates.map((tpl) => (
+
+      {/* Riga filtri: campo cerca a sinistra + filtri */}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca un modello…")} className="min-w-[180px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
+        <div className="flex items-center overflow-hidden rounded-lg border border-line">
+          {([["all", t("Tutti")], ["auto", t("Automatici")], ["manual", t("Manuali")]] as [typeof flt, string][]).map(([k, lab], i) => (
+            <button key={k} onClick={() => setFlt(k)} className={`px-3 py-2 text-xs font-semibold transition ${i > 0 ? "border-l border-line" : ""} ${flt === k ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{lab}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        {shown.map((tpl) => (
           <Card key={tpl.id}>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
