@@ -147,56 +147,63 @@ export default function NettarePage() {
     <div>
       <PageHeader title="Nèttare" subtitle={`${t("Prezzi dinamici")}${city ? ` · ${city}` : ""}`} />
 
-      <div className="grid items-start gap-4 lg:grid-cols-5">
-        {/* Riepilogo + applica */}
-        <div className="lg:col-span-2 rounded-2xl border border-line p-5" style={{ background: "var(--surface)", boxShadow: "0 1px 2px rgba(0,0,0,.04), 0 14px 34px -22px rgba(0,0,0,.16)" }}>
+      {/* Riepilogo Nèttare */}
+      <div className="mt-4 rounded-2xl border border-line p-5" style={{ background: "var(--surface)", boxShadow: "0 1px 2px rgba(0,0,0,.04), 0 14px 34px -22px rgba(0,0,0,.16)" }}>
+        <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
           <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl border border-line text-lg" style={{ background: "color-mix(in srgb,var(--focus) 10%,transparent)" }}>🦋</span>
-            <div><div className="text-[11px] font-semibold uppercase tracking-wider text-faint">{t("Motore prezzi dinamici")}</div><div className="font-display text-lg font-bold text-txt">Nèttare</div></div>
+            <span className="grid h-11 w-11 place-items-center rounded-xl border border-line text-xl" style={{ background: "color-mix(in srgb,var(--focus) 10%,transparent)" }}>🦋</span>
+            <div><div className="text-[11px] font-semibold uppercase tracking-wider text-faint">{t("Motore prezzi dinamici")}</div><div className="font-display text-xl font-bold tracking-tight text-txt">Nèttare</div></div>
           </div>
-          <div className="mt-4"><div className="text-[11px] font-semibold text-faint">{t("Ricavo in più stimato")} · {FUTURE}gg</div><div className="font-mono text-4xl font-extrabold tracking-tight" style={{ color: potential > 0 ? "var(--ok)" : "var(--txt)" }}>{potential > 0 ? "+" : ""}{eur(potential)}</div></div>
-          <div className="mt-3 flex gap-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <div><div className="text-[11px] font-semibold text-faint">{t("Ricavo in più stimato")} · {FUTURE}gg</div><div className="font-mono text-3xl font-extrabold tracking-tight" style={{ color: potential > 0 ? "var(--ok)" : "var(--txt)" }}>{potential > 0 ? "+" : ""}{eur(potential)}</div></div>
             <div><div className="text-[11px] text-faint">{t("Prezzo base")}</div><div className="font-mono text-lg font-bold text-txt">{eur(basePrice)}</div></div>
-            <div><div className="text-[11px] text-faint">{t("Prezzo medio consigliato")}</div><div className="font-mono text-lg font-bold text-txt">{eur(avgPrice)}</div></div>
-          </div>
-          <button onClick={applyPrices} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 active:scale-95" style={{ background: "var(--focus)" }}>{applied ? `✓ ${t("Prezzi applicati")}` : `${t("Applica ai prossimi")} ${FUTURE} ${t("giorni")}`}</button>
-          {city && <Link href="/mercato" className="mt-2 block text-center text-[12px] font-medium" style={{ color: "var(--focus)" }}>{t("Vedi i dati della Rete città")} →</Link>}
-        </div>
-
-        {/* Strategia */}
-        <div className="lg:col-span-3 rounded-2xl border border-line p-5" style={{ background: "var(--surface)" }}>
-          <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Strategia")}</h3>
-          <p className="mt-0.5 text-xs text-dim">{t("Scegli come Nèttare deve muovere i prezzi.")}</p>
-
-          <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Obiettivo")}</div>
-          <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
-            <GoalBtn v="fill" label={t("Riempi")} desc={t("più occupazione, prezzi più morbidi")} />
-            <GoalBtn v="balanced" label={t("Bilanciato")} desc={t("equilibrio prezzo/occupazione")} />
-            <GoalBtn v="revenue" label={t("Massimo ricavo")} desc={t("spingi il RevPAR quando c'è domanda")} />
-          </div>
-
-          <div className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Profilo di rischio")}</div>
-          <div className="mt-1.5 flex rounded-lg border border-line p-0.5" style={{ background: "var(--wash)" }}>
-            <Seg v="prudente" cur={strat.risk} onC={() => upd({ risk: "prudente" })}>{t("Prudente")}</Seg>
-            <Seg v="bilanciato" cur={strat.risk} onC={() => upd({ risk: "bilanciato" })}>{t("Bilanciato")}</Seg>
-            <Seg v="aggressivo" cur={strat.risk} onC={() => upd({ risk: "aggressivo" })}>{t("Aggressivo")}</Seg>
-          </div>
-          <div className="mt-1 text-[11px] text-faint">{t("Quanto ampie possono essere le variazioni di prezzo")}: {Math.round((RISK_BAND[strat.risk][0] - 1) * 100)}% / +{Math.round((RISK_BAND[strat.risk][1] - 1) * 100)}%</div>
-
-          <div className="mt-3 divide-y divide-[color:var(--line)]">
-            <Tgl on={strat.followMarket} onC={() => upd({ followMarket: !strat.followMarket })} label={t("Segui il mercato")} hint={t("usa i segnali della Rete città (occupazione e prezzi)")} />
-            <Tgl on={strat.events} onC={() => upd({ events: !strat.events })} label={t("Eventi & alta stagione")} hint={t("cavalca weekend e picchi di domanda")} />
-            <Tgl on={strat.lastMinute} onC={() => upd({ lastMinute: !strat.lastMinute })} label={t("Last-minute")} hint={t("sconti sugli ultimi giorni ancora vuoti")} />
-            <Tgl on={strat.minStay} onC={() => upd({ minStay: !strat.minStay })} label={t("Min-stay dinamico")} hint={t("notti minime consigliate nei picchi")} />
-          </div>
-
-          <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Guardrail")} · {t("prezzo min / max")}</div>
-          <div className="mt-1.5 flex gap-2">
-            <input type="number" inputMode="numeric" placeholder={t("min €")} value={strat.minPrice ?? ""} onChange={(e) => upd({ minPrice: e.target.value ? Number(e.target.value) : null })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} />
-            <input type="number" inputMode="numeric" placeholder={t("max €")} value={strat.maxPrice ?? ""} onChange={(e) => upd({ maxPrice: e.target.value ? Number(e.target.value) : null })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} />
+            <div><div className="text-[11px] text-faint">{t("Prezzo medio")}</div><div className="font-mono text-lg font-bold text-txt">{eur(avgPrice)}</div></div>
+            <button onClick={applyPrices} className="rounded-full px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 active:scale-95" style={{ background: "var(--focus)" }}>{applied ? `✓ ${t("Prezzi applicati")}` : `${t("Applica ai prossimi")} ${FUTURE} ${t("giorni")}`}</button>
           </div>
         </div>
+        {city && <Link href="/mercato" className="mt-3 inline-block text-[12px] font-medium" style={{ color: "var(--focus)" }}>{t("Vedi i dati della Rete città")} →</Link>}
       </div>
+
+      {/* Strategia */}
+      <section className="mt-4 rounded-2xl border border-line p-5" style={{ background: "var(--surface)" }}>
+        <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Strategia")}</h3>
+        <p className="mt-0.5 text-xs text-dim">{t("Scegli come Nèttare deve muovere i prezzi.")}</p>
+
+        <div className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Obiettivo")}</div>
+        <div className="mt-1.5 grid gap-2 sm:grid-cols-3">
+          <GoalBtn v="fill" label={t("Riempi")} desc={t("più occupazione, prezzi più morbidi")} />
+          <GoalBtn v="balanced" label={t("Bilanciato")} desc={t("equilibrio prezzo/occupazione")} />
+          <GoalBtn v="revenue" label={t("Massimo ricavo")} desc={t("spingi il RevPAR quando c'è domanda")} />
+        </div>
+
+        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Profilo di rischio")}</div>
+            <div className="mt-1.5 flex rounded-lg border border-line p-0.5" style={{ background: "var(--wash)" }}>
+              <Seg v="prudente" cur={strat.risk} onC={() => upd({ risk: "prudente" })}>{t("Prudente")}</Seg>
+              <Seg v="bilanciato" cur={strat.risk} onC={() => upd({ risk: "bilanciato" })}>{t("Bilanciato")}</Seg>
+              <Seg v="aggressivo" cur={strat.risk} onC={() => upd({ risk: "aggressivo" })}>{t("Aggressivo")}</Seg>
+            </div>
+            <div className="mt-1.5 text-[11px] text-faint">{t("Variazione massima dei prezzi")}: {Math.round((RISK_BAND[strat.risk][0] - 1) * 100)}% / +{Math.round((RISK_BAND[strat.risk][1] - 1) * 100)}%</div>
+          </div>
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Guardrail")} · {t("prezzo min / max")}</div>
+            <div className="mt-1.5 flex gap-2">
+              <input type="number" inputMode="numeric" placeholder={t("min €")} value={strat.minPrice ?? ""} onChange={(e) => upd({ minPrice: e.target.value ? Number(e.target.value) : null })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} />
+              <input type="number" inputMode="numeric" placeholder={t("max €")} value={strat.maxPrice ?? ""} onChange={(e) => upd({ maxPrice: e.target.value ? Number(e.target.value) : null })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} />
+            </div>
+            <div className="mt-1.5 text-[11px] text-faint">{t("Nèttare non andrà mai oltre questi limiti.")}</div>
+          </div>
+        </div>
+
+        <div className="mt-5 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Regole")}</div>
+        <div className="mt-1 grid gap-x-8 sm:grid-cols-2">
+          <div className="border-t border-line"><Tgl on={strat.followMarket} onC={() => upd({ followMarket: !strat.followMarket })} label={t("Segui il mercato")} hint={t("usa i segnali della Rete città")} /></div>
+          <div className="border-t border-line sm:border-t"><Tgl on={strat.events} onC={() => upd({ events: !strat.events })} label={t("Eventi & alta stagione")} hint={t("cavalca weekend e picchi")} /></div>
+          <div className="border-t border-line"><Tgl on={strat.lastMinute} onC={() => upd({ lastMinute: !strat.lastMinute })} label={t("Last-minute")} hint={t("sconti sugli ultimi giorni vuoti")} /></div>
+          <div className="border-t border-line"><Tgl on={strat.minStay} onC={() => upd({ minStay: !strat.minStay })} label={t("Min-stay dinamico")} hint={t("notti minime nei picchi")} /></div>
+        </div>
+      </section>
 
       {/* Prezzi giorno per giorno */}
       <section className="mt-4">
