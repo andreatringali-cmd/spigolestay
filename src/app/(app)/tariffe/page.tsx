@@ -188,7 +188,6 @@ export default function TariffePage() {
       {/* Prezzi base */}
       <section className="mb-7">
         <SectionTitle>{t("Prezzi base")}</SectionTitle>
-        <p className="mb-3 text-xs text-dim">{t("Il prezzo di partenza a notte di ogni tipologia, per i giorni che non forzi dal calendario. Le derivate seguono la madre.")}</p>
 
         <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
           <div className="overflow-x-auto">
@@ -224,9 +223,8 @@ export default function TariffePage() {
         </div>
 
         {types.some((rt) => rt.deriveFrom) && (
-          <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-line bg-wash px-3 py-2 text-[11px] text-dim">
-            <span>{t("Le tariffe derivate (es. uso singola) si creano e si collegano dalla pagina dedicata.")}</span>
-            <a href="/tariffe-derivate" className="shrink-0 whitespace-nowrap font-semibold text-focus hover:underline">{t("Tariffe derivate")} →</a>
+          <div className="mt-3 flex justify-end">
+            <a href="/tariffe-derivate" className="text-[11px] font-semibold text-focus hover:underline">{t("Tariffe derivate")} →</a>
           </div>
         )}
       </section>
