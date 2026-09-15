@@ -65,7 +65,7 @@ export default function BookingDrawer() {
   const {
     selectedBookingId, closeBooking, bookings, units,
     getGuest, getUnit, getStructure, getRoomType,
-    updateBooking, updateGuest, deleteBooking,
+    updateBooking, updateGuest, deleteBooking, deleteBookingGroup,
   } = useData();
 
   const router = useRouter();
@@ -289,6 +289,11 @@ export default function BookingDrawer() {
     w.document.close();
   };
 
+  const groupSize = booking?.groupId ? bookings.filter((x) => x.groupId === booking.groupId).length : 0;
+  const removeGroup = async () => {
+    if (!booking?.groupId) return;
+    if (await ask({ title: t("Elimina prenotazione di gruppo"), message: `${t("Eliminare definitivamente tutte le")} ${groupSize} ${t("camere di questo gruppo?")}`, danger: true, confirmLabel: t("Elimina tutto il gruppo") })) deleteBookingGroup(booking.groupId);
+  };
   const remove = async () => { if (await ask({ title: t("Elimina prenotazione"), message: t("Eliminare definitivamente questa prenotazione?"), danger: true, confirmLabel: t("Elimina") })) deleteBooking(booking.id); };
 
   const sendVoucherNow = async () => {
@@ -756,7 +761,8 @@ export default function BookingDrawer() {
       </Section>
 
       <Section title={t("Zona pericolo")}>
-        <button onClick={remove} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_10%,transparent)]">{t("Elimina prenotazione")}</button>
+        {groupSize > 1 && <button onClick={removeGroup} className="w-full rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--err)" }}>{t("Elimina tutto il gruppo")} ({groupSize} {t("camere")})</button>}
+        <button onClick={remove} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_10%,transparent)]">{groupSize > 1 ? t("Elimina solo questa camera") : t("Elimina prenotazione")}</button>
       </Section>
     </>
   );

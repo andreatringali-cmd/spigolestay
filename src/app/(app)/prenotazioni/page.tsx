@@ -21,13 +21,15 @@ import Icon from "@/components/Icon";
 import ExportMenu from "@/components/ExportMenu";
 import ChannelLogo from "@/components/ChannelLogo";
 import WeatherWidget from "@/components/WeatherWidget";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit" });
 
 export default function PrenotazioniPage() {
   const { t } = useLang();
-  const { bookings, guests, units, roomTypes, structures, getUnit, getStructure, openBooking, openNewBooking, activeStructureId } = useData();
+  const { bookings, guests, units, roomTypes, structures, getUnit, getStructure, openBooking, openNewBooking, activeStructureId, deleteBookingGroup } = useData();
+  const ask = useConfirm();
   // Nome ospite: dal collegamento se presente, altrimenti dallo snapshot salvato sulla prenotazione
   // (es. dopo l'eliminazione dell'anagrafica ospite il guestId resta vuoto ma primaryGuest conserva i dati).
   const guestName = (b: { guestId: string; primaryGuest?: { firstName?: string; lastName?: string } }) => {
@@ -444,7 +446,7 @@ export default function PrenotazioniPage() {
                     <td className="px-3 py-2.5 font-mono font-semibold text-txt">{eur(gSum(members, (x) => x.total ?? 0))}</td>
                     <td className="px-3 py-2.5 font-mono text-dim">{eur(gSum(members, (x) => commissionOf(x)))}</td>
                     <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{eur(gSum(members, (x) => nettoOf(x)))}</td>
-                    <td className="px-3 py-2.5"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }} title={t("Prenotazione di gruppo")}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span></td>
+                    <td className="px-3 py-2.5"><span className="inline-flex items-center gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }} title={t("Prenotazione di gruppo")}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><button onClick={async (e) => { e.stopPropagation(); if (await ask({ title: t("Elimina prenotazione di gruppo"), message: `${t("Eliminare definitivamente tutte le")} ${members.length} ${t("camere di questo gruppo?")}`, danger: true, confirmLabel: t("Elimina tutto il gruppo") })) deleteBookingGroup(gid); }} title={t("Elimina tutto il gruppo")} aria-label={t("Elimina tutto il gruppo")} className="grid h-6 w-6 place-items-center rounded-md text-faint hover:bg-[color:color-mix(in_srgb,var(--err)_12%,transparent)] hover:text-[color:var(--err)]"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /></svg></button></span></td>
                   </tr>
                   {open && members.map((m) => (
                     <tr key={m.id} onClick={() => openBooking(m.id)} className="cursor-pointer border-b border-line bg-wash/40 hover:bg-wash">{renderCells(m, true)}</tr>

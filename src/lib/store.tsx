@@ -73,6 +73,7 @@ interface DataContextValue {
   updateBooking: (id: string, patch: Partial<Booking>) => void;
   moveBooking: (id: string, to: { unitId: string; checkIn: string; checkOut: string }) => void;
   deleteBooking: (id: string) => void;
+  deleteBookingGroup: (groupId: string) => void; // elimina tutte le camere di una prenotazione di gruppo
 
   // Eventi calendario
   addEvent: (e: Omit<CalEvent, "id">) => void;
@@ -322,6 +323,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setBookings((prev) => prev.filter((b) => b.id !== id));
         setSelectedBookingId((s) => (s === id ? null : s));
         logAct("cancel", `Cancellazione${gName ? " — " + gName : ""}`);
+      },
+
+      deleteBookingGroup: (groupId) => {
+        const members = bookings.filter((x) => x.groupId === groupId);
+        if (!members.length) return;
+        const ids = new Set(members.map((m) => m.id));
+        const gName = guests.find((g) => g.id === members[0].guestId)?.fullName;
+        setBookings((prev) => prev.filter((b) => !ids.has(b.id)));
+        setSelectedBookingId((s) => (s && ids.has(s) ? null : s));
+        logAct("cancel", `Cancellazione gruppo (${members.length} camere)${gName ? " — " + gName : ""}`);
       },
 
       addEvent: (e) => { setEvents((prev) => [...prev, { id: uid(), ...e }]); logAct("event", `Evento: ${e.name}`); },
