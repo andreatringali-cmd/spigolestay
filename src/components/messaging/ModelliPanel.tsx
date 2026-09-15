@@ -49,7 +49,6 @@ export default function ModelliPanel() {
   const saveTpl = () => { if (!editing || !editing.name.trim()) return; setTemplates((prev) => (prev.some((t) => t.id === editing.id) ? prev.map((t) => (t.id === editing.id ? editing : t)) : [...prev, editing])); setEditing(null); };
   const insertVar = (token: string) => setEditing((e) => (e ? { ...e, texts: { ...e.texts, [editLang]: `${e.texts[editLang] ?? ""}${token}` } } : e));
   const del = async (tpl: MsgTemplate) => { if (await ask({ title: t("Elimina modello"), message: `${t("Eliminare il modello")} "${tpl.name}"? ${t("L'operazione non è reversibile.")}`, danger: true, confirmLabel: t("Elimina") })) setTemplates((p) => p.filter((x) => x.id !== tpl.id)); };
-  const activeAuto = templates.filter((t) => t.active && t.trigger !== "manual").length;
   const isAuto = (tp: MsgTemplate) => tp.active && tp.trigger !== "manual";
   const shown = templates.filter((tp) =>
     (search.trim() === "" || tp.name.toLowerCase().includes(search.trim().toLowerCase())) &&
@@ -58,16 +57,8 @@ export default function ModelliPanel() {
 
   return (
     <div>
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Modelli")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{templates.length}</div></Card>
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Automatici attivi")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{activeAuto}</div></Card>
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Coda invii")}</div><div className="mt-1 text-sm font-semibold text-txt">{t("nel tab Conversazioni")}</div><div className="mt-0.5 text-[11px] text-faint">{t("lì invii e vedi lo storico")}</div></Card>
-      </div>
-
-      <SectionTitle>{t("I tuoi modelli")}</SectionTitle>
-
-      {/* Riga filtri: campo cerca a sinistra + filtri */}
-      <div className="mt-2 flex flex-wrap items-center gap-2">
+      {/* Riga filtri (stile barra come le altre pagine): campo cerca a sinistra + filtri */}
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca un modello…")} className="min-w-[180px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
         <div className="flex items-center overflow-hidden rounded-lg border border-line">
           {([["all", t("Tutti")], ["auto", t("Automatici")], ["manual", t("Manuali")]] as [typeof flt, string][]).map(([k, lab], i) => (
@@ -76,7 +67,7 @@ export default function ModelliPanel() {
         </div>
       </div>
 
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
         {shown.map((tpl) => (
           <Card key={tpl.id}>
             <div className="flex items-start justify-between gap-2">
