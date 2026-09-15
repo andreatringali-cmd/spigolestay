@@ -428,7 +428,7 @@ export default function PrenotazioniPage() {
               return (
                 <Fragment key={gid}>
                   <tr onClick={() => toggleGroup(gid)} className="cursor-pointer border-b border-line bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)] hover:bg-wash">
-                    <td className="px-3 py-2.5 font-mono text-xs text-dim"><span className="inline-flex items-center gap-1.5">{bookingCode(b)}<span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }} title={t("Prenotazione di gruppo")}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span></span></td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-dim">{bookingCode(b)}</td>
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.bookedOn ? fmt(b.bookedOn) : "—"}</td>
                     {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
                     <td className="whitespace-nowrap px-3 py-2.5"><span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-2 py-0.5 text-[11px] font-semibold text-focus">{members.length} {t("camere")} {open ? "▾" : "▸"}</span></td>
@@ -444,7 +444,7 @@ export default function PrenotazioniPage() {
                     <td className="px-3 py-2.5 font-mono font-semibold text-txt">{eur(gSum(members, (x) => x.total ?? 0))}</td>
                     <td className="px-3 py-2.5 font-mono text-dim">{eur(gSum(members, (x) => commissionOf(x)))}</td>
                     <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{eur(gSum(members, (x) => nettoOf(x)))}</td>
-                    <td className="px-3 py-2.5 text-[11px] text-faint">{t("gruppo")}</td>
+                    <td className="px-3 py-2.5"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }} title={t("Prenotazione di gruppo")}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span></td>
                   </tr>
                   {open && members.map((m) => (
                     <tr key={m.id} onClick={() => openBooking(m.id)} className="cursor-pointer border-b border-line bg-wash/40 hover:bg-wash">{renderCells(m, true)}</tr>
