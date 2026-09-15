@@ -37,7 +37,8 @@ export async function POST(req: Request) {
     const { data: existing } = await admin.from("memberships").select("id").eq("org_id", inv.org_id).eq("user_id", caller.id).maybeSingle();
     if (!existing) {
       const { error: mErr } = await admin.from("memberships").insert({ org_id: inv.org_id, user_id: caller.id, role: "member" });
-      if (mErr) return NextResponse.json({ error: "membership_failed", message: mErr.message }, { status: 500 });
+      // 23505 = già membro (es. link aperto due volte in contemporanea): va bene così
+      if (mErr && mErr.code !== "23505") return NextResponse.json({ error: "membership_failed", message: mErr.message }, { status: 500 });
     }
     if (inv.status !== "accepted") {
       await admin.from("org_invites").update({ status: "accepted", accepted_at: new Date().toISOString(), accepted_by: caller.id }).eq("code", code);
