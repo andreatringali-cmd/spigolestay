@@ -67,6 +67,16 @@ export default function WidgetPage() {
   const [phone, setPhone] = useState("");
   const [doneMsg, setDoneMsg] = useState(false);
   const [copied, setCopied] = useState("");
+  // Formato del widget: scegli la forma in base al punto del sito dove lo incolli.
+  const FORMATS = [
+    { key: "v-narrow", label: t("Verticale stretto"), w: 340, h: 600, orient: "v" as const },
+    { key: "v-std", label: t("Verticale"), w: 440, h: 560, orient: "v" as const },
+    { key: "v-wide", label: t("Verticale largo"), w: 520, h: 560, orient: "v" as const },
+    { key: "h-wide", label: t("Orizzontale"), w: 760, h: 250, orient: "h" as const },
+    { key: "h-bar", label: t("Barra larga"), w: 980, h: 180, orient: "h" as const },
+  ];
+  const [fmtKey, setFmtKey] = useState("v-std");
+  const fmt = FORMATS.find((f) => f.key === fmtKey) ?? FORMATS[1];
 
   const structure = structures.find((s) => s.id === structureId);
   const rt = roomTypes.find((r) => r.id === rtId);
@@ -86,7 +96,7 @@ export default function WidgetPage() {
 
   const sitekey = `${structureId}-${c.accent.replace("#", "")}`;
   const script = `<div id="spigole-book" data-sitekey="${sitekey}"></div>\n<script type="text/javascript" src="https://book.xenora.com/widget/js/form.js" data-sitekey="${sitekey}" async></script>`;
-  const iframe = `<iframe src="https://book.xenora.com/w/${sitekey}?lang=${c.lang}" width="100%" height="560" style="border:0;max-width:440px" title="Prenota — ${structure?.name ?? ""}"></iframe>`;
+  const iframe = `<iframe src="https://book.xenora.com/w/${sitekey}?lang=${c.lang}&fmt=${fmt.key}" width="${fmt.w}" height="${fmt.h}" style="border:0;width:100%;max-width:${fmt.w}px" title="Prenota — ${structure?.name ?? ""}"></iframe>`;
   const copy = (k: string, t: string) => { navigator.clipboard?.writeText(t); setCopied(k); window.setTimeout(() => setCopied(""), 1500); };
   const radius = c.theme === "rounded" ? 16 : 4;
 
@@ -112,6 +122,11 @@ export default function WidgetPage() {
                 <select value={c.lang} onChange={(e) => set("lang", e.target.value)} className={`mt-1 ${inp}`}><option value="it">Italiano</option><option value="en">English</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="es">Español</option></select>
               </label>
             </div>
+            <label className="mt-2 block text-xs font-medium text-dim">{t("Formato")} <span className="font-normal text-faint">{t("(in base allo spazio del tuo sito)")}</span>
+              <select value={fmtKey} onChange={(e) => setFmtKey(e.target.value)} className={`mt-1 ${inp}`}>
+                {FORMATS.map((f) => (<option key={f.key} value={f.key}>{f.label} · {f.w}×{f.h}</option>))}
+              </select>
+            </label>
             <div className="mt-2">
               <div className="mb-1 text-xs font-medium text-dim">{t("Colore")}</div>
               <div className="flex flex-wrap gap-2">
@@ -191,13 +206,14 @@ export default function WidgetPage() {
         {/* Anteprima live */}
         <div className="lg:sticky lg:top-20 lg:self-start">
           <SectionTitle>{t("Anteprima widget")}</SectionTitle>
-          <div className="mx-auto max-w-[440px] overflow-hidden border border-line bg-surface shadow-lg" style={{ borderRadius: radius }}>
+          <div className="mx-auto overflow-hidden border border-line bg-surface shadow-lg" style={{ borderRadius: radius, width: fmt.w, maxWidth: "100%" }}>
             {c.showHeader && (
               <div className="px-5 py-4 text-white" style={{ backgroundColor: c.accent }}>
                 <div className="text-sm opacity-90">{t("Prenotazione online")}</div>
                 <div className="font-display text-xl font-bold">{structure?.name ?? t("La tua struttura")}</div>
               </div>
             )}
+            {fmt.orient === "v" ? (
             <div className="flex flex-col gap-3 p-5">
               <div className="grid grid-cols-2 gap-2">
                 <label className="block text-xs font-medium text-dim">{t("Arrivo")}<input type="date" value={ci} onChange={(e) => setCi(e.target.value)} className={`mt-1 ${inp}`} style={{ borderRadius: radius / 2 }} /></label>
@@ -229,6 +245,22 @@ export default function WidgetPage() {
               )}
               <div className="text-center text-[10px] text-faint">{t("Pagamenti:")} {[c.payCard && t("Carta"), c.payPaypal && "PayPal", c.payTransfer && t("Bonifico"), c.payOnsite && t("Sul posto")].filter(Boolean).join(" · ") || "—"}</div>
             </div>
+            ) : (
+            /* Formato orizzontale: barra di prenotazione compatta su una riga */
+            <div className="flex flex-wrap items-end gap-2 p-4">
+              <label className="block flex-1 text-[11px] font-medium text-dim" style={{ minWidth: 120 }}>{t("Arrivo")}<input type="date" value={ci} onChange={(e) => setCi(e.target.value)} className={`mt-1 ${inp}`} style={{ borderRadius: radius / 2 }} /></label>
+              <label className="block flex-1 text-[11px] font-medium text-dim" style={{ minWidth: 120 }}>{t("Partenza")}<input type="date" value={co} onChange={(e) => setCo(e.target.value)} className={`mt-1 ${inp}`} style={{ borderRadius: radius / 2 }} /></label>
+              <label className="block text-[11px] font-medium text-dim" style={{ width: 68 }}>{t("Adulti")}<input type="number" min={1} value={guests} onChange={(e) => setGuests(Math.max(1, +e.target.value))} className={`mt-1 ${inp}`} /></label>
+              {c.askChildren && <label className="block text-[11px] font-medium text-dim" style={{ width: 68 }}>{t("Bambini")}<input type="number" min={0} value={children} onChange={(e) => setChildren(Math.max(0, +e.target.value))} className={`mt-1 ${inp}`} /></label>}
+              <label className="block flex-1 text-[11px] font-medium text-dim" style={{ minWidth: 130 }}>{t("Camera")}<select value={rtId} onChange={(e) => setRtId(e.target.value)} className={`mt-1 ${inp}`}>{typesOf.map((rt) => (<option key={rt.id} value={rt.id}>{rt.name}</option>))}</select></label>
+              {c.showPrices && <div className="text-right"><div className="text-[10px] text-faint">{n} {n === 1 ? t("notte") : t("notti")}</div><div className="font-mono text-lg font-bold text-txt">{eur(price)}</div></div>}
+              {doneMsg ? (
+                <div className="flex-1 px-3 py-2.5 text-center text-sm font-semibold text-white" style={{ backgroundColor: "var(--ok)", borderRadius: radius / 2, minWidth: 160 }}>✓ {t("Ricevuta!")}</div>
+              ) : (
+                <button onClick={prenota} className="px-5 py-2.5 text-sm font-bold text-white transition hover:opacity-90" style={{ backgroundColor: c.accent, borderRadius: radius / 2 }}>{t("Prenota")}</button>
+              )}
+            </div>
+            )}
           </div>
           <p className="mt-2 text-center text-xs text-faint">{t("Anteprima reale: “Prenota ora” crea la prenotazione nel calendario.")}</p>
         </div>
