@@ -49,7 +49,7 @@ export default function ModelliPanel() {
   const saveTpl = () => { if (!editing || !editing.name.trim()) return; setTemplates((prev) => (prev.some((t) => t.id === editing.id) ? prev.map((t) => (t.id === editing.id ? editing : t)) : [...prev, editing])); setEditing(null); };
   const insertVar = (token: string) => setEditing((e) => (e ? { ...e, texts: { ...e.texts, [editLang]: `${e.texts[editLang] ?? ""}${token}` } } : e));
   const del = async (tpl: MsgTemplate) => { if (await ask({ title: t("Elimina modello"), message: `${t("Eliminare il modello")} "${tpl.name}"? ${t("L'operazione non è reversibile.")}`, danger: true, confirmLabel: t("Elimina") })) setTemplates((p) => p.filter((x) => x.id !== tpl.id)); };
-  const isAuto = (tp: MsgTemplate) => tp.active && tp.trigger !== "manual";
+  const isAuto = (tp: MsgTemplate) => tp.trigger !== "manual"; // "automatico" = ha un orario/trigger (a prescindere se è in pausa)
   const shown = templates.filter((tp) =>
     (search.trim() === "" || tp.name.toLowerCase().includes(search.trim().toLowerCase())) &&
     (flt === "all" || (flt === "auto" ? isAuto(tp) : !isAuto(tp)))
@@ -75,7 +75,12 @@ export default function ModelliPanel() {
                 <div className="flex items-center gap-1.5"><span className="font-display text-base font-bold text-txt">{tpl.name}</span>{tpl.srcId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-focus" title={t("Collegato a un'attività del «Da fare oggi»")}>{t("Da fare oggi")}</span>}</div>
                 <div className="mt-0.5 text-xs text-dim">{triggerDesc(tpl, t)}</div>
               </div>
-              <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${tpl.active && tpl.trigger !== "manual" ? "var(--ok)" : "var(--faint)"} 18%, transparent)`, color: tpl.active && tpl.trigger !== "manual" ? "var(--ok)" : "var(--faint)" }}>{tpl.active && tpl.trigger !== "manual" ? t("Automatico") : t("Manuale")}</span>
+              {(() => {
+                const auto = tpl.trigger !== "manual";
+                const col = auto ? (tpl.active ? "var(--ok)" : "var(--warn)") : "var(--faint)";
+                const label = auto ? (tpl.active ? t("Automatico") : `${t("Automatico")} · ${t("in pausa")}`) : t("Manuale");
+                return <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${col} 18%, transparent)`, color: col }}>{label}</span>;
+              })()}
             </div>
             <div className="mt-2 line-clamp-2 text-xs text-dim">{tpl.texts.it || tpl.texts.en || "—"}</div>
             <div className="mt-2 flex gap-2">
