@@ -767,14 +767,14 @@ function RoomCard({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle
 
   return (
     <div className={`flex h-full min-h-[160px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm transition ${done ? "opacity-70" : ""}`}>
-      {/* Intestazione: camera + cosa fare */}
-      <div className="flex items-center justify-between gap-2 px-3 py-2" style={{ backgroundColor: `color-mix(in srgb, ${accent} 12%, var(--surface))`, borderBottom: `1px solid color-mix(in srgb, ${accent} 28%, var(--line))` }}>
+      {/* Intestazione: camera + cosa fare — banda colorata in base alla tipologia della camera */}
+      <div className="flex items-center justify-between gap-2 px-3 py-2.5" style={{ background: `color-mix(in srgb, ${r.typeColor} 72%, #10131a)`, color: "#fff" }}>
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className={`truncate font-display text-[15px] font-bold ${done ? "text-dim line-through" : "text-txt"}`}>{r.unit.name}</span>
-          {r.typeName && <span className="shrink-0 text-[10px] font-medium text-faint">· {r.typeName}</span>}
-          {hasIssue && <span title={t("Segnalazione aperta")} className="shrink-0 text-[color:var(--err)]"><Icon name="alertTriangle" size={13} /></span>}
+          <span className={`truncate font-display text-[15px] font-bold text-white ${done ? "line-through opacity-70" : ""}`} style={{ textShadow: "0 1px 2px rgba(0,0,0,.25)" }}>{r.unit.name}</span>
+          {r.typeName && <span className="shrink-0 text-[10px] font-medium text-white/70">· {r.typeName}</span>}
+          {hasIssue && <span title={t("Segnalazione aperta")} className="shrink-0 text-white"><Icon name="alertTriangle" size={13} /></span>}
         </span>
-        <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: accent }}>{t(a.label)}</span>
+        <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide shadow-sm" style={{ backgroundColor: "rgba(255,255,255,.94)", color: accent }}>{t(a.label)}</span>
       </div>
 
       {/* Chi parte / arriva / alloggia */}
