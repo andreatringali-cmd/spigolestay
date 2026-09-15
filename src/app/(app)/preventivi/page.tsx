@@ -349,7 +349,6 @@ export default function PreventiviPage() {
     } catch { /* ripiego sotto */ }
     const s = await shortenLink(payUrl); payShortRef.current[payUrl] = s; return s;
   };
-  const shareMsg = (link: string) => `${outMsg}\n\nConferma e paga online: ${link}`;
   const [mailState, setMailState] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
   // Invio del preventivo via server (Resend), come la conferma prenotazione: niente client di posta.
   const sendQuoteEmail = async () => {
@@ -766,11 +765,8 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button onClick={printPdf} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Scarica / stampa PDF")}</button>
-            <button onClick={sendQuoteEmail} disabled={mailState.sending} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt transition hover:bg-wash disabled:opacity-50"><Icon name="mail" size={15} /> {mailState.sending ? t("Invio…") : t("Email")}</button>
-            <button onClick={async () => { if (!phone) return; save(); const link = await getPayLink(); window.open(`https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(shareMsg(link))}`, "_blank"); }} disabled={!phone} title={!phone ? t("Nessun numero") : undefined} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt transition hover:bg-wash disabled:opacity-40"><Icon name="chat" size={15} /> WhatsApp</button>
-            <button onClick={async () => { const link = await getPayLink(); navigator.clipboard?.writeText(shareMsg(link)); }} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt transition hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
-            <button onClick={async () => { save(); const link = await getPayLink(); navigator.clipboard?.writeText(link); setMailState({ ok: true, msg: t("Link pagamento copiato") }); }} title={t("Link dove l'ospite conferma e paga")} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90" style={{ backgroundColor: "var(--focus)", borderColor: "var(--focus)" }}><Icon name="card" size={15} /> {t("Link pagamento")}</button>
+            <button onClick={sendQuoteEmail} disabled={mailState.sending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"><Icon name="mail" size={15} /> {mailState.sending ? t("Invio…") : t("Invia via email")}</button>
+            <button onClick={printPdf} title={t("Scarica il preventivo in PDF")} aria-label={t("Scarica PDF")} className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><Icon name="fileText" size={16} /></button>
             {(mailState.sending || mailState.msg) && <span className={`text-xs ${mailState.sending ? "text-dim" : mailState.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{mailState.sending ? t("Invio…") : (mailState.ok ? "✓ " : "⚠ ") + mailState.msg}</span>}
           </div>
         </Card>
