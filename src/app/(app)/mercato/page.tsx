@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
@@ -11,19 +10,17 @@ import { PageHeader, Card } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 
 const WINDOW = 90;
-const FUTURE = 30;
 const THRESHOLD = 3;
 
 type Consents = { occupancy: boolean; adr: boolean; demand: boolean; channels: boolean };
 type Pulse = { n_structures: number; occupancy: number | null; adr: number | null; revpar: number | null; my_occupancy: number | null; my_adr: number | null; my_revpar: number | null };
-type Day = { date: string; factor: number; price: number; sold: number; reason: string };
 
 const dow = (iso: string) => new Date(iso + "T00:00:00").getDay();
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 export default function MercatoPage() {
   const { t } = useLang();
-  const { structures, roomTypes, units, bookings, activeStructureId } = useData();
+  const { structures, units, bookings, activeStructureId } = useData();
   const { user } = useAuth();
 
   const struct = useMemo(() => {
@@ -39,14 +36,6 @@ export default function MercatoPage() {
 
   const sUnits = useMemo(() => units.filter((u) => u.structureId === struct?.id && !u.outOfService), [units, struct?.id]);
   const sRooms = sUnits.length;
-  const sTypes = useMemo(() => roomTypes.filter((rt) => rt.structureId === struct?.id), [roomTypes, struct?.id]);
-  const mainType = useMemo(() => {
-    if (!sTypes.length) return undefined;
-    const counts = sTypes.map((rt) => ({ rt, n: sUnits.filter((u) => u.roomTypeId === rt.id).length }));
-    counts.sort((a, b) => b.n - a.n);
-    return counts[0].rt;
-  }, [sTypes, sUnits]);
-
   const myDaily = useMemo(() => {
     if (!struct || sRooms === 0) return [] as { date: string; rooms_total: number; rooms_sold: number; revenue: number; dow: number }[];
     const today = toISO(new Date());
@@ -67,51 +56,6 @@ export default function MercatoPage() {
     const rev = myDaily.reduce((s, r) => s + r.revenue, 0);
     return { occ: rt ? rs / rt : 0, adr: rs ? rev / rs : 0, revpar: rt ? rev / rt : 0 };
   }, [myDaily]);
-
-  const dowOcc = useMemo(() => {
-    const acc: Record<number, { s: number; t: number }> = {};
-    for (const r of myDaily) { const a = acc[r.dow] ?? (acc[r.dow] = { s: 0, t: 0 }); a.s += r.rooms_sold; a.t += r.rooms_total; }
-    const out: Record<number, number> = {};
-    for (let d = 0; d < 7; d++) out[d] = acc[d]?.t ? acc[d].s / acc[d].t : my.occ;
-    return out;
-  }, [myDaily, my.occ]);
-
-  const basePrice = useMemo(() => {
-    const fromAdr = my.adr > 0 ? Math.round(my.adr) : 0;
-    return fromAdr || (mainType?.basePrice ?? 0) || 90;
-  }, [my.adr, mainType]);
-
-  const cityHot = pulse?.occupancy != null && pulse.occupancy > my.occ + 0.05;
-  const adrGap = pulse?.adr != null && my.adr > 0 ? (pulse.adr - my.adr) / my.adr : 0;
-  const engine = useMemo<Day[]>(() => {
-    if (!struct || sRooms === 0) return [];
-    const today = toISO(new Date());
-    const mine = bookings.filter((b) => b.structureId === struct.id && b.status !== "cancelled" && b.channel !== "blocked");
-    const out: Day[] = [];
-    for (let i = 0; i < FUTURE; i++) {
-      const D = shiftISO(today, i);
-      const wd = dow(D);
-      const sold = mine.filter((b) => b.checkIn <= D && b.checkOut > D).length;
-      const pickup = sRooms ? sold / sRooms : 0;
-      let f = 1; const reasons: { w: number; txt: string }[] = [];
-      if (wd === 5 || wd === 6) { f *= 1.12; reasons.push({ w: 0.12, txt: t("weekend") }); }
-      else if (wd === 0) { f *= 0.97; }
-      if (pickup >= 0.7) { f *= 1.15; reasons.push({ w: 0.15, txt: t("quasi al completo") }); }
-      else if (pickup <= 0.2 && i <= 10) { f *= 0.92; reasons.push({ w: 0.08, txt: t("ancora vuoto: last-minute") }); }
-      if (cityHot) { f *= 1.08; reasons.push({ w: 0.08, txt: t("città molto piena") }); }
-      if (adrGap > 0.05) { const up = clamp(adrGap, 0, 0.15); f *= 1 + up; reasons.push({ w: up, txt: t("sotto la media città") }); }
-      else if (adrGap < -0.08) { f *= 0.96; reasons.push({ w: 0.05, txt: t("sopra la media città") }); }
-      f = clamp(f, 0.8, 1.5);
-      reasons.sort((a, b) => b.w - a.w);
-      out.push({ date: D, factor: f, price: Math.round(basePrice * f), sold, reason: reasons[0]?.txt || t("in linea") });
-    }
-    return out;
-  }, [struct, sRooms, bookings, basePrice, cityHot, adrGap, t]);
-
-  const potential = useMemo(() => {
-    const extra = engine.reduce((s, d) => s + (d.price - basePrice) * Math.max(d.sold, Math.round((dowOcc[dow(d.date)] ?? my.occ) * sRooms)), 0);
-    return Math.round(extra);
-  }, [engine, basePrice, dowOcc, my.occ, sRooms]);
 
   useEffect(() => {
     if (!supabase || !user?.id || !struct?.id) return;
@@ -159,18 +103,6 @@ export default function MercatoPage() {
   return (
     <div>
       <PageHeader title={t("Rete città")} subtitle={`${city} · ${t("confronto anonimo con i B&B della tua città")}`} />
-
-      {/* Banner Nèttare — i prezzi vivono nella pagina Nèttare */}
-      <Link href="/nettare" className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-line p-4 transition hover:brightness-[1.02]" style={{ background: "linear-gradient(100deg, color-mix(in srgb,var(--focus) 8%,var(--surface)), var(--surface))" }}>
-        <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-xl border border-line text-lg" style={{ background: "color-mix(in srgb,var(--focus) 10%,transparent)" }}>🦋</span>
-          <div>
-            <div className="text-sm font-bold text-txt">Nèttare · {t("prezzi dinamici")}</div>
-            <div className="text-[11px] text-dim">{potential > 0 ? <>{t("Ricavo in più stimato")}: <b style={{ color: "var(--ok)" }}>+{eur(potential)}/30gg</b></> : t("Prezzi consigliati per i prossimi 30 giorni, dai dati della rete")}</div>
-          </div>
-        </div>
-        <span className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ background: "var(--focus)" }}>{t("Apri Nèttare")} →</span>
-      </Link>
 
       {/* KPI: come vai rispetto alla città */}
       <section className="mt-4">

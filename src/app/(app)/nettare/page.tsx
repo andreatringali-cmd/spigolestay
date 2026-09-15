@@ -11,11 +11,13 @@ import { PageHeader } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { italianHolidays, italianBridges } from "@/lib/holidays";
-import { DEFAULT_STRAT, RISK_BAND, cellKey, runNettare, applyMod, hasMod, type Cell, type Goal, type Mod, type Strategy, type Step } from "@/lib/nettare";
+import { DEFAULT_STRAT, RISK_PRESET, MONTHS, cellKey, runNettare, applyMod, hasMod, normalizeStrategy, type Cell, type Mod, type Period, type Risk, type Strategy, type Step } from "@/lib/nettare";
+import { effBase } from "@/lib/pricing";
 
 const WINDOW = 90;
 const FUTURE = 30;
-const GRID_DAYS = 14;
+const GRID_DAYS = 30;
+const PREVIEW = 90;
 const STRAT_KEY = "spigolestay:nettare:strategy";
 const MODS_KEY = "spigolestay:nettare:mods";
 
@@ -42,11 +44,15 @@ export default function NettarePage() {
   const [applied, setApplied] = useState(false);
   const [start, setStart] = useState(today);
   const [openStrat, setOpenStrat] = useState(true);
+  const [openStart, setOpenStart] = useState(false);
+  const [scope, setScope] = useState<string>("general");
+  const [previewRt, setPreviewRt] = useState("");
+  const [openKids, setOpenKids] = useState<Record<string, boolean>>({});
   const [hover, setHover] = useState<{ key: string; x: number; y: number } | null>(null);
   const [panel, setPanel] = useState<string | null>(null);
 
   useEffect(() => {
-    try { const r = localStorage.getItem(STRAT_KEY); if (r) setStrat({ ...DEFAULT_STRAT, ...JSON.parse(r) }); } catch {}
+    try { const r = localStorage.getItem(STRAT_KEY); if (r) setStrat(normalizeStrategy(JSON.parse(r))); } catch {}
     try { const r = localStorage.getItem(MODS_KEY); if (r) setMods(JSON.parse(r)); } catch {}
   }, []);
   const upd = (p: Partial<Strategy>) => setStrat((s) => { const n = { ...s, ...p }; try { localStorage.setItem(STRAT_KEY, JSON.stringify(n)); } catch {} return n; });
@@ -91,9 +97,10 @@ export default function NettarePage() {
   // date calcolate: griglia visibile + prossimi 30 giorni (per "Applica" e ricavo stimato)
   const gridDates = useMemo(() => Array.from({ length: GRID_DAYS }, (_, i) => shiftISO(start, i)), [start]);
   const allDates = useMemo(() => {
-    const s = new Set<string>(gridDates); for (let i = 0; i < FUTURE; i++) s.add(shiftISO(today, i));
+    const s = new Set<string>(gridDates); for (let i = 0; i < PREVIEW; i++) s.add(shiftISO(today, i));
     return [...s].sort();
   }, [gridDates, today]);
+  const previewDates = useMemo(() => Array.from({ length: PREVIEW }, (_, i) => shiftISO(today, i)), [today]);
 
   const res = useMemo(() => {
     if (!struct || sRooms === 0) return { days: [], cells: {} as Record<string, Cell> };
@@ -130,27 +137,48 @@ export default function NettarePage() {
 
   if (!struct) return (<div><PageHeader title="Nèttare" subtitle={t("Prezzi dinamici")} /><div className="rounded-2xl border border-line p-4 text-sm text-dim" style={{ background: "var(--surface)" }}>{t("Aggiungi prima una struttura.")}</div></div>);
 
-  const GoalBtn = ({ v, label, desc }: { v: Goal; label: string; desc: string }) => (
-    <button onClick={() => upd({ goal: v })} className="flex-1 rounded-xl border p-3 text-left transition" style={{ borderColor: strat.goal === v ? "var(--focus)" : "var(--line)", background: strat.goal === v ? "color-mix(in srgb,var(--focus) 8%,var(--surface))" : "var(--surface)" }}>
-      <div className="text-sm font-semibold text-txt">{label}</div><div className="mt-0.5 text-[11px] text-dim">{desc}</div>
-    </button>
-  );
-  const Seg = ({ v, cur, onC, children }: { v: string; cur: string; onC: () => void; children: ReactNode }) => (
-    <button onClick={onC} className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition" style={{ background: cur === v ? "var(--focus)" : "transparent", color: cur === v ? "#fff" : "var(--dim)" }}>{children}</button>
-  );
-  const Tgl = ({ on, onC, label, hint }: { on: boolean; onC: () => void; label: string; hint: string }) => (
-    <div className="flex items-center justify-between gap-3 py-2.5">
-      <div><div className="text-sm font-medium text-txt">{label}</div><div className="text-[11px] text-faint">{hint}</div></div>
-      <button onClick={onC} aria-pressed={on} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? "var(--ok)" : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all" style={{ left: on ? 22 : 2 }} /></button>
-    </div>
-  );
-
-  const COL = 88, LABEL = 168;
+  const COL = 74, LABEL = 188;
+  // righe tipologie: madri, con le derivate raccolte in una tendina sotto la madre
+  const typeIds = new Set(sTypes.map((r) => r.id));
+  const kidsOf = (id: string) => sTypes.filter((r) => r.deriveFrom === id && r.id !== id);
+  const gridRows: { rt: (typeof sTypes)[number]; depth: number; kids: number }[] = [];
+  const pushRow = (rt: (typeof sTypes)[number], depth: number, seen: Set<string>) => {
+    if (seen.has(rt.id)) return; seen.add(rt.id);
+    const kids = kidsOf(rt.id);
+    gridRows.push({ rt, depth, kids: kids.length });
+    if (openKids[rt.id]) kids.forEach((k) => pushRow(k, depth + 1, seen));
+  };
+  sTypes.filter((r) => !r.deriveFrom || !typeIds.has(r.deriveFrom)).forEach((r) => pushRow(r, 0, new Set()));
   const hoverCell = hover ? res.cells[hover.key] : undefined;
   const panelCell = panel ? res.cells[panel] : undefined;
 
+  // ── strategia: generale o periodo selezionato ──
+  const period = scope === "general" ? undefined : strat.periods.find((p) => p.id === scope);
+  const cur = period ?? strat;
+  const updScope = (p: Partial<Period>) => { if (period) upd({ periods: strat.periods.map((x) => (x.id === period.id ? { ...x, ...p } : x)) }); else upd(p as Partial<Strategy>); };
+  const presetOf = (down: number, up: number) => (Object.keys(RISK_PRESET) as Risk[]).find((k) => RISK_PRESET[k].down === down && RISK_PRESET[k].up === up);
+  const addPeriod = () => {
+    const d = new Date();
+    const p: Period = { id: `p${Date.now()}`, name: t("Nuovo periodo"), from: toISO(new Date(d.getFullYear(), d.getMonth() + 1, 1)), to: toISO(new Date(d.getFullYear(), d.getMonth() + 2, 0)), goal: strat.goal, down: strat.down, up: strat.up, startAdj: 0, eventImpact: strat.eventImpact };
+    upd({ periods: [...strat.periods, p] }); setScope(p.id);
+  };
+  const delPeriod = async () => {
+    if (!period) return;
+    if (!(await ask({ title: t("Elimina periodo"), message: `${t("Elimino il periodo")} «${period.name}». ${t("In quelle date tornerà a valere la strategia generale.")}`, confirmLabel: t("Elimina"), danger: true }))) return;
+    upd({ periods: strat.periods.filter((x) => x.id !== period.id) }); setScope("general");
+  };
+
+  // ── anteprima ──
+  const pvRt = sTypes.find((r) => r.id === previewRt) ?? mainType;
+  const pvSeries = pvRt ? [
+    { key: "start", label: t("Prezzi di partenza"), color: "var(--faint)", dash: "5 4", values: previewDates.map((d) => res.cells[cellKey(pvRt.id, d)]?.base) },
+    { key: "nettare", label: t("Strategia Nèttare"), color: "var(--chart-1)", values: previewDates.map((d) => res.cells[cellKey(pvRt.id, d)]?.final) },
+    { key: "pub", label: t("Prezzi applicati"), color: "var(--chart-2)", values: previewDates.map((d) => published(pvRt.id, d)) },
+  ] : [];
+
   return (
     <div>
+      <style>{`:root{--chart-1:#2F6BB0;--chart-2:#C9751A}.dark{--chart-1:#6FA3DC;--chart-2:#D98A3A}`}</style>
       <PageHeader title="Nèttare" subtitle={`${t("Prezzi dinamici")}${city ? ` · ${city}` : ""}`} />
 
       {/* Riepilogo Nèttare */}
@@ -162,8 +190,8 @@ export default function NettarePage() {
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <div><div className="text-[11px] font-semibold text-faint">{t("Ricavo in più stimato")} · {FUTURE}gg</div><div className="font-mono text-3xl font-extrabold tracking-tight" style={{ color: stats.potential > 0 ? "var(--ok)" : "var(--txt)" }}>{stats.potential > 0 ? "+" : ""}{eur(stats.potential)}</div></div>
-            <div><div className="text-[11px] text-faint">{t("Prezzo base")}</div><div className="font-mono text-lg font-bold text-txt">{eur(basePrice)}</div></div>
             <div><div className="text-[11px] text-faint">{t("Prezzo medio")}</div><div className="font-mono text-lg font-bold text-txt">{eur(stats.avg)}</div></div>
+            <div><div className="text-[11px] text-faint">{t("Periodi")}</div><div className="font-mono text-lg font-bold text-txt">{strat.periods.length}</div></div>
             <div><div className="text-[11px] text-faint">{t("Da applicare")}</div><div className="font-mono text-lg font-bold" style={{ color: stats.pending ? "var(--warn)" : "var(--ok)" }}>{stats.pending}</div></div>
             <button onClick={applyPrices} className="rounded-full px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 active:scale-95" style={{ background: "var(--focus)" }}>{applied ? `✓ ${t("Prezzi applicati")}` : `${t("Applica ai prossimi")} ${FUTURE} ${t("giorni")}`}</button>
           </div>
@@ -174,52 +202,126 @@ export default function NettarePage() {
         </div>
       </div>
 
-      {/* Strategia */}
-      <section className="mt-4 rounded-2xl border border-line p-5" style={{ background: "var(--surface)" }}>
-        <button onClick={() => setOpenStrat((v) => !v)} className="flex w-full items-center justify-between text-left">
+      {/* Prezzi di partenza */}
+      <Card title={t("Prezzi di partenza")} desc={t("La base su cui Nèttare costruisce i prezzi: tariffa per tipologia e stagionalità per mese.")} open={openStart} onToggle={() => setOpenStart((v) => !v)}>
+        <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
           <div>
-            <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Strategia")}</h3>
-            <p className="mt-0.5 text-xs text-dim">{t("Scegli come Nèttare deve muovere i prezzi.")}</p>
-          </div>
-          <span className="text-dim transition" style={{ transform: openStrat ? "rotate(180deg)" : "none" }}>⌄</span>
-        </button>
-
-        {openStrat && <>
-          <div className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Obiettivo")}</div>
-          <div className="mt-1.5 grid gap-2 sm:grid-cols-3">
-            <GoalBtn v="fill" label={t("Riempi")} desc={t("più occupazione, prezzi più morbidi")} />
-            <GoalBtn v="balanced" label={t("Bilanciato")} desc={t("equilibrio prezzo/occupazione")} />
-            <GoalBtn v="revenue" label={t("Massimo ricavo")} desc={t("spingi il RevPAR quando c'è domanda")} />
-          </div>
-
-          <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Profilo di rischio")}</div>
-              <div className="mt-1.5 flex rounded-lg border border-line p-0.5" style={{ background: "var(--wash)" }}>
-                <Seg v="prudente" cur={strat.risk} onC={() => upd({ risk: "prudente" })}>{t("Prudente")}</Seg>
-                <Seg v="bilanciato" cur={strat.risk} onC={() => upd({ risk: "bilanciato" })}>{t("Bilanciato")}</Seg>
-                <Seg v="aggressivo" cur={strat.risk} onC={() => upd({ risk: "aggressivo" })}>{t("Aggressivo")}</Seg>
-              </div>
-              <div className="mt-1.5 text-[11px] text-faint">{t("Variazione massima dei prezzi")}: {Math.round((RISK_BAND[strat.risk][0] - 1) * 100)}% / +{Math.round((RISK_BAND[strat.risk][1] - 1) * 100)}%</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Tariffa di partenza per tipologia")}</div>
+            <div className="mt-1.5 divide-y divide-[var(--line)] rounded-xl border border-line">
+              {sTypes.map((rt) => {
+                const def = Math.max(0, effBase(rt, roomTypes)) || basePrice;
+                const v = strat.starting[rt.id];
+                return (
+                  <div key={rt.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <div className="min-w-0"><div className="truncate text-sm font-medium text-txt">{rt.name}</div><div className="text-[11px] text-faint">{t("tariffa in Camere")}: {eur(def)}</div></div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {v != null && <button onClick={() => { const s = { ...strat.starting }; delete s[rt.id]; upd({ starting: s }); }} className="text-[11px] text-faint hover:underline">{t("ripristina")}</button>}
+                      <input type="number" inputMode="numeric" min={0} value={v ?? ""} placeholder={String(def)} onChange={(e) => { const s = { ...strat.starting }; if (e.target.value === "") delete s[rt.id]; else s[rt.id] = Number(e.target.value); upd({ starting: s }); }} className="w-24 rounded-lg border border-line px-2 py-1.5 text-right font-mono text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} />
+                      <span className="text-xs text-dim">€</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div>
+            <div className="mt-4"><Slider label={t("Regolazione generale prezzi di partenza")} value={strat.startAdj} min={-30} max={50} step={1} suffix="%" onChange={(v) => upd({ startAdj: v })} hint={t("Alza o abbassa tutte le tariffe di partenza in un colpo.")} /></div>
+          </div>
+          <div>
+            <div className="flex items-end justify-between"><div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Stagionalità")}</div><button onClick={() => upd({ season: Array(12).fill(0) })} className="text-[11px] text-faint hover:underline">{t("azzera")}</button></div>
+            <div className="mt-1.5 grid grid-cols-4 gap-2 sm:grid-cols-6">
+              {MONTHS.map((m, i) => {
+                const v = strat.season[i] || 0;
+                return (
+                  <label key={m} className="rounded-xl border border-line p-2 text-center" style={{ background: v > 0 ? "color-mix(in srgb,var(--ok) 8%,var(--surface))" : v < 0 ? "color-mix(in srgb,var(--focus) 8%,var(--surface))" : "var(--surface)" }}>
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-dim">{t(m)}</div>
+                    <div className="mx-auto my-1 flex h-8 w-2 flex-col justify-end overflow-hidden rounded-full" style={{ background: "var(--wash)" }}><div style={{ height: `${Math.min(100, Math.abs(v) * 2)}%`, background: v >= 0 ? "var(--ok)" : "var(--focus)", borderRadius: 4 }} /></div>
+                    <div className="flex items-center justify-center"><input type="number" inputMode="numeric" value={v || ""} placeholder="0" onChange={(e) => { const s = [...strat.season]; s[i] = e.target.value === "" ? 0 : Number(e.target.value); upd({ season: s }); }} className="w-10 bg-transparent text-right font-mono text-xs outline-none" style={{ color: "var(--txt)" }} /><span className="text-[10px] text-dim">%</span></div>
+                  </label>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-[11px] text-faint">{t("Esempio: agosto +40%, novembre −15%. Nèttare parte da qui e poi aggiunge weekend, festivi, eventi e occupazione.")}</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Strategia */}
+      <Card title={t("Strategia")} desc={t("Una strategia generale e, se vuoi, periodi con regole diverse (es. agosto più aggressivo).")} open={openStrat} onToggle={() => setOpenStrat((v) => !v)}>
+        <div className="mt-4 flex flex-wrap items-center gap-1.5">
+          <Chip on={scope === "general"} onClick={() => setScope("general")}>{t("Strategia generale")}</Chip>
+          {strat.periods.map((p) => <Chip key={p.id} on={scope === p.id} onClick={() => setScope(p.id)}>{p.name}<span className="ml-1.5 font-normal opacity-70">{fmtShort(p.from)}–{fmtShort(p.to)}</span></Chip>)}
+          <button onClick={addPeriod} className="rounded-full border border-dashed border-line px-3 py-1.5 text-xs font-semibold text-dim hover:text-txt">+ {t("Nuovo periodo")}</button>
+        </div>
+
+        {period && (
+          <div className="mt-4 grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-[1fr_auto_auto_auto]" style={{ background: "var(--wash)" }}>
+            <input value={period.name} onChange={(e) => updScope({ name: e.target.value })} className="rounded-lg border border-line px-3 py-2 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} aria-label={t("Nome periodo")} />
+            <label className="flex items-center gap-1.5 text-xs text-dim">{t("dal")}<input type="date" value={period.from} onChange={(e) => updScope({ from: e.target.value })} className="rounded-lg border border-line px-2 py-1.5 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} /></label>
+            <label className="flex items-center gap-1.5 text-xs text-dim">{t("al")}<input type="date" value={period.to} min={period.from} onChange={(e) => updScope({ to: e.target.value })} className="rounded-lg border border-line px-2 py-1.5 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} /></label>
+            <button onClick={delPeriod} className="rounded-lg px-3 py-2 text-xs font-semibold" style={{ color: "var(--err)" }}>{t("Elimina")}</button>
+          </div>
+        )}
+
+        <div className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Obiettivo")}</div>
+        <div className="mt-1.5 grid gap-2 sm:grid-cols-3">
+          <GoalBtn on={cur.goal === "fill"} onClick={() => updScope({ goal: "fill" })} label={t("Riempi")} desc={t("più occupazione, prezzi più morbidi")} />
+          <GoalBtn on={cur.goal === "balanced"} onClick={() => updScope({ goal: "balanced" })} label={t("Bilanciato")} desc={t("equilibrio prezzo/occupazione")} />
+          <GoalBtn on={cur.goal === "revenue"} onClick={() => updScope({ goal: "revenue" })} label={t("Massimo ricavo")} desc={t("spingi il RevPAR quando c'è domanda")} />
+        </div>
+
+        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+          <div>
+            <div className="flex items-end justify-between gap-2">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Aggressività")}</div>
+              <span className="text-[11px] text-faint">{presetOf(cur.down, cur.up) ? "" : t("personalizzata")}</span>
+            </div>
+            <div className="mt-1.5 flex rounded-lg border border-line p-0.5" style={{ background: "var(--wash)" }}>
+              {(["prudente", "bilanciato", "aggressivo"] as Risk[]).map((k) => <Seg key={k} on={presetOf(cur.down, cur.up) === k} onClick={() => updScope({ ...RISK_PRESET[k], ...(period ? {} : { risk: k }) } as Partial<Period>)}>{t(k[0].toUpperCase() + k.slice(1))}</Seg>)}
+            </div>
+            <div className="mt-3 space-y-3">
+              <Slider label={t("Ribasso massimo")} value={cur.down} min={0} max={40} step={1} prefix="−" suffix="%" onChange={(v) => updScope({ down: v })} hint={t("Quanto può scendere sotto il prezzo di partenza.")} />
+              <Slider label={t("Rialzo massimo")} value={cur.up} min={0} max={100} step={1} prefix="+" suffix="%" onChange={(v) => updScope({ up: v })} hint={t("Quanto può salire nei giorni di domanda alta.")} />
+            </div>
+          </div>
+          <div className="space-y-3">
+            {period && <Slider label={t("Prezzi di partenza in questo periodo")} value={period.startAdj} min={-30} max={80} step={1} suffix="%" onChange={(v) => updScope({ startAdj: v })} hint={t("Si aggiunge alla stagionalità del mese.")} />}
+            <Slider label={t("Impatto eventi locali")} value={cur.eventImpact} min={0} max={60} step={1} prefix="+" suffix="%" onChange={(v) => updScope({ eventImpact: v })} hint={t("Di quanto alzare nei giorni con un evento in calendario.")} />
+            {!period && <div>
               <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Guardrail")} · {t("prezzo min / max")}</div>
               <div className="mt-1.5 flex gap-2">
                 <input type="number" inputMode="numeric" placeholder={t("min €")} value={strat.minPrice ?? ""} onChange={(e) => upd({ minPrice: e.target.value ? Number(e.target.value) : null })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} />
                 <input type="number" inputMode="numeric" placeholder={t("max €")} value={strat.maxPrice ?? ""} onChange={(e) => upd({ maxPrice: e.target.value ? Number(e.target.value) : null })} className="w-full rounded-lg border border-line px-3 py-2 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} />
               </div>
               <div className="mt-1.5 text-[11px] text-faint">{t("Nèttare non andrà mai oltre questi limiti.")}</div>
-            </div>
+            </div>}
           </div>
+        </div>
 
+        {!period && <>
           <div className="mt-5 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Regole")}</div>
           <div className="mt-1 grid gap-x-8 sm:grid-cols-2">
-            <div className="border-t border-line"><Tgl on={strat.followMarket} onC={() => upd({ followMarket: !strat.followMarket })} label={t("Segui il mercato")} hint={t("usa i segnali della Rete città")} /></div>
-            <div className="border-t border-line"><Tgl on={strat.events} onC={() => upd({ events: !strat.events })} label={t("Eventi, festività & weekend")} hint={t("cavalca weekend, festivi ed eventi del calendario")} /></div>
-            <div className="border-t border-line"><Tgl on={strat.lastMinute} onC={() => upd({ lastMinute: !strat.lastMinute })} label={t("Last-minute")} hint={t("sconti sugli ultimi giorni vuoti")} /></div>
-            <div className="border-t border-line"><Tgl on={strat.minStay} onC={() => upd({ minStay: !strat.minStay })} label={t("Min-stay dinamico")} hint={t("notti minime nei picchi")} /></div>
+            <div className="border-t border-line"><Tgl on={strat.followMarket} onClick={() => upd({ followMarket: !strat.followMarket })} label={t("Segui il mercato")} hint={t("usa i segnali della Rete città")} /></div>
+            <div className="border-t border-line"><Tgl on={strat.events} onClick={() => upd({ events: !strat.events })} label={t("Eventi, festività & weekend")} hint={t("cavalca weekend, festivi, ponti ed eventi")} /></div>
+            <div className="border-t border-line"><Tgl on={strat.lastMinute} onClick={() => upd({ lastMinute: !strat.lastMinute })} label={t("Last-minute")} hint={t("sconti sugli ultimi giorni vuoti")} /></div>
+            <div className="border-t border-line"><Tgl on={strat.minStay} onClick={() => upd({ minStay: !strat.minStay })} label={t("Min-stay dinamico")} hint={t("notti minime nei picchi")} /></div>
           </div>
         </>}
+        {period && <p className="mt-4 text-[11px] text-faint">{t("Regole, guardrail e stagionalità restano quelli della strategia generale.")}</p>}
+      </Card>
+
+      {/* Anteprima strategia */}
+      <section className="mt-4 rounded-2xl border border-line p-5" style={{ background: "var(--surface)" }}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Anteprima strategia")}</h3>
+            <p className="mt-0.5 text-xs text-dim">{t("Prossimi")} {PREVIEW} {t("giorni. Si aggiorna mentre modifichi strategia e prezzi di partenza, prima di applicare.")}</p>
+          </div>
+          {sTypes.length > 1 && (
+            <select value={pvRt?.id ?? ""} onChange={(e) => setPreviewRt(e.target.value)} className="rounded-lg border border-line px-3 py-2 text-sm" style={{ background: "var(--surface)", color: "var(--txt)" }} aria-label={t("Tipologia")}>
+              {sTypes.map((rt) => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
+            </select>
+          )}
+        </div>
+        {pvRt ? <PriceChart dates={previewDates} series={pvSeries} periods={strat.periods} t={t} /> : <p className="mt-3 text-xs text-faint">{t("Aggiungi camere e prezzi per vedere i consigli.")}</p>}
       </section>
 
       {/* Calendario prezzi */}
@@ -230,9 +332,9 @@ export default function NettarePage() {
             <p className="mt-0.5 text-xs text-dim">{t("Passa sopra una cella per vedere il perché del prezzo, cliccala per modificarla.")}</p>
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => setStart((s) => (shiftISO(s, -7) < today ? today : shiftISO(s, -7)))} disabled={start <= today} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim disabled:opacity-40" style={{ background: "var(--surface)" }} aria-label={t("Settimana precedente")}>‹</button>
+            <button onClick={() => setStart((s) => (shiftISO(s, -GRID_DAYS) < today ? today : shiftISO(s, -GRID_DAYS)))} disabled={start <= today} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim disabled:opacity-40" style={{ background: "var(--surface)" }} aria-label={t("30 giorni prima")}>‹</button>
             <button onClick={() => setStart(today)} className="h-8 rounded-lg border border-line px-3 text-xs font-semibold text-txt" style={{ background: "var(--surface)" }}>{t("Oggi")}</button>
-            <button onClick={() => setStart((s) => shiftISO(s, 7))} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim" style={{ background: "var(--surface)" }} aria-label={t("Settimana successiva")}>›</button>
+            <button onClick={() => setStart((s) => shiftISO(s, GRID_DAYS))} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim" style={{ background: "var(--surface)" }} aria-label={t("30 giorni dopo")}>›</button>
             <input type="date" value={start} min={today} onChange={(e) => e.target.value && setStart(e.target.value < today ? today : e.target.value)} className="h-8 rounded-lg border border-line px-2 text-xs" style={{ background: "var(--surface)", color: "var(--txt)" }} />
           </div>
         </div>
@@ -283,11 +385,18 @@ export default function NettarePage() {
                   ); })}
                 </tr>
                 {/* Tipologie */}
-                {sTypes.map((rt) => (
-                  <tr key={rt.id}>
-                    <td className="sticky left-0 z-10 border-b border-r border-line px-3 py-2" style={{ background: "var(--surface)" }}>
-                      <div className="truncate text-[13px] font-semibold text-txt" title={rt.name}><span className="text-faint">└ </span>{rt.name}</div>
-                      <div className="text-[10px] text-faint">{t("base")} {eur(res.cells[cellKey(rt.id, gridDates[0])]?.base ?? rt.basePrice)}</div>
+                {gridRows.map(({ rt, depth, kids }) => (
+                  <tr key={rt.id} style={depth ? { background: "color-mix(in srgb,var(--wash) 55%,transparent)" } : undefined}>
+                    <td className="sticky left-0 z-10 border-b border-r border-line py-2 pr-2" style={{ background: depth ? "color-mix(in srgb,var(--wash) 55%,var(--surface))" : "var(--surface)", paddingLeft: 12 + depth * 14 }}>
+                      <div className="flex items-center gap-1">
+                        {kids > 0
+                          ? <button onClick={() => setOpenKids((o) => ({ ...o, [rt.id]: !o[rt.id] }))} aria-expanded={!!openKids[rt.id]} aria-label={t("Mostra tariffe derivate")} className="grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-dim hover:bg-[var(--wash)]" style={{ transform: openKids[rt.id] ? "rotate(90deg)" : "none" }}>▸</button>
+                          : <span className="w-5 shrink-0 text-center text-faint">{depth ? "└" : ""}</span>}
+                        <div className="min-w-0">
+                          <div className={`truncate text-[13px] text-txt ${depth ? "font-medium" : "font-semibold"}`} title={rt.name}>{rt.name}</div>
+                          <div className="truncate text-[10px] text-faint">{depth ? `${t("derivata")}${rt.ratePlan ? ` · ${rt.ratePlan}` : ""}` : `${t("partenza")} ${eur(res.cells[cellKey(rt.id, gridDates[0])]?.base ?? rt.basePrice)}`}{kids > 0 && !openKids[rt.id] ? ` · ${kids} ${kids === 1 ? t("derivata") : t("derivate")}` : ""}</div>
+                        </div>
+                      </div>
                     </td>
                     {gridDates.map((d) => {
                       const k = cellKey(rt.id, d), c = res.cells[k]; if (!c) return <td key={d} className="border-b border-line" />;
@@ -308,7 +417,7 @@ export default function NettarePage() {
                               {c.modSet && c.mod?.locked == null && <span title={t("Modificatore impostato")} style={{ color: c.modActive ? "var(--warn)" : "var(--dim)" }}>◆</span>}
                             </span>
                             {pending && <span title={t("Da applicare")} className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full" style={{ background: "var(--warn)" }} />}
-                            <span className="font-mono text-[14px] font-bold text-txt">{eur(c.final)}</span>
+                            <span className="font-mono text-[13px] font-bold text-txt">€ {c.final}</span>
                             <span className="text-[10px] font-semibold" style={{ color: pct > 2 ? "var(--ok)" : pct < -2 ? "var(--focus)" : "var(--faint)" }}>{pct === 0 ? "=" : `${pct > 0 ? "+" : ""}${pct}%`}{c.minNights > 1 ? ` · ${c.minNights}n` : ""}</span>
                           </button>
                         </td>
@@ -364,7 +473,11 @@ function Breakdown({ c, dark, t }: { c: Cell; dark?: boolean; t: (s: string) => 
   const rows = [...c.steps.filter((s) => Math.abs(s.amount) >= 0.005), ...c.modSteps];
   return (
     <div className="text-[12px]">
-      <div className="flex justify-between font-semibold"><span>{t("Prezzo base")}</span><span className="font-mono">{eur(c.base)}</span></div>
+      {c.baseSteps.length > 1 && <div className="mb-1.5 space-y-0.5" style={{ opacity: 0.75 }}>
+        <div className="flex justify-between"><span>{t("Tariffa di partenza")}</span><span className="font-mono">{eur(c.baseSteps[0].amount)}</span></div>
+        {c.baseSteps.slice(1).map((s, i) => <div key={i} className="flex justify-between gap-3"><span className="truncate">{t(s.label)}</span><span className="shrink-0 font-mono">{money2(s.amount)}</span></div>)}
+      </div>}
+      <div className="flex justify-between font-semibold"><span>{t("Prezzo di partenza")}</span><span className="font-mono">{eur(c.base)}</span></div>
       <div className="my-2 space-y-1">
         {rows.length ? rows.map((s, i) => (
           <div key={i} className="flex justify-between gap-3" style={{ color: col(s) }}><span className="min-w-0 truncate">{t(s.label)}</span><span className="shrink-0 font-mono">{money2(s.amount)}</span></div>
@@ -453,6 +566,135 @@ function CellPanel({ c, rtName, published, floor, t, onClose, onSave, onReset }:
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+const fmtShort = (iso: string) => (iso ? new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }) : "…");
+
+function Card({ title, desc, open, onToggle, children }: { title: string; desc: string; open: boolean; onToggle: () => void; children: ReactNode }) {
+  return (
+    <section className="mt-4 rounded-2xl border border-line p-5" style={{ background: "var(--surface)" }}>
+      <button onClick={onToggle} className="flex w-full items-center justify-between gap-3 text-left" aria-expanded={open}>
+        <div><h3 className="text-[15px] font-bold tracking-tight text-txt">{title}</h3><p className="mt-0.5 text-xs text-dim">{desc}</p></div>
+        <span className="text-dim transition" style={{ transform: open ? "rotate(180deg)" : "none" }}>⌄</span>
+      </button>
+      {open && children}
+    </section>
+  );
+}
+
+function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
+  return <button onClick={onClick} className="rounded-full border px-3 py-1.5 text-xs font-semibold transition" style={{ borderColor: on ? "var(--focus)" : "var(--line)", background: on ? "var(--focus)" : "var(--surface)", color: on ? "#fff" : "var(--txt)" }}>{children}</button>;
+}
+
+function GoalBtn({ on, onClick, label, desc }: { on: boolean; onClick: () => void; label: string; desc: string }) {
+  return (
+    <button onClick={onClick} className="flex-1 rounded-xl border p-3 text-left transition" style={{ borderColor: on ? "var(--focus)" : "var(--line)", background: on ? "color-mix(in srgb,var(--focus) 8%,var(--surface))" : "var(--surface)" }}>
+      <div className="text-sm font-semibold text-txt">{label}</div><div className="mt-0.5 text-[11px] text-dim">{desc}</div>
+    </button>
+  );
+}
+
+function Seg({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
+  return <button onClick={onClick} className="flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition" style={{ background: on ? "var(--focus)" : "transparent", color: on ? "#fff" : "var(--dim)" }}>{children}</button>;
+}
+
+function Tgl({ on, onClick, label, hint }: { on: boolean; onClick: () => void; label: string; hint: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2.5">
+      <div><div className="text-sm font-medium text-txt">{label}</div><div className="text-[11px] text-faint">{hint}</div></div>
+      <button onClick={onClick} aria-pressed={on} aria-label={label} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? "var(--ok)" : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all" style={{ left: on ? 22 : 2 }} /></button>
+    </div>
+  );
+}
+
+function Slider({ label, value, min, max, step, prefix = "", suffix = "", hint, onChange }: { label: string; value: number; min: number; max: number; step: number; prefix?: string; suffix?: string; hint?: string; onChange: (v: number) => void }) {
+  const shown = prefix ? `${prefix}${Math.abs(value)}` : `${value > 0 ? "+" : ""}${value}`;
+  return (
+    <div>
+      <div className="flex items-end justify-between gap-2"><span className="text-[12px] font-medium text-txt">{label}</span><span className="rounded-md px-1.5 py-0.5 font-mono text-[12px] font-bold text-white" style={{ background: "var(--focus)" }}>{shown}{suffix}</span></div>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="mt-1.5 w-full" style={{ accentColor: "var(--focus)" }} aria-label={label} />
+      {hint && <div className="text-[11px] text-faint">{hint}</div>}
+    </div>
+  );
+}
+
+type Series = { key: string; label: string; color: string; dash?: string; values: (number | undefined)[] };
+
+function PriceChart({ dates, series, periods, t }: { dates: string[]; series: Series[]; periods: Period[]; t: (s: string) => string }) {
+  const [w, setW] = useState(720);
+  const [box, setBox] = useState<HTMLDivElement | null>(null);
+  const [hidden, setHidden] = useState<Record<string, boolean>>({});
+  const [hi, setHi] = useState<number | null>(null);
+  useEffect(() => {
+    if (!box) return;
+    const ro = new ResizeObserver((e) => setW(Math.max(280, Math.round(e[0].contentRect.width))));
+    ro.observe(box); return () => ro.disconnect();
+  }, [box]);
+
+  const H = 260, P = { l: 48, r: 12, t: 22, b: 26 };
+  const iw = w - P.l - P.r, ih = H - P.t - P.b;
+  const vis = series.filter((s) => !hidden[s.key]);
+  const all = vis.flatMap((s) => s.values.filter((v): v is number => v != null));
+  if (!all.length) all.push(0, 100);
+  const stepY = Math.max(5, Math.ceil((Math.max(...all) - Math.min(...all)) / 4 / 5) * 5 || 10);
+  const yMin = Math.max(0, Math.floor(Math.min(...all) / stepY) * stepY - stepY), yMax = Math.ceil(Math.max(...all) / stepY) * stepY + stepY;
+  const x = (i: number) => P.l + (dates.length > 1 ? (i / (dates.length - 1)) * iw : iw / 2);
+  const y = (v: number) => P.t + ih - ((v - yMin) / (yMax - yMin || 1)) * ih;
+  const ticks = Array.from({ length: Math.round((yMax - yMin) / stepY) + 1 }, (_, i) => yMin + i * stepY).filter((_, i, a) => a.length <= 7 || i % 2 === 0);
+  const path = (vals: (number | undefined)[]) => { let d = "", pen = false; vals.forEach((v, i) => { if (v == null) { pen = false; return; } d += `${pen ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`; pen = true; }); return d; };
+  const colW = iw / Math.max(1, dates.length - 1);
+
+  const onMove = (e: React.MouseEvent<SVGSVGElement> | React.TouchEvent<SVGSVGElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const cx = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const i = Math.round(((cx - r.left) - P.l) / (iw / Math.max(1, dates.length - 1)));
+    setHi(i >= 0 && i < dates.length ? i : null);
+  };
+
+  return (
+    <div className="mt-3">
+      <div className="mb-2 flex flex-wrap gap-2">
+        {series.map((s) => (
+          <button key={s.key} onClick={() => setHidden((h) => ({ ...h, [s.key]: !h[s.key] }))} aria-pressed={!hidden[s.key]} className="flex items-center gap-2 rounded-full border border-line px-3 py-1 text-xs font-medium text-txt transition" style={{ opacity: hidden[s.key] ? 0.45 : 1, background: "var(--surface)" }}>
+            <svg width="18" height="6" aria-hidden><line x1="1" y1="3" x2="17" y2="3" stroke={s.color} strokeWidth="2" strokeDasharray={s.dash} strokeLinecap="round" /></svg>{s.label}
+          </button>
+        ))}
+      </div>
+      <div ref={setBox} className="relative w-full" onMouseLeave={() => setHi(null)}>
+        <svg width={w} height={H} role="img" aria-label={t("Anteprima prezzi")} onMouseMove={onMove} onTouchStart={onMove} onTouchMove={onMove} style={{ display: "block", touchAction: "pan-y" }}>
+          {/* periodi */}
+          {periods.map((p) => {
+            const a = dates.findIndex((d) => d >= p.from), bIdx = dates.findLastIndex((d) => d <= p.to);
+            if (a < 0 || bIdx < 0 || bIdx < a) return null;
+            return (<g key={p.id}><rect x={x(a) - colW / 2} y={P.t} width={Math.max(colW, x(bIdx) - x(a) + colW)} height={ih} fill="var(--focus)" opacity={0.07} /><text x={x(a) - colW / 2 + 4} y={P.t - 8} fontSize="10" fontWeight={600} fill="var(--dim)">{p.name}</text></g>);
+          })}
+          {/* weekend */}
+          {dates.map((d, i) => { const wd = new Date(d + "T00:00:00").getDay(); return wd === 5 || wd === 6 ? <rect key={d} x={x(i) - colW / 2} y={P.t} width={colW} height={ih} fill="var(--txt)" opacity={0.035} /> : null; })}
+          {/* griglia */}
+          {ticks.map((v) => (<g key={v}><line x1={P.l} x2={w - P.r} y1={y(v)} y2={y(v)} stroke="var(--line)" strokeWidth={1} /><text x={P.l - 8} y={y(v) + 3.5} textAnchor="end" fontSize="10" fill="var(--faint)" style={{ fontVariantNumeric: "tabular-nums" }}>{v} €</text></g>))}
+          {dates.map((d, i) => (i % 14 === 0 ? <text key={d} x={x(i)} y={H - 8} textAnchor={i === 0 ? "start" : "middle"} fontSize="10" fill="var(--faint)">{fmtShort(d)}</text> : null))}
+          {/* linee */}
+          {vis.map((s) => <path key={s.key} d={path(s.values)} fill="none" stroke={s.color} strokeWidth={2} strokeDasharray={s.dash} strokeLinejoin="round" strokeLinecap="round" />)}
+          {/* hover */}
+          {hi != null && (<g>
+            <line x1={x(hi)} x2={x(hi)} y1={P.t} y2={P.t + ih} stroke="var(--dim)" strokeWidth={1} strokeDasharray="3 3" />
+            {vis.map((s) => s.values[hi] != null ? <circle key={s.key} cx={x(hi)} cy={y(s.values[hi]!)} r={4.5} fill={s.color} stroke="var(--surface)" strokeWidth={2} /> : null)}
+          </g>)}
+        </svg>
+        {hi != null && (
+          <div className="pointer-events-none absolute z-10 min-w-[170px] rounded-xl border border-line px-3 py-2 text-[12px] shadow-lg" style={{ background: "var(--surface)", top: 6, left: x(hi) > w * 0.6 ? x(hi) - 186 : x(hi) + 12 }}>
+            <div className="mb-1 font-semibold capitalize text-txt">{new Date(dates[hi] + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" })}</div>
+            {vis.map((s) => (
+              <div key={s.key} className="flex items-center justify-between gap-4">
+                <span className="flex items-center gap-1.5 text-dim"><svg width="12" height="6" aria-hidden><line x1="1" y1="3" x2="11" y2="3" stroke={s.color} strokeWidth="2" strokeDasharray={s.dash ? "3 2" : undefined} /></svg>{s.label}</span>
+                <span className="font-mono font-semibold text-txt">{s.values[hi] != null ? eur(s.values[hi]!) : "—"}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

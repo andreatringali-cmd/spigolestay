@@ -6,17 +6,50 @@ import { effectiveBase } from "./pricing";
 
 export type Goal = "fill" | "revenue" | "balanced";
 export type Risk = "prudente" | "bilanciato" | "aggressivo";
-export type Strategy = { goal: Goal; risk: Risk; lastMinute: boolean; followMarket: boolean; events: boolean; minStay: boolean; minPrice: number | null; maxPrice: number | null };
-export const DEFAULT_STRAT: Strategy = { goal: "balanced", risk: "bilanciato", lastMinute: true, followMarket: true, events: true, minStay: false, minPrice: null, maxPrice: null };
-export const RISK_BAND: Record<Risk, [number, number]> = { prudente: [0.94, 1.12], bilanciato: [0.88, 1.30], aggressivo: [0.82, 1.55] };
+
+/** Periodo con strategia propria (date incluse). Sovrascrive la strategia generale in quelle date. */
+export type Period = { id: string; name: string; from: string; to: string; goal: Goal; down: number; up: number; startAdj: number; eventImpact: number };
+
+export type Strategy = {
+  goal: Goal; risk: Risk;
+  down: number;          // ribasso massimo % rispetto al prezzo di partenza
+  up: number;            // rialzo massimo %
+  startAdj: number;      // regolazione globale prezzi di partenza %
+  eventImpact: number;   // impatto eventi locali %
+  season: number[];      // 12 mesi, % sul prezzo di partenza
+  starting: Record<string, number>; // prezzo di partenza per tipologia (assente = tariffa base)
+  periods: Period[];
+  lastMinute: boolean; followMarket: boolean; events: boolean; minStay: boolean;
+  minPrice: number | null; maxPrice: number | null;
+};
+
+export const RISK_PRESET: Record<Risk, { down: number; up: number }> = { prudente: { down: 6, up: 12 }, bilanciato: { down: 12, up: 30 }, aggressivo: { down: 18, up: 55 } };
+export const DEFAULT_STRAT: Strategy = {
+  goal: "balanced", risk: "bilanciato", ...RISK_PRESET.bilanciato, startAdj: 0, eventImpact: 15,
+  season: Array(12).fill(0), starting: {}, periods: [],
+  lastMinute: true, followMarket: true, events: true, minStay: false, minPrice: null, maxPrice: null,
+};
+export const MONTHS = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
+
+/** Carica una strategia salvata (anche nel vecchio formato) completando i campi mancanti. */
+export function normalizeStrategy(raw: Partial<Strategy> | null | undefined): Strategy {
+  const s = { ...DEFAULT_STRAT, ...(raw || {}) } as Strategy;
+  const preset = RISK_PRESET[s.risk] || RISK_PRESET.bilanciato;
+  if (raw?.down == null) s.down = preset.down;
+  if (raw?.up == null) s.up = preset.up;
+  s.season = Array.from({ length: 12 }, (_, i) => Number(s.season?.[i]) || 0);
+  s.starting = s.starting && typeof s.starting === "object" ? s.starting : {};
+  s.periods = Array.isArray(s.periods) ? s.periods : [];
+  return s;
+}
 
 /** Modificatori manuali di una cella (tipologia × giorno). */
 export type Mod = { locked?: number | null; min?: number | null; max?: number | null; adj?: number | null; adjMode?: "eur" | "pct" };
 export type Step = { label: string; amount: number; kind: "up" | "down" | "limit" };
-export type DayInfo = { date: string; occ: number; sold: number; total: number; holiday?: string; bridge?: string; events: CalEvent[] };
+export type DayInfo = { date: string; occ: number; sold: number; total: number; holiday?: string; bridge?: string; events: CalEvent[]; period?: string };
 export type Cell = {
   rtId: string; date: string;
-  base: number; recommended: number; final: number;
+  base: number; baseSteps: Step[]; recommended: number; final: number;
   steps: Step[]; modSteps: Step[];
   occ: number; sold: number; total: number; adr: number;
   mod?: Mod; modSet: boolean; modActive: boolean; minNights: number;
@@ -27,6 +60,26 @@ export const cellKey = (rtId: string, iso: string) => `${rtId}|${iso}`;
 const dow = (iso: string) => new Date(iso + "T00:00:00").getDay();
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const has = (v: number | null | undefined): v is number => v != null && !Number.isNaN(v);
+
+/** Strategia effettiva in una data: generale, sovrascritta dall'ultimo periodo che la contiene. */
+export function strategyAt(s: Strategy, iso: string): { goal: Goal; down: number; up: number; startAdj: number; eventImpact: number; period?: Period } {
+  const p = [...s.periods].reverse().find((x) => x.from && x.to && x.from <= iso && x.to >= iso);
+  if (p) return { goal: p.goal, down: p.down, up: p.up, startAdj: p.startAdj, eventImpact: p.eventImpact, period: p };
+  return { goal: s.goal, down: s.down, up: s.up, startAdj: s.startAdj, eventImpact: s.eventImpact };
+}
+
+/** Prezzo di partenza di una tipologia in una data (base × stagionalità × regolazione). */
+export function startingPrice(s: Strategy, rt: RoomType, all: RoomType[], iso: string, fallback: number): { price: number; steps: Step[] } {
+  const raw = has(s.starting[rt.id]) && s.starting[rt.id] > 0 ? s.starting[rt.id] : (Math.max(0, effectiveBase(rt, all)) || fallback);
+  const eff = strategyAt(s, iso);
+  const m = new Date(iso + "T00:00:00").getMonth();
+  const steps: Step[] = [];
+  let p = raw;
+  const sea = s.season[m] || 0;
+  if (sea) { const d = p * sea / 100; steps.push({ label: `Stagionalità ${MONTHS[m]} ${sea > 0 ? "+" : ""}${sea}%`, amount: d, kind: d >= 0 ? "up" : "down" }); p += d; }
+  if (eff.startAdj) { const d = p * eff.startAdj / 100; steps.push({ label: `${eff.period ? eff.period.name : "Prezzi di partenza"} ${eff.startAdj > 0 ? "+" : ""}${eff.startAdj}%`, amount: d, kind: d >= 0 ? "up" : "down" }); p += d; }
+  return { price: Math.max(0, Math.round(p)), steps: [{ label: "Tariffa di partenza", amount: raw, kind: "limit" }, ...steps] };
+}
 
 export function hasMod(m?: Mod): boolean {
   return !!m && (has(m.locked) || has(m.min) || has(m.max) || (has(m.adj) && m.adj !== 0));
@@ -66,7 +119,6 @@ type Input = {
 
 export function runNettare(inp: Input): { days: DayInfo[]; cells: Record<string, Cell> } {
   const { strat, roomTypes, units, bookings, market, structBase } = inp;
-  const [lo, hi] = RISK_BAND[strat.risk];
   const total = units.length;
   const days: DayInfo[] = [];
   const cells: Record<string, Cell> = {};
@@ -74,13 +126,15 @@ export function runNettare(inp: Input): { days: DayInfo[]; cells: Record<string,
   for (const D of inp.dates) {
     const i = Math.round((new Date(D + "T00:00:00").getTime() - new Date(inp.today + "T00:00:00").getTime()) / 86400000);
     const wd = dow(D);
+    const eff = strategyAt(strat, D);
+    const lo = 1 - eff.down / 100, hi = 1 + eff.up / 100;
     const inHouse = bookings.filter((b) => b.checkIn <= D && b.checkOut > D);
     const pickup = total ? inHouse.length / total : 0;
     const evs = inp.events.filter((e) => e.from <= D && e.to > D);
     const holiday = inp.holidays[D];
     const holidayNext = inp.holidays[shiftISO(D, 1)];
     const bridge = inp.bridges[D];
-    days.push({ date: D, occ: pickup, sold: inHouse.length, total, holiday, bridge, events: evs });
+    days.push({ date: D, occ: pickup, sold: inHouse.length, total, holiday, bridge, events: evs, period: eff.period?.name });
 
     // segnali a livello struttura (moltiplicatori con etichetta)
     const mults: { label: string; m: number }[] = [];
@@ -88,22 +142,23 @@ export function runNettare(inp: Input): { days: DayInfo[]; cells: Record<string,
     else if (wd === 0) mults.push({ label: "Domenica", m: 0.98 });
     if (strat.events && (holiday || holidayNext)) mults.push({ label: `Giorno festivo · ${holiday || holidayNext}`, m: 1.10 });
     else if (strat.events && bridge) mults.push({ label: `Ponte · ${bridge}`, m: 1.08 });
-    if (strat.events && evs.length) mults.push({ label: `Evento · ${evs.map((e) => e.name).join(", ")}`, m: 1.15 });
-    if (pickup >= 0.7) mults.push({ label: "Struttura quasi al completo", m: strat.goal === "revenue" ? 1.22 : 1.13 });
-    else if (pickup <= 0.2 && i >= 0 && i <= 10 && strat.lastMinute) mults.push({ label: `Distanza dalla data · ancora vuoto a ${i} gg`, m: strat.goal === "fill" ? 0.86 : 0.93 });
+    if (strat.events && evs.length && eff.eventImpact) mults.push({ label: `Evento · ${evs.map((e) => e.name).join(", ")}`, m: 1 + eff.eventImpact / 100 });
+    if (pickup >= 0.7) mults.push({ label: "Struttura quasi al completo", m: eff.goal === "revenue" ? 1.22 : 1.13 });
+    else if (pickup <= 0.2 && i >= 0 && i <= 10 && strat.lastMinute) mults.push({ label: `Distanza dalla data · ancora vuoto a ${i} gg`, m: eff.goal === "fill" ? 0.86 : 0.93 });
     if (strat.followMarket && market.cityHot) mults.push({ label: "Città molto piena (Rete città)", m: 1.08 });
     if (strat.followMarket && market.adrGap > 0.05) mults.push({ label: "Sotto il prezzo medio della città", m: 1 + clamp(market.adrGap, 0, 0.15) });
     else if (strat.followMarket && market.adrGap < -0.08) mults.push({ label: "Sopra il prezzo medio della città", m: 0.96 });
     if (strat.events && strat.followMarket && market.cityHot && (wd === 5 || wd === 6)) mults.push({ label: "Picco: weekend + città piena", m: 1.05 });
-    if (strat.goal === "fill") mults.push({ label: "Obiettivo: riempi", m: 0.97 });
-    else if (strat.goal === "revenue") mults.push({ label: "Obiettivo: massimo ricavo", m: 1.03 });
+    if (eff.goal === "fill") mults.push({ label: "Obiettivo: riempi", m: 0.97 });
+    else if (eff.goal === "revenue") mults.push({ label: "Obiettivo: massimo ricavo", m: 1.03 });
 
     for (const rt of roomTypes) {
       const rtUnits = units.filter((u) => u.roomTypeId === rt.id).length;
       const rtIn = inHouse.filter((b) => b.roomTypeId === rt.id);
       const rtOcc = rtUnits ? rtIn.length / rtUnits : 0;
       const adr = rtIn.length ? Math.round(rtIn.reduce((s, b) => s + (b.total || 0) / Math.max(1, nights(b.checkIn, b.checkOut)), 0) / rtIn.length) : 0;
-      const base = Math.max(0, effectiveBase(rt, inp.allRoomTypes)) || structBase;
+      const sp = startingPrice(strat, rt, inp.allRoomTypes, D, structBase);
+      const base = sp.price;
 
       const all = [...mults];
       if (rtUnits > 0 && rtOcc >= 0.99 && pickup < 0.7) all.push({ label: "Tipologia esaurita", m: 1.05 });
@@ -112,20 +167,20 @@ export function runNettare(inp: Input): { days: DayInfo[]; cells: Record<string,
       let running = base, f = 1;
       for (const x of all) { const d = running * (x.m - 1); steps.push({ label: x.label, amount: d, kind: d >= 0 ? "up" : "down" }); running *= x.m; f *= x.m; }
       const fBand = clamp(f, lo, hi);
-      if (fBand !== f) { steps.push({ label: `Limite profilo ${strat.risk}`, amount: base * fBand - running, kind: "limit" }); running = base * fBand; f = fBand; }
+      if (fBand !== f) { steps.push({ label: `Limite aggressività −${eff.down}% / +${eff.up}%`, amount: base * fBand - running, kind: "limit" }); running = base * fBand; f = fBand; }
       // guardrail strategia (espresso sul prezzo base della struttura)
       if (structBase > 0) {
-        let sp = structBase * f;
-        if (has(strat.minPrice) && strat.minPrice > 0) sp = Math.max(sp, strat.minPrice);
-        if (has(strat.maxPrice) && strat.maxPrice > 0) sp = Math.min(sp, strat.maxPrice);
-        const fG = sp / structBase;
+        let s = structBase * f;
+        if (has(strat.minPrice) && strat.minPrice > 0) s = Math.max(s, strat.minPrice);
+        if (has(strat.maxPrice) && strat.maxPrice > 0) s = Math.min(s, strat.maxPrice);
+        const fG = s / structBase;
         if (Math.abs(fG - f) > 1e-9) { steps.push({ label: "Guardrail min / max", amount: base * fG - running, kind: "limit" }); running = base * fG; f = fG; }
       }
       const recommended = Math.max(0, Math.round(running));
       const mod = inp.mods[cellKey(rt.id, D)];
       const { final, steps: modSteps } = applyMod(recommended, mod, rt.minPrice);
       const minNights = strat.minStay ? (f >= 1.18 ? 3 : f >= 1.08 ? 2 : 1) : 1;
-      cells[cellKey(rt.id, D)] = { rtId: rt.id, date: D, base, recommended, final, steps, modSteps, occ: rtOcc, sold: rtIn.length, total: rtUnits, adr, mod, modSet: hasMod(mod), modActive: final !== recommended, minNights };
+      cells[cellKey(rt.id, D)] = { rtId: rt.id, date: D, base, baseSteps: sp.steps, recommended, final, steps, modSteps, occ: rtOcc, sold: rtIn.length, total: rtUnits, adr, mod, modSet: hasMod(mod), modActive: final !== recommended, minNights };
     }
   }
   return { days, cells };
