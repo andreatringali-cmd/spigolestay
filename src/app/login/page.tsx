@@ -10,6 +10,15 @@ import Turnstile from "@/components/Turnstile";
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 type Mode = "login" | "signup";
+
+// Dove andare dopo l'accesso: ?next=/percorso (solo interno) oppure un invito in sospeso.
+function afterLoginPath(): string {
+  if (typeof window === "undefined") return "/";
+  const next = new URLSearchParams(window.location.search).get("next") || "";
+  if (next.startsWith("/") && !next.startsWith("//")) return next;
+  try { const code = localStorage.getItem("xn-pending-invite"); if (code) return `/accetta-invito?code=${encodeURIComponent(code)}`; } catch {}
+  return "/";
+}
 type Provider = "google";
 
 export default function LoginPage() {
@@ -44,7 +53,7 @@ export default function LoginPage() {
       })();
       return;
     }
-    supabase.auth.getSession().then(({ data }) => { if (data.session) router.replace("/"); });
+    supabase.auth.getSession().then(({ data }) => { if (data.session) router.replace(afterLoginPath()); });
   }, [router]);
 
   const submit = async (e: React.FormEvent) => {
@@ -57,7 +66,7 @@ export default function LoginPage() {
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pwd, options: { captchaToken: captchaToken ?? undefined } });
         if (error) { setErr(traduci(error.message)); return; }
-        router.push("/");
+        router.push(afterLoginPath());
       } else {
         if (pwd.length < 8) { setErr("La password deve avere almeno 8 caratteri."); return; }
         const { data, error } = await supabase.auth.signUp({
@@ -66,7 +75,7 @@ export default function LoginPage() {
           options: { data: { full_name: name.trim(), phone: phone.trim() }, emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined, captchaToken: captchaToken ?? undefined },
         });
         if (error) { setErr(traduci(error.message)); return; }
-        if (data.session) router.push("/");
+        if (data.session) router.push(afterLoginPath());
         else { setInfo("Ti abbiamo inviato un'email di conferma. Apri il link e poi torna qui per accedere."); setMode("login"); }
       }
     } catch {
@@ -78,7 +87,7 @@ export default function LoginPage() {
     setErr(null); setInfo(null);
     if (!supabaseEnabled || !supabase) { router.push("/"); return; }
     try {
-      const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: typeof window !== "undefined" ? `${window.location.origin}/` : undefined } });
+      const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: typeof window !== "undefined" ? `${window.location.origin}${afterLoginPath()}` : undefined } });
       if (error) { void provider; setErr("Accesso con Google non ancora attivo. Va abilitato nelle impostazioni."); }
     } catch { setErr("Accesso social non disponibile al momento."); }
   };

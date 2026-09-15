@@ -10,6 +10,7 @@ export default function AccettaInvito() {
   const [msg, setMsg] = useState("");
   const [structure, setStructure] = useState("");
   const [invitedEmail, setInvitedEmail] = useState("");
+  const [nextUrl, setNextUrl] = useState("/login");
 
   useEffect(() => {
     (async () => {
@@ -19,6 +20,8 @@ export default function AccettaInvito() {
         if (!supabase) { setState("error"); setMsg("Servizio non disponibile."); return; }
         const { data: sess } = await supabase.auth.getSession();
         const token = sess?.session?.access_token;
+        try { localStorage.setItem("xn-pending-invite", code); } catch {}
+        setNextUrl(`/login?next=${encodeURIComponent(`/accetta-invito?code=${code}`)}`);
         if (!token) { setState("need-login"); return; }
         setState("accepting");
         const r = await fetch("/api/org/accept", {
@@ -26,6 +29,7 @@ export default function AccettaInvito() {
           body: JSON.stringify({ code }),
         });
         const j = await r.json().catch(() => ({}));
+        try { localStorage.removeItem("xn-pending-invite"); } catch {} // esito ricevuto: niente più rimandi automatici
         if (r.ok && j?.ok) { setStructure(j.structureName || ""); setState("ok"); return; }
         if (j?.error === "email_mismatch") { setInvitedEmail(j.invitedEmail || ""); setState("mismatch"); return; }
         setState("error");
@@ -49,8 +53,8 @@ export default function AccettaInvito() {
         ) : state === "need-login" ? (
           <>
             <h1 style={{ fontSize: 18, fontWeight: 700, color: "#1f2430", margin: "0 0 8px" }}>Accedi per accettare</h1>
-            <p style={{ fontSize: 14, color: "#4b5563", margin: "0 0 16px" }}>Per accettare l'invito, accedi (o registrati) con <b>l'email a cui hai ricevuto questo invito</b>. Poi riapri questo link.</p>
-            <a href="/login" style={{ display: "block", textAlign: "center", background: "#285f92", color: "#fff", textDecoration: "none", fontWeight: 700, fontSize: 15, padding: 14, borderRadius: 10 }}>Vai all'accesso →</a>
+            <p style={{ fontSize: 14, color: "#4b5563", margin: "0 0 16px" }}>Per accettare l'invito, accedi (o registrati) con <b>l'email a cui hai ricevuto questo invito</b>. Dopo l'accesso tornerai qui e l'invito verrà accettato in automatico.</p>
+            <a href={nextUrl} style={{ display: "block", textAlign: "center", background: "#285f92", color: "#fff", textDecoration: "none", fontWeight: 700, fontSize: 15, padding: 14, borderRadius: 10 }}>Vai all'accesso →</a>
           </>
         ) : state === "ok" ? (
           <div style={{ textAlign: "center", padding: "12px 0" }}>
@@ -63,7 +67,7 @@ export default function AccettaInvito() {
           <>
             <h1 style={{ fontSize: 18, fontWeight: 700, color: "#1f2430", margin: "0 0 8px" }}>Email diversa</h1>
             <p style={{ fontSize: 14, color: "#4b5563", margin: "0 0 16px" }}>Questo invito è per <b>{invitedEmail}</b>, ma hai effettuato l'accesso con un'altra email. Esci e accedi con l'email invitata, poi riapri il link.</p>
-            <a href="/login" style={{ display: "block", textAlign: "center", background: "#285f92", color: "#fff", textDecoration: "none", fontWeight: 700, fontSize: 15, padding: 14, borderRadius: 10 }}>Cambia account →</a>
+            <a href={nextUrl} style={{ display: "block", textAlign: "center", background: "#285f92", color: "#fff", textDecoration: "none", fontWeight: 700, fontSize: 15, padding: 14, borderRadius: 10 }}>Cambia account →</a>
           </>
         ) : (
           <p style={{ color: "#b91c1c", fontSize: 14, padding: "16px 0", textAlign: "center" }}>{msg || "Errore."}</p>

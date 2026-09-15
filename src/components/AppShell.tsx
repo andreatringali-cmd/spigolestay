@@ -25,6 +25,7 @@ import WheelScroll from "./WheelScroll";
 import StyleLoader from "./StyleLoader";
 import OnboardingWizard from "./OnboardingWizard";
 import IdleLogout from "./IdleLogout";
+import PendingInvite from "./PendingInvite";
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -38,6 +39,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <DataProvider>
         <AccessProvider>
         <ConfirmProvider>
+        <PendingInvite />
         <WheelScroll />
         <StyleLoader />
         <div className="relative min-h-screen bg-paper text-txt">
