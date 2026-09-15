@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { eur } from "@/lib/format";
+import { supabase } from "@/lib/supabase";
 
 type QData = {
   s?: string;        // nome struttura
@@ -26,24 +27,29 @@ export default function PreventivoPubblico() {
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
-    try {
-      const sp = new URLSearchParams(window.location.search);
-      const q = sp.get("q");
-      let parsed: QData | null = null;
-      if (q) { parsed = JSON.parse(decodeURIComponent(atob(q))); setData(parsed); }
-      const paid = sp.get("paid"), sid = sp.get("session_id");
-      if (paid === "1" && sid) {
-        setState("paid");
-        // Registra la prenotazione lato struttura (crea la prenotazione e conferma il preventivo).
-        // La route verifica su Stripe che il pagamento sia reale prima di scrivere qualsiasi cosa.
-        fetch("/api/stripe/quote/confirm", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: sid, acct: parsed?.acct ?? "" }),
-        }).then((r) => r.json()).then((j) => {
-          if (j?.error === "not_paid") setState("view");
-        }).catch(() => {});
-      }
-    } catch { setMsg("Link non valido."); }
+    (async () => {
+      try {
+        const sp = new URLSearchParams(window.location.search);
+        let parsed: QData | null = null;
+        const c = sp.get("c"), q = sp.get("q");
+        // Link corto: /preventivo?c=<codice> → carico il preventivo dal server (tabella quotes).
+        if (c && supabase) {
+          const { data: row } = await supabase.from("quotes").select("data").eq("code", c).maybeSingle();
+          if (row?.data) parsed = row.data as QData;
+        }
+        // Compatibilità: vecchi link con il payload in base64 (?q=…).
+        if (!parsed && q) parsed = JSON.parse(decodeURIComponent(atob(q))) as QData;
+        if (parsed) setData(parsed);
+        const paid = sp.get("paid"), sid = sp.get("session_id");
+        if (paid === "1" && sid) {
+          setState("paid");
+          fetch("/api/stripe/quote/confirm", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: sid, acct: parsed?.acct ?? "" }),
+          }).then((r) => r.json()).then((j) => { if (j?.error === "not_paid") setState("view"); }).catch(() => {});
+        } else if (!parsed) { setMsg("Link non valido."); }
+      } catch { setMsg("Link non valido."); }
+    })();
   }, []);
 
   const nights = useMemo(() => { if (!data?.ci || !data?.co) return 0; return Math.max(0, Math.round((Date.parse(data.co) - Date.parse(data.ci)) / 86400000)); }, [data]);
@@ -54,7 +60,9 @@ export default function PreventivoPubblico() {
     if (!data) return;
     setState("paying"); setMsg("");
     try {
-      const url = window.location.href.split("?")[0] + "?" + new URLSearchParams({ q: new URLSearchParams(window.location.search).get("q") || "" }).toString();
+      const cur = new URLSearchParams(window.location.search);
+      const idp = cur.get("c") ? `c=${encodeURIComponent(cur.get("c")!)}` : `q=${encodeURIComponent(cur.get("q") || "")}`;
+      const url = window.location.href.split("?")[0] + "?" + idp;
       const res = await fetch("/api/stripe/quote", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

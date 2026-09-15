@@ -7,6 +7,7 @@ import { nights, parseISO, toISO, shiftISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { loadDeposit } from "@/lib/deposit";
 import { shortenLink } from "@/lib/guestlink";
+import { supabase } from "@/lib/supabase";
 import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } from "@/lib/rate-plans";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -331,7 +332,23 @@ export default function PreventiviPage() {
   const payUrl = (() => { try { return `${typeof window !== "undefined" ? window.location.origin : ""}/preventivo?q=${btoa(encodeURIComponent(JSON.stringify(payData)))}`; } catch { return ""; } })();
   // Accorcia il link (Supabase short_links → /g/<code>) per non mandare URL lunghissimi.
   const payShortRef = useRef<Record<string, string>>({});
-  const getPayLink = async () => { if (!payUrl) return payUrl; const c = payShortRef.current[payUrl]; if (c) return c; const s = await shortenLink(payUrl); payShortRef.current[payUrl] = s; return s; };
+  // Link pagamento CORTO: salvo il preventivo sul server (tabella quotes) e uso /preventivo?c=<codice>.
+  // Così il link condiviso su WhatsApp è breve. Se il salvataggio non riesce, ripiego sullo shortener/link lungo.
+  const getPayLink = async () => {
+    if (!payUrl) return payUrl;
+    const cached = payShortRef.current[payUrl];
+    if (cached) return cached;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    try {
+      if (supabase) {
+        const AL = "abcdefghijkmnpqrstuvwxyz23456789";
+        let code = ""; for (let i = 0; i < 7; i++) code += AL[Math.floor(Math.random() * AL.length)];
+        const { error } = await supabase.from("quotes").insert({ code, data: payData });
+        if (!error) { const short = `${origin}/preventivo?c=${code}`; payShortRef.current[payUrl] = short; return short; }
+      }
+    } catch { /* ripiego sotto */ }
+    const s = await shortenLink(payUrl); payShortRef.current[payUrl] = s; return s;
+  };
   const shareMsg = (link: string) => `${outMsg}\n\nConferma e paga online: ${link}`;
   const [mailState, setMailState] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
   // Invio del preventivo via server (Resend), come la conferma prenotazione: niente client di posta.
