@@ -72,7 +72,7 @@ export default function PrenotazioniPage() {
   const [q, setQ] = useState("");
   const [channel, setChannel] = useState<string>("all");
   const [loc, setLoc] = useState<string>("all"); // "all" | "str:<id>" | "unit:<id>"
-  const [from, setFrom] = useState("");
+  const [from, setFrom] = useState(() => toISO(new Date())); // "dal" = oggi come default
   const [to, setTo] = useState("");
   const [dateField, setDateField] = useState<"arrivo" | "prenotazione">("arrivo");
   const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "checkIn", dir: "asc" });
