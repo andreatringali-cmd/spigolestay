@@ -480,6 +480,17 @@ export default function BookingDrawer() {
         <Row label={t("Netto struttura")} value={eur(nettoV)} mono strong />
       </Section>
 
+      {booking.movedFrom && (
+        <div className="mx-5 mt-3 flex items-start gap-2 rounded-xl px-3 py-2.5 text-sm" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)" }}>
+          <span className="font-bold" style={{ color: "var(--warn)" }}>⇄</span>
+          <div className="min-w-0 flex-1 text-txt">
+            {t("Prenotazione spostata da")} <b>{booking.movedFrom.structureName || t("un'altra struttura")}</b>
+            <div className="text-[11px] text-dim">{new Date(booking.movedFrom.at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+          </div>
+          <button onClick={() => updateBooking(booking.id, { movedFrom: undefined })} className="shrink-0 text-xs font-semibold text-dim hover:text-txt">{t("Nascondi")}</button>
+        </div>
+      )}
+
       {booking.note && (
         <Section title={t("Note")}><p className="whitespace-pre-wrap text-sm text-txt">{booking.note}</p></Section>
       )}

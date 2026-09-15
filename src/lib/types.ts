@@ -291,6 +291,7 @@ export interface Booking {
   paid?: number; // € già incassati (acconto/saldo)
   commissionPct?: number; // % di commissione OTA specifica di questa prenotazione
   webCheckin?: boolean; // l'ospite ha completato il check-in online
+  movedFrom?: { structureId: string; structureName: string; at: string }; // spostata dal calendario da un'altra struttura (avviso)
   arrivalTime?: string; // orario di arrivo comunicato
   docPhotoFront?: string; // foto documento fronte (dataURL, dal check-in online)
   docPhotoBack?: string;  // foto documento retro (dataURL)

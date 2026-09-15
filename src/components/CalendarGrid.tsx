@@ -703,6 +703,7 @@ export default function CalendarGrid() {
             ) : null;
             const icons = !blocked && wide ? (
               <span className="flex shrink-0 items-center gap-1 pr-1.5" style={{ color: meta.text }}>
+                {b.movedFrom && <span title={`Spostata da ${b.movedFrom.structureName || "un'altra struttura"}`} className="grid h-3.5 min-w-3.5 place-items-center rounded-full px-0.5 text-[9px] font-bold leading-none" style={{ backgroundColor: "#fff", color: "var(--warn)" }}>⇄</span>}
                 {grp && <span title="Prenotazione di gruppo · camere collegate" className="text-[11px] leading-none">⛓</span>}
                 {turn && <span title="Turnover · check-out e check-in stesso giorno" className="text-[10px] leading-none">⚡</span>}
                 {bday && <span title="Compleanno durante il soggiorno"><Icon name="cake" size={11} /></span>}
@@ -725,6 +726,7 @@ export default function CalendarGrid() {
                       <span className="truncate">{label}{extra && <span className="text-faint"> · {extra}</span>}</span>
                       {!blocked && (
                         <span className="ml-1 flex shrink-0 items-center gap-0.5">
+                          {b.movedFrom && <span title={`Spostata da ${b.movedFrom.structureName || "un'altra struttura"}`} className="font-bold" style={{ color: "var(--warn)" }}>⇄</span>}
                           {bday && <span title="Compleanno" style={{ color: "#DB2777" }}><Icon name="cake" size={10} /></span>}
                           {noSched && <span title="Schedina da completare" className="font-bold text-[color:var(--warn)]">!</span>}
                           <span title="Pagamento" className="h-2 w-2 rounded-full" style={{ backgroundColor: PAY_DOT[pay] }} />
@@ -1696,6 +1698,11 @@ export default function CalendarGrid() {
                 <span className="font-display text-lg font-bold text-txt">Confermi lo spostamento?</span>
               </div>
               <p className="text-sm text-dim">Spostare la prenotazione di <b className="text-txt">{b ? guestName(b.guestId) : "—"}</b>?</p>
+              {b && toS && toS.id !== b.structureId && (
+                <div className="mt-2 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--txt)" }}>
+                  ⇄ Cambi struttura: da <b>{structures.find((s) => s.id === b.structureId)?.name ?? "—"}</b> a <b>{toS.name}</b>. La prenotazione avrà un avviso.
+                </div>
+              )}
               <div className="my-3 flex flex-col gap-1.5 rounded-xl border border-line bg-paper p-3 text-sm">
                 <div className="flex items-center justify-between gap-2"><span className="text-faint">Camera</span><span className="min-w-0 text-right text-txt">{fromU?.name ?? "Da assegnare"} <span className="text-faint">→</span> <b>{toU?.name}</b>{toS ? <span className="text-faint"> · {toS.name}</span> : null}</span></div>
                 <div className="flex items-center justify-between gap-2"><span className="text-faint">Periodo</span><span className="font-mono text-txt">{moveConfirm.checkIn.slice(5)} → {moveConfirm.checkOut.slice(5)} <span className="text-faint">({nightsN} ntt)</span></span></div>

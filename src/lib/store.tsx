@@ -298,8 +298,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (patch.status === "cancelled") logAct("cancel", "Prenotazione annullata");
       },
       moveBooking: (id, to) => {
-        setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, unitId: to.unitId, checkIn: to.checkIn, checkOut: to.checkOut } : b)));
-        logAct("move", "Prenotazione spostata di camera");
+        const target = units.find((u) => u.id === to.unitId);
+        const cur = bookings.find((b) => b.id === id);
+        const crossed = !!(target && cur && target.structureId !== cur.structureId);
+        setBookings((prev) => prev.map((b) => {
+          if (b.id !== id) return b;
+          const next: Booking = { ...b, unitId: to.unitId, checkIn: to.checkIn, checkOut: to.checkOut };
+          if (target && target.structureId !== b.structureId) {
+            // Cambio struttura: la prenotazione passa alla nuova struttura (e alla tipologia della camera di arrivo)
+            // e porta con sé l'avviso "spostata da…". Se torna alla struttura d'origine l'avviso sparisce.
+            next.structureId = target.structureId;
+            next.roomTypeId = target.roomTypeId;
+            if (b.movedFrom?.structureId === target.structureId) delete next.movedFrom;
+            else if (!b.movedFrom) next.movedFrom = { structureId: b.structureId, structureName: structures.find((s) => s.id === b.structureId)?.name ?? "", at: new Date().toISOString() };
+          }
+          return next;
+        }));
+        logAct("move", crossed ? `Prenotazione spostata a ${structures.find((s) => s.id === target!.structureId)?.name ?? "altra struttura"}` : "Prenotazione spostata di camera");
       },
       deleteBooking: (id) => {
         const b = bookings.find((x) => x.id === id);
