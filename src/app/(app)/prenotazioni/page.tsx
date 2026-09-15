@@ -95,8 +95,8 @@ export default function PrenotazioniPage() {
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return bookings.filter((b) => {
-      // Di default mostra solo le prenotazioni in corso o future; con un filtro data attivo si vede anche lo storico.
-      if (!from && !to && b.checkOut < todayISO) return false;
+      // Nessun filtro = tutte le prenotazioni (anche lo storico). Il "dal" è preimpostato a oggi:
+      // azzerando i filtri si vede tutto.
       // Filtro globale struttura (selettore in alto a destra)
       if (activeStructureId !== "all" && b.structureId !== activeStructureId) return false;
       if (term && !guestName(b).toLowerCase().includes(term) && !b.id.toLowerCase().includes(term) && !bookingCode(b).toLowerCase().includes(term)) return false;
