@@ -72,8 +72,8 @@ export default function PrenotazioniPage() {
   const [q, setQ] = useState("");
   const [channel, setChannel] = useState<string>("all");
   const [loc, setLoc] = useState<string>("all"); // "all" | "str:<id>" | "unit:<id>"
-  const [from, setFrom] = useState(() => toISO(new Date())); // "dal" = oggi come default
-  const [to, setTo] = useState("");
+  const [from, setFrom] = useState(() => `${new Date().getFullYear()}-01-01`); // default: anno solare corrente
+  const [to, setTo] = useState(() => `${new Date().getFullYear()}-12-31`);
   const [dateField, setDateField] = useState<"arrivo" | "prenotazione">("arrivo");
   const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "checkIn", dir: "asc" });
   const toggleSort = (key: string) => setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
