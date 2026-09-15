@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { toISO, shiftISO, nights } from "@/lib/dates";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
-import { useConfirm } from "@/components/ConfirmProvider";
 
 const WINDOW = 90;
 const FUTURE = 30;
@@ -23,8 +23,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 
 export default function MercatoPage() {
   const { t } = useLang();
-  const ask = useConfirm();
-  const { structures, roomTypes, units, bookings, activeStructureId, setDayRates } = useData();
+  const { structures, roomTypes, units, bookings, activeStructureId } = useData();
   const { user } = useAuth();
 
   const struct = useMemo(() => {
@@ -37,7 +36,6 @@ export default function MercatoPage() {
   const [pulse, setPulse] = useState<Pulse | null>(null);
   const [breakdown, setBreakdown] = useState<{ idx: number; is_me: boolean; occupancy: number | null; adr: number | null; revpar: number | null }[]>([]);
   const [loading, setLoading] = useState(false);
-  const [applied, setApplied] = useState(false);
 
   const sUnits = useMemo(() => units.filter((u) => u.structureId === struct?.id && !u.outOfService), [units, struct?.id]);
   const sRooms = sUnits.length;
@@ -151,16 +149,6 @@ export default function MercatoPage() {
   const toggle = (k: keyof Consents) => setConsents((c) => ({ ...c, [k]: !c[k] }));
   const enough = (pulse?.n_structures ?? 0) >= THRESHOLD;
 
-  const applyPrices = async () => {
-    if (!engine.length || !sTypes.length) return;
-    const ok = await ask({ title: t("Applica prezzi consigliati"), message: `${t("Imposto i prezzi consigliati per i prossimi")} ${FUTURE} ${t("giorni su tutte le tipologie di")} ${struct?.name}. ${t("Potrai modificarli a mano quando vuoi.")}`, confirmLabel: t("Applica") });
-    if (!ok) return;
-    const map: Record<string, number> = {};
-    for (const rt of sTypes) { const base = rt.basePrice ?? basePrice; for (const d of engine) map[`${rt.id}|${d.date}`] = Math.max(0, Math.round(base * d.factor)); }
-    setDayRates(map);
-    setApplied(true); setTimeout(() => setApplied(false), 2400);
-  };
-
   if (!struct) return (<div><PageHeader title={t("Rete città")} subtitle={t("Confronta la tua struttura con il mercato locale")} /><Card><p className="text-sm text-dim">{t("Aggiungi prima una struttura.")}</p></Card></div>);
   if (!city) return (<div><PageHeader title={t("Rete città")} subtitle={t("Confronta la tua struttura con il mercato locale")} /><Card><p className="text-sm text-dim">{t("Imposta la città nella scheda della struttura per attivare la rete.")}</p></Card></div>);
 
@@ -172,68 +160,29 @@ export default function MercatoPage() {
     <div>
       <PageHeader title={t("Rete città")} subtitle={`${city} · ${t("confronto anonimo con i B&B della tua città")}`} />
 
-      {/* riga 1: Nèttare + confronto città */}
-      <div className="mt-4 grid items-start gap-4 lg:grid-cols-5">
-        {/* HERO NÈTTARE */}
-        <div className="lg:col-span-3 rounded-2xl border border-line p-5" style={{ background: "var(--surface)", boxShadow: "0 1px 2px rgba(0,0,0,.04), 0 14px 34px -22px rgba(0,0,0,.16)" }}>
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl border border-line text-lg" style={{ background: "color-mix(in srgb,var(--focus) 10%,transparent)" }}>🦋</span>
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-faint">{t("Motore prezzi dinamici")}</div>
-              <div className="font-display text-lg font-bold tracking-tight text-txt">Nèttare</div>
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-1 items-end gap-4 sm:grid-cols-[1.3fr_1fr]">
-            <div>
-              <div className="text-[11px] font-semibold text-faint">{t("Ricavo in più stimato")} · {FUTURE}gg</div>
-              <div className="font-mono text-4xl font-extrabold tracking-tight" style={{ color: potential > 0 ? "var(--ok)" : "var(--txt)" }}>{potential > 0 ? "+" : ""}{eur(potential)}</div>
-              <div className="mt-1 text-xs text-faint">{t("rispetto ai tuoi prezzi attuali")} · {t("base")} {eur(basePrice)}/{t("notte")}</div>
-            </div>
-            <div><Spark days={engine} /><div className="mt-1 text-right text-[11px] text-faint">{t("andamento prezzo consigliato")}</div></div>
-          </div>
-          <button onClick={applyPrices} className="mt-4 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 active:scale-95" style={{ background: "var(--focus)" }}>
-            {applied ? `✓ ${t("Prezzi applicati")}` : `${t("Applica ai prossimi")} ${FUTURE} ${t("giorni")}`}
-          </button>
-          <p className="mt-2 text-[11px] text-faint">{t("dai tuoi dati")}{cityHot || adrGap > 0.05 ? ` + ${t("segnali della Rete città")}` : ""} · {t("poi li ritocchi a mano")}</p>
-        </div>
-
-        {/* TU VS CITTÀ */}
-        <div className="lg:col-span-2">
-          <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Come vai rispetto alla città")}</h3>
-          <p className="mb-2 mt-0.5 text-xs text-dim">{t("Barra piena = tu; trattino = media città (90gg).")}</p>
-          <div className="rounded-2xl border border-line px-4" style={{ background: "var(--surface)" }}>
-            <CmpRow label={t("Occupazione")} youStr={`${Math.round(my.occ * 100)}%`} cityStr={enough && consents.occupancy && pulse?.occupancy != null ? `${Math.round(pulse.occupancy * 100)}%` : null}
-              youW={my.occ} cityW={pulse?.occupancy ?? null} delta={pulse?.occupancy != null ? Math.round((my.occ - pulse.occupancy) * 100) : null} unit="pt" shared={consents.occupancy} enough={enough} t={t} />
-            <CmpRow label="ADR" youStr={my.adr ? eur(Math.round(my.adr)) : "—"} cityStr={enough && consents.adr && pulse?.adr != null ? eur(Math.round(pulse.adr)) : null}
-              youW={my.adr / adrMax} cityW={pulse?.adr != null ? pulse.adr / adrMax : null} delta={pulse?.adr != null ? Math.round(my.adr - pulse.adr) : null} unit="€" shared={consents.adr} enough={enough} t={t} />
-            <CmpRow label="RevPAR" youStr={my.revpar ? eur(Math.round(my.revpar)) : "—"} cityStr={enough && consents.adr && pulse?.revpar != null ? eur(Math.round(pulse.revpar)) : null}
-              youW={my.revpar / revMax} cityW={pulse?.revpar != null ? pulse.revpar / revMax : null} delta={pulse?.revpar != null ? Math.round(my.revpar - pulse.revpar) : null} unit="€" shared={consents.adr} enough={enough} t={t} last />
+      {/* Banner Nèttare — i prezzi vivono nella pagina Nèttare */}
+      <Link href="/nettare" className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-line p-4 transition hover:brightness-[1.02]" style={{ background: "linear-gradient(100deg, color-mix(in srgb,var(--focus) 8%,var(--surface)), var(--surface))" }}>
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-xl border border-line text-lg" style={{ background: "color-mix(in srgb,var(--focus) 10%,transparent)" }}>🦋</span>
+          <div>
+            <div className="text-sm font-bold text-txt">Nèttare · {t("prezzi dinamici")}</div>
+            <div className="text-[11px] text-dim">{potential > 0 ? <>{t("Ricavo in più stimato")}: <b style={{ color: "var(--ok)" }}>+{eur(potential)}/30gg</b></> : t("Prezzi consigliati per i prossimi 30 giorni, dai dati della rete")}</div>
           </div>
         </div>
-      </div>
+        <span className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ background: "var(--focus)" }}>{t("Apri Nèttare")} →</span>
+      </Link>
 
-      {/* ── PREZZI GIORNO PER GIORNO ── */}
+      {/* TU VS CITTÀ */}
       <section className="mt-4">
-        <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Prezzo consigliato, giorno per giorno")}</h3>
-        <p className="mb-2 mt-0.5 text-xs text-dim">{t("Cosa chiedere a notte nei prossimi giorni.")} <span style={{ color: "var(--ok)" }}>{t("verde = alza")}</span> · <span style={{ color: "var(--focus)" }}>{t("blu = abbassa")}</span></p>
-        <div className="rounded-2xl border border-line p-3" style={{ background: "var(--surface)" }}>
-          {engine.length ? (
-            <div className="flex gap-2 overflow-x-auto pb-1.5" style={{ scrollSnapType: "x mandatory" }}>
-              {engine.map((d) => {
-                const up = d.factor >= 1.03, down = d.factor <= 0.97;
-                const dt = new Date(d.date + "T00:00:00");
-                return (
-                  <div key={d.date} className="shrink-0 rounded-xl border p-2.5 text-center" style={{ width: 94, scrollSnapAlign: "start", borderColor: up ? "color-mix(in srgb,var(--ok) 45%,var(--line))" : down ? "color-mix(in srgb,var(--focus) 40%,var(--line))" : "var(--line)", background: up ? "color-mix(in srgb,var(--ok) 6%,var(--surface))" : down ? "color-mix(in srgb,var(--focus) 6%,var(--surface))" : "var(--surface)" }}>
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-dim">{dt.toLocaleDateString("it-IT", { weekday: "short" })}</div>
-                    <div className="text-[10px] text-faint">{dt.toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</div>
-                    <div className="mt-1.5 whitespace-nowrap font-mono text-lg font-bold text-txt">{eur(d.price)}</div>
-                    <div className="text-[11px] font-semibold" style={{ color: up ? "var(--ok)" : down ? "var(--focus)" : "var(--faint)" }}>{d.factor === 1 ? t("stabile") : `${d.factor > 1 ? "+" : ""}${Math.round((d.factor - 1) * 100)}%`}</div>
-                    <div className="mt-1 text-[9px] leading-tight text-faint" style={{ minHeight: 22 }}>{d.reason}</div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : <p className="text-xs text-faint">{t("Aggiungi camere e prezzi per vedere i consigli.")}</p>}
+        <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Come vai rispetto alla città")}</h3>
+        <p className="mb-2 mt-0.5 text-xs text-dim">{t("Barra piena = tu; trattino = media città (ultimi 90 giorni).")}</p>
+        <div className="rounded-2xl border border-line px-4" style={{ background: "var(--surface)" }}>
+          <CmpRow label={t("Occupazione")} youStr={`${Math.round(my.occ * 100)}%`} cityStr={enough && consents.occupancy && pulse?.occupancy != null ? `${Math.round(pulse.occupancy * 100)}%` : null}
+            youW={my.occ} cityW={pulse?.occupancy ?? null} delta={pulse?.occupancy != null ? Math.round((my.occ - pulse.occupancy) * 100) : null} unit="pt" shared={consents.occupancy} enough={enough} t={t} />
+          <CmpRow label="ADR" youStr={my.adr ? eur(Math.round(my.adr)) : "—"} cityStr={enough && consents.adr && pulse?.adr != null ? eur(Math.round(pulse.adr)) : null}
+            youW={my.adr / adrMax} cityW={pulse?.adr != null ? pulse.adr / adrMax : null} delta={pulse?.adr != null ? Math.round(my.adr - pulse.adr) : null} unit="€" shared={consents.adr} enough={enough} t={t} />
+          <CmpRow label="RevPAR" youStr={my.revpar ? eur(Math.round(my.revpar)) : "—"} cityStr={enough && consents.adr && pulse?.revpar != null ? eur(Math.round(pulse.revpar)) : null}
+            youW={my.revpar / revMax} cityW={pulse?.revpar != null ? pulse.revpar / revMax : null} delta={pulse?.revpar != null ? Math.round(my.revpar - pulse.revpar) : null} unit="€" shared={consents.adr} enough={enough} t={t} last />
         </div>
       </section>
 
@@ -294,21 +243,6 @@ export default function MercatoPage() {
 }
 
 /* ───────── componenti ───────── */
-
-function Spark({ days }: { days: Day[] }) {
-  if (days.length < 2) return <div style={{ height: 60 }} />;
-  const W = 200, H = 60;
-  const min = Math.min(...days.map((d) => d.price)), max = Math.max(...days.map((d) => d.price)), rng = Math.max(1, max - min);
-  const pts = days.map((d, i) => [(i / (days.length - 1)) * W, H - ((d.price - min) / rng) * (H - 8) - 4] as const);
-  const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" style={{ display: "block" }} aria-hidden>
-      <defs><linearGradient id="spk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--focus)" stopOpacity="0.18" /><stop offset="1" stopColor="var(--focus)" stopOpacity="0" /></linearGradient></defs>
-      <path d={`${line} L${W},${H} L0,${H} Z`} fill="url(#spk)" />
-      <path d={line} fill="none" stroke="var(--focus)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 function CmpRow({ label, youStr, cityStr, youW, cityW, delta, unit, shared, enough, last, t }: { label: string; youStr: string; cityStr: string | null; youW: number; cityW: number | null; delta: number | null; unit: string; shared: boolean; enough: boolean; last?: boolean; t: (s: string) => string }) {
   const show = shared && enough && cityStr != null;
