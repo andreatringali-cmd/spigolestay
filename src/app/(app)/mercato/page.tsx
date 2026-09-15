@@ -172,24 +172,34 @@ export default function MercatoPage() {
         <span className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ background: "var(--focus)" }}>{t("Apri Nèttare")} →</span>
       </Link>
 
-      {/* TU VS CITTÀ */}
+      {/* KPI: come vai rispetto alla città */}
       <section className="mt-4">
         <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Come vai rispetto alla città")}</h3>
-        <p className="mb-2 mt-0.5 text-xs text-dim">{t("Barra piena = tu; trattino = media città (ultimi 90 giorni).")}</p>
-        <div className="rounded-2xl border border-line px-4" style={{ background: "var(--surface)" }}>
-          <CmpRow label={t("Occupazione")} youStr={`${Math.round(my.occ * 100)}%`} cityStr={enough && consents.occupancy && pulse?.occupancy != null ? `${Math.round(pulse.occupancy * 100)}%` : null}
-            youW={my.occ} cityW={pulse?.occupancy ?? null} delta={pulse?.occupancy != null ? Math.round((my.occ - pulse.occupancy) * 100) : null} unit="pt" shared={consents.occupancy} enough={enough} t={t} />
-          <CmpRow label="ADR" youStr={my.adr ? eur(Math.round(my.adr)) : "—"} cityStr={enough && consents.adr && pulse?.adr != null ? eur(Math.round(pulse.adr)) : null}
-            youW={my.adr / adrMax} cityW={pulse?.adr != null ? pulse.adr / adrMax : null} delta={pulse?.adr != null ? Math.round(my.adr - pulse.adr) : null} unit="€" shared={consents.adr} enough={enough} t={t} />
-          <CmpRow label="RevPAR" youStr={my.revpar ? eur(Math.round(my.revpar)) : "—"} cityStr={enough && consents.adr && pulse?.revpar != null ? eur(Math.round(pulse.revpar)) : null}
-            youW={my.revpar / revMax} cityW={pulse?.revpar != null ? pulse.revpar / revMax : null} delta={pulse?.revpar != null ? Math.round(my.revpar - pulse.revpar) : null} unit="€" shared={consents.adr} enough={enough} t={t} last />
+        <p className="mb-2 mt-0.5 text-xs text-dim">{t("Il tuo dato (ultimi 90 giorni) a confronto con la media anonima della città.")}</p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <StatCard label={t("Occupazione")} youStr={`${Math.round(my.occ * 100)}%`} youW={my.occ}
+            cityStr={enough && consents.occupancy && pulse?.occupancy != null ? `${Math.round(pulse.occupancy * 100)}%` : null} cityW={pulse?.occupancy ?? null}
+            delta={pulse?.occupancy != null ? Math.round((my.occ - pulse.occupancy) * 100) : null} unit="pt" shared={consents.occupancy} enough={enough} t={t} />
+          <StatCard label="ADR" youStr={my.adr ? eur(Math.round(my.adr)) : "—"} youW={my.adr / adrMax}
+            cityStr={enough && consents.adr && pulse?.adr != null ? eur(Math.round(pulse.adr)) : null} cityW={pulse?.adr != null ? pulse.adr / adrMax : null}
+            delta={pulse?.adr != null ? Math.round(my.adr - pulse.adr) : null} unit="€" shared={consents.adr} enough={enough} t={t} />
+          <StatCard label="RevPAR" youStr={my.revpar ? eur(Math.round(my.revpar)) : "—"} youW={my.revpar / revMax}
+            cityStr={enough && consents.adr && pulse?.revpar != null ? eur(Math.round(pulse.revpar)) : null} cityW={pulse?.revpar != null ? pulse.revpar / revMax : null}
+            delta={pulse?.revpar != null ? Math.round(my.revpar - pulse.revpar) : null} unit="€" shared={consents.adr} enough={enough} t={t} />
         </div>
       </section>
 
-      {/* riga 3: strutture + consensi */}
-      <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
+      {/* ANDAMENTO OCCUPAZIONE */}
+      <section className="mt-4">
+        <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Andamento occupazione")} · {WINDOW}gg</h3>
+        <p className="mb-2 mt-0.5 text-xs text-dim">{t("La tua occupazione giorno per giorno; la linea tratteggiata è la media della città.")}</p>
+        <div className="rounded-2xl border border-line p-4" style={{ background: "var(--surface)" }}>
+          <TrendChart data={myDaily} cityAvg={enough && consents.occupancy ? pulse?.occupancy ?? null : null} t={t} />
+        </div>
+      </section>
+
       {/* ── STRUTTURE DELLA RETE ── */}
-      <section>
+      <section className="mt-4">
         <div className="flex items-center justify-between">
           <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Le strutture della rete")} · {city}</h3>
           <span className="inline-flex items-center gap-1.5 text-xs text-faint"><span className={`h-2 w-2 rounded-full ${loading ? "animate-pulse" : ""}`} style={{ background: enough ? "var(--ok)" : "var(--warn)" }} />{pulse?.n_structures ?? 0} {t("nella rete")}</span>
@@ -227,7 +237,7 @@ export default function MercatoPage() {
       </section>
 
       {/* ── COSA CONDIVIDI ── */}
-      <section>
+      <section className="mt-4">
         <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Cosa condividi")}</h3>
         <p className="mb-2 mt-0.5 text-xs text-dim">{t("Dai per ricevere: vedi un dato della città solo se lo condividi anche tu. Sempre anonimo e aggregato.")}</p>
         <div className="rounded-2xl border border-line px-4" style={{ background: "var(--surface)" }}>
@@ -237,27 +247,58 @@ export default function MercatoPage() {
           <ToggleRow on={consents.channels} onClick={() => toggle("channels")} label={t("Mix canali")} hint={t("in arrivo")} disabled last />
         </div>
       </section>
-      </div>
     </div>
   );
 }
 
 /* ───────── componenti ───────── */
 
-function CmpRow({ label, youStr, cityStr, youW, cityW, delta, unit, shared, enough, last, t }: { label: string; youStr: string; cityStr: string | null; youW: number; cityW: number | null; delta: number | null; unit: string; shared: boolean; enough: boolean; last?: boolean; t: (s: string) => string }) {
+function StatCard({ label, youStr, youW, cityStr, cityW, delta, unit, shared, enough, t }: { label: string; youStr: string; youW: number; cityStr: string | null; cityW: number | null; delta: number | null; unit: string; shared: boolean; enough: boolean; t: (s: string) => string }) {
   const show = shared && enough && cityStr != null;
   const up = (delta ?? 0) >= 0;
   return (
-    <div className="grid items-center gap-3 py-3 sm:grid-cols-[84px_1fr_auto]" style={last ? undefined : { borderBottom: "1px solid var(--hair, color-mix(in srgb,var(--line) 60%,transparent))" }}>
-      <div className="text-[13px] font-medium text-dim">{label}</div>
-      <div className="relative h-2 rounded-full" style={{ background: "var(--wash)" }}>
-        <div className="absolute left-0 top-0 h-2 rounded-full" style={{ width: `${clamp(youW, 0, 1) * 100}%`, background: "var(--focus)" }} />
-        {show && cityW != null && <div className="absolute -top-1 h-4 w-0.5 rounded" style={{ left: `${clamp(cityW, 0, 1) * 100}%`, background: "var(--faint)" }} />}
+    <div className="rounded-2xl border border-line p-4" style={{ background: "var(--surface)" }}>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-dim">{label}</span>
+        {show && delta != null && <span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ color: up ? "var(--ok)" : "var(--err)", background: up ? "color-mix(in srgb,var(--ok) 12%,transparent)" : "color-mix(in srgb,var(--err) 12%,transparent)" }}>{up ? "▲ +" : "▼ "}{unit === "€" ? eur(delta) : `${Math.abs(delta)} pt`}</span>}
       </div>
-      <div className="flex items-baseline justify-end gap-2 text-right">
-        <span className="font-mono text-xl font-bold text-txt">{youStr}</span>
-        {show ? <span className="text-xs text-dim">{t("città")} {cityStr}</span> : <span className="text-xs text-faint">{shared ? t("città: —") : `🔒 ${t("condividi")}`}</span>}
-        {show && delta != null && <span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ color: up ? "var(--ok)" : "var(--err)", background: up ? "color-mix(in srgb,var(--ok) 12%,transparent)" : "color-mix(in srgb,var(--err) 12%,transparent)" }}>{up ? "+" : ""}{unit === "€" ? eur(delta) : `${delta} pt`}</span>}
+      <div className="mt-1 font-mono text-3xl font-extrabold tracking-tight text-txt">{youStr}</div>
+      <div className="relative mt-3 h-2 rounded-full" style={{ background: "var(--wash)" }}>
+        <div className="absolute left-0 top-0 h-2 rounded-full" style={{ width: `${clamp(youW, 0, 1) * 100}%`, background: "var(--focus)" }} />
+        {show && cityW != null && <div className="absolute -top-1 h-4 w-0.5 rounded" style={{ left: `${clamp(cityW, 0, 1) * 100}%`, background: "var(--faint)" }} title={t("media città")} />}
+      </div>
+      <div className="mt-2 text-[11px]">
+        {show ? <span className="text-dim">{t("media città")} <b className="text-txt">{cityStr}</b></span> : <span className="text-faint">{shared ? t("città: dati insufficienti") : `🔒 ${t("condividi per vedere la città")}`}</span>}
+      </div>
+    </div>
+  );
+}
+
+function TrendChart({ data, cityAvg, t }: { data: { date: string; rooms_total: number; rooms_sold: number }[]; cityAvg: number | null; t: (s: string) => string }) {
+  if (data.length < 2) return <p className="text-xs text-faint">{t("Dati insufficienti per il grafico.")}</p>;
+  const W = 660, H = 130, pad = 6;
+  const pts = data.map((r, i) => { const x = pad + (i / (data.length - 1)) * (W - pad * 2); const occ = r.rooms_total ? r.rooms_sold / r.rooms_total : 0; return [x, H - pad - occ * (H - pad * 2)] as const; });
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  const area = `${line} L${pts[pts.length - 1][0].toFixed(1)},${H - pad} L${pts[0][0].toFixed(1)},${H - pad} Z`;
+  const last = pts[pts.length - 1];
+  const cityY = cityAvg == null ? null : H - pad - cityAvg * (H - pad * 2);
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" style={{ display: "block" }}>
+        <defs><linearGradient id="tr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--focus)" stopOpacity="0.4" /><stop offset="1" stopColor="var(--focus)" stopOpacity="0" /></linearGradient></defs>
+        {[0.25, 0.5, 0.75].map((g) => <line key={g} x1={pad} x2={W - pad} y1={H - pad - g * (H - pad * 2)} y2={H - pad - g * (H - pad * 2)} stroke="var(--line)" strokeWidth="1" strokeDasharray="3 5" />)}
+        <path d={area} fill="url(#tr)" />
+        <path d={line} fill="none" stroke="var(--focus)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        {cityY != null && <line x1={pad} x2={W - pad} y1={cityY} y2={cityY} stroke="#f59e0b" strokeWidth="2" strokeDasharray="6 4" />}
+        <circle cx={last[0]} cy={last[1]} r="4" fill="var(--focus)" stroke="var(--surface)" strokeWidth="2" />
+      </svg>
+      <div className="mt-1 flex items-center justify-between text-[10px] text-faint">
+        <span>{new Date(data[0].date + "T00:00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</span>
+        <span className="flex items-center gap-3">
+          <span className="flex items-center gap-1"><i className="inline-block h-2 w-3 rounded" style={{ background: "var(--focus)" }} /> {t("tu")}</span>
+          {cityAvg != null && <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-3" style={{ background: "#f59e0b" }} /> {t("media città")}</span>}
+          <span>{t("oggi")}</span>
+        </span>
       </div>
     </div>
   );
