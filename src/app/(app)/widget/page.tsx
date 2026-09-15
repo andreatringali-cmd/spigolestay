@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
 import { nights, toISO, shiftISO } from "@/lib/dates";
@@ -77,6 +77,16 @@ export default function WidgetPage() {
   ];
   const [fmtKey, setFmtKey] = useState("v-std");
   const fmt = FORMATS.find((f) => f.key === fmtKey) ?? FORMATS[1];
+  // Anteprima in scala: mostra la forma reale del formato dentro lo spazio disponibile.
+  const previewWrapRef = useRef<HTMLDivElement>(null);
+  const [availW, setAvailW] = useState(0);
+  useEffect(() => {
+    const el = previewWrapRef.current; if (!el) return;
+    const ro = new ResizeObserver(() => setAvailW(el.clientWidth));
+    ro.observe(el); setAvailW(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+  const previewScale = availW ? Math.min(1, availW / fmt.w) : 1;
 
   const structure = structures.find((s) => s.id === structureId);
   const rt = roomTypes.find((r) => r.id === rtId);
@@ -206,7 +216,9 @@ export default function WidgetPage() {
         {/* Anteprima live */}
         <div className="lg:sticky lg:top-20 lg:self-start">
           <SectionTitle>{t("Anteprima widget")}</SectionTitle>
-          <div className="mx-auto overflow-hidden border border-line bg-surface shadow-lg" style={{ borderRadius: radius, width: fmt.w, maxWidth: "100%" }}>
+          <div ref={previewWrapRef}>
+          <div style={{ zoom: previewScale }}>
+          <div className="mx-auto overflow-hidden border border-line bg-surface shadow-lg" style={{ borderRadius: radius, width: fmt.w }}>
             {c.showHeader && (
               <div className="px-5 py-4 text-white" style={{ backgroundColor: c.accent }}>
                 <div className="text-sm opacity-90">{t("Prenotazione online")}</div>
@@ -261,6 +273,8 @@ export default function WidgetPage() {
               )}
             </div>
             )}
+          </div>
+          </div>
           </div>
           <p className="mt-2 text-center text-xs text-faint">{t("Anteprima reale: “Prenota ora” crea la prenotazione nel calendario.")}</p>
         </div>
