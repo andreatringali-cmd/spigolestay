@@ -154,7 +154,7 @@ export default function BookingDrawer() {
   // ── Conto in sola lettura (dai dati salvati) ──
   const nView = nights(booking.checkIn, booking.checkOut);
   const accV = booking.total ?? nView * (roomType?.basePrice ?? 100);
-  const cleanV = booking.cleaningFee ?? 35;
+  const cleanV = booking.cleaningFee ?? 0;
   const extrasList = booking.extras ?? [];
   const extrasV = extrasList.reduce((a, e) => a + (e.price || 0), 0);
   const taxV = cityTaxOf(structure, booking.adults, nView, accV, booking.cityTaxExempt);

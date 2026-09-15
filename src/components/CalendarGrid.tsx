@@ -17,6 +17,7 @@ import {
   weekdayShort,
 } from "@/lib/dates";
 import { eur } from "@/lib/format";
+import { bookingGrandTotal } from "@/lib/booking";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import Icon from "@/components/Icon";
 import ChannelLogo from "@/components/ChannelLogo";
@@ -682,7 +683,8 @@ export default function CalendarGrid() {
             const pax = b.adults + b.children;
             const wide = g.width > 88;
             const xwide = g.width > 148;
-            const extra = blocked ? "" : [wide && `${pax}p`, xwide && b.total ? `€${Math.round(b.total)}` : ""].filter(Boolean).join(" · ");
+            const gtot = b.total ? bookingGrandTotal(b, structures.find((s) => s.id === b.structureId)) : 0; // totale unico (soggiorno+pulizia+extra+tassa)
+            const extra = blocked ? "" : [wide && `${pax}p`, xwide && gtot ? `€${Math.round(gtot)}` : ""].filter(Boolean).join(" · ");
             const tentative = !blocked && b.status === "tentative";
             const sotto = barStyle === "sotto";
             const barColor = blocked
@@ -715,7 +717,7 @@ export default function CalendarGrid() {
               <div
                 key={b.id}
                 onPointerDown={(e) => onBarPointerDown(e, b.id)}
-                title={`${blocked ? `Fuori servizio${b.note ? ` · ${b.note}` : ""}` : `${guestName(b.guestId)} · ${pax} ospiti${b.total ? ` · €${Math.round(b.total)}` : ""}`} · ${b.checkIn} → ${b.checkOut}${tentative ? " · opzione" : ""}`}
+                title={`${blocked ? `Fuori servizio${b.note ? ` · ${b.note}` : ""}` : `${guestName(b.guestId)} · ${pax} ospiti${gtot ? ` · €${Math.round(gtot)}` : ""}`} · ${b.checkIn} → ${b.checkOut}${tentative ? " · opzione" : ""}`}
                 className={`absolute overflow-hidden ${sotto ? "flex cursor-grab flex-col justify-end active:cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
                 style={{ left: g.left + 1, width: g.width - 2, top: 1, height: rowH - 2, opacity: dragging ? 0.35 : tentative ? 0.72 : 1, pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
               >

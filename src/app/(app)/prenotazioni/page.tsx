@@ -7,6 +7,7 @@ import { bookingCode } from "@/lib/bookingCode";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { nights, parseISO, toISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
+import { bookingGrandTotal } from "@/lib/booking";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import ScrollStrip from "@/components/ScrollStrip";
@@ -162,6 +163,7 @@ export default function PrenotazioniPage() {
     return out;
   })();
   const gSum = (ms: typeof sorted, f: (b: typeof sorted[number]) => number) => ms.reduce((a, b) => a + f(b), 0);
+  const grand = (b: typeof sorted[number]) => bookingGrandTotal(b, getStructure(b.structureId)); // totale unico (soggiorno+pulizia+extra+tassa)
   // Celle di una riga prenotazione (riusate per righe singole e per le camere di un gruppo).
   const renderCells = (b: typeof sorted[number], indent = false) => {
     const ch = CHANNELS[b.channel]; const alOk = alloggiatiOk(b); const pay = payStatus(b);
@@ -179,7 +181,7 @@ export default function PrenotazioniPage() {
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkOut)}</td>
       <td className="px-3 py-2.5 font-mono text-dim">{nights(b.checkIn, b.checkOut)}</td>
-      <td className="px-3 py-2.5 font-mono font-semibold text-txt">{b.total ? eur(b.total) : "—"}</td>
+      <td className="px-3 py-2.5 font-mono font-semibold text-txt">{b.total ? eur(grand(b)) : "—"}</td>
       <td className="px-3 py-2.5 font-mono text-dim">{commissionOf(b) ? <>{eur(commissionOf(b))} <span className="text-faint">({commissionPctOf(b)}%)</span></> : "—"}</td>
       <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{b.total ? eur(nettoOf(b)) : "—"}</td>
       <td className="px-3 py-2.5"><div className="flex items-center gap-1.5"><StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--faint)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} /><StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} /></div></td>
@@ -351,7 +353,7 @@ export default function PrenotazioniPage() {
                   <div className="mt-1 flex items-center gap-1.5 text-xs text-dim"><span className="font-mono">{fmt(b.checkIn)} → {fmt(b.checkOut)}</span><span className="text-faint">·</span><span>{nights(b.checkIn, b.checkOut)} {t("notti")}</span></div>
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[11px] font-semibold text-focus">{members.length} {t("camere")} {open ? "▾" : "▸"}</span>
-                    <span className="shrink-0 font-mono font-semibold text-txt">{eur(gSum(members, (x) => x.total ?? 0))}</span>
+                    <span className="shrink-0 font-mono font-semibold text-txt">{eur(gSum(members, (x) => grand(x)))}</span>
                   </div>
                 </button>
                 {open && (
@@ -443,7 +445,7 @@ export default function PrenotazioniPage() {
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkOut)}</td>
                     <td className="px-3 py-2.5 font-mono text-dim">{nights(b.checkIn, b.checkOut)}</td>
-                    <td className="px-3 py-2.5 font-mono font-semibold text-txt">{eur(gSum(members, (x) => x.total ?? 0))}</td>
+                    <td className="px-3 py-2.5 font-mono font-semibold text-txt">{eur(gSum(members, (x) => grand(x)))}</td>
                     <td className="px-3 py-2.5 font-mono text-dim">{eur(gSum(members, (x) => commissionOf(x)))}</td>
                     <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{eur(gSum(members, (x) => nettoOf(x)))}</td>
                     <td className="px-3 py-2.5"><span className="inline-flex items-center gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }} title={t("Prenotazione di gruppo")}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><button onClick={async (e) => { e.stopPropagation(); if (await ask({ title: t("Elimina prenotazione di gruppo"), message: `${t("Eliminare definitivamente tutte le")} ${members.length} ${t("camere di questo gruppo?")}`, danger: true, confirmLabel: t("Elimina tutto il gruppo") })) deleteBookingGroup(gid); }} title={t("Elimina tutto il gruppo")} aria-label={t("Elimina tutto il gruppo")} className="grid h-6 w-6 place-items-center rounded-md text-faint hover:bg-[color:color-mix(in_srgb,var(--err)_12%,transparent)] hover:text-[color:var(--err)]"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /></svg></button></span></td>
