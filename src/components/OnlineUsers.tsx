@@ -105,7 +105,6 @@ export default function OnlineUsers() {
               </div>
             </div>
           ))}
-          {!peers.length && <div className="px-2 pb-1 pt-1.5 text-[11px] text-faint">{t("Il tuo socio non è collegato in questo momento.")}</div>}
         </div>
       )}
       {toast && (

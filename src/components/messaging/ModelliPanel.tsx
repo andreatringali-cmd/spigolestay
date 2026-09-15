@@ -15,7 +15,7 @@ const TRIGGERS: [Trigger, string][] = [["manual", "Manuale"], ["before_arrival",
 const needsDays = (t: Trigger) => t === "before_arrival" || t === "after_arrival" || t === "after_checkout";
 const LINKABLE: [string, string][] = [["", "Nessuna"], ["selfcheckin", "Self check-in"], ["guida", "Guida ospiti"], ["info", "Info e codici d'ingresso"], ["checkout", "Messaggio di check-out"], ["recensione", "Richiesta recensione"]];
 
-interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; trigger: Trigger; days: number; time: string; active: boolean; srcId?: string }
+interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; trigger: Trigger; days: number; time: string; active: boolean; srcId?: string; order?: number }
 const emptyTpl = (): MsgTemplate => ({ id: (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random())), name: "", texts: { it: "", en: "", fr: "", de: "", es: "" }, trigger: "manual", days: 1, time: "10:00", active: true });
 const triggerDesc = (tpl: MsgTemplate, tr: (s: string) => string) => {
   if (tpl.trigger === "manual") return tr("Invio manuale");
@@ -50,10 +50,12 @@ export default function ModelliPanel() {
   const insertVar = (token: string) => setEditing((e) => (e ? { ...e, texts: { ...e.texts, [editLang]: `${e.texts[editLang] ?? ""}${token}` } } : e));
   const del = async (tpl: MsgTemplate) => { if (await ask({ title: t("Elimina modello"), message: `${t("Eliminare il modello")} "${tpl.name}"? ${t("L'operazione non è reversibile.")}`, danger: true, confirmLabel: t("Elimina") })) setTemplates((p) => p.filter((x) => x.id !== tpl.id)); };
   const isAuto = (tp: MsgTemplate) => tp.trigger !== "manual"; // "automatico" = ha un orario/trigger (a prescindere se è in pausa)
-  const shown = templates.filter((tp) =>
-    (search.trim() === "" || tp.name.toLowerCase().includes(search.trim().toLowerCase())) &&
-    (flt === "all" || (flt === "auto" ? isAuto(tp) : !isAuto(tp)))
-  );
+  const shown = [...templates]
+    .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999) || a.name.localeCompare(b.name, "it", { sensitivity: "base" }))
+    .filter((tp) =>
+      (search.trim() === "" || tp.name.toLowerCase().includes(search.trim().toLowerCase())) &&
+      (flt === "all" || (flt === "auto" ? isAuto(tp) : !isAuto(tp)))
+    );
 
   return (
     <div>
@@ -105,7 +107,10 @@ export default function ModelliPanel() {
               <SectionTitle>{t("Modello messaggio")}</SectionTitle>
               <button onClick={() => setEditing(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
             </div>
-            <label className="block text-xs font-medium text-dim">{t("Nome modello")} *<input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" placeholder={t("Es. Benvenuto pre-arrivo")} /></label>
+            <div className="flex items-end gap-2">
+              <label className="block flex-1 text-xs font-medium text-dim">{t("Nome modello")} *<input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" placeholder={t("Es. Benvenuto pre-arrivo")} /></label>
+              <label className="block w-20 text-xs font-medium text-dim" title={t("Numero d'ordine: più basso = più in alto nella lista")}>{t("Ordine")}<input type="number" min={0} value={editing.order ?? ""} onChange={(e) => setEditing({ ...editing, order: e.target.value === "" ? undefined : Number(e.target.value) })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" placeholder="—" /></label>
+            </div>
 
             <div className="mt-4">
               <div className="mb-1.5 flex items-center gap-1">
