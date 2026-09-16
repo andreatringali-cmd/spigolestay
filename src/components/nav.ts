@@ -27,18 +27,23 @@ export const NAV: NavItem[] = [
   { label: "Recensioni", href: "/recensioni", group: "Report", icon: "chat", perm: "webconcierge", module: "concierge" },
   { label: "Statistiche", href: "/statistiche", group: "Report", icon: "chart", perm: "statistiche", module: "pms" },
   { label: "Rete città", href: "/mercato", group: "Report", icon: "share", perm: "statistiche", module: "market" },
+  { label: "Provenienza viaggiatori", href: "/provenienza", group: "Report", icon: "chart", perm: "statistiche", module: "pms" },
   { label: "Nèttare · prezzi dinamici", href: "/nettare", group: "Report", icon: "sparkles", perm: "revenue", module: "rms" },
   { label: "Revenue", href: "/revenue", group: "Report", icon: "tag", perm: "revenue", module: "rms" },
   { label: "Rate checker", href: "/rate-checker", group: "Report", icon: "search", perm: "ratechecker", module: "ratecheck" },
 
   { label: "Cassa · Prima Nota", href: "/cassa", group: "Amministrazione", icon: "receipt", perm: "cassa", module: "cassa" },
+  { label: "Chiusura cassa", href: "/chiusura-cassa", group: "Amministrazione", icon: "receipt", perm: "cassa", module: "cassa" },
   { label: "Incassi", href: "/pagamenti", group: "Amministrazione", icon: "card", perm: "pagamenti", module: "pms" },
+  { label: "Scadenzario incassi", href: "/scadenzario-incassi", group: "Amministrazione", icon: "card", perm: "pagamenti", module: "pms" },
   { label: "Fatture passive", href: "/fatture-passive", group: "Amministrazione", icon: "receipt", perm: "cassa", module: "pms" },
+  { label: "Registro bollo", href: "/registro-bollo", group: "Amministrazione", icon: "receipt", perm: "cassa", module: "pms" },
 
   { label: "Ospiti", href: "/ospiti", group: "Anagrafiche", icon: "users", perm: "prenotazioni", module: "pms" },
   { label: "Alloggiati", href: "/alloggiati", group: "Anagrafiche", icon: "id", perm: "alloggiati", module: "pms" },
   { label: "Alloggiati Web", href: "/alloggiati-web", group: "Anagrafiche", icon: "id", perm: "alloggiati", module: "pms" },
   { label: "ISTAT · Turist@t", href: "/istat", group: "Anagrafiche", icon: "chart", perm: "alloggiati", module: "pms" },
+  { label: "Clienti / Agenzie", href: "/anagrafica-clienti", group: "Anagrafiche", icon: "users", perm: "prenotazioni", module: "pms" },
   { label: "Tassa soggiorno", href: "/tassa-soggiorno", group: "Anagrafiche", icon: "receipt", perm: "tassa", module: "pms" },
 
   // Distribuzione: cosa vendi e a quali prezzi (catena del prezzo: base → piani → derivate).
@@ -47,6 +52,7 @@ export const NAV: NavItem[] = [
   { label: "Tariffe derivate", href: "/tariffe-derivate", group: "Distribuzione", icon: "copy", perm: "tariffe", module: "pms" },
   { label: "Channel Manager", href: "/canali", group: "Distribuzione", icon: "share", perm: "canali", module: "cm" },
   { label: "Meta Search", href: "/metasearch", group: "Distribuzione", icon: "search", perm: "canali", module: "meta" },
+  { label: "Booking Engine", href: "/booking-engine", group: "Distribuzione", icon: "eye", perm: "sito", module: "booking" },
   { label: "Widget sito", href: "/widget", group: "Distribuzione", icon: "eye", perm: "sito", module: "booking" },
   { label: "Xenosite", href: "/sito", group: "Distribuzione", icon: "grid", perm: "sito", module: "site" },
 
