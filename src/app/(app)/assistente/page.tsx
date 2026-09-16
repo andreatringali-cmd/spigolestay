@@ -10,6 +10,7 @@ import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/authsync";
 import { PageHeader, Card } from "@/components/ui";
 import Icon from "@/components/Icon";
+import AssistantCore from "@/components/AssistantCore";
 import { eur } from "@/lib/format";
 import { bookingGrandTotal } from "@/lib/booking";
 
@@ -127,11 +128,12 @@ export default function AssistentePage() {
     return `${greet}${firstName ? " " + firstName : ""}. Oggi: ${parts.join(", ")}.`;
   }, [answers, dueCents, greet, firstName]);
 
-  const briefChips = useMemo(() => [
-    { n: answers.arrivalsToday.length, l: "arrivi", tone: "var(--ok)" },
-    { n: answers.departuresToday.length, l: "partenze", tone: "var(--warn)" },
-    { n: answers.noCheckin.length, l: "check-in mancanti", tone: "var(--focus)" },
-    ...(dueCents ? [{ n: -1, l: `${eur(dueCents / 100)} da incassare`, tone: "var(--err)" }] : []),
+  // Briefing "distribuito": ogni numero è una tessera a sé.
+  const tiles = useMemo(() => [
+    { label: "Arrivi oggi", value: String(answers.arrivalsToday.length), tone: "var(--ok)", q: "arrivi oggi" },
+    { label: "Partenze oggi", value: String(answers.departuresToday.length), tone: "var(--warn)", q: "partenze" },
+    { label: "Check-in mancanti", value: String(answers.noCheckin.length), tone: "var(--focus)", q: "check-in mancanti" },
+    { label: "Da incassare", value: dueCents != null ? eur(dueCents / 100) : "—", tone: "var(--err)", q: "da incassare" },
   ], [answers, dueCents]);
 
   // ── Motore risposte (parole chiave) ──
@@ -200,61 +202,42 @@ export default function AssistentePage() {
 
   return (
     <div>
-      <style>{`
-        @keyframes xnFloat { 0%,100% { transform: translateY(0) scale(1) } 50% { transform: translateY(-6px) scale(1.05) } }
-        @keyframes xnFlutter { 0%,100% { transform: translateY(0) scaleX(1) } 50% { transform: translateY(-2px) scaleX(.9) } }
-        @keyframes xnGlow { 0%,100% { opacity:.4; transform: scale(1) } 50% { opacity:.85; transform: scale(1.18) } }
-        @keyframes xnRing { 0% { transform: scale(.55); opacity:.7 } 100% { transform: scale(2); opacity:0 } }
-        .xn-fly { animation: xnFloat 4.2s ease-in-out infinite; transform-origin: center 60%; }
-        .xn-fly[data-s="listen"] { animation: xnFlutter .5s ease-in-out infinite; }
-        .xn-fly[data-s="speak"] { animation: xnFloat 1.5s ease-in-out infinite; }
-        .xn-glow { animation: xnGlow 4.2s ease-in-out infinite; }
-        .xn-glow[data-s="listen"] { animation-duration: 1.1s; }
-        .xn-glow[data-s="speak"] { animation-duration: 1.6s; }
-        .xn-ring { animation: xnRing 3.2s ease-out infinite; opacity: 0; }
-        .xn-ring[data-s="listen"], .xn-ring[data-s="speak"] { animation-duration: 1.4s; }
-        .xn-ring-2 { animation-delay: 1.6s; }
-        @media (prefers-reduced-motion: reduce) { .xn-fly,.xn-glow,.xn-ring { animation: none !important; } }
-      `}</style>
-
       <PageHeader title="Assistente Xenora" subtitle="Chiedi a voce o scrivi — rispondo con i tuoi numeri" />
 
-      {/* Core + briefing */}
+      {/* Hero: core astratto pulsante al centro + saluto */}
       <Card className="mb-4 overflow-hidden">
-        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
-          {/* Core animato: la farfalla Xenora che pulsa (tocca per parlare) */}
+        <div className="flex flex-col items-center gap-3 py-2 text-center">
           <button
             onClick={toggleListening}
             disabled={!voiceSupported}
-            title={voiceSupported ? (listening ? "Sto ascoltando… tocca per fermare" : "Tocca la farfalla per parlare") : "Il microfono non è supportato da questo browser"}
-            className="relative grid h-40 w-40 shrink-0 place-items-center rounded-full transition active:scale-95 disabled:opacity-70"
+            title={voiceSupported ? (listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare") : "Il microfono non è supportato da questo browser"}
+            className="relative grid place-items-center rounded-full transition active:scale-95 disabled:opacity-70"
           >
-            <span className="xn-ring absolute h-28 w-28 rounded-full" data-s={state} style={{ border: "2px solid var(--focus)" }} />
-            <span className="xn-ring xn-ring-2 absolute h-28 w-28 rounded-full" data-s={state} style={{ border: "2px solid var(--focus)" }} />
-            <span className="xn-glow absolute h-28 w-28 rounded-full" data-s={state} style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--focus) 42%, transparent), transparent 70%)" }} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/xenora-mark.png" alt="Xenora" draggable={false} className="xn-fly relative z-10 h-20 w-20 select-none object-contain" data-s={state} />
-            <span className="absolute bottom-1 right-1 z-20 grid h-8 w-8 place-items-center rounded-full text-white shadow-md" style={{ backgroundColor: listening ? "var(--err)" : "var(--focus)" }}>
+            <AssistantCore state={state} size={172} />
+            <span className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full text-white shadow-md" style={{ backgroundColor: listening ? "var(--err)" : "var(--focus)" }}>
               <Icon name="chat" size={15} />
             </span>
           </button>
-
-          {/* Testo briefing */}
-          <div className="min-w-0 flex-1 text-center sm:text-left">
+          <div className="max-w-xl">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">Briefing del giorno</div>
-            <p className="mt-1 text-lg font-semibold text-txt">{briefing}</p>
-            <div className="mt-2 flex flex-wrap justify-center gap-1.5 sm:justify-start">
-              {briefChips.map((c) => (
-                <span key={c.l} className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${c.tone} 15%, transparent)`, color: c.tone }}>{c.n >= 0 ? `${c.n} ` : ""}{c.l}</span>
-              ))}
-            </div>
-            <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
-              <button onClick={() => speak(briefing)} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash"><Icon name="chat" size={14} /> Ascolta il briefing</button>
-              <button onClick={toggleVoice} title="Attiva/disattiva la voce nelle risposte" className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${voiceOn ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}>{voiceOn ? "🔊 Voce attiva" : "🔇 Voce spenta"}</button>
-            </div>
+            <p className="mt-1 text-xl font-semibold text-txt">{briefing}</p>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button onClick={() => speak(briefing)} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash"><Icon name="chat" size={14} /> Ascolta il briefing</button>
+            <button onClick={toggleVoice} title="Attiva/disattiva la voce nelle risposte" className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${voiceOn ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}>{voiceOn ? "🔊 Voce attiva" : "🔇 Voce spenta"}</button>
           </div>
         </div>
       </Card>
+
+      {/* Briefing distribuito: una tessera per numero */}
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {tiles.map((tl) => (
+          <button key={tl.label} onClick={() => { setQ(tl.label); ask(tl.q); }} className="rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition hover:shadow-md">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{tl.label}</div>
+            <div className="mt-1 font-mono text-2xl font-bold" style={{ color: tl.tone }}>{tl.value}</div>
+          </button>
+        ))}
+      </div>
 
       {/* Input + chips */}
       <Card className="mb-4">
