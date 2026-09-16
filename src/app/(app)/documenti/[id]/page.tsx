@@ -164,6 +164,14 @@ export default function DocumentoPage() {
   const refresh = () => act("status", async () => { const r = await invPost<{ message?: string }>("status", { documentId: id }); if (r.message) setMsg(r.message); });
   const downloadXml = () => act("xml", async () => { const r = await invPost<{ xml: string }>("xml", { documentId: id }); const b = new Blob([r.xml], { type: "application/xml" }); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${(doc?.number_label ?? id).replace(/[^\w-]/g, "_")}.xml`; a.click(); URL.revokeObjectURL(a.href); });
   const addPayment = async (amountCents: number, method: string) => { if (!supabase || !user || amountCents <= 0) return; await act("pay", async () => { await supabase!.from("document_payments").insert({ document_id: id, tenant_id: user.id, amount_cents: amountCents, method }); }); };
+  const deleteDraft = async () => {
+    if (!supabase || !doc || doc.stato !== "bozza") return;
+    if (!confirm("Eliminare questa bozza? L'operazione non è reversibile.")) return;
+    setBusy("del"); setMsg("");
+    const { error } = await supabase.from("documents").delete().eq("id", id);
+    if (error) { setMsg("Errore: " + error.message); setBusy(""); return; }
+    router.push("/documenti");
+  };
 
   const printPdf = async () => {
     if (!doc) return;
@@ -343,6 +351,7 @@ export default function DocumentoPage() {
           <button onClick={onSave} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "save" ? "Salvo…" : "Salva bozza"}</button>
           <button onClick={onIssue} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "issue" ? "Emissione…" : "Emetti"}</button>
           {f.send_sdi && f.doc_kind !== "ricevuta_non_fiscale" && <button onClick={onSaveSend} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "savesend" ? "…" : "Salva e invia"}</button>}
+          <button onClick={deleteDraft} disabled={!!busy} className="rounded-lg px-3 py-2 text-sm font-medium text-faint hover:text-[color:var(--err)] disabled:opacity-50">{busy === "del" ? "Elimino…" : "Elimina bozza"}</button>
         </>}
         {doc.stato === "emessa" && doc.send_sdi && <button onClick={send} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "send" ? "Invio…" : "Invia allo SdI"}</button>}
         {doc.stato === "inviata_intermediario" && <button onClick={refresh} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "status" ? "Controllo…" : "Aggiorna esito"}</button>}

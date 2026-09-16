@@ -12,6 +12,7 @@ import { nights, parseISO, shiftISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { buildFatturaPA } from "@/lib/fatturapa";
 import { invPost } from "@/lib/invoicing/client";
+import AdempimentiPanel from "@/components/booking/AdempimentiPanel";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useAccess } from "@/lib/access";
@@ -625,6 +626,10 @@ export default function BookingDrawer() {
             <img src={booking.signature} alt={t("Firma")} className="h-16 rounded-lg border border-line bg-white p-1" />
           </div>
         )}
+      </Section>
+
+      <Section title={t("Adempimenti")}>
+        <AdempimentiPanel booking={booking} />
       </Section>
 
       <Section title={t("Documenti")}>
