@@ -18,8 +18,8 @@ export default function StrutturePage() {
   const owned = structures.filter((x) => !x.orgId);
   const shared = structures.filter((x) => !!x.orgId);
   const groups = [
-    { key: "own", title: t("Di mia proprietà"), desc: t("Strutture che gestisci solo tu."), list: owned, empty: t("Nessuna struttura di tua proprietà.") },
-    { key: "shared", title: t("Condivise"), desc: t("Strutture in comune con un socio: le vedete e modificate entrambi."), list: shared, empty: t("Nessuna struttura condivisa. Per condividerne una, apri la scheda della struttura e invita il socio.") },
+    { key: "own", title: t("Di mia proprietà"), desc: "", list: owned, empty: t("Nessuna struttura di tua proprietà.") },
+    { key: "shared", title: t("Condivise"), desc: "", list: shared, empty: t("Nessuna struttura condivisa. Per condividerne una, apri la scheda della struttura e invita il socio.") },
   ];
 
   const renderTable = (list: typeof structures) => (
@@ -53,7 +53,6 @@ export default function StrutturePage() {
                         <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-xs font-bold text-white" style={{ backgroundColor: color }}>{s.logo ? <img src={s.logo} alt="" className="h-full w-full object-cover" /> : s.name.slice(0, 2).toUpperCase()}</div>
                         <div>
                           <div className="font-medium text-txt">{s.name}</div>
-                          {s.orgId && <div className="text-[11px] text-dim">⇄ {t("in comune con il socio")}</div>}
                         </div>
                       </div>
                     </td>
@@ -95,7 +94,7 @@ export default function StrutturePage() {
           <div className="mb-2 flex items-end justify-between gap-3">
             <div>
               <h2 className="text-[15px] font-bold tracking-tight text-txt">{g.title} <span className="font-normal text-faint">· {g.list.length}</span></h2>
-              <p className="text-xs text-dim">{g.desc}</p>
+              {g.desc && <p className="text-xs text-dim">{g.desc}</p>}
             </div>
           </div>
           {g.list.length === 0 ? (
