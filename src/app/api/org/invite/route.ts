@@ -40,6 +40,14 @@ export async function POST(req: Request) {
     if (whoErr || !caller?.id) return NextResponse.json({ error: "unauthorized", message: "Sessione non valida, esci e rientra." }, { status: 401 });
     if (caller.email && caller.email.toLowerCase() === email) return NextResponse.json({ error: "self_invite" }, { status: 400 });
 
+    // REGOLA DI SICUREZZA: si può invitare SOLO un'email già registrata su Xenora.
+    // Così non si invita per errore un indirizzo sbagliato/non registrato (che, registrandosi
+    // dopo, potrebbe entrare nella struttura). Il socio deve prima creare l'account con quell'email.
+    const { data: prof } = await admin.from("profiles").select("user_id").ilike("email", email).maybeSingle();
+    if (!prof?.user_id) {
+      return NextResponse.json({ error: "email_not_registered", message: `L'email ${email} non è registrata su Xenora. Il socio deve prima creare un account con questa email, poi potrai invitarlo.` }, { status: 400 });
+    }
+
     // Carica lo stato del chiamante e trova la struttura.
     const { data: row } = await admin.from("app_state").select("data, rev").eq("user_id", caller.id).maybeSingle();
     const blob = ((row?.data ?? {}) as Record<string, string>) || {};
