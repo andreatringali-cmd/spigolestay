@@ -215,6 +215,10 @@ export default function AssistentePage() {
       {/* Briefing del giorno: card chiara con il core astratto */}
       <Card className="mb-4 overflow-hidden">
         <div className="flex flex-col items-center gap-3 py-1 text-center">
+          <div className="max-w-xl">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">Briefing del giorno</div>
+            <p className="mt-1 text-xl font-semibold text-txt">{briefing}</p>
+          </div>
           <button
             onClick={toggleListening}
             disabled={!voiceSupported}
@@ -226,10 +230,6 @@ export default function AssistentePage() {
               <Icon name="chat" size={15} />
             </span>
           </button>
-          <div className="max-w-xl">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">Briefing del giorno</div>
-            <p className="mt-1 text-xl font-semibold text-txt">{briefing}</p>
-          </div>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <button onClick={() => speak(briefing)} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash"><Icon name="chat" size={14} /> Ascolta il briefing</button>
             <button onClick={toggleVoice} title="Attiva/disattiva la voce nelle risposte" className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${voiceOn ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}>{voiceOn ? "🔊 Voce attiva" : "🔇 Voce spenta"}</button>
