@@ -62,6 +62,15 @@ export default function OspiteSchedaPage() {
   const setLocalPhoneVal = (v: string) => { setLocalPhone(v); set("phone", combinePhone(dial, v)); };
   // All'apertura normalizza un numero già salvato senza prefisso (così il link WhatsApp funziona).
   useEffect(() => { const p = parsePhone(existing?.phone); const c = combinePhone(p.dial, p.local); if (c && c !== existing?.phone) set("phone", c); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  // Se i dati arrivano DOPO il primo render (store non ancora idratato), la scheda partiva vuota.
+  // Quando l'ospite compare (o si cambia ospite), ricarico il form dai suoi dati — senza sovrascrivere
+  // le modifiche in corso sullo stesso ospite (g.id === existing.id).
+  useEffect(() => {
+    if (isNew || !existing || g.id === existing.id) return;
+    setG(existing);
+    const p = parsePhone(existing.phone); setDial(p.dial); setLocalPhone(p.local);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existing?.id, isNew]);
   const toggleTag = (t: string) => setG((p) => { const cur = p.tags ?? []; return { ...p, tags: cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t] }; });
 
   const list = existing ? bookings.filter((b) => b.guestId === existing.id).sort((a, b) => (a.checkIn < b.checkIn ? 1 : -1)) : [];
@@ -111,6 +120,18 @@ export default function OspiteSchedaPage() {
     deleteGuest(params.id);
     router.push("/ospiti");
   };
+
+  // Ospite inesistente (id non valido, dati già caricati): mostra un messaggio invece di un form vuoto.
+  if (!isNew && !existing && guests.length > 0) {
+    return (
+      <div>
+        <PageHeader title={t("Scheda ospite")} subtitle={t("Ospite non trovato")} />
+        <Card><p className="text-sm text-dim">{t("Questo ospite non esiste più o il link non è valido.")}</p>
+          <button onClick={() => router.push("/ospiti")} className="mt-3 rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash">← {t("Torna agli ospiti")}</button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div>

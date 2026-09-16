@@ -54,10 +54,12 @@ export default function CamerePage() {
   const typeMatchQ = (rt: { name: string }) => !q || rt.name.toLowerCase().includes(q);
   const unitMatchQ = (u: Unit) => !q || (u.name || "").toLowerCase().includes(q) || (u.code || "").toLowerCase().includes(q);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const COLLAPSE_KEY = "spigolestay:camere:collapsed:v1";
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  useEffect(() => { try { const r = localStorage.getItem(COLLAPSE_KEY); if (r) setCollapsed(new Set(JSON.parse(r))); } catch {} }, []);
-  const toggleCollapse = (id: string) => setCollapsed((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...n])); } catch {} return n; });
+  // Tendine delle camere: di default CHIUSE. Salviamo le tipologie APERTE, cosi un elenco
+  // vuoto (primo accesso o nuova tipologia) significa chiusa.
+  const OPEN_KEY = "spigolestay:camere:aperte:v2";
+  const [opened, setOpened] = useState<Set<string>>(new Set());
+  useEffect(() => { try { const r = localStorage.getItem(OPEN_KEY); if (r) setOpened(new Set(JSON.parse(r))); } catch {} }, []);
+  const toggleOpen = (id: string) => setOpened((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); try { localStorage.setItem(OPEN_KEY, JSON.stringify([...n])); } catch {} return n; });
   // Selezione multipla camere (modifica in blocco)
   const [sel, setSel] = useState<Set<string>>(new Set());
   const toggleSel = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -264,11 +266,11 @@ export default function CamerePage() {
                     const g = sortUnits(sUnits.filter((u) => u.roomTypeId === rt.id && (typeMatchQ(rt) || unitMatchQ(u))), types);
                     if (!g.length) return null;
                     const color = typeColor(rt, i);
-                    const open = !collapsed.has(rt.id);
+                    const open = !!search.trim() || opened.has(rt.id); // cercando, apriamo i gruppi che corrispondono
                     return (
                       <div key={rt.id} className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
                         <div className={`flex items-center justify-between gap-2 px-3 py-2.5 ${open ? "border-b border-line" : ""}`} style={{ borderLeft: `4px solid ${color}` }}>
-                          <button onClick={() => toggleCollapse(rt.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left" title={open ? t("Comprimi") : t("Espandi")}>
+                          <button onClick={() => toggleOpen(rt.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left" title={open ? t("Comprimi") : t("Espandi")}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-faint transition-transform" style={{ transform: open ? "rotate(90deg)" : "none" }}><polyline points="9 18 15 12 9 6" /></svg>
                             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
                             <span className="truncate font-display text-base font-bold text-txt">{rt.name}</span>
