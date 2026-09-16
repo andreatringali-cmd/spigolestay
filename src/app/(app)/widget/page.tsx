@@ -70,7 +70,7 @@ const WKEY = "spigolestay:widgets:v1";
 export default function WidgetPage() {
   const { t } = useLang();
   const ask = useConfirm();
-  const { structures, roomTypes, units, addGuest, addBooking } = useData();
+  const { structures, roomTypes, units, addGuest, addBooking, activeStructureId } = useData();
 
   const [widgets, setWidgets] = useState<Cfg[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -94,7 +94,11 @@ export default function WidgetPage() {
   const c = widgets.find((w) => w.id === editingId) ?? null;
   const set = <K extends keyof Cfg>(k: K, v: Cfg[K]) => { if (!c) return; setWidgets((prev) => prev.map((w) => (w.id === c.id ? { ...w, [k]: v } : w))); };
 
-  const createWidget = () => { const w = makeCfg(structures[0]?.id ?? "", `${structures[0]?.name ?? "Widget"} ${widgets.length + 1}`); setWidgets((p) => [...p, w]); setEditingId(w.id); };
+  // Lista filtrata per la struttura selezionata in alto ("Tutte" = tutti i widget).
+  const shownWidgets = activeStructureId === "all" ? widgets : widgets.filter((w) => w.structureId === activeStructureId);
+  const defStructId = activeStructureId !== "all" && structures.some((s) => s.id === activeStructureId) ? activeStructureId : (structures[0]?.id ?? "");
+  const defStructName = structures.find((s) => s.id === defStructId)?.name ?? "Widget";
+  const createWidget = () => { const w = makeCfg(defStructId, `${defStructName} ${widgets.length + 1}`); setWidgets((p) => [...p, w]); setEditingId(w.id); };
   const deleteWidget = (id: string) => setWidgets((p) => p.filter((w) => w.id !== id));
 
   // ── stato anteprima interattiva ──
@@ -136,8 +140,8 @@ export default function WidgetPage() {
         <PageHeader title={t("Widget sito")} subtitle={t("Crea uno o più widget di prenotazione per il tuo sito")}
           actions={<button onClick={createWidget} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ {t("Crea un nuovo widget")}</button>} />
         <Card>
-          {widgets.length === 0 ? (
-            <div className="py-10 text-center text-sm text-faint">{t("Nessun widget. Creane uno con “+ Crea un nuovo widget”.")}</div>
+          {shownWidgets.length === 0 ? (
+            <div className="py-10 text-center text-sm text-faint">{t("Nessun widget per questa struttura. Creane uno con “+ Crea un nuovo widget”.")}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[680px] text-sm">
@@ -145,7 +149,7 @@ export default function WidgetPage() {
                   <th className="py-2 pr-3 font-semibold">{t("Nome")}</th><th className="py-2 pr-3 font-semibold">{t("Struttura")}</th><th className="py-2 pr-3 font-semibold">{t("Tema")}</th><th className="py-2 pr-3 font-semibold">Layout</th><th className="py-2 pr-3 font-semibold">{t("Colore")}</th><th className="py-2 pr-3 font-semibold">Font</th><th className="py-2 pr-3 font-semibold">{t("Lingua")}</th><th className="py-2 text-right font-semibold"></th>
                 </tr></thead>
                 <tbody>
-                  {widgets.map((w) => (
+                  {shownWidgets.map((w) => (
                     <tr key={w.id} onClick={() => setEditingId(w.id)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                       <td className="py-2.5 pr-3 font-medium text-txt">{w.name || "—"}</td>
                       <td className="py-2.5 pr-3 text-dim">{structures.find((s) => s.id === w.structureId)?.name ?? "—"}</td>

@@ -76,6 +76,18 @@ export default function StrutturaSchedaPage() {
   };
   // Gestione condivisa: invita un socio a co-gestire questa struttura.
   const [socio, setSocio] = useState<{ email: string; loading?: boolean; ok?: boolean; msg?: string }>({ email: "" });
+  const [invites, setInvites] = useState<{ email: string; status: string; created_at: string; accepted_at?: string | null }[]>([]);
+  const loadInvites = async () => {
+    if (isNew || !supabase) return;
+    try {
+      const token = (await supabase.auth.getSession())?.data.session?.access_token;
+      if (!token) return;
+      const r = await fetch(`/api/org/invites?structureId=${encodeURIComponent(params.id as string)}`, { headers: { Authorization: `Bearer ${token}` } });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && Array.isArray(j.invites)) setInvites(j.invites);
+    } catch {}
+  };
+  useEffect(() => { loadInvites(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [params.id]);
   const inviteSocio = async () => {
     if (isNew) { setSocio((s) => ({ ...s, msg: t("Salva prima la struttura.") })); return; }
     const email = socio.email.trim();
@@ -89,6 +101,7 @@ export default function StrutturaSchedaPage() {
       if (r.ok && j?.ok) {
         if (j.orgId) { updateStructure(params.id as string, { orgId: j.orgId }); setF((p) => ({ ...p, orgId: j.orgId })); }
         setSocio({ email: "", ok: true, msg: j.emailSent ? t("Invito inviato via email a") + " " + email : t("Invito creato (email non inviata: verifica la configurazione)") });
+        loadInvites();
       } else {
         setSocio((s) => ({ ...s, loading: false, ok: false, msg: j?.error === "self_invite" ? t("Non puoi invitare te stesso") : (j?.message || t("Errore nell'invio dell'invito")) }));
       }
@@ -534,6 +547,24 @@ export default function StrutturaSchedaPage() {
                 </div>
               )}
               {socio.msg && <p className="mt-2 text-[11px]" style={{ color: socio.ok ? "var(--ok)" : "var(--err)" }}>{socio.msg}</p>}
+              {invites.length > 0 && (
+                <div className="mt-3 border-t border-line pt-3">
+                  <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Inviti")}</div>
+                  <div className="flex flex-col gap-1.5">
+                    {invites.map((iv, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 rounded-lg border border-line bg-paper px-3 py-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm text-txt">{iv.email}</div>
+                          <div className="text-[11px] text-faint">{new Date(iv.created_at).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}</div>
+                        </div>
+                        {iv.status === "accepted"
+                          ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)", color: "var(--ok)" }}>{t("Accettato")}</span>
+                          : <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 15%, transparent)", color: "var(--warn)" }}>{t("In attesa")}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </Card>
           )}
         </div>
