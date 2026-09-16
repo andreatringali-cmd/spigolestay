@@ -3,10 +3,11 @@
 // (RLS tenant_id = auth.uid()); la SCRITTURA fiscale passa dalle route server.
 import { supabase } from "@/lib/supabase";
 
-export async function invPost<T = Record<string, unknown>>(path: string, body: unknown): Promise<T> {
+// Poster generico verso una route /api/<path> con bearer token.
+export async function apiPost<T = Record<string, unknown>>(path: string, body: unknown): Promise<T> {
   const token = (await supabase?.auth.getSession())?.data.session?.access_token;
   if (!token) throw new Error("Devi essere connesso");
-  const r = await fetch(`/api/invoicing/${path}`, {
+  const r = await fetch(`/api/${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
@@ -15,6 +16,8 @@ export async function invPost<T = Record<string, unknown>>(path: string, body: u
   if (!r.ok || j.error) throw new Error(j.message || j.error || "Errore");
   return j as T;
 }
+
+export const invPost = <T = Record<string, unknown>>(path: string, body: unknown) => apiPost<T>(`invoicing/${path}`, body);
 
 export const centsEur = (c?: number | null) => (c ?? 0) / 100;
 

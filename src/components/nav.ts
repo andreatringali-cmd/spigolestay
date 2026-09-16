@@ -35,6 +35,8 @@ export const NAV: NavItem[] = [
 
   { label: "Ospiti", href: "/ospiti", group: "Anagrafiche", icon: "users", perm: "prenotazioni", module: "pms" },
   { label: "Alloggiati", href: "/alloggiati", group: "Anagrafiche", icon: "id", perm: "alloggiati", module: "pms" },
+  { label: "Alloggiati Web", href: "/alloggiati-web", group: "Anagrafiche", icon: "id", perm: "alloggiati", module: "pms" },
+  { label: "ISTAT · Turist@t", href: "/istat", group: "Anagrafiche", icon: "chart", perm: "alloggiati", module: "pms" },
   { label: "Tassa soggiorno", href: "/tassa-soggiorno", group: "Anagrafiche", icon: "receipt", perm: "tassa", module: "pms" },
 
   // Distribuzione: cosa vendi e a quali prezzi (catena del prezzo: base → piani → derivate).
