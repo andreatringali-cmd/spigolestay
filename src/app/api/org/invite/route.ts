@@ -31,13 +31,13 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const structureId = String(body?.structureId || "").trim();
     const email = String(body?.email || "").trim().toLowerCase();
-    if (!structureId) return NextResponse.json({ error: "missing_structure" }, { status: 400 });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "invalid_email" }, { status: 400 });
+    if (!structureId) return NextResponse.json({ error: "missing_structure", message: "Struttura mancante." }, { status: 400 });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "invalid_email", message: "Email non valida." }, { status: 400 });
 
     const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data: who, error: whoErr } = await admin.auth.getUser(token);
     const caller = who?.user;
-    if (whoErr || !caller?.id) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    if (whoErr || !caller?.id) return NextResponse.json({ error: "unauthorized", message: "Sessione non valida, esci e rientra." }, { status: 401 });
     if (caller.email && caller.email.toLowerCase() === email) return NextResponse.json({ error: "self_invite" }, { status: 400 });
 
     // Carica lo stato del chiamante e trova la struttura.
@@ -46,10 +46,22 @@ export async function POST(req: Request) {
     let d: J = {};
     try { d = JSON.parse(blob[DATA_KEY] || "{}") as J; } catch { d = {}; }
     const structures = arr(d.structures);
-    const S = structures.find((s) => s?.id === structureId) as J | undefined;
-    if (!S) return NextResponse.json({ error: "structure_not_found" }, { status: 404 });
+    let S = structures.find((s) => s?.id === structureId) as J | undefined;
+    let orgId = (S?.orgId as string) || "";
 
-    let orgId = (S.orgId as string) || "";
+    // Struttura NON nel personale: forse è già condivisa (in org_state). Trova l'org di cui il
+    // chiamante è membro che contiene questa struttura, così può invitare un altro socio.
+    if (!S) {
+      const { data: mships } = await admin.from("memberships").select("org_id").eq("user_id", caller.id);
+      for (const m of arr(mships)) {
+        const oid = m.org_id as string;
+        const { data: os } = await admin.from("org_state").select("data").eq("org_id", oid).maybeSingle();
+        let od: J = {}; try { od = JSON.parse(((os?.data ?? {}) as Record<string, string>)[DATA_KEY] || "{}") as J; } catch { od = {}; }
+        const found = arr(od.structures).find((s) => s?.id === structureId) as J | undefined;
+        if (found) { S = found; orgId = oid; break; }
+      }
+    }
+    if (!S) return NextResponse.json({ error: "structure_not_found", message: "Struttura non trovata nel tuo account. Ricarica la pagina e riprova." }, { status: 404 });
 
     // Prima condivisione: crea org + membership owner e migra la struttura in org_state.
     if (!orgId) {
