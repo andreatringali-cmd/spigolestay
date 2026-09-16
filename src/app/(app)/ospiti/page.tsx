@@ -65,7 +65,9 @@ export default function OspitiPage() {
       const topCh = Object.entries(chCount).sort((a, b) => b[1] - a[1])[0]?.[0] as Channel | undefined;
       return { guest: g, list, stays: list.length, nightsTot, spent, avg, comm, last, topCh };
     })
-    .filter((r) => activeStructureId === "all" || r.list.length > 0)
+    // Mostra: chi ha prenotazioni in questa struttura; con "Tutte" tutti; e SEMPRE
+    // i contatti senza prenotazioni (es. iscritti newsletter/lead), che non sono legati a una struttura.
+    .filter((r) => activeStructureId === "all" || r.list.length > 0 || !bookings.some((b) => b.guestId === r.guest.id && b.status !== "cancelled" && b.channel !== "blocked"))
     .filter((r) => !term || r.guest.fullName.toLowerCase().includes(term) || (r.guest.email ?? "").toLowerCase().includes(term) || (r.guest.country ?? "").toLowerCase().includes(term));
 
   const sorted = [...rows].sort((a, b) => {
@@ -149,7 +151,7 @@ export default function OspitiPage() {
               <input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: "var(--focus)" }} className="shrink-0" />
               <button onClick={() => router.push(`/ospiti/${guest.id}`)} className="min-w-0 flex-1 text-left">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="flex min-w-0 items-center gap-1.5 truncate font-semibold text-txt">{guest.fullName}{guest.vip && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}</span>
+                  <span className="flex min-w-0 items-center gap-1.5 truncate font-semibold text-txt">{guest.fullName}{guest.vip && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}{guest.tags?.includes("newsletter") && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>Newsletter</span>}</span>
                   <span className="shrink-0 font-mono font-semibold text-txt">{eur(spent)}</span>
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-dim">
@@ -192,7 +194,7 @@ export default function OspitiPage() {
               <tr key={guest.id} onClick={() => router.push(`/ospiti/${guest.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)]">
                 <td onClick={(e) => e.stopPropagation()} className="px-3 py-2"><input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} style={{ accentColor: "var(--focus)" }} /></td>
                 <td className="whitespace-nowrap px-3 py-2">
-                  <span className="flex items-center gap-1.5 font-medium text-txt">{guest.fullName}{guest.vip && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}</span>
+                  <span className="flex items-center gap-1.5 font-medium text-txt">{guest.fullName}{guest.vip && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}{guest.tags?.includes("newsletter") && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>Newsletter</span>}</span>
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-txt">{guest.phone ?? "—"}</td>
                 <td className="whitespace-nowrap px-3 py-2 text-txt">{guest.email ?? "—"}</td>
