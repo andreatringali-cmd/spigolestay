@@ -83,7 +83,15 @@ export function Site() {
   const nlValid = !!nl.email.trim() && !!nl.phone.trim() && (!!nl.firstName.trim() || !!nl.lastName.trim());
   const nlSubmit = () => {
     if (!nlValid) return;
-    addGuest({ firstName: nl.firstName.trim() || undefined, lastName: nl.lastName.trim() || undefined, email: nl.email.trim() || undefined, phone: nl.phone.trim() || undefined });
+    if (isPublicMode() && publicSlug()) {
+      // Sito pubblico: il contatto va salvato tra gli ospiti del proprietario (server).
+      fetch("/api/public-lead", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ slug: publicSlug(), guest: { firstName: nl.firstName.trim(), lastName: nl.lastName.trim(), email: nl.email.trim(), phone: nl.phone.trim() } }),
+      }).catch(() => {});
+    } else {
+      addGuest({ firstName: nl.firstName.trim() || undefined, lastName: nl.lastName.trim() || undefined, email: nl.email.trim() || undefined, phone: nl.phone.trim() || undefined });
+    }
     setNlDone(true); setNl({ firstName: "", lastName: "", email: "", phone: "" });
   };
   const cfg = useMemo<Cfg>(() => { try { const r = lsGet("spigolestay:sito"); if (r) return { ...DEFCFG, ...JSON.parse(r) }; } catch {} return DEFCFG; }, []);
@@ -219,7 +227,6 @@ export function Site() {
           <div className="ml-auto flex items-center gap-3 text-xs text-dim">
             {weather && <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-1 font-medium" title={`Meteo ${structure?.city ?? "Siracusa"}`}>{wIcon(weather.code)} {weather.temp}° · {structure?.city ?? "Siracusa"}</span>}
             <select value={lang} onChange={(e) => setLangP(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs" title="Lingua / Language">{SITE_LANGS.map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select>
-            {structures.length > 1 && <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs">{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>}
           </div>
         </div>
       </div>
