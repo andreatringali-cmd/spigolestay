@@ -305,7 +305,7 @@ export default function WidgetPage() {
         </div>
 
         {/* Anteprima live (in scala reale del layout) */}
-        <div className="lg:sticky lg:top-20 lg:self-start">
+        <Card className="lg:sticky lg:top-20 lg:self-start">
           <SectionTitle>{t("Anteprima widget")} · {t(LAYOUT_LABEL(c.layout))}</SectionTitle>
           <div ref={previewWrapRef}>
           <div style={{ zoom: previewScale }}>
@@ -366,7 +366,7 @@ export default function WidgetPage() {
           </div>
           </div>
           <p className="mt-2 text-center text-xs text-faint">{t("Anteprima reale: “Prenota ora” crea la prenotazione nel calendario.")}</p>
-        </div>
+        </Card>
       </div>
     </div>
   );
