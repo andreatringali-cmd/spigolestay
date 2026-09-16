@@ -433,39 +433,32 @@ export function Site() {
           <button onClick={() => go()} className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>Verifica disponibilità</button>
         </div>
 
-        {/* Recensioni Google (banner sempre visibile se c'è il link) */}
-        {cfg.googleUrl && (
-          <section className="mt-10">
-            <a href={cfg.googleUrl} target="_blank" rel="noreferrer" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-5 transition hover:shadow-md">
-              <div className="flex items-center gap-3">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-line bg-white">
-                  <svg width="22" height="22" viewBox="0 0 48 48"><path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-2.8-.4-4H24v7.3h12.1c-.2 1.9-1.6 4.8-4.5 6.7l-.1.3 6.5 5 .4.1c4.2-3.8 6.2-9.5 6.2-15.4Z"/><path fill="#34A853" d="M24 46c5.9 0 10.9-1.9 14.5-5.3l-6.9-5.4c-1.9 1.3-4.4 2.2-7.6 2.2-5.8 0-10.7-3.8-12.5-9.1l-.3.1-6.7 5.2-.1.3C7.5 41 15.1 46 24 46Z"/><path fill="#FBBC05" d="M11.5 28.4c-.5-1.4-.7-2.9-.7-4.4 0-1.5.3-3 .7-4.4v-.3l-6.8-5.3-.2.1A22.3 22.3 0 0 0 2 24c0 3.6.9 7 2.4 10l7.1-5.6Z"/><path fill="#EA4335" d="M24 10.5c4.1 0 6.9 1.8 8.5 3.3l6.2-6C34.9 4.3 29.9 2 24 2 15.1 2 7.5 7 4.4 14l7.1 5.6C13.3 14.3 18.2 10.5 24 10.5Z"/></svg>
-                </span>
-                <div>
-                  <div className="font-display text-lg font-bold text-txt">{T("Dicono di noi")}</div>
-                  <div className="text-sm text-dim">★★★★★ · {T("Leggi le recensioni su Google")}</div>
-                </div>
-              </div>
-              <span className="rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{ backgroundColor: accent }}>{T("Leggi le recensioni su Google")} ↗</span>
-            </a>
-          </section>
-        )}
-
-        {/* Recensioni interne (dagli ospiti) */}
-        {cfg.recensioni && reviews.length > 0 && (
+        {/* Recensioni: UNA sola sezione "Dicono di noi" — recensioni degli ospiti
+            con, se presente, il pulsante per leggere quelle su Google. */}
+        {cfg.recensioni && (reviews.length > 0 || cfg.googleUrl) && (
           <section className="mt-10">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-display text-xl font-bold text-txt">{T("Dicono di noi")} <span className="ml-1 text-sm font-normal text-dim">★ {reviewsAvg.toFixed(1)}/10 · {reviews.length} {T("recensioni")}</span></h2>
+              <h2 className="font-display text-xl font-bold text-txt">{T("Dicono di noi")}{reviews.length > 0 && <span className="ml-1 text-sm font-normal text-dim">★ {reviewsAvg.toFixed(1)}/10 · {reviews.length} {T("recensioni")}</span>}</h2>
+              {cfg.googleUrl && (
+                <a href={cfg.googleUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-txt transition hover:shadow-sm">
+                  <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-2.8-.4-4H24v7.3h12.1c-.2 1.9-1.6 4.8-4.5 6.7l-.1.3 6.5 5 .4.1c4.2-3.8 6.2-9.5 6.2-15.4Z"/><path fill="#34A853" d="M24 46c5.9 0 10.9-1.9 14.5-5.3l-6.9-5.4c-1.9 1.3-4.4 2.2-7.6 2.2-5.8 0-10.7-3.8-12.5-9.1l-.3.1-6.7 5.2-.1.3C7.5 41 15.1 46 24 46Z"/><path fill="#FBBC05" d="M11.5 28.4c-.5-1.4-.7-2.9-.7-4.4 0-1.5.3-3 .7-4.4v-.3l-6.8-5.3-.2.1A22.3 22.3 0 0 0 2 24c0 3.6.9 7 2.4 10l7.1-5.6Z"/><path fill="#EA4335" d="M24 10.5c4.1 0 6.9 1.8 8.5 3.3l6.2-6C34.9 4.3 29.9 2 24 2 15.1 2 7.5 7 4.4 14l7.1 5.6C13.3 14.3 18.2 10.5 24 10.5Z"/></svg>
+                  {T("Leggi le recensioni su Google")} ↗
+                </a>
+              )}
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {reviews.map((r) => (
-                <div key={r.id} className="rounded-xl border border-line bg-surface p-4">
-                  <div className="text-sm" style={{ color: "#E0A21C" }}>{"★".repeat(Math.round(r.rating / 2))}</div>
-                  <p className="mt-1 text-sm text-txt">“{r.text}”</p>
-                  <div className="mt-2 text-xs text-faint">— {r.name}</div>
-                </div>
-              ))}
-            </div>
+            {reviews.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-3">
+                {reviews.map((r) => (
+                  <div key={r.id} className="rounded-xl border border-line bg-surface p-4">
+                    <div className="text-sm" style={{ color: "#E0A21C" }}>{"★".repeat(Math.round(r.rating / 2))}</div>
+                    <p className="mt-1 text-sm text-txt">“{r.text}”</p>
+                    <div className="mt-2 text-xs text-faint">— {r.name}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-dim">{T("Leggi le recensioni su Google")}.</p>
+            )}
           </section>
         )}
 
