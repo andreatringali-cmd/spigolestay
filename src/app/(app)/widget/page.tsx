@@ -6,6 +6,7 @@ import { eur } from "@/lib/format";
 import { nights, toISO, shiftISO } from "@/lib/dates";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 const ACCENTS = ["#4F46E5", "#0E7C66", "#B4531F", "#B3453A", "#0891B2", "#DB2777"];
 const FONTS: [string, string][] = [
@@ -68,6 +69,7 @@ const WKEY = "spigolestay:widgets:v1";
 
 export default function WidgetPage() {
   const { t } = useLang();
+  const ask = useConfirm();
   const { structures, roomTypes, units, addGuest, addBooking } = useData();
 
   const [widgets, setWidgets] = useState<Cfg[]>([]);
@@ -192,7 +194,7 @@ export default function WidgetPage() {
   return (
     <div>
       <PageHeader title={c.name || t("Widget")} subtitle={t("Configura il widget; le prenotazioni entrano dirette nel calendario")}
-        actions={<div className="flex items-center gap-2"><button onClick={() => setEditingId(null)} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← {t("Torna alla lista")}</button><button onClick={() => { if (c && confirm(t("Eliminare questo widget?"))) { deleteWidget(c.id); setEditingId(null); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button><button onClick={() => setEditingId(null)} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Salva")}</button></div>} />
+        actions={<div className="flex items-center gap-2"><button onClick={() => setEditingId(null)} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← {t("Torna alla lista")}</button><button onClick={async () => { if (c && await ask({ title: t("Elimina widget"), message: `${t("Eliminare")} "${c.name || t("Widget")}"?`, danger: true, confirmLabel: t("Elimina") })) { deleteWidget(c.id); setEditingId(null); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button><button onClick={() => setEditingId(null)} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Salva")}</button></div>} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
