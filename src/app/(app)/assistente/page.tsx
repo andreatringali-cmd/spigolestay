@@ -204,30 +204,30 @@ export default function AssistentePage() {
     <div>
       <PageHeader title="Assistente Xenora" subtitle="Chiedi a voce o scrivi — rispondo con i tuoi numeri" />
 
-      {/* Hero: core astratto pulsante al centro + saluto */}
-      <Card className="mb-4 overflow-hidden">
-        <div className="flex flex-col items-center gap-3 py-2 text-center">
+      {/* Hero "cockpit": pannello scuro con il core astratto che brilla */}
+      <div className="mb-4 overflow-hidden rounded-2xl p-6 shadow-sm" style={{ background: "radial-gradient(130% 130% at 50% 0%, #1a2540 0%, #0b1120 72%)" }}>
+        <div className="flex flex-col items-center gap-3 text-center">
           <button
             onClick={toggleListening}
             disabled={!voiceSupported}
             title={voiceSupported ? (listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare") : "Il microfono non è supportato da questo browser"}
             className="relative grid place-items-center rounded-full transition active:scale-95 disabled:opacity-70"
           >
-            <AssistantCore state={state} size={172} />
+            <AssistantCore state={state} size={184} />
             <span className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full text-white shadow-md" style={{ backgroundColor: listening ? "var(--err)" : "var(--focus)" }}>
               <Icon name="chat" size={15} />
             </span>
           </button>
           <div className="max-w-xl">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">Briefing del giorno</div>
-            <p className="mt-1 text-xl font-semibold text-txt">{briefing}</p>
+            <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "rgba(255,255,255,.5)" }}>Briefing del giorno</div>
+            <p className="mt-1 text-xl font-semibold" style={{ color: "#fff" }}>{briefing}</p>
           </div>
           <div className="flex flex-wrap justify-center gap-2">
-            <button onClick={() => speak(briefing)} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash"><Icon name="chat" size={14} /> Ascolta il briefing</button>
-            <button onClick={toggleVoice} title="Attiva/disattiva la voce nelle risposte" className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${voiceOn ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}>{voiceOn ? "🔊 Voce attiva" : "🔇 Voce spenta"}</button>
+            <button onClick={() => speak(briefing)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10" style={{ borderColor: "rgba(255,255,255,.25)" }}><Icon name="chat" size={14} /> Ascolta il briefing</button>
+            <button onClick={toggleVoice} title="Attiva/disattiva la voce nelle risposte" className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10" style={{ borderColor: voiceOn ? "var(--focus)" : "rgba(255,255,255,.25)" }}>{voiceOn ? "🔊 Voce attiva" : "🔇 Voce spenta"}</button>
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* Briefing distribuito: una tessera per numero */}
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
