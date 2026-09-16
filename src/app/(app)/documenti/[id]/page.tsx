@@ -30,7 +30,7 @@ export default function DocumentoPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
-  const { structures, bookings, getGuest, getStructure, getRoomType } = useData();
+  const { structures, activeStructureId, bookings, getGuest, getStructure, getRoomType } = useData();
   const id = String(params.id || "");
   const [doc, setDoc] = useState<Doc | null>(null);
   const [events, setEvents] = useState<Ev[]>([]);
@@ -76,6 +76,12 @@ export default function DocumentoPage() {
     setLoading(false);
   }, [id, hydrate]);
   useEffect(() => { load(); }, [load]);
+  // Se in alto è selezionata UNA struttura, il documento in bozza la eredita (menu nascosto).
+  useEffect(() => {
+    if (doc?.stato === "bozza" && activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId)) {
+      setStructureId((cur) => (cur === activeStructureId ? cur : activeStructureId));
+    }
+  }, [doc?.stato, activeStructureId, structures]);
 
   // Calcolo totali live dalle righe in editing.
   const totals = useMemo(() => {
@@ -246,7 +252,9 @@ export default function DocumentoPage() {
             </div>
           ) : (
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              <label className={lbl}>Struttura<select value={structureId} onChange={(e) => setStructureId(e.target.value)} className={inp}><option value="">— scegli —</option>{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+              {activeStructureId === "all"
+                ? <label className={lbl}>Struttura<select value={structureId} onChange={(e) => setStructureId(e.target.value)} className={inp}><option value="">— scegli —</option>{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+                : <div><span className={lbl}>Struttura</span><div className="mt-1 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-txt">{structures.find((x) => x.id === structureId)?.name ?? "—"}</div></div>}
               <div><span className={lbl}>Prenotazione <span className="text-faint">(facoltativa)</span></span>
                 <div className="mt-1 flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate rounded-lg border border-line bg-wash px-3 py-2 text-sm text-txt">{link.bookingCode ?? "nessuna"}</span>
