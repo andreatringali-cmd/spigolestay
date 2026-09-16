@@ -20,18 +20,21 @@ export default function AdempimentiPanel({ booking }: { booking: Booking }) {
   const [sched, setSched] = useState<{ stato: string }[]>([]);
   const [istat, setIstat] = useState<{ stato: string }[]>([]);
   const [docs, setDocs] = useState<{ stato: string; number_label: string | null }[]>([]);
+  const [timeline, setTimeline] = useState<{ id: string; ts: string; message: string }[]>([]);
 
   useEffect(() => {
     if (!supabase) return;
     (async () => {
-      const [a, i, d] = await Promise.all([
+      const [a, i, d, ev] = await Promise.all([
         supabase.from("alloggiati_schedine").select("stato").eq("booking_id", booking.id),
         supabase.from("istat_rows").select("stato").eq("booking_id", booking.id),
         supabase.from("documents").select("stato, number_label").eq("booking_id", booking.id).order("created_at", { ascending: false }),
+        supabase.from("booking_events").select("id, ts, message").eq("booking_id", booking.id).order("ts", { ascending: false }).limit(8),
       ]);
       setSched((a.data ?? []) as { stato: string }[]);
       setIstat((i.data ?? []) as { stato: string }[]);
       setDocs((d.data ?? []) as { stato: string; number_label: string | null }[]);
+      setTimeline((ev.data ?? []) as { id: string; ts: string; message: string }[]);
     })();
   }, [booking.id]);
 
@@ -75,6 +78,16 @@ export default function AdempimentiPanel({ booking }: { booking: Booking }) {
       <Row label="ISTAT · Turist@t" c={istatChip} onClick={() => router.push("/istat")} />
       <Row label="Documenti fiscali" c={docChip} onClick={() => router.push("/documenti")} />
       <Row label="Pagamenti" c={payChip} />
+      {timeline.length > 0 && (
+        <div className="mt-2 border-t border-line pt-2">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-faint">Attività</div>
+          <div className="flex flex-col gap-1">
+            {timeline.map((e) => (
+              <div key={e.id} className="flex gap-2 text-[12px]"><span className="w-16 shrink-0 text-faint">{new Date(e.ts).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })}</span><span className="text-dim">{e.message}</span></div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

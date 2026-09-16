@@ -10,7 +10,6 @@ import { buildGuestLink, buildGroupGuestLink, guideMessage, shortenGuideLink, sh
 import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
 import { nights, parseISO, shiftISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
-import { buildFatturaPA } from "@/lib/fatturapa";
 import { invPost } from "@/lib/invoicing/client";
 import AdempimentiPanel from "@/components/booking/AdempimentiPanel";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -230,16 +229,6 @@ export default function BookingDrawer() {
 
   // Fattura elettronica FatturaPA (XML SdI) — genera e scarica il file.
   const nextProgressivo = () => { try { const key = "spigolestay:sdiprog"; const n = (JSON.parse(localStorage.getItem(key) || "0") || 0) + 1; localStorage.setItem(key, JSON.stringify(n)); return String(n).padStart(5, "0"); } catch { return "00001"; } };
-  const exportFatturaXml = () => {
-    const no = booking.invoiceNo ?? nextInvoiceNo();
-    if (!booking.invoiceNo) updateBooking(booking.id, { invoiceNo: no });
-    const { xml, filename, warnings } = buildFatturaPA(booking, structure, guest, { accommodation: accV, cleaning: cleanV, cityTax: taxV }, no, nextProgressivo());
-    const blob = new Blob([xml], { type: "application/xml" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    if (warnings.length) window.setTimeout(() => alert(t("Fattura elettronica generata come BOZZA.") + "\n\n" + warnings.join("\n") + "\n\n" + t("Completa i dati fiscali nella scheda struttura per un file pronto all'invio allo SdI.")), 100);
-  };
   const printInvoice = () => {
     const w = window.open("", "_blank", "width=820,height=940");
     if (!w) return;
@@ -645,10 +634,6 @@ export default function BookingDrawer() {
         <button onClick={printInvoice} className="flex w-full items-center justify-between rounded-lg border border-line bg-paper px-3 py-2.5 text-sm font-medium text-txt hover:border-focus hover:bg-wash">
           <span>{t("Fattura")}{booking.invoiceNo ? ` n. ${booking.invoiceNo}` : ""}</span>
           <span className="text-xs text-dim">{t("PDF / Stampa")} →</span>
-        </button>
-        <button onClick={exportFatturaXml} className="flex w-full items-center justify-between rounded-lg border border-line bg-paper px-3 py-2.5 text-sm font-medium text-txt hover:border-focus hover:bg-wash">
-          <span>{t("Fattura elettronica")} <span className="text-[10px] font-bold uppercase text-focus">FatturaPA · SdI</span></span>
-          <span className="text-xs text-dim">{t("Scarica XML")} →</span>
         </button>
       </Section>
 

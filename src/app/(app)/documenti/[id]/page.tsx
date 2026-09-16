@@ -47,6 +47,7 @@ export default function DocumentoPage() {
   const [link, setLink] = useState<{ bookingId: string | null; bookingCode: string | null }>({ bookingId: null, bookingCode: null });
   const [bookingPicker, setBookingPicker] = useState(false);
   const [bq, setBq] = useState("");
+  const [vies, setVies] = useState<{ status?: string; msg?: string }>({});
 
   const hydrate = useCallback((d: Doc, dl: DbLine[]) => {
     setF({
@@ -169,6 +170,17 @@ export default function DocumentoPage() {
   const send = () => act("send", async () => { const r = await invPost<{ message?: string }>("send", { documentId: id }); if (r.message) setMsg(r.message); });
   const refresh = () => act("status", async () => { const r = await invPost<{ message?: string }>("status", { documentId: id }); if (r.message) setMsg(r.message); });
   const downloadXml = () => act("xml", async () => { const r = await invPost<{ xml: string }>("xml", { documentId: id }); const b = new Blob([r.xml], { type: "application/xml" }); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${(doc?.number_label ?? id).replace(/[^\w-]/g, "_")}.xml`; a.click(); URL.revokeObjectURL(a.href); });
+  const creditNote = () => act("nc", async () => { const r = await invPost<{ documentId: string }>("credit-note", { documentId: id }); router.push(`/documenti/${r.documentId}`); });
+  const verifyVies = async () => {
+    if (!cp.vat.trim()) return;
+    setVies({ status: "loading" });
+    try {
+      const r = await invPost<{ status: string; valid?: boolean; name?: string | null; address?: string | null; message?: string }>("vies", { vat: cp.vat });
+      if (r.valid) { setVies({ status: "valid", msg: r.name || "P.IVA valida" }); if (r.name && !cp.name) setCp((c) => ({ ...c, name: r.name as string })); }
+      else if (r.status === "invalid") setVies({ status: "invalid", msg: "P.IVA non valida" });
+      else setVies({ status: "unknown", msg: r.message || "Verifica non disponibile" });
+    } catch (e) { setVies({ status: "unknown", msg: e instanceof Error ? e.message : "Errore" }); }
+  };
   const addPayment = async (amountCents: number, method: string) => { if (!supabase || !user || amountCents <= 0) return; await act("pay", async () => { await supabase!.from("document_payments").insert({ document_id: id, tenant_id: user.id, amount_cents: amountCents, method }); }); };
   const deleteDraft = async () => {
     if (!supabase || !doc || doc.stato !== "bozza") return;
@@ -325,7 +337,7 @@ export default function DocumentoPage() {
               <label className={cp.kind === "privato" ? lbl : `${lbl} sm:col-span-2`}>{cp.kind === "societa" ? "Ragione sociale" : "Nome"}<input value={cp.name} onChange={(e) => setCp({ ...cp, name: e.target.value })} className={inp} /></label>
               {cp.kind === "privato" && <label className={lbl}>Cognome<input value={cp.lastName} onChange={(e) => setCp({ ...cp, lastName: e.target.value })} className={inp} /></label>}
               <label className={lbl}>Nazione<input value={cp.country} onChange={(e) => setCp({ ...cp, country: e.target.value })} className={inp} /></label>
-              {cp.kind !== "privato" && <label className={lbl}>Partita IVA<input value={cp.vat} onChange={(e) => setCp({ ...cp, vat: e.target.value })} className={inp} /></label>}
+              {cp.kind !== "privato" && <div><span className={lbl}>Partita IVA</span><div className="mt-1 flex gap-1"><input value={cp.vat} onChange={(e) => { setCp({ ...cp, vat: e.target.value }); setVies({}); }} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /><button type="button" onClick={verifyVies} className="shrink-0 rounded-lg border border-line px-2 text-xs font-semibold text-txt hover:bg-wash">VIES</button></div>{vies.status && vies.status !== "loading" && <span className="mt-0.5 block text-[11px] font-semibold" style={{ color: vies.status === "valid" ? "var(--ok)" : vies.status === "invalid" ? "var(--err)" : "var(--dim)" }}>{vies.status === "valid" ? "✓ " : vies.status === "invalid" ? "✕ " : ""}{vies.msg}</span>}{vies.status === "loading" && <span className="mt-0.5 block text-[11px] text-faint">Verifica…</span>}</div>}
               {cp.kind === "privato" && <label className={lbl}>Codice fiscale<input value={cp.tax_code} onChange={(e) => setCp({ ...cp, tax_code: e.target.value })} className={inp} /></label>}
               <label className={`${lbl} sm:col-span-2`}>Indirizzo<input value={cp.address} onChange={(e) => setCp({ ...cp, address: e.target.value })} className={inp} /></label>
               <label className={lbl}>Città<input value={cp.city} onChange={(e) => setCp({ ...cp, city: e.target.value })} className={inp} /></label>
@@ -365,6 +377,7 @@ export default function DocumentoPage() {
         {doc.stato === "inviata_intermediario" && <button onClick={refresh} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "status" ? "Controllo…" : "Aggiorna esito"}</button>}
         <button onClick={printPdf} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Stampa PDF</button>
         {doc.provider_ref && <button onClick={downloadXml} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "xml" ? "…" : "Scarica XML"}</button>}
+        {frozen && doc.doc_kind !== "nota_di_credito" && doc.stato !== "stornata" && <button onClick={creditNote} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-[color:var(--err)] hover:bg-wash disabled:opacity-50">{busy === "nc" ? "…" : "Nota di credito"}</button>}
         <span className="ml-auto text-[11px] text-faint">Regime: {doc.regime ?? "—"} · {doc.send_sdi ? "SDI attivo" : "no SDI"}</span>
       </div>
     </div>

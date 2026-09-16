@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Structure, Booking, Guest } from "@/lib/types";
 import { nights } from "@/lib/dates";
 import { getAlloggiatiProvider, type AlloggiatiCreds, type SchedinaPayload } from "./provider";
+import { logBookingEvent } from "@/lib/booking-events";
 
 const DATA_KEY = "spigolestay:data:v1";
 
@@ -126,6 +127,9 @@ export async function sendReady(admin: SupabaseClient, tenantId: string, structu
   await admin.from("alloggiati_submissions").update({ stato: res.ok ? "sent" : "error", esito: res.message, ricevuta: res.ricevuta ?? null, tentativi: 1 }).eq("id", sub!.id);
   if (res.ok) {
     await admin.from("alloggiati_schedine").update({ stato: "inviata", submission_id: sub!.id, ricevuta: res.ricevuta ?? null }).in("id", list.map((s) => s.id));
+    for (const bid of Array.from(new Set(list.map((s) => s.booking_id).filter(Boolean))) as string[]) {
+      await logBookingEvent(admin, tenantId, bid, "schedina", "Schedina Alloggiati inviata alla Questura");
+    }
   }
   return { ok: res.ok, message: res.message, sent: res.ok ? list.length : 0 };
 }

@@ -4,6 +4,7 @@
 // Turist@t...) è uno scheletro da completare con le credenziali del portale.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Structure, Booking, Guest } from "@/lib/types";
+import { logBookingEvent } from "@/lib/booking-events";
 
 const DATA_KEY = "spigolestay:data:v1";
 type Blob = { structures?: Structure[]; bookings?: Booking[]; guests?: Guest[] };
@@ -47,14 +48,18 @@ export async function syncIstat(admin: SupabaseClient, tenantId: string, opts: {
 export async function closeDay(admin: SupabaseClient, tenantId: string, structureId: string, day?: string): Promise<{ ok: boolean; message: string; sent: number }> {
   const { data: sett } = await admin.from("istat_settings").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).maybeSingle();
   const provider = "mock"; // TODO(istat): connettore regionale reale (Ross1000/Turist@t) via credenziali sett
-  let q = admin.from("istat_rows").select("id").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pending");
+  let q = admin.from("istat_rows").select("id, booking_id").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pending");
   if (day) q = q.eq("arrival", day);
   const { data: rows } = await q;
-  const ids = (rows ?? []).map((r) => r.id);
+  const list = (rows ?? []) as { id: string; booking_id: string | null }[];
+  const ids = list.map((r) => r.id);
   if (!ids.length) return { ok: false, message: "Nessuna riga da inviare.", sent: 0 };
   if (provider === "mock") {
     if (!sett?.username || !sett?.password_enc) return { ok: false, message: "Credenziali ISTAT mancanti.", sent: 0 };
     await admin.from("istat_rows").update({ stato: "sent", esito: "Inviato (mock)" }).in("id", ids);
+    for (const bid of Array.from(new Set(list.map((r) => r.booking_id).filter(Boolean))) as string[]) {
+      await logBookingEvent(admin, tenantId, bid, "istat", "Movimento ISTAT inviato");
+    }
     return { ok: true, message: `Movimento inviato: ${ids.length} righe (mock).`, sent: ids.length };
   }
   throw new Error("istat_provider_not_configured");

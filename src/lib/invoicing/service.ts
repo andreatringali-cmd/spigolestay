@@ -14,6 +14,7 @@ import {
   buildDocumentDraft, toCents, type FolioLine, type Regime, type DocKind,
 } from "./folio";
 import { getProvider, type EInvoicePayload } from "./provider";
+import { logBookingEvent } from "@/lib/booking-events";
 
 const DATA_KEY = "spigolestay:data:v1";
 
@@ -231,11 +232,38 @@ export async function createBlankDocument(admin: SupabaseClient, tenantId: strin
   return { documentId: doc.id as string, toPayCents: 0, totalCents: 0 };
 }
 
+// Crea una NOTA DI CREDITO in bozza che storna un documento emesso (copia righe/intestatario).
+export async function createCreditNote(admin: SupabaseClient, tenantId: string, sourceId: string): Promise<CreateResult> {
+  const { data: src } = await admin.from("documents").select("*").eq("id", sourceId).eq("tenant_id", tenantId).maybeSingle();
+  if (!src) throw new Error("document_not_found");
+  if (src.stato === "bozza") throw new Error("source_not_issued");
+  if (src.doc_kind === "nota_di_credito") throw new Error("already_credit_note");
+  const { data: srcLines } = await admin.from("document_lines").select("*").eq("document_id", sourceId).order("pos");
+  const { data: doc, error } = await admin.from("documents").insert({
+    tenant_id: tenantId, structure_id: src.structure_id, booking_id: src.booking_id, booking_code: src.booking_code,
+    doc_kind: "nota_di_credito", sdi_type: "TD04", regime: src.regime, serie: src.structure_id, stato: "bozza",
+    counterpart: src.counterpart, counterpart_id: src.counterpart_id, related_document_id: src.id,
+    payment_method: src.payment_method, vat_exigibility: src.vat_exigibility, send_sdi: src.send_sdi, provider: src.provider, currency: src.currency,
+    taxable_cents: src.taxable_cents, vat_cents: src.vat_cents, out_of_scope_cents: src.out_of_scope_cents, bollo_cents: 0, rounding_cents: 0, total_cents: src.total_cents, advance_cents: 0,
+    notes: `Storno documento ${src.number_label ?? ""}`,
+  }).select("id").single();
+  if (error || !doc) throw new Error(error?.message || "insert_failed");
+  const nid = doc.id as string;
+  if (srcLines?.length) {
+    await admin.from("document_lines").insert(srcLines.map((l, i) => ({
+      document_id: nid, tenant_id: tenantId, pos: i + 1, description: l.description, qty: l.qty, unit_price_cents: l.unit_price_cents,
+      vat_rate: l.vat_rate, vat_nature: l.vat_nature, line_total_cents: l.line_total_cents, source_kind: l.source_kind, booking_id: l.booking_id, folio_ref: l.folio_ref,
+    })));
+  }
+  await admin.from("document_events").insert({ tenant_id: tenantId, document_id: nid, kind: "created", message: `Nota di credito da ${src.number_label ?? "documento"}` });
+  return { documentId: nid, toPayCents: src.total_cents, totalCents: src.total_cents };
+}
+
 export interface IssueResult { number: number; numberLabel: string; serie: string; anno: number }
 
 // c) Emette il documento: numerazione atomica + congelamento (funzione DB).
 export async function issueDocument(admin: SupabaseClient, tenantId: string, documentId: string): Promise<IssueResult> {
-  const { data: doc, error } = await admin.from("documents").select("id, stato, tenant_id").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
+  const { data: doc, error } = await admin.from("documents").select("id, stato, tenant_id, booking_id, doc_kind").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!doc) throw new Error("document_not_found");
   if (doc.stato !== "bozza") throw new Error("already_issued");
@@ -244,6 +272,7 @@ export async function issueDocument(admin: SupabaseClient, tenantId: string, doc
   const { data, error: rpcErr } = await admin.rpc("fn_issue_document", { p_doc: documentId });
   if (rpcErr) throw new Error(rpcErr.message);
   const r = Array.isArray(data) ? data[0] : data;
+  await logBookingEvent(admin, tenantId, doc.booking_id, "documento", `${doc.doc_kind === "nota_di_credito" ? "Nota di credito" : "Documento"} emesso n. ${r.number_label}`);
   return { number: r.number, numberLabel: r.number_label, serie: r.serie, anno: r.anno };
 }
 
@@ -283,7 +312,7 @@ export interface SendOutcome { providerRef: string; stato: string; message?: str
 
 // Invia il documento emesso all'intermediario (SDI). Ricevuta non fiscale: nessun invio.
 export async function sendDocument(admin: SupabaseClient, tenantId: string, documentId: string): Promise<SendOutcome> {
-  const { data: doc } = await admin.from("documents").select("id, stato, doc_kind, send_sdi").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
+  const { data: doc } = await admin.from("documents").select("id, stato, doc_kind, send_sdi, booking_id").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
   if (!doc) throw new Error("document_not_found");
   if (doc.stato === "bozza") throw new Error("not_issued");
   if (!doc.send_sdi) return { providerRef: "", stato: doc.stato, skipped: true, message: "Documento non trasmesso allo SdI (ricevuta/impostazione)." };
@@ -295,6 +324,7 @@ export async function sendDocument(admin: SupabaseClient, tenantId: string, docu
 
   await admin.from("documents").update({ stato: "inviata_intermediario", provider: providerName, provider_ref: res.providerRef, sent_at: new Date().toISOString() }).eq("id", documentId);
   await admin.from("document_events").insert({ tenant_id: tenantId, document_id: documentId, kind: "sent", message: res.message || "Documento inviato all'intermediario", meta: { provider: providerName, ref: res.providerRef } });
+  await logBookingEvent(admin, tenantId, doc.booking_id, "documento", "Documento inviato allo SdI");
   return { providerRef: res.providerRef, stato: "inviata_intermediario", message: res.message };
 }
 
@@ -302,7 +332,7 @@ export interface StatusOutcome { stato: string; message: string; changed: boolea
 
 // e) Core del job di polling: legge l'esito dall'intermediario e aggiorna stato+timeline.
 export async function refreshDocumentStatus(admin: SupabaseClient, tenantId: string, documentId: string): Promise<StatusOutcome> {
-  const { data: doc } = await admin.from("documents").select("id, stato, provider, provider_ref").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
+  const { data: doc } = await admin.from("documents").select("id, stato, provider, provider_ref, booking_id").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
   if (!doc) throw new Error("document_not_found");
   if (!doc.provider_ref || doc.stato !== "inviata_intermediario") return { stato: doc?.stato, message: "Nessun aggiornamento", changed: false };
 
@@ -318,6 +348,7 @@ export async function refreshDocumentStatus(admin: SupabaseClient, tenantId: str
     kind: st.status === "scartata" ? "rejected" : "delivered",
     message: st.message, meta: { status: st.status },
   });
+  await logBookingEvent(admin, tenantId, doc.booking_id, "documento", st.status === "scartata" ? "Documento SCARTATO dallo SdI" : "Documento consegnato (SdI)");
   return { stato: st.status, message: st.message, changed: true };
 }
 
