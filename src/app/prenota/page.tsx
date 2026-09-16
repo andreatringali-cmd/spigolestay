@@ -207,11 +207,14 @@ function Engine() {
     w.document.close();
   };
 
+  // Link "Torna alla home": sul sito pubblico va all'indirizzo pulito /<slug>.
+  const homeHref = isPublicMode() && publicSlug() ? `/${publicSlug()}` : `/sito-web?s=${structureId}`;
+
   // ---- Header ----
   const header = (
     <div className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
-        <a href={`/sito-web?s=${structureId}`} className="flex items-center gap-2 rounded-lg transition hover:opacity-80" title="Torna alla home">
+        <a href={homeHref} className="flex items-center gap-2 rounded-lg transition hover:opacity-80" title="Torna alla home">
           <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : (structure?.name ?? "SS").slice(0, 2).toUpperCase()}</div>
           <div className="leading-tight"><div className="text-sm font-bold text-txt">{structure?.name ?? "Xenora"}</div><div className="text-[11px] text-faint">← Torna alla home</div></div>
         </a>
@@ -230,7 +233,7 @@ function Engine() {
     <footer className="mt-12 border-t border-line bg-surface">
       <div className="mx-auto max-w-7xl px-4 py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <a href={`/sito-web?s=${structureId}`} className="flex items-center gap-2 text-sm font-bold text-txt hover:opacity-80">
+          <a href={homeHref} className="flex items-center gap-2 text-sm font-bold text-txt hover:opacity-80">
             <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md text-xs font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : (structure?.name ?? "SS").slice(0, 2).toUpperCase()}</span>
             {structure?.name ?? "Xenora"}
           </a>
