@@ -50,15 +50,14 @@ export default function AssistentePage() {
   // Scelta della voce italiana più naturale disponibile (Google/cloud/neural), non quella robotica di default.
   useEffect(() => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
-    // Preferenza: voce MASCHILE italiana, meglio se naturale/cloud.
-    const MALE = /cosimo|diego|giorgio|luca|carlo|marco|paolo|giuseppe|antonio|male\b|maschile|uomo|man\b/;
-    const FEMALE = /elsa|alice|federica|chiara|bianca|isabella|giulia|carla|google italiano|female|femminile|donna|woman/;
+    // Priorità alla NATURALEZZA (voci cloud/Google/neural): quelle robotiche locali perdono.
+    // Il maschile è solo una preferenza a parità di qualità, non a scapito della naturalezza.
+    const MALE = /cosimo|diego|giorgio|luca|carlo|marco|paolo|giuseppe|antonio|maschile|uomo/;
     const score = (v: SpeechSynthesisVoice) => {
       const n = v.name.toLowerCase(); let s = 0;
-      if (MALE.test(n)) s += 10;
-      if (FEMALE.test(n)) s -= 6;
-      if (/natural|neural|premium|enhanced|wavenet|siri/.test(n)) s += 5;
-      if (v.localService === false) s += 3; // voce cloud = più realistica
+      if (v.localService === false) s += 8;                                   // cloud = naturale
+      if (/google|natural|neural|premium|enhanced|wavenet|siri/.test(n)) s += 8;
+      if (MALE.test(n)) s += 3;                                               // preferenza maschile (tiebreak)
       return s;
     };
     const pick = () => {
@@ -242,11 +241,24 @@ export default function AssistentePage() {
   }, [answer, speak]);
 
   // ── Voce in entrata ──
-  const startListening = () => {
+  const startListening = async () => {
     const SR = (window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: new () => unknown }).webkitSpeechRecognition;
     if (!SR) { setMicHint("Microfono non supportato da questo browser"); return; }
-    try { window.speechSynthesis?.cancel(); } catch {}
     setMicHint("");
+    // Richiesta ESPLICITA del permesso microfono: fa comparire il popup o rivela il blocco.
+    if (navigator.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((tr) => tr.stop());
+      } catch (err) {
+        const name = (err as { name?: string })?.name;
+        if (name === "NotFoundError" || name === "DevicesNotFoundError") setMicHint("Nessun microfono trovato sul dispositivo.");
+        else if (name === "NotAllowedError" || name === "SecurityError") setMicHint("Microfono bloccato. Se sei nell'app di Claude non è disponibile: apri xenora.it in Chrome/Edge e consenti il microfono.");
+        else setMicHint("Microfono non disponibile qui. Apri xenora.it in Chrome/Edge per usare la voce.");
+        return;
+      }
+    }
+    try { window.speechSynthesis?.cancel(); } catch {}
     let rec: { lang: string; interimResults: boolean; continuous: boolean; maxAlternatives: number; start: () => void; stop: () => void; onresult: (e: unknown) => void; onend: () => void; onerror: (e: unknown) => void };
     try { rec = new SR() as typeof rec; } catch { setMicHint("Microfono non disponibile"); return; }
     rec.lang = "it-IT"; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
@@ -260,7 +272,7 @@ export default function AssistentePage() {
     rec.onerror = (e: unknown) => {
       setListening(false);
       const err = (e as { error?: string })?.error;
-      setMicHint(err === "not-allowed" || err === "service-not-allowed" ? "Permesso microfono negato — consentilo nel browser" : err === "no-speech" ? "Non ho sentito nulla, riprova" : "Microfono non disponibile");
+      setMicHint(err === "not-allowed" || err === "service-not-allowed" ? "Microfono bloccato. Nell'app di Claude non è disponibile: apri xenora.it in Chrome/Edge." : err === "no-speech" ? "Non ho sentito nulla, riprova" : err === "audio-capture" ? "Nessun microfono trovato." : "Microfono non disponibile qui.");
     };
     rec.onend = () => { setListening(false); const txt = lastText.trim(); if (txt) ask(txt); };
     recRef.current = rec;
