@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { PageHeader, Card } from "@/components/ui";
+import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 
 interface CP { id: string; kind: string; name: string; vat: string | null; tax_code: string | null; address: string | null; city: string | null; cap: string | null; province: string | null; country: string | null; sdi_code: string | null; pec: string | null; email: string | null }
@@ -48,7 +49,7 @@ export default function AnagraficaClientiPage() {
       <PageHeader title="Anagrafica clienti / agenzie" subtitle="Intestatari riutilizzabili per fatture e documenti" />
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca nome, P.IVA, CF…" className={`${sel} min-w-0 flex-1`} />
+          <SearchInput value={q} onChange={setQ} placeholder="Cerca nome, P.IVA, CF…" />
           <select value={kind} onChange={(e) => setKind(e.target.value)} className={sel}><option value="all">Tutti</option>{Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
           <button onClick={() => setEdit(emptyForm())} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuovo</button>
         </div>

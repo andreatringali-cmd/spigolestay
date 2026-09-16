@@ -6,6 +6,7 @@ import { useData } from "@/lib/store";
 import { AV_COLORS, initials } from "@/lib/users";
 import { useLang } from "@/lib/i18n";
 import { PageHeader } from "@/components/ui";
+import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { nights, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
@@ -227,7 +228,7 @@ export default function OspitiPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca per nome, email o paese…")} className="w-full max-w-sm rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
+        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca per nome, email o paese…")} />
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <button onClick={() => router.push("/promozioni")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">✉ {t("Promozioni")}</button>
           <button onClick={() => router.push("/ospiti/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ {t("Nuovo ospite")}</button>

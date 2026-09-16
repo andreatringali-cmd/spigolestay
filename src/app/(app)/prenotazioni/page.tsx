@@ -10,6 +10,7 @@ import { eur } from "@/lib/format";
 import { bookingGrandTotal } from "@/lib/booking";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import ScrollStrip from "@/components/ScrollStrip";
 import Donut from "@/components/Donut";
@@ -309,7 +310,7 @@ export default function PrenotazioniPage() {
 
       {/* Filtri */}
       <div className="no-print mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca nome o codice…")} className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus sm:w-72 lg:w-80 xl:w-[22rem] 2xl:w-96" />
+        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca nome o codice…")} />
         <div className="flex items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
           <Select value={dateField} onChange={(v) => setDateField(v as "arrivo" | "prenotazione")} label={t("Tipo data")}>
             <option value="arrivo">{t("Arrivo / check-in")}</option>

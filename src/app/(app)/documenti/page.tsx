@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { PageHeader, Card } from "@/components/ui";
+import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 import { centsEur, DOC_KIND_LABEL, STATO, apiPost } from "@/lib/invoicing/client";
@@ -89,7 +90,7 @@ export default function DocumentiPage() {
 
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca numero, cliente, prenotazione…" className={`${selCls} min-w-0 flex-1`} />
+          <SearchInput value={q} onChange={setQ} placeholder="Cerca numero, cliente, prenotazione…" />
           <select value={String(year)} onChange={(e) => setYear(e.target.value === "all" ? "all" : Number(e.target.value))} className={selCls}>
             <option value="all">Tutti gli anni</option>
             {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}

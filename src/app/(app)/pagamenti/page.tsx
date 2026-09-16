@@ -6,6 +6,7 @@ import { nights, parseISO, toISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, Card } from "@/components/ui";
+import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import ExportMenu from "@/components/ExportMenu";
 import { useLang } from "@/lib/i18n";
@@ -83,7 +84,7 @@ export default function PagamentiPage() {
 
       {/* Filtri */}
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca ospite o codice…")} className="rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
+        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca ospite o codice…")} />
         <div className="flex items-center rounded-lg border border-line p-0.5">
           {([["due", "Con saldo"], ["overdue", "Scaduti"], ["all", "Tutti"]] as const).map(([k, l]) => (
             <button key={k} onClick={() => setFilter(k)} className={`rounded-md px-3 py-1.5 text-xs font-medium ${filter === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t(l)}</button>

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { PageHeader, Card } from "@/components/ui";
+import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 
@@ -126,7 +127,7 @@ export default function FatturePassivePage() {
 
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca fornitore, numero, categoria…" className={`${sel} min-w-0 flex-1`} />
+          <SearchInput value={q} onChange={setQ} placeholder="Cerca fornitore, numero, categoria…" />
           <select value={String(year)} onChange={(e) => setYear(e.target.value === "all" ? "all" : Number(e.target.value))} className={sel}><option value="all">Tutti gli anni</option>{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
           <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={sel}><option value="all">Tutti i tipi</option>{Object.entries(TIPI).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
           <select value={pay} onChange={(e) => setPay(e.target.value)} className={sel}><option value="all">Pagate e non</option><option value="unpaid">Da pagare</option><option value="paid">Pagate</option></select>
