@@ -93,12 +93,7 @@ export default function DocumentiPage() {
 
   return (
     <div>
-      <PageHeader title="Documenti fiscali" subtitle="Fatture, note di credito e ricevute — con stato SDI"
-        actions={<div className="flex items-center gap-2">
-          <button onClick={() => router.push("/impostazioni-fattura")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Impostazioni</button>
-          <button onClick={exportCsv} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
-          <button onClick={() => { setPq(""); setPicker(true); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuovo documento</button>
-        </div>} />
+      <PageHeader title="Documenti fiscali" subtitle="Fatture, note di credito e ricevute — con stato SDI" />
 
       {picker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -143,6 +138,11 @@ export default function DocumentiPage() {
             <option value="all">Tutti gli stati</option>
             {Object.entries(STATO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
+          <div className="ml-auto flex items-center gap-2">
+            <button onClick={() => router.push("/impostazioni-fattura")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Impostazioni</button>
+            <button onClick={exportCsv} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
+            <button onClick={() => { setPq(""); setPicker(true); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuovo documento</button>
+          </div>
         </div>
       </Card>
 
