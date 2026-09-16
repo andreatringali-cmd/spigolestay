@@ -63,7 +63,9 @@ export default function IstatPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <SectionTitle>Connessione ISTAT</SectionTitle>
-          <div className="mt-2 space-y-2">
+          <details open={!s.username} className="mt-2">
+            <summary className="mb-2 cursor-pointer text-xs font-semibold text-focus">Credenziali e opzioni</summary>
+          <div className="space-y-2">
             <label className="block"><span className={lbl}>Regione</span><select value={s.region} onChange={(e) => set({ region: e.target.value })} className={inp}>{REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}</select></label>
             <label className="block"><span className={lbl}>Portale / partner</span><input value={s.partner} onChange={(e) => set({ partner: e.target.value })} placeholder="Turist@t / Ross1000…" className={inp} /></label>
             <label className="block"><span className={lbl}>Username</span><input value={s.username} onChange={(e) => set({ username: e.target.value })} className={inp} /></label>
@@ -71,6 +73,7 @@ export default function IstatPage() {
             <label className="block"><span className={lbl}>Elabora i dati a partire dal</span><input type="date" value={s.start_from?.slice(0, 10) ?? ""} onChange={(e) => set({ start_from: e.target.value })} className={inp} /></label>
             <label className="flex items-center justify-between pt-1"><span className="text-sm text-txt">Invio automatico giornaliero</span><input type="checkbox" checked={s.auto_daily} onChange={(e) => set({ auto_daily: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
           </div>
+          </details>
           <button onClick={save} disabled={!!busy} className="mt-3 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "save" ? "Salvataggio…" : "Salva"}</button>
         </Card>
 

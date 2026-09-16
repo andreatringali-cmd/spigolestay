@@ -24,6 +24,12 @@ interface Pay { id: string; amount_cents: number; method: string | null; paid_at
 interface ELine { id?: string; description: string; qty: number; unitEur: number; vat: string; sourceKind: string }
 
 const VAT_OPTS = [["22", "22%"], ["10", "10%"], ["4", "4%"], ["0", "0%"], ["N1", "Fuori campo (N1)"], ["N2.2", "Non sogg. (N2.2)"]] as const;
+// OTA precaricate (dati anagrafici; la P.IVA va confermata secondo il contratto).
+const OTA_PRESETS = [
+  { name: "Booking.com B.V.", kind: "societa", country: "NL", vat: "NL805734958B01", address: "Herengracht 597", city: "Amsterdam", cap: "1017CE", province: "", sdi_code: "XXXXXXX" },
+  { name: "Airbnb Ireland UC", kind: "societa", country: "IE", vat: "IE9827384L", address: "8 Hanover Quay", city: "Dublin", cap: "D02 K512", province: "", sdi_code: "XXXXXXX" },
+  { name: "Expedia Lodging Partner Services Sàrl", kind: "societa", country: "CH", vat: "", address: "", city: "Ginevra", cap: "", province: "", sdi_code: "XXXXXXX" },
+];
 const num = (v: string) => { const n = Number(String(v).replace(",", ".")); return isNaN(n) ? 0 : n; };
 
 export default function DocumentoPage() {
@@ -48,6 +54,7 @@ export default function DocumentoPage() {
   const [bookingPicker, setBookingPicker] = useState(false);
   const [bq, setBq] = useState("");
   const [vies, setVies] = useState<{ status?: string; msg?: string }>({});
+  const [cpList, setCpList] = useState<{ id: string; kind: string; name: string; vat: string | null; tax_code: string | null; country: string | null; address: string | null; city: string | null; cap: string | null; province: string | null; sdi_code: string | null; pec: string | null }[]>([]);
 
   const hydrate = useCallback((d: Doc, dl: DbLine[]) => {
     setF({
@@ -77,6 +84,23 @@ export default function DocumentoPage() {
     setLoading(false);
   }, [id, hydrate]);
   useEffect(() => { load(); }, [load]);
+  const loadCounterparts = useCallback(async () => {
+    if (!supabase) return;
+    const { data } = await supabase.from("counterparts").select("id, kind, name, vat, tax_code, country, address, city, cap, province, sdi_code, pec").order("name");
+    setCpList((data ?? []) as typeof cpList);
+  }, []);
+  useEffect(() => { loadCounterparts(); }, [loadCounterparts]);
+  const applyCounterpart = (c: { kind?: string; name?: string; vat?: string | null; tax_code?: string | null; country?: string | null; address?: string | null; city?: string | null; cap?: string | null; province?: string | null; sdi_code?: string | null; pec?: string | null }) => {
+    setCp({ kind: c.kind ?? "societa", name: c.name ?? "", lastName: "", vat: c.vat ?? "", tax_code: c.tax_code ?? "", country: c.country ?? "IT", address: c.address ?? "", city: c.city ?? "", cap: c.cap ?? "", province: c.province ?? "" });
+    setF((p) => ({ ...p, sdi_code: c.sdi_code ?? p.sdi_code, pec: c.pec ?? "" }));
+  };
+  const saveCounterpart = async () => {
+    if (!supabase || !user || !cp.name.trim()) return;
+    const fullName = `${cp.name} ${cp.lastName}`.trim();
+    const { error } = await supabase.from("counterparts").insert({ tenant_id: user.id, kind: cp.kind, name: fullName, vat: cp.vat || null, tax_code: cp.tax_code || null, country: cp.country || "IT", address: cp.address || null, city: cp.city || null, cap: cp.cap || null, province: cp.province || null, sdi_code: f.sdi_code || null, pec: f.pec || null });
+    setMsg(error ? "Errore anagrafica: " + error.message : "Intestatario salvato in anagrafica ✓");
+    if (!error) loadCounterparts();
+  };
   // Se in alto è selezionata UNA struttura, il documento in bozza la eredita (menu nascosto).
   useEffect(() => {
     if (doc?.stato === "bozza" && activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId)) {
@@ -275,12 +299,17 @@ export default function DocumentoPage() {
                 </div>
               </div>
               <label className={lbl}>Tipologia<select value={f.doc_kind} onChange={(e) => setF({ ...f, doc_kind: e.target.value })} className={inp}><option value="fattura">Fattura</option><option value="nota_di_credito">Nota di credito</option><option value="ricevuta_non_fiscale">Ricevuta</option></select></label>
-              <label className={lbl}>Tipo doc. SDI<select value={f.sdi_type} onChange={(e) => setF({ ...f, sdi_type: e.target.value })} className={inp}><option value="TD01">TD01 - Fattura</option><option value="TD04">TD04 - Nota di credito</option><option value="TD16">TD16 - Autofattura</option></select></label>
               <label className={lbl}>Data emissione<input type="date" value={f.issue_date} onChange={(e) => setF({ ...f, issue_date: e.target.value })} className={inp} /></label>
               <div><span className={lbl}>Scadenza pagamento</span><div className="mt-1 flex gap-1"><input type="date" value={f.due_date} onChange={(e) => setF({ ...f, due_date: e.target.value })} className="w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt" />{[30, 60, 120].map((d) => <button key={d} onClick={() => setDue(d)} className="shrink-0 rounded-lg bg-wash px-2 text-xs font-semibold text-dim hover:bg-line">+{d}</button>)}</div></div>
-              <label className={lbl}>Condizioni pagamento<select value={f.payment_terms} onChange={(e) => setF({ ...f, payment_terms: e.target.value })} className={inp}><option>Pagamento completo</option><option>Acconto</option><option>Pagamento a rate</option></select></label>
-              <label className={lbl}>Esigibilità IVA<select value={f.vat_exigibility} onChange={(e) => setF({ ...f, vat_exigibility: e.target.value })} className={inp}><option value="I">Immediata</option><option value="D">Differita</option><option value="S">Scissione pagamenti</option></select></label>
-              <label className={`${lbl} sm:col-span-2`}>Metodo di pagamento<select value={f.payment_method} onChange={(e) => setF({ ...f, payment_method: e.target.value })} className={inp}><option>Bonifico bancario</option><option>Carta</option><option>Contanti</option><option>PayPal</option><option>Assegno</option></select></label>
+              <label className={lbl}>Metodo di pagamento<select value={f.payment_method} onChange={(e) => setF({ ...f, payment_method: e.target.value })} className={inp}><option>Bonifico bancario</option><option>Carta</option><option>Contanti</option><option>PayPal</option><option>Assegno</option></select></label>
+              <details className="sm:col-span-2 mt-1">
+                <summary className="cursor-pointer text-xs font-semibold text-focus">Altre opzioni</summary>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  <label className={lbl}>Tipo doc. SDI<select value={f.sdi_type} onChange={(e) => setF({ ...f, sdi_type: e.target.value })} className={inp}><option value="TD01">TD01 - Fattura</option><option value="TD04">TD04 - Nota di credito</option><option value="TD16">TD16 - Autofattura</option></select></label>
+                  <label className={lbl}>Condizioni pagamento<select value={f.payment_terms} onChange={(e) => setF({ ...f, payment_terms: e.target.value })} className={inp}><option>Pagamento completo</option><option>Acconto</option><option>Pagamento a rate</option></select></label>
+                  <label className={lbl}>Esigibilità IVA<select value={f.vat_exigibility} onChange={(e) => setF({ ...f, vat_exigibility: e.target.value })} className={inp}><option value="I">Immediata</option><option value="D">Differita</option><option value="S">Scissione pagamenti</option></select></label>
+                </div>
+              </details>
             </div>
           )}
         </Card>
@@ -333,6 +362,16 @@ export default function DocumentoPage() {
             <div className="mt-2 space-y-1 text-sm"><div className="font-semibold text-txt">{cp.name} {cp.lastName}</div>{cp.vat && <div className="text-dim">P.IVA {cp.vat}</div>}{cp.tax_code && <div className="text-dim">CF {cp.tax_code}</div>}<div className="text-dim">{[cp.address, cp.cap, cp.city, cp.province].filter(Boolean).join(" ")}</div><div className="text-faint">Cod. dest. {f.sdi_code}{f.pec ? ` · PEC ${f.pec}` : ""}</div></div>
           ) : (
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <div className="sm:col-span-2 flex flex-wrap items-end gap-2">
+                <label className="flex-1"><span className={lbl}>Scegli da anagrafica / OTA</span>
+                  <select value="" onChange={(e) => { const v = e.target.value; if (v.startsWith("cp:")) { const c = cpList.find((x) => x.id === v.slice(3)); if (c) applyCounterpart(c); } else if (v.startsWith("ota:")) applyCounterpart(OTA_PRESETS[Number(v.slice(4))]); }} className={inp}>
+                    <option value="">— nuovo intestatario —</option>
+                    {cpList.length > 0 && <optgroup label="Anagrafica">{cpList.map((c) => <option key={c.id} value={`cp:${c.id}`}>{c.name}</option>)}</optgroup>}
+                    <optgroup label="OTA">{OTA_PRESETS.map((o, i) => <option key={i} value={`ota:${i}`}>{o.name}</option>)}</optgroup>
+                  </select>
+                </label>
+                <button type="button" onClick={saveCounterpart} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash">Salva in anagrafica</button>
+              </div>
               <label className={`${lbl} sm:col-span-2`}>Tipologia persona<select value={cp.kind} onChange={(e) => setCp({ ...cp, kind: e.target.value })} className={inp}><option value="privato">Privato</option><option value="societa">Società</option><option value="estero">Estero</option><option value="ota">OTA</option></select></label>
               <label className={cp.kind === "privato" ? lbl : `${lbl} sm:col-span-2`}>{cp.kind === "societa" ? "Ragione sociale" : "Nome"}<input value={cp.name} onChange={(e) => setCp({ ...cp, name: e.target.value })} className={inp} /></label>
               {cp.kind === "privato" && <label className={lbl}>Cognome<input value={cp.lastName} onChange={(e) => setCp({ ...cp, lastName: e.target.value })} className={inp} /></label>}
