@@ -43,7 +43,7 @@ export const NAV: NavItem[] = [
   { label: "Channel Manager", href: "/canali", group: "Distribuzione", icon: "share", perm: "canali", module: "cm" },
   { label: "Meta Search", href: "/metasearch", group: "Distribuzione", icon: "search", perm: "canali", module: "meta" },
   { label: "Widget sito", href: "/widget", group: "Distribuzione", icon: "eye", perm: "sito", module: "booking" },
-  { label: "Sito web", href: "/sito", group: "Distribuzione", icon: "grid", perm: "sito", module: "site" },
+  { label: "Xenosite", href: "/sito", group: "Distribuzione", icon: "grid", perm: "sito", module: "site" },
 
   { label: "Utenti", href: "/utenti", group: "Configurazione", icon: "users", perm: "utenti", module: "pms" },
   { label: "Strutture", href: "/strutture", group: "Configurazione", icon: "building", perm: "impostazioni", module: "pms" },

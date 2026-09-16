@@ -43,7 +43,7 @@ export const MODULES: Module[] = [
   { key: "messaging", name: "Messaggi & automazioni", desc: "Messaggi automatici agli ospiti (WhatsApp/email) con modelli e trigger: benvenuto e guida, check-in, recensione.", href: "/messaggi" },
   { key: "meta", name: "Meta Search", desc: "Connessione ai principali metasearch (Google, Trivago…).", href: "/metasearch" },
   { key: "bi", name: "Statistiche & BI", desc: "Report avanzati e statistiche sui tuoi dati.", href: "/statistiche" },
-  { key: "site", name: "Sito web", desc: "Mini-sito integrato con il motore prenotazioni.", href: "/sito" },
+  { key: "site", name: "Xenosite", desc: "Il tuo mini-sito integrato con il motore prenotazioni.", href: "/sito" },
   { key: "rms", name: "Revenue · prezzi dinamici", desc: "Suggerimenti di prezzo in base a occupazione ed eventi; in arrivo i prezzi dinamici locali basati sulla domanda reale della Rete città.", href: "/revenue" },
   { key: "ratecheck", name: "Rate checker", desc: "Confronto tariffe con i competitor.", href: "/rate-checker" },
   { key: "team", name: "Utenti & permessi", desc: "Multi-utente con permessi granulari, ruoli, turni e limiti operativi.", href: "/utenti" },

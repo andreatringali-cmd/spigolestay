@@ -36,7 +36,7 @@ export default function SitoPage() {
 
   return (
     <div>
-      <PageHeader title={t("Sito web")} subtitle={t("Il tuo mini-sito con motore di prenotazione integrato")} actions={<a href="/sito-web" target="_blank" rel="noreferrer" className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Apri sito pubblico")} ↗</a>} />
+      <PageHeader title="Xenosite" subtitle={t("Il tuo mini-sito con motore di prenotazione integrato")} actions={<a href="/sito-web" target="_blank" rel="noreferrer" className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Apri sito pubblico")} ↗</a>} />
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
           <Card>
