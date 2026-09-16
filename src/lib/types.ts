@@ -300,4 +300,21 @@ export interface Booking {
   extraGuests?: { firstName: string; lastName: string; sex?: "M" | "F"; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string }[]; // co-ospiti (dal web check-in o aggiunti a mano)
   primaryGuest?: { firstName?: string; lastName?: string; sex?: "M" | "F"; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string }; // dati ospite principale conservati sulla prenotazione (es. se l'anagrafica viene eliminata) — per Alloggiati Web
   extras?: { name: string; price: number }[]; // servizi/consumi extra aggiunti alla prenotazione
+  invoiceRequest?: InvoiceRequest; // "richiedo fattura" raccolto al check-in online (dati intestazione)
+}
+
+// Dati di intestazione fattura raccolti dall'ospite al check-in (usati dal modulo Documenti).
+export interface InvoiceRequest {
+  wants: boolean;
+  kind?: "privato" | "societa" | "estero";
+  name?: string;        // nome e cognome / ragione sociale
+  vat?: string;         // P.IVA (società)
+  taxCode?: string;     // codice fiscale (privato)
+  address?: string;
+  city?: string;
+  cap?: string;
+  province?: string;
+  country?: string;     // ISO, default IT
+  sdiCode?: string;     // codice destinatario 7 char (società) / 0000000 privato / XXXXXXX estero
+  pec?: string;
 }

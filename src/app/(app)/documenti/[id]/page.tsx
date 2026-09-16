@@ -60,6 +60,42 @@ export default function DocumentoPage() {
     a.download = `${(doc?.number_label ?? id).replace(/[^\w-]/g, "_")}.xml`; a.click(); URL.revokeObjectURL(a.href);
   });
 
+  const printPdf = async () => {
+    if (!doc) return;
+    const { data: st } = await supabase!.from("tenant_invoice_settings").select("*").maybeSingle();
+    const cp = doc.counterpart ?? {};
+    const e = (c: number) => eur(centsEur(c));
+    const rows = lines.map((l) => `<tr><td>${l.description}</td><td style="text-align:right">${Number(l.qty)}</td><td style="text-align:right">${l.vat_nature ? l.vat_nature : Number(l.vat_rate) + "%"}</td><td style="text-align:right">${e(l.line_total_cents)}</td></tr>`).join("");
+    const emit = [st?.denominazione, st?.vat ? "P.IVA " + st.vat : "", st?.tax_code ? "CF " + st.tax_code : "", [st?.address, st?.cap, st?.city, st?.province].filter(Boolean).join(" "), st?.pec].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
+    const cli = [cp.name, cp.vat ? "P.IVA " + cp.vat : "", cp.tax_code ? "CF " + cp.tax_code : "", [cp.address, cp.cap, cp.city, cp.province].filter(Boolean).join(" "), cp.sdi_code ? "Cod. dest. " + cp.sdi_code : "", cp.pec].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
+    const w = window.open("", "_blank", "width=820,height=1040"); if (!w) return;
+    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>${doc.number_label ?? "Documento"}</title>
+      <style>*{box-sizing:border-box}body{font-family:Georgia,'Times New Roman',serif;color:#1a2131;margin:0;padding:44px 52px;font-size:13px;line-height:1.5}
+      .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #285f92;padding-bottom:14px;margin-bottom:18px}
+      .doc{font-size:22px;font-weight:700;color:#285f92}.muted{color:#5c6479}
+      .parties{display:flex;justify-content:space-between;gap:24px;margin:16px 0}
+      .parties h4{margin:0 0 4px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#5c6479}
+      table{width:100%;border-collapse:collapse;margin-top:10px}th,td{padding:8px 6px;border-bottom:1px solid #e3e6ef}th{text-align:left;font-size:11px;text-transform:uppercase;color:#5c6479}
+      .tot{margin-top:14px;margin-left:auto;width:280px}.tot div{display:flex;justify-content:space-between;padding:4px 0}.tot .g{border-top:2px solid #285f92;font-weight:700;font-size:15px;margin-top:6px;padding-top:8px}
+      .note{margin-top:26px;font-size:11px;color:#7a8194;border-top:1px solid #e3e6ef;padding-top:12px}
+      @media print{body{padding:24px 30px}}</style></head><body>
+      <div class="head"><div>${emit || '<div class="muted">Emittente da configurare in Impostazioni fattura</div>'}</div>
+        <div style="text-align:right"><div class="doc">${DOC_KIND_LABEL[doc.doc_kind] ?? "Documento"}</div><div>n. ${doc.number_label ?? "(bozza)"}</div><div class="muted">${doc.issue_date ? new Date(doc.issue_date).toLocaleDateString("it-IT") : ""}</div></div>
+      </div>
+      <div class="parties"><div><h4>Cliente</h4>${cli}</div>${doc.booking_code ? `<div style="text-align:right"><h4>Prenotazione</h4><div>${doc.booking_code}</div></div>` : ""}</div>
+      <table><thead><tr><th>Descrizione</th><th style="text-align:right">Q.tà</th><th style="text-align:right">IVA</th><th style="text-align:right">Totale</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="tot">
+        <div><span>Imponibile</span><span>${e(doc.taxable_cents)}</span></div>
+        <div><span>IVA</span><span>${e(doc.vat_cents)}</span></div>
+        ${doc.out_of_scope_cents ? `<div><span>Tassa di soggiorno (fuori campo IVA art.15)</span><span>${e(doc.out_of_scope_cents)}</span></div>` : ""}
+        ${doc.bollo_cents ? `<div><span>Bollo</span><span>${e(doc.bollo_cents)}</span></div>` : ""}
+        <div class="g"><span>Totale</span><span>${e(doc.total_cents)}</span></div>
+      </div>
+      <div class="note">${st?.regime_note ? st.regime_note + "<br>" : ""}${st?.footer_note ?? ""}<br>Documento di cortesia. ${doc.send_sdi ? "L'originale fiscale è la fattura elettronica trasmessa allo SdI." : ""}</div>
+      </body></html>`);
+    w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
+  };
+
   const paid = pays.reduce((a, p) => a + p.amount_cents, 0);
   const residuo = (doc?.total_cents ?? 0) - paid;
 
@@ -177,6 +213,7 @@ export default function DocumentoPage() {
         {doc.stato === "bozza" && <button onClick={issue} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "issue" ? "Emissione…" : "Emetti documento"}</button>}
         {doc.stato === "emessa" && doc.send_sdi && <button onClick={send} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "send" ? "Invio…" : "Invia allo SdI"}</button>}
         {doc.stato === "inviata_intermediario" && <button onClick={refresh} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "status" ? "Controllo…" : "Aggiorna esito"}</button>}
+        <button onClick={printPdf} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Stampa PDF</button>
         {doc.provider_ref && <button onClick={downloadXml} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "xml" ? "…" : "Scarica XML"}</button>}
         <span className="ml-auto text-[11px] text-faint">Regime: {doc.regime ?? "—"} · {doc.send_sdi ? "invio SDI attivo" : "no SDI"}</span>
       </div>

@@ -88,6 +88,21 @@ async function resolveCounterpart(
     const { data } = await admin.from("counterparts").select("*").eq("id", opts.counterpartId).eq("tenant_id", tenantId).maybeSingle();
     if (data) return { counterpartId: data.id as string, snapshot: data as Record<string, unknown> };
   }
+  // Dati fattura raccolti al check-in online ("richiedo fattura").
+  const ir = ctx.booking.invoiceRequest;
+  if (ir?.wants) {
+    return {
+      counterpartId: null,
+      snapshot: {
+        kind: ir.kind ?? "privato", name: ir.name || ctx.guest?.fullName || "Cliente",
+        vat: ir.vat ?? null, tax_code: ir.taxCode ?? null, address: ir.address ?? null,
+        city: ir.city ?? null, cap: ir.cap ?? null, province: ir.province ?? null,
+        country: ir.country || "IT",
+        sdi_code: ir.sdiCode || (ir.kind === "estero" ? "XXXXXXX" : "0000000"),
+        pec: ir.pec ?? null, email: ctx.guest?.email ?? null,
+      },
+    };
+  }
   const g = ctx.guest;
   return {
     counterpartId: null,

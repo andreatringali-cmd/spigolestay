@@ -49,6 +49,8 @@ function Engine() {
   const [photoBack, setPhotoBack] = useState<string | undefined>();
   const [signature, setSignature] = useState<string | undefined>();
   const [consent, setConsent] = useState(false);
+  const [inv, setInv] = useState({ wants: false, kind: "privato", name: "", vat: "", taxCode: "", address: "", city: "", cap: "", province: "", sdiCode: "", pec: "" });
+  const setI = (k: string, v: string | boolean) => setInv((p) => ({ ...p, [k]: v }));
   const frontRef = useRef<HTMLInputElement>(null);
   const backRef = useRef<HTMLInputElement>(null);
   const onPhoto = async (file: File | undefined, set: (v: string) => void) => { if (!file || !file.type.startsWith("image/")) return; try { set(await downscaleImage(file, 900, 0.72)); } catch {} };
@@ -63,6 +65,7 @@ function Engine() {
       setPhotoFront(booking.docPhotoFront); setPhotoBack(booking.docPhotoBack); setSignature(booking.signature);
       const need = Math.max(0, (booking.adults ?? 1) - 1);
       setExtras(booking.extraGuests?.length ? booking.extraGuests.map((e) => ({ ...emptyExtra(), ...e })) : Array.from({ length: need }, emptyExtra));
+      if (booking.invoiceRequest) setInv((p) => ({ ...p, ...Object.fromEntries(Object.entries(booking.invoiceRequest!).filter(([, v]) => v != null)) }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booking, guest]);
@@ -75,7 +78,10 @@ function Engine() {
     if (!booking || !guest || !doc || !valid) return;
     updateGuest(guest.id, { firstName: doc.firstName.trim(), lastName: doc.lastName.trim(), fullName: `${doc.firstName} ${doc.lastName}`.trim(), sex: (doc.sex || undefined) as "M" | "F" | undefined, birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: doc.docNumber.trim(), docPlace: doc.docPlace });
     const cleanExtras = extras.filter((e) => e.firstName.trim() && e.lastName.trim());
-    updateBooking(booking.id, { webCheckin: true, arrivalTime: arrival, extraGuests: cleanExtras, docPhotoFront: photoFront, docPhotoBack: photoBack, signature, guestRequests: guestReq.trim() || undefined });
+    const invoiceRequest = inv.wants
+      ? { wants: true, kind: inv.kind as "privato" | "societa" | "estero", name: inv.name.trim() || undefined, vat: inv.vat.trim() || undefined, taxCode: inv.taxCode.trim() || undefined, address: inv.address.trim() || undefined, city: inv.city.trim() || undefined, cap: inv.cap.trim() || undefined, province: inv.province.trim() || undefined, sdiCode: inv.sdiCode.trim() || undefined, pec: inv.pec.trim() || undefined, country: "IT" }
+      : { wants: false };
+    updateBooking(booking.id, { webCheckin: true, arrivalTime: arrival, extraGuests: cleanExtras, docPhotoFront: photoFront, docPhotoBack: photoBack, signature, guestRequests: guestReq.trim() || undefined, invoiceRequest });
     // Avvisa il gestore via email (best-effort, non blocca la conferma all'ospite).
     void sendCheckinNotice(booking, { getStructure, getGuest, getRoomType, getUnit }, [{ ...doc }, ...cleanExtras], arrival);
     setDone(true); window.scrollTo(0, 0);
@@ -216,6 +222,33 @@ function Engine() {
           <h2 className="mb-1 font-display text-lg font-bold text-txt">Firma</h2>
           <p className="mb-3 text-xs text-dim">Firma per confermare la correttezza dei dati e l'accettazione delle condizioni.</p>
           <SignaturePad value={signature} onChange={setSignature} />
+        </div>
+
+        {/* Richiedi fattura (facoltativo) */}
+        <div className={`${box} p-4`}>
+          <label className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-txt">Richiedo fattura</span>
+            <input type="checkbox" checked={inv.wants} onChange={(e) => setI("wants", e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" />
+          </label>
+          {inv.wants && (
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <label className={`${lbl} sm:col-span-2`}>Tipo
+                <select value={inv.kind} onChange={(e) => setI("kind", e.target.value)} className={`${field} mt-1`}>
+                  <option value="privato">Privato</option><option value="societa">Società / P.IVA</option><option value="estero">Estero</option>
+                </select>
+              </label>
+              <label className={`${lbl} sm:col-span-2`}>{inv.kind === "societa" ? "Ragione sociale" : "Nome e cognome"}<input value={inv.name} onChange={(e) => setI("name", e.target.value)} className={`${field} mt-1`} /></label>
+              {inv.kind === "societa" && <label className={lbl}>Partita IVA<input value={inv.vat} onChange={(e) => setI("vat", e.target.value)} className={`${field} mt-1`} /></label>}
+              {inv.kind !== "societa" && <label className={lbl}>Codice fiscale<input value={inv.taxCode} onChange={(e) => setI("taxCode", e.target.value)} className={`${field} mt-1`} /></label>}
+              {inv.kind === "societa" && <label className={lbl}>Codice destinatario / PEC<input value={inv.sdiCode} onChange={(e) => setI("sdiCode", e.target.value)} placeholder="7 caratteri o PEC" className={`${field} mt-1`} /></label>}
+              <label className={`${lbl} sm:col-span-2`}>Indirizzo<input value={inv.address} onChange={(e) => setI("address", e.target.value)} className={`${field} mt-1`} /></label>
+              <label className={lbl}>Città<input value={inv.city} onChange={(e) => setI("city", e.target.value)} className={`${field} mt-1`} /></label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className={lbl}>CAP<input value={inv.cap} onChange={(e) => setI("cap", e.target.value)} className={`${field} mt-1`} /></label>
+                <label className={lbl}>Prov.<input value={inv.province} onChange={(e) => setI("province", e.target.value)} className={`${field} mt-1`} /></label>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Arrivo + consenso + invio */}
