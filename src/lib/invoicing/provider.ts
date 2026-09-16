@@ -119,12 +119,54 @@ export class OpenapiProvider implements EInvoiceProvider {
   }
 }
 
-// Nota: fattureincloud (OAuth, spinge nel conto del cliente) sarà un'altra
-// implementazione di EInvoiceProvider — per ora solo l'interfaccia, non implementata.
+// ---------------------------------------------------------------------------
+// FATTURE IN CLOUD (scelta del commercialista): OAuth2, "spinge" la fattura nel
+// conto Fatture in Cloud del cliente, che gestisce XML + SdI. SCHELETRO — da
+// completare col flusso OAuth (token per tenant) e gli endpoint REST.
+// Doc: https://developers.fattureincloud.it
+// ---------------------------------------------------------------------------
+export interface FicConfig { accessToken?: string; companyId?: string }
+
+export class FattureInCloudProvider implements EInvoiceProvider {
+  readonly name = "fattureincloud" as const;
+  constructor(private cfg: FicConfig) {}
+
+  // TODO(fic): base API. Auth = Bearer access_token OAuth del tenant (rinnovabile via refresh_token).
+  private base() { return "https://api-v2.fattureincloud.it"; }
+  private headers() { return { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${this.cfg.accessToken ?? ""}` }; }
+  private company() {
+    if (!this.cfg.companyId) throw new Error("fattureincloud_not_connected"); // manca il collegamento OAuth + company_id
+    return this.cfg.companyId;
+  }
+
+  async send(_payload: EInvoicePayload): Promise<SendResult> {
+    void _payload; void this.base; void this.headers; void this.company;
+    // TODO(fic): POST /c/{company_id}/issued_documents con il documento (type=invoice),
+    //   e_invoice=true per l'invio SdI; mappare l'id FIC in providerRef.
+    //   Mappare le nostre righe/aliquote/nature nel formato FIC (vat, not_taxable...).
+    throw new Error("fattureincloud_not_configured");
+  }
+  async sendCreditNote(payload: EInvoicePayload): Promise<SendResult> { return this.send(payload); }
+  async getStatus(_ref: string): Promise<StatusResult> {
+    void _ref;
+    // TODO(fic): GET /c/{company_id}/issued_documents/{id}/e_invoice → stato SdI → nostri stati.
+    throw new Error("fattureincloud_not_configured");
+  }
+  async getXml(_ref: string): Promise<string | null> {
+    void _ref;
+    // TODO(fic): GET dell'XML e-fattura prodotto da Fatture in Cloud.
+    throw new Error("fattureincloud_not_configured");
+  }
+  async listNotifications(): Promise<ProviderNotification[]> {
+    // TODO(fic): sincronizzazione periodica degli esiti SdI dei documenti aperti.
+    throw new Error("fattureincloud_not_configured");
+  }
+}
 
 export function getProvider(name: ProviderName | string | undefined, config: Record<string, unknown> = {}): EInvoiceProvider {
   switch (name) {
     case "openapi": return new OpenapiProvider(config as OpenapiConfig);
+    case "fattureincloud": return new FattureInCloudProvider(config as FicConfig);
     case "mock":
     default: return new MockProvider();
   }

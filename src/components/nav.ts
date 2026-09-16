@@ -50,6 +50,7 @@ export const NAV: NavItem[] = [
   { label: "Strutture", href: "/strutture", group: "Configurazione", icon: "building", perm: "impostazioni", module: "pms" },
   { label: "Camere", href: "/camere", group: "Configurazione", icon: "bed", perm: "camere", module: "pms" },
   { label: "Guida ospiti", href: "/guida-ospiti", group: "Configurazione", icon: "share", perm: "webconcierge", module: "guide" },
+  { label: "Impostazioni fattura", href: "/impostazioni-fattura", group: "Configurazione", icon: "receipt", perm: "webconcierge", module: "concierge" },
   { label: "Registro attività", href: "/registro", group: "Configurazione", icon: "clipboard", perm: "impostazioni", module: "pms" },
   { label: "Impostazioni", href: "/impostazioni", group: "Configurazione", icon: "settings", perm: "impostazioni", module: "pms" },
 
