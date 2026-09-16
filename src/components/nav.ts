@@ -33,6 +33,7 @@ export const NAV: NavItem[] = [
 
   { label: "Cassa · Prima Nota", href: "/cassa", group: "Amministrazione", icon: "receipt", perm: "cassa", module: "cassa" },
   { label: "Incassi", href: "/pagamenti", group: "Amministrazione", icon: "card", perm: "pagamenti", module: "pms" },
+  { label: "Fatture passive", href: "/fatture-passive", group: "Amministrazione", icon: "receipt", perm: "cassa", module: "pms" },
 
   { label: "Ospiti", href: "/ospiti", group: "Anagrafiche", icon: "users", perm: "prenotazioni", module: "pms" },
   { label: "Alloggiati", href: "/alloggiati", group: "Anagrafiche", icon: "id", perm: "alloggiati", module: "pms" },

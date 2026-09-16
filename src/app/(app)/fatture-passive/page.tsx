@@ -1,0 +1,207 @@
+"use client";
+
+// Fatture passive (acquisti/fornitori). CRUD lato client via Supabase (RLS tenant).
+// Importi in centesimi; input in euro. Ispirato a Octorate, semplificato.
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/authsync";
+import { PageHeader, Card } from "@/components/ui";
+import { eur } from "@/lib/format";
+
+const CATEGORIES = ["Pulizie", "Utenze", "Manutenzione", "OTA / commissioni", "Forniture", "Consulenze", "Tasse e tributi", "Marketing", "Assicurazioni", "Altro"];
+const TIPI: Record<string, string> = { fattura: "Fattura", nota_credito: "Nota di credito", ricevuta: "Ricevuta", spesa: "Spesa" };
+const cents = (c?: number | null) => (c ?? 0) / 100;
+const numv = (v: string | number) => { const n = Number(String(v).replace(",", ".")); return isNaN(n) ? 0 : n; };
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const YEARS = (() => { const y = new Date().getFullYear(); return [y, y - 1, y - 2]; })();
+
+interface Doc { id: string; supplier_id: string | null; supplier_name: string | null; doc_number: string | null; doc_date: string | null; doc_type: string; category: string | null; taxable_cents: number; vat_cents: number; total_cents: number; due_date: string | null; paid: boolean; paid_at: string | null; payment_method: string | null; notes: string | null }
+interface Supplier { id: string; name: string; vat: string | null; category: string | null }
+
+const emptyForm = () => ({ id: "" as string, supplierName: "", supplierId: null as string | null, doc_number: "", doc_date: todayISO(), doc_type: "fattura", category: "", taxableEur: "", vatEur: "", due_date: "", paid: false, paid_at: "", payment_method: "Bonifico bancario", notes: "" });
+
+export default function FatturePassivePage() {
+  const { user } = useAuth();
+  const [docs, setDocs] = useState<Doc[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  // filtri
+  const [q, setQ] = useState("");
+  const [year, setYear] = useState<number | "all">(new Date().getFullYear());
+  const [tipo, setTipo] = useState("all");
+  const [pay, setPay] = useState("all");   // all | paid | unpaid
+  const [scad, setScad] = useState("all"); // all | overdue
+  // editor
+  const [edit, setEdit] = useState<ReturnType<typeof emptyForm> | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!supabase) { setErr("Devi essere connesso."); setLoading(false); return; }
+    setLoading(true); setErr("");
+    const [d, s] = await Promise.all([
+      supabase.from("purchase_documents").select("*").order("doc_date", { ascending: false }),
+      supabase.from("suppliers").select("id, name, vat, category").order("name"),
+    ]);
+    if (d.error) setErr(d.error.message); else setDocs((d.data ?? []) as Doc[]);
+    setSuppliers((s.data ?? []) as Supplier[]);
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const t = todayISO();
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    return docs.filter((r) => {
+      if (year !== "all" && (r.doc_date ?? "").slice(0, 4) !== String(year)) return false;
+      if (tipo !== "all" && r.doc_type !== tipo) return false;
+      if (pay === "paid" && !r.paid) return false;
+      if (pay === "unpaid" && r.paid) return false;
+      if (scad === "overdue" && !(r.due_date && r.due_date < t && !r.paid)) return false;
+      if (term && !`${r.supplier_name ?? ""} ${r.doc_number ?? ""} ${r.category ?? ""}`.toLowerCase().includes(term)) return false;
+      return true;
+    });
+  }, [docs, q, year, tipo, pay, scad, t]);
+
+  const totals = useMemo(() => filtered.reduce((a, r) => ({ imp: a.imp + r.taxable_cents, iva: a.iva + r.vat_cents, tot: a.tot + r.total_cents, unpaid: a.unpaid + (r.paid ? 0 : r.total_cents) }), { imp: 0, iva: 0, tot: 0, unpaid: 0 }), [filtered]);
+
+  const openNew = () => setEdit(emptyForm());
+  const openEdit = (r: Doc) => setEdit({ id: r.id, supplierName: r.supplier_name ?? "", supplierId: r.supplier_id, doc_number: r.doc_number ?? "", doc_date: r.doc_date ?? todayISO(), doc_type: r.doc_type, category: r.category ?? "", taxableEur: String(cents(r.taxable_cents)), vatEur: String(cents(r.vat_cents)), due_date: r.due_date ?? "", paid: r.paid, paid_at: r.paid_at ?? "", payment_method: r.payment_method ?? "Bonifico bancario", notes: r.notes ?? "" });
+
+  const save = async () => {
+    if (!supabase || !user || !edit) return;
+    setSaving(true); setErr("");
+    // Fornitore: usa quello scelto o crea/riusa per nome.
+    let supplierId = edit.supplierId;
+    const nameTrim = edit.supplierName.trim();
+    if (nameTrim) {
+      const existing = suppliers.find((s) => s.name.toLowerCase() === nameTrim.toLowerCase());
+      if (existing) supplierId = existing.id;
+      else { const { data: ns } = await supabase.from("suppliers").insert({ tenant_id: user.id, name: nameTrim, category: edit.category || null }).select("id").single(); supplierId = ns?.id ?? null; }
+    }
+    const taxable = Math.round(numv(edit.taxableEur) * 100);
+    const vat = Math.round(numv(edit.vatEur) * 100);
+    const row = {
+      tenant_id: user.id, supplier_id: supplierId, supplier_name: nameTrim || null, doc_number: edit.doc_number || null,
+      doc_date: edit.doc_date || null, doc_type: edit.doc_type, category: edit.category || null,
+      taxable_cents: taxable, vat_cents: vat, total_cents: taxable + vat, due_date: edit.due_date || null,
+      paid: edit.paid, paid_at: edit.paid ? (edit.paid_at || todayISO()) : null, payment_method: edit.payment_method || null,
+      notes: edit.notes || null, updated_at: new Date().toISOString(),
+    };
+    const res = edit.id ? await supabase.from("purchase_documents").update(row).eq("id", edit.id) : await supabase.from("purchase_documents").insert(row);
+    setSaving(false);
+    if (res.error) { setErr(res.error.message); return; }
+    setEdit(null); await load();
+  };
+  const del = async () => {
+    if (!supabase || !edit?.id) return;
+    if (!confirm("Eliminare questa fattura passiva?")) return;
+    await supabase.from("purchase_documents").delete().eq("id", edit.id);
+    setEdit(null); await load();
+  };
+  const togglePaid = async (r: Doc) => { if (!supabase) return; await supabase.from("purchase_documents").update({ paid: !r.paid, paid_at: !r.paid ? todayISO() : null }).eq("id", r.id); await load(); };
+
+  const exportCsv = () => {
+    const head = ["Data", "Fornitore", "Numero", "Tipo", "Categoria", "Imponibile", "IVA", "Totale", "Scadenza", "Pagata"];
+    const lines = filtered.map((r) => [r.doc_date ?? "", r.supplier_name ?? "", r.doc_number ?? "", TIPI[r.doc_type], r.category ?? "", cents(r.taxable_cents).toFixed(2), cents(r.vat_cents).toFixed(2), cents(r.total_cents).toFixed(2), r.due_date ?? "", r.paid ? "sì" : "no"].map((x) => `"${String(x).replace(/"/g, '""')}"`).join(","));
+    const blob = new Blob([[head.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `fatture-passive-${year}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  };
+
+  const sel = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+  const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+  const lbl = "block text-xs font-medium text-dim";
+  const totEur = numv(edit?.taxableEur ?? 0) + numv(edit?.vatEur ?? 0);
+
+  return (
+    <div>
+      <PageHeader title="Fatture passive" subtitle="Fatture e costi dei fornitori" />
+
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca fornitore, numero, categoria…" className={`${sel} min-w-0 flex-1`} />
+          <select value={String(year)} onChange={(e) => setYear(e.target.value === "all" ? "all" : Number(e.target.value))} className={sel}><option value="all">Tutti gli anni</option>{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
+          <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={sel}><option value="all">Tutti i tipi</option>{Object.entries(TIPI).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+          <select value={pay} onChange={(e) => setPay(e.target.value)} className={sel}><option value="all">Pagate e non</option><option value="unpaid">Da pagare</option><option value="paid">Pagate</option></select>
+          <select value={scad} onChange={(e) => setScad(e.target.value)} className={sel}><option value="all">Tutte le scadenze</option><option value="overdue">Scadute non pagate</option></select>
+          <div className="ml-auto flex items-center gap-2">
+            <button onClick={exportCsv} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
+            <button onClick={openNew} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuova fattura</button>
+          </div>
+        </div>
+      </Card>
+
+      {err && <Card className="mb-4"><p className="text-sm text-[color:var(--err)]">{err}</p></Card>}
+
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[["Imponibile", totals.imp, "var(--dim)"], ["IVA", totals.iva, "var(--dim)"], ["Totale", totals.tot, "var(--txt)"], ["Da pagare", totals.unpaid, totals.unpaid > 0 ? "var(--warn)" : "var(--ok)"]].map(([l, v, c]) => (
+          <Card key={l as string}><div className="text-[10px] font-medium uppercase tracking-wide text-faint">{l as string}</div><div className="font-mono text-lg font-bold" style={{ color: c as string }}>{eur(cents(v as number))}</div></Card>
+        ))}
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+        <table className="w-full min-w-[860px] text-sm">
+          <thead>
+            <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+              <th className="px-3 py-2 font-semibold">Data</th><th className="px-3 py-2 font-semibold">Fornitore</th><th className="px-3 py-2 font-semibold">Numero</th><th className="px-3 py-2 font-semibold">Tipo</th><th className="px-3 py-2 font-semibold">Categoria</th><th className="px-3 py-2 text-right font-semibold">Imponibile</th><th className="px-3 py-2 text-right font-semibold">IVA</th><th className="px-3 py-2 text-right font-semibold">Totale</th><th className="px-3 py-2 font-semibold">Scadenza</th><th className="px-3 py-2 font-semibold">Stato</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r) => {
+              const overdue = r.due_date && r.due_date < t && !r.paid;
+              return (
+                <tr key={r.id} onClick={() => openEdit(r)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
+                  <td className="whitespace-nowrap px-3 py-2.5 text-dim">{r.doc_date ? new Date(r.doc_date).toLocaleDateString("it-IT") : "—"}</td>
+                  <td className="px-3 py-2.5 font-medium text-txt">{r.supplier_name || "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs text-dim">{r.doc_number || "—"}</td>
+                  <td className="px-3 py-2.5 text-dim">{TIPI[r.doc_type]}</td>
+                  <td className="px-3 py-2.5 text-dim">{r.category || "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-dim">{eur(cents(r.taxable_cents))}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-dim">{eur(cents(r.vat_cents))}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono font-semibold text-txt">{eur(cents(r.total_cents))}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-xs" style={{ color: overdue ? "var(--err)" : "var(--dim)" }}>{r.due_date ? new Date(r.due_date).toLocaleDateString("it-IT") : "—"}</td>
+                  <td className="px-3 py-2.5" onClick={(e) => { e.stopPropagation(); togglePaid(r); }}>
+                    <span className="cursor-pointer rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${r.paid ? "var(--ok)" : overdue ? "var(--err)" : "var(--warn)"} 16%, transparent)`, color: r.paid ? "var(--ok)" : overdue ? "var(--err)" : "var(--warn)" }}>{r.paid ? "Pagata" : overdue ? "Scaduta" : "Da pagare"}</span>
+                  </td>
+                </tr>
+              );
+            })}
+            {!loading && filtered.length === 0 && <tr><td colSpan={10} className="px-3 py-10 text-center text-sm text-faint">Nessuna fattura passiva. Aggiungine una con “+ Nuova fattura”.</td></tr>}
+            {loading && <tr><td colSpan={10} className="px-3 py-10 text-center text-sm text-faint">Caricamento…</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      {edit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button aria-label="Chiudi" onClick={() => setEdit(null)} className="absolute inset-0 bg-black/40" />
+          <div className="relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">{edit.id ? "Modifica fattura passiva" : "Nuova fattura passiva"}</span><button onClick={() => setEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className={`${lbl} sm:col-span-2`}>Fornitore
+                <input list="sup-list" value={edit.supplierName} onChange={(e) => setEdit({ ...edit, supplierName: e.target.value, supplierId: null })} className={inp} placeholder="Nome fornitore" />
+                <datalist id="sup-list">{suppliers.map((s) => <option key={s.id} value={s.name} />)}</datalist>
+              </label>
+              <label className={lbl}>Numero documento<input value={edit.doc_number} onChange={(e) => setEdit({ ...edit, doc_number: e.target.value })} className={inp} /></label>
+              <label className={lbl}>Data<input type="date" value={edit.doc_date} onChange={(e) => setEdit({ ...edit, doc_date: e.target.value })} className={inp} /></label>
+              <label className={lbl}>Tipo<select value={edit.doc_type} onChange={(e) => setEdit({ ...edit, doc_type: e.target.value })} className={inp}>{Object.entries(TIPI).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+              <label className={lbl}>Categoria<select value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value })} className={inp}><option value="">—</option>{CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
+              <label className={lbl}>Imponibile €<input value={edit.taxableEur} onChange={(e) => setEdit({ ...edit, taxableEur: e.target.value })} className={inp} inputMode="decimal" /></label>
+              <label className={lbl}>IVA €<input value={edit.vatEur} onChange={(e) => setEdit({ ...edit, vatEur: e.target.value })} className={inp} inputMode="decimal" /></label>
+              <div className="sm:col-span-2 flex items-center justify-between rounded-lg bg-wash px-3 py-2 text-sm"><span className="text-dim">Totale</span><span className="font-mono font-bold text-txt">{eur(totEur)}</span></div>
+              <label className={lbl}>Scadenza pagamento<input type="date" value={edit.due_date} onChange={(e) => setEdit({ ...edit, due_date: e.target.value })} className={inp} /></label>
+              <label className={lbl}>Metodo<select value={edit.payment_method} onChange={(e) => setEdit({ ...edit, payment_method: e.target.value })} className={inp}><option>Bonifico bancario</option><option>Carta</option><option>Contanti</option><option>RID/SDD</option><option>PayPal</option></select></label>
+              <label className="sm:col-span-2 flex items-center gap-2 pt-1"><input type="checkbox" checked={edit.paid} onChange={(e) => setEdit({ ...edit, paid: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /><span className="text-sm text-txt">Pagata</span>{edit.paid && <input type="date" value={edit.paid_at || todayISO()} onChange={(e) => setEdit({ ...edit, paid_at: e.target.value })} className="ml-auto rounded-lg border border-line bg-paper px-2 py-1 text-sm" />}</label>
+              <label className={`${lbl} sm:col-span-2`}>Note<textarea value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} rows={2} className={inp} /></label>
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? "Salvo…" : "Salva"}</button>
+              {edit.id && <button onClick={del} className="rounded-lg px-3 py-2 text-sm font-medium text-faint hover:text-[color:var(--err)]">Elimina</button>}
+              <button onClick={() => setEdit(null)} className="ml-auto rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Annulla</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

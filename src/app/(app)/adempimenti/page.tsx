@@ -18,18 +18,21 @@ export default function AdempimentiPage() {
   const [istat, setIstat] = useState<{ id: string; arrival: string; stato: string }[]>([]);
   const [docs, setDocs] = useState<{ id: string; number_label: string | null; stato: string; total_cents: number; counterpart: { name?: string } | null }[]>([]);
   const [pays, setPays] = useState<{ document_id: string; amount_cents: number }[]>([]);
+  const [passive, setPassive] = useState<{ id: string; supplier_name: string | null; due_date: string | null; total_cents: number }[]>([]);
 
   useEffect(() => {
     if (!supabase) return;
     (async () => {
-      const [a, i, d, p] = await Promise.all([
+      const [a, i, d, p, pv] = await Promise.all([
         supabase.from("alloggiati_schedine").select("id, arrival, stato").neq("stato", "inviata"),
         supabase.from("istat_rows").select("id, arrival, stato").eq("stato", "pending"),
         supabase.from("documents").select("id, number_label, stato, total_cents, counterpart").in("stato", ["scartata", "emessa", "inviata_intermediario", "consegnata"]),
         supabase.from("document_payments").select("document_id, amount_cents"),
+        supabase.from("purchase_documents").select("id, supplier_name, due_date, total_cents").eq("paid", false),
       ]);
       setSched((a.data ?? []) as typeof sched); setIstat((i.data ?? []) as typeof istat);
       setDocs((d.data ?? []) as typeof docs); setPays((p.data ?? []) as typeof pays);
+      setPassive((pv.data ?? []) as typeof passive);
     })();
   }, []);
 
@@ -43,6 +46,7 @@ export default function AdempimentiPage() {
   const docsRejected = docs.filter((d) => d.stato === "scartata");
   const paidByDoc = useMemo(() => { const m = new Map<string, number>(); for (const p of pays) m.set(p.document_id, (m.get(p.document_id) ?? 0) + p.amount_cents); return m; }, [pays]);
   const docsUnpaid = docs.filter((d) => d.stato !== "scartata" && d.total_cents - (paidByDoc.get(d.id) ?? 0) > 0);
+  const passiveOverdue = passive.filter((p) => p.due_date && p.due_date <= t);
 
   const Tile = ({ n, label, tone, action, onClick, children }: { n: number; label: string; tone: string; action: string; onClick: () => void; children?: React.ReactNode }) => (
     <Card className="flex flex-col">
@@ -58,7 +62,7 @@ export default function AdempimentiPage() {
     </Card>
   );
 
-  const allClear = arrivalsNoCheckin.length === 0 && schedRisk.length === 0 && istatPending === 0 && docsRejected.length === 0 && docsUnpaid.length === 0;
+  const allClear = arrivalsNoCheckin.length === 0 && schedRisk.length === 0 && istatPending === 0 && docsRejected.length === 0 && docsUnpaid.length === 0 && passiveOverdue.length === 0;
 
   return (
     <div>
@@ -83,6 +87,10 @@ export default function AdempimentiPage() {
 
         <Tile n={docsUnpaid.length} label="Documenti da incassare" tone="var(--focus)" action="Documenti" onClick={() => router.push("/documenti")}>
           {docsUnpaid.slice(0, 4).map((d) => <div key={d.id} className="flex justify-between gap-2"><span className="truncate">{d.number_label} · {d.counterpart?.name ?? ""}</span><span className="shrink-0 font-mono">{eur(centsEur(d.total_cents - (paidByDoc.get(d.id) ?? 0)))}</span></div>)}
+        </Tile>
+
+        <Tile n={passiveOverdue.length} label="Fatture fornitori scadute" tone="var(--err)" action="Fatture passive" onClick={() => router.push("/fatture-passive")}>
+          {passiveOverdue.slice(0, 4).map((p) => <div key={p.id} className="flex justify-between gap-2"><span className="truncate">{p.supplier_name ?? "Fornitore"}</span><span className="shrink-0 font-mono">{eur(centsEur(p.total_cents))}</span></div>)}
         </Tile>
       </div>
     </div>
