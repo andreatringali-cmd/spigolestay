@@ -35,9 +35,10 @@ export default function SitoPage() {
   // anche se stai navigando l'app dal dominio *.vercel.app.
   const PUBLIC_HOST = "xenora.it";
   const publicBase = `https://${PUBLIC_HOST}`;
-  // Preview del proprietario (legge dal browser). Il sito PUBBLICO usa lo slug.
+  // Anteprima: se il sito è PUBBLICATO apre l'indirizzo pubblico reale (xenora.it/<slug>);
+  // altrimenti la preview locale del proprietario (legge dal browser).
   const previewLink = `${origin}/sito-web${sid ? `?s=${sid}` : ""}`;
-  const openPreview = () => window.open(previewLink, "_blank");
+  const openPreview = () => window.open(publishedSlug ? `${publicBase}/${publishedSlug}` : previewLink, "_blank");
 
   // --- Pubblicazione Xenosite (xenora.it/<slug>) -----------------------------
   const { user } = useAuth();
