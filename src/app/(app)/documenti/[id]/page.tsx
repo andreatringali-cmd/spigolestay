@@ -16,7 +16,7 @@ interface Doc { id: string; tenant_id: string; structure_id: string | null; book
   doc_kind: string; sdi_type: string; regime: string | null; number_label: string | null; stato: string; issue_date: string | null;
   due_date: string | null; payment_terms: string | null; payment_method: string | null; vat_exigibility: string | null; notes: string | null;
   counterpart: Record<string, string> | null; taxable_cents: number; vat_cents: number; out_of_scope_cents: number;
-  bollo_cents: number; rounding_cents: number; total_cents: number; advance_cents: number; send_sdi: boolean; provider: string | null; provider_ref: string | null; }
+  bollo_cents: number; rounding_cents: number; total_cents: number; advance_cents: number; send_sdi: boolean; provider: string | null; provider_ref: string | null; related_document_id: string | null; }
 interface DbLine { id: string; pos: number; description: string; qty: number; unit_price_cents: number; vat_rate: number; vat_nature: string | null; line_total_cents: number; source_kind: string | null }
 interface Ev { id: string; ts: string; kind: string; message: string }
 interface Pay { id: string; amount_cents: number; method: string | null; paid_at: string; note: string | null }
@@ -55,6 +55,7 @@ export default function DocumentoPage() {
   const [bq, setBq] = useState("");
   const [vies, setVies] = useState<{ status?: string; msg?: string }>({});
   const [cpList, setCpList] = useState<{ id: string; kind: string; name: string; vat: string | null; tax_code: string | null; country: string | null; address: string | null; city: string | null; cap: string | null; province: string | null; sdi_code: string | null; pec: string | null }[]>([]);
+  const [related, setRelated] = useState<{ id: string; number_label: string | null; doc_kind: string; role: string }[]>([]);
 
   const hydrate = useCallback((d: Doc, dl: DbLine[]) => {
     setF({
@@ -81,6 +82,17 @@ export default function DocumentoPage() {
     const dd = (d.data ?? null) as Doc | null;
     setDoc(dd); setEvents((e.data ?? []) as Ev[]); setPays((p.data ?? []) as Pay[]);
     if (dd) hydrate(dd, (l.data ?? []) as DbLine[]);
+    // Documenti collegati: la fattura di origine (se questo è una NC) e le NC che stornano questo doc.
+    if (dd) {
+      const rel: { id: string; number_label: string | null; doc_kind: string; role: string }[] = [];
+      if (dd.related_document_id) {
+        const { data: src } = await supabase.from("documents").select("id, number_label, doc_kind").eq("id", dd.related_document_id).maybeSingle();
+        if (src) rel.push({ ...(src as { id: string; number_label: string | null; doc_kind: string }), role: "Documento di origine" });
+      }
+      const { data: nc } = await supabase.from("documents").select("id, number_label, doc_kind").eq("related_document_id", dd.id);
+      (nc ?? []).forEach((x) => rel.push({ ...(x as { id: string; number_label: string | null; doc_kind: string }), role: "Nota di credito" }));
+      setRelated(rel);
+    }
     setLoading(false);
   }, [id, hydrate]);
   useEffect(() => { load(); }, [load]);
@@ -401,6 +413,17 @@ export default function DocumentoPage() {
             {pays.map((p) => <div key={p.id} className="flex justify-between text-sm text-dim"><span>{new Date(p.paid_at).toLocaleDateString("it-IT")} · {p.method}</span><span className="font-mono">{e2(p.amount_cents)}</span></div>)}
             {residuo > 0 && <button onClick={() => addPayment(residuo, "manuale")} disabled={!!busy} className="mt-2 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">Incassa tutto ({e2(residuo)})</button>}
           </div>
+          {related.length > 0 && (
+            <div className="mt-3 border-t border-line pt-2">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">Documenti collegati</div>
+              {related.map((r) => (
+                <button key={r.id} onClick={() => router.push(`/documenti/${r.id}`)} className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1 text-left text-sm hover:bg-wash">
+                  <span className="text-dim">{r.role}</span>
+                  <span className="font-semibold text-focus">{DOC_KIND_LABEL[r.doc_kind] ?? "Doc"} {r.number_label ?? "(bozza)"} ↗</span>
+                </button>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
 
