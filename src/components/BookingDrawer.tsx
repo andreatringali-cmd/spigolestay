@@ -225,69 +225,6 @@ export default function BookingDrawer() {
     w.document.close();
   };
 
-  const nextInvoiceNo = () => { try { const y = new Date().getFullYear(); const key = "spigolestay:invoicecounter"; const raw = JSON.parse(localStorage.getItem(key) || "{}"); const n = (raw.year === y ? raw.n : 0) + 1; localStorage.setItem(key, JSON.stringify({ year: y, n })); return `${n}/${y}`; } catch { return `1/${new Date().getFullYear()}`; } };
-
-  // Fattura elettronica FatturaPA (XML SdI) — genera e scarica il file.
-  const nextProgressivo = () => { try { const key = "spigolestay:sdiprog"; const n = (JSON.parse(localStorage.getItem(key) || "0") || 0) + 1; localStorage.setItem(key, JSON.stringify(n)); return String(n).padStart(5, "0"); } catch { return "00001"; } };
-  const printInvoice = () => {
-    const w = window.open("", "_blank", "width=820,height=940");
-    if (!w) return;
-    const money = (x: number) => "€ " + x.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const no = booking.invoiceNo ?? nextInvoiceNo();
-    if (!booking.invoiceNo) updateBooking(booking.id, { invoiceNo: no });
-    const today = new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" });
-    const unitV = getUnit(booking.unitId);
-    const forfettario = !structure?.vat;
-    const imponibile = forfettario ? accV + cleanV : Math.round((accV + cleanV) / 1.1);
-    const ivaAmt = forfettario ? 0 : (accV + cleanV) - imponibile;
-    const seller = structure?.businessName || structure?.name || "Xenora";
-    const fiscal = [structure?.vat ? `P. IVA ${structure.vat}` : "", structure?.taxCode ? `C.F. ${structure.taxCode}` : "", structure?.sdi ? `SDI ${structure.sdi}` : "", structure?.pec ? `PEC ${structure.pec}` : ""].filter(Boolean).join(" · ");
-    const rows: [string, string][] = [
-      [`Soggiorno · ${nView} ${nView === 1 ? "notte" : "notti"} (${fmtDate(booking.checkIn)} → ${fmtDate(booking.checkOut)})`, money(forfettario ? accV : Math.round(accV / 1.1))],
-      ["Pulizia finale", money(forfettario ? cleanV : Math.round(cleanV / 1.1))],
-    ];
-    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Fattura ${no}</title>
-    <style>
-      *{box-sizing:border-box} body{font-family:Georgia,'Times New Roman',serif;color:#1a2131;margin:0;padding:44px 52px;font-size:13px;line-height:1.5}
-      .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #4f46e5;padding-bottom:16px;margin-bottom:22px}
-      .brand{font-size:20px;font-weight:700;color:#1a2131}
-      .small{font-size:11px;color:#5c6479;margin-top:3px;line-height:1.5}
-      .doc{text-align:right} .doc h1{font-size:15px;letter-spacing:1px;text-transform:uppercase;color:#4f46e5;margin:0 0 4px}
-      .grid2{display:flex;gap:16px;margin-bottom:22px}
-      .box{flex:1;background:#f5f6fa;border:1px solid #e3e6ef;border-radius:8px;padding:12px 14px}
-      .box b{display:block;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#9aa2b6;margin-bottom:4px;font-family:Arial,sans-serif}
-      table{width:100%;border-collapse:collapse;margin-top:6px}
-      th{font-family:Arial,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#9aa2b6;text-align:left;border-bottom:1px solid #e3e6ef;padding:8px 4px}
-      td{padding:10px 4px;border-bottom:1px solid #eef0f6} td.amt{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-      tr.sum td{border:none;padding:4px 4px} tr.tot td{border-top:2px solid #1a2131;font-weight:700;font-size:16px;padding-top:12px}
-      .note{margin-top:26px;font-size:10px;color:#9aa2b6;border-top:1px solid #e3e6ef;padding-top:12px;line-height:1.6}
-      @media print{body{padding:22px 28px}}
-    </style></head><body>
-      <div class="head">
-        <div><div class="brand">${seller}</div><div class="small">${structure?.address ?? ""}${structure?.postalCode ? ", " + structure.postalCode : ""} ${structure?.city ?? "Siracusa"}<br>${fiscal}</div></div>
-        <div class="doc"><h1>Fattura</h1><div class="small">n. <b style="color:#1a2131">${no}</b><br>${today}</div></div>
-      </div>
-      <div class="grid2">
-        <div class="box"><b>Cliente</b>${guest?.fullName ?? "—"}${guest?.email ? "<br>" + guest.email : ""}${guest?.phone ? "<br>" + guest.phone : ""}</div>
-        <div class="box"><b>Riferimento</b>Prenotazione ${bookingCode(booking)}<br>${roomType?.name ?? ""}${unitV?.name ? " — " + unitV.name : ""}<br>${booking.adults} adulti${booking.children ? " · " + booking.children + " bambini" : ""}</div>
-      </div>
-      <table>
-        <tr><th>Descrizione</th><th style="text-align:right">${forfettario ? "Importo" : "Imponibile"}</th></tr>
-        ${rows.map((r) => `<tr><td>${r[0]}</td><td class="amt">${r[1]}</td></tr>`).join("")}
-        <tr class="sum"><td>${forfettario ? "Totale imponibile" : "Imponibile"}</td><td class="amt">${money(imponibile)}</td></tr>
-        ${forfettario ? "" : `<tr class="sum"><td>IVA 10%</td><td class="amt">${money(ivaAmt)}</td></tr>`}
-        ${taxV > 0 ? `<tr class="sum"><td>Imposta di soggiorno (fuori campo IVA)</td><td class="amt">${money(taxV)}</td></tr>` : ""}
-        <tr class="tot"><td>Totale documento</td><td class="amt">${money(totalV)}</td></tr>
-      </table>
-      <div class="note">
-        ${forfettario ? "Operazione effettuata ai sensi dell'art. 1, commi 54-89, L. 190/2014 (regime forfettario): non soggetta a IVA né a ritenuta d'acconto." : "IVA assolta con aliquota 10% sui servizi di alloggio (n. 120 Tab. A parte III DPR 633/72)."}<br>
-        Imposta di soggiorno riscossa in nome e per conto del Comune di ${structure?.cityTaxComune || structure?.city || "Siracusa"} — fuori campo IVA art. 4 DPR 633/72.<br>
-        Documento emesso da ${seller}${booking.paid ? ` · Acconto già versato: ${money(Math.min(booking.paid, totalV))}` : ""}.
-      </div>
-      <script>window.onload=function(){window.print()}<\/script>
-    </body></html>`);
-    w.document.close();
-  };
 
   const groupSize = booking?.groupId ? bookings.filter((x) => x.groupId === booking.groupId).length : 0;
   const removeGroup = async () => {
@@ -627,14 +564,7 @@ export default function BookingDrawer() {
           <span className="text-xs opacity-90">{t("fattura elettronica")} →</span>
         </button>
         {emit.msg && <p className="text-[11px] text-[color:var(--err)]">{emit.msg}</p>}
-        <button onClick={printReceipt} className="flex w-full items-center justify-between rounded-lg border border-line bg-paper px-3 py-2.5 text-sm font-medium text-txt hover:border-focus hover:bg-wash">
-          <span>{t("Ricevuta su carta intestata")}</span>
-          <span className="text-xs text-dim">{t("PDF / Stampa")} →</span>
-        </button>
-        <button onClick={printInvoice} className="flex w-full items-center justify-between rounded-lg border border-line bg-paper px-3 py-2.5 text-sm font-medium text-txt hover:border-focus hover:bg-wash">
-          <span>{t("Fattura")}{booking.invoiceNo ? ` n. ${booking.invoiceNo}` : ""}</span>
-          <span className="text-xs text-dim">{t("PDF / Stampa")} →</span>
-        </button>
+        <p className="text-[11px] text-faint">{t("Fattura, ricevuta e nota di credito si gestiscono in")} <span className="font-semibold text-focus">Documenti fiscali</span>.</p>
       </Section>
 
       <div className="border-t border-line px-5 py-3">
