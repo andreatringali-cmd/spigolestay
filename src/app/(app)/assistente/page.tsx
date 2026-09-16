@@ -13,16 +13,19 @@ import Icon from "@/components/Icon";
 import AssistantCore from "@/components/AssistantCore";
 import { eur } from "@/lib/format";
 import { bookingGrandTotal } from "@/lib/booking";
+import { nights } from "@/lib/dates";
+import { CHANNELS, type Booking } from "@/lib/types";
 
 // Data locale (NON UTC): altrimenti vicino a mezzanotte "oggi" sfasa di un giorno.
 const todayISO = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; };
 const monthOf = (iso: string) => (iso || "").slice(0, 7);
 
-type Ans = { title: string; value: string; detail?: string; go?: { label: string; href: string } };
+type PickItem = { id: string; label: string; sub?: string };
+type Ans = { title: string; value?: string; detail?: string; speech?: string; list?: PickItem[]; go?: { label: string; href: string } };
 
 export default function AssistentePage() {
   const router = useRouter();
-  const { bookings, getGuest, getStructure } = useData();
+  const { bookings, roomTypes, getGuest, getStructure, getUnit } = useData();
   const { user } = useAuth();
   const [q, setQ] = useState("");
   const [ans, setAns] = useState<Ans | null>(null);
@@ -47,12 +50,15 @@ export default function AssistentePage() {
   // Scelta della voce italiana più naturale disponibile (Google/cloud/neural), non quella robotica di default.
   useEffect(() => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
+    // Preferenza: voce MASCHILE italiana, meglio se naturale/cloud.
+    const MALE = /cosimo|diego|giorgio|luca|carlo|marco|paolo|giuseppe|antonio|male\b|maschile|uomo|man\b/;
+    const FEMALE = /elsa|alice|federica|chiara|bianca|isabella|giulia|carla|google italiano|female|femminile|donna|woman/;
     const score = (v: SpeechSynthesisVoice) => {
       const n = v.name.toLowerCase(); let s = 0;
-      if (/google/.test(n)) s += 6;
-      if (/natural|neural|premium|enhanced|wavenet|siri/.test(n)) s += 7;
-      if (v.localService === false) s += 4; // voce cloud = più realistica
-      if (/federica|alice|elsa|isabella|bianca|chiara|luca|giorgio|cosimo/.test(n)) s += 2;
+      if (MALE.test(n)) s += 10;
+      if (FEMALE.test(n)) s -= 6;
+      if (/natural|neural|premium|enhanced|wavenet|siri/.test(n)) s += 5;
+      if (v.localService === false) s += 3; // voce cloud = più realistica
       return s;
     };
     const pick = () => {
@@ -91,17 +97,13 @@ export default function AssistentePage() {
     const ricavoMese = monthArr.reduce((a, b) => a + bookingGrandTotal(b, getStructure(b.structureId)), 0);
     const incassatoMese = monthArr.reduce((a, b) => a + (b.paid ?? 0), 0);
     const nextArrival = active.filter((b) => b.checkIn > t).sort((a, b) => a.checkIn.localeCompare(b.checkIn))[0];
-    const list = (bs: typeof bookings) => bs.slice(0, 6).map((b) => `${getGuest(b.guestId)?.fullName || "Ospite"} (${getStructure(b.structureId)?.name ?? ""})`).join(", ");
     return {
       arrivalsToday, departuresToday, noCheckin,
-      arrivi: { title: "Arrivi di oggi", value: `${arrivalsToday.length}`, detail: list(arrivalsToday) || "Nessun arrivo oggi.", go: { label: "Prenotazioni", href: "/prenotazioni" } } as Ans,
-      checkin: { title: "Arrivi senza check-in online", value: `${noCheckin.length}`, detail: list(noCheckin) || "Tutti hanno fatto il check-in.", go: { label: "Prenotazioni", href: "/prenotazioni" } } as Ans,
-      partenze: { title: "Partenze di oggi", value: `${departuresToday.length}`, detail: list(departuresToday) || "Nessuna partenza oggi.", go: { label: "Pulizie", href: "/pulizie" } } as Ans,
       ricavo: { title: "Ricavo del mese", value: eur(ricavoMese), detail: `${monthArr.length} prenotazioni con arrivo questo mese.`, go: { label: "Statistiche", href: "/statistiche" } } as Ans,
       incassato: { title: "Incassato del mese", value: eur(incassatoMese), detail: `Su ${eur(ricavoMese)} di ricavo previsto.`, go: { label: "Incassi", href: "/pagamenti" } } as Ans,
       prossimo: { title: "Prossimo arrivo", value: nextArrival ? new Date(nextArrival.checkIn).toLocaleDateString("it-IT") : "—", detail: nextArrival ? `${getGuest(nextArrival.guestId)?.fullName || "Ospite"} · ${getStructure(nextArrival.structureId)?.name ?? ""}` : "Nessun arrivo futuro.", go: { label: "Calendario", href: "/calendario" } } as Ans,
     };
-  }, [active, t, ym, getGuest, getStructure, bookings]);
+  }, [active, t, ym, getGuest, getStructure]);
 
   // ── Briefing del giorno ──
   const [dueCents, setDueCents] = useState<number | null>(null);
@@ -130,6 +132,53 @@ export default function AssistentePage() {
     return `${greet}${firstName ? " " + firstName : ""}. Oggi: ${parts.join(", ")}.`;
   }, [answers, dueCents, greet, firstName]);
 
+  // Descrizione COMPLETA e discorsiva di una prenotazione (per lettura vocale + testo).
+  const narrate = useCallback((b: Booking): { title: string; text: string } => {
+    const g = getGuest(b.guestId);
+    const name = g?.fullName || [b.primaryGuest?.firstName, b.primaryGuest?.lastName].filter(Boolean).join(" ") || "Ospite";
+    const st = getStructure(b.structureId);
+    const unit = getUnit(b.unitId);
+    const rt = roomTypes.find((r) => r.id === b.roomTypeId);
+    const nN = nights(b.checkIn, b.checkOut);
+    const dOf = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
+    const ch = CHANNELS[b.channel]?.label || b.channel;
+    const total = b.total ?? 0, paid = b.paid ?? 0, resid = Math.max(0, total - paid);
+    const people = `${b.adults} adult${b.adults === 1 ? "o" : "i"}${b.children ? ` e ${b.children} bambin${b.children === 1 ? "o" : "i"}` : ""}`;
+    const pay = total === 0 ? "Nessun importo registrato per il soggiorno." : paid <= 0 ? `Deve ancora pagare l'intero importo di ${eur(total)}: non ha versato nulla.` : resid <= 0 ? `Ha già saldato tutto, ${eur(total)}.` : `Ha versato ${eur(paid)} su ${eur(total)}; restano ${eur(resid)} da incassare.`;
+    const p: string[] = [];
+    p.push(`${name}: ${b.checkIn === todayISO() ? "arriva oggi" : `arriva ${dOf(b.checkIn)}`} e riparte ${dOf(b.checkOut)}, ${nN} nott${nN === 1 ? "e" : "i"}.`);
+    p.push(`Ha prenotato tramite ${ch}.`);
+    p.push(unit ? `Alloggia ${st ? `al ${st.name}, ` : ""}camera ${unit.name}${rt ? `, tipologia ${rt.name}` : ""}.` : `Camera non ancora assegnata${rt ? `, tipologia ${rt.name}` : ""}${st ? `, ${st.name}` : ""}.`);
+    p.push(`Sono ${people}.`);
+    if (b.arrivalTime) p.push(`Orario di arrivo previsto: ${b.arrivalTime}.`);
+    p.push(pay);
+    p.push(b.webCheckin ? "Ha già fatto il check-in online." : "Non ha ancora fatto il check-in online.");
+    p.push(b.parking ? "Ha prenotato il parcheggio." : "Non ha prenotato il parcheggio.");
+    if (b.extras && b.extras.length) p.push(`Extra richiesti: ${b.extras.map((e) => e.name).join(", ")}.`);
+    if (b.cityTaxExempt) p.push("È esente dalla tassa di soggiorno.");
+    else p.push(b.cityTaxPaid ? "La tassa di soggiorno è stata incassata." : "La tassa di soggiorno è ancora da incassare.");
+    if (b.depositPaid) p.push("La caparra è stata ricevuta.");
+    if (b.guestRequests) p.push(`Richieste dell'ospite: ${b.guestRequests}.`);
+    else if (b.note) p.push(`Nota interna: ${b.note}.`);
+    return { title: name, text: p.join(" ") };
+  }, [getGuest, getStructure, getUnit, roomTypes]);
+
+  const subOf = useCallback((b: Booking) => {
+    const u = getUnit(b.unitId); const parts: string[] = [];
+    if (u) parts.push(`Camera ${u.name}`);
+    if (b.arrivalTime) parts.push(`arrivo ${b.arrivalTime}`);
+    parts.push(CHANNELS[b.channel]?.label || b.channel);
+    if (!b.webCheckin) parts.push("check-in da fare");
+    return parts.join(" · ");
+  }, [getUnit]);
+
+  const pickBooking = useCallback((id: string) => {
+    const b = bookings.find((x) => x.id === id); if (!b) return;
+    const nb = narrate(b);
+    setAns({ title: nb.title, detail: nb.text, speech: nb.text, go: { label: "Apri in Prenotazioni", href: "/prenotazioni" } });
+    speak(nb.text);
+  }, [bookings, narrate, speak]);
+
   // Briefing "distribuito": ogni numero è una tessera a sé.
   const tiles = useMemo(() => [
     { label: "Arrivi oggi", value: String(answers.arrivalsToday.length), tone: "var(--ok)", q: "arrivi oggi" },
@@ -140,10 +189,36 @@ export default function AssistentePage() {
 
   // ── Motore risposte (parole chiave) ──
   const answer = useCallback(async (text: string): Promise<Ans> => {
-    const s = text.toLowerCase();
-    if (/check[\s-]?in|schedin/.test(s)) return answers.checkin;
-    if (/partenz|check[\s-]?out|pulizi/.test(s)) return answers.partenze;
-    if (/arriv|oggi|chi viene/.test(s)) return answers.arrivi;
+    const s = text.toLowerCase().trim();
+    const itemsOf = (bs: Booking[]): PickItem[] => bs.map((b) => ({ id: b.id, label: getGuest(b.guestId)?.fullName || "Ospite", sub: subOf(b) }));
+
+    // Nome ospite nella domanda → narrazione diretta di quella prenotazione.
+    if (!/arriv|partenz|check|incass|ricav|fornitor|mese|prossim/.test(s)) {
+      const named = active.find((b) => {
+        const nm = (getGuest(b.guestId)?.fullName || "").toLowerCase(); if (!nm) return false;
+        const parts = nm.split(/\s+/).filter((w) => w.length > 2);
+        const matches = parts.filter((w) => s.includes(w)).length;
+        return matches >= 2 || (matches >= 1 && /info|dimmi|parla|prenotaz|ospite|chi è/.test(s));
+      });
+      if (named) { const nb = narrate(named); return { title: nb.title, detail: nb.text, speech: nb.text, go: { label: "Apri in Prenotazioni", href: "/prenotazioni" } }; }
+    }
+
+    if (/check[\s-]?in|schedin/.test(s)) {
+      const bs = answers.noCheckin, n = bs.length;
+      const intro = n === 0 ? "Tutti gli arrivi di oggi hanno già fatto il check-in online." : `Ci ${n === 1 ? "è" : "sono"} ${n} arriv${n === 1 ? "o" : "i"} senza check-in online. Scegline uno e ti dico tutto.`;
+      return { title: "Check-in da completare", value: String(n), detail: intro, speech: intro, list: itemsOf(bs) };
+    }
+    if (/partenz|check[\s-]?out|pulizi/.test(s)) {
+      const bs = answers.departuresToday, n = bs.length;
+      const intro = n === 0 ? `${firstName ? firstName + ", o" : "O"}ggi non ci sono partenze.` : `Oggi ${n === 1 ? "parte" : "partono"} ${n} ospit${n === 1 ? "e" : "i"}. Toccane uno per i dettagli.`;
+      return { title: "Partenze di oggi", value: String(n), detail: intro, speech: intro, list: itemsOf(bs) };
+    }
+    if (/arriv|chi viene|chi arriva/.test(s)) {
+      const bs = answers.arrivalsToday, n = bs.length;
+      const hello = `Ciao${firstName ? " " + firstName : ""}`;
+      const intro = n === 0 ? `${hello}, oggi non ci sono arrivi.` : `${hello}! Oggi ci ${n === 1 ? "è un arrivo" : `sono ${n} arrivi`}. Se vuoi ti dico tutto di ognuno: scegli una prenotazione qui sotto o dimmi il nome dell'ospite.`;
+      return { title: "Arrivi di oggi", value: String(n), detail: intro, speech: intro, list: itemsOf(bs) };
+    }
     if (/incass|pagat/.test(s)) return answers.incassato;
     if (/ricav|fatturat|guadagn|incasso previst/.test(s)) return answers.ricavo;
     if (/prossim|futur/.test(s)) return answers.prossimo;
@@ -156,14 +231,14 @@ export default function AssistentePage() {
       const tot = ((data ?? []) as { total_cents: number }[]).reduce((a, r) => a + r.total_cents, 0);
       return { title: "Fatture fornitori da pagare", value: eur(tot / 100), detail: `${(data ?? []).length} fatture non pagate.`, go: { label: "Fatture passive", href: "/fatture-passive" } };
     }
-    return { title: "Non ho capito", value: "🤔", detail: "Prova con una delle domande rapide qui sotto." };
-  }, [answers, dueCents]);
+    return { title: "Non ho capito", value: "🤔", detail: "Prova con: chi arriva oggi, partenze, check-in, ricavo del mese, da incassare — oppure dimmi il nome di un ospite." };
+  }, [answers, active, dueCents, firstName, getGuest, narrate, subOf]);
 
   const ask = useCallback(async (text: string) => {
     if (!text.trim()) return;
     const a = await answer(text);
     setAns(a);
-    speak(`${a.title}. ${a.value}. ${a.detail ?? ""}`);
+    speak(a.speech ?? [a.title, a.value, a.detail].filter(Boolean).join(". "));
   }, [answer, speak]);
 
   // ── Voce in entrata ──
@@ -265,13 +340,23 @@ export default function AssistentePage() {
       {ans && (
         <Card>
           <div className="flex items-start justify-between gap-2">
-            <div>
+            <div className="min-w-0">
               <div className="text-xs font-semibold uppercase tracking-wide text-faint">{ans.title}</div>
-              <div className="mt-1 font-mono text-3xl font-bold text-txt">{ans.value}</div>
-              {ans.detail && <p className="mt-1 text-sm text-dim">{ans.detail}</p>}
+              {ans.value && <div className="mt-1 font-mono text-3xl font-bold text-txt">{ans.value}</div>}
+              {ans.detail && <p className="mt-1 text-sm leading-relaxed text-dim">{ans.detail}</p>}
             </div>
-            <button onClick={() => speak(`${ans.title}. ${ans.value}. ${ans.detail ?? ""}`)} title="Rileggi ad alta voce" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash"><Icon name="chat" size={16} /></button>
+            <button onClick={() => speak(ans.speech ?? [ans.title, ans.value, ans.detail].filter(Boolean).join(". "))} title="Rileggi ad alta voce" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash"><Icon name="chat" size={16} /></button>
           </div>
+          {ans.list && ans.list.length > 0 && (
+            <div className="mt-3 flex flex-col gap-1.5">
+              {ans.list.map((it) => (
+                <button key={it.id} onClick={() => pickBooking(it.id)} className="flex items-center justify-between gap-3 rounded-lg border border-line px-3 py-2 text-left transition hover:bg-wash">
+                  <span className="min-w-0"><span className="block truncate text-sm font-semibold text-txt">{it.label}</span>{it.sub && <span className="block truncate text-[11px] text-faint">{it.sub}</span>}</span>
+                  <span className="shrink-0 text-xs font-semibold text-focus">Dettagli →</span>
+                </button>
+              ))}
+            </div>
+          )}
           {ans.go && <button onClick={() => router.push(ans.go!.href)} className="mt-3 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{ans.go.label} →</button>}
         </Card>
       )}
