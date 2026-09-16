@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { useData } from "@/lib/store";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { eur } from "@/lib/format";
 import { nights } from "@/lib/dates";
@@ -36,6 +37,7 @@ export default function DocumentoPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const ask = useConfirm();
   const { structures, activeStructureId, bookings, getGuest, getStructure, getRoomType } = useData();
   const id = String(params.id || "");
   const [doc, setDoc] = useState<Doc | null>(null);
@@ -220,7 +222,7 @@ export default function DocumentoPage() {
   const addPayment = async (amountCents: number, method: string) => { if (!supabase || !user || amountCents <= 0) return; await act("pay", async () => { await supabase!.from("document_payments").insert({ document_id: id, tenant_id: user.id, amount_cents: amountCents, method }); }); };
   const deleteDraft = async () => {
     if (!supabase || !doc || doc.stato !== "bozza") return;
-    if (!confirm("Eliminare questa bozza? L'operazione non è reversibile.")) return;
+    if (!(await ask({ title: "Elimina bozza", message: "Eliminare questa bozza di documento?", danger: true, confirmLabel: "Elimina" }))) return;
     setBusy("del"); setMsg("");
     const { error } = await supabase.from("documents").delete().eq("id", id);
     if (error) { setMsg("Errore: " + error.message); setBusy(""); return; }
