@@ -9,6 +9,7 @@ export interface NavItem {
 
 export const NAV: NavItem[] = [
   { label: "Dashboard", href: "/", group: "", icon: "grid" },
+  { label: "Assistente", href: "/assistente", group: "", icon: "sparkles", perm: "prenotazioni", module: "pms" },
   { label: "Adempimenti oggi", href: "/adempimenti", group: "", icon: "clipboard", perm: "prenotazioni", module: "pms" },
   { label: "Prenotazioni", href: "/prenotazioni", group: "", icon: "clipboard", perm: "prenotazioni", module: "pms" },
 

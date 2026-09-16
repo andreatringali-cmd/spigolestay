@@ -70,7 +70,7 @@ export default function ScrollStrip({ items, onReorder, gap = "gap-4" }: { items
   const nudge = (dir: -1 | 1) => { const el = ref.current; if (!el) return; el.scrollBy({ left: dir * stepPx(), behavior: "smooth" }); };
 
   const activeIdx = items.findIndex((i) => i.key === active);
-  const arrowCls = "absolute top-1/2 z-20 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-line bg-surface text-lg text-txt shadow-md transition hover:bg-wash disabled:pointer-events-none disabled:opacity-0";
+  const arrowCls = "absolute top-1/2 z-20 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-focus text-lg font-bold leading-none text-white shadow-md transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-0";
 
   return (
     <div>

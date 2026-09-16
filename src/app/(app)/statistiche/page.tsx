@@ -32,6 +32,8 @@ export default function StatistichePage() {
   const [chartsOn, setChartsOn] = useState(true);
   useEffect(() => { try { const r = localStorage.getItem("spigolestay:statscharts:on"); if (r !== null) setChartsOn(r === "1"); } catch {} }, []);
   const toggleCharts = () => setChartsOn((v) => { const n = !v; try { localStorage.setItem("spigolestay:statscharts:on", n ? "1" : "0"); } catch {} return n; });
+  // Report attivo: i tanti report di Octorate condensati in 3 (Produzione, Previsionale, Annuale).
+  const [report, setReport] = useState<"produzione" | "previsionale" | "annuale">("produzione");
 
   const active = bookings.filter((b) => b.status !== "cancelled" && (activeStructureId === "all" || b.structureId === activeStructureId));
   const scopedStructures = activeStructureId === "all" ? structures : structures.filter((s) => s.id === activeStructureId);
@@ -178,6 +180,28 @@ export default function StatistichePage() {
     { key: "stay", title: t("Durata del soggiorno"), node: <Bars items={stayDist} /> },
     { key: "rev-str", title: t("Ricavi per struttura"), perStructure: true, node: <Bars items={revByStructure} /> },
   ].filter((c) => !(singleStruct && c.perStructure));
+  // ---- Report annuale: 12 mesi dell'anno scelto + totali con confronto sull'anno precedente ----
+  const yearOptions = useMemo(() => {
+    const ys = new Set<number>([y]); bks.forEach((b) => ys.add(Number(b.checkIn.slice(0, 4))));
+    return [...ys].filter((n) => n >= 2000).sort((a, b) => b - a);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings, activeStructureId]);
+  const [annualYear, setAnnualYear] = useState(y);
+  const daysInYear = (yr: number) => ((yr % 4 === 0 && yr % 100 !== 0) || yr % 400 === 0 ? 366 : 365);
+  const yearMetrics = (yr: number) => {
+    let revenue = 0, roomNights = 0, arrivals = 0;
+    const months = Array.from({ length: 12 }, (_, i) => {
+      const m = metrics(`${yr}-${pad2(i + 1)}-01`, toISO(new Date(yr, i + 1, 1)));
+      revenue += m.revenue; roomNights += m.roomNights; arrivals += m.count;
+      return { i, label: new Date(yr, i, 1).toLocaleDateString("it-IT", { month: "short" }), ...m };
+    });
+    const denom = scopedUnits.length * daysInYear(yr);
+    return { months, revenue, roomNights, arrivals, occ: denom ? roomNights / denom : 0, adr: roomNights ? revenue / roomNights : 0, revpar: denom ? revenue / denom : 0 };
+  };
+  const annCur = yearMetrics(annualYear);
+  const annPrev = yearMetrics(annualYear - 1);
+  const annualBars = annCur.months.map((m) => ({ label: m.label, value: m.revenue, color: "var(--focus)" }));
+
   // Applica l'ordine scelto dall'utente (doppio clic per riposizionare).
   const orderedCharts = [...charts].sort((a, b) => {
     const ia = chartOrder.indexOf(a.key), ib = chartOrder.indexOf(b.key);
@@ -189,10 +213,17 @@ export default function StatistichePage() {
 
   return (
     <div>
-      <PageHeader title={t("Statistiche")} subtitle={t("Andamento e report previsionale del mese selezionato")} />
+      <PageHeader title={t("Statistiche")} subtitle={t("Tre report: produzione del mese, previsionale e annuale")} />
+
+      {/* Selettore report: Produzione · Previsionale · Annuale */}
+      <div className="mb-4 inline-flex rounded-xl border border-line bg-surface p-0.5 text-sm shadow-sm">
+        {([["produzione", t("Produzione")], ["previsionale", t("Previsionale")], ["annuale", t("Annuale")]] as const).map(([k, lab]) => (
+          <button key={k} onClick={() => setReport(k)} className={`rounded-lg px-4 py-1.5 font-semibold transition ${report === k ? "bg-focus text-white shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
+        ))}
+      </div>
 
       {/* Base di attribuzione dei ricavi */}
-      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+      <div className={`mb-3 flex flex-wrap items-center gap-2 text-xs ${report === "previsionale" ? "hidden" : ""}`}>
         <span className="text-dim">{t("Ricavi calcolati")}:</span>
         <div className="inline-flex rounded-lg border border-line p-0.5">
           {([["notte", t("Per notte (competenza)")], ["arrivo", t("Per data di arrivo")], ["incasso", t("All'incasso")]] as const).map(([k, lab]) => (
@@ -201,6 +232,7 @@ export default function StatistichePage() {
         </div>
       </div>
 
+      {report === "produzione" && (<>
       {/* KPI del mese selezionato con confronto sul mese precedente */}
       <div className="mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <KpiD label={t("Notti vendute")} value={String(cur.roomNights)} d={prev ? delta(cur.roomNights, prev.roomNights) : null} cmp={R.cmp} />
@@ -229,9 +261,10 @@ export default function StatistichePage() {
         />
         )}
       </div>
+      </>)}
 
-      {/* Riga filtro unica: mese (guida KPI e report) + toggle grafici */}
-      <div className="mt-4 mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
+      {/* Riga filtro unica: mese (guida KPI e report) + toggle grafici — non nel report annuale */}
+      <div className={`mt-4 mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm ${report === "annuale" ? "hidden" : ""}`}>
         <span className="text-sm font-semibold text-txt">{t("Mese")}</span>
         <select value={repMonth} onChange={(e) => setRepMonth(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm capitalize text-txt outline-none focus:border-focus">
           {monthOptions.map((mk) => <option key={mk} value={mk} className="capitalize">{monthLabelOf(mk)}</option>)}
@@ -241,6 +274,7 @@ export default function StatistichePage() {
       </div>
 
       {/* Report previsionale (stile Octorate): giorno per giorno, storico + previsione */}
+      {report === "previsionale" && (
       <div>
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
           <h2 className="font-display text-lg font-bold text-txt">{t("Report previsionale")}</h2>
@@ -315,6 +349,69 @@ export default function StatistichePage() {
         </div>
         <p className="mt-2 text-xs text-faint"><b className="text-dim">{t("Storico")}</b> {t("= giorni già passati")} · <b className="text-dim">{t("Previsione")}</b> {t("= giorni futuri")}. {t("Tutte le prenotazioni prese e confermate valgono come ricavo pieno (come se tutto fosse incassato). Gli incassi effettivi sono nella sezione")} <b className="text-dim">{t("Incassi")}</b>.</p>
       </div>
+      )}
+
+      {/* Report annuale: 12 mesi dell'anno scelto + totali con confronto sull'anno precedente */}
+      {report === "annuale" && (
+      <div>
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <h2 className="font-display text-lg font-bold text-txt">{t("Report annuale")}</h2>
+          <select value={annualYear} onChange={(e) => setAnnualYear(Number(e.target.value))} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+            {yearOptions.map((yr) => <option key={yr} value={yr}>{yr}</option>)}
+          </select>
+        </div>
+
+        {/* KPI anno con confronto sull'anno precedente */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <KpiD label={t("Notti vendute")} value={String(annCur.roomNights)} d={delta(annCur.roomNights, annPrev.roomNights)} cmp={String(annualYear - 1)} />
+          <KpiD label={t("Occupazione")} value={`${Math.round(annCur.occ * 100)}%`} d={delta(annCur.occ, annPrev.occ)} cmp={String(annualYear - 1)} />
+          <KpiD label="ADR" value={eur(annCur.adr)} d={delta(annCur.adr, annPrev.adr)} cmp={String(annualYear - 1)} />
+          <KpiD label="RevPAR" value={eur(annCur.revpar)} d={delta(annCur.revpar, annPrev.revpar)} cmp={String(annualYear - 1)} />
+          <KpiD label={t("Ricavi")} value={eur(annCur.revenue)} d={delta(annCur.revenue, annPrev.revenue)} cmp={String(annualYear - 1)} />
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{t("Ricavi per mese")} · {annualYear}</div>
+            <ColumnChart bars={annualBars} format={(n) => eur(n)} />
+          </div>
+          <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-wash text-left text-xs uppercase tracking-wide text-faint">
+                  <th className="px-3 py-2 font-semibold">{t("Mese")}</th>
+                  <th className="px-3 py-2 text-right font-semibold">{t("Occup.")}</th>
+                  <th className="px-3 py-2 text-right font-semibold">{t("Notti")}</th>
+                  <th className="px-3 py-2 text-right font-semibold">ADR</th>
+                  <th className="px-3 py-2 text-right font-semibold">{t("Ricavi")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {annCur.months.map((m) => (
+                  <tr key={m.i} className="border-b border-line last:border-0">
+                    <td className="px-3 py-2 font-medium capitalize text-txt">{m.label}</td>
+                    <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(m.occ * 100)}%</td>
+                    <td className="px-3 py-2 text-right font-mono text-dim">{m.roomNights || ""}</td>
+                    <td className="px-3 py-2 text-right font-mono text-dim">{m.roomNights ? eur(m.adr) : "—"}</td>
+                    <td className="px-3 py-2 text-right font-mono text-txt">{eur(m.revenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tbody>
+                <tr className="border-t-2 border-line bg-wash font-bold">
+                  <td className="px-3 py-2 text-txt">{t("Totale")} {annualYear}</td>
+                  <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(annCur.occ * 100)}%</td>
+                  <td className="px-3 py-2 text-right font-mono text-dim">{annCur.roomNights}</td>
+                  <td className="px-3 py-2 text-right font-mono text-dim">{annCur.roomNights ? eur(annCur.adr) : "—"}</td>
+                  <td className="px-3 py-2 text-right font-mono text-[color:var(--ok)]">{eur(annCur.revenue)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-faint">{t("Ricavi calcolati")}: <b className="text-dim">{basis === "notte" ? t("per notte (competenza)") : basis === "arrivo" ? t("per data di arrivo") : t("all'incasso")}</b>. {t("Confronto sull'anno")} {annualYear - 1}.</p>
+      </div>
+      )}
     </div>
   );
 }
