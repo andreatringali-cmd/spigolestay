@@ -400,25 +400,26 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Sezione giorno */}
-      <div className="mt-6 mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        <div className="no-print flex flex-wrap items-center gap-2">
-          <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca ospite…")} />
-          <div className="flex items-center gap-1">
-            <button onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash hover:text-txt">‹</button>
-            <DateField value={date} onChange={setDate} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-focus" />
-            <button onClick={() => setDate(toISO(addDays(parseISO(date), 1)))} title={t("Giorno successivo")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash hover:text-txt">›</button>
+      {/* Sezione giorno — la ricerca sta nella STESSA griglia dei KPI: larga quanto una card e allineata */}
+      <div className="mt-6 mb-4 grid grid-cols-2 items-center gap-3 lg:grid-cols-4">
+        <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca ospite…")} className="no-print col-span-2 w-full lg:col-span-1" />
+        <div className="col-span-2 flex flex-wrap items-center gap-2 lg:col-span-3">
+          <div className="no-print flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1">
+              <button onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash hover:text-txt">‹</button>
+              <DateField value={date} onChange={setDate} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-focus" />
+              <button onClick={() => setDate(toISO(addDays(parseISO(date), 1)))} title={t("Giorno successivo")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash hover:text-txt">›</button>
+            </div>
+            {focus && <span className="rounded-full bg-wash px-2.5 py-0.5 text-[11px] font-semibold text-focus">{t("Filtro")}: {focus === "attive" ? t("attive") : focus === "inhouse" ? t("in struttura") : focus === "arrivi" ? t("arrivi") : t("partenze")}</span>}
+            {hasFilters && <button onClick={() => { setSearch(""); setDate(todayISO); setFocus(null); }} className="rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-wash" style={{ borderColor: "var(--err)", color: "var(--err)" }}>{t("Rimuovi filtri")}</button>}
           </div>
-          {focus && <span className="rounded-full bg-wash px-2.5 py-0.5 text-[11px] font-semibold text-focus">{t("Filtro")}: {focus === "attive" ? t("attive") : focus === "inhouse" ? t("in struttura") : focus === "arrivi" ? t("arrivi") : t("partenze")}</span>}
-          {hasFilters && <button onClick={() => { setSearch(""); setDate(todayISO); setFocus(null); }} className="rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-wash" style={{ borderColor: "var(--err)", color: "var(--err)" }}>{t("Rimuovi filtri")}</button>}
-        </div>
-        <div className="no-print ml-auto flex items-center gap-2">
-          {/* Selettore grafici da mostrare */}
-          {/* Toggle grafici: un click mostra tutti / nasconde tutti (neutro) */}
-          <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border border-line transition ${shownCharts.length > 0 ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
-            <Icon name="chart" size={16} />
-          </button>
-          <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
+          <div className="no-print ml-auto flex items-center gap-2">
+            {/* Toggle grafici: un click mostra tutti / nasconde tutti (neutro) */}
+            <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border border-line transition ${shownCharts.length > 0 ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
+              <Icon name="chart" size={16} />
+            </button>
+            <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
+          </div>
         </div>
       </div>
       <div className={`grid gap-4 ${gridCols}`}>
