@@ -244,10 +244,11 @@ export default function CamerePage() {
                 {types.length === 0 && <div className="w-full rounded-xl border border-dashed border-line"><EmptyState title={t("Nessuna tipologia. Aggiungine una col pulsante “+ Tipologia”.")} /></div>}
               </div>
 
-              {/* Filtri camere: riquadro con ricerca a sinistra e azioni a destra */}
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm">
-                <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="w-full sm:w-[calc((100%-1.5rem)/4)]" />
-                <div className="flex gap-2">
+              {/* Filtri camere: la ricerca sta nella STESSA griglia delle tipologie, così è larga
+                  esattamente quanto una card soprastante e vi si allinea; le azioni riempiono il resto. */}
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="col-span-2 w-full sm:col-span-1" />
+                <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-3">
                   <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
                   <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
                 </div>
