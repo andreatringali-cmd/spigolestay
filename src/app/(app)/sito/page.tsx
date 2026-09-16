@@ -105,31 +105,6 @@ export default function SitoPage() {
     <div>
       <PageHeader title="Xenosite" subtitle={t("Il tuo mini-sito con motore di prenotazione integrato")} actions={<button onClick={openPreview} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Anteprima")} ↗</button>} />
 
-      {/* Pubblicazione: l'indirizzo pubblico xenora.it/<nome> */}
-      <Card className="mb-4">
-        <div className="flex items-center justify-between gap-3">
-          <SectionTitle>{t("Indirizzo pubblico")}</SectionTitle>
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${publishedSlug ? "text-white" : "bg-wash text-dim"}`} style={publishedSlug ? { backgroundColor: "var(--ok)" } : undefined}>{publishedSlug ? t("Online") : t("Non pubblicato")}</span>
-        </div>
-        <p className="mb-2 mt-0.5 text-xs text-dim">{t("Scegli l'indirizzo del tuo sito. I visitatori lo vedranno senza login; i dati degli ospiti non vengono pubblicati.")}</p>
-        <div className="flex flex-wrap items-stretch gap-2">
-          <div className="flex min-w-0 flex-1 items-center rounded-lg border border-line bg-paper focus-within:border-focus">
-            <span className="whitespace-nowrap pl-3 text-sm text-faint">{PUBLIC_HOST}/</span>
-            <input value={slug} onChange={(e) => setSlug(cleanSlug(e.target.value))} placeholder="nome-struttura" className="min-w-0 flex-1 bg-transparent py-2 pr-3 text-sm font-semibold text-txt outline-none" />
-          </div>
-          <button onClick={publish} disabled={pubBusy || !slug} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{pubBusy ? t("Pubblico…") : publishedSlug ? (isDirtySlug ? t("Cambia indirizzo") : t("Aggiorna")) : t("Pubblica")}</button>
-        </div>
-        {publishedSlug && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <a href={`${publicBase}/${publishedSlug}`} target="_blank" rel="noreferrer" className="text-sm font-semibold text-focus hover:underline">{PUBLIC_HOST}/{publishedSlug} ↗</a>
-            <button onClick={() => { navigator.clipboard?.writeText(`${publicBase}/${publishedSlug}`); setPubCopied(true); window.setTimeout(() => setPubCopied(false), 1500); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">{pubCopied ? t("Copiato ✓") : t("Copia link")}</button>
-            <button onClick={unpublish} disabled={pubBusy} className="rounded-lg px-2.5 py-1 text-xs font-semibold text-faint hover:text-[color:var(--err)] disabled:opacity-50">{t("Rimuovi dal pubblico")}</button>
-          </div>
-        )}
-        {pubMsg && <p className="mt-2 text-[12px] font-medium text-dim">{pubMsg}</p>}
-        {publishedSlug && <p className="mt-1 text-[11px] text-faint">{t("Dopo ogni modifica ai contenuti o alle camere, premi «Aggiorna» per aggiornare il sito online.")}</p>}
-      </Card>
-
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
           <Card>
@@ -189,6 +164,31 @@ export default function SitoPage() {
           <p className="mt-3 text-xs text-faint">{t("Il motore di prenotazione è lo stesso del")} <Link href="/widget" className="font-medium text-focus hover:underline">{t("Widget sito")}</Link>: {t("ogni prenotazione entra diretta nel calendario, senza commissioni.")}</p>
         </Card>
       </div>
+
+      {/* Pubblicazione: l'indirizzo pubblico xenora.it/<nome> — sotto l'anteprima */}
+      <Card className="mt-4">
+        <div className="flex items-center justify-between gap-3">
+          <SectionTitle>{t("Indirizzo pubblico")}</SectionTitle>
+          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${publishedSlug ? "text-white" : "bg-wash text-dim"}`} style={publishedSlug ? { backgroundColor: "var(--ok)" } : undefined}>{publishedSlug ? t("Online") : t("Non pubblicato")}</span>
+        </div>
+        <p className="mb-2 mt-0.5 text-xs text-dim">{t("Scegli l'indirizzo del tuo sito. I visitatori lo vedranno senza login; i dati degli ospiti non vengono pubblicati.")}</p>
+        <div className="flex flex-wrap items-stretch gap-2">
+          <div className="flex min-w-0 flex-1 items-center rounded-lg border border-line bg-paper focus-within:border-focus">
+            <span className="whitespace-nowrap pl-3 text-sm text-faint">{PUBLIC_HOST}/</span>
+            <input value={slug} onChange={(e) => setSlug(cleanSlug(e.target.value))} placeholder="nome-struttura" className="min-w-0 flex-1 bg-transparent py-2 pr-3 text-sm font-semibold text-txt outline-none" />
+          </div>
+          <button onClick={publish} disabled={pubBusy || !slug} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{pubBusy ? t("Pubblico…") : publishedSlug ? (isDirtySlug ? t("Cambia indirizzo") : t("Aggiorna")) : t("Pubblica")}</button>
+        </div>
+        {publishedSlug && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <a href={`${publicBase}/${publishedSlug}`} target="_blank" rel="noreferrer" className="text-sm font-semibold text-focus hover:underline">{PUBLIC_HOST}/{publishedSlug} ↗</a>
+            <button onClick={() => { navigator.clipboard?.writeText(`${publicBase}/${publishedSlug}`); setPubCopied(true); window.setTimeout(() => setPubCopied(false), 1500); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">{pubCopied ? t("Copiato ✓") : t("Copia link")}</button>
+            <button onClick={unpublish} disabled={pubBusy} className="rounded-lg px-2.5 py-1 text-xs font-semibold text-faint hover:text-[color:var(--err)] disabled:opacity-50">{t("Rimuovi dal pubblico")}</button>
+          </div>
+        )}
+        {pubMsg && <p className="mt-2 text-[12px] font-medium text-dim">{pubMsg}</p>}
+        {publishedSlug && <p className="mt-1 text-[11px] text-faint">{t("Dopo ogni modifica ai contenuti o alle camere, premi «Aggiorna» per aggiornare il sito online.")}</p>}
+      </Card>
     </div>
   );
 }

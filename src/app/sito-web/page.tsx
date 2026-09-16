@@ -71,7 +71,7 @@ export default function SitoWebPage() {
 }
 
 export function Site() {
-  const { structures, roomTypes, units, bookings, getStructure, getGuest, addGuest } = useData();
+  const { structures, roomTypes, units, bookings, getStructure, addGuest } = useData();
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [weather, setWeather] = useState<{ temp: number; code: number } | null>(null);
   const [lang, setLang] = useState("it");
@@ -162,15 +162,21 @@ export function Site() {
   // Offerte attive (modulo Promozioni).
   const offers = useMemo(() => { try { const t = new Date().toISOString().slice(0, 10); return loadPromos().filter((p) => p.discountPct && p.code && (!p.validUntil || p.validUntil >= t)); } catch { return []; } }, []);
 
-  // Recensioni reali: dagli ospiti passati (come il modulo Recensioni).
+  // Recensioni REALI soltanto: lette dallo store recensioni (spigolestay:sitereviews),
+  // una lista scritta dal proprietario/importata. Nessun testo inventato: se non ci
+  // sono recensioni vere, la sezione mostra solo il link a Google (se impostato).
   const reviews = useMemo(() => {
-    const TXT = ["Soggiorno perfetto, posizione ottima e host gentilissimo.", "Camera pulita e silenziosa, torneremo di sicuro.", "Accoglienza calorosa e tutto come descritto.", "Colazione ottima e consigli preziosi sulla città.", "Struttura curata nei dettagli, esperienza top."];
-    const R = [10, 9, 10, 9, 8, 10, 9, 10];
-    return bookings
-      .filter((b) => b.structureId === sid && b.checkOut < today && b.status !== "cancelled" && b.channel !== "blocked")
-      .sort((a, b) => b.checkOut.localeCompare(a.checkOut)).slice(0, 6)
-      .map((b, i) => ({ id: b.id, name: (getGuest(b.guestId)?.fullName || "Ospite").split(" ")[0], date: b.checkOut, rating: R[i % R.length], text: TXT[i % TXT.length] }));
-  }, [bookings, sid, today, getGuest]);
+    try {
+      const raw = lsGet("spigolestay:sitereviews");
+      if (!raw) return [] as { id: string; name: string; date?: string; rating: number; text: string }[];
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return [];
+      return arr
+        .filter((r) => r && (r.structureId === sid || !r.structureId) && typeof r.text === "string" && r.text.trim())
+        .map((r, i) => ({ id: String(r.id ?? i), name: String(r.name || "Ospite"), date: r.date, rating: Number(r.rating) || 10, text: String(r.text) }))
+        .slice(0, 12);
+    } catch { return []; }
+  }, [sid]);
   const reviewsAvg = reviews.length ? (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length) : 0;
 
   const field = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
@@ -209,7 +215,7 @@ export function Site() {
       <div className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
           <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-sm font-bold text-white" style={{ backgroundColor: structure?.photoColor ?? accent }}>{structure?.logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={structure.logo} alt="" className="h-full w-full object-cover" /> : name.slice(0, 2).toUpperCase()}</div>
-          <div className="text-sm font-bold text-txt">{name}<span className="ml-1 text-[11px] font-normal text-faint">· Xenorabook</span></div>
+          <div className="text-sm font-bold text-txt">{name}<span className="ml-1 text-[11px] font-normal text-faint">· Xenosite</span></div>
           <div className="ml-auto flex items-center gap-3 text-xs text-dim">
             {weather && <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-1 font-medium" title={`Meteo ${structure?.city ?? "Siracusa"}`}>{wIcon(weather.code)} {weather.temp}° · {structure?.city ?? "Siracusa"}</span>}
             <select value={lang} onChange={(e) => setLangP(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs" title="Lingua / Language">{SITE_LANGS.map(([c, l]) => <option key={c} value={c}>{l}</option>)}</select>
