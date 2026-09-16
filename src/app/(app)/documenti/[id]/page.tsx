@@ -4,8 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
+import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { eur } from "@/lib/format";
+import { nights } from "@/lib/dates";
+import { cityTaxOf } from "@/lib/booking";
 import { invPost, centsEur, DOC_KIND_LABEL, STATO } from "@/lib/invoicing/client";
 import { BOLLO_THRESHOLD_CENTS } from "@/lib/invoicing/folio";
 
@@ -27,6 +30,7 @@ export default function DocumentoPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { structures, bookings, getGuest, getStructure, getRoomType } = useData();
   const id = String(params.id || "");
   const [doc, setDoc] = useState<Doc | null>(null);
   const [events, setEvents] = useState<Ev[]>([]);
@@ -39,6 +43,10 @@ export default function DocumentoPage() {
   const [f, setF] = useState({ doc_kind: "fattura", sdi_type: "TD01", issue_date: "", due_date: "", payment_terms: "Pagamento completo", vat_exigibility: "I", payment_method: "Bonifico bancario", send_sdi: true, sdi_code: "0000000", pec: "", notes: "", rounding: false, bollo: false });
   const [cp, setCp] = useState({ kind: "privato", name: "", lastName: "", vat: "", tax_code: "", country: "IT", address: "", city: "", cap: "", province: "" });
   const [lines, setLines] = useState<ELine[]>([]);
+  const [structureId, setStructureId] = useState("");
+  const [link, setLink] = useState<{ bookingId: string | null; bookingCode: string | null }>({ bookingId: null, bookingCode: null });
+  const [bookingPicker, setBookingPicker] = useState(false);
+  const [bq, setBq] = useState("");
 
   const hydrate = useCallback((d: Doc, dl: DbLine[]) => {
     setF({
@@ -50,6 +58,8 @@ export default function DocumentoPage() {
     const c = d.counterpart ?? {};
     setCp({ kind: c.kind ?? "privato", name: c.name ?? "", lastName: c.lastName ?? "", vat: c.vat ?? "", tax_code: c.tax_code ?? "", country: c.country ?? "IT", address: c.address ?? "", city: c.city ?? "", cap: c.cap ?? "", province: c.province ?? "" });
     setLines(dl.map((l) => ({ id: l.id, description: l.description, qty: Number(l.qty), unitEur: l.unit_price_cents / 100, vat: l.vat_nature ?? String(Number(l.vat_rate)), sourceKind: l.source_kind ?? "extra" })));
+    setStructureId(d.structure_id ?? "");
+    setLink({ bookingId: d.booking_id, bookingCode: d.booking_code });
   }, []);
 
   const load = useCallback(async () => {
@@ -96,6 +106,32 @@ export default function DocumentoPage() {
   const delLine = (i: number) => setLines((p) => p.filter((_, j) => j !== i));
   const delCityTax = () => setLines((p) => p.filter((l) => l.vat !== "N1" && l.sourceKind !== "city_tax"));
 
+  const dmy = (iso: string) => { const [y, m, d] = (iso || "").split("-"); return d ? `${d}/${m}/${y}` : iso; };
+  const attachBooking = (bid: string) => {
+    const b = bookings.find((x) => x.id === bid); if (!b) return;
+    const rt = getRoomType(b.roomTypeId); const structure = getStructure(b.structureId); const g = getGuest(b.guestId);
+    const add: ELine[] = [];
+    if (b.total) add.push({ description: `${(rt?.name ?? "Soggiorno").toUpperCase()} – ${dmy(b.checkIn)} al ${dmy(b.checkOut)}`, qty: 1, unitEur: b.total, vat: "10", sourceKind: "accommodation" });
+    if (b.cleaningFee) add.push({ description: "Pulizia finale", qty: 1, unitEur: b.cleaningFee, vat: "10", sourceKind: "cleaning" });
+    (b.extras ?? []).forEach((e) => { if (e?.price) add.push({ description: e.name || "Extra", qty: 1, unitEur: e.price, vat: "22", sourceKind: "extra" }); });
+    const tax = cityTaxOf(structure, b.adults ?? 0, nights(b.checkIn, b.checkOut), b.total ?? 0, b.cityTaxExempt);
+    if (tax) add.push({ description: "Imposta di soggiorno", qty: 1, unitEur: tax, vat: "N1", sourceKind: "city_tax" });
+    setLines((p) => [...p, ...add]);
+    setStructureId(b.structureId);
+    setLink({ bookingId: b.id, bookingCode: b.code ?? null });
+    const ir = b.invoiceRequest;
+    if (ir?.wants) setCp({ kind: ir.kind ?? "privato", name: ir.name ?? "", lastName: "", vat: ir.vat ?? "", tax_code: ir.taxCode ?? "", country: ir.country ?? "IT", address: ir.address ?? "", city: ir.city ?? "", cap: ir.cap ?? "", province: ir.province ?? "" });
+    else if (g && !cp.name) setCp((c) => ({ ...c, name: g.firstName ?? g.fullName, lastName: g.lastName ?? "" }));
+    setBookingPicker(false);
+  };
+  const bookingList = useMemo(() => {
+    const term = bq.trim().toLowerCase();
+    return [...bookings].filter((b) => b.status !== "cancelled" && b.channel !== "blocked")
+      .sort((a, b) => (b.checkIn || "").localeCompare(a.checkIn || ""))
+      .filter((b) => { if (!term) return true; return `${getGuest(b.guestId)?.fullName ?? ""} ${b.code ?? ""}`.toLowerCase().includes(term); })
+      .slice(0, 40);
+  }, [bookings, bq, getGuest]);
+
   const saveDraft = async () => {
     if (!supabase || !user || !doc) return false;
     // Righe: elimino e reinserisco (solo in bozza è consentito dal trigger).
@@ -110,6 +146,7 @@ export default function DocumentoPage() {
     }
     const counterpart = { kind: cp.kind, name: cp.name, lastName: cp.lastName || undefined, vat: cp.vat || null, tax_code: cp.tax_code || null, country: cp.country || "IT", address: cp.address || null, city: cp.city || null, cap: cp.cap || null, province: cp.province || null, sdi_code: f.sdi_code || (cp.kind === "estero" ? "XXXXXXX" : "0000000"), pec: f.pec || null };
     const { error } = await supabase.from("documents").update({
+      structure_id: structureId || null, serie: structureId || null, booking_id: link.bookingId, booking_code: link.bookingCode,
       doc_kind: f.doc_kind, sdi_type: f.doc_kind === "nota_di_credito" ? "TD04" : f.sdi_type, issue_date: f.issue_date || null, due_date: f.due_date || null,
       payment_terms: f.payment_terms, vat_exigibility: f.vat_exigibility, payment_method: f.payment_method, send_sdi: f.send_sdi, notes: f.notes || null,
       counterpart, taxable_cents: totals.taxable, vat_cents: totals.vat, out_of_scope_cents: totals.out, bollo_cents: totals.bolloCents,
@@ -169,6 +206,26 @@ export default function DocumentoPage() {
       {frozen && <div className="mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white" style={{ backgroundColor: "var(--err)" }}>🔒 Le informazioni fiscali non sono più modificabili ({st.label.toLowerCase()}). Per correggere si emette una nota di credito.</div>}
       {msg && <Card className="mb-4"><p className="text-sm text-dim">{msg}</p></Card>}
 
+      {bookingPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button aria-label="Chiudi" onClick={() => setBookingPicker(false)} className="absolute inset-0 bg-black/40" />
+          <div className="relative flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">Collega una prenotazione</span><button onClick={() => setBookingPicker(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <input value={bq} onChange={(e) => setBq(e.target.value)} placeholder="Cerca ospite o codice…" className={inp} autoFocus />
+            <div className="mt-2 flex-1 overflow-y-auto">
+              {bookingList.map((b) => (
+                <button key={b.id} onClick={() => attachBooking(b.id)} className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left hover:border-focus hover:bg-wash">
+                  <div className="min-w-0"><div className="truncate text-sm font-medium text-txt">{getGuest(b.guestId)?.fullName || "Ospite"} <span className="text-faint">· {b.code}</span></div><div className="text-[11px] text-faint">{new Date(b.checkIn).toLocaleDateString("it-IT")}–{new Date(b.checkOut).toLocaleDateString("it-IT")}</div></div>
+                  <span className="shrink-0 font-mono text-sm text-txt">{eur(b.total ?? 0)}</span>
+                </button>
+              ))}
+              {bookingList.length === 0 && <p className="py-6 text-center text-sm text-faint">Nessuna prenotazione.</p>}
+            </div>
+            <p className="mt-2 text-[11px] text-faint">Collegando la prenotazione, le righe del folio (soggiorno, pulizia, extra, tassa) vengono aggiunte alle voci.</p>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-2">
         {/* FATTURA */}
         <Card>
@@ -181,6 +238,14 @@ export default function DocumentoPage() {
             </div>
           ) : (
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <label className={lbl}>Struttura<select value={structureId} onChange={(e) => setStructureId(e.target.value)} className={inp}><option value="">— scegli —</option>{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+              <div><span className={lbl}>Prenotazione <span className="text-faint">(facoltativa)</span></span>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate rounded-lg border border-line bg-wash px-3 py-2 text-sm text-txt">{link.bookingCode ?? "nessuna"}</span>
+                  <button type="button" onClick={() => { setBq(""); setBookingPicker(true); }} className="shrink-0 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash">Collega</button>
+                  {link.bookingId && <button type="button" onClick={() => setLink({ bookingId: null, bookingCode: null })} className="shrink-0 text-faint hover:text-[color:var(--err)]">✕</button>}
+                </div>
+              </div>
               <label className={lbl}>Tipologia<select value={f.doc_kind} onChange={(e) => setF({ ...f, doc_kind: e.target.value })} className={inp}><option value="fattura">Fattura</option><option value="nota_di_credito">Nota di credito</option><option value="ricevuta_non_fiscale">Ricevuta</option></select></label>
               <label className={lbl}>Tipo doc. SDI<select value={f.sdi_type} onChange={(e) => setF({ ...f, sdi_type: e.target.value })} className={inp}><option value="TD01">TD01 - Fattura</option><option value="TD04">TD04 - Nota di credito</option><option value="TD16">TD16 - Autofattura</option></select></label>
               <label className={lbl}>Data emissione<input type="date" value={f.issue_date} onChange={(e) => setF({ ...f, issue_date: e.target.value })} className={inp} /></label>

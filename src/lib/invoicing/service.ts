@@ -214,6 +214,23 @@ export async function createDocumentFromBooking(
   return { documentId, toPayCents: draft.totals.toPayCents, totalCents: draft.totals.totalCents };
 }
 
+// Crea una BOZZA vuota (senza prenotazione): la prenotazione si collega dopo dalla scheda.
+export async function createBlankDocument(admin: SupabaseClient, tenantId: string, opts: { structureId?: string } = {}): Promise<CreateResult> {
+  const { data: settings } = await admin.from("tenant_invoice_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
+  const regime = (settings?.regime as Regime) ?? "imprenditoriale_ordinario";
+  const provider = (settings?.default_provider as string) ?? "mock";
+  const { data: doc, error } = await admin.from("documents").insert({
+    tenant_id: tenantId, structure_id: opts.structureId ?? null, doc_kind: "fattura", sdi_type: "TD01",
+    regime, serie: opts.structureId ?? null, stato: "bozza",
+    counterpart: { kind: "privato", name: "", country: "IT", sdi_code: "0000000" },
+    send_sdi: regime !== "non_imprenditoriale", provider, currency: "EUR",
+    taxable_cents: 0, vat_cents: 0, out_of_scope_cents: 0, bollo_cents: 0, total_cents: 0, advance_cents: 0,
+  }).select("id").single();
+  if (error || !doc) throw new Error(error?.message || "insert_failed");
+  await admin.from("document_events").insert({ tenant_id: tenantId, document_id: doc.id, kind: "created", message: "Bozza creata" });
+  return { documentId: doc.id as string, toPayCents: 0, totalCents: 0 };
+}
+
 export interface IssueResult { number: number; numberLabel: string; serie: string; anno: number }
 
 // c) Emette il documento: numerazione atomica + congelamento (funzione DB).

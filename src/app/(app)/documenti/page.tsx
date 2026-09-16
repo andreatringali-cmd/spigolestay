@@ -6,8 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { PageHeader, Card } from "@/components/ui";
 import { eur } from "@/lib/format";
-import { nights } from "@/lib/dates";
-import { centsEur, DOC_KIND_LABEL, STATO, invPost } from "@/lib/invoicing/client";
+import { centsEur, DOC_KIND_LABEL, STATO, apiPost } from "@/lib/invoicing/client";
 
 interface DocRow {
   id: string; structure_id: string | null; booking_code: string | null; doc_kind: string;
@@ -20,9 +19,7 @@ const YEARS = (() => { const y = new Date().getFullYear(); return [y, y - 1, y -
 
 export default function DocumentiPage() {
   const router = useRouter();
-  const { structures, bookings, getGuest } = useData();
-  const [picker, setPicker] = useState(false);
-  const [pq, setPq] = useState("");
+  const { structures, activeStructureId } = useData();
   const [creating, setCreating] = useState(false);
   const [rows, setRows] = useState<DocRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,51 +72,19 @@ export default function DocumentiPage() {
 
   const selCls = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
-  // "Nuovo documento": si emette da una prenotazione (il folio alimenta le righe).
-  const pickList = useMemo(() => {
-    const term = pq.trim().toLowerCase();
-    return [...bookings]
-      .filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && (b.total ?? 0) > 0)
-      .sort((a, b) => (b.checkIn || "").localeCompare(a.checkIn || ""))
-      .filter((b) => { if (!term) return true; const g = getGuest(b.guestId)?.fullName ?? ""; return `${g} ${b.code ?? ""}`.toLowerCase().includes(term); })
-      .slice(0, 40);
-  }, [bookings, pq, getGuest]);
-
-  const createFrom = async (bookingId: string) => {
+  // Nuovo documento VUOTO: la prenotazione si collega dopo dalla scheda.
+  const createNew = async () => {
     setCreating(true);
-    try { const r = await invPost<{ documentId: string }>("create", { bookingId }); router.push(`/documenti/${r.documentId}`); }
-    catch (e) { setErr(e instanceof Error ? e.message : "Errore"); setCreating(false); setPicker(false); }
+    try {
+      const structureId = activeStructureId !== "all" ? activeStructureId : structures[0]?.id;
+      const r = await apiPost<{ documentId: string }>("invoicing/new", { structureId });
+      router.push(`/documenti/${r.documentId}`);
+    } catch (e) { setErr(e instanceof Error ? e.message : "Errore"); setCreating(false); }
   };
 
   return (
     <div>
       <PageHeader title="Documenti fiscali" subtitle="Fatture, note di credito e ricevute — con stato SDI" />
-
-      {picker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button aria-label="Chiudi" onClick={() => setPicker(false)} className="absolute inset-0 bg-black/40" />
-          <div className="relative flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">Nuovo documento da prenotazione</span><button onClick={() => setPicker(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
-            <input value={pq} onChange={(e) => setPq(e.target.value)} placeholder="Cerca ospite o codice…" className={`${selCls} mb-2`} autoFocus />
-            <div className="flex-1 overflow-y-auto">
-              {pickList.map((b) => {
-                const g = getGuest(b.guestId);
-                return (
-                  <button key={b.id} disabled={creating} onClick={() => createFrom(b.id)} className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left hover:border-focus hover:bg-wash disabled:opacity-50">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-txt">{g?.fullName || "Ospite"} <span className="text-faint">· {b.code}</span></div>
-                      <div className="text-[11px] text-faint">{structName(b.structureId)} · {new Date(b.checkIn).toLocaleDateString("it-IT")}–{new Date(b.checkOut).toLocaleDateString("it-IT")} · {nights(b.checkIn, b.checkOut)} notti</div>
-                    </div>
-                    <span className="shrink-0 font-mono text-sm text-txt">{eur(b.total ?? 0)}</span>
-                  </button>
-                );
-              })}
-              {pickList.length === 0 && <p className="py-6 text-center text-sm text-faint">Nessuna prenotazione trovata.</p>}
-            </div>
-            <p className="mt-2 text-[11px] text-faint">Il documento nasce come bozza dal folio della prenotazione: righe, IVA, acconti e bollo precompilati.</p>
-          </div>
-        </div>
-      )}
 
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -141,7 +106,7 @@ export default function DocumentiPage() {
           <div className="ml-auto flex items-center gap-2">
             <button onClick={() => router.push("/impostazioni-fattura")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Impostazioni</button>
             <button onClick={exportCsv} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
-            <button onClick={() => { setPq(""); setPicker(true); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuovo documento</button>
+            <button onClick={createNew} disabled={creating} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{creating ? "Creo…" : "+ Nuovo documento"}</button>
           </div>
         </div>
       </Card>
