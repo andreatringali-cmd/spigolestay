@@ -40,7 +40,7 @@ export const NAV: NavItem[] = [
   { label: "Tariffe", href: "/tariffe", group: "Distribuzione", icon: "tag", perm: "tariffe", module: "pms" },
   { label: "Piani tariffari", href: "/piani-tariffari", group: "Distribuzione", icon: "receipt", perm: "tariffe", module: "pms" },
   { label: "Tariffe derivate", href: "/tariffe-derivate", group: "Distribuzione", icon: "copy", perm: "tariffe", module: "pms" },
-  { label: "Canali", href: "/canali", group: "Distribuzione", icon: "share", perm: "canali", module: "cm" },
+  { label: "Channel Manager", href: "/canali", group: "Distribuzione", icon: "share", perm: "canali", module: "cm" },
   { label: "Meta Search", href: "/metasearch", group: "Distribuzione", icon: "search", perm: "canali", module: "meta" },
   { label: "Widget sito", href: "/widget", group: "Distribuzione", icon: "eye", perm: "sito", module: "booking" },
   { label: "Sito web", href: "/sito", group: "Distribuzione", icon: "grid", perm: "sito", module: "site" },
