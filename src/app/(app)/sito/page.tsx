@@ -20,11 +20,20 @@ const KEY = "spigolestay:sito";
 
 export default function SitoPage() {
   const { t } = useLang();
-  const { structures } = useData();
+  const { structures, activeStructureId } = useData();
   const [c, setC] = useState<Cfg>(DEF);
   const [sid, setSid] = useState("");
   useEffect(() => { try { const r = localStorage.getItem(KEY); if (r) setC({ ...DEF, ...JSON.parse(r) }); } catch {} }, []);
-  useEffect(() => { if ((!sid || !structures.some((s) => s.id === sid)) && structures[0]) setSid(structures[0].id); }, [structures, sid]);
+  // Se in alto è selezionata UNA struttura, il mini-sito segue quella (menu nascosto).
+  // Se è selezionato "Tutte", resta il menu a tendina per scegliere quale configurare.
+  useEffect(() => {
+    if (activeStructureId !== "all" && structures.some((s) => s.id === activeStructureId)) {
+      if (activeStructureId !== sid) setSid(activeStructureId);
+    } else if ((!sid || !structures.some((s) => s.id === sid)) && structures[0]) {
+      setSid(structures[0].id);
+    }
+  }, [structures, activeStructureId, sid]);
+  const showStructPicker = activeStructureId === "all" && structures.length > 1;
   const set = (patch: Partial<Cfg>) => setC((p) => { const n = { ...p, ...patch }; try { localStorage.setItem(KEY, JSON.stringify(n)); } catch {} return n; });
   const toggleLang = (l: string) => set({ lang: c.lang.includes(l) ? c.lang.filter((x) => x !== l) : [...c.lang, l] });
   // Nome e link presi dalla struttura (fonte di verità = scheda struttura).
@@ -110,7 +119,7 @@ export default function SitoPage() {
         <div className="flex flex-col gap-4">
           <Card>
             <SectionTitle>{t("Contenuti")}</SectionTitle>
-            {structures.length > 1 && (
+            {showStructPicker && (
               <label className="mb-2 block"><span className="text-xs text-dim">{t("Struttura")}</span>
                 <select value={sid} onChange={(e) => setSid(e.target.value)} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
               </label>
