@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import EmptyState from "@/components/EmptyState";
 import { apiPost } from "@/lib/invoicing/client";
 
 interface Sett { username: string; password_enc: string; ws_code_enc: string; ws_code_expires_at: string; auto_daily: boolean; group_guests: boolean; group_by_room: boolean; status: string; status_msg: string }
@@ -110,7 +111,7 @@ export default function AlloggiatiWebPage() {
                 </div>
               );
             })}
-            {sched.length === 0 && <p className="py-6 text-center text-sm text-faint">Nessuna schedina. Premi «Sincronizza dagli arrivi».</p>}
+            {sched.length === 0 && <EmptyState title="Nessuna schedina" sub="Premi «Sincronizza dagli arrivi»." />}
           </div>
         </Card>
       </div>

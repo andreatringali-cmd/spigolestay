@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { PageHeader, Card } from "@/components/ui";
+import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 import { centsEur, DOC_KIND_LABEL, STATO, apiPost } from "@/lib/invoicing/client";
 
@@ -149,7 +150,7 @@ export default function DocumentiPage() {
                 </tr>
               );
             })}
-            {!loading && filtered.length === 0 && <tr><td colSpan={11} className="px-3 py-10 text-center text-sm text-faint">Nessun documento. Emetti il primo dalla scheda di una prenotazione.</td></tr>}
+            {!loading && filtered.length === 0 && <tr><td colSpan={11}><EmptyState title="Nessun documento" sub="Crea il primo con “+ Nuovo documento” o dalla scheda di una prenotazione." /></td></tr>}
             {loading && <tr><td colSpan={11} className="px-3 py-10 text-center text-sm text-faint">Caricamento…</td></tr>}
           </tbody>
         </table>

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { PageHeader, Card } from "@/components/ui";
+import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 
 const CATEGORIES = ["Pulizie", "Utenze", "Manutenzione", "OTA / commissioni", "Forniture", "Consulenze", "Tasse e tributi", "Marketing", "Assicurazioni", "Altro"];
@@ -117,6 +118,12 @@ export default function FatturePassivePage() {
     <div>
       <PageHeader title="Fatture passive" subtitle="Fatture e costi dei fornitori" />
 
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[["Imponibile", totals.imp, "var(--dim)"], ["IVA", totals.iva, "var(--dim)"], ["Totale", totals.tot, "var(--txt)"], ["Da pagare", totals.unpaid, totals.unpaid > 0 ? "var(--warn)" : "var(--ok)"]].map(([l, v, c]) => (
+          <Card key={l as string}><div className="text-[10px] font-medium uppercase tracking-wide text-faint">{l as string}</div><div className="font-mono text-lg font-bold" style={{ color: c as string }}>{eur(cents(v as number))}</div></Card>
+        ))}
+      </div>
+
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca fornitore, numero, categoria…" className={`${sel} min-w-0 flex-1`} />
@@ -132,12 +139,6 @@ export default function FatturePassivePage() {
       </Card>
 
       {err && <Card className="mb-4"><p className="text-sm text-[color:var(--err)]">{err}</p></Card>}
-
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[["Imponibile", totals.imp, "var(--dim)"], ["IVA", totals.iva, "var(--dim)"], ["Totale", totals.tot, "var(--txt)"], ["Da pagare", totals.unpaid, totals.unpaid > 0 ? "var(--warn)" : "var(--ok)"]].map(([l, v, c]) => (
-          <Card key={l as string}><div className="text-[10px] font-medium uppercase tracking-wide text-faint">{l as string}</div><div className="font-mono text-lg font-bold" style={{ color: c as string }}>{eur(cents(v as number))}</div></Card>
-        ))}
-      </div>
 
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <table className="w-full min-w-[860px] text-sm">
@@ -166,7 +167,7 @@ export default function FatturePassivePage() {
                 </tr>
               );
             })}
-            {!loading && filtered.length === 0 && <tr><td colSpan={10} className="px-3 py-10 text-center text-sm text-faint">Nessuna fattura passiva. Aggiungine una con “+ Nuova fattura”.</td></tr>}
+            {!loading && filtered.length === 0 && <tr><td colSpan={10}><EmptyState title="Nessuna fattura passiva" sub="Registra la prima con “+ Nuova fattura”." /></td></tr>}
             {loading && <tr><td colSpan={10} className="px-3 py-10 text-center text-sm text-faint">Caricamento…</td></tr>}
           </tbody>
         </table>

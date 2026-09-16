@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import EmptyState from "@/components/EmptyState";
 import { apiPost } from "@/lib/invoicing/client";
 
 interface Sett { region: string; partner: string; username: string; password_enc: string; auto_daily: boolean; start_from: string; status: string; status_msg: string }
@@ -89,7 +90,7 @@ export default function IstatPage() {
                 <div className="min-w-0"><div className="truncate text-sm text-txt">{r.arrival ? new Date(r.arrival).toLocaleDateString("it-IT") : "—"} → {r.departure ? new Date(r.departure).toLocaleDateString("it-IT") : "—"}</div><div className="text-[11px] text-faint">{r.guests} ospiti · provenienza {r.provenance || "—"}</div></div>
                 <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.c} 16%, transparent)`, color: st.c }}>{st.l}</span>
               </div>); })}
-            {rows.length === 0 && <p className="py-6 text-center text-sm text-faint">Nessun movimento. Premi «Sincronizza dagli arrivi».</p>}
+            {rows.length === 0 && <EmptyState title="Nessun movimento" sub="Premi «Sincronizza dagli arrivi»." />}
           </div>
         </Card>
       </div>

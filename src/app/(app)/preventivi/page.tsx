@@ -10,6 +10,7 @@ import { shortenLink } from "@/lib/guestlink";
 import { supabase } from "@/lib/supabase";
 import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } from "@/lib/rate-plans";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
@@ -775,7 +776,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
 
       {/* Archivio */}
       {tab === "archivio" && saved.length === 0 && (
-        <Card><div className="py-12 text-center text-sm text-faint">{t("Nessun preventivo in archivio.")}<br />{t("Crea e invia un preventivo per ritrovarlo qui.")}</div></Card>
+        <Card><EmptyState title={t("Nessun preventivo in archivio.")} sub={t("Crea e invia un preventivo per ritrovarlo qui.")} /></Card>
       )}
       {tab === "archivio" && saved.length > 0 && (
         <div>
