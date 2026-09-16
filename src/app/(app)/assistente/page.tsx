@@ -245,24 +245,35 @@ export default function AssistentePage() {
     const SR = (window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: new () => unknown }).webkitSpeechRecognition;
     if (!SR) { setMicHint("Microfono non supportato da questo browser"); return; }
     setMicHint("");
-    // Richiesta ESPLICITA del permesso microfono: fa comparire il popup o rivela il blocco.
+    const embedded = (() => { try { return window.self !== window.top; } catch { return true; } })();
+    // Pre-controllo del permesso: NON blocca piu. Se fallisce annotiamo il motivo e proviamo
+    // lo stesso, perche il riconoscimento vocale di Chrome chiede il permesso per conto suo.
+    let preErr = "";
+    let granted = false;
+    try {
+      const st = await (navigator.permissions as unknown as { query?: (d: { name: string }) => Promise<{ state: string }> })?.query?.({ name: "microphone" });
+      granted = st?.state === "granted";
+    } catch {}
     if (navigator.mediaDevices?.getUserMedia) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         stream.getTracks().forEach((tr) => tr.stop());
+        granted = true;
       } catch (err) {
         const name = (err as { name?: string })?.name || "";
-        console.warn("[Assistente] getUserMedia error:", err);
-        if (name === "NotFoundError" || name === "DevicesNotFoundError") setMicHint("Nessun microfono rilevato sul dispositivo.");
-        else if (name === "NotReadableError") setMicHint("Il microfono è occupato da un'altra app (es. Zoom/Teams). Chiudila e riprova.");
-        else if (name === "NotAllowedError" || name === "SecurityError") setMicHint("Bloccato dal sistema. Su Windows: Impostazioni → Privacy e sicurezza → Microfono → attiva anche «Consenti alle app desktop di accedere al microfono». E apri xenora.it in Chrome (non nell'app di Claude).");
-        else setMicHint(`Microfono non disponibile qui (${name || "sconosciuto"}). Apri xenora.it in Chrome/Edge.`);
-        return;
+        console.warn("[Assistente] getUserMedia error:", err, { embedded, granted });
+        if (name === "NotFoundError" || name === "DevicesNotFoundError") { setMicHint("Nessun microfono rilevato sul dispositivo."); return; }
+        if (name === "NotReadableError" || name === "TrackStartError") { setMicHint("Il microfono è occupato da un'altra app (es. Zoom/Teams). Chiudila e riprova."); return; }
+        preErr = embedded
+          ? `Qui la pagina gira dentro un'altra app e il microfono non passa (${name || "sconosciuto"}). Apri xenora.it in una scheda di Chrome o Edge.`
+          : granted
+            ? "Il sito ha il permesso ma il microfono resta bloccato. Su Windows: Impostazioni → Privacy e sicurezza → Microfono → attiva anche «Consenti alle app desktop di accedere al microfono», poi riavvia il browser."
+            : `Permesso negato (${name || "sconosciuto"}). Clicca il lucchetto accanto all'indirizzo, consenti il microfono e ricarica la pagina.`;
       }
     }
     try { window.speechSynthesis?.cancel(); } catch {}
     let rec: { lang: string; interimResults: boolean; continuous: boolean; maxAlternatives: number; start: () => void; stop: () => void; onresult: (e: unknown) => void; onend: () => void; onerror: (e: unknown) => void };
-    try { rec = new SR() as typeof rec; } catch { setMicHint("Microfono non disponibile"); return; }
+    try { rec = new SR() as typeof rec; } catch { setMicHint(preErr || "Microfono non disponibile"); return; }
     rec.lang = "it-IT"; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
     let lastText = "";
     rec.onresult = (e: unknown) => {
@@ -274,12 +285,18 @@ export default function AssistentePage() {
     rec.onerror = (e: unknown) => {
       setListening(false);
       const err = (e as { error?: string })?.error;
-      setMicHint(err === "not-allowed" || err === "service-not-allowed" ? "Microfono bloccato. Nell'app di Claude non è disponibile: apri xenora.it in Chrome/Edge." : err === "no-speech" ? "Non ho sentito nulla, riprova" : err === "audio-capture" ? "Nessun microfono trovato." : "Microfono non disponibile qui.");
+      console.warn("[Assistente] SpeechRecognition error:", err);
+      if (err === "not-allowed" || err === "service-not-allowed") setMicHint(preErr || "Microfono bloccato: clicca il lucchetto accanto all'indirizzo, consenti il microfono e ricarica.");
+      else if (err === "no-speech") setMicHint("Non ho sentito nulla, riprova");
+      else if (err === "audio-capture") setMicHint("Nessun microfono trovato.");
+      else if (err === "network") setMicHint("Il riconoscimento vocale non raggiunge il server: serve Chrome o Edge con connessione attiva.");
+      else if (err === "aborted") setMicHint("");
+      else setMicHint(`Microfono non disponibile qui (${err || "sconosciuto"}).`);
     };
     rec.onend = () => { setListening(false); const txt = lastText.trim(); if (txt) ask(txt); };
     recRef.current = rec;
     setListening(true); setAns(null);
-    try { rec.start(); } catch { setListening(false); setMicHint("Impossibile avviare il microfono"); }
+    try { rec.start(); } catch { setListening(false); setMicHint(preErr || "Impossibile avviare il microfono"); }
   };
   const stopListening = () => { try { (recRef.current as { stop: () => void } | null)?.stop(); } catch {} setListening(false); };
   const toggleListening = () => (listening ? stopListening() : startListening());
