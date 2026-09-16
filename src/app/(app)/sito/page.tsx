@@ -6,6 +6,9 @@ import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
+import { useAuth } from "@/lib/authsync";
+import { supabase } from "@/lib/supabase";
+import { buildPublishData, slugify, RESERVED_SLUGS } from "@/lib/publicdata";
 
 interface Cfg { nome: string; dominio: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean; lang: string[] }
 const DEF: Cfg = { nome: "", dominio: "", tagline: "", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, camere: true, recensioni: true, mappa: true, contatti: true, lang: ["it", "en"] };
@@ -20,7 +23,6 @@ export default function SitoPage() {
   const { structures } = useData();
   const [c, setC] = useState<Cfg>(DEF);
   const [sid, setSid] = useState("");
-  const [copied, setCopied] = useState(false);
   useEffect(() => { try { const r = localStorage.getItem(KEY); if (r) setC({ ...DEF, ...JSON.parse(r) }); } catch {} }, []);
   useEffect(() => { if ((!sid || !structures.some((s) => s.id === sid)) && structures[0]) setSid(structures[0].id); }, [structures, sid]);
   const set = (patch: Partial<Cfg>) => setC((p) => { const n = { ...p, ...patch }; try { localStorage.setItem(KEY, JSON.stringify(n)); } catch {} return n; });
@@ -28,15 +30,102 @@ export default function SitoPage() {
   // Nome e link presi dalla struttura (fonte di verità = scheda struttura).
   const struct = structures.find((s) => s.id === sid);
   const siteName = struct?.name || "";
-  const slug = (siteName || "struttura").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const publicLink = `${origin}/sito-web${sid ? `?s=${sid}` : ""}`;
-  const suggestedDomain = `${slug}.xenora.app`;
-  const openPublic = () => window.open(publicLink, "_blank");
+  // Preview del proprietario (legge dal browser). Il sito PUBBLICO usa lo slug.
+  const previewLink = `${origin}/sito-web${sid ? `?s=${sid}` : ""}`;
+  const openPreview = () => window.open(previewLink, "_blank");
+
+  // --- Pubblicazione Xenosite (xenora.it/<slug>) -----------------------------
+  const { user } = useAuth();
+  const [slug, setSlug] = useState("");
+  const [publishedSlug, setPublishedSlug] = useState<string | null>(null); // slug attualmente online
+  const [pubBusy, setPubBusy] = useState(false);
+  const [pubMsg, setPubMsg] = useState("");
+  const [pubCopied, setPubCopied] = useState(false);
+  const publicUrl = slug ? `${origin}/${slug}` : "";
+
+  // Slug proposto dal nome quando cambio struttura; carico lo stato pubblicato dal server.
+  useEffect(() => {
+    if (!sid) return;
+    setSlug(slugify(siteName) || "struttura");
+    setPublishedSlug(null);
+    setPubMsg("");
+    if (!supabase) return;
+    supabase.from("public_sites").select("slug").eq("structure_id", sid).maybeSingle()
+      .then(({ data }) => { if (data?.slug) { setSlug(data.slug); setPublishedSlug(data.slug); } });
+  }, [sid, siteName]);
+
+  const cleanSlug = (v: string) => slugify(v);
+
+  const publish = async () => {
+    if (!supabase || !user) { setPubMsg(t("Devi essere connesso per pubblicare.")); return; }
+    const base = cleanSlug(slug) || slugify(siteName) || "struttura";
+    if (RESERVED_SLUGS.has(base)) { setPubMsg(t("Questo indirizzo è riservato, scegline un altro.")); return; }
+    const data = buildPublishData(sid);
+    if (!data) { setPubMsg(t("Dati struttura non disponibili.")); return; }
+    setPubBusy(true); setPubMsg("");
+    try {
+      // Risolvo eventuali collisioni con lo slug di un ALTRO utente aggiungendo un suffisso.
+      let finalSlug = base;
+      for (let i = 0; i < 30; i++) {
+        const { data: row } = await supabase.from("public_sites").select("slug,user_id,structure_id").eq("slug", finalSlug).maybeSingle();
+        if (!row) break; // libero
+        if (row.user_id === user.id && row.structure_id === sid) break; // è già il mio (aggiorno)
+        finalSlug = `${base}-${i + 2}`; // occupato da altri → provo base-2, base-3…
+      }
+      // Se questa struttura era pubblicata con uno slug diverso, rimuovo il vecchio record.
+      if (publishedSlug && publishedSlug !== finalSlug) {
+        await supabase.from("public_sites").delete().eq("slug", publishedSlug).eq("user_id", user.id);
+      }
+      const { error } = await supabase.from("public_sites").upsert({
+        slug: finalSlug, user_id: user.id, structure_id: sid, structure_name: siteName, data, updated_at: new Date().toISOString(),
+      });
+      if (error) { setPubMsg(t("Pubblicazione non riuscita.") + " " + error.message); }
+      else { setSlug(finalSlug); setPublishedSlug(finalSlug); setPubMsg(t("Sito online e aggiornato ✓")); }
+    } catch (e) {
+      setPubMsg(t("Pubblicazione non riuscita.") + " " + (e instanceof Error ? e.message : ""));
+    } finally { setPubBusy(false); }
+  };
+
+  const unpublish = async () => {
+    if (!supabase || !user || !publishedSlug) return;
+    setPubBusy(true); setPubMsg("");
+    try {
+      await supabase.from("public_sites").delete().eq("slug", publishedSlug).eq("user_id", user.id);
+      setPublishedSlug(null); setPubMsg(t("Sito rimosso dal pubblico."));
+    } finally { setPubBusy(false); }
+  };
+  const isDirtySlug = publishedSlug !== null && cleanSlug(slug) !== publishedSlug;
 
   return (
     <div>
-      <PageHeader title="Xenosite" subtitle={t("Il tuo mini-sito con motore di prenotazione integrato")} actions={<a href="/sito-web" target="_blank" rel="noreferrer" className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Apri sito pubblico")} ↗</a>} />
+      <PageHeader title="Xenosite" subtitle={t("Il tuo mini-sito con motore di prenotazione integrato")} actions={<button onClick={openPreview} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Anteprima")} ↗</button>} />
+
+      {/* Pubblicazione: l'indirizzo pubblico xenora.it/<nome> */}
+      <Card className="mb-4">
+        <div className="flex items-center justify-between gap-3">
+          <SectionTitle>{t("Indirizzo pubblico")}</SectionTitle>
+          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${publishedSlug ? "text-white" : "bg-wash text-dim"}`} style={publishedSlug ? { backgroundColor: "var(--ok)" } : undefined}>{publishedSlug ? t("Online") : t("Non pubblicato")}</span>
+        </div>
+        <p className="mb-2 mt-0.5 text-xs text-dim">{t("Scegli l'indirizzo del tuo sito. I visitatori lo vedranno senza login; i dati degli ospiti non vengono pubblicati.")}</p>
+        <div className="flex flex-wrap items-stretch gap-2">
+          <div className="flex min-w-0 flex-1 items-center rounded-lg border border-line bg-paper focus-within:border-focus">
+            <span className="whitespace-nowrap pl-3 text-sm text-faint">{origin.replace(/^https?:\/\//, "")}/</span>
+            <input value={slug} onChange={(e) => setSlug(cleanSlug(e.target.value))} placeholder="nome-struttura" className="min-w-0 flex-1 bg-transparent py-2 pr-3 text-sm font-semibold text-txt outline-none" />
+          </div>
+          <button onClick={publish} disabled={pubBusy || !slug} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{pubBusy ? t("Pubblico…") : publishedSlug ? (isDirtySlug ? t("Cambia indirizzo") : t("Aggiorna")) : t("Pubblica")}</button>
+        </div>
+        {publishedSlug && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <a href={`${origin}/${publishedSlug}`} target="_blank" rel="noreferrer" className="text-sm font-semibold text-focus hover:underline">{origin.replace(/^https?:\/\//, "")}/{publishedSlug} ↗</a>
+            <button onClick={() => { navigator.clipboard?.writeText(`${origin}/${publishedSlug}`); setPubCopied(true); window.setTimeout(() => setPubCopied(false), 1500); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">{pubCopied ? t("Copiato ✓") : t("Copia link")}</button>
+            <button onClick={unpublish} disabled={pubBusy} className="rounded-lg px-2.5 py-1 text-xs font-semibold text-faint hover:text-[color:var(--err)] disabled:opacity-50">{t("Rimuovi dal pubblico")}</button>
+          </div>
+        )}
+        {pubMsg && <p className="mt-2 text-[12px] font-medium text-dim">{pubMsg}</p>}
+        {publishedSlug && <p className="mt-1 text-[11px] text-faint">{t("Dopo ogni modifica ai contenuti o alle camere, premi «Aggiorna» per aggiornare il sito online.")}</p>}
+      </Card>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
           <Card>
@@ -47,15 +136,6 @@ export default function SitoPage() {
               </label>
             )}
             <label className="mb-2 block"><span className="text-xs text-dim">{t("Nome struttura")} <span className="text-faint">({t("dalla scheda struttura")})</span></span><input value={siteName} readOnly disabled className="mt-0.5 w-full cursor-not-allowed rounded-lg border border-line bg-wash px-3 py-2 text-sm text-dim" /></label>
-            <div className="mb-2">
-              <span className="text-xs text-dim">{t("Link del sito")}</span>
-              <div className="mt-0.5 flex items-center gap-2">
-                <input value={publicLink} readOnly className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none" />
-                <button onClick={() => { navigator.clipboard?.writeText(publicLink); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }} className="shrink-0 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash">{copied ? t("Copiato ✓") : t("Copia")}</button>
-                <button onClick={openPublic} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-xs font-semibold text-white hover:opacity-90">{t("Apri")} ↗</button>
-              </div>
-              <span className="mt-1 block text-[11px] text-faint">{t("Dominio consigliato")}: <b className="text-dim">{suggestedDomain}</b> — {t("in produzione potrai collegarlo al tuo dominio.")}</span>
-            </div>
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Sottotitolo")}</span><input value={c.tagline} onChange={(e) => set({ tagline: e.target.value })} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Link recensioni Google")} <span className="text-faint">({t("opzionale")})</span></span><input value={c.googleUrl ?? ""} onChange={(e) => set({ googleUrl: e.target.value })} placeholder="https://g.page/…/review" className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             <div className="mb-1 text-xs text-dim">{t("Colore")}</div>
@@ -86,7 +166,7 @@ export default function SitoPage() {
         </div>
 
         <Card>
-          <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Anteprima")}</SectionTitle><span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{suggestedDomain}</span></div>
+          <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Anteprima")}</SectionTitle>{publishedSlug ? <a href={`${origin}/${publishedSlug}`} target="_blank" rel="noreferrer" className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-focus hover:underline">{origin.replace(/^https?:\/\//, "")}/{publishedSlug} ↗</a> : <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{slug ? `${origin.replace(/^https?:\/\//, "")}/${slug}` : t("non pubblicato")}</span>}</div>
           <div className="overflow-hidden rounded-xl border border-line">
             {c.hero && (
               <div className="relative p-6 text-white" style={{ background: c.heroBg ? `linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), url(${c.heroBg}) center/cover no-repeat` : `linear-gradient(135deg, ${c.accent}, color-mix(in srgb, ${c.accent} 55%, #000))` }}>

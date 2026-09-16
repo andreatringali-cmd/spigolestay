@@ -1,6 +1,8 @@
 // Gestione immagini per il prototipo: ridimensiona con canvas a miniatura e salva in
 // una chiave localStorage dedicata (con budget) per non saturare lo store principale.
 
+import { lsGet } from "./publicdata";
+
 const KEY = "spigolestay:images";
 const MAX_TOTAL = 3_500_000; // ~3.5 MB complessivi per le immagini
 
@@ -30,7 +32,7 @@ export function downscaleImage(file: File, maxDim = 500, quality = 0.72): Promis
 }
 
 function loadAll(): Record<string, string[]> {
-  try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { return {}; }
+  try { return JSON.parse(lsGet(KEY) || "{}"); } catch { return {}; }
 }
 export function getImages(entityKey: string): string[] {
   try { return loadAll()[entityKey] ?? []; } catch { return []; }

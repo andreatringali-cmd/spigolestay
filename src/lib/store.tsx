@@ -8,6 +8,7 @@ import type { Structure, RoomType, Unit, Guest, Booking, Channel, CalEvent } fro
 import { STRUCTURES, ROOM_TYPES, UNITS } from "./mock-data";
 import { playSound } from "./sound";
 import { loadUsers } from "./users";
+import { isPublicMode, lsGet, DATA_KEY } from "./publicdata";
 
 export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "quote" | "payment" | "login" | "message" | "config";
 export interface Activity {
@@ -129,6 +130,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
   //    non riesce così a salvare il seed sovrascrivendo i dati appena caricati.
   const [ready, setReady] = useState(false);
   useEffect(() => {
+    // Modalità sito pubblico (xenora.it/<slug>): i dati arrivano dallo snapshot in
+    // memoria, non dal localStorage. Non si esegue reset/onboarding e NON si salva.
+    if (isPublicMode()) {
+      try {
+        const raw = lsGet(DATA_KEY);
+        if (raw) {
+          const d = JSON.parse(raw);
+          if (Array.isArray(d.structures)) setStructures(d.structures);
+          if (Array.isArray(d.roomTypes)) setRoomTypes(d.roomTypes);
+          if (Array.isArray(d.units)) setUnits(d.units);
+          if (Array.isArray(d.guests)) setGuests(d.guests);
+          if (Array.isArray(d.bookings)) setBookings(d.bookings);
+          if (Array.isArray(d.events)) setEvents(d.events);
+          if (d.rateOverrides && typeof d.rateOverrides === "object") setRateOverrides(d.rateOverrides);
+        }
+      } catch {}
+      setReady(true);
+      return;
+    }
     try {
       // Reset forzato una-tantum: alla prima apertura dopo questo aggiornamento azzera TUTTO
       // (cancella ogni dato locale) e riparte dal primo accesso. Poi imposta un flag e non si ripete.
@@ -181,7 +201,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
   // 2) Salvataggio ad ogni cambiamento, solo dopo il caricamento iniziale.
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || isPublicMode()) return; // in pubblico non si scrive nel browser del visitatore
     try { localStorage.setItem(KEY, JSON.stringify({ structures, roomTypes, units, guests, bookings, events, rateOverrides, activities })); } catch {}
   }, [ready, structures, roomTypes, units, guests, bookings, events, rateOverrides, activities]);
   // Registra l'accesso al gestionale una volta per sessione del browser.

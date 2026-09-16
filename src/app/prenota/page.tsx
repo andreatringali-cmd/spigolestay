@@ -10,6 +10,7 @@ import { effectiveBase, effectiveClosed } from "@/lib/pricing";
 import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } from "@/lib/rate-plans";
 import { amenityIcon } from "@/lib/amenities";
 import { loadPromos } from "@/lib/promos";
+import { loadPublicSite, lsGet, isPublicMode, publicSlug } from "@/lib/publicdata";
 
 // ---- pricing helpers --------------------------------------------------------
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
@@ -28,6 +29,16 @@ const box = "rounded-xl border border-line bg-surface";
 const field = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
 export default function PrenotaPage() {
+  // Se si arriva da un Xenosite pubblico (xenora.it/<slug> → ?site=<slug>), carica
+  // i dati pubblicati dal server prima di montare lo store.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let slug: string | null = null;
+    try { slug = new URLSearchParams(window.location.search).get("site"); } catch {}
+    if (slug) loadPublicSite(slug).finally(() => setReady(true));
+    else setReady(true);
+  }, []);
+  if (!ready) return null;
   return <DataProvider><Engine /></DataProvider>;
 }
 
@@ -36,7 +47,7 @@ function Engine() {
 
   // Config salvata (piani, weekend) — fallback ai default.
   const plans = useMemo<Plan[]>(() => { const p = loadPlans(); return p.length ? p : DEFAULT_PLANS; }, []);
-  const weekendPct = useMemo(() => { try { const r = localStorage.getItem("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {} return 25; }, []);
+  const weekendPct = useMemo(() => { try { const r = lsGet("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {} return 25; }, []);
   const promos = useMemo(() => { try { return loadPromos(); } catch { return []; } }, []);
 
   const qp = (k: string) => { try { return new URLSearchParams(window.location.search).get(k); } catch { return null; } };
@@ -138,8 +149,22 @@ function Engine() {
     }
     const chosenExtras = extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => `${extraQty[x.id]}× ${x.name}`);
     const note = [`Sito diretto · ${selPlan?.name}`, appliedPromo ? `Promo ${appliedPromo.code} (−${appliedPromo.pct}%)` : "", chosenExtras.length ? `Extra: ${chosenExtras.join(", ")}` : "", wantsCot ? "🍼 Culla richiesta" : "", guest.arrival !== "Non lo so" ? `Arrivo ~${guest.arrival}` : "", guest.requests.trim()].filter(Boolean).join(" · ");
-    addBooking({ structureId, roomTypeId: selRt.id, unitId: unit?.id ?? null, guestId: gid, channel: "direct", status: "confirmed", checkIn, checkOut, adults, children, childAges: childAges.length ? childAges : undefined, total: accommodation, cleaningFee: 0, paid: deposit, cityTaxPaid: false, note });
-    addActivity("booking", `Prenotazione dal sito — ${guest.firstName} ${guest.lastName}`);
+    // Sito PUBBLICO: la prenotazione non sta nel browser del visitatore ma va
+    // inviata al server, che la scrive nel calendario del proprietario.
+    if (isPublicMode() && publicSlug()) {
+      const token = (globalThis.crypto?.randomUUID?.() ?? String(Date.now()));
+      fetch("/api/public-booking", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          slug: publicSlug(), token, rt: selRt.id, ci: checkIn, co: checkOut,
+          adults, children, childAges, total: accommodation, deposit, note,
+          guest: { firstName: guest.firstName.trim(), lastName: guest.lastName.trim(), email: guest.email.trim(), phone: guest.phone.trim(), country: guest.country },
+        }),
+      }).catch(() => {});
+    } else {
+      addBooking({ structureId, roomTypeId: selRt.id, unitId: unit?.id ?? null, guestId: gid, channel: "direct", status: "confirmed", checkIn, checkOut, adults, children, childAges: childAges.length ? childAges : undefined, total: accommodation, cleaningFee: 0, paid: deposit, cityTaxPaid: false, note });
+      addActivity("booking", `Prenotazione dal sito — ${guest.firstName} ${guest.lastName}`);
+    }
     setCode(`SPG-${new Date().getFullYear()}-${Math.abs([...(gid + checkIn)].reduce((a, c) => a + c.charCodeAt(0), 0)) % 100000}`);
     setStep("done");
     window.scrollTo(0, 0);

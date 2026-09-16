@@ -8,6 +8,7 @@ import { getImages } from "@/lib/images";
 import { loadPromos } from "@/lib/promos";
 import { eur } from "@/lib/format";
 import { amenityIcon } from "@/lib/amenities";
+import { isPublicMode, publicSlug, lsGet } from "@/lib/publicdata";
 
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
 const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return toISO(d); };
@@ -69,7 +70,7 @@ export default function SitoWebPage() {
   return <DataProvider><Site /></DataProvider>;
 }
 
-function Site() {
+export function Site() {
   const { structures, roomTypes, units, bookings, getStructure, getGuest, addGuest } = useData();
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [weather, setWeather] = useState<{ temp: number; code: number } | null>(null);
@@ -85,7 +86,7 @@ function Site() {
     addGuest({ firstName: nl.firstName.trim() || undefined, lastName: nl.lastName.trim() || undefined, email: nl.email.trim() || undefined, phone: nl.phone.trim() || undefined });
     setNlDone(true); setNl({ firstName: "", lastName: "", email: "", phone: "" });
   };
-  const cfg = useMemo<Cfg>(() => { try { const r = localStorage.getItem("spigolestay:sito"); if (r) return { ...DEFCFG, ...JSON.parse(r) }; } catch {} return DEFCFG; }, []);
+  const cfg = useMemo<Cfg>(() => { try { const r = lsGet("spigolestay:sito"); if (r) return { ...DEFCFG, ...JSON.parse(r) }; } catch {} return DEFCFG; }, []);
   const [sid, setSid] = useState(() => { try { return new URLSearchParams(window.location.search).get("s") || structures[0]?.id || ""; } catch { return structures[0]?.id ?? ""; } });
   // Lo store carica i dati dopo il mount: aggancia la prima struttura appena disponibile.
   useEffect(() => { if ((!sid || !structures.some((s) => s.id === sid)) && structures[0]) setSid(structures[0].id); }, [structures, sid]);
@@ -135,7 +136,8 @@ function Site() {
 
   // Home: solo le camere "madri". Le tariffe derivate (es. uso singola) compaiono come opzioni in "Verifica disponibilità".
   const types = roomTypes.filter((rt) => rt.structureId === sid && !rt.deriveFrom);
-  const go = (extra = "") => { window.location.href = `/prenota?s=${sid}&ci=${ci}&co=${co}&ad=${ad}&ch=${ch}${ch > 0 ? `&ages=${childAges.join(",")}` : ""}${wantsCot ? "&cot=1" : ""}${extra}`; };
+  const siteQ = isPublicMode() && publicSlug() ? `&site=${encodeURIComponent(publicSlug()!)}` : "";
+  const go = (extra = "") => { window.location.href = `/prenota?s=${sid}&ci=${ci}&co=${co}&ad=${ad}&ch=${ch}${ch > 0 ? `&ages=${childAges.join(",")}` : ""}${wantsCot ? "&cot=1" : ""}${siteQ}${extra}`; };
 
   // Galleria: foto delle tipologie + foto delle singole camere, con etichetta della tipologia.
   const gallery = useMemo(() => {

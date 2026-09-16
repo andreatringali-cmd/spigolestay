@@ -1,4 +1,6 @@
 // Libreria promo riutilizzabili, condivisa tra Promozioni, Ospiti e scheda ospite.
+import { lsGet } from "./publicdata";
+
 export interface Promo {
   id: string;
   name: string;
@@ -42,7 +44,7 @@ export const DEFAULT_PROMOS: Promo[] = [
 ];
 
 export function loadPromos(): Promo[] {
-  try { const r = localStorage.getItem(KEY); return r ? JSON.parse(r) : []; } catch { return []; }
+  try { const r = lsGet(KEY); return r ? JSON.parse(r) : []; } catch { return []; }
 }
 export function savePromos(list: Promo[]) {
   try { localStorage.setItem(KEY, JSON.stringify(list)); } catch {}

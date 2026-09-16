@@ -20,10 +20,12 @@ export interface RatePlan {
   description?: string;
 }
 
+import { lsGet } from "./publicdata";
+
 export const RATE_PLANS_KEY = "spigolestay:rateplans";
 
 export function loadPlans(): RatePlan[] {
-  try { const p = localStorage.getItem(RATE_PLANS_KEY); if (p) { const a = JSON.parse(p); if (Array.isArray(a) && a.length) return a as RatePlan[]; } } catch {}
+  try { const p = lsGet(RATE_PLANS_KEY); if (p) { const a = JSON.parse(p); if (Array.isArray(a) && a.length) return a as RatePlan[]; } } catch {}
   return [];
 }
 
