@@ -246,7 +246,7 @@ export default function CamerePage() {
 
               {/* Filtri camere: riquadro con ricerca a sinistra e azioni a destra */}
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm">
-                <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} />
+                <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="w-full sm:w-[calc((100%-1.5rem)/4)]" />
                 <div className="flex gap-2">
                   <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
                   <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>

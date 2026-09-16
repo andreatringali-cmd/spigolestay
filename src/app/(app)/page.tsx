@@ -21,6 +21,7 @@ import DensityChart from "@/components/DensityChart";
 import DateField from "@/components/DateField";
 import Icon from "@/components/Icon";
 import AdempimentiToday from "@/components/AdempimentiToday";
+import SearchInput from "@/components/SearchInput";
 import ExportMenu from "@/components/ExportMenu";
 import WeatherWidget from "@/components/WeatherWidget";
 import DayNotes from "@/components/DayNotes";
@@ -405,7 +406,7 @@ export default function Dashboard() {
       {/* Sezione giorno */}
       <div className="mt-6 mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <div className="no-print flex flex-wrap items-center gap-2">
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca ospite…")} className="w-full max-w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus sm:w-72 lg:w-80 xl:w-[22rem] 2xl:w-96" />
+          <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca ospite…")} />
           <div className="flex items-center gap-1">
             <button onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash hover:text-txt">‹</button>
             <DateField value={date} onChange={setDate} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-focus" />

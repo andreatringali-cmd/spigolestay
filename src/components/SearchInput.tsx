@@ -19,7 +19,7 @@ export default function SearchInput({
   autoFocus?: boolean;
 }) {
   return (
-    <div className={`relative w-full sm:w-72 ${className}`}>
+    <div className={`relative ${className || "w-full sm:w-72"}`}>
       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint">
         <Icon name="search" size={16} />
       </span>

@@ -5,6 +5,7 @@
 import { useMemo, useState } from "react";
 import { useData, type ActivityType } from "@/lib/store";
 import { PageHeader, Card } from "@/components/ui";
+import SearchInput from "@/components/SearchInput";
 import { useLang } from "@/lib/i18n";
 
 const META: Record<ActivityType, { label: string; color: string }> = {
@@ -40,7 +41,7 @@ export default function RegistroPage() {
 
       {/* Riga filtri */}
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca…")} className="w-48 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca…")} />
         <select value={type} onChange={(e) => setType(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-txt outline-none focus:border-focus">
           <option value="all">{t("Tutti gli eventi")}</option>
           {(Object.keys(META) as ActivityType[]).map((k) => <option key={k} value={k}>{t(META[k].label)}</option>)}
