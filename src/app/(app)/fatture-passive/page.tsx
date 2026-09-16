@@ -14,7 +14,7 @@ const CATEGORIES = ["Pulizie", "Utenze", "Manutenzione", "OTA / commissioni", "F
 const TIPI: Record<string, string> = { fattura: "Fattura", nota_credito: "Nota di credito", ricevuta: "Ricevuta", spesa: "Spesa" };
 const cents = (c?: number | null) => (c ?? 0) / 100;
 const numv = (v: string | number) => { const n = Number(String(v).replace(",", ".")); return isNaN(n) ? 0 : n; };
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const YEARS = (() => { const y = new Date().getFullYear(); return [y, y - 1, y - 2]; })();
 
 interface Doc { id: string; supplier_id: string | null; supplier_name: string | null; doc_number: string | null; doc_date: string | null; doc_type: string; category: string | null; taxable_cents: number; vat_cents: number; total_cents: number; due_date: string | null; paid: boolean; paid_at: string | null; payment_method: string | null; notes: string | null }

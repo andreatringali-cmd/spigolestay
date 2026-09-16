@@ -10,7 +10,7 @@ import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 
 interface Mov { date: string; kind: "in" | "out"; amount: number; conto: string }
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const numv = (v: string) => { const n = Number(String(v).replace(",", ".")); return isNaN(n) ? 0 : n; };
 
 export default function ChiusuraCassaPage() {

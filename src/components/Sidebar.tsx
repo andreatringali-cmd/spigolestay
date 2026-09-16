@@ -52,9 +52,9 @@ export default function Sidebar({
         className={`${mobileOpen ? "fixed inset-y-0 left-0 z-50 flex w-64" : "hidden"} flex-col border-r border-line bg-surface md:sticky md:top-0 md:flex md:h-screen ${collapsed ? "md:w-[70px]" : "md:w-64"}`}
       >
         {/* Header */}
-        <div className="flex items-center gap-2.5 border-b border-line px-3 py-3.5">
+        <div className="flex h-14 items-center gap-2.5 border-b border-line px-3">
           {!collapsed && (
-            <Image src="/xenora-logo.png" alt="Xenora" width={132} height={38} priority className="object-contain" style={{ height: 30, width: "auto" }} />
+            <Image src="/xenora-logo.png" alt="Xenora" width={132} height={38} priority className="object-contain" style={{ height: 26, width: "auto" }} />
           )}
           <button
             onClick={onToggleCollapse}

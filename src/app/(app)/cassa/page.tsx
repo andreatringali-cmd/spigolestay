@@ -78,7 +78,7 @@ interface Rule {
 const monthKey = (iso: string) => iso.slice(0, 7);
 const monthLabel = (ym: string) => { const [y, m] = ym.split("-").map(Number); return new Date(y, m - 1, 1).toLocaleDateString("it-IT", { month: "long", year: "numeric" }); };
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `m-${Math.floor(performance.now() * 1000)}`);
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const pad = (n: number) => String(n).padStart(2, "0");
 const fmt = (y: number, m0: number, d: number) => `${y}-${pad(m0 + 1)}-${pad(d)}`;
 const daysIn = (y: number, m0: number) => new Date(y, m0 + 1, 0).getDate();

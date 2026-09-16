@@ -212,6 +212,16 @@ export default function AssistentePage() {
     <div>
       <PageHeader title="Assistente Xenora" subtitle="Chiedi a voce o scrivi — rispondo con i tuoi numeri" />
 
+      {/* Tessere in alto: i numeri del giorno */}
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {tiles.map((tl) => (
+          <button key={tl.label} onClick={() => { setQ(tl.label); ask(tl.q); }} className="rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition hover:shadow-md">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{tl.label}</div>
+            <div className="mt-1 font-mono text-2xl font-bold" style={{ color: tl.tone }}>{tl.value}</div>
+          </button>
+        ))}
+      </div>
+
       {/* Briefing del giorno: card chiara con il core astratto */}
       <Card className="mb-4 overflow-hidden">
         <div className="flex flex-col items-center gap-3 py-1 text-center">
@@ -237,16 +247,6 @@ export default function AssistentePage() {
           </div>
         </div>
       </Card>
-
-      {/* Briefing distribuito: una tessera per numero */}
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {tiles.map((tl) => (
-          <button key={tl.label} onClick={() => { setQ(tl.label); ask(tl.q); }} className="rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition hover:shadow-md">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{tl.label}</div>
-            <div className="mt-1 font-mono text-2xl font-bold" style={{ color: tl.tone }}>{tl.value}</div>
-          </button>
-        ))}
-      </div>
 
       {/* Input + chips */}
       <Card className="mb-4">
