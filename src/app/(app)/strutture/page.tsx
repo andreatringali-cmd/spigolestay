@@ -26,7 +26,7 @@ export default function StrutturePage() {
   const renderRow = (s: typeof structures[number]) => {
     const sUnits = units.filter((u) => u.structureId === s.id);
     const nCamere = sUnits.length;
-    const nTipologie = roomTypes.filter((rt) => rt.structureId === s.id).length;
+    const nTipologie = roomTypes.filter((rt) => rt.structureId === s.id && !rt.deriveFrom).length;
     const posti = sUnits.reduce((a, u) => a + (roomTypes.find((rt) => rt.id === u.roomTypeId)?.beds ?? 0), 0);
     const color = s.photoColor ?? AV_COLORS[1];
     return (
