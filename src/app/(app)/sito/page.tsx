@@ -83,7 +83,7 @@ export default function SitoPage() {
 
   const publish = async () => {
     if (!supabase || !user) { setPubMsg(t("Devi essere connesso per pubblicare.")); return; }
-    const base = cleanSlug(slug) || slugify(siteName) || "struttura";
+    const base = slugify(slug) || slugify(siteName) || "struttura";
     if (RESERVED_SLUGS.has(base)) { setPubMsg(t("Questo indirizzo è riservato, scegline un altro.")); return; }
     const data = buildPublishData(sid);
     if (!data) { setPubMsg(t("Dati struttura non disponibili.")); return; }
@@ -119,7 +119,7 @@ export default function SitoPage() {
       setPublishedSlug(null); setPubMsg(t("Sito rimosso dal pubblico."));
     } finally { setPubBusy(false); }
   };
-  const isDirtySlug = publishedSlug !== null && cleanSlug(slug) !== publishedSlug;
+  const isDirtySlug = publishedSlug !== null && slugify(slug) !== publishedSlug;
 
   return (
     <div>

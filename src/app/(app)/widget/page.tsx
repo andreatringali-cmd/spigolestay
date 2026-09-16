@@ -192,7 +192,7 @@ export default function WidgetPage() {
   return (
     <div>
       <PageHeader title={c.name || t("Widget")} subtitle={t("Configura il widget; le prenotazioni entrano dirette nel calendario")}
-        actions={<div className="flex items-center gap-2"><button onClick={() => setEditingId(null)} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← {t("Torna alla lista")}</button><button onClick={() => { if (c && confirm(t("Eliminare questo widget?"))) { deleteWidget(c.id); setEditingId(null); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button><button onClick={() => setEditingId(null)} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">💾 {t("Salva")}</button></div>} />
+        actions={<div className="flex items-center gap-2"><button onClick={() => setEditingId(null)} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← {t("Torna alla lista")}</button><button onClick={() => { if (c && confirm(t("Eliminare questo widget?"))) { deleteWidget(c.id); setEditingId(null); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button><button onClick={() => setEditingId(null)} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Salva")}</button></div>} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
@@ -280,12 +280,6 @@ export default function WidgetPage() {
           </Card>
 
           <Card>
-            <SectionTitle>{t("Personalizza CSS")}</SectionTitle>
-            <p className="mb-2 text-xs text-dim">{t("CSS personalizzato applicato al widget. Usa il selettore")} <code className="rounded bg-wash px-1">#spigole-book</code> {t("per mirare al widget.")}</p>
-            <textarea value={c.customCss} onChange={(e) => set("customCss", e.target.value)} rows={5} spellCheck={false} className="w-full resize-y rounded-lg border border-line bg-paper p-3 font-mono text-[12px] text-txt outline-none focus:border-focus" placeholder={"#spigole-book button{ text-transform:uppercase; }"} />
-          </Card>
-
-          <Card>
             <SectionTitle>{t("Codice sorgente")}</SectionTitle>
             <p className="mb-2 text-xs text-dim">{t("Copia e incolla nel tuo sito, dentro il tag")} <code>&lt;body&gt;</code>.</p>
             <div className="text-xs font-medium text-dim">Script</div>
@@ -299,6 +293,12 @@ export default function WidgetPage() {
               <button onClick={() => copy("i", iframe)} className="shrink-0 rounded-lg border border-line px-3 py-2 text-xs font-medium text-txt hover:bg-wash">{copied === "i" ? "✓" : t("Copia")}</button>
             </div>
             <p className="mt-2 text-xs text-faint">{t("C'è anche il")} <b className="text-dim">{t("plugin WordPress")}</b> {t("(in arrivo): installalo e incolla la sitekey.")}</p>
+          </Card>
+
+          <Card>
+            <SectionTitle>{t("Personalizza CSS")}</SectionTitle>
+            <p className="mb-2 text-xs text-dim">{t("CSS personalizzato applicato al widget. Usa il selettore")} <code className="rounded bg-wash px-1">#spigole-book</code> {t("per mirare al widget.")}</p>
+            <textarea value={c.customCss} onChange={(e) => set("customCss", e.target.value)} rows={5} spellCheck={false} className="w-full resize-y rounded-lg border border-line bg-paper p-3 font-mono text-[12px] text-txt outline-none focus:border-focus" placeholder={"#spigole-book button{ text-transform:uppercase; }"} />
           </Card>
         </div>
 
