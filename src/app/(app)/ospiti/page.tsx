@@ -63,7 +63,9 @@ export default function OspitiPage() {
       const chCount: Record<string, number> = {};
       list.forEach((b) => { chCount[b.channel] = (chCount[b.channel] ?? 0) + 1; });
       const topCh = Object.entries(chCount).sort((a, b) => b[1] - a[1])[0]?.[0] as Channel | undefined;
-      return { guest: g, list, stays: list.length, nightsTot, spent, avg, comm, last, topCh };
+      // Ha prenotazioni reali in QUALSIASI struttura? Se sì è un ospite; se no è un contatto/lead (newsletter).
+      const anyBookings = bookings.some((b) => b.guestId === g.id && b.status !== "cancelled" && b.channel !== "blocked");
+      return { guest: g, list, stays: list.length, nightsTot, spent, avg, comm, last, topCh, anyBookings };
     })
     // Mostra: chi ha prenotazioni in questa struttura; con "Tutte" tutti; e SEMPRE
     // i contatti senza prenotazioni (es. iscritti newsletter/lead), che non sono legati a una struttura.
@@ -96,10 +98,13 @@ export default function OspitiPage() {
   const avgAll = (() => { const nt = rows.reduce((a, r) => a + r.nightsTot, 0); return nt > 0 ? Math.round(totRevenue / nt) : 0; })();
   const repeat = rows.filter((r) => r.stays > 1).length;
 
+  // Due registri: OSPITI (con prenotazioni) e NEWSLETTER (contatti senza prenotazioni).
+  // Se un iscritto newsletter prenota, ha "anyBookings" → passa automaticamente agli ospiti.
+  const guestSorted = sorted.filter((r) => r.anyBookings);
+  const nlSorted = sorted.filter((r) => !r.anyBookings);
+
   // Selezione multipla → invio promo
   const selEmails = sorted.filter((r) => sel.has(r.guest.id)).map((r) => r.guest.email).filter(Boolean) as string[];
-  const allSel = sorted.length > 0 && sorted.every((r) => sel.has(r.guest.id));
-  const toggleAll = () => setSel(allSel ? new Set() : new Set(sorted.map((r) => r.guest.id)));
   const sendPromoTo = (p: Promo) => {
     if (selEmails.length) {
       const st = activeStructureId !== "all" ? structures.find((s) => s.id === activeStructureId) : structures[0];
@@ -107,6 +112,103 @@ export default function OspitiPage() {
       window.open(promoMailto(selEmails, p, { struttura: st?.name, contatti }), "_blank");
     }
     setPickPromo(false);
+  };
+
+  // Registro riutilizzabile: variante "lead" (newsletter) con colonne ridotte.
+  const Register = ({ title, list, empty, lead }: { title: string; list: typeof sorted; empty: string; lead?: boolean }) => {
+    const ids = list.map((r) => r.guest.id);
+    const allR = ids.length > 0 && ids.every((id) => sel.has(id));
+    const toggleAllR = () => setSel((prev) => { const n = new Set(prev); if (allR) ids.forEach((id) => n.delete(id)); else ids.forEach((id) => n.add(id)); return n; });
+    const nameCell = (guest: typeof list[number]["guest"]) => (
+      <span className="flex min-w-0 items-center gap-1.5 truncate font-medium text-txt">{guest.fullName}
+        {guest.vip && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}
+        {guest.tags?.includes("newsletter") && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>Newsletter</span>}
+      </span>
+    );
+    return (
+      <div className="mb-6">
+        {/* Telefono: schede */}
+        <div className="md:hidden">
+          <div className="mb-2 px-1 text-sm font-bold uppercase tracking-wide text-txt">{title} <span className="font-normal text-faint">· {list.length}</span></div>
+          <div className="flex flex-col gap-2">
+            {list.map(({ guest, stays, nightsTot, spent, last, topCh }) => (
+              <div key={guest.id} className="flex items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm">
+                <input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: "var(--focus)" }} className="shrink-0" />
+                <button onClick={() => router.push(`/ospiti/${guest.id}`)} className="min-w-0 flex-1 text-left">
+                  <div className="flex items-center justify-between gap-2">
+                    {nameCell(guest)}
+                    {!lead && <span className="shrink-0 font-mono font-semibold text-txt">{eur(spent)}</span>}
+                  </div>
+                  {lead ? (
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-dim">{guest.email || guest.phone || "—"}{guest.email && guest.phone ? ` · ${guest.phone}` : ""}{guest.country ? ` · ${guest.country}` : ""}</div>
+                  ) : (
+                    <>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-dim">
+                        {topCh && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `var(${CHANNELS[topCh].cssVar})`, color: CHANNELS[topCh].text }}>{CHANNELS[topCh].label}</span>}
+                        <span>{stays} {t("pren.")} · {nightsTot} {t("notti")}</span>
+                        {guest.country && <><span className="text-faint">·</span><span>{guest.country}</span></>}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-faint">{t("Ultimo")}: {last ? fmtD(last) : "—"}{guest.phone ? ` · ${guest.phone}` : ""}</div>
+                    </>
+                  )}
+                </button>
+              </div>
+            ))}
+            {list.length === 0 && <div className="rounded-xl border border-line bg-surface p-6 text-center text-sm text-faint">{empty}</div>}
+          </div>
+        </div>
+
+        {/* Tablet/desktop: tabella */}
+        <div className="hidden rounded-xl border border-line bg-surface shadow-sm md:block">
+          <div className="flex items-center gap-1.5 border-b border-line px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-txt">{title} <span className="font-normal text-faint">· {list.length}</span></div>
+          <div className="max-h-[62vh] overflow-auto">
+          <table className={`w-full ${lead ? "min-w-[560px]" : "min-w-[980px]"} text-sm`}>
+            <thead className="sticky top-0 z-10 bg-wash">
+              <tr className="border-b border-line text-[11px] uppercase tracking-wide text-faint">
+                <th className="w-8 px-3 py-2"><input type="checkbox" checked={allR} onChange={toggleAllR} style={{ accentColor: "var(--focus)" }} /></th>
+                <Th k="name">{t("Ospite")}</Th>
+                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold">{t("Telefono")}</th>
+                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold">{t("Email")}</th>
+                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold">{t("Paese")}</th>
+                {!lead && <>
+                  <th className="whitespace-nowrap px-3 py-2 text-left font-semibold">{t("Canale")}</th>
+                  <Th k="stays" right>{t("Prenotazioni")}</Th>
+                  <Th k="nights" right>{t("Notti")}</Th>
+                  <Th k="avg" right>{t("Notte medio")}</Th>
+                  <Th k="spent" right>{t("Speso")}</Th>
+                  <Th k="comm" right>{t("Commissioni")}</Th>
+                  <Th k="last" right>{t("Ultimo soggiorno")}</Th>
+                </>}
+                <th className="whitespace-nowrap px-3 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map(({ guest, stays, nightsTot, avg, spent, comm, last, topCh }) => (
+                <tr key={guest.id} onClick={() => router.push(`/ospiti/${guest.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)]">
+                  <td onClick={(e) => e.stopPropagation()} className="px-3 py-2"><input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} style={{ accentColor: "var(--focus)" }} /></td>
+                  <td className="whitespace-nowrap px-3 py-2">{nameCell(guest)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-txt">{guest.phone ?? "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-txt">{guest.email ?? "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-txt">{guest.country ?? "—"}</td>
+                  {!lead && <>
+                    <td className="whitespace-nowrap px-3 py-2">{topCh ? <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `var(${CHANNELS[topCh].cssVar})`, color: CHANNELS[topCh].text }}>{CHANNELS[topCh].label}</span> : "—"}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{stays}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{nightsTot}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{avg > 0 ? eur(avg) : "—"}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono font-semibold text-txt">{eur(spent)}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{comm > 0 ? eur(comm) : "—"}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{last ? fmtD(last) : "—"}</td>
+                  </>}
+                  <td className="whitespace-nowrap px-3 py-2 text-right text-faint">›</td>
+                </tr>
+              ))}
+              {list.length === 0 && <tr><td colSpan={lead ? 6 : 13} className="px-3 py-8 text-center text-sm text-faint">{empty}</td></tr>}
+            </tbody>
+          </table>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -142,78 +244,8 @@ export default function OspitiPage() {
         </div>
       )}
 
-      {/* Telefono: registro ospiti a schede */}
-      <div className="md:hidden">
-        <div className="mb-2 px-1 text-sm font-bold uppercase tracking-wide text-txt">{t("Registro ospiti")} <span className="font-normal text-faint">· {sorted.length}</span></div>
-        <div className="flex flex-col gap-2">
-          {sorted.map(({ guest, stays, nightsTot, spent, last, topCh }) => (
-            <div key={guest.id} className="flex items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm">
-              <input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: "var(--focus)" }} className="shrink-0" />
-              <button onClick={() => router.push(`/ospiti/${guest.id}`)} className="min-w-0 flex-1 text-left">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="flex min-w-0 items-center gap-1.5 truncate font-semibold text-txt">{guest.fullName}{guest.vip && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}{guest.tags?.includes("newsletter") && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>Newsletter</span>}</span>
-                  <span className="shrink-0 font-mono font-semibold text-txt">{eur(spent)}</span>
-                </div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-dim">
-                  {topCh && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `var(${CHANNELS[topCh].cssVar})`, color: CHANNELS[topCh].text }}>{CHANNELS[topCh].label}</span>}
-                  <span>{stays} {t("pren.")} · {nightsTot} {t("notti")}</span>
-                  {guest.country && <><span className="text-faint">·</span><span>{guest.country}</span></>}
-                </div>
-                <div className="mt-0.5 text-[11px] text-faint">{t("Ultimo")}: {last ? fmtD(last) : "—"}{guest.phone ? ` · ${guest.phone}` : ""}</div>
-              </button>
-            </div>
-          ))}
-          {sorted.length === 0 && <div className="rounded-xl border border-line bg-surface p-6 text-center text-sm text-faint">{t("Nessun ospite trovato.")}</div>}
-        </div>
-      </div>
-
-      {/* Tablet/desktop: tabella */}
-      <div className="hidden rounded-xl border border-line bg-surface shadow-sm md:block">
-        <div className="flex items-center gap-1.5 border-b border-line px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-txt">{t("Registro ospiti")} <span className="font-normal text-faint">· {sorted.length}</span></div>
-        <div className="max-h-[62vh] overflow-auto">
-        <table className="w-full min-w-[980px] text-sm">
-          <thead className="sticky top-0 z-10 bg-wash">
-            <tr className="border-b border-line text-[11px] uppercase tracking-wide text-faint">
-              <th className="w-8 px-3 py-2"><input type="checkbox" checked={allSel} onChange={toggleAll} style={{ accentColor: "var(--focus)" }} /></th>
-              <Th k="name">{t("Ospite")}</Th>
-              <th className="whitespace-nowrap px-3 py-2 text-left font-semibold">{t("Telefono")}</th>
-              <th className="whitespace-nowrap px-3 py-2 text-left font-semibold">{t("Email")}</th>
-              <th className="whitespace-nowrap px-3 py-2 text-left font-semibold">{t("Paese")}</th>
-              <th className="whitespace-nowrap px-3 py-2 text-left font-semibold">{t("Canale")}</th>
-              <Th k="stays" right>{t("Prenotazioni")}</Th>
-              <Th k="nights" right>{t("Notti")}</Th>
-              <Th k="avg" right>{t("Notte medio")}</Th>
-              <Th k="spent" right>{t("Speso")}</Th>
-              <Th k="comm" right>{t("Commissioni")}</Th>
-              <Th k="last" right>{t("Ultimo soggiorno")}</Th>
-              <th className="whitespace-nowrap px-3 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map(({ guest, stays, nightsTot, avg, spent, comm, last, topCh }) => (
-              <tr key={guest.id} onClick={() => router.push(`/ospiti/${guest.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)]">
-                <td onClick={(e) => e.stopPropagation()} className="px-3 py-2"><input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} style={{ accentColor: "var(--focus)" }} /></td>
-                <td className="whitespace-nowrap px-3 py-2">
-                  <span className="flex items-center gap-1.5 font-medium text-txt">{guest.fullName}{guest.vip && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}{guest.tags?.includes("newsletter") && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>Newsletter</span>}</span>
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-txt">{guest.phone ?? "—"}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-txt">{guest.email ?? "—"}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-txt">{guest.country ?? "—"}</td>
-                <td className="whitespace-nowrap px-3 py-2">{topCh ? <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `var(${CHANNELS[topCh].cssVar})`, color: CHANNELS[topCh].text }}>{CHANNELS[topCh].label}</span> : "—"}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{stays}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{nightsTot}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{avg > 0 ? eur(avg) : "—"}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-right font-mono font-semibold text-txt">{eur(spent)}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{comm > 0 ? eur(comm) : "—"}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{last ? fmtD(last) : "—"}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-right text-faint">›</td>
-              </tr>
-            ))}
-            {sorted.length === 0 && <tr><td colSpan={13} className="px-3 py-8 text-center text-sm text-faint">{t("Nessun ospite trovato.")}</td></tr>}
-          </tbody>
-        </table>
-        </div>
-      </div>
+      <Register title={t("Registro ospiti")} list={guestSorted} empty={t("Nessun ospite trovato.")} />
+      <Register title={t("Registro newsletter")} list={nlSorted} empty={t("Nessun iscritto alla newsletter.")} lead />
 
       {pickPromo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

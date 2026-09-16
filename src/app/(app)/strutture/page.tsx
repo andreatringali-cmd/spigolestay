@@ -24,7 +24,19 @@ export default function StrutturePage() {
 
   const renderTable = (list: typeof structures) => (
   <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
-          <table className="w-full min-w-[820px] text-sm">
+          <table className="w-full min-w-[820px] table-fixed text-sm">
+            <colgroup>
+              <col style={{ width: "19%" }} />{/* Struttura */}
+              <col style={{ width: "10%" }} />{/* Città */}
+              <col style={{ width: "15%" }} />{/* Indirizzo */}
+              <col style={{ width: "9%" }} />{/* Tipo */}
+              <col style={{ width: "11%" }} />{/* Gruppo */}
+              <col style={{ width: "9%" }} />{/* Camere */}
+              <col style={{ width: "8%" }} />{/* Posti letto */}
+              <col style={{ width: "9%" }} />{/* CIN */}
+              <col style={{ width: "7%" }} />{/* Stato */}
+              <col style={{ width: "3%" }} />{/* freccia */}
+            </colgroup>
             <thead>
               <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
                 <th className="px-3 py-2 font-semibold">{t("Struttura")}</th>
@@ -103,7 +115,6 @@ export default function StrutturePage() {
         </section>
       ))}
 
-      <p className="mt-3 text-xs text-faint">{t("Clicca una riga per aprire la scheda completa (anagrafica, contatti, indirizzo/GPS, fisco, check-in, tassa di soggiorno, servizi, policy, pagamenti).")}</p>
     </div>
   );
 }
