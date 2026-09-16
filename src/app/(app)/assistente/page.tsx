@@ -251,10 +251,12 @@ export default function AssistentePage() {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         stream.getTracks().forEach((tr) => tr.stop());
       } catch (err) {
-        const name = (err as { name?: string })?.name;
-        if (name === "NotFoundError" || name === "DevicesNotFoundError") setMicHint("Nessun microfono trovato sul dispositivo.");
-        else if (name === "NotAllowedError" || name === "SecurityError") setMicHint("Microfono bloccato. Se sei nell'app di Claude non è disponibile: apri xenora.it in Chrome/Edge e consenti il microfono.");
-        else setMicHint("Microfono non disponibile qui. Apri xenora.it in Chrome/Edge per usare la voce.");
+        const name = (err as { name?: string })?.name || "";
+        console.warn("[Assistente] getUserMedia error:", err);
+        if (name === "NotFoundError" || name === "DevicesNotFoundError") setMicHint("Nessun microfono rilevato sul dispositivo.");
+        else if (name === "NotReadableError") setMicHint("Il microfono è occupato da un'altra app (es. Zoom/Teams). Chiudila e riprova.");
+        else if (name === "NotAllowedError" || name === "SecurityError") setMicHint("Bloccato dal sistema. Su Windows: Impostazioni → Privacy e sicurezza → Microfono → attiva anche «Consenti alle app desktop di accedere al microfono». E apri xenora.it in Chrome (non nell'app di Claude).");
+        else setMicHint(`Microfono non disponibile qui (${name || "sconosciuto"}). Apri xenora.it in Chrome/Edge.`);
         return;
       }
     }
