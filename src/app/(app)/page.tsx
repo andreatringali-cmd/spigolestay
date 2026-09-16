@@ -20,7 +20,7 @@ import Gauge from "@/components/Gauge";
 import DensityChart from "@/components/DensityChart";
 import DateField from "@/components/DateField";
 import Icon from "@/components/Icon";
-import AdempimentiCard from "@/components/AdempimentiCard";
+import AdempimentiToday from "@/components/AdempimentiToday";
 import ExportMenu from "@/components/ExportMenu";
 import WeatherWidget from "@/components/WeatherWidget";
 import DayNotes from "@/components/DayNotes";
@@ -360,7 +360,7 @@ export default function Dashboard() {
     <div>
       <PageHeader title={t("Dashboard")} subtitle={`${t("Riferito a")} ${parseISO(date).toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}`} actions={<WeatherWidget compact />} />
 
-      <AdempimentiCard />
+      <AdempimentiToday />
 
       {/* KPI stato attuale — cliccabili per filtrare i movimenti sotto */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

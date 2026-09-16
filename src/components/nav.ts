@@ -11,7 +11,6 @@ export const NAV: NavItem[] = [
   // In cima, senza categoria: le cose che apri ogni giorno.
   { label: "Dashboard", href: "/", group: "", icon: "grid" },
   { label: "Assistente", href: "/assistente", group: "", icon: "sparkles", perm: "prenotazioni", module: "pms" },
-  { label: "Adempimenti oggi", href: "/adempimenti", group: "", icon: "clipboard", perm: "prenotazioni", module: "pms" },
 
   // PMS: la gestione quotidiana della struttura (il cuore del gestionale).
   { label: "Prenotazioni", href: "/prenotazioni", group: "PMS", icon: "clipboard", perm: "prenotazioni", module: "pms" },

@@ -36,7 +36,7 @@ export default function AssistentePage() {
     const list = (bs: typeof bookings) => bs.slice(0, 6).map((b) => `${getGuest(b.guestId)?.fullName || "Ospite"} (${getStructure(b.structureId)?.name ?? ""})`).join(", ");
     return {
       arrivi: { title: "Arrivi di oggi", value: `${arrivalsToday.length}`, detail: list(arrivalsToday) || "Nessun arrivo oggi.", go: { label: "Prenotazioni", href: "/prenotazioni" } } as Ans,
-      checkin: { title: "Arrivi senza check-in online", value: `${noCheckin.length}`, detail: list(noCheckin) || "Tutti hanno fatto il check-in.", go: { label: "Adempimenti", href: "/adempimenti" } } as Ans,
+      checkin: { title: "Arrivi senza check-in online", value: `${noCheckin.length}`, detail: list(noCheckin) || "Tutti hanno fatto il check-in.", go: { label: "Prenotazioni", href: "/prenotazioni" } } as Ans,
       partenze: { title: "Partenze di oggi", value: `${departuresToday.length}`, detail: list(departuresToday) || "Nessuna partenza oggi.", go: { label: "Pulizie", href: "/pulizie" } } as Ans,
       ricavo: { title: "Ricavo del mese", value: eur(ricavoMese), detail: `${monthArr.length} prenotazioni con arrivo questo mese.`, go: { label: "Statistiche", href: "/statistiche" } } as Ans,
       incassato: { title: "Incassato del mese", value: eur(incassatoMese), detail: `Su ${eur(ricavoMese)} di ricavo previsto.`, go: { label: "Incassi", href: "/pagamenti" } } as Ans,
