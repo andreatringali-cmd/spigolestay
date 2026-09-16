@@ -18,6 +18,7 @@ export const NAV: NavItem[] = [
 
   // Vendita: cosa vendi e come lo proponi.
   { label: "Preventivi", href: "/preventivi", group: "Vendita", icon: "fileText", perm: "webconcierge", module: "concierge" },
+  { label: "Documenti fiscali", href: "/documenti", group: "Vendita", icon: "receipt", perm: "webconcierge", module: "concierge" },
   { label: "Promozioni", href: "/promozioni", group: "Vendita", icon: "mail", perm: "webconcierge", module: "concierge" },
   { label: "Upselling & extra", href: "/upselling", group: "Vendita", icon: "tag", perm: "webconcierge", module: "concierge" },
 

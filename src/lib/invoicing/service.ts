@@ -288,3 +288,12 @@ export async function refreshDocumentStatus(admin: SupabaseClient, tenantId: str
   });
   return { stato: st.status, message: st.message, changed: true };
 }
+
+// Recupera l'XML del documento dall'intermediario (per download).
+export async function getDocumentXml(admin: SupabaseClient, tenantId: string, documentId: string): Promise<string | null> {
+  const { data: doc } = await admin.from("documents").select("provider, provider_ref").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
+  if (!doc?.provider_ref) return null;
+  const { providerCfg } = await buildPayload(admin, tenantId, documentId);
+  const provider = getProvider((doc.provider as string) || "mock", providerCfg);
+  return provider.getXml(doc.provider_ref as string);
+}

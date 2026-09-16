@@ -11,6 +11,7 @@ import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/li
 import { nights, parseISO, shiftISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { buildFatturaPA } from "@/lib/fatturapa";
+import { invPost } from "@/lib/invoicing/client";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useAccess } from "@/lib/access";
@@ -78,6 +79,15 @@ export default function BookingDrawer() {
   const [form, setForm] = useState<Form | null>(null);
   const [saved, setSaved] = useState(false);
   const [voucher, setVoucher] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
+  const [emit, setEmit] = useState<{ busy?: boolean; msg?: string }>({});
+  const emitDocument = async () => {
+    if (!booking) return;
+    setEmit({ busy: true });
+    try {
+      const r = await invPost<{ documentId: string }>("create", { bookingId: booking.id });
+      router.push(`/documenti/${r.documentId}`);
+    } catch (e) { setEmit({ msg: e instanceof Error ? e.message : "Errore" }); }
+  };
   const [checkinQr, setCheckinQr] = useState("");
   const [expanded, setExpanded] = useState(false); // false = anteprima, true = scheda intera
   const [qa, setQa] = useState<null | "incasso" | "extra">(null); // azione rapida aperta
@@ -618,6 +628,11 @@ export default function BookingDrawer() {
       </Section>
 
       <Section title={t("Documenti")}>
+        <button onClick={emitDocument} disabled={emit.busy} className="flex w-full items-center justify-between rounded-lg bg-focus px-3 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
+          <span>{emit.busy ? t("Creazione…") : t("Emetti documento")}</span>
+          <span className="text-xs opacity-90">{t("fattura elettronica")} →</span>
+        </button>
+        {emit.msg && <p className="text-[11px] text-[color:var(--err)]">{emit.msg}</p>}
         <button onClick={printReceipt} className="flex w-full items-center justify-between rounded-lg border border-line bg-paper px-3 py-2.5 text-sm font-medium text-txt hover:border-focus hover:bg-wash">
           <span>{t("Ricevuta su carta intestata")}</span>
           <span className="text-xs text-dim">{t("PDF / Stampa")} →</span>
