@@ -25,7 +25,7 @@ export default function TassaSoggiornoPage() {
 
   // Periodo
   const [mode, setMode] = useState<"mese" | "trimestre">("trimestre");
-  const [year, setYear] = useState(2026);
+  const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth()); // 0-11
   const [quarter, setQuarter] = useState(Math.floor(new Date().getMonth() / 3) + 1); // 1-4
 

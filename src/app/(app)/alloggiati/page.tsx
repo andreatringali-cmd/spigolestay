@@ -101,7 +101,7 @@ export default function AlloggiatiPage() {
   return (
     <div>
       <PageHeader
-        title="Alloggiati Web"
+        title={t("Alloggiati · Tracciato Questura")}
         subtitle={t("Comunicazione ospiti alla Questura (entro 24h dal check-in) · un record per persona")}
         actions={<button onClick={genera} disabled={readyCount === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{t("Genera tracciato")} ({readyCount})</button>}
       />
