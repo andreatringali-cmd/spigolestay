@@ -29,6 +29,7 @@ export default function AssistentePage() {
   const [voiceOn, setVoiceOn] = useState(true);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const recRef = useRef<unknown>(null);
+  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
 
   const t = todayISO();
   const ym = monthOf(t);
@@ -39,6 +40,28 @@ export default function AssistentePage() {
     const SR = typeof window !== "undefined" ? ((window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition) : undefined;
     setVoiceSupported(!!SR);
   }, []);
+
+  // Scelta della voce italiana più naturale disponibile (Google/cloud/neural), non quella robotica di default.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const score = (v: SpeechSynthesisVoice) => {
+      const n = v.name.toLowerCase(); let s = 0;
+      if (/google/.test(n)) s += 6;
+      if (/natural|neural|premium|enhanced|wavenet|siri/.test(n)) s += 7;
+      if (v.localService === false) s += 4; // voce cloud = più realistica
+      if (/federica|alice|elsa|isabella|bianca|chiara|luca|giorgio|cosimo/.test(n)) s += 2;
+      return s;
+    };
+    const pick = () => {
+      const vs = window.speechSynthesis.getVoices();
+      const it = vs.filter((v) => /^it(-|_)?/i.test(v.lang) || /ital/i.test(v.name));
+      it.sort((a, b) => score(b) - score(a));
+      voiceRef.current = it[0] ?? vs.find((v) => /^it/i.test(v.lang)) ?? null;
+    };
+    pick();
+    window.speechSynthesis.onvoiceschanged = pick;
+    return () => { try { window.speechSynthesis.onvoiceschanged = null; } catch {} };
+  }, []);
   const toggleVoice = () => setVoiceOn((v) => { const n = !v; try { localStorage.setItem("spigolestay:assistant:voice", n ? "1" : "0"); } catch {} if (!n) window.speechSynthesis?.cancel(); return n; });
 
   const speak = useCallback((text: string) => {
@@ -46,7 +69,9 @@ export default function AssistentePage() {
     try {
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
-      u.lang = "it-IT"; u.rate = 1.05; u.pitch = 1;
+      u.lang = "it-IT";
+      if (voiceRef.current) u.voice = voiceRef.current;
+      u.rate = 1.0; u.pitch = 1.02; u.volume = 1;
       u.onstart = () => setSpeaking(true);
       u.onend = () => setSpeaking(false);
       u.onerror = () => setSpeaking(false);
@@ -176,16 +201,20 @@ export default function AssistentePage() {
   return (
     <div>
       <style>{`
-        @keyframes xnPulse { 0%,100% { transform: scale(1); opacity:.55 } 50% { transform: scale(1.12); opacity:.9 } }
-        @keyframes xnRing { 0% { transform: scale(.7); opacity:.6 } 100% { transform: scale(1.9); opacity:0 } }
-        @keyframes xnSpin { to { transform: rotate(360deg) } }
-        .xn-core { animation: xnPulse 3.6s ease-in-out infinite; }
-        .xn-core[data-s="listen"] { animation-duration: 1.1s; }
-        .xn-core[data-s="speak"] { animation-duration: 1.7s; }
-        .xn-ring { animation: xnRing 2.4s ease-out infinite; }
-        .xn-ring[data-s="listen"] { animation-duration: 1.1s; }
-        .xn-halo { animation: xnSpin 14s linear infinite; }
-        @media (prefers-reduced-motion: reduce) { .xn-core,.xn-ring,.xn-halo { animation: none !important; } }
+        @keyframes xnFloat { 0%,100% { transform: translateY(0) scale(1) } 50% { transform: translateY(-6px) scale(1.05) } }
+        @keyframes xnFlutter { 0%,100% { transform: translateY(0) scaleX(1) } 50% { transform: translateY(-2px) scaleX(.9) } }
+        @keyframes xnGlow { 0%,100% { opacity:.4; transform: scale(1) } 50% { opacity:.85; transform: scale(1.18) } }
+        @keyframes xnRing { 0% { transform: scale(.55); opacity:.7 } 100% { transform: scale(2); opacity:0 } }
+        .xn-fly { animation: xnFloat 4.2s ease-in-out infinite; transform-origin: center 60%; }
+        .xn-fly[data-s="listen"] { animation: xnFlutter .5s ease-in-out infinite; }
+        .xn-fly[data-s="speak"] { animation: xnFloat 1.5s ease-in-out infinite; }
+        .xn-glow { animation: xnGlow 4.2s ease-in-out infinite; }
+        .xn-glow[data-s="listen"] { animation-duration: 1.1s; }
+        .xn-glow[data-s="speak"] { animation-duration: 1.6s; }
+        .xn-ring { animation: xnRing 3.2s ease-out infinite; opacity: 0; }
+        .xn-ring[data-s="listen"], .xn-ring[data-s="speak"] { animation-duration: 1.4s; }
+        .xn-ring-2 { animation-delay: 1.6s; }
+        @media (prefers-reduced-motion: reduce) { .xn-fly,.xn-glow,.xn-ring { animation: none !important; } }
       `}</style>
 
       <PageHeader title="Assistente Xenora" subtitle="Chiedi a voce o scrivi — rispondo con i tuoi numeri" />
@@ -193,21 +222,22 @@ export default function AssistentePage() {
       {/* Core + briefing */}
       <Card className="mb-4 overflow-hidden">
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
-          {/* Core animato */}
-          <div className="relative grid h-36 w-36 shrink-0 place-items-center">
-            <span className="xn-ring absolute h-24 w-24 rounded-full" data-s={state} style={{ border: "2px solid var(--focus)" }} />
-            <span className="xn-halo absolute h-32 w-32 rounded-full opacity-40" style={{ background: "conic-gradient(from 0deg, transparent, color-mix(in srgb, var(--focus) 55%, transparent), transparent 60%)" }} />
-            <span className="xn-core absolute h-24 w-24 rounded-full" data-s={state} style={{ background: "radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--focus) 45%, transparent), color-mix(in srgb, var(--focus) 12%, transparent))" }} />
-            <button
-              onClick={toggleListening}
-              disabled={!voiceSupported}
-              title={voiceSupported ? (listening ? "Sto ascoltando… tocca per fermare" : "Parla con l'assistente") : "Il microfono non è supportato da questo browser"}
-              className="relative z-10 grid h-16 w-16 place-items-center rounded-full text-white shadow-lg transition active:scale-95 disabled:opacity-60"
-              style={{ backgroundColor: listening ? "var(--err)" : "var(--focus)" }}
-            >
-              <Icon name={listening ? "chat" : "sparkles"} size={26} />
-            </button>
-          </div>
+          {/* Core animato: la farfalla Xenora che pulsa (tocca per parlare) */}
+          <button
+            onClick={toggleListening}
+            disabled={!voiceSupported}
+            title={voiceSupported ? (listening ? "Sto ascoltando… tocca per fermare" : "Tocca la farfalla per parlare") : "Il microfono non è supportato da questo browser"}
+            className="relative grid h-40 w-40 shrink-0 place-items-center rounded-full transition active:scale-95 disabled:opacity-70"
+          >
+            <span className="xn-ring absolute h-28 w-28 rounded-full" data-s={state} style={{ border: "2px solid var(--focus)" }} />
+            <span className="xn-ring xn-ring-2 absolute h-28 w-28 rounded-full" data-s={state} style={{ border: "2px solid var(--focus)" }} />
+            <span className="xn-glow absolute h-28 w-28 rounded-full" data-s={state} style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--focus) 42%, transparent), transparent 70%)" }} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/xenora-mark.png" alt="Xenora" draggable={false} className="xn-fly relative z-10 h-20 w-20 select-none object-contain" data-s={state} />
+            <span className="absolute bottom-1 right-1 z-20 grid h-8 w-8 place-items-center rounded-full text-white shadow-md" style={{ backgroundColor: listening ? "var(--err)" : "var(--focus)" }}>
+              <Icon name="chat" size={15} />
+            </span>
+          </button>
 
           {/* Testo briefing */}
           <div className="min-w-0 flex-1 text-center sm:text-left">
