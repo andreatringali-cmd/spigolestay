@@ -401,7 +401,7 @@ export default function Dashboard() {
       )}
 
       {/* Sezione giorno — la ricerca sta nella STESSA griglia dei KPI: larga quanto una card e allineata */}
-      <div className="mt-6 mb-4 grid grid-cols-2 items-center gap-3 lg:grid-cols-4">
+      <div className="mt-6 mb-4 grid grid-cols-2 items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm lg:grid-cols-4">
         <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca ospite…")} className="no-print col-span-2 w-full lg:col-span-1" />
         <div className="col-span-2 flex flex-wrap items-center gap-2 lg:col-span-3">
           <div className="no-print flex flex-wrap items-center gap-2">

@@ -246,7 +246,7 @@ export default function CamerePage() {
 
               {/* Filtri camere: la ricerca sta nella STESSA griglia delle tipologie, così è larga
                   esattamente quanto una card soprastante e vi si allinea; le azioni riempiono il resto. */}
-              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="mb-3 grid grid-cols-2 items-center gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm sm:grid-cols-4">
                 <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="col-span-2 w-full sm:col-span-1" />
                 <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-3">
                   <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>

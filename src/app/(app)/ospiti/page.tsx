@@ -228,7 +228,7 @@ export default function OspitiPage() {
       </div>
 
       {/* Stessa griglia dei riepiloghi sopra: ricerca larga quanto una card e allineata. */}
-      <div className="mb-4 grid grid-cols-2 items-center gap-2.5 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm sm:grid-cols-4">
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca per nome, email o paese…")} className="col-span-2 w-full sm:col-span-1" />
         <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 sm:col-span-3">
           <button onClick={() => router.push("/promozioni")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">✉ {t("Promozioni")}</button>

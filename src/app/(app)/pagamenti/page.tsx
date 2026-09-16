@@ -83,7 +83,7 @@ export default function PagamentiPage() {
       </div>
 
       {/* Stessa griglia dei KPI sopra: ricerca larga quanto una card e allineata. */}
-      <div className="mb-4 grid grid-cols-2 items-center gap-3 lg:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm lg:grid-cols-4">
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca ospite o codice…")} className="col-span-2 w-full lg:col-span-1" />
         <div className="col-span-2 flex flex-wrap items-center gap-2 lg:col-span-3">
           <div className="flex items-center rounded-lg border border-line p-0.5">
