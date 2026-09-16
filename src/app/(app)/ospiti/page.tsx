@@ -144,7 +144,7 @@ export default function OspitiPage() {
 
       {/* Telefono: registro ospiti a schede */}
       <div className="md:hidden">
-        <div className="mb-2 px-1 text-sm font-bold text-txt">{t("Registro ospiti")} <span className="text-faint">· {sorted.length}</span></div>
+        <div className="mb-2 px-1 text-sm font-bold uppercase tracking-wide text-txt">{t("Registro ospiti")} <span className="font-normal text-faint">· {sorted.length}</span></div>
         <div className="flex flex-col gap-2">
           {sorted.map(({ guest, stays, nightsTot, spent, last, topCh }) => (
             <div key={guest.id} className="flex items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm">
@@ -169,7 +169,7 @@ export default function OspitiPage() {
 
       {/* Tablet/desktop: tabella */}
       <div className="hidden rounded-xl border border-line bg-surface shadow-sm md:block">
-        <div className="flex items-center gap-1.5 border-b border-line px-4 py-2.5 text-sm font-bold text-txt">{t("Registro ospiti")} <span className="text-faint">· {sorted.length}</span></div>
+        <div className="flex items-center gap-1.5 border-b border-line px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-txt">{t("Registro ospiti")} <span className="font-normal text-faint">· {sorted.length}</span></div>
         <div className="max-h-[62vh] overflow-auto">
         <table className="w-full min-w-[980px] text-sm">
           <thead className="sticky top-0 z-10 bg-wash">
