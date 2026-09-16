@@ -20,7 +20,6 @@ import Gauge from "@/components/Gauge";
 import DensityChart from "@/components/DensityChart";
 import DateField from "@/components/DateField";
 import Icon from "@/components/Icon";
-import AdempimentiToday from "@/components/AdempimentiToday";
 import SearchInput from "@/components/SearchInput";
 import ExportMenu from "@/components/ExportMenu";
 import WeatherWidget from "@/components/WeatherWidget";
@@ -442,9 +441,6 @@ export default function Dashboard() {
           </Card>
         )}
       </div>
-
-      {/* Adempimenti oggi (compliance) subito prima di "Da fare oggi" (operatività) */}
-      <AdempimentiToday />
 
       {/* Checklist del giorno */}
       {(() => {
