@@ -1,21 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { eur } from "@/lib/format";
 import { invPost, centsEur, DOC_KIND_LABEL, STATO } from "@/lib/invoicing/client";
+import { BOLLO_THRESHOLD_CENTS } from "@/lib/invoicing/folio";
 
 interface Doc { id: string; tenant_id: string; structure_id: string | null; booking_id: string | null; booking_code: string | null;
   doc_kind: string; sdi_type: string; regime: string | null; number_label: string | null; stato: string; issue_date: string | null;
-  due_date: string | null; payment_method: string | null; vat_exigibility: string | null; notes: string | null;
+  due_date: string | null; payment_terms: string | null; payment_method: string | null; vat_exigibility: string | null; notes: string | null;
   counterpart: Record<string, string> | null; taxable_cents: number; vat_cents: number; out_of_scope_cents: number;
-  bollo_cents: number; total_cents: number; advance_cents: number; send_sdi: boolean; provider: string | null; provider_ref: string | null; }
-interface Line { id: string; pos: number; description: string; qty: number; vat_rate: number; vat_nature: string | null; line_total_cents: number }
+  bollo_cents: number; rounding_cents: number; total_cents: number; advance_cents: number; send_sdi: boolean; provider: string | null; provider_ref: string | null; }
+interface DbLine { id: string; pos: number; description: string; qty: number; unit_price_cents: number; vat_rate: number; vat_nature: string | null; line_total_cents: number; source_kind: string | null }
 interface Ev { id: string; ts: string; kind: string; message: string }
 interface Pay { id: string; amount_cents: number; method: string | null; paid_at: string; note: string | null }
+// Riga in editing (prezzo in euro per comodità dell'utente).
+interface ELine { id?: string; description: string; qty: number; unitEur: number; vat: string; sourceKind: string }
+
+const VAT_OPTS = [["22", "22%"], ["10", "10%"], ["4", "4%"], ["0", "0%"], ["N1", "Fuori campo (N1)"], ["N2.2", "Non sogg. (N2.2)"]] as const;
+const num = (v: string) => { const n = Number(String(v).replace(",", ".")); return isNaN(n) ? 0 : n; };
 
 export default function DocumentoPage() {
   const params = useParams();
@@ -23,12 +29,28 @@ export default function DocumentoPage() {
   const { user } = useAuth();
   const id = String(params.id || "");
   const [doc, setDoc] = useState<Doc | null>(null);
-  const [lines, setLines] = useState<Line[]>([]);
   const [events, setEvents] = useState<Ev[]>([]);
   const [pays, setPays] = useState<Pay[]>([]);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // Buffer di editing (solo in bozza)
+  const [f, setF] = useState({ doc_kind: "fattura", sdi_type: "TD01", issue_date: "", due_date: "", payment_terms: "Pagamento completo", vat_exigibility: "I", payment_method: "Bonifico bancario", send_sdi: true, sdi_code: "0000000", pec: "", notes: "", rounding: false, bollo: false });
+  const [cp, setCp] = useState({ kind: "privato", name: "", lastName: "", vat: "", tax_code: "", country: "IT", address: "", city: "", cap: "", province: "" });
+  const [lines, setLines] = useState<ELine[]>([]);
+
+  const hydrate = useCallback((d: Doc, dl: DbLine[]) => {
+    setF({
+      doc_kind: d.doc_kind, sdi_type: d.sdi_type, issue_date: d.issue_date ?? new Date().toISOString().slice(0, 10),
+      due_date: d.due_date ?? "", payment_terms: d.payment_terms ?? "Pagamento completo", vat_exigibility: d.vat_exigibility ?? "I",
+      payment_method: d.payment_method ?? "Bonifico bancario", send_sdi: d.send_sdi, sdi_code: (d.counterpart?.sdi_code as string) ?? "0000000",
+      pec: (d.counterpart?.pec as string) ?? "", notes: d.notes ?? "", rounding: (d.rounding_cents ?? 0) !== 0, bollo: (d.bollo_cents ?? 0) > 0,
+    });
+    const c = d.counterpart ?? {};
+    setCp({ kind: c.kind ?? "privato", name: c.name ?? "", lastName: c.lastName ?? "", vat: c.vat ?? "", tax_code: c.tax_code ?? "", country: c.country ?? "IT", address: c.address ?? "", city: c.city ?? "", cap: c.cap ?? "", province: c.province ?? "" });
+    setLines(dl.map((l) => ({ id: l.id, description: l.description, qty: Number(l.qty), unitEur: l.unit_price_cents / 100, vat: l.vat_nature ?? String(Number(l.vat_rate)), sourceKind: l.source_kind ?? "extra" })));
+  }, []);
 
   const load = useCallback(async () => {
     if (!supabase) { setLoading(false); return; }
@@ -38,82 +60,105 @@ export default function DocumentoPage() {
       supabase.from("document_events").select("*").eq("document_id", id).order("ts", { ascending: false }),
       supabase.from("document_payments").select("*").eq("document_id", id).order("paid_at"),
     ]);
-    setDoc((d.data ?? null) as Doc | null);
-    setLines((l.data ?? []) as Line[]);
-    setEvents((e.data ?? []) as Ev[]);
-    setPays((p.data ?? []) as Pay[]);
+    const dd = (d.data ?? null) as Doc | null;
+    setDoc(dd); setEvents((e.data ?? []) as Ev[]); setPays((p.data ?? []) as Pay[]);
+    if (dd) hydrate(dd, (l.data ?? []) as DbLine[]);
     setLoading(false);
-  }, [id]);
+  }, [id, hydrate]);
   useEffect(() => { load(); }, [load]);
 
-  const act = async (label: string, fn: () => Promise<void>) => {
-    setBusy(label); setMsg("");
-    try { await fn(); await load(); } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
+  // Calcolo totali live dalle righe in editing.
+  const totals = useMemo(() => {
+    let taxable = 0, out = 0; const byRate: Record<number, number> = {};
+    for (const l of lines) {
+      const cents = Math.round(l.unitEur * 100 * (l.qty || 0));
+      if (l.vat === "N1") { out += cents; continue; }
+      taxable += cents;
+      const rate = l.vat === "N2.2" ? 0 : Number(l.vat) || 0;
+      if (rate > 0) byRate[rate] = (byRate[rate] ?? 0) + cents;
+    }
+    let vat = 0; for (const r of Object.keys(byRate)) vat += Math.round(byRate[Number(r)] * Number(r) / 100);
+    const bolloCents = f.bollo ? 200 : 0;
+    let total = taxable + vat + out + bolloCents;
+    let roundingCents = 0;
+    if (f.rounding) { const r = Math.round(total / 100) * 100; roundingCents = r - total; total = r; }
+    return { taxable, vat, out, bolloCents, roundingCents, total };
+  }, [lines, f.bollo, f.rounding]);
+
+  const bolloEligible = doc?.regime === "forfettario" && (totals.taxable + totals.vat + totals.out) > BOLLO_THRESHOLD_CENTS;
+
+  const paid = pays.reduce((a, p) => a + p.amount_cents, 0);
+  const residuo = totals.total - paid;
+  const frozen = !!doc && doc.stato !== "bozza";
+
+  const setLine = (i: number, patch: Partial<ELine>) => setLines((p) => p.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  const addLine = (preset: Partial<ELine>) => setLines((p) => [...p, { description: "", qty: 1, unitEur: 0, vat: "22", sourceKind: "extra", ...preset }]);
+  const delLine = (i: number) => setLines((p) => p.filter((_, j) => j !== i));
+  const delCityTax = () => setLines((p) => p.filter((l) => l.vat !== "N1" && l.sourceKind !== "city_tax"));
+
+  const saveDraft = async () => {
+    if (!supabase || !user || !doc) return false;
+    // Righe: elimino e reinserisco (solo in bozza è consentito dal trigger).
+    await supabase.from("document_lines").delete().eq("document_id", id);
+    if (lines.length) {
+      await supabase.from("document_lines").insert(lines.map((l, i) => ({
+        document_id: id, tenant_id: user.id, pos: i + 1, description: l.description || "—", qty: l.qty || 1,
+        unit_price_cents: Math.round(l.unitEur * 100), vat_rate: l.vat === "N1" || l.vat === "N2.2" ? 0 : Number(l.vat) || 0,
+        vat_nature: l.vat === "N1" ? "N1" : l.vat === "N2.2" ? "N2.2" : null,
+        line_total_cents: Math.round(l.unitEur * 100 * (l.qty || 0)), source_kind: l.sourceKind, booking_id: doc.booking_id, folio_ref: `l${i}`,
+      })));
+    }
+    const counterpart = { kind: cp.kind, name: cp.name, lastName: cp.lastName || undefined, vat: cp.vat || null, tax_code: cp.tax_code || null, country: cp.country || "IT", address: cp.address || null, city: cp.city || null, cap: cp.cap || null, province: cp.province || null, sdi_code: f.sdi_code || (cp.kind === "estero" ? "XXXXXXX" : "0000000"), pec: f.pec || null };
+    const { error } = await supabase.from("documents").update({
+      doc_kind: f.doc_kind, sdi_type: f.doc_kind === "nota_di_credito" ? "TD04" : f.sdi_type, issue_date: f.issue_date || null, due_date: f.due_date || null,
+      payment_terms: f.payment_terms, vat_exigibility: f.vat_exigibility, payment_method: f.payment_method, send_sdi: f.send_sdi, notes: f.notes || null,
+      counterpart, taxable_cents: totals.taxable, vat_cents: totals.vat, out_of_scope_cents: totals.out, bollo_cents: totals.bolloCents,
+      rounding_cents: totals.roundingCents, total_cents: totals.total,
+    }).eq("id", id);
+    if (error) { setMsg("Errore salvataggio: " + error.message); return false; }
+    return true;
   };
-  const issue = () => act("issue", async () => { await invPost("issue", { documentId: id }); });
+
+  const act = async (label: string, fn: () => Promise<void>) => { setBusy(label); setMsg(""); try { await fn(); await load(); } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); } };
+  const onSave = () => act("save", async () => { if (await saveDraft()) setMsg("Bozza salvata ✓"); });
+  const onIssue = () => act("issue", async () => { if (await saveDraft()) { await invPost("issue", { documentId: id }); setMsg("Documento emesso ✓"); } });
+  const onSaveSend = () => act("savesend", async () => { if (await saveDraft()) { await invPost("issue", { documentId: id }); const r = await invPost<{ message?: string }>("send", { documentId: id }); setMsg(r.message || "Emesso e inviato"); } });
   const send = () => act("send", async () => { const r = await invPost<{ message?: string }>("send", { documentId: id }); if (r.message) setMsg(r.message); });
   const refresh = () => act("status", async () => { const r = await invPost<{ message?: string }>("status", { documentId: id }); if (r.message) setMsg(r.message); });
-  const downloadXml = () => act("xml", async () => {
-    const r = await invPost<{ xml: string }>("xml", { documentId: id });
-    const blob = new Blob([r.xml], { type: "application/xml" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-    a.download = `${(doc?.number_label ?? id).replace(/[^\w-]/g, "_")}.xml`; a.click(); URL.revokeObjectURL(a.href);
-  });
+  const downloadXml = () => act("xml", async () => { const r = await invPost<{ xml: string }>("xml", { documentId: id }); const b = new Blob([r.xml], { type: "application/xml" }); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${(doc?.number_label ?? id).replace(/[^\w-]/g, "_")}.xml`; a.click(); URL.revokeObjectURL(a.href); });
+  const addPayment = async (amountCents: number, method: string) => { if (!supabase || !user || amountCents <= 0) return; await act("pay", async () => { await supabase!.from("document_payments").insert({ document_id: id, tenant_id: user.id, amount_cents: amountCents, method }); }); };
 
   const printPdf = async () => {
     if (!doc) return;
-    const { data: st } = await supabase!.from("tenant_invoice_settings").select("*").maybeSingle();
-    const cp = doc.counterpart ?? {};
+    const { data: se } = await supabase!.from("tenant_invoice_settings").select("*").maybeSingle();
     const e = (c: number) => eur(centsEur(c));
-    const rows = lines.map((l) => `<tr><td>${l.description}</td><td style="text-align:right">${Number(l.qty)}</td><td style="text-align:right">${l.vat_nature ? l.vat_nature : Number(l.vat_rate) + "%"}</td><td style="text-align:right">${e(l.line_total_cents)}</td></tr>`).join("");
-    const emit = [st?.denominazione, st?.vat ? "P.IVA " + st.vat : "", st?.tax_code ? "CF " + st.tax_code : "", [st?.address, st?.cap, st?.city, st?.province].filter(Boolean).join(" "), st?.pec].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
-    const cli = [cp.name, cp.vat ? "P.IVA " + cp.vat : "", cp.tax_code ? "CF " + cp.tax_code : "", [cp.address, cp.cap, cp.city, cp.province].filter(Boolean).join(" "), cp.sdi_code ? "Cod. dest. " + cp.sdi_code : "", cp.pec].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
+    const rows = lines.map((l) => `<tr><td>${l.description}</td><td style="text-align:right">${l.qty}</td><td style="text-align:right">${l.vat === "N1" || l.vat === "N2.2" ? l.vat : l.vat + "%"}</td><td style="text-align:right">${eur(l.unitEur * (l.qty || 0))}</td></tr>`).join("");
+    const emit = [se?.denominazione, se?.vat ? "P.IVA " + se.vat : "", se?.tax_code ? "CF " + se.tax_code : "", [se?.address, se?.cap, se?.city, se?.province].filter(Boolean).join(" "), se?.pec].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
+    const cli = [`${cp.name} ${cp.lastName}`.trim(), cp.vat ? "P.IVA " + cp.vat : "", cp.tax_code ? "CF " + cp.tax_code : "", [cp.address, cp.cap, cp.city, cp.province].filter(Boolean).join(" ")].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
     const w = window.open("", "_blank", "width=820,height=1040"); if (!w) return;
     w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>${doc.number_label ?? "Documento"}</title>
-      <style>*{box-sizing:border-box}body{font-family:Georgia,'Times New Roman',serif;color:#1a2131;margin:0;padding:44px 52px;font-size:13px;line-height:1.5}
-      .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #285f92;padding-bottom:14px;margin-bottom:18px}
-      .doc{font-size:22px;font-weight:700;color:#285f92}.muted{color:#5c6479}
-      .parties{display:flex;justify-content:space-between;gap:24px;margin:16px 0}
-      .parties h4{margin:0 0 4px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#5c6479}
+      <style>*{box-sizing:border-box}body{font-family:Georgia,serif;color:#1a2131;margin:0;padding:44px 52px;font-size:13px;line-height:1.5}
+      .head{display:flex;justify-content:space-between;border-bottom:3px solid #285f92;padding-bottom:14px;margin-bottom:18px}.doc{font-size:22px;font-weight:700;color:#285f92}
+      .p{display:flex;justify-content:space-between;gap:24px;margin:16px 0}.p h4{margin:0 0 4px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#5c6479}
       table{width:100%;border-collapse:collapse;margin-top:10px}th,td{padding:8px 6px;border-bottom:1px solid #e3e6ef}th{text-align:left;font-size:11px;text-transform:uppercase;color:#5c6479}
-      .tot{margin-top:14px;margin-left:auto;width:280px}.tot div{display:flex;justify-content:space-between;padding:4px 0}.tot .g{border-top:2px solid #285f92;font-weight:700;font-size:15px;margin-top:6px;padding-top:8px}
-      .note{margin-top:26px;font-size:11px;color:#7a8194;border-top:1px solid #e3e6ef;padding-top:12px}
-      @media print{body{padding:24px 30px}}</style></head><body>
-      <div class="head"><div>${emit || '<div class="muted">Emittente da configurare in Impostazioni fattura</div>'}</div>
-        <div style="text-align:right"><div class="doc">${DOC_KIND_LABEL[doc.doc_kind] ?? "Documento"}</div><div>n. ${doc.number_label ?? "(bozza)"}</div><div class="muted">${doc.issue_date ? new Date(doc.issue_date).toLocaleDateString("it-IT") : ""}</div></div>
-      </div>
-      <div class="parties"><div><h4>Cliente</h4>${cli}</div>${doc.booking_code ? `<div style="text-align:right"><h4>Prenotazione</h4><div>${doc.booking_code}</div></div>` : ""}</div>
+      .tot{margin:14px 0 0auto;margin-left:auto;width:280px}.tot div{display:flex;justify-content:space-between;padding:4px 0}.tot .g{border-top:2px solid #285f92;font-weight:700;font-size:15px;margin-top:6px;padding-top:8px}
+      .note{margin-top:26px;font-size:11px;color:#7a8194;border-top:1px solid #e3e6ef;padding-top:12px}@media print{body{padding:24px 30px}}</style></head><body>
+      <div class="head"><div>${emit || '<div>Emittente da configurare</div>'}</div><div style="text-align:right"><div class="doc">${DOC_KIND_LABEL[doc.doc_kind]}</div><div>n. ${doc.number_label ?? "(bozza)"}</div><div>${f.issue_date ? new Date(f.issue_date).toLocaleDateString("it-IT") : ""}</div></div></div>
+      <div class="p"><div><h4>Cliente</h4>${cli}</div>${doc.booking_code ? `<div style="text-align:right"><h4>Prenotazione</h4><div>${doc.booking_code}</div></div>` : ""}</div>
       <table><thead><tr><th>Descrizione</th><th style="text-align:right">Q.tà</th><th style="text-align:right">IVA</th><th style="text-align:right">Totale</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="tot">
-        <div><span>Imponibile</span><span>${e(doc.taxable_cents)}</span></div>
-        <div><span>IVA</span><span>${e(doc.vat_cents)}</span></div>
-        ${doc.out_of_scope_cents ? `<div><span>Tassa di soggiorno (fuori campo IVA art.15)</span><span>${e(doc.out_of_scope_cents)}</span></div>` : ""}
-        ${doc.bollo_cents ? `<div><span>Bollo</span><span>${e(doc.bollo_cents)}</span></div>` : ""}
-        <div class="g"><span>Totale</span><span>${e(doc.total_cents)}</span></div>
-      </div>
-      <div class="note">${st?.regime_note ? st.regime_note + "<br>" : ""}${st?.footer_note ?? ""}<br>Documento di cortesia. ${doc.send_sdi ? "L'originale fiscale è la fattura elettronica trasmessa allo SdI." : ""}</div>
-      </body></html>`);
+      <div class="tot"><div><span>Imponibile</span><span>${e(totals.taxable)}</span></div><div><span>IVA</span><span>${e(totals.vat)}</span></div>${totals.out ? `<div><span>Fuori campo IVA (art.15)</span><span>${e(totals.out)}</span></div>` : ""}${totals.bolloCents ? `<div><span>Bollo</span><span>${e(totals.bolloCents)}</span></div>` : ""}<div class="g"><span>Totale</span><span>${e(totals.total)}</span></div></div>
+      <div class="note">${se?.regime_note ? se.regime_note + "<br>" : ""}${se?.footer_note ?? ""}<br>Documento di cortesia.</div></body></html>`);
     w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
-  };
-
-  const paid = pays.reduce((a, p) => a + p.amount_cents, 0);
-  const residuo = (doc?.total_cents ?? 0) - paid;
-
-  const addPayment = async (amountCents: number, method: string) => {
-    if (!supabase || !user || amountCents <= 0) return;
-    await act("pay", async () => {
-      const { error } = await supabase!.from("document_payments").insert({ document_id: id, tenant_id: user.id, amount_cents: amountCents, method });
-      if (error) throw new Error(error.message);
-      await supabase!.from("document_events").insert({ tenant_id: user.id, document_id: id, kind: "payment", message: `Incasso registrato ${eur(centsEur(amountCents))}` });
-    });
   };
 
   if (loading) return <div className="p-6 text-sm text-faint">Caricamento…</div>;
   if (!doc) return <div className="p-6 text-sm text-faint">Documento non trovato. <button onClick={() => router.push("/documenti")} className="font-semibold text-focus hover:underline">Torna ai documenti</button></div>;
 
   const st = STATO[doc.stato] ?? { label: doc.stato, color: "var(--dim)" };
-  const frozen = doc.stato !== "bozza";
-  const cp = doc.counterpart ?? {};
+  const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+  const lbl = "block text-xs font-medium text-dim";
+  const e2 = (c: number) => eur(centsEur(c));
+  const setDue = (days: number) => setF((p) => ({ ...p, due_date: new Date(Date.now() + days * 86400000).toISOString().slice(0, 10) }));
 
   return (
     <div>
@@ -121,101 +166,124 @@ export default function DocumentoPage() {
         subtitle={doc.booking_code ? `Prenotazione ${doc.booking_code}` : undefined}
         actions={<button onClick={() => router.push("/documenti")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← Documenti</button>} />
 
-      {frozen && (
-        <div className="mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white" style={{ backgroundColor: "var(--err)" }}>
-          🔒 Le informazioni fiscali di questo documento non sono più modificabili (documento {st.label.toLowerCase()}). Per correggere si emette una nota di credito.
-        </div>
-      )}
+      {frozen && <div className="mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white" style={{ backgroundColor: "var(--err)" }}>🔒 Le informazioni fiscali non sono più modificabili ({st.label.toLowerCase()}). Per correggere si emette una nota di credito.</div>}
       {msg && <Card className="mb-4"><p className="text-sm text-dim">{msg}</p></Card>}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Stato + timeline */}
+        {/* FATTURA */}
         <Card>
-          <div className="mb-2 flex items-center justify-between"><SectionTitle>Stato</SectionTitle>
-            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 16%, transparent)`, color: st.color }}>{st.label}</span>
-          </div>
-          <div className="flex flex-col gap-2">
-            {events.map((e) => (
-              <div key={e.id} className="flex gap-2 text-sm">
-                <span className="w-28 shrink-0 text-[11px] text-faint">{new Date(e.ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
-                <span className="text-txt">{e.message}</span>
-              </div>
-            ))}
-            {events.length === 0 && <p className="text-sm text-faint">Nessun evento.</p>}
-          </div>
+          <SectionTitle>Documento</SectionTitle>
+          {frozen ? (
+            <div className="mt-2 space-y-1 text-sm text-dim">
+              <div>Tipo: <b className="text-txt">{DOC_KIND_LABEL[doc.doc_kind]}</b> · {doc.sdi_type}</div>
+              <div>Numero: <b className="text-txt">{doc.number_label}</b> · {doc.issue_date && new Date(doc.issue_date).toLocaleDateString("it-IT")}</div>
+              <div>Pagamento: {doc.payment_method} · scad. {doc.due_date ? new Date(doc.due_date).toLocaleDateString("it-IT") : "—"}</div>
+            </div>
+          ) : (
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <label className={lbl}>Tipologia<select value={f.doc_kind} onChange={(e) => setF({ ...f, doc_kind: e.target.value })} className={inp}><option value="fattura">Fattura</option><option value="nota_di_credito">Nota di credito</option><option value="ricevuta_non_fiscale">Ricevuta</option></select></label>
+              <label className={lbl}>Tipo doc. SDI<select value={f.sdi_type} onChange={(e) => setF({ ...f, sdi_type: e.target.value })} className={inp}><option value="TD01">TD01 - Fattura</option><option value="TD04">TD04 - Nota di credito</option><option value="TD16">TD16 - Autofattura</option></select></label>
+              <label className={lbl}>Data emissione<input type="date" value={f.issue_date} onChange={(e) => setF({ ...f, issue_date: e.target.value })} className={inp} /></label>
+              <div><span className={lbl}>Scadenza pagamento</span><div className="mt-1 flex gap-1"><input type="date" value={f.due_date} onChange={(e) => setF({ ...f, due_date: e.target.value })} className="w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt" />{[30, 60, 120].map((d) => <button key={d} onClick={() => setDue(d)} className="shrink-0 rounded-lg bg-wash px-2 text-xs font-semibold text-dim hover:bg-line">+{d}</button>)}</div></div>
+              <label className={lbl}>Condizioni pagamento<select value={f.payment_terms} onChange={(e) => setF({ ...f, payment_terms: e.target.value })} className={inp}><option>Pagamento completo</option><option>Acconto</option><option>Pagamento a rate</option></select></label>
+              <label className={lbl}>Esigibilità IVA<select value={f.vat_exigibility} onChange={(e) => setF({ ...f, vat_exigibility: e.target.value })} className={inp}><option value="I">Immediata</option><option value="D">Differita</option><option value="S">Scissione pagamenti</option></select></label>
+              <label className={`${lbl} sm:col-span-2`}>Metodo di pagamento<select value={f.payment_method} onChange={(e) => setF({ ...f, payment_method: e.target.value })} className={inp}><option>Bonifico bancario</option><option>Carta</option><option>Contanti</option><option>PayPal</option><option>Assegno</option></select></label>
+            </div>
+          )}
         </Card>
 
-        {/* Voci */}
+        {/* VOCI */}
         <Card>
           <SectionTitle>Voci del documento</SectionTitle>
           <div className="mt-2 overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="py-1.5 pr-2 font-semibold">Descrizione</th><th className="py-1.5 px-2 text-right font-semibold">Q.tà</th><th className="py-1.5 px-2 text-right font-semibold">IVA</th><th className="py-1.5 pl-2 text-right font-semibold">Totale</th></tr></thead>
+              <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="py-1.5 pr-2 font-semibold">Descrizione</th><th className="py-1.5 px-1 text-right font-semibold">Q.tà</th><th className="py-1.5 px-1 text-right font-semibold">Prezzo</th><th className="py-1.5 px-1 font-semibold">IVA</th><th className="py-1.5 pl-1 text-right font-semibold">Totale</th>{!frozen && <th></th>}</tr></thead>
               <tbody>
-                {lines.map((l) => (
-                  <tr key={l.id} className="border-b border-line last:border-0">
-                    <td className="py-2 pr-2 text-txt">{l.description}</td>
-                    <td className="py-2 px-2 text-right font-mono text-dim">{Number(l.qty)}</td>
-                    <td className="py-2 px-2 text-right font-mono text-dim">{l.vat_nature ? l.vat_nature : `${Number(l.vat_rate)}%`}</td>
-                    <td className="py-2 pl-2 text-right font-mono text-txt">{eur(centsEur(l.line_total_cents))}</td>
+                {lines.map((l, i) => (
+                  <tr key={i} className="border-b border-line last:border-0">
+                    {frozen ? <td className="py-2 pr-2 text-txt">{l.description}</td> : <td className="py-1 pr-2"><input value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} className="w-full rounded border border-line bg-paper px-2 py-1 text-sm" /></td>}
+                    {frozen ? <td className="py-2 px-1 text-right font-mono text-dim">{l.qty}</td> : <td className="py-1 px-1"><input value={l.qty} onChange={(e) => setLine(i, { qty: num(e.target.value) })} className="w-14 rounded border border-line bg-paper px-1 py-1 text-right text-sm" /></td>}
+                    {frozen ? <td className="py-2 px-1 text-right font-mono text-dim">{eur(l.unitEur)}</td> : <td className="py-1 px-1"><input value={l.unitEur} onChange={(e) => setLine(i, { unitEur: num(e.target.value) })} className="w-20 rounded border border-line bg-paper px-1 py-1 text-right text-sm" /></td>}
+                    {frozen ? <td className="py-2 px-1 text-dim">{l.vat === "N1" || l.vat === "N2.2" ? l.vat : l.vat + "%"}</td> : <td className="py-1 px-1"><select value={l.vat} onChange={(e) => setLine(i, { vat: e.target.value })} className="rounded border border-line bg-paper px-1 py-1 text-sm">{VAT_OPTS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select></td>}
+                    <td className="py-1 pl-1 text-right font-mono text-txt">{eur(l.unitEur * (l.qty || 0))}</td>
+                    {!frozen && <td className="py-1 pl-1 text-right"><button onClick={() => delLine(i)} className="text-faint hover:text-[color:var(--err)]">✕</button></td>}
                   </tr>
                 ))}
+                {lines.length === 0 && <tr><td colSpan={6} className="py-3 text-center text-sm text-faint">Nessuna voce.</td></tr>}
               </tbody>
             </table>
           </div>
-          <div className="mt-3 flex flex-col gap-1 border-t border-line pt-3 text-sm">
-            <div className="flex justify-between"><span className="text-dim">Imponibile</span><span className="font-mono text-txt">{eur(centsEur(doc.taxable_cents))}</span></div>
-            <div className="flex justify-between"><span className="text-dim">IVA</span><span className="font-mono text-txt">{eur(centsEur(doc.vat_cents))}</span></div>
-            {doc.out_of_scope_cents > 0 && <div className="flex justify-between"><span className="text-dim">Tassa di soggiorno (fuori campo IVA)</span><span className="font-mono text-txt">{eur(centsEur(doc.out_of_scope_cents))}</span></div>}
-            {doc.bollo_cents > 0 && <div className="flex justify-between"><span className="text-dim">Bollo</span><span className="font-mono text-txt">{eur(centsEur(doc.bollo_cents))}</span></div>}
-            <div className="flex justify-between border-t border-line pt-1 text-base font-bold"><span>Totale</span><span className="font-mono">{eur(centsEur(doc.total_cents))}</span></div>
-          </div>
-        </Card>
-
-        {/* Intestatario */}
-        <Card>
-          <SectionTitle>Intestatario</SectionTitle>
-          <div className="mt-2 space-y-1 text-sm">
-            <div className="font-semibold text-txt">{cp.name ?? "—"}</div>
-            <div className="text-dim">{cp.kind === "societa" ? "Società" : cp.kind === "estero" ? "Estero" : cp.kind === "ota" ? "OTA" : "Privato"}</div>
-            {cp.vat && <div className="text-dim">P.IVA {cp.vat}</div>}
-            {cp.tax_code && <div className="text-dim">CF {cp.tax_code}</div>}
-            {(cp.address || cp.city) && <div className="text-dim">{[cp.address, cp.cap, cp.city, cp.province].filter(Boolean).join(" ")}</div>}
-            <div className="text-faint">Codice destinatario: {cp.sdi_code || "0000000"}{cp.pec ? ` · PEC ${cp.pec}` : ""}</div>
-          </div>
-        </Card>
-
-        {/* Incassi */}
-        <Card>
-          <div className="mb-2 flex items-center justify-between">
-            <SectionTitle>Registra gli incassi</SectionTitle>
-            {residuo > 0
-              ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>Residuo {eur(centsEur(residuo))}</span>
-              : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>Incassato ✓</span>}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {pays.map((p) => (
-              <div key={p.id} className="flex items-center justify-between rounded-lg border border-line bg-paper px-3 py-2 text-sm">
-                <span className="text-dim">{new Date(p.paid_at).toLocaleDateString("it-IT")} · {p.method ?? "—"}</span>
-                <span className="font-mono text-txt">{eur(centsEur(p.amount_cents))}</span>
-              </div>
-            ))}
-            {pays.length === 0 && <p className="text-sm text-faint">Nessun incasso registrato.</p>}
-          </div>
-          {residuo > 0 && (
-            <button onClick={() => addPayment(residuo, "manuale")} disabled={!!busy} className="mt-2 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "pay" ? "…" : `Incassa tutto (${eur(centsEur(residuo))})`}</button>
+          {!frozen && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <button onClick={() => addLine({ description: "", vat: "22", sourceKind: "extra" })} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash">+ Riga</button>
+              <button onClick={() => addLine({ description: "Imposta di soggiorno", vat: "N1", sourceKind: "city_tax" })} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash">+ Tassa soggiorno</button>
+              <button onClick={delCityTax} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-[color:var(--err)] hover:bg-wash">Elimina tasse soggiorno</button>
+            </div>
           )}
+          <div className="mt-3 flex flex-col gap-1 border-t border-line pt-3 text-sm">
+            <div className="flex justify-between"><span className="text-dim">Imponibile</span><span className="font-mono">{e2(totals.taxable)}</span></div>
+            <div className="flex justify-between"><span className="text-dim">IVA</span><span className="font-mono">{e2(totals.vat)}</span></div>
+            {totals.out > 0 && <div className="flex justify-between"><span className="text-dim">Fuori campo IVA (art.15)</span><span className="font-mono">{e2(totals.out)}</span></div>}
+            {!frozen && (
+              <div className="flex items-center justify-between"><span className="text-dim">Bollo virtuale {bolloEligible ? "(dovuto)" : ""}</span><label className="inline-flex cursor-pointer items-center gap-1"><input type="checkbox" checked={f.bollo} onChange={(e) => setF({ ...f, bollo: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /><span className="font-mono">{e2(totals.bolloCents)}</span></label></div>
+            )}
+            {frozen && totals.bolloCents > 0 && <div className="flex justify-between"><span className="text-dim">Bollo</span><span className="font-mono">{e2(totals.bolloCents)}</span></div>}
+            {!frozen && <label className="flex items-center justify-between"><span className="text-dim">Arrotonda all'euro</span><input type="checkbox" checked={f.rounding} onChange={(e) => setF({ ...f, rounding: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>}
+            <div className="flex justify-between border-t border-line pt-1 text-base font-bold"><span>Totale</span><span className="font-mono">{e2(totals.total)}</span></div>
+          </div>
+        </Card>
+
+        {/* INTESTAZIONE */}
+        <Card>
+          <SectionTitle>Intestazione</SectionTitle>
+          {frozen ? (
+            <div className="mt-2 space-y-1 text-sm"><div className="font-semibold text-txt">{cp.name} {cp.lastName}</div>{cp.vat && <div className="text-dim">P.IVA {cp.vat}</div>}{cp.tax_code && <div className="text-dim">CF {cp.tax_code}</div>}<div className="text-dim">{[cp.address, cp.cap, cp.city, cp.province].filter(Boolean).join(" ")}</div><div className="text-faint">Cod. dest. {f.sdi_code}{f.pec ? ` · PEC ${f.pec}` : ""}</div></div>
+          ) : (
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <label className={`${lbl} sm:col-span-2`}>Tipologia persona<select value={cp.kind} onChange={(e) => setCp({ ...cp, kind: e.target.value })} className={inp}><option value="privato">Privato</option><option value="societa">Società</option><option value="estero">Estero</option><option value="ota">OTA</option></select></label>
+              <label className={cp.kind === "privato" ? lbl : `${lbl} sm:col-span-2`}>{cp.kind === "societa" ? "Ragione sociale" : "Nome"}<input value={cp.name} onChange={(e) => setCp({ ...cp, name: e.target.value })} className={inp} /></label>
+              {cp.kind === "privato" && <label className={lbl}>Cognome<input value={cp.lastName} onChange={(e) => setCp({ ...cp, lastName: e.target.value })} className={inp} /></label>}
+              <label className={lbl}>Nazione<input value={cp.country} onChange={(e) => setCp({ ...cp, country: e.target.value })} className={inp} /></label>
+              {cp.kind !== "privato" && <label className={lbl}>Partita IVA<input value={cp.vat} onChange={(e) => setCp({ ...cp, vat: e.target.value })} className={inp} /></label>}
+              {cp.kind === "privato" && <label className={lbl}>Codice fiscale<input value={cp.tax_code} onChange={(e) => setCp({ ...cp, tax_code: e.target.value })} className={inp} /></label>}
+              <label className={`${lbl} sm:col-span-2`}>Indirizzo<input value={cp.address} onChange={(e) => setCp({ ...cp, address: e.target.value })} className={inp} /></label>
+              <label className={lbl}>Città<input value={cp.city} onChange={(e) => setCp({ ...cp, city: e.target.value })} className={inp} /></label>
+              <div className="grid grid-cols-2 gap-2"><label className={lbl}>CAP<input value={cp.cap} onChange={(e) => setCp({ ...cp, cap: e.target.value })} className={inp} /></label><label className={lbl}>Prov.<input value={cp.province} onChange={(e) => setCp({ ...cp, province: e.target.value })} className={inp} /></label></div>
+              <div className="sm:col-span-2 mt-1 border-t border-line pt-2">
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">Fattura elettronica</div>
+                <label className="flex items-center justify-between"><span className="text-sm text-txt">Comunica documento al SDI</span><input type="checkbox" checked={f.send_sdi} onChange={(e) => setF({ ...f, send_sdi: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
+                <div className="mt-2 grid grid-cols-2 gap-2"><label className={lbl}>Codice destinatario<input value={f.sdi_code} onChange={(e) => setF({ ...f, sdi_code: e.target.value })} className={inp} /></label><label className={lbl}>PEC<input value={f.pec} onChange={(e) => setF({ ...f, pec: e.target.value })} className={inp} /></label></div>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* STATO + INCASSI */}
+        <Card>
+          <div className="mb-2 flex items-center justify-between"><SectionTitle>Stato e incassi</SectionTitle><span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 16%, transparent)`, color: st.color }}>{st.label}</span></div>
+          <div className="flex flex-col gap-1.5">
+            {events.map((ev) => <div key={ev.id} className="flex gap-2 text-[13px]"><span className="w-24 shrink-0 text-[11px] text-faint">{new Date(ev.ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span><span className="text-txt">{ev.message}</span></div>)}
+          </div>
+          <div className="mt-3 border-t border-line pt-2">
+            <div className="mb-1 flex items-center justify-between"><span className="text-sm font-semibold text-txt">Incassi</span>{residuo > 0 ? <span className="text-[11px] font-semibold text-[color:var(--warn)]">Residuo {e2(residuo)}</span> : <span className="text-[11px] font-semibold text-[color:var(--ok)]">Saldato ✓</span>}</div>
+            {pays.map((p) => <div key={p.id} className="flex justify-between text-sm text-dim"><span>{new Date(p.paid_at).toLocaleDateString("it-IT")} · {p.method}</span><span className="font-mono">{e2(p.amount_cents)}</span></div>)}
+            {residuo > 0 && <button onClick={() => addPayment(residuo, "manuale")} disabled={!!busy} className="mt-2 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">Incassa tutto ({e2(residuo)})</button>}
+          </div>
         </Card>
       </div>
 
-      {/* Barra azioni */}
+      {/* AZIONI */}
       <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        {doc.stato === "bozza" && <button onClick={issue} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "issue" ? "Emissione…" : "Emetti documento"}</button>}
+        {!frozen && <>
+          <button onClick={onSave} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "save" ? "Salvo…" : "Salva bozza"}</button>
+          <button onClick={onIssue} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "issue" ? "Emissione…" : "Emetti"}</button>
+          {f.send_sdi && f.doc_kind !== "ricevuta_non_fiscale" && <button onClick={onSaveSend} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "savesend" ? "…" : "Salva e invia"}</button>}
+        </>}
         {doc.stato === "emessa" && doc.send_sdi && <button onClick={send} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "send" ? "Invio…" : "Invia allo SdI"}</button>}
         {doc.stato === "inviata_intermediario" && <button onClick={refresh} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "status" ? "Controllo…" : "Aggiorna esito"}</button>}
         <button onClick={printPdf} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Stampa PDF</button>
         {doc.provider_ref && <button onClick={downloadXml} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "xml" ? "…" : "Scarica XML"}</button>}
-        <span className="ml-auto text-[11px] text-faint">Regime: {doc.regime ?? "—"} · {doc.send_sdi ? "invio SDI attivo" : "no SDI"}</span>
+        <span className="ml-auto text-[11px] text-faint">Regime: {doc.regime ?? "—"} · {doc.send_sdi ? "SDI attivo" : "no SDI"}</span>
       </div>
     </div>
   );
