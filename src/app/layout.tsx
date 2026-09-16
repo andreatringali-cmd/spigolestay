@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://xenora.it"),
   title: "Xenora — Gestionale e Channel Manager per B&B",
   description: "Prenotazioni, canali, ospiti e incassi: tutta la tua struttura in un'unica piattaforma.",
+  icons: { icon: "/icon.png", shortcut: "/icon.png", apple: "/apple-icon.png" },
   openGraph: {
     title: "Xenora",
     description: "Prenotazioni, canali, ospiti e incassi in un'unica piattaforma.",
