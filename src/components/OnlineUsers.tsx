@@ -23,12 +23,22 @@ export default function OnlineUsers() {
   const ref = useRef<HTMLDivElement>(null);
   const known = useRef<Set<string>>(new Set());
   const ready = useRef(false);
+  const [netOnline, setNetOnline] = useState(true);
 
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+
+  // Stato di rete reale: il pallino è verde quando SEI online (connesso), non solo se c'è un socio.
+  useEffect(() => {
+    const on = () => setNetOnline(true), off = () => setNetOnline(false);
+    try { setNetOnline(navigator.onLine); } catch {}
+    window.addEventListener("online", on); window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
+  const selfOnline = netOnline && !!user?.id;
 
   const md = (user?.user_metadata ?? {}) as Record<string, unknown>;
   const myName = (md.full_name as string) || `${localUser?.firstName ?? ""} ${localUser?.lastName ?? ""}`.trim() || (user?.email ?? "").split("@")[0] || t("Tu");
@@ -86,7 +96,7 @@ export default function OnlineUsers() {
           ))}
         </div>
         <span className="hidden items-center gap-1 text-xs font-medium text-dim sm:flex">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: peers.length ? "var(--ok)" : "var(--faint)" }} />
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: selfOnline ? "var(--ok)" : "var(--faint)" }} />
           {peers.length ? `${peers.length === 1 ? peers[0].name.split(" ")[0] : `${peers.length} ${t("soci")}`} ${t("online")}` : `${online.length} ${t("online")}`}
         </span>
       </button>

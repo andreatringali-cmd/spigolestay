@@ -3,7 +3,7 @@
 // Store condiviso del prototipo (in memoria, niente localStorage — da brief).
 // In produzione questi dati arriveranno da Supabase.
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Structure, RoomType, Unit, Guest, Booking, Channel, CalEvent } from "./types";
 import { STRUCTURES, ROOM_TYPES, UNITS } from "./mock-data";
 import { playSound } from "./sound";
@@ -110,6 +110,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [rateOverrides, setRateOverrides] = useState<Record<string, number>>({});
   const [activities, setActivities] = useState<Activity[]>([]);
+  // Lapidi (tombstone): id delle entità cancellate qui. Servono a impedire che la fusione a 3 vie
+  // con il server le "resusciti" al refresh (la base di fusione è vuota alla prima idratazione).
+  const deletedRef = useRef<Record<string, string[]>>({});
+  const tomb = (key: string, ...ids: (string | undefined | null)[]) => {
+    const set = new Set(deletedRef.current[key] ?? []);
+    for (const i of ids) if (i) set.add(i);
+    deletedRef.current[key] = [...set];
+  };
   const currentActor = (): string | undefined => {
     try {
       const cur = localStorage.getItem("spigolestay:currentuser");
@@ -184,6 +192,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (Array.isArray(d.units)) {
           setUnits((d.units as typeof UNITS).map((u) => (u.id === "u_h2" && u.roomTypeId === "rt_house" ? { ...u, roomTypeId: "rt_house_tri" } : u)));
         }
+        if (d._deleted && typeof d._deleted === "object") deletedRef.current = d._deleted as Record<string, string[]>;
         if (Array.isArray(d.guests)) setGuests(d.guests);
         if (Array.isArray(d.bookings)) setBookings(d.bookings);
         if (Array.isArray(d.events)) setEvents(d.events);
@@ -202,7 +211,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // 2) Salvataggio ad ogni cambiamento, solo dopo il caricamento iniziale.
   useEffect(() => {
     if (!ready || isPublicMode()) return; // in pubblico non si scrive nel browser del visitatore
-    try { localStorage.setItem(KEY, JSON.stringify({ structures, roomTypes, units, guests, bookings, events, rateOverrides, activities })); } catch {}
+    try { localStorage.setItem(KEY, JSON.stringify({ structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, _deleted: deletedRef.current })); } catch {}
   }, [ready, structures, roomTypes, units, guests, bookings, events, rateOverrides, activities]);
   // Registra l'accesso al gestionale una volta per sessione del browser.
   useEffect(() => {
@@ -256,16 +265,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
       deleteStructure: (id) => {
         const nm = structures.find((s) => s.id === id)?.name;
         const rtIds = roomTypes.filter((rt) => rt.structureId === id).map((rt) => rt.id);
+        const uIds = units.filter((u) => u.structureId === id).map((u) => u.id);
+        const bIds = bookings.filter((b) => b.structureId === id).map((b) => b.id);
+        tomb("structures", id); tomb("roomTypes", ...rtIds); tomb("units", ...uIds); tomb("bookings", ...bIds);
         setBookings((prev) => prev.filter((b) => b.structureId !== id));
         setUnits((prev) => prev.filter((u) => u.structureId !== id));
         setRoomTypes((prev) => prev.filter((rt) => rt.structureId !== id));
         setStructures((prev) => prev.filter((s) => s.id !== id));
         logAct("config", `Struttura eliminata${nm ? " — " + nm : ""}`);
-        void rtIds;
       },
       deleteRoomType: (id) => {
         const nm = roomTypes.find((rt) => rt.id === id)?.name;
         const unitIds = units.filter((u) => u.roomTypeId === id).map((u) => u.id);
+        const bIds = bookings.filter((b) => b.roomTypeId === id || unitIds.includes(b.unitId ?? "")).map((b) => b.id);
+        tomb("roomTypes", id); tomb("units", ...unitIds); tomb("bookings", ...bIds);
         setBookings((prev) => prev.filter((b) => b.roomTypeId !== id && !unitIds.includes(b.unitId ?? "")));
         setUnits((prev) => prev.filter((u) => u.roomTypeId !== id));
         setRoomTypes((prev) => prev.filter((rt) => rt.id !== id));
@@ -273,6 +286,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       },
       deleteUnit: (id) => {
         const nm = units.find((u) => u.id === id)?.name;
+        tomb("units", id);
         // Le prenotazioni dell'unità restano ma tornano "da assegnare".
         setBookings((prev) => prev.map((b) => (b.unitId === id ? { ...b, unitId: null } : b)));
         setUnits((prev) => prev.filter((u) => u.id !== id));
@@ -290,12 +304,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         // Conserva i dati dell'ospite sulla prenotazione (per Alloggiati Web) prima di sganciarlo.
         const g = guests.find((x) => x.id === id);
         const snap = g ? { firstName: g.firstName, lastName: g.lastName, sex: g.sex, birthDate: g.birthDate, birthPlace: g.birthPlace, citizenship: g.citizenship, docType: g.docType, docNumber: g.docNumber } : undefined;
+        tomb("guests", id);
         setBookings((prev) => prev.map((b) => (b.guestId === id ? { ...b, guestId: "", primaryGuest: b.primaryGuest ?? snap } : b)));
         setGuests((prev) => prev.filter((x) => x.id !== id));
       },
       mergeGuests: (keepId, dropIds) => {
         const drop = new Set(dropIds.filter((d) => d && d !== keepId));
         if (drop.size === 0) return;
+        tomb("guests", ...drop);
         setBookings((prev) => prev.map((b) => (drop.has(b.guestId) ? { ...b, guestId: keepId } : b)));
         setGuests((prev) => prev.filter((g) => !drop.has(g.id)));
         logAct("config", `Anagrafica: ${drop.size} doppione/i uniti`);
@@ -340,6 +356,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       deleteBooking: (id) => {
         const b = bookings.find((x) => x.id === id);
         const gName = b ? guests.find((g) => g.id === b.guestId)?.fullName : undefined;
+        tomb("bookings", id);
         setBookings((prev) => prev.filter((b) => b.id !== id));
         setSelectedBookingId((s) => (s === id ? null : s));
         logAct("cancel", `Cancellazione${gName ? " — " + gName : ""}`);
@@ -350,6 +367,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (!members.length) return;
         const ids = new Set(members.map((m) => m.id));
         const gName = guests.find((g) => g.id === members[0].guestId)?.fullName;
+        tomb("bookings", ...ids);
         setBookings((prev) => prev.filter((b) => !ids.has(b.id)));
         setSelectedBookingId((s) => (s && ids.has(s) ? null : s));
         logAct("cancel", `Cancellazione gruppo (${members.length} camere)${gName ? " — " + gName : ""}`);
