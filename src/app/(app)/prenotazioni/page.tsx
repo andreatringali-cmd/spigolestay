@@ -112,7 +112,6 @@ export default function PrenotazioniPage() {
   }, [bookings, q, channel, activeStructureId, loc, from, to, dateField, todayISO]);
 
   const structuresToShow = structures.filter((s) => activeStructureId === "all" || s.id === activeStructureId);
-  const hasFilters = !!(q || channel !== "all" || loc !== "all" || from || to);
   const clearFilters = () => { setQ(""); setChannel("all"); setLoc("all"); setFrom(""); setTo(""); };
 
   // % commissione: quella specifica della prenotazione, altrimenti il default del canale.
@@ -324,9 +323,6 @@ export default function PrenotazioniPage() {
           <option value="all">{t("Tutti i canali")}</option>
           {(Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => (<option key={c} value={c}>{CHANNELS[c].label}</option>))}
         </Select>
-        {hasFilters && (
-          <button onClick={clearFilters} className="rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-wash" style={{ borderColor: "var(--err)", color: "var(--err)" }}>{t("Rimuovi filtri")}</button>
-        )}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {/* Toggle grafici: un click mostra tutti / nasconde tutti */}
           <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${shownCharts.length > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
