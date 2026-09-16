@@ -220,7 +220,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   return (
     <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
       {/* Elenco (su cellulare: nascosto quando una conversazione/invii è aperta) */}
-      <div className={`${(current || showInvii) ? "hidden lg:flex" : "flex"} h-[calc(100vh-13rem)] min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm`}>
+      <div className={`${(current || showInvii) ? "hidden lg:flex" : "flex"} h-[calc(100vh-15rem)] min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm`}>
         <div className="border-b border-line p-2">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca ospite…")} className="w-full rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
         </div>
@@ -267,7 +267,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       </div>
 
       {/* Thread + invii programmati (su cellulare: visibile solo quando selezioni una conversazione/invii) */}
-      <div className={`${(current || showInvii) ? "flex" : "hidden lg:flex"} h-[calc(100vh-13rem)] min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm`}>
+      <div className={`${(current || showInvii) ? "flex" : "hidden lg:flex"} h-[calc(100vh-15rem)] min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm`}>
         {!current ? (
           !showInvii ? (
             // Nessun ospite selezionato → placeholder pulito (gli invii si aprono col pulsante).
