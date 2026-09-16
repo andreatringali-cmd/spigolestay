@@ -69,7 +69,8 @@ export default function SitoPage() {
   const [pubCopied, setPubCopied] = useState(false);
   const publicUrl = slug ? `${publicBase}/${slug}` : "";
 
-  // Slug proposto dal nome quando cambio struttura; carico lo stato pubblicato dal server.
+  // L'indirizzo è SEMPRE derivato dal nome della struttura (non modificabile).
+  // Carico solo lo stato pubblicato dal server (per link/stato).
   useEffect(() => {
     if (!sid) return;
     setSlug(slugify(siteName) || "struttura");
@@ -77,10 +78,8 @@ export default function SitoPage() {
     setPubMsg("");
     if (!supabase) return;
     supabase.from("public_sites").select("slug").eq("structure_id", sid).maybeSingle()
-      .then(({ data }) => { if (data?.slug) { setSlug(data.slug); setPublishedSlug(data.slug); } });
+      .then(({ data }) => { if (data?.slug) setPublishedSlug(data.slug); });
   }, [sid, siteName]);
-
-  const cleanSlug = (v: string) => slugify(v);
 
   const publish = async () => {
     if (!supabase || !user) { setPubMsg(t("Devi essere connesso per pubblicare.")); return; }
@@ -205,11 +204,10 @@ export default function SitoPage() {
               <span className="text-sm font-bold text-txt">{t("Indirizzo pubblico")}</span>
               <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${publishedSlug ? "text-white" : "bg-wash text-dim"}`} style={publishedSlug ? { backgroundColor: "var(--ok)" } : undefined}>{publishedSlug ? t("Online") : t("Non pubblicato")}</span>
             </div>
-            <p className="mb-2 mt-0.5 text-xs text-dim">{t("L'indirizzo del tuo sito. I visitatori lo vedono senza login; i dati degli ospiti non vengono pubblicati.")}</p>
-            <div className="flex flex-wrap items-stretch gap-2">
-              <div className="flex min-w-0 flex-1 items-center rounded-lg border border-line bg-paper focus-within:border-focus">
-                <span className="whitespace-nowrap pl-3 text-sm text-faint">{PUBLIC_HOST}/</span>
-                <input value={slug} onChange={(e) => setSlug(cleanSlug(e.target.value))} placeholder="nome-struttura" className="min-w-0 flex-1 bg-transparent py-2 pr-3 text-sm font-semibold text-txt outline-none" />
+            <p className="mb-2 mt-0.5 text-xs text-dim">{t("Generato dal nome della struttura.")}</p>
+            <div className="mt-2 flex flex-wrap items-stretch gap-2">
+              <div className="flex min-w-0 flex-1 items-center rounded-lg border border-line bg-wash px-3 py-2 text-sm">
+                <span className="truncate"><span className="text-faint">{PUBLIC_HOST}/</span><span className="font-semibold text-txt">{slug}</span></span>
               </div>
               <button onClick={() => { const url = publishedSlug ? `${publicBase}/${publishedSlug}` : publicUrl; if (url) { navigator.clipboard?.writeText(url); setPubCopied(true); window.setTimeout(() => setPubCopied(false), 1500); } }} disabled={!slug} className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{pubCopied ? t("Copiato ✓") : t("Copia")}</button>
               <button onClick={publish} disabled={pubBusy || !slug} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{pubBusy ? t("Pubblico…") : publishedSlug ? (isDirtySlug ? t("Cambia indirizzo") : t("Aggiorna")) : t("Pubblica")}</button>
@@ -220,7 +218,6 @@ export default function SitoPage() {
               {publishedSlug && <button onClick={unpublish} disabled={pubBusy} className="ml-auto rounded-lg px-2.5 py-1 text-xs font-semibold text-faint hover:text-[color:var(--err)] disabled:opacity-50">{t("Rimuovi dal pubblico")}</button>}
             </div>
             {pubMsg && <p className="mt-2 text-[12px] font-medium text-dim">{pubMsg}</p>}
-            {publishedSlug && <p className="mt-1 text-[11px] text-faint">{t("Dopo ogni modifica ai contenuti o alle camere, premi «Aggiorna» per aggiornare il sito online.")}</p>}
           </div>
         </Card>
       </div>
