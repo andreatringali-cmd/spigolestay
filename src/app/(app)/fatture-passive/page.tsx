@@ -126,15 +126,18 @@ export default function FatturePassivePage() {
       </div>
 
       <Card className="mb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <SearchInput value={q} onChange={setQ} placeholder="Cerca fornitore, numero, categoria…" />
-          <select value={String(year)} onChange={(e) => setYear(e.target.value === "all" ? "all" : Number(e.target.value))} className={sel}><option value="all">Tutti gli anni</option>{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
-          <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={sel}><option value="all">Tutti i tipi</option>{Object.entries(TIPI).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-          <select value={pay} onChange={(e) => setPay(e.target.value)} className={sel}><option value="all">Pagate e non</option><option value="unpaid">Da pagare</option><option value="paid">Pagate</option></select>
-          <select value={scad} onChange={(e) => setScad(e.target.value)} className={sel}><option value="all">Tutte le scadenze</option><option value="overdue">Scadute non pagate</option></select>
-          <div className="ml-auto flex items-center gap-2">
-            <button onClick={exportCsv} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
-            <button onClick={openNew} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuova fattura</button>
+        {/* Stessa griglia dei KPI sopra: ricerca larga quanto una card e allineata. */}
+        <div className="grid grid-cols-2 items-center gap-3 sm:grid-cols-4">
+          <SearchInput value={q} onChange={setQ} placeholder="Cerca fornitore, numero, categoria…" className="col-span-2 w-full sm:col-span-1" />
+          <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-3">
+            <select value={String(year)} onChange={(e) => setYear(e.target.value === "all" ? "all" : Number(e.target.value))} className={sel}><option value="all">Tutti gli anni</option>{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
+            <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={sel}><option value="all">Tutti i tipi</option>{Object.entries(TIPI).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+            <select value={pay} onChange={(e) => setPay(e.target.value)} className={sel}><option value="all">Pagate e non</option><option value="unpaid">Da pagare</option><option value="paid">Pagate</option></select>
+            <select value={scad} onChange={(e) => setScad(e.target.value)} className={sel}><option value="all">Tutte le scadenze</option><option value="overdue">Scadute non pagate</option></select>
+            <div className="ml-auto flex items-center gap-2">
+              <button onClick={exportCsv} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
+              <button onClick={openNew} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuova fattura</button>
+            </div>
           </div>
         </div>
       </Card>

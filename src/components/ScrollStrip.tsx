@@ -61,13 +61,20 @@ export default function ScrollStrip({ items, onReorder, gap = "gap-4" }: { items
     const ro = new ResizeObserver(updateArrows); ro.observe(el);
     return () => ro.disconnect();
   }, [items.length]);
-  const stepPx = () => {
-    const el = ref.current; if (!el || el.children.length === 0) return 300;
-    const kids = el.children;
-    if (kids.length > 1) return (kids[1] as HTMLElement).offsetLeft - (kids[0] as HTMLElement).offsetLeft;
-    return (kids[0] as HTMLElement).offsetWidth;
+  // Scorre di UN grafico intero: allinea a sinistra il grafico successivo/precedente,
+  // qualunque sia la sua larghezza (1, 2 o 3 card).
+  const nudge = (dir: -1 | 1) => {
+    const el = ref.current; if (!el) return;
+    const kids = [...el.children] as HTMLElement[]; if (!kids.length) return;
+    const cur = el.scrollLeft, eps = 4;
+    if (dir === 1) {
+      const next = kids.find((k) => k.offsetLeft > cur + eps);
+      el.scrollTo({ left: next ? next.offsetLeft : el.scrollWidth, behavior: "smooth" });
+    } else {
+      const prevs = kids.filter((k) => k.offsetLeft < cur - eps);
+      el.scrollTo({ left: prevs.length ? prevs[prevs.length - 1].offsetLeft : 0, behavior: "smooth" });
+    }
   };
-  const nudge = (dir: -1 | 1) => { const el = ref.current; if (!el) return; el.scrollBy({ left: dir * stepPx(), behavior: "smooth" }); };
 
   const activeIdx = items.findIndex((i) => i.key === active);
   const arrowCls = "absolute top-1/2 z-20 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-focus text-lg font-bold leading-none text-white shadow-md transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-0";

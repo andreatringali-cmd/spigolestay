@@ -33,6 +33,7 @@ export default function AssistentePage() {
   const [speaking, setSpeaking] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
   const [voiceSupported, setVoiceSupported] = useState(false);
+  const [micAvailable, setMicAvailable] = useState(true);
   const [micHint, setMicHint] = useState("");
   const recRef = useRef<unknown>(null);
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
@@ -45,6 +46,15 @@ export default function AssistentePage() {
     try { const v = localStorage.getItem("spigolestay:assistant:voice"); if (v !== null) setVoiceOn(v === "1"); } catch {}
     const SR = typeof window !== "undefined" ? ((window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition) : undefined;
     setVoiceSupported(!!SR);
+    setMicAvailable(!!SR);
+    // Se il permesso microfono risulta già NEGATO/assente (es. dentro l'app di Claude), nascondi la voce.
+    if (!SR || !navigator.mediaDevices?.getUserMedia) { setMicAvailable(false); return; }
+    try {
+      navigator.permissions?.query({ name: "microphone" as PermissionName }).then((p) => {
+        if (p.state === "denied") setMicAvailable(false);
+        p.onchange = () => setMicAvailable(p.state !== "denied");
+      }).catch(() => {});
+    } catch {}
   }, []);
 
   // Scelta della voce italiana più naturale disponibile (Google/cloud/neural), non quella robotica di default.
@@ -176,6 +186,16 @@ export default function AssistentePage() {
     const nb = narrate(b);
     setAns({ title: nb.title, detail: nb.text, speech: nb.text, go: { label: "Apri in Prenotazioni", href: "/prenotazioni" } });
     speak(nb.text);
+  }, [bookings, narrate, speak]);
+
+  // Racconta TUTTE le prenotazioni dell'elenco, una dopo l'altra, in un unico discorso.
+  const readAllList = useCallback((list: PickItem[]) => {
+    const parts = list.map((it, i) => { const b = bookings.find((x) => x.id === it.id); return b ? `${i + 1}) ${narrate(b).text}` : ""; }).filter(Boolean);
+    if (!parts.length) return;
+    const intro = `Ecco il riepilogo completo, ${parts.length} prenotazion${parts.length === 1 ? "e" : "i"}.`;
+    const full = [intro, ...parts].join("  ");
+    setAns({ title: "Riepilogo completo", detail: full, speech: full, go: { label: "Apri in Prenotazioni", href: "/prenotazioni" } });
+    speak(full);
   }, [bookings, narrate, speak]);
 
   // Briefing "distribuito": ogni numero è una tessera a sé.
@@ -337,18 +357,21 @@ export default function AssistentePage() {
           </div>
           <button
             onClick={toggleListening}
-            disabled={!voiceSupported}
-            title={voiceSupported ? (listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare") : "Il microfono non è supportato da questo browser"}
-            className="relative grid place-items-center rounded-full transition active:scale-95 disabled:opacity-70"
+            disabled={!micAvailable}
+            title={micAvailable ? (listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare") : "Voce non disponibile qui — apri Xenora in Chrome/Edge"}
+            className="relative grid place-items-center rounded-full transition active:scale-95 disabled:cursor-default"
           >
             <AssistantCore state={state} size={176} />
-            <span className="absolute bottom-1 right-1 grid h-8 w-8 place-items-center rounded-full text-white shadow-md" style={{ backgroundColor: listening ? "var(--err)" : "var(--focus)" }}>
-              <Icon name="chat" size={15} />
-            </span>
+            {micAvailable && (
+              <span className="absolute bottom-1 right-1 grid h-8 w-8 place-items-center rounded-full text-white shadow-md" style={{ backgroundColor: listening ? "var(--err)" : "var(--focus)" }}>
+                <Icon name="chat" size={15} />
+              </span>
+            )}
           </button>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <button onClick={() => speak(briefing)} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash"><Icon name="chat" size={14} /> Ascolta il briefing</button>
             <button onClick={toggleVoice} title="Attiva/disattiva la voce nelle risposte" className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${voiceOn ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}>{voiceOn ? "🔊 Voce attiva" : "🔇 Voce spenta"}</button>
+            {!micAvailable && <span className="text-xs font-medium text-faint">🎙 La voce in entrata si attiva aprendo Xenora in Chrome/Edge</span>}
             {micHint && <span className="text-xs font-medium text-[color:var(--err)]">{micHint}</span>}
           </div>
         </div>
@@ -357,7 +380,7 @@ export default function AssistentePage() {
       {/* Input + chips */}
       <Card className="mb-4">
         <form onSubmit={(e) => { e.preventDefault(); ask(q); }} className="flex items-center gap-2">
-          {voiceSupported && (
+          {micAvailable && (
             <button type="button" onClick={toggleListening} title="Parla" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash" style={listening ? { borderColor: "var(--err)", color: "var(--err)" } : undefined}><Icon name="chat" size={18} /></button>
           )}
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={listening ? "Sto ascoltando…" : "Es. quanto ho incassato questo mese?"} className="min-w-0 flex-1 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
@@ -380,6 +403,7 @@ export default function AssistentePage() {
           </div>
           {ans.list && ans.list.length > 0 && (
             <div className="mt-3 flex flex-col gap-1.5">
+              <button onClick={() => readAllList(ans.list!)} className="mb-1 inline-flex items-center justify-center gap-1.5 self-start rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"><Icon name="chat" size={14} /> Leggimi tutti</button>
               {ans.list.map((it) => (
                 <button key={it.id} onClick={() => pickBooking(it.id)} className="flex items-center justify-between gap-3 rounded-lg border border-line px-3 py-2 text-left transition hover:bg-wash">
                   <span className="min-w-0"><span className="block truncate text-sm font-semibold text-txt">{it.label}</span>{it.sub && <span className="block truncate text-[11px] text-faint">{it.sub}</span>}</span>
@@ -392,7 +416,6 @@ export default function AssistentePage() {
         </Card>
       )}
 
-      <p className="mt-3 text-xs text-faint">Assistente a risposte calcolate sui tuoi dati, con voce del browser (nessun dato esce da Xenora). L'assistente conversazionale completo si attiverà collegando una API.</p>
     </div>
   );
 }

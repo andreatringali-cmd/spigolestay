@@ -96,15 +96,17 @@ export default function UpsellingPage() {
         ))}
       </div>
 
-      {/* Riga filtri: cerca extra · struttura · aggiungi extra (a destra) */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
-        <SearchInput value={q} onChange={setQ} placeholder="Cerca extra…" />
-        {activeStructureId === "all" && structures.length > 0 && (
-          <select value={catId} onChange={(e) => setLocalCat(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-dim outline-none focus:border-focus">
-            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        )}
-        <button onClick={addExtra} disabled={!catId} className="ml-auto rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>+ Aggiungi extra</button>
+      {/* Riga filtri: stessa griglia delle card sopra, ricerca larga quanto una card */}
+      <div className="mb-4 grid grid-cols-2 items-center gap-2.5 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm sm:grid-cols-4">
+        <SearchInput value={q} onChange={setQ} placeholder="Cerca extra…" className="col-span-2 w-full sm:col-span-1" />
+        <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-3">
+          {activeStructureId === "all" && structures.length > 0 && (
+            <select value={catId} onChange={(e) => setLocalCat(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-dim outline-none focus:border-focus">
+              {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          )}
+          <button onClick={addExtra} disabled={!catId} className="ml-auto rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>+ Aggiungi extra</button>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
