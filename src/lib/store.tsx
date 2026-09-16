@@ -5,7 +5,6 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Structure, RoomType, Unit, Guest, Booking, Channel, CalEvent } from "./types";
-import { STRUCTURES, ROOM_TYPES, UNITS } from "./mock-data";
 import { playSound } from "./sound";
 import { loadUsers } from "./users";
 import { isPublicMode, lsGet, DATA_KEY } from "./publicdata";
@@ -177,21 +176,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const zeroPrices = localStorage.getItem("spigolestay:zeroprices:v1") !== "1";
       if (raw) {
         const d = JSON.parse(raw);
-        if (Array.isArray(d.structures)) setStructures(d.structures.map((s: Structure) => s.photoColor ? s : { ...s, photoColor: STRUCTURES.find((x) => x.id === s.id)?.photoColor }));
-        // Auto-riparazione dati demo: Spigole House camera 2 → Tripla (idempotente).
+        if (Array.isArray(d.structures)) setStructures(d.structures as Structure[]);
         if (Array.isArray(d.roomTypes)) {
-          let rts = d.roomTypes as typeof ROOM_TYPES;
-          // Auto-riparazione SOLO sui dati demo (Spigole House): se l'utente ha resettato/creato
-          // le proprie tipologie, non reintroduco quelle d'esempio.
-          const isDemo = rts.some((r) => r.id === "rt_house" || r.structureId === "st_house");
-          if (isDemo && !rts.some((r) => r.id === "rt_house_tri")) rts = [...rts, ROOM_TYPES.find((r) => r.id === "rt_house_tri")!];
-          rts = rts.map((r) => (r.id === "rt_house" && r.name === "Matrimoniale" ? { ...r, name: "Deluxe" } : r));
+          let rts = d.roomTypes as RoomType[];
           if (zeroPrices) rts = rts.map((r) => ({ ...r, basePrice: 0 }));
           setRoomTypes(rts);
         }
-        if (Array.isArray(d.units)) {
-          setUnits((d.units as typeof UNITS).map((u) => (u.id === "u_h2" && u.roomTypeId === "rt_house" ? { ...u, roomTypeId: "rt_house_tri" } : u)));
-        }
+        if (Array.isArray(d.units)) setUnits(d.units as Unit[]);
         if (d._deleted && typeof d._deleted === "object") deletedRef.current = d._deleted as Record<string, string[]>;
         if (Array.isArray(d.guests)) setGuests(d.guests);
         if (Array.isArray(d.bookings)) setBookings(d.bookings);
