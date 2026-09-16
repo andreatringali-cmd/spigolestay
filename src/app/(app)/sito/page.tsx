@@ -31,6 +31,10 @@ export default function SitoPage() {
   const struct = structures.find((s) => s.id === sid);
   const siteName = struct?.name || "";
   const origin = typeof window !== "undefined" ? window.location.origin : "";
+  // Dominio pubblico canonico: l'indirizzo del sito è SEMPRE su xenora.it,
+  // anche se stai navigando l'app dal dominio *.vercel.app.
+  const PUBLIC_HOST = "xenora.it";
+  const publicBase = `https://${PUBLIC_HOST}`;
   // Preview del proprietario (legge dal browser). Il sito PUBBLICO usa lo slug.
   const previewLink = `${origin}/sito-web${sid ? `?s=${sid}` : ""}`;
   const openPreview = () => window.open(previewLink, "_blank");
@@ -42,7 +46,7 @@ export default function SitoPage() {
   const [pubBusy, setPubBusy] = useState(false);
   const [pubMsg, setPubMsg] = useState("");
   const [pubCopied, setPubCopied] = useState(false);
-  const publicUrl = slug ? `${origin}/${slug}` : "";
+  const publicUrl = slug ? `${publicBase}/${slug}` : "";
 
   // Slug proposto dal nome quando cambio struttura; carico lo stato pubblicato dal server.
   useEffect(() => {
@@ -110,15 +114,15 @@ export default function SitoPage() {
         <p className="mb-2 mt-0.5 text-xs text-dim">{t("Scegli l'indirizzo del tuo sito. I visitatori lo vedranno senza login; i dati degli ospiti non vengono pubblicati.")}</p>
         <div className="flex flex-wrap items-stretch gap-2">
           <div className="flex min-w-0 flex-1 items-center rounded-lg border border-line bg-paper focus-within:border-focus">
-            <span className="whitespace-nowrap pl-3 text-sm text-faint">{origin.replace(/^https?:\/\//, "")}/</span>
+            <span className="whitespace-nowrap pl-3 text-sm text-faint">{PUBLIC_HOST}/</span>
             <input value={slug} onChange={(e) => setSlug(cleanSlug(e.target.value))} placeholder="nome-struttura" className="min-w-0 flex-1 bg-transparent py-2 pr-3 text-sm font-semibold text-txt outline-none" />
           </div>
           <button onClick={publish} disabled={pubBusy || !slug} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{pubBusy ? t("Pubblico…") : publishedSlug ? (isDirtySlug ? t("Cambia indirizzo") : t("Aggiorna")) : t("Pubblica")}</button>
         </div>
         {publishedSlug && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <a href={`${origin}/${publishedSlug}`} target="_blank" rel="noreferrer" className="text-sm font-semibold text-focus hover:underline">{origin.replace(/^https?:\/\//, "")}/{publishedSlug} ↗</a>
-            <button onClick={() => { navigator.clipboard?.writeText(`${origin}/${publishedSlug}`); setPubCopied(true); window.setTimeout(() => setPubCopied(false), 1500); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">{pubCopied ? t("Copiato ✓") : t("Copia link")}</button>
+            <a href={`${publicBase}/${publishedSlug}`} target="_blank" rel="noreferrer" className="text-sm font-semibold text-focus hover:underline">{PUBLIC_HOST}/{publishedSlug} ↗</a>
+            <button onClick={() => { navigator.clipboard?.writeText(`${publicBase}/${publishedSlug}`); setPubCopied(true); window.setTimeout(() => setPubCopied(false), 1500); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">{pubCopied ? t("Copiato ✓") : t("Copia link")}</button>
             <button onClick={unpublish} disabled={pubBusy} className="rounded-lg px-2.5 py-1 text-xs font-semibold text-faint hover:text-[color:var(--err)] disabled:opacity-50">{t("Rimuovi dal pubblico")}</button>
           </div>
         )}
@@ -166,7 +170,7 @@ export default function SitoPage() {
         </div>
 
         <Card>
-          <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Anteprima")}</SectionTitle>{publishedSlug ? <a href={`${origin}/${publishedSlug}`} target="_blank" rel="noreferrer" className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-focus hover:underline">{origin.replace(/^https?:\/\//, "")}/{publishedSlug} ↗</a> : <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{slug ? `${origin.replace(/^https?:\/\//, "")}/${slug}` : t("non pubblicato")}</span>}</div>
+          <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Anteprima")}</SectionTitle>{publishedSlug ? <a href={`${publicBase}/${publishedSlug}`} target="_blank" rel="noreferrer" className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-focus hover:underline">{PUBLIC_HOST}/{publishedSlug} ↗</a> : <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{slug ? `${PUBLIC_HOST}/${slug}` : t("non pubblicato")}</span>}</div>
           <div className="overflow-hidden rounded-xl border border-line">
             {c.hero && (
               <div className="relative p-6 text-white" style={{ background: c.heroBg ? `linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), url(${c.heroBg}) center/cover no-repeat` : `linear-gradient(135deg, ${c.accent}, color-mix(in srgb, ${c.accent} 55%, #000))` }}>
