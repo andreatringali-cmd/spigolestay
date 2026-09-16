@@ -8,7 +8,8 @@ import { PageHeader, Card } from "@/components/ui";
 import { eur } from "@/lib/format";
 import { centsEur } from "@/lib/invoicing/client";
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Data locale (NON UTC): altrimenti vicino a mezzanotte "oggi" sfasa di un giorno.
+const today = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; };
 
 export default function AdempimentiPage() {
   const router = useRouter();
