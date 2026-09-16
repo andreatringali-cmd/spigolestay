@@ -10,11 +10,22 @@ import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { buildPublishData, slugify, RESERVED_SLUGS } from "@/lib/publicdata";
 
-interface Cfg { nome: string; dominio: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean; lang: string[] }
-const DEF: Cfg = { nome: "", dominio: "", tagline: "", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, camere: true, recensioni: true, mappa: true, contatti: true, lang: ["it", "en"] };
+interface Cfg { nome: string; dominio: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; chisiamo: boolean; camere: boolean; servizi: boolean; info: boolean; galleria: boolean; offerte: boolean; newsletter: boolean; recensioni: boolean; mappa: boolean; contatti: boolean; lang: string[] }
+const DEF: Cfg = { nome: "", dominio: "", tagline: "", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, chisiamo: true, camere: true, servizi: true, info: true, galleria: true, offerte: true, newsletter: true, recensioni: true, mappa: true, contatti: true, lang: ["it", "en"] };
 const LANGS = [["it", "Italiano"], ["en", "English"], ["fr", "Français"], ["de", "Deutsch"], ["es", "Español"]] as const;
+// Ordine come appaiono nel sito pubblico.
 const SEZIONI: { key: keyof Cfg; label: string }[] = [
-  { key: "hero", label: "Copertina (hero)" }, { key: "camere", label: "Camere e prezzi" }, { key: "recensioni", label: "Recensioni" }, { key: "mappa", label: "Mappa e dintorni" }, { key: "contatti", label: "Contatti" },
+  { key: "hero", label: "Copertina (hero)" },
+  { key: "chisiamo", label: "Chi siamo" },
+  { key: "camere", label: "Camere e prezzi" },
+  { key: "servizi", label: "Servizi e dotazioni" },
+  { key: "info", label: "Informazioni utili" },
+  { key: "galleria", label: "Galleria foto" },
+  { key: "offerte", label: "Offerte e promozioni" },
+  { key: "newsletter", label: "Newsletter" },
+  { key: "recensioni", label: "Recensioni" },
+  { key: "mappa", label: "Mappa e dintorni" },
+  { key: "contatti", label: "Contatti" },
 ];
 const KEY = "spigolestay:sito";
 
@@ -182,33 +193,33 @@ export default function SitoPage() {
             </div>
           </div>
           <p className="mt-3 text-xs text-faint">{t("Il motore di prenotazione è lo stesso del")} <Link href="/widget" className="font-medium text-focus hover:underline">{t("Widget sito")}</Link>: {t("ogni prenotazione entra diretta nel calendario, senza commissioni.")}</p>
+
+          {/* Indirizzo pubblico: dentro il box anteprima, in fondo */}
+          <div className="mt-4 border-t border-line pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-bold text-txt">{t("Indirizzo pubblico")}</span>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${publishedSlug ? "text-white" : "bg-wash text-dim"}`} style={publishedSlug ? { backgroundColor: "var(--ok)" } : undefined}>{publishedSlug ? t("Online") : t("Non pubblicato")}</span>
+            </div>
+            <p className="mb-2 mt-0.5 text-xs text-dim">{t("L'indirizzo del tuo sito. I visitatori lo vedono senza login; i dati degli ospiti non vengono pubblicati.")}</p>
+            <div className="flex flex-wrap items-stretch gap-2">
+              <div className="flex min-w-0 flex-1 items-center rounded-lg border border-line bg-paper focus-within:border-focus">
+                <span className="whitespace-nowrap pl-3 text-sm text-faint">{PUBLIC_HOST}/</span>
+                <input value={slug} onChange={(e) => setSlug(cleanSlug(e.target.value))} placeholder="nome-struttura" className="min-w-0 flex-1 bg-transparent py-2 pr-3 text-sm font-semibold text-txt outline-none" />
+              </div>
+              <button onClick={publish} disabled={pubBusy || !slug} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{pubBusy ? t("Pubblico…") : publishedSlug ? (isDirtySlug ? t("Cambia indirizzo") : t("Aggiorna")) : t("Pubblica")}</button>
+            </div>
+            {publishedSlug && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <a href={`${publicBase}/${publishedSlug}`} target="_blank" rel="noreferrer" className="text-sm font-semibold text-focus hover:underline">{PUBLIC_HOST}/{publishedSlug} ↗</a>
+                <button onClick={() => { navigator.clipboard?.writeText(`${publicBase}/${publishedSlug}`); setPubCopied(true); window.setTimeout(() => setPubCopied(false), 1500); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">{pubCopied ? t("Copiato ✓") : t("Copia link")}</button>
+                <button onClick={unpublish} disabled={pubBusy} className="rounded-lg px-2.5 py-1 text-xs font-semibold text-faint hover:text-[color:var(--err)] disabled:opacity-50">{t("Rimuovi dal pubblico")}</button>
+              </div>
+            )}
+            {pubMsg && <p className="mt-2 text-[12px] font-medium text-dim">{pubMsg}</p>}
+            {publishedSlug && <p className="mt-1 text-[11px] text-faint">{t("Dopo ogni modifica ai contenuti o alle camere, premi «Aggiorna» per aggiornare il sito online.")}</p>}
+          </div>
         </Card>
       </div>
-
-      {/* Pubblicazione: l'indirizzo pubblico xenora.it/<nome> — sotto l'anteprima */}
-      <Card className="mt-4">
-        <div className="flex items-center justify-between gap-3">
-          <SectionTitle>{t("Indirizzo pubblico")}</SectionTitle>
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${publishedSlug ? "text-white" : "bg-wash text-dim"}`} style={publishedSlug ? { backgroundColor: "var(--ok)" } : undefined}>{publishedSlug ? t("Online") : t("Non pubblicato")}</span>
-        </div>
-        <p className="mb-2 mt-0.5 text-xs text-dim">{t("Scegli l'indirizzo del tuo sito. I visitatori lo vedranno senza login; i dati degli ospiti non vengono pubblicati.")}</p>
-        <div className="flex flex-wrap items-stretch gap-2">
-          <div className="flex min-w-0 flex-1 items-center rounded-lg border border-line bg-paper focus-within:border-focus">
-            <span className="whitespace-nowrap pl-3 text-sm text-faint">{PUBLIC_HOST}/</span>
-            <input value={slug} onChange={(e) => setSlug(cleanSlug(e.target.value))} placeholder="nome-struttura" className="min-w-0 flex-1 bg-transparent py-2 pr-3 text-sm font-semibold text-txt outline-none" />
-          </div>
-          <button onClick={publish} disabled={pubBusy || !slug} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{pubBusy ? t("Pubblico…") : publishedSlug ? (isDirtySlug ? t("Cambia indirizzo") : t("Aggiorna")) : t("Pubblica")}</button>
-        </div>
-        {publishedSlug && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <a href={`${publicBase}/${publishedSlug}`} target="_blank" rel="noreferrer" className="text-sm font-semibold text-focus hover:underline">{PUBLIC_HOST}/{publishedSlug} ↗</a>
-            <button onClick={() => { navigator.clipboard?.writeText(`${publicBase}/${publishedSlug}`); setPubCopied(true); window.setTimeout(() => setPubCopied(false), 1500); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">{pubCopied ? t("Copiato ✓") : t("Copia link")}</button>
-            <button onClick={unpublish} disabled={pubBusy} className="rounded-lg px-2.5 py-1 text-xs font-semibold text-faint hover:text-[color:var(--err)] disabled:opacity-50">{t("Rimuovi dal pubblico")}</button>
-          </div>
-        )}
-        {pubMsg && <p className="mt-2 text-[12px] font-medium text-dim">{pubMsg}</p>}
-        {publishedSlug && <p className="mt-1 text-[11px] text-faint">{t("Dopo ogni modifica ai contenuti o alle camere, premi «Aggiorna» per aggiornare il sito online.")}</p>}
-      </Card>
     </div>
   );
 }

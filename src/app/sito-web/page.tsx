@@ -61,8 +61,8 @@ const SITE_DICT: Record<string, Record<string, string>> = {
   "notti": { en: "nights", fr: "nuits", de: "Nächte", es: "noches" },
 };
 
-interface Cfg { nome: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; camere: boolean; recensioni: boolean; mappa: boolean; contatti: boolean }
-const DEFCFG: Cfg = { nome: "", tagline: "", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, camere: true, recensioni: true, mappa: true, contatti: true };
+interface Cfg { nome: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; chisiamo: boolean; camere: boolean; servizi: boolean; info: boolean; galleria: boolean; offerte: boolean; newsletter: boolean; recensioni: boolean; mappa: boolean; contatti: boolean }
+const DEFCFG: Cfg = { nome: "", tagline: "", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, chisiamo: true, camere: true, servizi: true, info: true, galleria: true, offerte: true, newsletter: true, recensioni: true, mappa: true, contatti: true };
 
 
 
@@ -263,7 +263,7 @@ export function Site() {
 
       <div id="site-content" className="mx-auto max-w-7xl px-4">
         {/* Chi siamo */}
-        {structure?.description && (
+        {cfg.chisiamo && structure?.description && (
           <section className="mt-10">
             <h2 className="mb-3 font-display text-xl font-bold text-txt">{T("Chi siamo")}</h2>
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-dim">{structure.description}</p>
@@ -298,7 +298,7 @@ export function Site() {
         )}
 
         {/* Servizi struttura */}
-        {(structure?.services ?? []).length > 0 && (
+        {cfg.servizi && (structure?.services ?? []).length > 0 && (
           <section className="mt-10">
             <h2 className="mb-3 font-display text-xl font-bold text-txt">{T("Servizi")}</h2>
             <div className="flex flex-wrap gap-2">{(structure?.services ?? []).map((s) => <span key={s} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-sm text-dim"><span className="text-txt">{amenityIcon(s)}</span>{s}</span>)}</div>
@@ -306,7 +306,7 @@ export function Site() {
         )}
 
         {/* Informazioni utili */}
-        {structure && (() => {
+        {cfg.info && structure && (() => {
           const polLabel: Record<string, string> = { flessibile: "Gratuita fino a 1 giorno prima dell'arrivo", moderata: "Gratuita fino a 5 giorni prima dell'arrivo", rigida: "Gratuita fino a 14 giorni prima dell'arrivo" };
           const tax = structure.cityTax ? (structure.cityTaxMode === "percent" ? `${structure.cityTaxPercent ?? 0}% del soggiorno` : `${structure.cityTaxAmount ?? 2} € a persona/notte`) : "";
           const svc = (structure.services ?? []).map((s) => s.toLowerCase());
@@ -343,7 +343,7 @@ export function Site() {
         })()}
 
         {/* Galleria (carosello) */}
-        {gallery.length > 0 && (() => {
+        {cfg.galleria && gallery.length > 0 && (() => {
           const len = galItems.length || 1;
           const idx = gi % len;
           const cur = galItems[idx] ?? galItems[0];
@@ -388,7 +388,7 @@ export function Site() {
         })()}
 
         {/* Offerte attive */}
-        {offers.length > 0 && (
+        {cfg.offerte && offers.length > 0 && (
           <section className="mt-10">
             <h2 className="mb-3 font-display text-xl font-bold text-txt">{T("Offerte")}</h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -409,6 +409,7 @@ export function Site() {
 
         {/* Newsletter (sinistra) / Mappa (destra) */}
         <section className="mt-10 grid gap-3 sm:grid-cols-2">
+          {cfg.newsletter && (
           <div className="rounded-xl border border-line bg-surface p-4">
             <h3 className="font-display text-lg font-bold text-txt">{T("Iscriviti alla newsletter")}</h3>
             <p className="mt-1 text-sm text-dim">{T("Lascia i tuoi dati e ricevi in anteprima le nostre offerte e promozioni.")}</p>
@@ -424,6 +425,7 @@ export function Site() {
               </div>
             )}
           </div>
+          )}
           {cfg.mappa && (() => {
             const addr = [structure?.address, structure?.streetNumber].filter(Boolean).join(" ");
             const full = [addr, [structure?.postalCode, structure?.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
