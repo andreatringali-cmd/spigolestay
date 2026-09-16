@@ -10,6 +10,7 @@ import { downscaleImage } from "@/lib/images";
 import { AV_COLORS } from "@/lib/users";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useAccess } from "@/lib/access";
 import { amenityIcon } from "@/lib/amenities";
@@ -239,7 +240,7 @@ export default function CamerePage() {
                     </button>
                   );
                 })}
-                {types.length === 0 && <div className="w-full rounded-xl border border-dashed border-line p-4 text-sm text-faint">{t("Nessuna tipologia. Aggiungine una col pulsante “+ Tipologia”.")}</div>}
+                {types.length === 0 && <div className="w-full rounded-xl border border-dashed border-line"><EmptyState title={t("Nessuna tipologia. Aggiungine una col pulsante “+ Tipologia”.")} /></div>}
               </div>
 
               {/* Filtri camere: riquadro con ricerca a sinistra e azioni a destra */}
@@ -257,7 +258,7 @@ export default function CamerePage() {
               {/* Camere — un box separato per ogni tipologia */}
               <SectionTitle>{t("Camere")}</SectionTitle>
               {sUnits.length === 0 ? (
-                <div className="mt-2 rounded-xl border border-dashed border-line p-4 text-sm text-faint">{t("Nessuna camera. Aggiungine una col pulsante “+ Camera”.")}</div>
+                <div className="mt-2 rounded-xl border border-dashed border-line"><EmptyState title={t("Nessuna camera. Aggiungine una col pulsante “+ Camera”.")} /></div>
               ) : (
                 <div className="mt-2 flex flex-col gap-4">
                   {types.map((rt, i) => {

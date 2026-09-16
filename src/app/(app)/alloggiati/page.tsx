@@ -6,6 +6,7 @@ import { nights, parseISO, toISO } from "@/lib/dates";
 import { DOC_TYPES } from "@/lib/types";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card } from "@/components/ui";
+import EmptyState from "@/components/EmptyState";
 
 type Co = NonNullable<import("@/lib/types").Booking["extraGuests"]>[number];
 
@@ -132,7 +133,7 @@ export default function AlloggiatiPage() {
       </Card>
 
       {arrivals.length === 0 ? (
-        <Card><div className="py-8 text-center text-sm text-faint">{t("Nessun arrivo nel periodo selezionato.")}</div></Card>
+        <Card><EmptyState title={t("Nessun arrivo nel periodo selezionato.")} /></Card>
       ) : (
         <div className="flex flex-col gap-3">
           {arrivals.map((b) => {

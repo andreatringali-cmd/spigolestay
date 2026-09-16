@@ -6,6 +6,7 @@ import { useData } from "@/lib/store";
 import { AV_COLORS, initials } from "@/lib/users";
 import { useLang } from "@/lib/i18n";
 import { PageHeader } from "@/components/ui";
+import EmptyState from "@/components/EmptyState";
 import { nights, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { CHANNELS, type Channel } from "@/lib/types";
@@ -154,7 +155,7 @@ export default function OspitiPage() {
                 </button>
               </div>
             ))}
-            {list.length === 0 && <div className="rounded-xl border border-line bg-surface p-6 text-center text-sm text-faint">{empty}</div>}
+            {list.length === 0 && <div className="rounded-xl border border-line bg-surface"><EmptyState title={empty} /></div>}
           </div>
         </div>
 
@@ -202,7 +203,7 @@ export default function OspitiPage() {
                   <td className="whitespace-nowrap px-3 py-2 text-right text-faint">›</td>
                 </tr>
               ))}
-              {list.length === 0 && <tr><td colSpan={lead ? 6 : 13} className="px-3 py-8 text-center text-sm text-faint">{empty}</td></tr>}
+              {list.length === 0 && <tr><td colSpan={lead ? 6 : 13}><EmptyState title={empty} /></td></tr>}
             </tbody>
           </table>
           </div>

@@ -6,6 +6,7 @@ import { useData } from "@/lib/store";
 import { AV_COLORS } from "@/lib/users";
 import { useLang } from "@/lib/i18n";
 import { PageHeader } from "@/components/ui";
+import EmptyState from "@/components/EmptyState";
 import { planStructureLimit, planName } from "@/lib/plan";
 
 export default function StrutturePage() {
@@ -103,7 +104,7 @@ export default function StrutturePage() {
                   <td colSpan={10} className="px-3 py-2 text-[13px] font-bold tracking-tight text-txt">{g.title} <span className="font-normal text-faint">· {g.list.length}</span></td>
                 </tr>
                 {g.list.length === 0
-                  ? <tr className="border-b border-line last:border-0"><td colSpan={10} className="px-3 py-4 text-sm text-dim">{g.empty}</td></tr>
+                  ? <tr className="border-b border-line last:border-0"><td colSpan={10}><EmptyState title={g.empty} /></td></tr>
                   : g.list.map((s) => renderRow(s))}
               </Fragment>
             ))}

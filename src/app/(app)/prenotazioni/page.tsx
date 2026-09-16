@@ -10,6 +10,7 @@ import { eur } from "@/lib/format";
 import { bookingGrandTotal } from "@/lib/booking";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import EmptyState from "@/components/EmptyState";
 import ScrollStrip from "@/components/ScrollStrip";
 import Donut from "@/components/Donut";
 import ChannelBars from "@/components/ChannelBars";
@@ -393,7 +394,7 @@ export default function PrenotazioniPage() {
             </button>
           );
         })}
-        {!filtered.length && <div className="rounded-xl border border-line bg-surface p-6 text-center text-sm text-faint">{t("Nessuna prenotazione con questi filtri")}</div>}
+        {!filtered.length && <div className="rounded-xl border border-line bg-surface"><EmptyState title={t("Nessuna prenotazione con questi filtri")} /></div>}
       </div>
 
       {/* Tabella (tablet/desktop) */}
@@ -454,7 +455,7 @@ export default function PrenotazioniPage() {
               );
             })}
             {!filtered.length && (
-              <tr><td colSpan={activeStructureId === "all" ? 14 : 13} className="px-3 py-8 text-center text-sm text-faint">{t("Nessuna prenotazione con questi filtri")}</td></tr>
+              <tr><td colSpan={activeStructureId === "all" ? 14 : 13}><EmptyState title={t("Nessuna prenotazione con questi filtri")} /></td></tr>
             )}
           </tbody>
           {filtered.length > 0 && (

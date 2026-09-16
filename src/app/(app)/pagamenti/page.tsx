@@ -6,6 +6,7 @@ import { nights, parseISO, toISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, Card } from "@/components/ui";
+import EmptyState from "@/components/EmptyState";
 import ExportMenu from "@/components/ExportMenu";
 import { useLang } from "@/lib/i18n";
 
@@ -128,7 +129,7 @@ export default function PagamentiPage() {
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-sm text-faint">{t("Nessun pagamento con questi filtri.")}</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={8}><EmptyState title={t("Nessun pagamento con questi filtri.")} /></td></tr>}
           </tbody>
         </table>
       </div>

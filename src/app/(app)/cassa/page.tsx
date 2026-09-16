@@ -5,6 +5,7 @@ import { useData } from "@/lib/store";
 import { CHANNELS } from "@/lib/types";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import EmptyState from "@/components/EmptyState";
 import ExportMenu from "@/components/ExportMenu";
 import { exportExcel, exportPdf } from "@/lib/export";
 import CatIcon, { ICON_KEYS } from "@/components/CatIcon";
@@ -498,7 +499,7 @@ export default function CassaPage() {
         <div className="flex flex-col gap-4 lg:col-span-2">
           <Card>
             <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Movimenti")}</SectionTitle><span className="text-xs text-faint">{rows.length} {t("nel periodo")}</span></div>
-            {rows.length === 0 ? <p className="text-sm text-faint">{t("Nessun movimento.")}</p> : (
+            {rows.length === 0 ? <EmptyState title={t("Nessun movimento.")} /> : (
               <div className="-mx-1 max-h-[640px] overflow-y-auto px-1">
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {rows.map((m) => {
