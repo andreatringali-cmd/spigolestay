@@ -154,7 +154,6 @@ export default function SitoPage() {
               <label className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-focus hover:bg-wash">{c.heroBg ? t("Cambia foto") : t("Carica foto")}<input type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (f) { try { set({ heroBg: await downscaleImage(f, 1600, 0.72) }); } catch {} } e.target.value = ""; }} /></label>
               {c.heroBg && <button onClick={() => set({ heroBg: "" })} className="text-xs font-medium text-faint hover:text-[color:var(--err)]">{t("Rimuovi")}</button>}
             </div>
-            <p className="mt-1 text-[11px] text-faint">{t("Se non carichi una foto, la copertina usa il colore scelto.")}</p>
           </Card>
           <Card>
             <SectionTitle>{t("Sezioni")}</SectionTitle>
