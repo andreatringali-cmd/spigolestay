@@ -20,7 +20,7 @@ const KEY = "spigolestay:sito";
 
 export default function SitoPage() {
   const { t } = useLang();
-  const { structures, activeStructureId } = useData();
+  const { structures, roomTypes, units, activeStructureId } = useData();
   const [c, setC] = useState<Cfg>(DEF);
   const [sid, setSid] = useState("");
   useEffect(() => { try { const r = localStorage.getItem(KEY); if (r) setC({ ...DEF, ...JSON.parse(r) }); } catch {} }, []);
@@ -165,10 +165,20 @@ export default function SitoPage() {
               </div>
             )}
             <div className="flex flex-col divide-y divide-[color:var(--line)] bg-surface">
-              {c.camere && <div className="px-4 py-3 text-sm text-txt">{t("Camere e prezzi")} <span className="text-faint">· {t("da")} {structures.length} {structures.length === 1 ? t("struttura") : t("strutture")}, {t("sincronizzate col calendario")}</span></div>}
-              {c.recensioni && <div className="px-4 py-3 text-sm text-txt">{t("Recensioni")} <span className="text-faint">· ★ 9,4 · 128 {t("giudizi")}</span></div>}
-              {c.mappa && <div className="px-4 py-3 text-sm text-txt">{t("Mappa e dintorni")} <span className="text-faint">· Ortigia, Siracusa</span></div>}
-              {c.contatti && <div className="px-4 py-3 text-sm text-txt">{t("Contatti")} <span className="text-faint">· {t("WhatsApp, email, telefono")}</span></div>}
+              {(() => {
+                const nTypes = roomTypes.filter((rt) => rt.structureId === sid && !rt.deriveFrom).length;
+                const nUnits = units.filter((u) => u.structureId === sid).length;
+                const contatti = [struct?.whatsapp && "WhatsApp", struct?.email && "email", struct?.phone && t("telefono")].filter(Boolean).join(", ");
+                const luogo = [struct?.city, [struct?.address, struct?.streetNumber].filter(Boolean).join(" ")].filter(Boolean).join(" · ");
+                return (
+                  <>
+                    {c.camere && <div className="px-4 py-3 text-sm text-txt">{t("Camere e prezzi")} <span className="text-faint">· {nTypes} {nTypes === 1 ? t("tipologia") : t("tipologie")}, {nUnits} {nUnits === 1 ? t("camera") : t("camere")} {t("sincronizzate col calendario")}</span></div>}
+                    {c.recensioni && <div className="px-4 py-3 text-sm text-txt">{t("Recensioni")} <span className="text-faint">· {c.googleUrl ? t("recensioni da Google") : t("recensioni degli ospiti")}</span></div>}
+                    {c.mappa && <div className="px-4 py-3 text-sm text-txt">{t("Mappa e dintorni")} <span className="text-faint">· {luogo || t("aggiungi indirizzo nella scheda struttura")}</span></div>}
+                    {c.contatti && <div className="px-4 py-3 text-sm text-txt">{t("Contatti")} <span className="text-faint">· {contatti || t("aggiungi i contatti nella scheda struttura")}</span></div>}
+                  </>
+                );
+              })()}
             </div>
           </div>
           <p className="mt-3 text-xs text-faint">{t("Il motore di prenotazione è lo stesso del")} <Link href="/widget" className="font-medium text-focus hover:underline">{t("Widget sito")}</Link>: {t("ogni prenotazione entra diretta nel calendario, senza commissioni.")}</p>
