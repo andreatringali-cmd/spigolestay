@@ -201,9 +201,11 @@ export const DEFAULT_USERS: User[] = [
   { id: "u-maria", active: true, username: "maria", twoFactor: true, twoFactorMethod: "sms", firstName: "Maria", lastName: "Russo", email: "maria.pulizie@example.com", phone: "+39 340 118 7742", language: "it", avatarColor: "#C08A3A", managerCheckin: false, managerCheckout: false, managerHousekeeping: true, allStructures: false, structureIds: ["st_cpa", "st_cpd"], templateKey: "housekeeping", perms: PERM_TEMPLATES.find((t) => t.key === "housekeeping")!.perms(), notify: defaultNotify(), workDays: ["Lun", "Mer", "Ven", "Sab", "Dom"], workFrom: "09:00", workTo: "13:00", payType: "hourly", payAmount: 12, payToCassa: false, guestLangs: ["it"], status: "Attivo", createdAt: "2025-09-15" },
 ];
 
+// Utenti demo di esempio (prototipo) da NON mostrare: Greta Bianchi, Maria Russo.
+const DEMO_USER_IDS = new Set(["u-greta", "u-maria"]);
 export function loadUsers(): User[] {
-  try { const r = localStorage.getItem(USERS_KEY); if (r) { const list = JSON.parse(r); if (Array.isArray(list) && list.length) return list; } } catch {}
-  return DEFAULT_USERS;
+  try { const r = localStorage.getItem(USERS_KEY); if (r) { const list = JSON.parse(r); if (Array.isArray(list) && list.length) return (list as User[]).filter((u) => !DEMO_USER_IDS.has(u.id)); } } catch {}
+  return DEFAULT_USERS.filter((u) => !DEMO_USER_IDS.has(u.id));
 }
 export function saveUsers(list: User[]) { try { localStorage.setItem(USERS_KEY, JSON.stringify(list)); } catch {} }
 export function newUserId() { return typeof crypto !== "undefined" && "randomUUID" in crypto ? `u-${crypto.randomUUID().slice(0, 8)}` : `u-${Math.floor(performance.now() * 1000)}`; }
