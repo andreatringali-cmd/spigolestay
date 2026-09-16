@@ -9,6 +9,7 @@ export interface NavItem {
 
 export const NAV: NavItem[] = [
   { label: "Dashboard", href: "/", group: "", icon: "grid" },
+  { label: "Adempimenti oggi", href: "/adempimenti", group: "", icon: "clipboard", perm: "prenotazioni", module: "pms" },
   { label: "Prenotazioni", href: "/prenotazioni", group: "", icon: "clipboard", perm: "prenotazioni", module: "pms" },
 
   // Operatività: la gestione quotidiana della struttura (incl. i messaggi agli ospiti).
