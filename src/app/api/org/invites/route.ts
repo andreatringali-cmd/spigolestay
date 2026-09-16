@@ -26,7 +26,7 @@ export async function GET(req: Request) {
 
     // Inviti mandati dal chiamante per questa struttura (più recenti prima).
     const { data, error } = await admin.from("org_invites")
-      .select("email, status, created_at, accepted_at")
+      .select("code, email, status, created_at, accepted_at")
       .eq("structure_id", structureId)
       .eq("invited_by", caller.id)
       .order("created_at", { ascending: false });

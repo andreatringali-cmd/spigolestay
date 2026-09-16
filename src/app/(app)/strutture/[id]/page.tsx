@@ -76,7 +76,17 @@ export default function StrutturaSchedaPage() {
   };
   // Gestione condivisa: invita un socio a co-gestire questa struttura.
   const [socio, setSocio] = useState<{ email: string; loading?: boolean; ok?: boolean; msg?: string }>({ email: "" });
-  const [invites, setInvites] = useState<{ email: string; status: string; created_at: string; accepted_at?: string | null }[]>([]);
+  const [invites, setInvites] = useState<{ code: string; email: string; status: string; created_at: string; accepted_at?: string | null }[]>([]);
+  const revokeInvite = async (code: string) => {
+    if (!supabase) return;
+    if (!confirm(t("Eliminare questo invito in attesa?"))) return;
+    try {
+      const token = (await supabase.auth.getSession())?.data.session?.access_token;
+      if (!token) return;
+      const r = await fetch("/api/org/invite/revoke", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ code }) });
+      if (r.ok) loadInvites();
+    } catch {}
+  };
   const loadInvites = async () => {
     if (isNew || !supabase) return;
     try {
@@ -551,17 +561,24 @@ export default function StrutturaSchedaPage() {
                 <div className="mt-3 border-t border-line pt-3">
                   <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Inviti")}</div>
                   <div className="flex flex-col gap-1.5">
-                    {invites.map((iv, i) => (
-                      <div key={i} className="flex items-center justify-between gap-2 rounded-lg border border-line bg-paper px-3 py-2">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm text-txt">{iv.email}</div>
-                          <div className="text-[11px] text-faint">{new Date(iv.created_at).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}</div>
+                    {invites.map((iv) => {
+                      const days = Math.floor((Date.now() - new Date(iv.created_at).getTime()) / 86400000);
+                      const pending = iv.status !== "accepted";
+                      return (
+                        <div key={iv.code} className="flex items-center justify-between gap-2 rounded-lg border border-line bg-paper px-3 py-2">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm text-txt">{iv.email}</div>
+                            <div className="text-[11px] text-faint">{new Date(iv.created_at).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}{pending ? ` · ${days === 0 ? t("oggi") : `${days} ${t("giorni fa")}`}` : ""}</div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            {iv.status === "accepted"
+                              ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)", color: "var(--ok)" }}>{t("Accettato")}</span>
+                              : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${days >= 3 ? "var(--err)" : "var(--warn)"} 15%, transparent)`, color: days >= 3 ? "var(--err)" : "var(--warn)" }}>{t("In attesa")}</span>}
+                            {pending && <button onClick={() => revokeInvite(iv.code)} title={t("Elimina invito")} className="text-faint hover:text-[color:var(--err)]">✕</button>}
+                          </div>
                         </div>
-                        {iv.status === "accepted"
-                          ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)", color: "var(--ok)" }}>{t("Accettato")}</span>
-                          : <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 15%, transparent)", color: "var(--warn)" }}>{t("In attesa")}</span>}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
