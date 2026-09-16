@@ -124,7 +124,7 @@ export default function SitoPage() {
 
   return (
     <div>
-      <PageHeader title="Xenosite" subtitle={t("Il tuo mini-sito con motore di prenotazione integrato")} actions={<button onClick={openPreview} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Anteprima")} ↗</button>} />
+      <PageHeader title="Xenosite" subtitle={t("Il tuo mini-sito con motore di prenotazione integrato")} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
@@ -212,15 +212,14 @@ export default function SitoPage() {
                 <span className="whitespace-nowrap pl-3 text-sm text-faint">{PUBLIC_HOST}/</span>
                 <input value={slug} onChange={(e) => setSlug(cleanSlug(e.target.value))} placeholder="nome-struttura" className="min-w-0 flex-1 bg-transparent py-2 pr-3 text-sm font-semibold text-txt outline-none" />
               </div>
+              <button onClick={() => { const url = publishedSlug ? `${publicBase}/${publishedSlug}` : publicUrl; if (url) { navigator.clipboard?.writeText(url); setPubCopied(true); window.setTimeout(() => setPubCopied(false), 1500); } }} disabled={!slug} className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{pubCopied ? t("Copiato ✓") : t("Copia")}</button>
               <button onClick={publish} disabled={pubBusy || !slug} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{pubBusy ? t("Pubblico…") : publishedSlug ? (isDirtySlug ? t("Cambia indirizzo") : t("Aggiorna")) : t("Pubblica")}</button>
             </div>
-            {publishedSlug && (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <a href={`${publicBase}/${publishedSlug}`} target="_blank" rel="noreferrer" className="text-sm font-semibold text-focus hover:underline">{PUBLIC_HOST}/{publishedSlug} ↗</a>
-                <button onClick={() => { navigator.clipboard?.writeText(`${publicBase}/${publishedSlug}`); setPubCopied(true); window.setTimeout(() => setPubCopied(false), 1500); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">{pubCopied ? t("Copiato ✓") : t("Copia link")}</button>
-                <button onClick={unpublish} disabled={pubBusy} className="rounded-lg px-2.5 py-1 text-xs font-semibold text-faint hover:text-[color:var(--err)] disabled:opacity-50">{t("Rimuovi dal pubblico")}</button>
-              </div>
-            )}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button onClick={openPreview} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{t("Anteprima")} ↗</button>
+              {publishedSlug && <a href={`${publicBase}/${publishedSlug}`} target="_blank" rel="noreferrer" className="text-sm font-semibold text-focus hover:underline">{PUBLIC_HOST}/{publishedSlug} ↗</a>}
+              {publishedSlug && <button onClick={unpublish} disabled={pubBusy} className="ml-auto rounded-lg px-2.5 py-1 text-xs font-semibold text-faint hover:text-[color:var(--err)] disabled:opacity-50">{t("Rimuovi dal pubblico")}</button>}
+            </div>
             {pubMsg && <p className="mt-2 text-[12px] font-medium text-dim">{pubMsg}</p>}
             {publishedSlug && <p className="mt-1 text-[11px] text-faint">{t("Dopo ogni modifica ai contenuti o alle camere, premi «Aggiorna» per aggiornare il sito online.")}</p>}
           </div>

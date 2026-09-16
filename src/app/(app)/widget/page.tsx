@@ -138,23 +138,21 @@ export default function WidgetPage() {
             <div className="py-10 text-center text-sm text-faint">{t("Nessun widget. Creane uno con “+ Crea un nuovo widget”.")}</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-sm">
+              <table className="w-full min-w-[680px] text-sm">
                 <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
-                  <th className="py-2 pr-3 font-semibold">{t("Nome")}</th><th className="py-2 pr-3 font-semibold">{t("Struttura")}</th><th className="py-2 pr-3 font-semibold">{t("Tema")}</th><th className="py-2 pr-3 font-semibold">Layout</th><th className="py-2 text-right font-semibold"></th>
+                  <th className="py-2 pr-3 font-semibold">{t("Nome")}</th><th className="py-2 pr-3 font-semibold">{t("Struttura")}</th><th className="py-2 pr-3 font-semibold">{t("Tema")}</th><th className="py-2 pr-3 font-semibold">Layout</th><th className="py-2 pr-3 font-semibold">{t("Colore")}</th><th className="py-2 pr-3 font-semibold">Font</th><th className="py-2 pr-3 font-semibold">{t("Lingua")}</th><th className="py-2 text-right font-semibold"></th>
                 </tr></thead>
                 <tbody>
                   {widgets.map((w) => (
-                    <tr key={w.id} className="border-b border-line">
+                    <tr key={w.id} onClick={() => setEditingId(w.id)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                       <td className="py-2.5 pr-3 font-medium text-txt">{w.name || "—"}</td>
                       <td className="py-2.5 pr-3 text-dim">{structures.find((s) => s.id === w.structureId)?.name ?? "—"}</td>
                       <td className="py-2.5 pr-3 text-dim">{t(THEME_LABEL(w.theme))}</td>
                       <td className="py-2.5 pr-3 text-dim">{t(LAYOUT_LABEL(w.layout))}</td>
-                      <td className="py-2.5 text-right">
-                        <div className="flex justify-end gap-1.5">
-                          <button onClick={() => setEditingId(w.id)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{t("Modifica")}</button>
-                          <button onClick={() => deleteWidget(w.id)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>
-                        </div>
-                      </td>
+                      <td className="py-2.5 pr-3"><span className="inline-flex items-center gap-1.5 text-dim"><span className="h-4 w-4 shrink-0 rounded-full border border-line" style={{ backgroundColor: w.accent }} /><span className="font-mono text-xs">{w.accent}</span></span></td>
+                      <td className="py-2.5 pr-3 text-dim">{w.font === "system" ? t("Sistema") : w.font.replace(/['"]/g, "").split(",")[0]}</td>
+                      <td className="py-2.5 pr-3 text-dim uppercase">{w.lang}</td>
+                      <td className="py-2.5 text-right text-faint">›</td>
                     </tr>
                   ))}
                 </tbody>
@@ -194,7 +192,7 @@ export default function WidgetPage() {
   return (
     <div>
       <PageHeader title={c.name || t("Widget")} subtitle={t("Configura il widget; le prenotazioni entrano dirette nel calendario")}
-        actions={<div className="flex items-center gap-2"><button onClick={() => setEditingId(null)} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← {t("Torna alla lista")}</button><button onClick={() => setEditingId(null)} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">💾 {t("Salva")}</button></div>} />
+        actions={<div className="flex items-center gap-2"><button onClick={() => setEditingId(null)} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← {t("Torna alla lista")}</button><button onClick={() => { if (c && confirm(t("Eliminare questo widget?"))) { deleteWidget(c.id); setEditingId(null); } }} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button><button onClick={() => setEditingId(null)} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">💾 {t("Salva")}</button></div>} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
