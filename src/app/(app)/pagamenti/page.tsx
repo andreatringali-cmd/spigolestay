@@ -82,15 +82,17 @@ export default function PagamentiPage() {
         </button>
       </div>
 
-      {/* Filtri */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
-        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca ospite o codice…")} />
-        <div className="flex items-center rounded-lg border border-line p-0.5">
-          {([["due", "Con saldo"], ["overdue", "Scaduti"], ["all", "Tutti"]] as const).map(([k, l]) => (
-            <button key={k} onClick={() => setFilter(k)} className={`rounded-md px-3 py-1.5 text-xs font-medium ${filter === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t(l)}</button>
-          ))}
+      {/* Stessa griglia dei KPI sopra: ricerca larga quanto una card e allineata. */}
+      <div className="mb-4 grid grid-cols-2 items-center gap-3 lg:grid-cols-4">
+        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca ospite o codice…")} className="col-span-2 w-full lg:col-span-1" />
+        <div className="col-span-2 flex flex-wrap items-center gap-2 lg:col-span-3">
+          <div className="flex items-center rounded-lg border border-line p-0.5">
+            {([["due", "Con saldo"], ["overdue", "Scaduti"], ["all", "Tutti"]] as const).map(([k, l]) => (
+              <button key={k} onClick={() => setFilter(k)} className={`rounded-md px-3 py-1.5 text-xs font-medium ${filter === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t(l)}</button>
+            ))}
+          </div>
+          <span className="ml-auto text-xs text-faint">{rows.length} {t("prenotazioni")}</span>
         </div>
-        <span className="ml-auto text-xs text-faint">{rows.length} {t("prenotazioni")}</span>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">

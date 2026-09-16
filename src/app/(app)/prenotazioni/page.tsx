@@ -309,8 +309,11 @@ export default function PrenotazioniPage() {
       )}
 
       {/* Filtri */}
-      <div className="no-print mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3">
-        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca nome o codice…")} />
+      {/* Stessa griglia dei KPI sopra: la ricerca è la 1ª cella (= larga quanto una card e allineata),
+          gli altri filtri occupano le colonne restanti. */}
+      <div className="no-print mb-4 grid items-center gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca nome o codice…")} className="w-full" />
+        <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
         <div className="flex items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
           <Select value={dateField} onChange={(v) => setDateField(v as "arrivo" | "prenotazione")} label={t("Tipo data")}>
             <option value="arrivo">{t("Arrivo / check-in")}</option>
@@ -330,6 +333,7 @@ export default function PrenotazioniPage() {
           <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${shownCharts.length > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
           <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
           <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
+        </div>
         </div>
       </div>
 
