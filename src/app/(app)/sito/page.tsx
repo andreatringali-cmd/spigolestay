@@ -139,7 +139,13 @@ export default function SitoPage() {
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Sottotitolo")}</span><input value={c.tagline} onChange={(e) => set({ tagline: e.target.value })} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Link recensioni Google")} <span className="text-faint">({t("opzionale")})</span></span><input value={c.googleUrl ?? ""} onChange={(e) => set({ googleUrl: e.target.value })} placeholder="https://g.page/…/review" className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             <div className="mb-1 text-xs text-dim">{t("Colore")}</div>
-            <div className="flex gap-2">{["#4F46E5", "#0E9F6E", "#BE5D38", "#2563EB", "#DB2777", "#0891B2"].map((col) => <button key={col} onClick={() => set({ accent: col })} className={`h-7 w-7 rounded-full border-2 ${c.accent === col ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: col }} />)}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              {["#4F46E5", "#7C3AED", "#9333EA", "#DB2777", "#E11D48", "#DC2626", "#EA580C", "#BE5D38", "#CA8A04", "#0E9F6E", "#16A34A", "#65A30D", "#0F766E", "#0891B2", "#2563EB", "#1E3A8A", "#475569", "#111827"].map((col) => <button key={col} onClick={() => set({ accent: col })} title={col} className={`h-7 w-7 rounded-full border-2 ${c.accent === col ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: col }} />)}
+              <label className="relative grid h-7 w-7 cursor-pointer place-items-center overflow-hidden rounded-full border-2 border-dashed border-line text-[13px] text-dim hover:border-focus" title={t("Colore personalizzato")}>
+                +
+                <input type="color" value={c.accent} onChange={(e) => set({ accent: e.target.value })} className="absolute inset-0 cursor-pointer opacity-0" />
+              </label>
+            </div>
             <div className="mb-1 mt-4 text-xs text-dim">{t("Sfondo copertina")}</div>
             <div className="flex items-center gap-2">
               {c.heroBg
