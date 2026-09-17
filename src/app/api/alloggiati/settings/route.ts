@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
-import { encryptCred } from "@/lib/crypto-creds";
+import { encryptCred, decryptCred } from "@/lib/crypto-creds";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +16,12 @@ export async function POST(req: Request) {
     const b = await req.json().catch(() => ({}));
     const structureId = String(b?.structureId || "").trim();
     if (!structureId) return NextResponse.json({ error: "missing_structure" }, { status: 400 });
+
+    // Mostra le credenziali al proprietario autenticato (reveal), decifrate lato server.
+    if (b?.action === "reveal") {
+      const { data } = await auth.admin.from("alloggiati_settings").select("username, password_enc, ws_code_enc").eq("tenant_id", auth.tenantId).eq("structure_id", structureId).maybeSingle();
+      return NextResponse.json({ ok: true, username: data?.username ?? "", password: decryptCred(data?.password_enc), wsCode: decryptCred(data?.ws_code_enc) });
+    }
 
     // PK = (tenant_id, structure_id): niente colonna id. Upsert su quel conflitto.
     const { data: existing } = await auth.admin.from("alloggiati_settings").select("password_enc, ws_code_enc").eq("tenant_id", auth.tenantId).eq("structure_id", structureId).maybeSingle();

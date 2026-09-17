@@ -26,6 +26,7 @@ export default function AlloggiatiWebPage() {
   const [ws, setWs] = useState("");
   const [hasPw, setHasPw] = useState(false);
   const [hasWs, setHasWs] = useState(false);
+  const [shown, setShown] = useState(false); // "Mostra credenziali": recupera i valori in chiaro (solo per il proprietario)
   const [ricDate, setRicDate] = useState("");
 
   useEffect(() => {
@@ -60,6 +61,15 @@ export default function AlloggiatiWebPage() {
     try { const r = await apiPost<{ message?: string; count?: number; sent?: number }>(`alloggiati/${path}`, { structureId: sid, ...body }); setMsg(r.message || `OK${r.count != null ? ` (${r.count})` : ""}${r.sent != null ? ` — inviate ${r.sent}` : ""}`); await load(); }
     catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
   };
+  // Mostra/nascondi le credenziali salvate (decifrate lato server, solo proprietario).
+  const toggleShow = async () => {
+    if (shown) { setShown(false); setPw(""); setWs(""); return; }
+    try {
+      const r = await apiPost<{ password?: string; wsCode?: string }>("alloggiati/settings", { structureId: sid, action: "reveal" });
+      setPw(r.password ?? ""); setWs(r.wsCode ?? ""); setShown(true);
+    } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); }
+  };
+
   // Scarica la ricevuta PDF di una data (integrazione reale attiva).
   const getRicevuta = async () => {
     if (!ricDate) { setMsg("Scegli una data per la ricevuta."); return; }
@@ -90,15 +100,15 @@ export default function AlloggiatiWebPage() {
         <Card>
           <SectionTitle>Impostazioni account</SectionTitle>
           <div className="mt-2">
-            <div className="mb-2 text-xs font-semibold text-focus">Credenziali e opzioni</div>
           <div className="space-y-2">
-            <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa ospiti (capofamiglia + membri)</span><input type="checkbox" checked={s.group_guests} onChange={(e) => set({ group_guests: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
-            <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa per camera</span><input type="checkbox" checked={s.group_by_room} onChange={(e) => set({ group_by_room: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
             <label className="block"><span className={lbl}>Username (es. SR001860)</span><input value={s.username} onChange={(e) => set({ username: e.target.value })} className={inp} /></label>
-            <label className="block"><span className={lbl}>Password</span><input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder={hasPw ? "•••••••• (salvata — lascia vuoto per non cambiarla)" : ""} className={inp} /></label>
-            <label className="block"><span className={lbl}>Webservice Code</span><input value={ws} onChange={(e) => setWs(e.target.value)} placeholder={hasWs ? "•••••••• (salvato — lascia vuoto per non cambiarlo)" : ""} className={`${inp} font-mono text-[11px]`} /></label>
+            <label className="block"><span className={lbl}>Password {hasPw && <span className="ml-1 font-semibold" style={{ color: "var(--ok)" }}>✓ salvata</span>}</span><input type={shown ? "text" : "password"} value={pw} onChange={(e) => setPw(e.target.value)} placeholder={hasPw ? "••••••••  ·  lascia vuoto per non cambiarla" : "Inserisci la password"} className={inp} /></label>
+            <label className="block"><span className={lbl}>Webservice Code {hasWs && <span className="ml-1 font-semibold" style={{ color: "var(--ok)" }}>✓ salvato</span>}</span><input type={shown ? "text" : "password"} value={ws} onChange={(e) => setWs(e.target.value)} placeholder={hasWs ? "••••••••  ·  lascia vuoto per non cambiarlo" : "Incolla il Webservice Code"} className={`${inp} font-mono text-[11px]`} /></label>
+            {(hasPw || hasWs) && <button type="button" onClick={toggleShow} className="text-[11px] font-semibold text-focus hover:underline">{shown ? "🙈 Nascondi credenziali" : "👁 Mostra credenziali salvate"}</button>}
             <label className="block"><span className={lbl}>Scadenza Webservice Code</span><input type="date" value={s.ws_code_expires_at?.slice(0, 10) ?? ""} onChange={(e) => set({ ws_code_expires_at: e.target.value })} className={inp} />{wsExpSoon && <span className="mt-1 block text-[11px] font-semibold text-[color:var(--warn)]">⚠️ In scadenza: rigenera il codice sul portale Alloggiati.</span>}</label>
-            <label className="flex items-center justify-between pt-1"><span className="text-sm text-txt">Invio automatico giornaliero</span><input type="checkbox" checked={s.auto_daily} onChange={(e) => set({ auto_daily: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
+            <label className="flex items-center justify-between pt-1"><span className="text-sm text-txt">Raggruppa ospiti (capofamiglia + membri)</span><input type="checkbox" checked={s.group_guests} onChange={(e) => set({ group_guests: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
+            <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa per camera</span><input type="checkbox" checked={s.group_by_room} onChange={(e) => set({ group_by_room: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
+            <label className="flex items-center justify-between"><span className="text-sm text-txt">Invio automatico giornaliero</span><input type="checkbox" checked={s.auto_daily} onChange={(e) => set({ auto_daily: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
           </div>
           <p className="mt-2 text-[11px] text-faint">L'invio automatico avviene dopo la mezzanotte. Per rientrare nelle 24h di legge puoi forzare l'invio manualmente in qualsiasi momento.</p>
           </div>
@@ -108,9 +118,8 @@ export default function AlloggiatiWebPage() {
             <button onClick={() => call("tabelle", "tabelle")} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Scarica dal portale i codici ufficiali di comuni, stati e documenti">{busy === "tabelle" ? "Aggiorno…" : "Aggiorna tabelle codici"}</button>
           </div>
           <div className="mt-3 border-t border-line pt-3 text-sm">
-            <span className="text-dim">Stato connessione: </span>
+            <span className="text-dim">Stato connessione al portale Alloggiati: </span>
             {s.status === "attivata" ? <span className="font-semibold text-[color:var(--ok)]">✔ Attivata</span> : s.status === "errore" ? <span className="font-semibold text-[color:var(--err)]">✕ Errore</span> : <span className="text-faint">non verificata</span>}
-            {s.status_msg && <div className="text-[11px] text-faint">{s.status_msg}</div>}
           </div>
         </Card>
 
