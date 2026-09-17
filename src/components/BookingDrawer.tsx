@@ -9,6 +9,7 @@ import { sendVoucher } from "@/lib/mailer";
 import { buildGuestLink, buildGroupGuestLink, guideMessage, shortenGuideLink, shortenLink } from "@/lib/guestlink";
 import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
 import { nights, parseISO, shiftISO } from "@/lib/dates";
+import { cityTaxOf } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { invPost } from "@/lib/invoicing/client";
 import AdempimentiPanel from "@/components/booking/AdempimentiPanel";
@@ -39,15 +40,7 @@ const STATUS: Record<BookingStatus, { label: string; color: string }> = {
   no_show: { label: "No-show", color: "var(--faint)" },
 };
 
-// Tassa di soggiorno secondo le impostazioni struttura: fissa (€ a persona/notte, con tetto notti)
-// oppure in percentuale sul totale soggiorno. Default: 2 €/persona/notte, max 3 notti.
-const cityTaxOf = (structure: Structure | undefined, adults: number, n: number, accommodation: number, exempt?: boolean) => {
-  if (exempt || !structure?.cityTax) return 0;
-  if (structure.cityTaxMode === "percent") return Math.round((accommodation || 0) * (structure.cityTaxPercent ?? 0) / 100);
-  const rate = structure.cityTaxAmount ?? 2;
-  const maxN = structure.cityTaxMaxNights ?? 3;
-  return Math.round(adults * Math.min(n, maxN) * rate);
-};
+// Tassa di soggiorno: logica unica condivisa in @/lib/booking (cityTaxOf).
 
 interface Form {
   checkIn: string; checkOut: string;

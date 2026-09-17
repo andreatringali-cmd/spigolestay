@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { useData } from "@/lib/store";
 import { nights, parseISO, toISO, shiftISO } from "@/lib/dates";
+import { cityTaxOf } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { loadDeposit } from "@/lib/deposit";
 import { shortenLink } from "@/lib/guestlink";
@@ -223,9 +224,9 @@ export default function PreventiviPage() {
   const breakfastTotal = breakfast ? breakfastPrice * n : 0;
   const wantsCot = children > 0 && cot;
   const cotTotal = 0; // culla sempre gratuita
-  // Imposta di soggiorno Siracusa: 4% del pernottamento (tariffa più alta), max 5 € a persona/notte, max 7 notti, bambini sotto i 15 esenti.
-  const priceForTax = roomLines.reduce((m, l) => Math.max(m, l.price), 0);
-  const cityTax = Math.round(Math.min(priceForTax * 0.04, 5 * taxPersons) * Math.min(n, 7));
+  // Imposta di soggiorno: logica unica dalla config struttura (a Siracusa 4% del
+  // pernottamento, max 5€ a persona/notte, prime 7 notti). taxPersons esclude i minori esenti.
+  const cityTax = cityTaxOf(structures.find((s) => s.id === structureId), taxPersons, n, accommodation);
   const total = accommodation + parkingTotal + breakfastTotal + cotTotal + cityTax;
   const deposit = Math.round(total * acconto / 100);
   const balance = total - deposit;

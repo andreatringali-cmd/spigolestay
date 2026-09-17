@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useData } from "@/lib/store";
-import { nights, parseISO, toISO } from "@/lib/dates";
+import { parseISO, toISO } from "@/lib/dates";
+import { bookingGrandTotal } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, Card } from "@/components/ui";
@@ -13,14 +14,7 @@ import { useLang } from "@/lib/i18n";
 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" });
 
-// Totale a carico dell'ospite: soggiorno + pulizia + tassa di soggiorno.
-function totalOf(b: { total?: number; cleaningFee?: number; adults: number; cityTaxExempt?: boolean; checkIn: string; checkOut: string }) {
-  const n = nights(b.checkIn, b.checkOut);
-  const acc = b.total ?? 0;
-  const clean = b.cleaningFee ?? 35;
-  const tax = b.cityTaxExempt ? 0 : b.adults * Math.min(n, 3) * 2;
-  return acc + clean + tax;
-}
+// Totale a carico dell'ospite: logica unica in @/lib/booking (soggiorno + pulizia + extra + tassa).
 
 const STATUS: Record<string, { label: string; color: string }> = {
   saldato: { label: "Saldato", color: "var(--ok)" },
@@ -39,7 +33,7 @@ export default function PagamentiPage() {
 
   const scoped = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId));
   const enrich = scoped.map((b) => {
-    const due = totalOf(b);
+    const due = bookingGrandTotal(b, getStructure(b.structureId));
     const paid = Math.min(b.paid ?? 0, due);
     const balance = Math.max(0, due - paid);
     const overdue = balance > 0 && b.checkOut < todayISO;

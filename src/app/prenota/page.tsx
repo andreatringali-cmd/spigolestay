@@ -7,6 +7,7 @@ import { DEFAULT_EXTRAS } from "@/lib/types";
 import { getImages } from "@/lib/images";
 import { eur } from "@/lib/format";
 import { effectiveBase, effectiveClosed } from "@/lib/pricing";
+import { cityTaxOf } from "@/lib/booking";
 import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } from "@/lib/rate-plans";
 import { amenityIcon } from "@/lib/amenities";
 import { loadPromos } from "@/lib/promos";
@@ -115,13 +116,8 @@ function Engine() {
   const accommodation = selRt && selPlan ? stayPrice(selRt, selPlan) : 0;
   const extraPrice = (x: ExtraService) => x.per === "night" ? x.price * nights : x.per === "person" ? x.price * adults : x.price;
   const extrasTotal = extras.reduce((a, x) => a + (extraQty[x.id] ?? 0) * extraPrice(x), 0);
-  // Tassa di soggiorno: 0 finché non è selezionata una camera; poi fissa (€/persona/notte) o % del soggiorno.
-  const cityTaxNights = Math.min(nights, structure?.cityTaxMaxNights ?? 3);
-  const cityTax = (selRt && structure?.cityTax)
-    ? (structure.cityTaxMode === "percent"
-        ? Math.round(accommodation * (structure.cityTaxPercent ?? 0) / 100)
-        : (structure.cityTaxAmount ?? 2) * adults * cityTaxNights)
-    : 0;
+  // Tassa di soggiorno: 0 finché non è selezionata una camera; poi logica unica (@/lib/booking).
+  const cityTax = selRt ? cityTaxOf(structure, adults, nights, accommodation) : 0;
   const discount = appliedPromo ? Math.round(accommodation * appliedPromo.pct / 100) : 0;
   const total = accommodation + extrasTotal + cityTax - discount;
   const depositPct = selPlan ? planDepositPct(selPlan) : 0; // acconto secondo la politica di incasso del piano
@@ -466,7 +462,7 @@ function Engine() {
                 <div className="my-3 border-t border-line" />
                 <Line label={`${selRt.name} · ${selPlan.name}`} value={eur(accommodation)} />
                 {extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => <Line key={x.id} label={`${extraQty[x.id]}× ${x.name}`} value={eur((extraQty[x.id] ?? 0) * extraPrice(x))} sub />)}
-                {cityTax > 0 && <Line label={structure?.cityTaxMode === "percent" ? `Tassa di soggiorno (${structure.cityTaxPercent ?? 0}%)` : `Tassa di soggiorno (${adults}×${cityTaxNights})`} value={eur(cityTax)} sub />}
+                {cityTax > 0 && <Line label={structure?.cityTaxMode === "percent" ? `Tassa di soggiorno (${structure.cityTaxPercent ?? 0}%)` : `Tassa di soggiorno`} value={eur(cityTax)} sub />}
                 {discount > 0 && <div className="mt-1 flex items-baseline justify-between gap-3 text-xs" style={{ color: "var(--ok)" }}><span className="min-w-0">Sconto{appliedPromo?.code ? ` ${appliedPromo.code}` : ""} (−{appliedPromo?.pct}%)</span><span className="shrink-0 font-mono">−{eur(discount)}</span></div>}
                 <div className="my-2 border-t border-line" />
                 <div className="flex items-baseline justify-between"><span className="text-sm font-semibold text-txt">Totale</span><span className="font-mono text-xl font-bold text-txt">{eur(total)}</span></div>

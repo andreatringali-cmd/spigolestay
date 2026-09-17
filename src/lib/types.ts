@@ -73,10 +73,11 @@ export interface Structure {
   accessInfo?: string;     // istruzioni/codici accesso (sensibile)
   // Tassa di soggiorno
   cityTax?: boolean;
-  cityTaxMode?: "fixed" | "percent"; // fisso €/persona/notte oppure % del totale prenotazione
+  cityTaxMode?: "fixed" | "percent"; // fisso €/persona/notte oppure % del pernottamento
   cityTaxAmount?: number;  // € per persona a notte (modalità "fixed")
-  cityTaxPercent?: number; // % sul totale soggiorno (modalità "percent")
-  cityTaxMaxNights?: number;
+  cityTaxPercent?: number; // % del pernottamento per persona a notte (modalità "percent")
+  cityTaxCap?: number;     // tetto € per persona a notte (modalità "percent", es. Siracusa 5€)
+  cityTaxMaxNights?: number; // notti massime tassabili (es. Siracusa 7)
   cityTaxComune?: string;
   // Policy
   cancelPolicy?: "flessibile" | "moderata" | "rigida";

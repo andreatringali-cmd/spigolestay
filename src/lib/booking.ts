@@ -4,12 +4,26 @@
 import { nights } from "./dates";
 import type { Structure } from "./types";
 
+// Tassa di soggiorno. Due modalità:
+//  - "fixed":   € a persona per notte × persone × notti tassabili
+//  - "percent": % del pernottamento a persona per notte, con TETTO € a persona/notte
+//               (es. Siracusa: 4% del costo camera/ospite, max 5€ a persona/notte, prime 7 notti)
 export function cityTaxOf(structure: Structure | undefined, adults: number, n: number, accommodation: number, exempt?: boolean): number {
   if (exempt || !structure?.cityTax) return 0;
-  if (structure.cityTaxMode === "percent") return Math.round((accommodation || 0) * (structure.cityTaxPercent ?? 0) / 100);
+  const persons = Math.max(1, adults || 0);
+  const nightsTot = Math.max(0, n || 0);
+  const maxN = structure.cityTaxMaxNights ?? (structure.cityTaxMode === "percent" ? 7 : 3);
+  const taxedNights = Math.min(nightsTot, maxN);
+  if (taxedNights <= 0) return 0;
+  if (structure.cityTaxMode === "percent") {
+    const roomPerNight = nightsTot > 0 ? (accommodation || 0) / nightsTot : (accommodation || 0);
+    const perPersonNight = (roomPerNight / persons) * ((structure.cityTaxPercent ?? 0) / 100);
+    const cap = structure.cityTaxCap ?? 0;
+    const capped = cap > 0 ? Math.min(perPersonNight, cap) : perPersonNight;
+    return Math.round(capped * persons * taxedNights);
+  }
   const rate = structure.cityTaxAmount ?? 2;
-  const maxN = structure.cityTaxMaxNights ?? 3;
-  return Math.round(adults * Math.min(n, maxN) * rate);
+  return Math.round(persons * taxedNights * rate);
 }
 
 type BookingLike = {

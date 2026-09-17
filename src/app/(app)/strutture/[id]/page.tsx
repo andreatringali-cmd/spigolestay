@@ -34,7 +34,7 @@ function Info({ children }: { children: React.ReactNode }) {
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
 
-const blankStructure = (): Structure => ({ id: "", name: "", groupName: "", city: "Siracusa", province: "SR", region: "Sicilia", country: "Italia", active: true, type: "B&B", photoColor: AV_COLORS[1], services: [], payMethods: ["Contanti", "Carta / POS"], currency: "EUR", language: "it", cancelPolicy: "moderata", checkInFrom: "15:00", checkInTo: "20:00", checkOutBy: "10:30", cityTax: true, cityTaxAmount: 2, cityTaxMaxNights: 4, cityTaxComune: "Siracusa" });
+const blankStructure = (): Structure => ({ id: "", name: "", groupName: "", city: "Siracusa", province: "SR", region: "Sicilia", country: "Italia", active: true, type: "B&B", photoColor: AV_COLORS[1], services: [], payMethods: ["Contanti", "Carta / POS"], currency: "EUR", language: "it", cancelPolicy: "moderata", checkInFrom: "15:00", checkInTo: "20:00", checkOutBy: "10:30", cityTax: true, cityTaxMode: "percent", cityTaxPercent: 4, cityTaxCap: 5, cityTaxAmount: 2, cityTaxMaxNights: 7, cityTaxComune: "Siracusa" });
 
 export default function StrutturaSchedaPage() {
   const router = useRouter();
@@ -444,13 +444,18 @@ export default function StrutturaSchedaPage() {
                 <>
                   <div className="mb-3 inline-flex rounded-lg border border-line bg-paper p-0.5 text-xs font-semibold">
                     <button type="button" onClick={() => set("cityTaxMode", "fixed")} className={`rounded-md px-3 py-1.5 transition ${mode === "fixed" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Fisso (€ persona/notte)")}</button>
-                    <button type="button" onClick={() => set("cityTaxMode", "percent")} className={`rounded-md px-3 py-1.5 transition ${mode === "percent" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("% del totale")}</button>
+                    <button type="button" onClick={() => set("cityTaxMode", "percent")} className={`rounded-md px-3 py-1.5 transition ${mode === "percent" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("% del pernottamento")}</button>
                   </div>
                   {mode === "percent" ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className={lbl}>{t("% sul totale soggiorno")}<div className="relative mt-1"><input type="number" min={0} step={0.5} value={f.cityTaxPercent ?? ""} onChange={(e) => set("cityTaxPercent", num(e.target.value))} className={`${inp} pr-7`} placeholder="10" /><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-faint">%</span></div></label>
+                    <>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <label className={lbl}>{t("% pernottamento")}<div className="relative mt-1"><input type="number" min={0} step={0.5} value={f.cityTaxPercent ?? ""} onChange={(e) => set("cityTaxPercent", num(e.target.value))} className={`${inp} pr-7`} placeholder="4" /><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-faint">%</span></div></label>
+                      <label className={lbl}>{t("Tetto € persona/notte")}<input value={f.cityTaxCap ?? ""} onChange={(e) => set("cityTaxCap", num(e.target.value))} className={`${inp} mt-1`} placeholder="5,00" /></label>
+                      <label className={lbl}>{t("Max notti")}<input type="number" min={0} value={f.cityTaxMaxNights ?? ""} onChange={(e) => set("cityTaxMaxNights", num(e.target.value))} className={`${inp} mt-1`} placeholder="7" /></label>
                       <label className={lbl}>{t("Comune")}<input value={f.cityTaxComune ?? ""} onChange={(e) => set("cityTaxComune", e.target.value)} className={`${inp} mt-1`} /></label>
                     </div>
+                    <p className="mt-2 text-[11px] text-faint">{t("Es. Siracusa: 4% del costo camera per ospite a notte, max 5€ a persona/notte, prime 7 notti.")}</p>
+                    </>
                   ) : (
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                       <label className={lbl}>{t("€ persona/notte")}<input value={f.cityTaxAmount ?? ""} onChange={(e) => set("cityTaxAmount", num(e.target.value))} className={`${inp} mt-1`} placeholder="2,00" /></label>

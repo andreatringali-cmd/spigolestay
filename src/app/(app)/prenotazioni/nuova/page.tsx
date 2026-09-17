@@ -8,6 +8,7 @@ import { sendVoucher } from "@/lib/mailer";
 import { shortenLink } from "@/lib/guestlink";
 import { effBase } from "@/lib/pricing";
 import { shiftISO, toISO, nights } from "@/lib/dates";
+import { cityTaxOf } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { Card } from "@/components/ui";
 import Icon from "@/components/Icon";
@@ -636,15 +637,6 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
-
-// Tassa di soggiorno secondo le impostazioni struttura (fissa €/persona/notte con tetto notti, o % del soggiorno).
-function cityTaxOf(structure: { cityTax?: boolean; cityTaxMode?: "fixed" | "percent"; cityTaxAmount?: number; cityTaxMaxNights?: number; cityTaxPercent?: number } | undefined, adults: number, n: number, accommodation: number) {
-  if (!structure?.cityTax) return 0;
-  if (structure.cityTaxMode === "percent") return Math.round((accommodation || 0) * (structure.cityTaxPercent ?? 0) / 100);
-  const rate = structure.cityTaxAmount ?? 2;
-  const maxN = structure.cityTaxMaxNights ?? 3;
-  return Math.round(adults * Math.min(n, maxN) * rate);
-}
 
 function FieldL({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block text-xs font-medium text-dim">{label}<div className="mt-1">{children}</div></label>;
