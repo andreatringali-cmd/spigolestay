@@ -10,7 +10,7 @@ import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/authsync";
 import { PageHeader, Card } from "@/components/ui";
 import Icon from "@/components/Icon";
-import AssistantCore from "@/components/AssistantCore";
+import NeuralShell from "@/components/NeuralShell";
 import { eur } from "@/lib/format";
 import { bookingGrandTotal } from "@/lib/booking";
 import { nights } from "@/lib/dates";
@@ -204,6 +204,8 @@ export default function AssistentePage() {
     { label: "Partenze oggi", value: String(answers.departuresToday.length), tone: "var(--warn)", q: "partenze" },
     { label: "Check-in mancanti", value: String(answers.noCheckin.length), tone: "var(--focus)", q: "check-in mancanti" },
     { label: "Da incassare", value: dueCents != null ? eur(dueCents / 100) : "—", tone: "var(--err)", q: "da incassare" },
+    { label: "Incassato mese", value: answers.incassato.value ?? "—", tone: "var(--ok)", q: "incassato" },
+    { label: "Ricavo previsto", value: answers.ricavo.value ?? "—", tone: "var(--focus)", q: "ricavo" },
   ], [answers, dueCents]);
 
   // ── Motore risposte (parole chiave) ──
@@ -339,43 +341,27 @@ export default function AssistentePage() {
     <div>
       <PageHeader title="Assistente Xenora" subtitle="Chiedi a voce o scrivi — rispondo con i tuoi numeri" />
 
-      {/* Tessere in alto: i numeri del giorno */}
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {tiles.map((tl) => (
-          <button key={tl.label} onClick={() => { setQ(tl.label); ask(tl.q); }} className="rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition hover:shadow-md">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{tl.label}</div>
-            <div className="mt-1 font-mono text-2xl font-bold" style={{ color: tl.tone }}>{tl.value}</div>
-          </button>
-        ))}
+      {/* Neural Shell: i dati delle sessioni (sinistra) fluiscono nel core (destra) */}
+      <div className="mb-4">
+        <NeuralShell inputs={tiles} state={state} onInput={(q) => { setQ(q); ask(q); }} />
       </div>
 
-      {/* Briefing del giorno: card chiara con il core astratto */}
-      <Card className="mb-4 overflow-hidden">
-        <div className="flex flex-col items-center gap-3 py-1 text-center">
-          <div className="max-w-xl">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">Briefing del giorno</div>
-            <p className="mt-1 text-xl font-semibold text-txt">{briefing}</p>
+      {/* Output del core: briefing del giorno + comandi voce */}
+      <Card className="mb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">Core output · Briefing del giorno</div>
+            <p className="mt-1 text-lg font-semibold leading-snug text-txt">{briefing}</p>
           </div>
-          <button
-            onClick={toggleListening}
-            disabled={!micAvailable}
-            title={micAvailable ? (listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare") : "Voce non disponibile qui — apri Xenora in Chrome/Edge"}
-            className="relative grid place-items-center rounded-full transition active:scale-95 disabled:cursor-default"
-          >
-            <AssistantCore state={state} size={176} />
+          <div className="flex flex-wrap items-center gap-2">
             {micAvailable && (
-              <span className="absolute bottom-1 right-1 grid h-8 w-8 place-items-center rounded-full text-white shadow-md" style={{ backgroundColor: listening ? "var(--err)" : "var(--focus)" }}>
-                <Icon name="chat" size={15} />
-              </span>
+              <button onClick={toggleListening} title={listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare"} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition active:scale-95" style={{ backgroundColor: listening ? "var(--err)" : "var(--focus)" }}><Icon name="chat" size={14} /> {listening ? "Ascolto…" : "Parla"}</button>
             )}
-          </button>
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <button onClick={() => speak(briefing)} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash"><Icon name="chat" size={14} /> Ascolta il briefing</button>
+            <button onClick={() => speak(briefing)} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash"><Icon name="chat" size={14} /> Ascolta</button>
             <button onClick={toggleVoice} title="Attiva/disattiva la voce nelle risposte" className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${voiceOn ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}>{voiceOn ? "🔊 Voce attiva" : "🔇 Voce spenta"}</button>
-            {!micAvailable && <span className="text-xs font-medium text-faint">🎙 La voce in entrata si attiva aprendo Xenora in Chrome/Edge</span>}
-            {micHint && <span className="text-xs font-medium text-[color:var(--err)]">{micHint}</span>}
           </div>
         </div>
+        {(!micAvailable || micHint) && <p className="mt-2 text-xs font-medium" style={{ color: micHint ? "var(--err)" : "var(--faint)" }}>{micHint || "🎙 La voce in entrata si attiva aprendo Xenora in Chrome/Edge"}</p>}
       </Card>
 
       {/* Input + chips */}
