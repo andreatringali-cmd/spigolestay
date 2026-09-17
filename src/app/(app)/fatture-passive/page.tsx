@@ -5,12 +5,31 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
+import { useData } from "@/lib/store";
+import { CHANNELS, type Channel } from "@/lib/types";
 import { PageHeader, Card } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { eur } from "@/lib/format";
 import { apiPost } from "@/lib/invoicing/client";
+
+// Dati fornitore per le OTA (per l'autofattura: sede estera del cedente).
+const OTA_META: Record<string, { name: string; country: string }> = {
+  booking: { name: "Booking.com B.V.", country: "NL" },
+  airbnb: { name: "Airbnb Ireland UC", country: "IE" },
+  expedia: { name: "Expedia Lodging Partner Services Sàrl", country: "CH" },
+  other: { name: "OTA estera", country: "EE" },
+};
+// Parsing numerico robusto: gestisce "1.234,56" (IT) e "1,234.56" (EN) e simboli valuta.
+function parseNum(s: string): number {
+  let x = (s ?? "").toString().replace(/[^\d.,-]/g, "").trim();
+  if (!x) return 0;
+  if (x.includes(",") && x.includes(".")) x = x.lastIndexOf(",") > x.lastIndexOf(".") ? x.replace(/\./g, "").replace(",", ".") : x.replace(/,/g, "");
+  else if (x.includes(",")) x = x.replace(",", ".");
+  const n = Number(x);
+  return isNaN(n) ? 0 : n;
+}
 
 const CATEGORIES = ["Pulizie", "Utenze", "Manutenzione", "OTA / commissioni", "Forniture", "Consulenze", "Tasse e tributi", "Marketing", "Assicurazioni", "Altro"];
 const TIPI: Record<string, string> = { fattura: "Fattura", nota_credito: "Nota di credito", ricevuta: "Ricevuta", spesa: "Spesa" };
@@ -22,11 +41,20 @@ const YEARS = (() => { const y = new Date().getFullYear(); return [y, y - 1, y -
 interface Doc { id: string; supplier_id: string | null; supplier_name: string | null; doc_number: string | null; doc_date: string | null; doc_type: string; category: string | null; taxable_cents: number; vat_cents: number; total_cents: number; due_date: string | null; paid: boolean; paid_at: string | null; payment_method: string | null; notes: string | null; selfinvoice_number: string | null; selfinvoice_status: string | null }
 interface Supplier { id: string; name: string; vat: string | null; category: string | null }
 
-const emptyForm = () => ({ id: "" as string, supplierName: "", supplierId: null as string | null, doc_number: "", doc_date: todayISO(), doc_type: "fattura", category: "", taxableEur: "", vatEur: "", due_date: "", paid: false, paid_at: "", payment_method: "Bonifico bancario", notes: "" });
+const emptyForm = () => ({ id: "" as string, supplierName: "", supplierId: null as string | null, supplierCountry: "", doc_number: "", doc_date: todayISO(), doc_type: "fattura", category: "", taxableEur: "", vatEur: "", due_date: "", paid: false, paid_at: "", payment_method: "Bonifico bancario", notes: "" });
+const monthNow = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+const prevMonth = () => { const d = new Date(); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 
 export default function FatturePassivePage() {
   const { user } = useAuth();
   const ask = useConfirm();
+  const { bookings } = useData();
+  // Modale "Autofattura OTA": #2 da commissioni tracciate, #3 import CSV.
+  const [ota, setOta] = useState(false);
+  const [otaMonth, setOtaMonth] = useState(prevMonth());
+  const [otaChannel, setOtaChannel] = useState<Channel>("booking");
+  const [csvTotal, setCsvTotal] = useState<number | null>(null);
+  const [csvInfo, setCsvInfo] = useState("");
   const [docs, setDocs] = useState<Doc[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +103,7 @@ export default function FatturePassivePage() {
   const totals = useMemo(() => filtered.reduce((a, r) => ({ imp: a.imp + r.taxable_cents, iva: a.iva + r.vat_cents, tot: a.tot + r.total_cents, unpaid: a.unpaid + (r.paid ? 0 : r.total_cents) }), { imp: 0, iva: 0, tot: 0, unpaid: 0 }), [filtered]);
 
   const openNew = () => { setEdit(emptyForm()); setAf({}); setAfMsg(""); };
-  const openEdit = (r: Doc) => { setEdit({ id: r.id, supplierName: r.supplier_name ?? "", supplierId: r.supplier_id, doc_number: r.doc_number ?? "", doc_date: r.doc_date ?? todayISO(), doc_type: r.doc_type, category: r.category ?? "", taxableEur: String(cents(r.taxable_cents)), vatEur: String(cents(r.vat_cents)), due_date: r.due_date ?? "", paid: r.paid, paid_at: r.paid_at ?? "", payment_method: r.payment_method ?? "Bonifico bancario", notes: r.notes ?? "" }); setAf({ number: r.selfinvoice_number ?? undefined, status: r.selfinvoice_status ?? undefined }); setAfMsg(""); };
+  const openEdit = (r: Doc) => { setEdit({ id: r.id, supplierName: r.supplier_name ?? "", supplierId: r.supplier_id, supplierCountry: "", doc_number: r.doc_number ?? "", doc_date: r.doc_date ?? todayISO(), doc_type: r.doc_type, category: r.category ?? "", taxableEur: String(cents(r.taxable_cents)), vatEur: String(cents(r.vat_cents)), due_date: r.due_date ?? "", paid: r.paid, paid_at: r.paid_at ?? "", payment_method: r.payment_method ?? "Bonifico bancario", notes: r.notes ?? "" }); setAf({ number: r.selfinvoice_number ?? undefined, status: r.selfinvoice_status ?? undefined }); setAfMsg(""); };
 
   // Genera (ed eventualmente invia) l'autofattura TD17 reverse charge.
   const genAutofattura = async () => {
@@ -92,6 +120,44 @@ export default function FatturePassivePage() {
     catch (e) { setAfMsg(e instanceof Error ? e.message : "Errore"); } finally { setAfBusy(""); }
   };
 
+  // #2 — commissioni tracciate da Xenora per mese/canale (imponibile autofattura).
+  const otaCommission = useMemo(() => {
+    const [y, m] = otaMonth.split("-").map(Number);
+    const start = `${otaMonth}-01`;
+    const end = `${otaMonth}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+    const list = bookings.filter((b) => b.channel === otaChannel && b.status !== "cancelled" && (b.checkOut || "") >= start && (b.checkOut || "") <= end);
+    const sum = list.reduce((a, b) => a + (b.total ?? 0) * (b.commissionPct ?? CHANNELS[b.channel].commission), 0);
+    return { sum: Math.round(sum * 100) / 100, count: list.length, end };
+  }, [bookings, otaChannel, otaMonth]);
+
+  const precompileCommissions = () => {
+    const meta = OTA_META[otaChannel] ?? OTA_META.other;
+    setEdit({ ...emptyForm(), supplierName: meta.name, supplierCountry: meta.country, category: "OTA / commissioni", doc_date: otaCommission.end, taxableEur: otaCommission.sum.toFixed(2), notes: `Commissioni ${CHANNELS[otaChannel].label} ${otaMonth} (${otaCommission.count} prenotazioni) — imponibile per autofattura reverse charge. Verifica con la fattura del portale.` });
+    setAf({}); setAfMsg(""); setOta(false);
+  };
+
+  // #3 — import CSV estratto commissioni (Booking Finance o simile).
+  const onCsv = async (file: File) => {
+    setCsvTotal(null); setCsvInfo("");
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter((l) => l.trim());
+    if (!lines.length) { setCsvInfo("File vuoto."); return; }
+    const delim = (lines[0].match(/;/g)?.length ?? 0) > (lines[0].match(/,/g)?.length ?? 0) ? ";" : ",";
+    const header = lines[0].split(delim).map((h) => h.trim().toLowerCase());
+    let col = header.findIndex((h) => /commission|commissione/.test(h));
+    if (col < 0) col = header.findIndex((h) => /amount|importo|totale|total/.test(h));
+    if (col < 0) { setCsvInfo("Colonna importo non trovata (cerco 'commissione'/'importo')."); return; }
+    let sum = 0, rows = 0;
+    for (const l of lines.slice(1)) { const v = parseNum(l.split(delim)[col] || ""); if (v) { sum += v; rows++; } }
+    setCsvTotal(Math.round(sum * 100) / 100); setCsvInfo(`${rows} righe · colonna "${header[col]}"`);
+  };
+  const precompileCsv = () => {
+    if (csvTotal == null) return;
+    const meta = OTA_META[otaChannel] ?? OTA_META.booking;
+    setEdit({ ...emptyForm(), supplierName: meta.name, supplierCountry: meta.country, category: "OTA / commissioni", doc_date: otaCommission.end, taxableEur: csvTotal.toFixed(2), notes: `Import CSV commissioni ${CHANNELS[otaChannel].label} ${otaMonth}` });
+    setAf({}); setAfMsg(""); setOta(false); setCsvTotal(null); setCsvInfo("");
+  };
+
   const save = async () => {
     if (!supabase || !user || !edit) return;
     setSaving(true); setErr("");
@@ -100,8 +166,8 @@ export default function FatturePassivePage() {
     const nameTrim = edit.supplierName.trim();
     if (nameTrim) {
       const existing = suppliers.find((s) => s.name.toLowerCase() === nameTrim.toLowerCase());
-      if (existing) supplierId = existing.id;
-      else { const { data: ns } = await supabase.from("suppliers").insert({ tenant_id: user.id, name: nameTrim, category: edit.category || null }).select("id").single(); supplierId = ns?.id ?? null; }
+      if (existing) { supplierId = existing.id; if (edit.supplierCountry) await supabase.from("suppliers").update({ country: edit.supplierCountry }).eq("id", existing.id); }
+      else { const { data: ns } = await supabase.from("suppliers").insert({ tenant_id: user.id, name: nameTrim, category: edit.category || null, country: edit.supplierCountry || null }).select("id").single(); supplierId = ns?.id ?? null; }
     }
     const taxable = Math.round(numv(edit.taxableEur) * 100);
     const vat = Math.round(numv(edit.vatEur) * 100);
@@ -158,6 +224,7 @@ export default function FatturePassivePage() {
             <select value={scad} onChange={(e) => setScad(e.target.value)} className={sel}><option value="all">Tutte le scadenze</option><option value="overdue">Scadute non pagate</option></select>
             <div className="ml-auto flex items-center gap-2">
               <button onClick={exportCsv} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
+              <button onClick={() => { setOta(true); setCsvTotal(null); setCsvInfo(""); }} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash" title="Precompila una fattura passiva OTA dalle commissioni tracciate o da un CSV">⚡ Autofattura OTA</button>
               <button onClick={openNew} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuova fattura</button>
             </div>
           </div>
@@ -198,6 +265,39 @@ export default function FatturePassivePage() {
           </tbody>
         </table>
       </div>
+
+      {ota && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button aria-label="Chiudi" onClick={() => setOta(false)} className="absolute inset-0 bg-black/40" />
+          <div className="relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">Autofattura OTA — precompila</span><button onClick={() => setOta(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className={lbl}>Canale<select value={otaChannel} onChange={(e) => setOtaChannel(e.target.value as Channel)} className={inp}>{(["booking", "airbnb", "expedia", "other"] as Channel[]).map((c) => <option key={c} value={c}>{CHANNELS[c].label}</option>)}</select></label>
+              <label className={lbl}>Mese<input type="month" value={otaMonth} max={monthNow()} onChange={(e) => setOtaMonth(e.target.value)} className={inp} /></label>
+            </div>
+
+            <div className="mt-3 rounded-lg border border-line p-3">
+              <div className="text-xs font-semibold text-txt">1) Dalle commissioni tracciate da Xenora</div>
+              <p className="mt-1 text-[11px] text-faint">Somma le commissioni ({CHANNELS[otaChannel].label}) delle prenotazioni con partenza nel mese scelto.</p>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-sm text-dim">{otaCommission.count} prenotazioni · stimato</span>
+                <span className="font-mono text-lg font-bold text-txt">{eur(otaCommission.sum)}</span>
+              </div>
+              <button onClick={precompileCommissions} disabled={otaCommission.sum <= 0} className="mt-2 w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">Precompila da commissioni</button>
+            </div>
+
+            <div className="mt-3 rounded-lg border border-line p-3">
+              <div className="text-xs font-semibold text-txt">2) Da CSV del portale (importi ufficiali)</div>
+              <p className="mt-1 text-[11px] text-faint">Estratto commissioni dall&apos;area Finance del portale (colonna &quot;commissione&quot; o &quot;importo&quot;).</p>
+              <input type="file" accept=".csv,text/csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) onCsv(f); }} className="mt-2 block w-full text-xs text-dim file:mr-2 file:rounded-lg file:border file:border-line file:bg-paper file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-txt" />
+              {csvInfo && <p className="mt-1 text-[11px] text-faint">{csvInfo}</p>}
+              {csvTotal != null && <div className="mt-2 flex items-center justify-between"><span className="text-sm text-dim">Totale rilevato</span><span className="font-mono text-lg font-bold text-txt">{eur(csvTotal)}</span></div>}
+              <button onClick={precompileCsv} disabled={csvTotal == null || csvTotal <= 0} className="mt-2 w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">Precompila da CSV</button>
+            </div>
+            <p className="mt-3 text-[11px] text-faint">Dopo la precompilazione controlla l&apos;imponibile con la fattura del portale, salva, poi premi &quot;Genera autofattura TD17&quot;.</p>
+          </div>
+        </div>
+      )}
 
       {edit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
