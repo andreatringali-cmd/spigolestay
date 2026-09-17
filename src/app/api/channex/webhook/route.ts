@@ -1,25 +1,30 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { importBookings } from "@/lib/channex-inbound";
 
-// Webhook Channex: qui arrivano le notifiche di nuova prenotazione/modifica/cancellazione dalle OTA.
-// URL da registrare su Channex (HTTPS): https://xenora-app.vercel.app/api/channex/webhook
-//
-// Flusso previsto (fase successiva, quando ci sarà il datastore server):
-//   1. Ricevi il webhook (booking revision id).
-//   2. Scarica la prenotazione: GET /booking_revisions/{id}
-//   3. Salvala nel gestionale.
-//   4. Conferma la ricezione: acknowledge booking.
-// Per ora: accetta e risponde 200 (Channex richiede sempre 200, anche in caso di errore interno).
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+// Webhook Channex: notifica di nuova prenotazione/modifica/cancellazione dalle OTA.
+// URL da registrare su Channex (HTTPS): https://xenora.it/api/channex/webhook
+// Alla ricezione leggiamo il FEED delle booking revision non confermate, le
+// importiamo nella app_state del proprietario giusto (via channex_map) e facciamo ACK.
+// Rispondiamo SEMPRE 200 (Channex ritenta all'infinito se non riceve 200).
 export async function POST(req: Request) {
   try {
     const payload = await req.json().catch(() => ({}));
-    // Log leggero (senza dati sensibili) per verificare la ricezione durante i test.
-    console.log("[channex webhook]", JSON.stringify(payload).slice(0, 500));
-  } catch { /* ignora corpo non valido */ }
-  // Sempre 200: evita che Channex reinvii all'infinito il webhook.
+    const propertyId = String((payload?.property_id as string) || (payload?.data?.property_id as string) || "").trim() || undefined;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && service) {
+      const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+      const res = await importBookings(admin, propertyId ? { propertyId } : {});
+      console.log("[channex webhook] import", JSON.stringify({ feed: res.feed, imported: res.imported, cancelled: res.cancelled, acked: res.acked, skipped: res.skipped }));
+    }
+  } catch (e) { console.log("[channex webhook] error", (e as Error)?.message); }
   return NextResponse.json({ received: true }, { status: 200 });
 }
 
-// GET di cortesia: utile per verificare che l'endpoint sia raggiungibile.
 export async function GET() {
   return NextResponse.json({ ok: true, endpoint: "channex-webhook", ready: true }, { status: 200 });
 }

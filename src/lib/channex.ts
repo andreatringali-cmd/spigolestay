@@ -105,6 +105,35 @@ export async function pushRates(values: RateValue[]) {
   return channex("/restrictions", { method: "POST", body: JSON.stringify({ values }) });
 }
 
+// ── Prenotazioni in ENTRATA (feed booking revisions non ancora acked) ──
+// La via consigliata da Channex per ricevere le prenotazioni: si legge il feed
+// delle revision non confermate, si importano e si fa l'ACK (così non tornano più).
+export interface ChxOccupancy { adults?: number; children?: number; infants?: number }
+export interface ChxRoom { room_type_id?: string; rate_plan_id?: string; checkin_date?: string; checkout_date?: string; occupancy?: ChxOccupancy; guests?: { name?: string; surname?: string }[]; days?: Record<string, string> }
+export interface ChxRevision {
+  id: string; property_id?: string; booking_id?: string; status?: string; ota_reservation_code?: string;
+  ota_name?: string; arrival_date?: string; departure_date?: string; amount?: string; currency?: string;
+  customer?: { name?: string; surname?: string; mail?: string; email?: string; phone?: string };
+  rooms?: ChxRoom[];
+}
+// Normalizza una riga JSON:API (id + attributes) in ChxRevision piatta.
+function flattenRevision(row: unknown): ChxRevision {
+  const r = row as { id?: string; attributes?: Record<string, unknown> } & Record<string, unknown>;
+  const a = (r.attributes ?? r) as Record<string, unknown>;
+  return { id: String(r.id ?? a.id ?? ""), ...(a as object) } as ChxRevision;
+}
+export async function bookingRevisionsFeed(propertyId?: string): Promise<ChxResultList> {
+  const q = propertyId ? `?filter[property_id]=${encodeURIComponent(propertyId)}` : "";
+  const res = await channex<{ data?: unknown[] }>(`/booking_revisions/feed${q}`);
+  if (!res.ok) return { ok: false, status: res.status, error: res.error, revisions: [] };
+  const list = Array.isArray(res.data?.data) ? res.data!.data! : [];
+  return { ok: true, status: res.status, revisions: list.map(flattenRevision) };
+}
+export interface ChxResultList { ok: boolean; status: number; error?: string; revisions: ChxRevision[] }
+export async function ackBookingRevision(id: string) {
+  return channex(`/booking_revisions/${encodeURIComponent(id)}/ack`, { method: "POST", body: "{}" });
+}
+
 export async function createRatePlan(propertyId: string, roomTypeId: string, opts: { title?: string; occupancy: number; rate: number; currency?: string }) {
   return channex<Created>("/rate_plans", {
     method: "POST",

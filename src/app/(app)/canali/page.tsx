@@ -10,6 +10,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import Icon from "@/components/Icon";
 import IcalSyncPanel from "@/components/IcalSyncPanel";
+import { apiPost } from "@/lib/invoicing/client";
 
 // Portali gestiti dal Channel Manager.
 const OTAS = [
@@ -76,6 +77,18 @@ export default function CanaliPage() {
   const [chxMap, setChxMap] = useState<Record<string, { propertyId: string; rooms?: Record<string, { roomTypeId: string; ratePlanId?: string }>; at: string }>>({});
   const [chxSync, setChxSync] = useState<{ running: boolean; msg?: string; ok?: boolean }>({ running: false });
   const [ariSync, setAriSync] = useState<{ running: boolean; msg?: string; ok?: boolean }>({ running: false });
+  const [impSync, setImpSync] = useState<{ running: boolean; msg?: string; ok?: boolean }>({ running: false });
+  // Importa le prenotazioni OTA in entrata dal feed Channex (2-way).
+  const importOta = async () => {
+    setImpSync({ running: true, msg: "Controllo nuove prenotazioni dalle OTA…" });
+    try {
+      const j = await apiPost<{ ok: boolean; imported?: number; cancelled?: number; feed?: number; error?: string }>("channex/import", {});
+      if (!j.ok) { setImpSync({ running: false, ok: false, msg: j.error || "Import non riuscito" }); return; }
+      const n = (j.imported ?? 0) + (j.cancelled ?? 0);
+      setImpSync({ running: false, ok: true, msg: n > 0 ? `Importate ${j.imported ?? 0} prenotazioni${j.cancelled ? `, ${j.cancelled} cancellazioni` : ""} ✓` : "Nessuna nuova prenotazione." });
+      if (n > 0) saveLog([{ id: uid(), ts: Date.now(), text: `${t("Prenotazioni OTA importate da Channex")} — ${j.imported ?? 0}`, color: "var(--ok)" }, ...log]);
+    } catch (e) { setImpSync({ running: false, ok: false, msg: e instanceof Error ? e.message : "errore di rete" }); }
+  };
   useEffect(() => { try { const m = localStorage.getItem("spigolestay:channexmap"); if (m) setChxMap(JSON.parse(m)); } catch {} }, []);
   const unlinkChannex = () => {
     const sid = effStructure;
@@ -108,8 +121,7 @@ export default function CanaliPage() {
     };
     setChxSync({ running: true, msg: "Creazione su Channex in corso…" });
     try {
-      const res = await fetch("/api/channex/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ structure, rooms }) });
-      const j = await res.json();
+      const j = await apiPost<{ ok: boolean; propertyId: string; rooms?: { xid?: string; roomTypeId?: string; ratePlanId?: string; ok: boolean }[]; error?: string; step?: string }>("channex/sync", { structureId: sid, structure, rooms });
       if (!j.ok) { setChxSync({ running: false, ok: false, msg: `Errore: ${j.error || j.step || "sync fallita"}` }); return; }
       const okRooms = (j.rooms || []).filter((r: { ok: boolean }) => r.ok).length;
       const roomMap: Record<string, { roomTypeId: string; ratePlanId?: string }> = {};
@@ -216,11 +228,13 @@ export default function CanaliPage() {
             </div>
             {chxSync.msg && <div className="mt-1 text-[11px] font-semibold" style={{ color: chxSync.ok === false ? "var(--err)" : chxSync.ok ? "var(--ok)" : "var(--dim)" }}>{chxSync.msg}</div>}
             {ariSync.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: ariSync.ok === false ? "var(--err)" : ariSync.ok ? "var(--ok)" : "var(--dim)" }}>{ariSync.msg}</div>}
+            {impSync.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: impSync.ok === false ? "var(--err)" : impSync.ok ? "var(--ok)" : "var(--dim)" }}>{impSync.msg}</div>}
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {chxMap[effStructure] ? (
               <>
                 <button onClick={pushAri} disabled={ariSync.running} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{ariSync.running ? t("Invio…") : "↑ " + t("Prezzi & disponibilità")}</button>
+                <button onClick={importOta} disabled={impSync.running} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{impSync.running ? t("Importo…") : "↓ " + t("Importa prenotazioni OTA")}</button>
                 <button onClick={unlinkChannex} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Scollega")}</button>
               </>
             ) : (
