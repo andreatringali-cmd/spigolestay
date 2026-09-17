@@ -5,6 +5,9 @@ import { DataProvider, useData } from "@/lib/store";
 import { DOC_TYPES } from "@/lib/types";
 import { downscaleImage } from "@/lib/images";
 import { sendCheckinNotice } from "@/lib/mailer";
+import { nights } from "@/lib/dates";
+import { cityTaxOf, bookingExtrasTotal } from "@/lib/booking";
+import { eur } from "@/lib/format";
 import SignaturePad from "@/components/SignaturePad";
 
 const box = "rounded-xl border border-line bg-surface";
@@ -51,6 +54,8 @@ function Engine() {
   const [consent, setConsent] = useState(false);
   const [inv, setInv] = useState({ wants: false, kind: "privato", name: "", vat: "", taxCode: "", address: "", city: "", cap: "", province: "", sdiCode: "", pec: "" });
   const setI = (k: string, v: string | boolean) => setInv((p) => ({ ...p, [k]: v }));
+  const [ups, setUps] = useState<Record<string, number>>({}); // upsell scelti (extra struttura) id→qty
+  const [paying, setPaying] = useState(false);
   const frontRef = useRef<HTMLInputElement>(null);
   const backRef = useRef<HTMLInputElement>(null);
   const onPhoto = async (file: File | undefined, set: (v: string) => void) => { if (!file || !file.type.startsWith("image/")) return; try { set(await downscaleImage(file, 900, 0.72)); } catch {} };
@@ -81,10 +86,43 @@ function Engine() {
     const invoiceRequest = inv.wants
       ? { wants: true, kind: inv.kind as "privato" | "societa" | "estero", name: inv.name.trim() || undefined, vat: inv.vat.trim() || undefined, taxCode: inv.taxCode.trim() || undefined, address: inv.address.trim() || undefined, city: inv.city.trim() || undefined, cap: inv.cap.trim() || undefined, province: inv.province.trim() || undefined, sdiCode: inv.sdiCode.trim() || undefined, pec: inv.pec.trim() || undefined, country: "IT" }
       : { wants: false };
-    updateBooking(booking.id, { webCheckin: true, arrivalTime: arrival, extraGuests: cleanExtras, docPhotoFront: photoFront, docPhotoBack: photoBack, signature, guestRequests: guestReq.trim() || undefined, invoiceRequest });
+    // Unisci gli extra scelti a check-in (upsell) senza duplicare quelli già presenti.
+    const baseList = booking.extras ?? [];
+    const merged = [...baseList];
+    for (const c of upsellItems) if (!merged.some((x) => x.name === c.name)) merged.push(c);
+    updateBooking(booking.id, { webCheckin: true, arrivalTime: arrival, extraGuests: cleanExtras, docPhotoFront: photoFront, docPhotoBack: photoBack, signature, guestRequests: guestReq.trim() || undefined, invoiceRequest, extras: merged });
     // Avvisa il gestore via email (best-effort, non blocca la conferma all'ospite).
     void sendCheckinNotice(booking, { getStructure, getGuest, getRoomType, getUnit }, [{ ...doc }, ...cleanExtras], arrival);
     setDone(true); window.scrollTo(0, 0);
+  };
+
+  // ── Upsell + riepilogo pagamento ──
+  const n = booking ? nights(booking.checkIn, booking.checkOut) : 0;
+  const offer = (structure?.extras ?? []).filter((e) => e.active !== false);
+  const extraUnit = (e: { price: number; per?: string }) => e.per === "night" ? e.price * n : e.per === "person" ? e.price * (booking?.adults ?? 1) : e.price;
+  const upsellItems = offer.filter((e) => (ups[e.id] ?? 0) > 0).map((e) => { const q = ups[e.id] ?? 0; return { name: q > 1 ? `${e.name} ×${q}` : e.name, price: extraUnit(e) * q }; });
+  const upsellTotal = upsellItems.reduce((a, x) => a + x.price, 0);
+  const accommodation = booking?.total ?? 0;
+  const cleaning = booking?.cleaningFee ?? 0;
+  const baseExtras = booking ? bookingExtrasTotal(booking) : 0;
+  const cityTax = booking ? cityTaxOf(structure ?? undefined, booking.adults ?? 0, n, accommodation, booking.cityTaxExempt) : 0;
+  const grand = accommodation ? accommodation + cleaning + baseExtras + upsellTotal + cityTax : 0;
+  const paid = booking?.paid ?? 0;
+  const balance = Math.max(0, grand - paid);
+  const canPay = !!structure?.stripeChargesEnabled && balance > 0;
+
+  const payNow = async () => {
+    if (!booking || !structure || balance <= 0) return;
+    setPaying(true);
+    try {
+      const origin = window.location.origin;
+      const r = await fetch("/api/stripe/quote", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: balance, label: `Soggiorno ${structure.name}`, email: guest?.email, acct: structure.stripeAccount || "", metadata: { bookingId: booking.id }, successUrl: `${origin}/checkin?b=${booking.id}&paid=1`, cancelUrl: `${origin}/checkin?b=${booking.id}` }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (j.url) window.location.href = j.url; else setPaying(false);
+    } catch { setPaying(false); }
   };
 
   const header = (
@@ -216,6 +254,56 @@ function Engine() {
             ))}
           </div>
         </div>
+
+        {/* Servizi extra (upsell) */}
+        {offer.length > 0 && (
+          <div className={`${box} mb-4 p-4`}>
+            <h2 className="mb-1 font-display text-lg font-bold text-txt">Servizi extra</h2>
+            <p className="mb-3 text-xs text-dim">Aggiungi comfort al tuo soggiorno: li troverai pronti all&apos;arrivo.</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {offer.map((e) => {
+                const qy = ups[e.id] ?? 0;
+                return (
+                  <div key={e.id} className="flex items-center justify-between gap-2 rounded-lg border border-line p-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-txt">{e.name}</div>
+                      {e.desc && <div className="text-[11px] text-faint">{e.desc}</div>}
+                      <div className="text-xs text-dim">{eur(extraUnit(e))}{e.per === "night" ? ` · ${n} notti` : e.per === "person" ? " · a persona" : ""}</div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <button type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: Math.max(0, (u[e.id] ?? 0) - 1) }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash">−</button>
+                      <span className="w-5 text-center font-mono text-sm">{qy}</span>
+                      <button type="button" onClick={() => setUps((u) => ({ ...u, [e.id]: (u[e.id] ?? 0) + 1 }))} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-txt hover:bg-wash">+</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Riepilogo & pagamento */}
+        {grand > 0 && (
+          <div className={`${box} mb-4 p-4`}>
+            <h2 className="mb-2 font-display text-lg font-bold text-txt">Riepilogo & pagamento</h2>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between"><span className="text-dim">Soggiorno</span><span className="font-mono text-txt">{eur(accommodation)}</span></div>
+              {cleaning > 0 && <div className="flex justify-between"><span className="text-dim">Pulizia</span><span className="font-mono text-txt">{eur(cleaning)}</span></div>}
+              {baseExtras > 0 && <div className="flex justify-between"><span className="text-dim">Extra</span><span className="font-mono text-txt">{eur(baseExtras)}</span></div>}
+              {upsellItems.map((x) => <div key={x.name} className="flex justify-between"><span className="text-dim">+ {x.name}</span><span className="font-mono text-txt">{eur(x.price)}</span></div>)}
+              {cityTax > 0 && <div className="flex justify-between"><span className="text-dim">Tassa di soggiorno</span><span className="font-mono text-txt">{eur(cityTax)}</span></div>}
+              <div className="mt-1 flex justify-between border-t border-line pt-2"><span className="font-semibold text-txt">Totale</span><span className="font-mono font-bold text-txt">{eur(grand)}</span></div>
+              {paid > 0 && <div className="flex justify-between"><span className="text-dim">Già versato</span><span className="font-mono" style={{ color: "var(--ok)" }}>−{eur(paid)}</span></div>}
+              <div className="flex justify-between"><span className="font-semibold text-txt">Saldo</span><span className="font-mono text-lg font-extrabold" style={{ color: balance > 0 ? "var(--err)" : "var(--ok)" }}>{eur(balance)}</span></div>
+            </div>
+            {canPay ? (
+              <button type="button" onClick={payNow} disabled={paying} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{paying ? "Apro il pagamento…" : `Paga ora ${eur(balance)}`}</button>
+            ) : (
+              <p className="mt-3 text-center text-xs text-faint">{balance > 0 ? "Il saldo si paga all'arrivo in struttura." : "Soggiorno già saldato."}</p>
+            )}
+            <p className="mt-2 text-center text-[11px] text-faint">Il pagamento online arriva direttamente alla struttura (Stripe).</p>
+          </div>
+        )}
 
         {/* Firma */}
         <div className={`${box} mb-4 p-4`}>
