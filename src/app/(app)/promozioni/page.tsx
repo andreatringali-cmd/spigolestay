@@ -201,7 +201,7 @@ export default function PromozioniPage() {
         {/* Editor: crea/salva (nessun invio qui) */}
         <Card>
           <SectionTitle>{editId ? "Modifica promo" : "Nuova promo"}</SectionTitle>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="col-span-2 block text-xs font-medium text-dim">Nome promo *<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Es. Promo primavera" className={`${inp} mt-1`} /></label>
             <label className="col-span-2 block text-xs font-medium text-dim">Oggetto email<input value={subject} onChange={(e) => setSubject(e.target.value)} className={`${inp} mt-1`} /></label>
             <label className="block text-xs font-medium text-dim">Sconto %<input type="number" min={0} max={90} value={discount} onChange={(e) => setDiscount(Math.max(0, Number(e.target.value)))} className={`${inp} mt-1`} /></label>

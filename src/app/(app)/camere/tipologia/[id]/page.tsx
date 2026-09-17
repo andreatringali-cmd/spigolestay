@@ -202,7 +202,7 @@ export default function TipologiaSchedaPage() {
               <label className={lbl}>{t("Letti extra")}<input type="number" min={0} value={f.extraBeds ?? ""} onChange={(e) => set("extraBeds", num(e.target.value))} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("€ letto extra")}<input type="number" min={0} value={f.extraBedPrice ?? ""} onChange={(e) => set("extraBedPrice", num(e.target.value))} className={`${inp} mt-1`} /></label>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className={lbl}>{t("Composizione letti")}<select value={f.bedConfig ?? ""} onChange={(e) => set("bedConfig", e.target.value)} className={`${inp} mt-1`}><option value="">—</option>{BED_CONFIGS.map((b) => <option key={b} value={b}>{t(b)}</option>)}</select></label>
               <label className={lbl}>{t("Superficie m²")}<input type="number" min={0} value={f.size ?? ""} onChange={(e) => set("size", num(e.target.value))} className={`${inp} mt-1`} /></label>
             </div>

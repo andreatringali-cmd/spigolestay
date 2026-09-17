@@ -232,7 +232,7 @@ function PlanModal({ plan, allTypes, roomName, onSave, onDelete, onClose }: {
 
   return (
     <Modal title={t("Dettagli piano tariffario")} onClose={onClose}>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className={`${lbl} col-span-2`}>{t("Nome")}<input value={f.name} onChange={(e) => set("name", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. BB Flessibile 7gg")} /></label>
         <label className={lbl}>{t("Trattamento")}<select value={f.board} onChange={(e) => set("board", e.target.value)} className={`${inp} mt-1`}>{BOARDS.map((b) => <option key={b} value={b}>{t(b)}</option>)}</select></label>
         <label className={lbl}>{t("Notti minime")}<input type="number" min={1} value={f.minStay} onFocus={(e) => e.currentTarget.select()} onChange={(e) => set("minStay", num(e.target.value, 1))} className={`${inp} mt-1`} /></label>
@@ -249,8 +249,8 @@ function PlanModal({ plan, allTypes, roomName, onSave, onDelete, onClose }: {
       </div>
 
       {/* Politiche prenotazione */}
-      <div className="mt-3 grid grid-cols-2 gap-3">
-        <div className="col-span-2 grid grid-cols-2 gap-3 rounded-lg border border-line p-3">
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="col-span-2 grid grid-cols-1 gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
           <label className="col-span-2 flex items-center justify-between gap-2 text-sm text-txt">{t("Rimborsabile")}<Toggle on={f.refundable} onClick={() => set("refundable", !f.refundable)} /></label>
           {f.refundable && <label className={`${lbl} col-span-2`}>{t("Cancellazione gratuita fino a (giorni prima)")}<input type="number" min={0} value={f.cancelDays ?? 0} onFocus={(e) => e.currentTarget.select()} onChange={(e) => set("cancelDays", num(e.target.value))} className={`${inp} mt-1`} placeholder="7" /></label>}
         </div>
