@@ -217,7 +217,7 @@ export default function CamerePage() {
 
               {/* Tipologie */}
               <SectionTitle>{t("Tipologie")}</SectionTitle>
-              <div className="mb-4 grid auto-rows-fr grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="mb-4 grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {types.map((rt, i) => {
                   if (rt.deriveFrom) return null; // le derivate stanno nella tabella "Tariffe derivate"
                   const color = typeColor(rt, i);
