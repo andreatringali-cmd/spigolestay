@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/lib/store";
 import { effectiveBase } from "@/lib/pricing";
 import { addDays, isWeekend, toISO } from "@/lib/dates";
@@ -90,6 +90,18 @@ export default function CanaliPage() {
     } catch (e) { setImpSync({ running: false, ok: false, msg: e instanceof Error ? e.message : "errore di rete" }); }
   };
   useEffect(() => { try { const m = localStorage.getItem("spigolestay:channexmap"); if (m) setChxMap(JSON.parse(m)); } catch {} }, []);
+  // Allinea al server la mappatura Channex già presente nel browser (per le
+  // strutture collegate prima, così il webhook/import sa a chi assegnare le prenotazioni).
+  const mapPushed = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    Object.entries(chxMap).forEach(([sid, m]) => {
+      if (!m?.propertyId || mapPushed.current.has(sid)) return;
+      mapPushed.current.add(sid);
+      const rooms: Record<string, string> = {};
+      Object.entries(m.rooms || {}).forEach(([xid, r]) => { if (r?.roomTypeId) rooms[r.roomTypeId] = xid; });
+      apiPost("channex/map", { structureId: sid, propertyId: m.propertyId, rooms }).catch(() => {});
+    });
+  }, [chxMap]);
   const unlinkChannex = () => {
     const sid = effStructure;
     const next = { ...chxMap }; delete next[sid];
