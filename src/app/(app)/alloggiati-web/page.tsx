@@ -41,7 +41,10 @@ export default function AlloggiatiWebPage() {
       supabase.from("alloggiati_schedine").select("id, booking_id, arrival, guest, ruolo, stato, errors, ricevuta").eq("structure_id", sid).order("arrival", { ascending: false }),
     ]);
     setS(st.data ? { ...DEF, ...Object.fromEntries(Object.entries(st.data).filter(([, v]) => v !== null)) as Partial<Sett> } : DEF);
-    setHasPw(!!st.data?.password_enc); setHasWs(!!st.data?.ws_code_enc); setPw(""); setWs("");
+    setHasPw(!!st.data?.password_enc); setHasWs(!!st.data?.ws_code_enc); setPw(""); setShown(false);
+    // Webservice Code: sempre visibile (in chiaro) → lo recupero decifrato dal server.
+    if (st.data?.ws_code_enc) { try { const r = await apiPost<{ wsCode?: string }>("alloggiati/settings", { structureId: sid, action: "reveal" }); setWs(r.wsCode ?? ""); } catch { setWs(""); } }
+    else setWs("");
     setSched((sc.data ?? []) as Sched[]);
   }, [sid]);
   useEffect(() => { load(); }, [load]);
@@ -63,10 +66,10 @@ export default function AlloggiatiWebPage() {
   };
   // Mostra/nascondi le credenziali salvate (decifrate lato server, solo proprietario).
   const toggleShow = async () => {
-    if (shown) { setShown(false); setPw(""); setWs(""); return; }
+    if (shown) { setShown(false); setPw(""); return; }
     try {
-      const r = await apiPost<{ password?: string; wsCode?: string }>("alloggiati/settings", { structureId: sid, action: "reveal" });
-      setPw(r.password ?? ""); setWs(r.wsCode ?? ""); setShown(true);
+      const r = await apiPost<{ password?: string }>("alloggiati/settings", { structureId: sid, action: "reveal" });
+      setPw(r.password ?? ""); setShown(true);
     } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); }
   };
 
@@ -102,11 +105,16 @@ export default function AlloggiatiWebPage() {
           <div className="mt-2">
           <div className="space-y-2">
             <label className="block"><span className={lbl}>Username (es. SR001860)</span><input value={s.username} onChange={(e) => set({ username: e.target.value })} className={inp} /></label>
-            <label className="block"><span className={lbl}>Password {hasPw && <span className="ml-1 font-semibold" style={{ color: "var(--ok)" }}>✓ salvata</span>}</span><input type={shown ? "text" : "password"} value={pw} onChange={(e) => setPw(e.target.value)} placeholder={hasPw ? "••••••••  ·  lascia vuoto per non cambiarla" : "Inserisci la password"} className={inp} /></label>
-            <label className="block"><span className={lbl}>Webservice Code {hasWs && <span className="ml-1 font-semibold" style={{ color: "var(--ok)" }}>✓ salvato</span>}</span><input type={shown ? "text" : "password"} value={ws} onChange={(e) => setWs(e.target.value)} placeholder={hasWs ? "••••••••  ·  lascia vuoto per non cambiarlo" : "Incolla il Webservice Code"} className={`${inp} font-mono text-[11px]`} /></label>
-            {(hasPw || hasWs) && <button type="button" onClick={toggleShow} className="text-[11px] font-semibold text-focus hover:underline">{shown ? "🙈 Nascondi credenziali" : "👁 Mostra credenziali salvate"}</button>}
+            <label className="block"><span className={lbl}>Password {hasPw && <span className="ml-1 font-semibold" style={{ color: "var(--ok)" }}>✓ salvata</span>}</span>
+              <div className="relative">
+                <input type={shown ? "text" : "password"} value={pw} onChange={(e) => setPw(e.target.value)} placeholder={hasPw ? "••••••••  ·  lascia vuoto per non cambiarla" : "Inserisci la password"} className={`${inp} pr-10`} />
+                <button type="button" onClick={toggleShow} title={shown ? "Nascondi" : "Mostra le credenziali salvate"} className="absolute right-2 top-1/2 -translate-y-1/2 text-base text-dim hover:text-txt">{shown ? "🙈" : "👁"}</button>
+              </div>
+            </label>
+            <label className="block"><span className={lbl}>Webservice Code {hasWs && <span className="ml-1 font-semibold" style={{ color: "var(--ok)" }}>✓ salvato</span>}</span><input value={ws} onChange={(e) => setWs(e.target.value)} placeholder="Incolla il Webservice Code" className={`${inp} font-mono text-[11px]`} /></label>
             <label className="block"><span className={lbl}>Scadenza Webservice Code</span><input type="date" value={s.ws_code_expires_at?.slice(0, 10) ?? ""} onChange={(e) => set({ ws_code_expires_at: e.target.value })} className={inp} />{wsExpSoon && <span className="mt-1 block text-[11px] font-semibold text-[color:var(--warn)]">⚠️ In scadenza: rigenera il codice sul portale Alloggiati.</span>}</label>
-            <label className="flex items-center justify-between pt-1"><span className="text-sm text-txt">Raggruppa ospiti (capofamiglia + membri)</span><input type="checkbox" checked={s.group_guests} onChange={(e) => set({ group_guests: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
+            <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-faint">Opzioni</div>
+            <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa ospiti (capofamiglia + membri)</span><input type="checkbox" checked={s.group_guests} onChange={(e) => set({ group_guests: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
             <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa per camera</span><input type="checkbox" checked={s.group_by_room} onChange={(e) => set({ group_by_room: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
             <label className="flex items-center justify-between"><span className="text-sm text-txt">Invio automatico giornaliero</span><input type="checkbox" checked={s.auto_daily} onChange={(e) => set({ auto_daily: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
           </div>
