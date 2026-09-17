@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/authsync";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
@@ -15,13 +14,15 @@ const REGIONS = ["Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagn
 const STA = (k: string) => ({ pending: { l: "Da inviare", c: "var(--warn)" }, sent: { l: "Inviato", c: "var(--ok)" }, error: { l: "Errore", c: "var(--err)" } } as Record<string, { l: string; c: string }>)[k] ?? { l: k, c: "var(--dim)" };
 
 export default function IstatPage() {
-  const { user } = useAuth();
   const { structures, activeStructureId } = useData();
   const [sid, setSid] = useState("");
   const [s, setS] = useState<Sett>(DEF);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
+  // Password mai pre-caricata nel client (cifrata sul server). Vuota = non cambiare.
+  const [pw, setPw] = useState("");
+  const [hasPw, setHasPw] = useState(false);
 
   useEffect(() => {
     const target = activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId) ? activeStructureId : structures[0]?.id ?? "";
@@ -35,16 +36,20 @@ export default function IstatPage() {
       supabase.from("istat_rows").select("id, arrival, departure, provenance, guests, stato").eq("structure_id", sid).order("arrival", { ascending: false }),
     ]);
     setS(st.data ? { ...DEF, ...Object.fromEntries(Object.entries(st.data).filter(([, v]) => v !== null)) as Partial<Sett> } : DEF);
+    setHasPw(!!st.data?.password_enc); setPw("");
     setRows((rw.data ?? []) as Row[]);
   }, [sid]);
   useEffect(() => { load(); }, [load]);
 
   const set = (p: Partial<Sett>) => setS((x) => ({ ...x, ...p }));
   const save = async () => {
-    if (!supabase || !user || !sid) return;
+    if (!sid) return;
     setBusy("save"); setMsg("");
-    const { error } = await supabase.from("istat_settings").upsert({ tenant_id: user.id, structure_id: sid, region: s.region, partner: s.partner, username: s.username, password_enc: s.password_enc, auto_daily: s.auto_daily, start_from: s.start_from || null, updated_at: new Date().toISOString() });
-    setBusy(""); setMsg(error ? "Errore: " + error.message : "Impostazioni salvate ✓");
+    try {
+      // La cifratura della password avviene lato server nella route.
+      await apiPost("istat/settings", { structureId: sid, region: s.region, partner: s.partner, username: s.username, password: pw, auto_daily: s.auto_daily, start_from: s.start_from || null });
+      await load(); setMsg("Impostazioni salvate ✓");
+    } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
   };
   const call = async (label: string, path: string) => {
     setBusy(label); setMsg("");
@@ -70,7 +75,7 @@ export default function IstatPage() {
             <label className="block"><span className={lbl}>Regione</span><select value={s.region} onChange={(e) => set({ region: e.target.value })} className={inp}>{REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}</select></label>
             <label className="block"><span className={lbl}>Portale / partner</span><input value={s.partner} onChange={(e) => set({ partner: e.target.value })} placeholder="Turist@t / Ross1000…" className={inp} /></label>
             <label className="block"><span className={lbl}>Username</span><input value={s.username} onChange={(e) => set({ username: e.target.value })} className={inp} /></label>
-            <label className="block"><span className={lbl}>Password</span><input type="password" value={s.password_enc} onChange={(e) => set({ password_enc: e.target.value })} className={inp} /></label>
+            <label className="block"><span className={lbl}>Password</span><input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder={hasPw ? "•••••••• (salvata — lascia vuoto per non cambiarla)" : ""} className={inp} /></label>
             <label className="block"><span className={lbl}>Elabora i dati a partire dal</span><input type="date" value={s.start_from?.slice(0, 10) ?? ""} onChange={(e) => set({ start_from: e.target.value })} className={inp} /></label>
             <label className="flex items-center justify-between pt-1"><span className="text-sm text-txt">Invio automatico giornaliero</span><input type="checkbox" checked={s.auto_daily} onChange={(e) => set({ auto_daily: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
           </div>

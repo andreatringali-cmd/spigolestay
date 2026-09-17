@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Structure, Booking, Guest } from "@/lib/types";
 import { logBookingEvent } from "@/lib/booking-events";
+import { decryptCred } from "@/lib/crypto-creds";
 
 const DATA_KEY = "spigolestay:data:v1";
 type Blob = { structures?: Structure[]; bookings?: Booking[]; guests?: Guest[] };
@@ -54,8 +55,9 @@ export async function closeDay(admin: SupabaseClient, tenantId: string, structur
   const list = (rows ?? []) as { id: string; booking_id: string | null }[];
   const ids = list.map((r) => r.id);
   if (!ids.length) return { ok: false, message: "Nessuna riga da inviare.", sent: 0 };
+  const istatPassword = decryptCred(sett?.password_enc);
   if (provider === "mock") {
-    if (!sett?.username || !sett?.password_enc) return { ok: false, message: "Credenziali ISTAT mancanti.", sent: 0 };
+    if (!sett?.username || !istatPassword) return { ok: false, message: "Credenziali ISTAT mancanti.", sent: 0 };
     await admin.from("istat_rows").update({ stato: "sent", esito: "Inviato (mock)" }).in("id", ids);
     for (const bid of Array.from(new Set(list.map((r) => r.booking_id).filter(Boolean))) as string[]) {
       await logBookingEvent(admin, tenantId, bid, "istat", "Movimento ISTAT inviato");

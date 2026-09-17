@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/authsync";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
@@ -15,13 +14,18 @@ interface Sched { id: string; booking_id: string; arrival: string; guest: { cogn
 const RUOLO: Record<string, string> = { "16": "Singolo", "17": "Capofamiglia", "18": "Capogruppo", "19": "Familiare", "20": "Membro" };
 
 export default function AlloggiatiWebPage() {
-  const { user } = useAuth();
   const { structures, activeStructureId } = useData();
   const [sid, setSid] = useState("");
   const [s, setS] = useState<Sett>(DEF);
   const [sched, setSched] = useState<Sched[]>([]);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
+  // Credenziali: mai pre-caricate nel client (sono cifrate sul server). L'utente
+  // digita solo per impostarle/cambiarle; campo vuoto = mantieni quella salvata.
+  const [pw, setPw] = useState("");
+  const [ws, setWs] = useState("");
+  const [hasPw, setHasPw] = useState(false);
+  const [hasWs, setHasWs] = useState(false);
 
   useEffect(() => {
     const target = activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId) ? activeStructureId : structures[0]?.id ?? "";
@@ -35,16 +39,20 @@ export default function AlloggiatiWebPage() {
       supabase.from("alloggiati_schedine").select("id, booking_id, arrival, guest, ruolo, stato, errors, ricevuta").eq("structure_id", sid).order("arrival", { ascending: false }),
     ]);
     setS(st.data ? { ...DEF, ...Object.fromEntries(Object.entries(st.data).filter(([, v]) => v !== null)) as Partial<Sett> } : DEF);
+    setHasPw(!!st.data?.password_enc); setHasWs(!!st.data?.ws_code_enc); setPw(""); setWs("");
     setSched((sc.data ?? []) as Sched[]);
   }, [sid]);
   useEffect(() => { load(); }, [load]);
 
   const set = (p: Partial<Sett>) => setS((x) => ({ ...x, ...p }));
   const save = async () => {
-    if (!supabase || !user || !sid) return;
+    if (!sid) return;
     setBusy("save"); setMsg("");
-    const { error } = await supabase.from("alloggiati_settings").upsert({ tenant_id: user.id, structure_id: sid, username: s.username, password_enc: s.password_enc, ws_code_enc: s.ws_code_enc, ws_code_expires_at: s.ws_code_expires_at || null, auto_daily: s.auto_daily, group_guests: s.group_guests, group_by_room: s.group_by_room, updated_at: new Date().toISOString() });
-    setBusy(""); setMsg(error ? "Errore: " + error.message : "Impostazioni salvate ✓");
+    try {
+      // La cifratura di password/WS code avviene lato server nella route.
+      await apiPost("alloggiati/settings", { structureId: sid, username: s.username, password: pw, wsCode: ws, ws_code_expires_at: s.ws_code_expires_at || null, auto_daily: s.auto_daily, group_guests: s.group_guests, group_by_room: s.group_by_room });
+      await load(); setMsg("Impostazioni salvate ✓");
+    } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
   };
   const call = async (label: string, path: string, body: Record<string, unknown> = {}) => {
     setBusy(label); setMsg("");
@@ -71,8 +79,8 @@ export default function AlloggiatiWebPage() {
             <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa ospiti (capofamiglia + membri)</span><input type="checkbox" checked={s.group_guests} onChange={(e) => set({ group_guests: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
             <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa per camera</span><input type="checkbox" checked={s.group_by_room} onChange={(e) => set({ group_by_room: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
             <label className="block"><span className={lbl}>Username (es. SR001860)</span><input value={s.username} onChange={(e) => set({ username: e.target.value })} className={inp} /></label>
-            <label className="block"><span className={lbl}>Password</span><input type="password" value={s.password_enc} onChange={(e) => set({ password_enc: e.target.value })} className={inp} /></label>
-            <label className="block"><span className={lbl}>Webservice Code</span><input value={s.ws_code_enc} onChange={(e) => set({ ws_code_enc: e.target.value })} className={`${inp} font-mono text-[11px]`} /></label>
+            <label className="block"><span className={lbl}>Password</span><input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder={hasPw ? "•••••••• (salvata — lascia vuoto per non cambiarla)" : ""} className={inp} /></label>
+            <label className="block"><span className={lbl}>Webservice Code</span><input value={ws} onChange={(e) => setWs(e.target.value)} placeholder={hasWs ? "•••••••• (salvato — lascia vuoto per non cambiarlo)" : ""} className={`${inp} font-mono text-[11px]`} /></label>
             <label className="block"><span className={lbl}>Scadenza Webservice Code</span><input type="date" value={s.ws_code_expires_at?.slice(0, 10) ?? ""} onChange={(e) => set({ ws_code_expires_at: e.target.value })} className={inp} />{wsExpSoon && <span className="mt-1 block text-[11px] font-semibold text-[color:var(--warn)]">⚠️ In scadenza: rigenera il codice sul portale Alloggiati.</span>}</label>
             <label className="flex items-center justify-between pt-1"><span className="text-sm text-txt">Invio automatico giornaliero</span><input type="checkbox" checked={s.auto_daily} onChange={(e) => set({ auto_daily: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
           </div>

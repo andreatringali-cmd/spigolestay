@@ -5,6 +5,7 @@ import type { Structure, Booking, Guest } from "@/lib/types";
 import { nights } from "@/lib/dates";
 import { getAlloggiatiProvider, type AlloggiatiCreds, type SchedinaPayload } from "./provider";
 import { logBookingEvent } from "@/lib/booking-events";
+import { decryptCred } from "@/lib/crypto-creds";
 
 const DATA_KEY = "spigolestay:data:v1";
 
@@ -101,7 +102,7 @@ export async function syncSchedine(admin: SupabaseClient, tenantId: string, opts
 
 async function creds(admin: SupabaseClient, tenantId: string, structureId: string): Promise<{ c: AlloggiatiCreds; provider: string }> {
   const { data } = await admin.from("alloggiati_settings").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).maybeSingle();
-  return { c: { username: data?.username, password: data?.password_enc, wsCode: data?.ws_code_enc }, provider: "mock" };
+  return { c: { username: data?.username, password: decryptCred(data?.password_enc), wsCode: decryptCred(data?.ws_code_enc) }, provider: "mock" };
 }
 
 export async function testConnection(admin: SupabaseClient, tenantId: string, structureId: string): Promise<{ ok: boolean; message: string }> {
