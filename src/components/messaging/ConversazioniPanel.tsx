@@ -10,6 +10,7 @@ import { CHANNELS, type Booking, type Guest } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
 import { eur } from "@/lib/format";
 import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
+import { apiPost } from "@/lib/invoicing/client";
 
 
 interface Msg { id: string; dir: "out" | "in"; text: string; ts: number; via?: string }
@@ -116,8 +117,18 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const addTo = (gid: string, dir: "out" | "in", text: string, via?: string) => { if (!text.trim()) return; setThreads((tt) => ({ ...tt, [gid]: [...(tt[gid] ?? []), { id: uid(), dir, text: text.trim(), ts: Date.now(), via }] })); playSound(dir === "out" ? "sent" : "received"); };
   const add = (dir: "out" | "in", text: string, via?: string) => { if (sel) addTo(sel, dir, text, via); };
 
+  // Stato collegamento WhatsApp Cloud API: se attivo, invio reale dall'app.
+  const [waOn, setWaOn] = useState(false);
+  useEffect(() => { apiPost<{ connected: boolean }>("whatsapp/settings", { action: "status" }).then((r) => setWaOn(!!r.connected)).catch(() => {}); }, []);
+  const waSendReal = async (to: string, text: string) => { try { const r = await apiPost<{ ok: boolean }>("whatsapp/send", { to, text }); return !!r.ok; } catch { return false; } };
+
   const digits = (current?.phone ?? "").replace(/\D/g, "");
-  const sendWa = () => { if (!draft.trim()) return; add("out", draft, "WhatsApp"); if (digits) window.open(`https://wa.me/${digits}?text=${encodeURIComponent(draft)}`, "_blank", "noopener"); setDraft(""); };
+  const sendWa = async () => {
+    if (!draft.trim()) return;
+    const text = draft; add("out", text, "WhatsApp"); setDraft("");
+    if (waOn && digits && await waSendReal(digits, text)) return; // inviato via Cloud API
+    if (digits) window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+  };
   const sendMail = async () => {
     if (!draft.trim()) return;
     if (!current?.email) { window.alert(t("L'ospite non ha un'email.")); return; }
@@ -206,10 +217,14 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   };
   const sentKey = (x: { tpl: MsgTemplate; b: Booking; date: string }) => `${x.tpl.srcId || x.tpl.id}-${x.b.id}-${x.date}`;
   const isSent = (x: { tpl: MsgTemplate; b: Booking; date: string }) => sent.some((s) => s.key === sentKey(x));
-  const sendScheduled = (x: { tpl: MsgTemplate; b: Booking; g: Guest; date: string }) => {
+  const sendScheduled = async (x: { tpl: MsgTemplate; b: Booking; g: Guest; date: string }) => {
     const l = sendLinkFor(x.tpl, x.b, x.g); if (!l) return;
-    window.open(l.href, "_blank", "noopener");
-    addTo(x.g.id, "out", fillFor(x.tpl.texts[langOf(x.g)] || x.tpl.texts.it || "", x.b, x.g), l.kind === "wa" ? "WhatsApp" : "Email");
+    const body = fillFor(x.tpl.texts[langOf(x.g)] || x.tpl.texts.it || "", x.b, x.g);
+    const dg = (x.g.phone ?? "").replace(/\D/g, "");
+    // Se WhatsApp è collegato e c'è un numero: invio reale dall'app; altrimenti wa.me/mailto.
+    const sentReal = l.kind === "wa" && waOn && dg && await waSendReal(dg, body);
+    if (!sentReal) window.open(l.href, "_blank", "noopener");
+    addTo(x.g.id, "out", body, l.kind === "wa" ? "WhatsApp" : "Email");
     saveSent([{ key: sentKey(x), guest: x.g.fullName, tpl: x.tpl.name, via: l.kind === "wa" ? "WhatsApp" : "Email", ts: Date.now() }, ...sent.filter((s) => s.key !== sentKey(x))].slice(0, 200));
   };
   const todayQueue = queue.filter((x) => x.date === todayISO && !isSent(x));
