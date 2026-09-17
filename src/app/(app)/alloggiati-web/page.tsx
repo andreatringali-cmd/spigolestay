@@ -89,8 +89,8 @@ export default function AlloggiatiWebPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <SectionTitle>Impostazioni account</SectionTitle>
-          <details open={!s.username} className="mt-2">
-            <summary className="mb-2 cursor-pointer text-xs font-semibold text-focus">Credenziali e opzioni</summary>
+          <div className="mt-2">
+            <div className="mb-2 text-xs font-semibold text-focus">Credenziali e opzioni</div>
           <div className="space-y-2">
             <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa ospiti (capofamiglia + membri)</span><input type="checkbox" checked={s.group_guests} onChange={(e) => set({ group_guests: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
             <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa per camera</span><input type="checkbox" checked={s.group_by_room} onChange={(e) => set({ group_by_room: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
@@ -101,7 +101,7 @@ export default function AlloggiatiWebPage() {
             <label className="flex items-center justify-between pt-1"><span className="text-sm text-txt">Invio automatico giornaliero</span><input type="checkbox" checked={s.auto_daily} onChange={(e) => set({ auto_daily: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
           </div>
           <p className="mt-2 text-[11px] text-faint">L'invio automatico avviene dopo la mezzanotte. Per rientrare nelle 24h di legge puoi forzare l'invio manualmente in qualsiasi momento.</p>
-          </details>
+          </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button onClick={save} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "save" ? "Salvataggio…" : "Salva"}</button>
             <button onClick={() => call("test", "test")} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "test" ? "Test…" : "Test connessione"}</button>
