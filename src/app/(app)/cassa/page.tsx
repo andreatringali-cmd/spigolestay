@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
-import { CHANNELS } from "@/lib/types";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
@@ -12,6 +11,8 @@ import CatIcon, { ICON_KEYS } from "@/components/CatIcon";
 import Icon from "@/components/Icon";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
+import { useAuth } from "@/lib/authsync";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, deleteMovement, insertRule, deleteRule, addPaid, migrateLocalCash } from "@/lib/cassa";
 
 // ---- Conti cassa ------------------------------------------------------------
 const CONTI = [
@@ -22,7 +23,6 @@ const CONTI = [
 ] as const;
 
 // ---- Categorie (entrate / uscite) ------------------------------------------
-type Kind = "in" | "out";
 interface Cat { key: string; label: string; kind: Kind; color: string; icon: string; auto?: boolean; custom?: boolean }
 const DEFAULT_CATS: Cat[] = [
   // Entrate
@@ -46,75 +46,14 @@ const PALETTE = ["#DC2626", "#EA580C", "#D97706", "#CA8A04", "#16A34A", "#0E9F6E
 
 const FREQ: Record<string, string> = { monthly: "Ogni mese", weekly: "Ogni settimana", yearly: "Ogni anno" };
 
-interface Mov {
-  id: string;
-  date: string; // ISO YYYY-MM-DD
-  kind: Kind;
-  cat: string;
-  desc: string;
-  amount: number;
-  conto: string;
-  structureId?: string;
-  auto?: boolean;   // generato da prenotazioni
-  sched?: boolean;  // generato da pagamento programmato
-  ref?: string;
-}
-interface Rule {
-  id: string;
-  kind: Kind;
-  cat: string;
-  desc: string;
-  amount: number;
-  conto: string;
-  structureId?: string;
-  freq: "monthly" | "weekly" | "yearly";
-  day: number;      // giorno del mese (mensile)
-  start: string;    // ISO
-  end?: string;     // ISO opzionale (assente = "Mai")
-  auto: boolean;    // Automatica: si registra da sola alla scadenza
-  note?: string;
-}
-
 const monthKey = (iso: string) => iso.slice(0, 7);
 const monthLabel = (ym: string) => { const [y, m] = ym.split("-").map(Number); return new Date(y, m - 1, 1).toLocaleDateString("it-IT", { month: "long", year: "numeric" }); };
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `m-${Math.floor(performance.now() * 1000)}`);
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const pad = (n: number) => String(n).padStart(2, "0");
 const fmt = (y: number, m0: number, d: number) => `${y}-${pad(m0 + 1)}-${pad(d)}`;
-const daysIn = (y: number, m0: number) => new Date(y, m0 + 1, 0).getDate();
 
-// Genera le date di ricorrenza di una regola nell'intervallo [from, to] (ISO inclusi).
-function occurrences(r: Rule, fromISO: string, toISO: string): string[] {
-  const res: string[] = [];
-  const startISO = r.start;
-  const end = r.end && r.end < toISO ? r.end : toISO;
-  if (r.freq === "monthly") {
-    const sd = new Date(startISO);
-    let y = sd.getFullYear(), m = sd.getMonth();
-    for (let i = 0; i < 480; i++) {
-      const d = Math.min(r.day || sd.getDate(), daysIn(y, m));
-      const iso = fmt(y, m, d);
-      if (iso > end) break;
-      if (iso >= fromISO && iso >= startISO) res.push(iso);
-      m++; if (m > 11) { m = 0; y++; }
-    }
-  } else {
-    const step = r.freq === "weekly" ? 7 : 0;
-    const d = new Date(startISO);
-    for (let i = 0; i < 800; i++) {
-      const iso = fmt(d.getFullYear(), d.getMonth(), d.getDate());
-      if (iso > end) break;
-      if (iso >= fromISO && iso >= startISO) res.push(iso);
-      if (r.freq === "weekly") d.setDate(d.getDate() + step); else d.setFullYear(d.getFullYear() + 1);
-    }
-  }
-  return res;
-}
-
-const KEY = "spigolestay:cassa:v1";
 const CATS_KEY = "spigolestay:cassa:cats";
-const RULES_KEY = "spigolestay:cassa:rules";
-const PAID_KEY = "spigolestay:cassa:paid";
 
 // Grafico a ciambella (torta) per la composizione delle uscite.
 function Donut({ data, center, size = 148 }: { data: { label: string; value: number; color: string }[]; center?: string; size?: number }) {
@@ -139,6 +78,7 @@ export default function CassaPage() {
   const { bookings, guests, structures, activeStructureId, getStructure } = useData();
   const ask = useConfirm();
   const { t } = useLang();
+  const { user } = useAuth();
 
   // Categorie (default + personalizzate).
   const [cats, setCats] = useState<Cat[]>(DEFAULT_CATS);
@@ -146,57 +86,26 @@ export default function CassaPage() {
   const saveCats = (list: Cat[]) => { setCats(list); try { localStorage.setItem(CATS_KEY, JSON.stringify(list.filter((c) => c.custom))); } catch {} };
   const catOf = (k: string) => cats.find((c) => c.key === k);
 
-  // Movimenti manuali.
+  // Movimenti manuali, regole ricorrenti e occorrenze saldate — su Supabase (non più localStorage).
   const [manual, setManual] = useState<Mov[]>([]);
-  useEffect(() => { try { const r = localStorage.getItem(KEY); if (r) setManual(JSON.parse(r)); } catch {} }, []);
-  const save = (list: Mov[]) => { setManual(list); try { localStorage.setItem(KEY, JSON.stringify(list)); } catch {} };
-
-  // Pagamenti programmati (regole ricorrenti).
   const [rules, setRules] = useState<Rule[]>([]);
-  useEffect(() => { try { const r = localStorage.getItem(RULES_KEY); if (r) setRules(JSON.parse(r)); } catch {} }, []);
-  const saveRules = (list: Rule[]) => { setRules(list); try { localStorage.setItem(RULES_KEY, JSON.stringify(list)); } catch {} };
-
-  // Occorrenze già saldate manualmente (per le regole non automatiche). Chiave: `${ruleId}|${iso}`.
   const [paid, setPaid] = useState<string[]>([]);
-  useEffect(() => { try { const r = localStorage.getItem(PAID_KEY); if (r) setPaid(JSON.parse(r)); } catch {} }, []);
-  const savePaid = (list: string[]) => { setPaid(list); try { localStorage.setItem(PAID_KEY, JSON.stringify(list)); } catch {} };
   const paidSet = useMemo(() => new Set(paid), [paid]);
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      await migrateLocalCash(user.id); // una-tantum: sale i vecchi dati locali sul server
+      const c = await loadCash();
+      setManual(c.movements); setRules(c.rules); setPaid(c.paid);
+    })();
+  }, [user]);
 
   const today = todayISO();
 
-  // Movimenti automatici dalle prenotazioni.
-  const auto = useMemo<Mov[]>(() => {
-    const out: Mov[] = [];
-    for (const b of bookings) {
-      if (b.status === "cancelled" || b.channel === "blocked") continue;
-      if (activeStructureId !== "all" && b.structureId !== activeStructureId) continue;
-      const g = guests.find((x) => x.id === b.guestId);
-      const st = getStructure(b.structureId);
-      const total = b.total ?? 0;
-      if (total > 0) out.push({ id: `auto-in-${b.id}`, date: b.checkIn, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: total, conto: b.channel === "direct" ? "contanti" : "banca", auto: true, ref: b.id });
-      const pct = b.commissionPct ?? CHANNELS[b.channel].commission;
-      const comm = Math.round(total * pct);
-      if (comm > 0) out.push({ id: `auto-comm-${b.id}`, date: b.checkIn, kind: "out", cat: "commissioni", desc: `Commissione ${CHANNELS[b.channel].label} · ${g?.fullName ?? "Ospite"}`, amount: comm, conto: "banca", auto: true, ref: b.id });
-    }
-    return out;
-  }, [bookings, guests, activeStructureId, getStructure]);
-
-  const ruleVisible = (structureId?: string) => activeStructureId === "all" || !structureId || structureId === "all" || structureId === activeStructureId;
-
-  // Occorrenze passate (fino a oggi) → contano nel saldo se: regola automatica, oppure occorrenza già segnata pagata.
-  const scheduled = useMemo<Mov[]>(() => {
-    const out: Mov[] = [];
-    const from = fmt(new Date().getFullYear() - 2, new Date().getMonth(), 1);
-    for (const r of rules) {
-      if (!ruleVisible(r.structureId)) continue;
-      for (const iso of occurrences(r, from, today)) {
-        if (!r.auto && !paidSet.has(`${r.id}|${iso}`)) continue; // non-auto non ancora saldata → non conta
-        out.push({ id: `sched-${r.id}-${iso}`, date: iso, kind: r.kind, cat: r.cat, desc: r.desc, amount: r.amount, conto: r.conto, structureId: r.structureId, sched: true, ref: r.id });
-      }
-    }
-    return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rules, activeStructureId, today, paidSet]);
+  // Movimenti automatici dalle prenotazioni + occorrenze programmate (logica condivisa con la Chiusura cassa).
+  const auto = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, activeStructureId), [bookings, guests, activeStructureId, getStructure]);
+  const ruleVisible = (structureId?: string) => scopeVisible(structureId, activeStructureId);
+  const scheduled = useMemo<Mov[]>(() => computeScheduled(rules, paidSet, activeStructureId, today), [rules, activeStructureId, today, paidSet]);
 
   // Scadenze da registrare: occorrenze passate di regole NON automatiche, non ancora saldate (stato SCADUTA).
   const pending = useMemo(() => {
@@ -209,8 +118,8 @@ export default function CassaPage() {
     return out.sort((a, b) => (a.iso < b.iso ? 1 : -1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rules, activeStructureId, today, paidSet]);
-  const markPaid = (r: Rule, iso: string) => savePaid([...paid, `${r.id}|${iso}`]);
-  const markAllPaid = () => savePaid([...paid, ...pending.map((p) => `${p.rule.id}|${p.iso}`)]);
+  const markPaid = (r: Rule, iso: string) => { const k = `${r.id}|${iso}`; setPaid((p) => [...p, k]); if (user) addPaid(user.id, [k]); };
+  const markAllPaid = () => { const keys = pending.map((p) => `${p.rule.id}|${p.iso}`); setPaid((p) => [...p, ...keys]); if (user) addPaid(user.id, keys); };
 
   // Prossime scadenze (dopo oggi).
   const upcoming = useMemo(() => {
@@ -259,7 +168,9 @@ export default function CassaPage() {
     const amt = Math.round(parseFloat(form.amount.replace(",", ".")) || 0);
     if (amt <= 0) return;
     const desc = form.desc.trim() || catOf(form.cat)?.label || "";
-    save([{ id: uid(), date: form.date, kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura }, ...manual]);
+    const mov: Mov = { id: uid(), date: form.date, kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura };
+    setManual((prev) => [mov, ...prev]);
+    if (user) insertMovement(user.id, mov);
     // Ricorrente: crea la regola che riparte dal periodo SUCCESSIVO (questo è già registrato come movimento).
     if (form.repeat !== "once") {
       const d = new Date(form.date);
@@ -267,11 +178,13 @@ export default function CassaPage() {
       else if (form.repeat === "weekly") d.setDate(d.getDate() + 7);
       else d.setFullYear(d.getFullYear() + 1);
       const nextStart = fmt(d.getFullYear(), d.getMonth(), d.getDate());
-      saveRules([...rules, { id: uid(), kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura, freq: form.repeat, day: parseInt(form.date.slice(8, 10)) || 1, start: nextStart, auto: true }]);
+      const rule: Rule = { id: uid(), kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura, freq: form.repeat, day: parseInt(form.date.slice(8, 10)) || 1, start: nextStart, auto: true };
+      setRules((prev) => [...prev, rule]);
+      if (user) insertRule(user.id, rule);
     }
     setForm((f) => ({ ...f, desc: "", amount: "", repeat: "once" }));
   };
-  const del = async (id: string) => { if (!(await ask({ message: t("Eliminare questo movimento?"), danger: true, confirmLabel: t("Elimina") }))) return; save(manual.filter((m) => m.id !== id)); };
+  const del = async (id: string) => { if (!(await ask({ message: t("Eliminare questo movimento?"), danger: true, confirmLabel: t("Elimina") }))) return; setManual((prev) => prev.filter((m) => m.id !== id)); deleteMovement(id); };
 
   // ---- Modale selezione/gestione categorie ----------------------------------
   const [catPicker, setCatPicker] = useState(false);
@@ -294,11 +207,13 @@ export default function CassaPage() {
   const addRule = () => {
     const amt = Math.round(parseFloat(rf.amount.replace(",", ".")) || 0);
     if (amt <= 0) return;
-    saveRules([...rules, { id: uid(), kind: rf.kind, cat: rf.cat, desc: rf.desc.trim() || catOf(rf.cat)?.label || "", amount: amt, conto: rf.conto, structureId: rf.struttura, freq: rf.freq, day: parseInt(rf.day) || 1, start: rf.start, auto: rf.auto, end: rf.end || undefined, note: rf.note?.trim() || undefined }]);
+    const rule: Rule = { id: uid(), kind: rf.kind, cat: rf.cat, desc: rf.desc.trim() || catOf(rf.cat)?.label || "", amount: amt, conto: rf.conto, structureId: rf.struttura, freq: rf.freq, day: parseInt(rf.day) || 1, start: rf.start, auto: rf.auto, end: rf.end || undefined, note: rf.note?.trim() || undefined };
+    setRules((prev) => [...prev, rule]);
+    if (user) insertRule(user.id, rule);
     setRuleModal(false);
     setRf((f) => ({ ...f, desc: "", amount: "" }));
   };
-  const delRule = async (id: string) => { if (!(await ask({ message: t("Eliminare questo pagamento programmato?"), danger: true, confirmLabel: t("Elimina") }))) return; saveRules(rules.filter((r) => r.id !== id)); };
+  const delRule = async (id: string) => { if (!(await ask({ message: t("Eliminare questo pagamento programmato?"), danger: true, confirmLabel: t("Elimina") }))) return; setRules((prev) => prev.filter((r) => r.id !== id)); deleteRule(id); };
   const monthlyRecurring = rules.filter((r) => r.freq === "monthly" && ruleVisible(r.structureId)).reduce((a, r) => a + (r.kind === "out" ? r.amount : -r.amount), 0);
 
   const selCat = catOf(form.cat);
