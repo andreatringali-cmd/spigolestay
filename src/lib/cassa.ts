@@ -56,7 +56,10 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
     const g = guests.find((x) => x.id === b.guestId);
     const st = getStructure(b.structureId);
     const total = b.total ?? 0;
-    if (total > 0) out.push({ id: `auto-in-${b.id}`, date: b.checkIn, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: total, conto: b.channel === "direct" ? "contanti" : "banca", auto: true, ref: b.id });
+    // Incasso automatico = quanto realmente incassato sulla prenotazione (fonte di
+    // verità = prenotazione), non l'intero totale: così la cassa/chiusura riflette il reale.
+    const incassato = b.paid ?? 0;
+    if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: b.checkIn, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: b.channel === "direct" ? "contanti" : "banca", auto: true, ref: b.id });
     const pct = b.commissionPct ?? CHANNELS[b.channel].commission;
     const comm = Math.round(total * pct);
     if (comm > 0) out.push({ id: `auto-comm-${b.id}`, date: b.checkIn, kind: "out", cat: "commissioni", desc: `Commissione ${CHANNELS[b.channel].label} · ${g?.fullName ?? "Ospite"}`, amount: comm, conto: "banca", auto: true, ref: b.id });

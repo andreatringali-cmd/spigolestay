@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useData } from "@/lib/store";
 import { parseISO, toISO } from "@/lib/dates";
 import { bookingGrandTotal } from "@/lib/booking";
+import { amountPaid, paymentStatus } from "@/lib/incassi";
 import { eur } from "@/lib/format";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, Card } from "@/components/ui";
@@ -33,11 +34,12 @@ export default function PagamentiPage() {
 
   const scoped = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId));
   const enrich = scoped.map((b) => {
-    const due = bookingGrandTotal(b, getStructure(b.structureId));
-    const paid = Math.min(b.paid ?? 0, due);
+    const structure = getStructure(b.structureId);
+    const due = bookingGrandTotal(b, structure);
+    const paid = Math.min(amountPaid(b), due);
     const balance = Math.max(0, due - paid);
     const overdue = balance > 0 && b.checkOut < todayISO;
-    const status = balance <= 0 ? "saldato" : paid > 0 ? "acconto" : "da incassare";
+    const status = paymentStatus(b, structure);
     return { b, due, paid, balance, overdue, status };
   });
 

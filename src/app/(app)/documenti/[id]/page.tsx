@@ -38,7 +38,7 @@ export default function DocumentoPage() {
   const router = useRouter();
   const { user } = useAuth();
   const ask = useConfirm();
-  const { structures, activeStructureId, bookings, getGuest, getStructure, getRoomType } = useData();
+  const { structures, activeStructureId, bookings, getGuest, getStructure, getRoomType, updateBooking } = useData();
   const id = String(params.id || "");
   const [doc, setDoc] = useState<Doc | null>(null);
   const [events, setEvents] = useState<Ev[]>([]);
@@ -219,7 +219,14 @@ export default function DocumentoPage() {
       else setVies({ status: "unknown", msg: r.message || "Verifica non disponibile" });
     } catch (e) { setVies({ status: "unknown", msg: e instanceof Error ? e.message : "Errore" }); }
   };
-  const addPayment = async (amountCents: number, method: string) => { if (!supabase || !user || amountCents <= 0) return; await act("pay", async () => { await supabase!.from("document_payments").insert({ document_id: id, tenant_id: user.id, amount_cents: amountCents, method }); }); };
+  const addPayment = async (amountCents: number, method: string) => {
+    if (!supabase || !user || amountCents <= 0) return;
+    await act("pay", async () => {
+      await supabase!.from("document_payments").insert({ document_id: id, tenant_id: user.id, amount_cents: amountCents, method });
+      // Fonte di verità = prenotazione: propaga l'incasso su booking.paid (in €).
+      if (link.bookingId) { const b = bookings.find((x) => x.id === link.bookingId); if (b) updateBooking(b.id, { paid: (b.paid ?? 0) + Math.round(amountCents) / 100 }); }
+    });
+  };
   const deleteDraft = async () => {
     if (!supabase || !doc || doc.stato !== "bozza") return;
     if (!(await ask({ title: "Elimina bozza", message: "Eliminare questa bozza di documento?", danger: true, confirmLabel: "Elimina" }))) return;

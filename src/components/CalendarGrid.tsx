@@ -8,7 +8,6 @@ import { CHANNELS, EVENT_COLORS, type Unit } from "@/lib/types";
 import {
   addDays,
   dayIndex,
-  isWeekend,
   monthLabel,
   nights,
   parseISO,
@@ -18,6 +17,7 @@ import {
 } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { bookingGrandTotal } from "@/lib/booking";
+import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import Icon from "@/components/Icon";
 import ChannelLogo from "@/components/ChannelLogo";
@@ -427,24 +427,11 @@ export default function CalendarGrid() {
     return { left: cl * cellW, width: (cr - cl) * cellW };
   }
 
-  // Tariffe per tipologia (con tariffe derivate) + override per (tipologia, giorno).
+  // Tariffe: logica UNICA condivisa (override calendario + base derivata + weekend).
   const activeUnits = visibleUnits.filter((u) => !u.outOfService);
-  const effectiveBase = (rt: { id: string; basePrice: number; deriveFrom?: string; deriveMode?: "amount" | "percent"; deriveValue?: number }, seen: Set<string> = new Set()): number => {
-    if (!rt.deriveFrom || seen.has(rt.id)) return rt.basePrice;
-    seen.add(rt.id);
-    const src = roomTypes.find((x) => x.id === rt.deriveFrom);
-    if (!src) return rt.basePrice;
-    const base = effectiveBase(src, seen);
-    const v = rt.deriveValue ?? 0;
-    return Math.max(0, Math.round(rt.deriveMode === "percent" ? base * (1 + v / 100) : base + v));
-  };
   const rateKey = (typeId: string, iso: string) => `${typeId}|${iso}`;
-  const rateFor = (typeId: string, iso: string) => {
-    const ov = rateOverrides[rateKey(typeId, iso)];
-    if (ov != null) return ov;
-    const rt = roomTypes.find((x) => x.id === typeId);
-    return Math.round((rt ? effectiveBase(rt) : 100) * (isWeekend(parseISO(iso)) ? 1.25 : 1));
-  };
+  const weekendPct = loadWeekendPct();
+  const rateFor = (typeId: string, iso: string) => rateForDay(typeId, iso, roomTypes, rateOverrides, weekendPct);
   // Striscia tariffa+disponibilità per una singola tipologia.
   const typeStrip = (typeId: string, typeUnits: typeof units) => {
     const act = typeUnits.filter((u) => !u.outOfService);

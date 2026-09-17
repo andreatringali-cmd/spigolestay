@@ -5,6 +5,7 @@ import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
+import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 
 const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -32,15 +33,10 @@ export default function RevenuePage() {
   const totalUnits = activeUnits.length || 1;
   const scopedTypes = roomTypes.filter((rt) => (activeStructureId === "all" || rt.structureId === activeStructureId) && units.some((u) => u.roomTypeId === rt.id && !u.outOfService));
 
-  // Tariffa effettiva per (tipologia, giorno): override del calendario, altrimenti base + weekend.
+  // Tariffa effettiva per (tipologia, giorno): logica unica (override calendario,
+  // altrimenti base effettiva con derivazione + maggiorazione weekend configurabile).
   const rateKey = (typeId: string, iso: string) => `${typeId}|${iso}`;
-  const rateForType = (typeId: string, iso: string) => {
-    const ov = rateOverrides[rateKey(typeId, iso)];
-    if (ov != null) return ov;
-    const rt = roomTypes.find((x) => x.id === typeId);
-    const dow = new Date(iso).getDay();
-    return Math.round((rt?.basePrice ?? 80) * (dow === 0 || dow === 6 ? 1.25 : 1));
-  };
+  const rateForType = (typeId: string, iso: string) => rateForDay(typeId, iso, roomTypes, rateOverrides, loadWeekendPct());
   // Applica una variazione % a tutte le tipologie attive per un giorno (scrive gli override del calendario).
   const applyDay = (iso: string, pct: number) => {
     if (!pct) return;

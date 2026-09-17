@@ -2,6 +2,7 @@
 // Fonte unica usata da Tariffe, motore prenotazioni, nuova prenotazione, sito web.
 
 import type { RoomType } from "./types";
+import { parseISO, isWeekend } from "./dates";
 
 export function effectiveBase(rt: RoomType, all: RoomType[], seen: Set<string> = new Set()): number {
   if (!rt.deriveFrom || seen.has(rt.id)) return rt.basePrice;
@@ -28,3 +29,23 @@ function resolveInherited<T>(rt: RoomType, all: RoomType[], pick: (r: RoomType) 
 }
 export const effectiveMinStay = (rt: RoomType, all: RoomType[]) => resolveInherited(rt, all, (r) => r.minStay ?? 0);
 export const effectiveClosed = (rt: RoomType, all: RoomType[]) => resolveInherited(rt, all, (r) => !!r.salesClosed);
+
+export const isWeekendISO = (iso: string) => isWeekend(parseISO(iso));
+
+// Maggiorazione weekend configurabile (regole prezzo in localStorage). Default 25%.
+export function loadWeekendPct(): number {
+  if (typeof localStorage === "undefined") return 25;
+  try { const r = localStorage.getItem("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {}
+  return 25;
+}
+
+// TARIFFA UNICA per (tipologia, giorno): override calendario (per tipo o per giorno),
+// altrimenti base effettiva (con derivazione) + maggiorazione weekend. Usata da
+// calendario, motore prenotazioni, revenue, preventivi, sito/widget.
+export function rateForDay(typeId: string, iso: string, all: RoomType[], overrides: Record<string, number> = {}, weekendPct = 25): number {
+  const ov = overrides[`${typeId}|${iso}`] ?? overrides[iso];
+  if (ov != null) return Math.max(0, Math.round(ov));
+  const rt = all.find((x) => x.id === typeId);
+  const base = rt ? effectiveBase(rt, all) : 0;
+  return Math.max(0, Math.round(base * (isWeekendISO(iso) ? 1 + weekendPct / 100 : 1)));
+}
