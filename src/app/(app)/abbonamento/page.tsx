@@ -73,6 +73,18 @@ export default function AbbonamentoPage() {
     return () => { cancel = true; };
   }, [user?.id, refCode]);
 
+  // Statistiche referral reali: amici invitati + mesi gratis (amici con abbonamento attivo).
+  const [refStats, setRefStats] = useState({ friends: 0, freeMonths: 0 });
+  useEffect(() => {
+    const sb = supabase; const uid = user?.id;
+    if (!sb || !uid) return;
+    (async () => {
+      const { data } = await sb.from("referrals").select("status").eq("inviter_id", uid);
+      const rows = (data ?? []) as { status: string }[];
+      setRefStats({ friends: rows.length, freeMonths: rows.filter((r) => r.status === "active" || r.status === "subscribed" || r.status === "converted").length });
+    })();
+  }, [user?.id]);
+
   const [refQr, setRefQr] = useState("");
   useEffect(() => {
     if (!refLink) { setRefQr(""); return; }
@@ -341,8 +353,8 @@ export default function AbbonamentoPage() {
               <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">{t("Codice")} </span><span className="font-mono text-sm font-bold text-txt">{refCode}</span>
             </div>
             <div className="mt-3 flex justify-center gap-2">
-              <div className="rounded-lg border border-line bg-surface px-3 py-1.5 text-center"><div className="font-mono text-lg font-bold text-txt">0</div><div className="text-[9px] uppercase tracking-wide text-faint">{t("Amici")}</div></div>
-              <div className="rounded-lg border border-line bg-surface px-3 py-1.5 text-center"><div className="font-mono text-lg font-bold" style={{ color: "var(--focus)" }}>0</div><div className="text-[9px] uppercase tracking-wide text-faint">{t("Mesi gratis")}</div></div>
+              <div className="rounded-lg border border-line bg-surface px-3 py-1.5 text-center"><div className="font-mono text-lg font-bold text-txt">{refStats.friends}</div><div className="text-[9px] uppercase tracking-wide text-faint">{t("Amici")}</div></div>
+              <div className="rounded-lg border border-line bg-surface px-3 py-1.5 text-center"><div className="font-mono text-lg font-bold" style={{ color: "var(--focus)" }}>{refStats.freeMonths}</div><div className="text-[9px] uppercase tracking-wide text-faint">{t("Mesi gratis")}</div></div>
             </div>
           </div>
         </div>

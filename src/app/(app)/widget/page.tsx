@@ -70,7 +70,7 @@ const WKEY = "spigolestay:widgets:v1";
 export default function WidgetPage() {
   const { t } = useLang();
   const ask = useConfirm();
-  const { structures, roomTypes, units, addGuest, addBooking, activeStructureId } = useData();
+  const { structures, roomTypes, activeStructureId } = useData();
 
   const [widgets, setWidgets] = useState<Cfg[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -175,11 +175,9 @@ export default function WidgetPage() {
   const price = c.adjMode === "fixed" ? Math.max(0, raw + c.adjValue) : c.adjMode === "percent" ? Math.max(0, Math.round(raw * (1 + c.adjValue / 100))) : raw;
   const depositAmt = c.deposit === "firstNight" ? (rt?.basePrice ?? 100) : c.deposit === "percent" ? Math.round(price * c.depositPct / 100) : 0;
 
+  // Anteprima: SIMULA la prenotazione (mostra la conferma) SENZA creare dati reali.
   const prenota = () => {
     if (!lastName.trim() && !firstName.trim()) return;
-    const gid = addGuest({ lastName: lastName.trim() || undefined, firstName: firstName.trim() || undefined, email: email.trim() || undefined, phone: phone.trim() || undefined });
-    const anyUnit = units.find((u) => u.roomTypeId === rtId && !u.outOfService);
-    addBooking({ structureId, roomTypeId: rtId, unitId: anyUnit?.id ?? null, guestId: gid, channel: "direct", status: "confirmed", checkIn: ci, checkOut: co, adults: guests, children, total: price, paid: depositAmt });
     setDoneMsg(true);
     window.setTimeout(() => { setDoneMsg(false); setLastName(""); setFirstName(""); setEmail(""); setPhone(""); }, 3500);
   };
