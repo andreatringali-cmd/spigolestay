@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     const structureId = String(b?.structureId || "").trim();
     if (!structureId) return NextResponse.json({ error: "missing_structure" }, { status: 400 });
 
-    const { data: existing } = await auth.admin.from("istat_settings").select("id, password_enc").eq("tenant_id", auth.tenantId).eq("structure_id", structureId).maybeSingle();
+    const { data: existing } = await auth.admin.from("istat_settings").select("password_enc").eq("tenant_id", auth.tenantId).eq("structure_id", structureId).maybeSingle();
 
     const password_enc = b?.password ? encryptCred(String(b.password)) : (existing?.password_enc ?? null);
     const row = {
@@ -30,9 +30,7 @@ export async function POST(req: Request) {
       start_from: b?.start_from ? String(b.start_from) : null,
       updated_at: new Date().toISOString(),
     };
-    const res = existing?.id
-      ? await auth.admin.from("istat_settings").update(row).eq("id", existing.id)
-      : await auth.admin.from("istat_settings").insert(row);
+    const res = await auth.admin.from("istat_settings").upsert(row, { onConflict: "tenant_id,structure_id" });
     if (res.error) return NextResponse.json({ error: "save_failed", message: res.error.message }, { status: 400 });
     return NextResponse.json({ ok: true, message: "Impostazioni salvate ✓" });
   } catch (e) { return NextResponse.json({ error: "save_failed", message: (e as Error)?.message ?? "errore" }, { status: 400 }); }

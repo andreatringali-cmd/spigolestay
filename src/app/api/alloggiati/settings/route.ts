@@ -17,7 +17,8 @@ export async function POST(req: Request) {
     const structureId = String(b?.structureId || "").trim();
     if (!structureId) return NextResponse.json({ error: "missing_structure" }, { status: 400 });
 
-    const { data: existing } = await auth.admin.from("alloggiati_settings").select("id, password_enc, ws_code_enc").eq("tenant_id", auth.tenantId).eq("structure_id", structureId).maybeSingle();
+    // PK = (tenant_id, structure_id): niente colonna id. Upsert su quel conflitto.
+    const { data: existing } = await auth.admin.from("alloggiati_settings").select("password_enc, ws_code_enc").eq("tenant_id", auth.tenantId).eq("structure_id", structureId).maybeSingle();
 
     const password_enc = b?.password ? encryptCred(String(b.password)) : (existing?.password_enc ?? null);
     const ws_code_enc = b?.wsCode ? encryptCred(String(b.wsCode)) : (existing?.ws_code_enc ?? null);
@@ -32,9 +33,7 @@ export async function POST(req: Request) {
       group_by_room: !!b?.group_by_room,
       updated_at: new Date().toISOString(),
     };
-    const res = existing?.id
-      ? await auth.admin.from("alloggiati_settings").update(row).eq("id", existing.id)
-      : await auth.admin.from("alloggiati_settings").insert(row);
+    const res = await auth.admin.from("alloggiati_settings").upsert(row, { onConflict: "tenant_id,structure_id" });
     if (res.error) return NextResponse.json({ error: "save_failed", message: res.error.message }, { status: 400 });
     return NextResponse.json({ ok: true, message: "Impostazioni salvate ✓" });
   } catch (e) { return NextResponse.json({ error: "save_failed", message: (e as Error)?.message ?? "errore" }, { status: 400 }); }
