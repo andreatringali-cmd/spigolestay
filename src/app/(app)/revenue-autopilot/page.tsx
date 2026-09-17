@@ -9,20 +9,30 @@ import { toISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useToast } from "@/components/ToastProvider";
-import { computeSuggestions, loadAutopilot, saveAutopilot, toOverrideMap, type AutopilotCfg, type Suggestion } from "@/lib/autopilot";
+import { italianHolidays, italianBridges } from "@/lib/holidays";
+import { computeSuggestions, loadAutopilot, saveAutopilot, toOverrideMap, highDemandMap, type AutopilotCfg, type Suggestion } from "@/lib/autopilot";
 
 const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
 
 export default function RevenueAutopilotPage() {
-  const { bookings, roomTypes, units, rateOverrides, setDayRates, structures, activeStructureId, getStructure } = useData();
+  const { bookings, roomTypes, units, events, rateOverrides, setDayRates, structures, activeStructureId, getStructure } = useData();
   const toast = useToast();
   const todayISO = toISO(new Date());
   const [cfg, setCfg] = useState<AutopilotCfg>(loadAutopilot());
   const scope = activeStructureId;
 
+  // Giorni ad alta richiesta (festivi/ponti/eventi) per prezzi consapevoli.
+  const highDemand = useMemo(() => {
+    const years = [new Date().getFullYear(), new Date().getFullYear() + 1];
+    const city = (scope !== "all" ? getStructure(scope)?.city : structures[0]?.city) ?? "";
+    const h = italianHolidays(years, city);
+    return highDemandMap(events ?? [], h, italianBridges(h), todayISO, cfg.horizonDays);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, scope, structures, cfg.horizonDays, todayISO]);
+
   const suggestions = useMemo(
-    () => computeSuggestions(bookings, roomTypes, units, rateOverrides, cfg, todayISO, scope),
-    [bookings, roomTypes, units, rateOverrides, cfg, todayISO, scope],
+    () => computeSuggestions(bookings, roomTypes, units, rateOverrides, cfg, todayISO, scope, highDemand),
+    [bookings, roomTypes, units, rateOverrides, cfg, todayISO, scope, highDemand],
   );
 
   const setCfgPersist = (patch: Partial<AutopilotCfg>) => { const next = { ...cfg, ...patch }; setCfg(next); saveAutopilot(next); };

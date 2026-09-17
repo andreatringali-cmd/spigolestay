@@ -13,8 +13,17 @@ export interface AutopilotCfg {
   maxChangePct: number; // variazione massima vs tariffa base (±%)
   floorPct: number;     // pavimento: mai sotto questo % della base
   ceilPct: number;      // tetto: mai sopra questo % della base
+  lastRun?: string;     // data ISO dell'ultima applicazione automatica (giornaliera)
 }
 export const DEFAULT_AUTOPILOT: AutopilotCfg = { on: false, horizonDays: 30, maxChangePct: 25, floorPct: 70, ceilPct: 180 };
+
+// Mappa dei giorni ad alta richiesta (festivo/ponte/evento) per prezzi consapevoli.
+export function highDemandMap(events: { from: string; to: string; name: string }[], holidays: Record<string, string>, bridges: Record<string, string>, fromISO: string, days: number): Map<string, string> {
+  const m = new Map<string, string>();
+  for (let d = 0; d < days; d++) { const iso = shiftISO(fromISO, d); if (holidays[iso]) m.set(iso, holidays[iso]); else if (bridges[iso]) m.set(iso, "Ponte"); }
+  for (const e of events || []) { let iso = e.from; let guard = 0; while (iso < e.to && guard++ < 400) { m.set(iso, e.name); iso = shiftISO(iso, 1); } }
+  return m;
+}
 
 const KEY = "spigolestay:autopilot";
 export function loadAutopilot(): AutopilotCfg {
@@ -44,6 +53,7 @@ function typeOccupancy(typeUnitIds: Set<string>, bookings: Booking[], iso: strin
 export function computeSuggestions(
   bookings: Booking[], roomTypes: RoomType[], units: Unit[], rateOverrides: Record<string, number>,
   cfg: AutopilotCfg, todayISO: string, structureId: string,
+  highDemand?: Map<string, string>, // iso → motivo (festivo/ponte/evento) per prezzi consapevoli
 ): Suggestion[] {
   const weekendPct = loadWeekendPct();
   const out: Suggestion[] = [];
@@ -70,6 +80,9 @@ export function computeSuggestions(
       if (d <= 3 && occ < 50) { mult *= 0.93; reasons.push("Last-minute scarico"); }
       // Buco tra prenotazioni (giorno più libero dei vicini)
       if (occ < 100 && occPrev > occ && occNext > occ) { mult *= 0.90; reasons.push("Buco tra prenotazioni"); }
+      // Alta richiesta: festivo / ponte / evento locale → alza (se non già scarico)
+      const hd = highDemand?.get(iso);
+      if (hd && occ >= 25) { mult *= 1.10; reasons.push(hd); }
 
       // Guardrail: variazione massima vs base + pavimento/tetto
       let suggested = Math.round(base * mult);
