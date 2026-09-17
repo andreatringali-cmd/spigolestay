@@ -8,6 +8,7 @@ import { DEFAULT_EXTRAS, CHANNELS, type ExtraService } from "@/lib/types";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import Icon from "@/components/Icon";
+import { useToast } from "@/components/ToastProvider";
 
 const PER_LABEL: Record<string, string> = { stay: "a soggiorno", night: "a notte", person: "a persona", day: "a giornata" };
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
@@ -16,6 +17,7 @@ const isActive = (e: ExtraService) => e.active !== false;
 
 export default function UpsellingPage() {
   const { bookings, guests, structures, roomTypes, getUnit, activeStructureId, updateStructure, addActivity } = useData();
+  const toast = useToast();
   const today = toISO(new Date());
   const guest = (id: string) => guests.find((g) => g.id === id);
 
@@ -71,7 +73,7 @@ export default function UpsellingPage() {
     if (via === "copy") { try { await navigator.clipboard.writeText(msg); } catch {} }
     else if (via === "wa") window.open(`https://wa.me/${(g?.phone ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
     else if (via === "email") {
-      if (!g?.email) { alert("L'ospite non ha un'email."); return; }
+      if (!g?.email) { toast("L'ospite non ha un'email.", "error"); return; }
       // Invio automatico dal server (Resend), come conferma e preventivi.
       try {
         const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: g.email, subject: "Servizi extra per il tuo soggiorno", text: msg, accent: st?.photoColor, replyTo: st?.email }) });

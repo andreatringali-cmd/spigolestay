@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/lib/theme";
 import { LangProvider } from "@/lib/i18n";
 import { AccessProvider } from "@/lib/access";
 import { ConfirmProvider } from "./ConfirmProvider";
+import { ToastProvider } from "./ToastProvider";
 import Sidebar from "./Sidebar";
 import Icon from "./Icon";
 import BookingDrawer from "./BookingDrawer";
@@ -39,6 +40,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <DataProvider>
         <AccessProvider>
         <ConfirmProvider>
+        <ToastProvider>
         <PendingInvite />
         <WheelScroll />
         <StyleLoader />
@@ -81,6 +83,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <OnboardingWizard />
           <IdleLogout />
         </div>
+        </ToastProvider>
         </ConfirmProvider>
         </AccessProvider>
       </DataProvider>

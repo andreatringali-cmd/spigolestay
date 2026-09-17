@@ -9,6 +9,7 @@ import ScrollStrip from "@/components/ScrollStrip";
 import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, DEFAULT_PROMOS } from "@/lib/promos";
 import { CHANNELS, GUEST_TAGS, type Channel } from "@/lib/types";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useToast } from "@/components/ToastProvider";
 import VarLegend, { PROMO_VARS } from "@/components/VarLegend";
 
 // Canali OTA (a commissione): sono i candidati da riportare al diretto.
@@ -45,6 +46,7 @@ const daysAgo = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime(
 export default function PromozioniPage() {
   const { guests, bookings, structures } = useData();
   const ask = useConfirm();
+  const toast = useToast();
   const today = toISO(new Date());
   const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
@@ -149,7 +151,7 @@ export default function PromozioniPage() {
     }
     setPromoSending(false);
     if (ok > 0) persistLogs([{ id: newPromoId(), promoName: sending.name, date: today, recipients: ok, segment }, ...logs]);
-    window.alert(`Inviate ${ok} email${fail ? ` · ${fail} non riuscite (controlla email/limiti)` : ""}.`);
+    toast(`Inviate ${ok} email${fail ? ` · ${fail} non riuscite (controlla email/limiti)` : ""}.`, fail && ok === 0 ? "error" : "success");
     if (ok > 0) setSending(null);
   };
 

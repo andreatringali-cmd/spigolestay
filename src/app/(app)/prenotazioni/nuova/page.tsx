@@ -123,9 +123,14 @@ export default function NuovaPrenotazionePage() {
   const parkingPriceN = parking ? Math.max(0, Number(parkingPrice) || 0) : 0;
   // Extra salvati sulla prenotazione: servizi scelti + parcheggio se a pagamento.
   const bookingExtras = [...chosenExtras, ...(parkingPriceN > 0 ? [{ name: "Parcheggio", price: parkingPriceN }] : [])];
-  // Tassa di soggiorno e totale finale del voucher (camere + extra + parcheggio + tassa).
-  const taxStruct = getStructure(selected[0]?.structureId);
-  const cityTax = cityTaxOf(taxStruct, adults, nightsN, grandTotal);
+  // Tassa di soggiorno: sommata PER CAMERA e PER STRUTTURA (come verrà salvata su
+  // ogni prenotazione), così i gruppi multi-struttura/comune sono corretti. Gli
+  // adulti sono distribuiti fra le camere come nella creazione (dist).
+  const taxStruct = getStructure(selected[0]?.structureId); // struttura "principale" (voucher/etichette)
+  const roomInstances = selected.flatMap((rt) => Array<typeof rt>(qty[rt.id] ?? 0).fill(rt));
+  const nInst = Math.max(1, roomInstances.length);
+  const distAdults = (i: number) => nInst > 1 ? Math.floor(adults / nInst) + (i < adults % nInst ? 1 : 0) : adults;
+  const cityTax = roomInstances.reduce((sum, rt, i) => sum + cityTaxOf(getStructure(rt.structureId), distAdults(i), nightsN, linePrice(rt)), 0);
   const grandFinal = grandWithExtras + parkingPriceN + cityTax;
 
   const doSearch = () => {

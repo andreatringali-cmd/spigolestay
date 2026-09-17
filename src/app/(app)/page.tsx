@@ -269,7 +269,7 @@ export default function Dashboard() {
   // Centro di comando: stato cross-modulo (dati salvati dalle altre sezioni).
   const relTime = (ts: number) => { const d = Math.floor((Date.now() - ts) / 60000); if (d < 1) return t("adesso"); if (d < 60) return `${d} ${t("min fa")}`; if (d < 1440) return `${Math.floor(d / 60)} ${t("h fa")}`; return `${Math.floor(d / 1440)} ${t("g fa")}`; };
   const daIncassare = scoped.filter((b) => b.checkOut >= todayISO).reduce((a, b) => a + Math.max(0, (b.total ?? 0) + (b.cleaningFee ?? 0) - (b.paid ?? 0)), 0);
-  const [cc, setCc] = useState<{ invii: number; canali: number; sync: string }>({ invii: 0, canali: 0, sync: "—" });
+  const [cc, setCc] = useState<{ invii: number; canali: number; tot: number; sync: string }>({ invii: 0, canali: 0, tot: 0, sync: "—" });
   useEffect(() => {
     try {
       const addD = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -287,7 +287,7 @@ export default function Dashboard() {
       const conn: Record<string, { connected?: boolean; lastSync?: string }> = JSON.parse(localStorage.getItem("spigolestay:canali:conn") || "{}");
       const connected = Object.values(conn).filter((c) => c?.connected).length;
       const syncs = Object.values(conn).map((c) => c?.lastSync).filter(Boolean).map((s) => new Date(s as string).getTime());
-      setCc({ invii, canali: connected, sync: syncs.length ? relTime(Math.max(...syncs)) : t("mai") });
+      setCc({ invii, canali: connected, tot: Object.keys(conn).length, sync: syncs.length ? relTime(Math.max(...syncs)) : t("mai") });
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoMap]);
@@ -583,9 +583,9 @@ export default function Dashboard() {
           {/* Stato canali */}
           <OpsCard title={t("Stato canali OTA")} icon="share" color="#5B74E6" right={<Link href="/canali" className="text-[11px] font-semibold text-focus hover:underline">{t("Gestisci")} →</Link>}>
             <div className="flex items-center gap-3">
-              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cc.canali >= 6 ? "var(--ok)" : cc.canali > 0 ? "var(--warn)" : "var(--err)" }} />
+              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cc.tot > 0 && cc.canali >= cc.tot ? "var(--ok)" : cc.canali > 0 ? "var(--warn)" : "var(--err)" }} />
               <div>
-                <div className="font-mono text-xl font-bold text-txt">{cc.canali}/6 <span className="text-sm font-medium text-dim">{t("connessi")}</span></div>
+                <div className="font-mono text-xl font-bold text-txt">{cc.canali}{cc.tot > 0 ? `/${cc.tot}` : ""} <span className="text-sm font-medium text-dim">{t("connessi")}</span></div>
                 <div className="text-[11px] text-faint">{t("ultima sincronizzazione")} · {cc.sync}</div>
               </div>
             </div>

@@ -11,6 +11,7 @@ import { eur } from "@/lib/format";
 import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { useToast } from "@/components/ToastProvider";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
@@ -42,6 +43,7 @@ export default function StrutturaSchedaPage() {
   const isNew = params.id === "nuovo";
   const { structures, roomTypes, units, addStructure, updateStructure, setActiveStructure, addActivity } = useData();
   const { t } = useLang();
+  const toast = useToast();
   const { moduleOn, user } = useAccess();
   const { user: authUser } = useAuth();
   const hasGuide = moduleOn("concierge"); // Guida ospiti personalizzata = modulo Web Concierge
@@ -201,14 +203,14 @@ export default function StrutturaSchedaPage() {
   // Indirizzo inserito → latitudine/longitudine (+ link Maps automatico dai coordinati).
   const geocode = async () => {
     const query = [f.address, f.streetNumber, f.postalCode, f.city, f.province, f.country || "Italia"].filter(Boolean).join(", ");
-    if (!query.trim()) { alert(t("Inserisci prima l'indirizzo.")); return; }
+    if (!query.trim()) { toast(t("Inserisci prima l'indirizzo."), "error"); return; }
     setGeoBusy(true);
     try {
       const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`, { headers: { Accept: "application/json" } });
       const data = await res.json();
-      if (Array.isArray(data) && data[0]) setF((p) => ({ ...p, lat: Number(Number(data[0].lat).toFixed(6)), lng: Number(Number(data[0].lon).toFixed(6)) }));
-      else alert(t("Indirizzo non trovato. Controlla i campi o incolla un link di Maps."));
-    } catch { alert(t("Ricerca posizione non riuscita. Riprova tra poco.")); }
+      if (Array.isArray(data) && data[0]) { setF((p) => ({ ...p, lat: Number(Number(data[0].lat).toFixed(6)), lng: Number(Number(data[0].lon).toFixed(6)) })); toast(t("Posizione trovata."), "success"); }
+      else toast(t("Indirizzo non trovato. Controlla i campi o incolla un link di Maps."), "error");
+    } catch { toast(t("Ricerca posizione non riuscita. Riprova tra poco."), "error"); }
     setGeoBusy(false);
   };
   // Coordinate → indirizzo (compila i campi mancanti dal punto sulla mappa).
