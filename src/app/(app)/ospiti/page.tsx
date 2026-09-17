@@ -120,6 +120,13 @@ export default function OspitiPage() {
   const nlSorted = sorted.filter((r) => !r.anyBookings);
   const SEGMENTS: [string, string][] = [["all", t("Tutti")], ["repeat", t("Abituali")], ["vip", "VIP"], ["new", t("Nuovi")], ["ch:booking", "Booking"], ["ch:airbnb", "Airbnb"], ["ch:direct", t("Diretta")]];
   const selectSegment = () => setSel((prev) => { const n = new Set(prev); guestSorted.forEach((r) => n.add(r.guest.id)); return n; });
+  // Esporta il segmento corrente in CSV (per mailing/analisi esterne).
+  const exportSegment = () => {
+    const head = [t("Nome"), t("Email"), t("Telefono"), t("Paese"), t("Prenotazioni"), t("Notti"), t("Speso"), t("Ultimo soggiorno"), t("Canale"), "Tag"];
+    const lines = guestSorted.map((r) => [r.guest.fullName, r.guest.email ?? "", r.guest.phone ?? "", r.guest.country ?? "", r.stays, r.nightsTot, r.spent, r.last ? fmtD(r.last) : "", r.topCh ? CHANNELS[r.topCh].label : "", (r.guest.tags ?? []).join("|")].map((x) => `"${String(x).replace(/"/g, '""')}"`).join(","));
+    const blob = new Blob([["﻿" + head.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `ospiti-${seg}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  };
 
   // Selezione multipla → invio promo
   const selEmails = sorted.filter((r) => sel.has(r.guest.id)).map((r) => r.guest.email).filter(Boolean) as string[];
@@ -269,9 +276,12 @@ export default function OspitiPage() {
         {SEGMENTS.map(([k, lab]) => (
           <button key={k} onClick={() => setSeg(k)} className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${seg === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{lab}</button>
         ))}
-        {seg !== "all" && guestSorted.length > 0 && (
-          <button onClick={selectSegment} className="ml-auto rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash">{t("Seleziona segmento")} ({guestSorted.length})</button>
-        )}
+        <div className="ml-auto flex items-center gap-1.5">
+          {guestSorted.length > 0 && <button onClick={exportSegment} className="rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash">⬇ CSV ({guestSorted.length})</button>}
+          {seg !== "all" && guestSorted.length > 0 && (
+            <button onClick={selectSegment} className="rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash">{t("Seleziona segmento")} ({guestSorted.length})</button>
+          )}
+        </div>
       </div>
 
       <Register title={t("Registro ospiti")} list={guestSorted} empty={t("Nessun ospite in questo segmento.")} />

@@ -155,7 +155,7 @@ export default function OspiteSchedaPage() {
         <div className="flex flex-wrap items-center gap-4">
           <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full text-lg font-bold text-white" style={{ backgroundColor: color }}>{initials(g.firstName, g.lastName) || "?"}</div>
           <div className="flex-1">
-            <div className="flex items-center gap-2"><span className="font-display text-lg font-bold text-txt">{fullName}</span>{g.vip && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}</div>
+            <div className="flex items-center gap-2"><span className="font-display text-lg font-bold text-txt">{fullName}</span>{g.vip && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}{stays.length > 1 && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Abituale")}</span>}</div>
             <div className="text-xs text-dim">{g.email || "—"}{g.phone ? ` · ${g.phone}` : ""}</div>
           </div>
           {!isNew && (
