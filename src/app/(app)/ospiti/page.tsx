@@ -48,6 +48,7 @@ export default function OspitiPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dupCount]);
   const [q, setQ] = useState("");
+  const [seg, setSeg] = useState<string>("all"); // segmento CRM: all|repeat|vip|new|ch:<canale>
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "stays", dir: "desc" });
   const [sel, setSel] = useState<Set<string>>(new Set());
   const toggleSel = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -102,10 +103,23 @@ export default function OspitiPage() {
   const avgAll = (() => { const nt = rows.reduce((a, r) => a + r.nightsTot, 0); return nt > 0 ? Math.round(totRevenue / nt) : 0; })();
   const repeat = rows.filter((r) => r.stays > 1).length;
 
+  // Ospiti abituali (più di un soggiorno): per badge e segmento CRM.
+  const repeatIds = useMemo(() => new Set(rows.filter((r) => r.stays > 1).map((r) => r.guest.id)), [rows]);
+  // Segmento CRM selezionato.
+  const segMatch = (r: typeof sorted[number]) =>
+    seg === "all" ? true
+    : seg === "repeat" ? r.stays > 1
+    : seg === "vip" ? !!r.guest.vip
+    : seg === "new" ? r.stays === 1
+    : seg.startsWith("ch:") ? r.topCh === seg.slice(3)
+    : true;
+
   // Due registri: OSPITI (con prenotazioni) e NEWSLETTER (contatti senza prenotazioni).
   // Se un iscritto newsletter prenota, ha "anyBookings" → passa automaticamente agli ospiti.
-  const guestSorted = sorted.filter((r) => r.anyBookings);
+  const guestSorted = sorted.filter((r) => r.anyBookings && segMatch(r));
   const nlSorted = sorted.filter((r) => !r.anyBookings);
+  const SEGMENTS: [string, string][] = [["all", t("Tutti")], ["repeat", t("Abituali")], ["vip", "VIP"], ["new", t("Nuovi")], ["ch:booking", "Booking"], ["ch:airbnb", "Airbnb"], ["ch:direct", t("Diretta")]];
+  const selectSegment = () => setSel((prev) => { const n = new Set(prev); guestSorted.forEach((r) => n.add(r.guest.id)); return n; });
 
   // Selezione multipla → invio promo
   const selEmails = sorted.filter((r) => sel.has(r.guest.id)).map((r) => r.guest.email).filter(Boolean) as string[];
@@ -126,6 +140,7 @@ export default function OspitiPage() {
     const nameCell = (guest: typeof list[number]["guest"]) => (
       <span className="flex min-w-0 items-center gap-1.5 truncate font-medium text-txt">{guest.fullName}
         {guest.vip && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, #D4A017 22%, transparent)", color: "#B8860B" }}>VIP</span>}
+        {repeatIds.has(guest.id) && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 18%, transparent)", color: "var(--ok)" }}>{t("Abituale")}</span>}
         {guest.tags?.includes("newsletter") && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>Newsletter</span>}
       </span>
     );
@@ -249,7 +264,17 @@ export default function OspitiPage() {
         </div>
       )}
 
-      <Register title={t("Registro ospiti")} list={guestSorted} empty={t("Nessun ospite trovato.")} />
+      {/* Segmenti CRM: filtra il registro ospiti e permette invii mirati */}
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        {SEGMENTS.map(([k, lab]) => (
+          <button key={k} onClick={() => setSeg(k)} className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${seg === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{lab}</button>
+        ))}
+        {seg !== "all" && guestSorted.length > 0 && (
+          <button onClick={selectSegment} className="ml-auto rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash">{t("Seleziona segmento")} ({guestSorted.length})</button>
+        )}
+      </div>
+
+      <Register title={t("Registro ospiti")} list={guestSorted} empty={t("Nessun ospite in questo segmento.")} />
       <Register title={t("Registro newsletter")} list={nlSorted} empty={t("Nessun iscritto alla newsletter.")} lead />
 
       {pickPromo && (
