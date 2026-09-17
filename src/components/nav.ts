@@ -39,6 +39,7 @@ export const NAV: NavItem[] = [
   // Revenue: prezzi dinamici e confronto col mercato.
   { label: "Nèttare · prezzi dinamici", href: "/nettare", group: "Revenue", icon: "sparkles", perm: "revenue", module: "rms" },
   { label: "Revenue", href: "/revenue", group: "Revenue", icon: "tag", perm: "revenue", module: "rms" },
+  { label: "Revenue Autopilot", href: "/revenue-autopilot", group: "Revenue", icon: "sparkles", perm: "revenue", module: "rms" },
   { label: "Rate checker", href: "/rate-checker", group: "Revenue", icon: "search", perm: "ratechecker", module: "ratecheck" },
   { label: "Rete città", href: "/mercato", group: "Revenue", icon: "share", perm: "statistiche", module: "market" },
 
