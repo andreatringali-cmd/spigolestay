@@ -26,6 +26,7 @@ export default function AlloggiatiWebPage() {
   const [ws, setWs] = useState("");
   const [hasPw, setHasPw] = useState(false);
   const [hasWs, setHasWs] = useState(false);
+  const [ricDate, setRicDate] = useState("");
 
   useEffect(() => {
     const target = activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId) ? activeStructureId : structures[0]?.id ?? "";
@@ -59,6 +60,21 @@ export default function AlloggiatiWebPage() {
     try { const r = await apiPost<{ message?: string; count?: number; sent?: number }>(`alloggiati/${path}`, { structureId: sid, ...body }); setMsg(r.message || `OK${r.count != null ? ` (${r.count})` : ""}${r.sent != null ? ` — inviate ${r.sent}` : ""}`); await load(); }
     catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
   };
+  // Scarica la ricevuta PDF di una data (integrazione reale attiva).
+  const getRicevuta = async () => {
+    if (!ricDate) { setMsg("Scegli una data per la ricevuta."); return; }
+    setBusy("ricevuta"); setMsg("");
+    try {
+      const r = await apiPost<{ ok: boolean; message?: string; pdfBase64?: string }>("alloggiati/ricevuta", { structureId: sid, date: ricDate });
+      if (r.pdfBase64) {
+        const a = document.createElement("a");
+        a.href = `data:application/pdf;base64,${r.pdfBase64}`;
+        a.download = `ricevuta-alloggiati-${ricDate}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setMsg("Ricevuta scaricata ✓");
+      } else setMsg(r.message || "Ricevuta non disponibile.");
+    } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
+  };
 
   const readyCount = sched.filter((x) => x.stato === "pronta").length;
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
@@ -89,6 +105,7 @@ export default function AlloggiatiWebPage() {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button onClick={save} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "save" ? "Salvataggio…" : "Salva"}</button>
             <button onClick={() => call("test", "test")} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "test" ? "Test…" : "Test connessione"}</button>
+            <button onClick={() => call("tabelle", "tabelle")} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Scarica dal portale i codici ufficiali di comuni, stati e documenti">{busy === "tabelle" ? "Aggiorno…" : "Aggiorna tabelle codici"}</button>
           </div>
           <div className="mt-3 border-t border-line pt-3 text-sm">
             <span className="text-dim">Stato connessione: </span>
@@ -104,7 +121,13 @@ export default function AlloggiatiWebPage() {
           </div>
           <div className="mb-2 flex flex-wrap gap-2">
             <button onClick={() => call("sync", "sync")} disabled={!!busy} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "sync" ? "Sincronizzo…" : "Sincronizza dagli arrivi"}</button>
+            <button onClick={() => call("check", "check")} disabled={!!busy || readyCount === 0} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Controllo preliminare presso il portale, senza inviare">{busy === "check" ? "Controllo…" : "Controlla"}</button>
             <button onClick={() => call("send", "send")} disabled={!!busy || readyCount === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "send" ? "Invio…" : `Invia le pronte (${readyCount})`}</button>
+          </div>
+          <div className="mb-2 flex flex-wrap items-center gap-2 border-t border-line pt-2">
+            <span className="text-[11px] font-medium text-dim">Ricevuta:</span>
+            <input type="date" value={ricDate} onChange={(e) => setRicDate(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+            <button onClick={getRicevuta} disabled={!!busy} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "ricevuta" ? "Scarico…" : "Scarica ricevuta"}</button>
           </div>
           <div className="max-h-[52vh] overflow-y-auto">
             {sched.map((x) => {
