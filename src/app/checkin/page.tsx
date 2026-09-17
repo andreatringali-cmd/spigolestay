@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DataProvider, useData } from "@/lib/store";
 import { DOC_TYPES } from "@/lib/types";
 import { downscaleImage } from "@/lib/images";
@@ -124,6 +124,14 @@ function Engine() {
       if (j.url) window.location.href = j.url; else setPaying(false);
     } catch { setPaying(false); }
   };
+
+  // Ritorno dal pagamento Stripe (?paid=1): registra l'incasso sulla prenotazione.
+  const justPaid = useMemo(() => { try { return new URLSearchParams(window.location.search).get("paid") === "1"; } catch { return false; } }, []);
+  const paidHandled = useRef(false);
+  useEffect(() => {
+    if (!justPaid || paidHandled.current || !booking) return;
+    if (grand > 0 && (booking.paid ?? 0) < grand) { updateBooking(booking.id, { paid: grand }); paidHandled.current = true; }
+  }, [justPaid, booking, grand, updateBooking]);
 
   const header = (
     <div className="border-b border-line bg-surface">
@@ -286,6 +294,7 @@ function Engine() {
         {grand > 0 && (
           <div className={`${box} mb-4 p-4`}>
             <h2 className="mb-2 font-display text-lg font-bold text-txt">Riepilogo & pagamento</h2>
+            {justPaid && <div className="mb-3 rounded-lg px-3 py-2 text-sm font-medium" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }}>✓ Pagamento ricevuto — grazie! L&apos;incasso è stato registrato.</div>}
             <div className="space-y-1 text-sm">
               <div className="flex justify-between"><span className="text-dim">Soggiorno</span><span className="font-mono text-txt">{eur(accommodation)}</span></div>
               {cleaning > 0 && <div className="flex justify-between"><span className="text-dim">Pulizia</span><span className="font-mono text-txt">{eur(cleaning)}</span></div>}
