@@ -65,6 +65,9 @@ export default function UserSchedaPage() {
 
   // Cambio password reale (account collegato via Supabase): attuale + nuova ×2.
   const { user: authUser } = useAuth();
+  // È l'account attualmente loggato? La password (con quella attuale) si può cambiare solo per sé;
+  // per gli altri utenti si può solo inviare un'email di reset.
+  const isSelf = !!authUser?.email && !!u.email && authUser.email.trim().toLowerCase() === u.email.trim().toLowerCase();
   const [pwOpen, setPwOpen] = useState(false);
   const [curPw, setCurPw] = useState("");
   const [newPw, setNewPw] = useState("");
@@ -76,6 +79,7 @@ export default function UserSchedaPage() {
     setPwMsg(null);
     if (newPw.length < 6) { setPwMsg({ ok: false, text: t("La nuova password deve avere almeno 6 caratteri.") }); return; }
     if (newPw !== newPw2) { setPwMsg({ ok: false, text: t("Le due nuove password non coincidono.") }); return; }
+    if (!isSelf) { setPwMsg({ ok: false, text: t("Puoi cambiare direttamente solo la password del TUO account. Per gli altri usa «Invia email di reset».") }); return; }
     if (!supabase || !authUser?.email) { setPwMsg({ ok: false, text: t("Accesso non disponibile.") }); return; }
     setPwBusy(true);
     try {
@@ -88,11 +92,12 @@ export default function UserSchedaPage() {
     finally { setPwBusy(false); }
   };
   const forgotPw = async () => {
-    if (!supabase || !authUser?.email) { setPwMsg({ ok: false, text: t("Accesso non disponibile.") }); return; }
+    const target = (u.email || authUser?.email || "").trim();
+    if (!supabase || !target) { setPwMsg({ ok: false, text: t("Serve un'email valida sull'utente.") }); return; }
     setPwBusy(true); setPwMsg(null);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(authUser.email, { redirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined });
-      setPwMsg(error ? { ok: false, text: error.message } : { ok: true, text: t("Ti abbiamo inviato un'email per reimpostare la password.") });
+      const { error } = await supabase.auth.resetPasswordForEmail(target, { redirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined });
+      setPwMsg(error ? { ok: false, text: error.message } : { ok: true, text: `${t("Email di reset inviata a")} ${target}.` });
     } finally { setPwBusy(false); }
   };
 
@@ -181,7 +186,6 @@ export default function UserSchedaPage() {
           <Card>
             <div className="mb-3 flex items-center justify-between">
               <SectionTitle>{t("Account")}</SectionTitle>
-              <button className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-dim hover:bg-wash" title={t("Accedi come questo utente (impersona)")}>↪ {t("Login come")}</button>
             </div>
             <div className="flex items-center justify-between py-1.5">
               <span className="text-sm text-txt">{t("Utente attivo")}</span>
@@ -195,7 +199,7 @@ export default function UserSchedaPage() {
               <div className="mt-1 flex flex-wrap gap-2">
                 <button onClick={() => { setPwOpen((o) => !o); resetPwFields(); }} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-txt hover:bg-wash">🔑 {t("Cambia password")}</button>
               </div>
-              {pwOpen && (
+              {pwOpen && (isSelf ? (
                 <div className="mt-2 space-y-2">
                   <input type="password" autoComplete="current-password" value={curPw} onChange={(e) => setCurPw(e.target.value)} placeholder={t("Password attuale")} className={inp} />
                   <input type="password" autoComplete="new-password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder={t("Nuova password (min. 6)")} className={inp} />
@@ -206,7 +210,12 @@ export default function UserSchedaPage() {
                   </div>
                   <p className="text-[11px] text-faint">{t("Se non ricordi quella attuale, usa «Password dimenticata»: ti arriva un link via email per reimpostarla.")}</p>
                 </div>
-              )}
+              ) : (
+                <div className="mt-2 space-y-2">
+                  <p className="text-[12px] text-dim">{t("Per motivi di sicurezza non puoi impostare tu la password di un altro utente. Invia un'email di reset: l'utente sceglierà la sua nuova password.")}</p>
+                  <button onClick={forgotPw} disabled={pwBusy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">{pwBusy ? t("Attendi…") : `✉ ${t("Invia email di reset")}`}</button>
+                </div>
+              ))}
               {pwMsg && <div className="mt-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: pwMsg.ok ? "color-mix(in srgb, var(--ok) 12%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: pwMsg.ok ? "var(--ok)" : "var(--err)" }}>{pwMsg.text}</div>}
             </div>
             <MfaSetup />

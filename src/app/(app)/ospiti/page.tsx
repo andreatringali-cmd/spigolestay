@@ -22,11 +22,13 @@ export default function OspitiPage() {
   const router = useRouter();
   const { t } = useLang();
   const { guests, bookings, structures, activeStructureId, mergeGuests, updateGuest } = useData();
-  // Rileva doppioni: stessa email, oppure stesso nome completo.
+  // Rileva doppioni SOLO su un contatto forte (stessa email o stesso telefono): due omonimi
+  // senza contatto NON vengono mai uniti (rischio di fondere persone diverse).
   const dupGroups = useMemo(() => {
     const nrm = (s?: string) => (s ?? "").trim().toLowerCase();
+    const nrmPhone = (s?: string) => (s ?? "").replace(/[\s+()./-]/g, "");
     const byKey = new Map<string, typeof guests>();
-    guests.forEach((g) => { const key = nrm(g.email) || nrm(g.fullName); if (!key) return; const arr = byKey.get(key) ?? []; arr.push(g); byKey.set(key, arr); });
+    guests.forEach((g) => { const key = nrm(g.email) || (nrmPhone(g.phone).length >= 6 ? "tel:" + nrmPhone(g.phone) : ""); if (!key) return; const arr = byKey.get(key) ?? []; arr.push(g); byKey.set(key, arr); });
     return [...byKey.values()].filter((a) => a.length > 1);
   }, [guests]);
   const dupCount = dupGroups.reduce((a, g) => a + g.length - 1, 0);

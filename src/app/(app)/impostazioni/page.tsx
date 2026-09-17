@@ -10,8 +10,7 @@ import StyleChooser from "@/components/StyleChooser";
 
 export default function ImpostazioniPage() {
   const { theme, setTheme } = useTheme();
-  const { t } = useLang();
-  const [lang, setLang] = useState("it");
+  const { t, lang, setLang } = useLang();
   const NOTIF_KEY = "spigolestay:notifs";
   const NOTIF_DEF = { newBooking: true, cancel: true, checkin: true, payment: false, review: true, message: true, cleaning: false, ota: true };
   const [notifs, setNotifs] = useState(NOTIF_DEF);
@@ -67,7 +66,7 @@ export default function ImpostazioniPage() {
       <Card className="mt-4">
         <SectionTitle>{t("Lingua")}</SectionTitle>
         <Row label={t("Lingua interfaccia")}>
-          <select value={lang} onChange={(e) => setLang(e.target.value)} className={inp}>
+          <select value={lang} onChange={(e) => setLang(e.target.value as Parameters<typeof setLang>[0])} className={inp}>
             <option value="it">Italiano</option>
             <option value="en">English</option>
           </select>

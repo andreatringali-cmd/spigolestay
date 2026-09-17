@@ -238,13 +238,14 @@ export default function AssistentePage() {
       const intro = n === 0 ? `${hello}, oggi non ci sono arrivi.` : `${hello}! Oggi ci ${n === 1 ? "è un arrivo" : `sono ${n} arrivi`}. Se vuoi ti dico tutto di ognuno: scegli una prenotazione qui sotto o dimmi il nome dell'ospite.`;
       return { title: "Arrivi di oggi", value: String(n), detail: intro, speech: intro, list: itemsOf(bs) };
     }
+    // "Da incassare/residuo/scadenze" PRIMA di "incassato", altrimenti verrebbe intercettato da /incass/.
+    if (/da incassare|residuo|scaden|da riscuotere/.test(s)) {
+      const v = dueCents ?? 0;
+      return { title: "Da incassare", value: eur(v / 100), detail: "Documenti emessi non ancora saldati.", speech: `Da incassare: ${eur(v / 100)} di documenti emessi non ancora saldati.`, go: { label: "Scadenzario", href: "/scadenzario-incassi" } };
+    }
     if (/incass|pagat/.test(s)) return answers.incassato;
     if (/ricav|fatturat|guadagn|incasso previst/.test(s)) return answers.ricavo;
     if (/prossim|futur/.test(s)) return answers.prossimo;
-    if (/da incassare|residuo|scaden/.test(s) && supabase) {
-      const v = dueCents ?? 0;
-      return { title: "Da incassare", value: eur(v / 100), detail: "Documenti emessi non ancora saldati.", go: { label: "Scadenzario", href: "/scadenzario-incassi" } };
-    }
     if (/fornitor|passiv|da pagare/.test(s) && supabase) {
       const { data } = await supabase.from("purchase_documents").select("total_cents, paid").eq("paid", false);
       const tot = ((data ?? []) as { total_cents: number }[]).reduce((a, r) => a + r.total_cents, 0);
