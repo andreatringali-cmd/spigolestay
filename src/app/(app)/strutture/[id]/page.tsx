@@ -35,7 +35,7 @@ function Info({ children }: { children: React.ReactNode }) {
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
 
-const blankStructure = (): Structure => ({ id: "", name: "", groupName: "", city: "Siracusa", province: "SR", region: "Sicilia", country: "Italia", active: true, type: "B&B", photoColor: AV_COLORS[1], services: [], payMethods: ["Contanti", "Carta / POS"], currency: "EUR", language: "it", cancelPolicy: "moderata", checkInFrom: "15:00", checkInTo: "20:00", checkOutBy: "10:30", cityTax: true, cityTaxMode: "percent", cityTaxPercent: 4, cityTaxCap: 5, cityTaxAmount: 2, cityTaxMaxNights: 7, cityTaxComune: "Siracusa" });
+const blankStructure = (): Structure => ({ id: "", name: "", groupName: "", city: "Siracusa", province: "SR", region: "Sicilia", country: "Italia", active: true, type: "B&B", photoColor: AV_COLORS[1], services: [], payMethods: ["Contanti", "Carta / POS"], currency: "EUR", language: "it", cancelPolicy: "moderata", checkInFrom: "15:00", checkInTo: "20:00", checkOutBy: "10:30", cityTax: true, cityTaxMode: "percent", cityTaxPercent: 4, cityTaxCap: 5, cityTaxAmount: 2, cityTaxMaxNights: 7, cityTaxChildFreeUnder: 14, cityTaxComune: "Siracusa" });
 
 export default function StrutturaSchedaPage() {
   const router = useRouter();
@@ -454,14 +454,16 @@ export default function StrutturaSchedaPage() {
                       <label className={lbl}>{t("% pernottamento")}<div className="relative mt-1"><input type="number" min={0} step={0.5} value={f.cityTaxPercent ?? ""} onChange={(e) => set("cityTaxPercent", num(e.target.value))} className={`${inp} pr-7`} placeholder="4" /><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-faint">%</span></div></label>
                       <label className={lbl}>{t("Tetto € persona/notte")}<input value={f.cityTaxCap ?? ""} onChange={(e) => set("cityTaxCap", num(e.target.value))} className={`${inp} mt-1`} placeholder="5,00" /></label>
                       <label className={lbl}>{t("Max notti")}<input type="number" min={0} value={f.cityTaxMaxNights ?? ""} onChange={(e) => set("cityTaxMaxNights", num(e.target.value))} className={`${inp} mt-1`} placeholder="7" /></label>
+                      <label className={lbl}>{t("Minori esenti sotto")}<input type="number" min={0} max={18} value={f.cityTaxChildFreeUnder ?? ""} onChange={(e) => set("cityTaxChildFreeUnder", num(e.target.value))} className={`${inp} mt-1`} placeholder="14" /></label>
                       <label className={lbl}>{t("Comune")}<input value={f.cityTaxComune ?? ""} onChange={(e) => set("cityTaxComune", e.target.value)} className={`${inp} mt-1`} /></label>
                     </div>
-                    <p className="mt-2 text-[11px] text-faint">{t("Es. Siracusa: 4% del costo camera per ospite a notte, max 5€ a persona/notte, prime 7 notti.")}</p>
+                    <p className="mt-2 text-[11px] text-faint">{t("Le regole variano per comune: imposta %, tetto, notti massime ed età di esenzione minori. Es. Siracusa: 4%, max 5€/persona/notte, 7 notti, minori sotto i 14.")}</p>
                     </>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       <label className={lbl}>{t("€ persona/notte")}<input value={f.cityTaxAmount ?? ""} onChange={(e) => set("cityTaxAmount", num(e.target.value))} className={`${inp} mt-1`} placeholder="2,00" /></label>
                       <label className={lbl}>{t("Max notti")}<input type="number" min={0} value={f.cityTaxMaxNights ?? ""} onChange={(e) => set("cityTaxMaxNights", num(e.target.value))} className={`${inp} mt-1`} /></label>
+                      <label className={lbl}>{t("Minori esenti sotto")}<input type="number" min={0} max={18} value={f.cityTaxChildFreeUnder ?? ""} onChange={(e) => set("cityTaxChildFreeUnder", num(e.target.value))} className={`${inp} mt-1`} placeholder="14" /></label>
                       <label className={lbl}>{t("Comune")}<input value={f.cityTaxComune ?? ""} onChange={(e) => set("cityTaxComune", e.target.value)} className={`${inp} mt-1`} /></label>
                     </div>
                   )}

@@ -78,6 +78,7 @@ export interface Structure {
   cityTaxPercent?: number; // % del pernottamento per persona a notte (modalità "percent")
   cityTaxCap?: number;     // tetto € per persona a notte (modalità "percent", es. Siracusa 5€)
   cityTaxMaxNights?: number; // notti massime tassabili (es. Siracusa 7)
+  cityTaxChildFreeUnder?: number; // età sotto la quale i minori sono esenti (varia per comune; Siracusa 14)
   cityTaxComune?: string;
   // Policy
   cancelPolicy?: "flessibile" | "moderata" | "rigida";

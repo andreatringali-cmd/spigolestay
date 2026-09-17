@@ -27,9 +27,18 @@ export function cityTaxOf(structure: Structure | undefined, adults: number, n: n
 }
 
 type BookingLike = {
-  checkIn: string; checkOut: string; adults?: number;
+  checkIn: string; checkOut: string; adults?: number; children?: number; childAges?: number[];
   total?: number; cleaningFee?: number; extras?: { price?: number }[]; cityTaxExempt?: boolean;
 };
+
+// Persone paganti la tassa: adulti + minori NON esenti (età >= soglia comunale).
+// Se non sono note le età dei bambini, si considerano esenti (comportamento prudente).
+export function cityTaxPayers(structure: Structure | undefined, b: { adults?: number; childAges?: number[] }): number {
+  const adults = b.adults ?? 0;
+  const freeUnder = structure?.cityTaxChildFreeUnder ?? 18; // default: tutti i minorenni esenti
+  const payingKids = (b.childAges ?? []).filter((a) => typeof a === "number" && a >= freeUnder).length;
+  return adults + payingKids;
+}
 
 export function bookingExtrasTotal(b: BookingLike): number {
   return Array.isArray(b.extras) ? b.extras.reduce((a, e) => a + (e?.price || 0), 0) : 0;
@@ -40,6 +49,6 @@ export function bookingGrandTotal(b: BookingLike, structure: Structure | undefin
   const acc = b.total ?? 0;
   if (!acc) return 0;
   const clean = b.cleaningFee ?? 0;
-  const tax = cityTaxOf(structure, b.adults ?? 0, nights(b.checkIn, b.checkOut), acc, b.cityTaxExempt);
+  const tax = cityTaxOf(structure, cityTaxPayers(structure, b), nights(b.checkIn, b.checkOut), acc, b.cityTaxExempt);
   return acc + clean + bookingExtrasTotal(b) + tax;
 }
