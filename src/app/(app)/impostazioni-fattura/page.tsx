@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { FORFETTARIO_NOTE } from "@/lib/invoicing/folio";
+import { apiPost } from "@/lib/invoicing/client";
 
 interface Settings {
   regime: string; denominazione: string; vat: string; tax_code: string;
@@ -25,6 +26,11 @@ export default function ImpostazioniFatturaPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  // Credenziali intermediario (token cifrato lato server, mai pre-caricato).
+  const [cred, setCred] = useState({ hasToken: false, sandbox: true, signature: false, legalStorage: false });
+  const [token, setToken] = useState("");
+  const [credBusy, setCredBusy] = useState("");
+  const [credMsg, setCredMsg] = useState("");
 
   useEffect(() => {
     if (!supabase) { setLoading(false); return; }
@@ -35,6 +41,30 @@ export default function ImpostazioniFatturaPage() {
   }, []);
 
   const set = (patch: Partial<Settings>) => setS((p) => ({ ...p, ...patch }));
+
+  // Carica lo stato credenziali quando il provider selezionato le richiede.
+  const provNeedsCreds = s.default_provider === "openapi";
+  useEffect(() => {
+    if (!provNeedsCreds) return;
+    apiPost<{ hasToken: boolean; sandbox: boolean; signature: boolean; legalStorage: boolean }>("invoicing/provider", { provider: s.default_provider, action: "status" })
+      .then((r) => { setCred({ hasToken: r.hasToken, sandbox: r.sandbox, signature: r.signature, legalStorage: r.legalStorage }); setToken(""); })
+      .catch(() => {});
+  }, [s.default_provider, provNeedsCreds]);
+
+  const saveCred = async () => {
+    setCredBusy("save"); setCredMsg("");
+    try {
+      const r = await apiPost<{ ok: boolean; message?: string }>("invoicing/provider", { provider: s.default_provider, action: "save", token, sandbox: cred.sandbox, signature: cred.signature, legalStorage: cred.legalStorage });
+      setCredMsg(r.message || "Salvato ✓"); setToken("");
+      const st = await apiPost<{ hasToken: boolean; sandbox: boolean; signature: boolean; legalStorage: boolean }>("invoicing/provider", { provider: s.default_provider, action: "status" });
+      setCred({ hasToken: st.hasToken, sandbox: st.sandbox, signature: st.signature, legalStorage: st.legalStorage });
+    } catch (e) { setCredMsg(e instanceof Error ? e.message : "Errore"); } finally { setCredBusy(""); }
+  };
+  const testCred = async () => {
+    setCredBusy("test"); setCredMsg("");
+    try { const r = await apiPost<{ ok: boolean; message?: string }>("invoicing/provider", { provider: s.default_provider, action: "test" }); setCredMsg(r.message || (r.ok ? "OK" : "Errore")); }
+    catch (e) { setCredMsg(e instanceof Error ? e.message : "Errore"); } finally { setCredBusy(""); }
+  };
 
   const save = async () => {
     if (!supabase || !user) { setMsg("Devi essere connesso."); return; }
@@ -86,14 +116,34 @@ export default function ImpostazioniFatturaPage() {
             <select value={s.default_provider} onChange={(e) => set({ default_provider: e.target.value })} className={inp}>
               <option value="mock">Test (mock, nessun invio reale)</option>
               <option value="fattureincloud">Fatture in Cloud (da collegare)</option>
-              <option value="openapi">Openapi (da collegare)</option>
+              <option value="openapi">Openapi.it (SdI)</option>
             </select>
           </label>
           <p className="mt-2 text-[12px] text-dim">
             {s.default_provider === "mock" && "Modalità di prova: i documenti vengono numerati ed 'emessi' ma non trasmessi davvero allo SdI."}
             {s.default_provider === "fattureincloud" && "Le fatture verranno spinte nel tuo conto Fatture in Cloud, che gestisce XML e SdI. Serve il collegamento OAuth (in arrivo)."}
-            {s.default_provider === "openapi" && "Invio tramite intermediario Openapi. Serve la configurazione delle credenziali (in arrivo)."}
+            {s.default_provider === "openapi" && "Invio tramite intermediario Openapi.it: Xenora costruisce l'XML FatturaPA e lo trasmette allo SdI. Incolla il token del tuo account Openapi."}
           </p>
+
+          {provNeedsCreds && (
+            <div className="mt-3 space-y-2 rounded-lg border border-line bg-wash/50 p-3">
+              <label className="block"><span className={lbl}>Token API Openapi</span>
+                <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={cred.hasToken ? "•••••••• (salvato — lascia vuoto per non cambiarlo)" : "Bearer token del tuo account Openapi"} className={inp} /></label>
+              <label className="flex items-center justify-between"><span className="text-sm text-txt">Ambiente di test (sandbox)</span>
+                <input type="checkbox" checked={cred.sandbox} onChange={(e) => setCred((c) => ({ ...c, sandbox: e.target.checked }))} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
+              <label className="flex items-center justify-between"><span className="text-sm text-txt">Firma digitale automatica</span>
+                <input type="checkbox" checked={cred.signature} onChange={(e) => setCred((c) => ({ ...c, signature: e.target.checked }))} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
+              <label className="flex items-center justify-between"><span className="text-sm text-txt">Conservazione a norma</span>
+                <input type="checkbox" checked={cred.legalStorage} onChange={(e) => setCred((c) => ({ ...c, legalStorage: e.target.checked }))} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button onClick={saveCred} disabled={!!credBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{credBusy === "save" ? "Salvo…" : "Salva credenziali"}</button>
+                <button onClick={testCred} disabled={!!credBusy || !cred.hasToken} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{credBusy === "test" ? "Test…" : "Test connessione"}</button>
+                <span className="text-[11px] font-medium" style={{ color: cred.hasToken ? "var(--ok)" : "var(--faint)" }}>{cred.hasToken ? "● token configurato" : "○ token mancante"}</span>
+              </div>
+              {credMsg && <p className="text-[12px] text-dim">{credMsg}</p>}
+              <p className="text-[11px] text-faint">Il token è cifrato sul server (AES-256-GCM) e non viene mai ri-mostrato. Usa prima la sandbox per un invio di prova.</p>
+            </div>
+          )}
           <label className="mt-3 block"><span className={lbl}>Lingua PDF predefinita</span>
             <select value={s.default_pdf_lang} onChange={(e) => set({ default_pdf_lang: e.target.value })} className={inp}>
               <option value="it">Italiano</option><option value="en">English</option>

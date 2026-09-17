@@ -15,6 +15,17 @@ import {
 } from "./folio";
 import { getProvider, type EInvoicePayload } from "./provider";
 import { logBookingEvent } from "@/lib/booking-events";
+import { decryptCred, encryptCred } from "@/lib/crypto-creds";
+
+// Decifra i campi segreti della config provider (salvati come <campo>_enc) e li
+// espone col nome atteso dal provider (token, accessToken, clientSecret…).
+function decryptProviderCfg(cfg: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...cfg };
+  for (const [k, v] of Object.entries(cfg)) {
+    if (k.endsWith("_enc") && typeof v === "string") out[k.slice(0, -4)] = decryptCred(v);
+  }
+  return out;
+}
 
 const DATA_KEY = "spigolestay:data:v1";
 
@@ -305,7 +316,7 @@ async function buildPayload(admin: SupabaseClient, tenantId: string, documentId:
     payment: { method: doc.payment_method, dueDate: doc.due_date, terms: doc.payment_terms },
     notes: doc.notes,
   };
-  return { payload, docKind: doc.doc_kind, providerName: (doc.provider as string) || (settings?.default_provider as string) || "mock", providerCfg: (cred?.config as Record<string, unknown>) ?? {} };
+  return { payload, docKind: doc.doc_kind, providerName: (doc.provider as string) || (settings?.default_provider as string) || "mock", providerCfg: decryptProviderCfg((cred?.config as Record<string, unknown>) ?? {}) };
 }
 
 export interface SendOutcome { providerRef: string; stato: string; message?: string; skipped?: boolean }
@@ -359,4 +370,36 @@ export async function getDocumentXml(admin: SupabaseClient, tenantId: string, do
   const { providerCfg } = await buildPayload(admin, tenantId, documentId);
   const provider = getProvider((doc.provider as string) || "mock", providerCfg);
   return provider.getXml(doc.provider_ref as string);
+}
+
+// --- Credenziali intermediario (token cifrato) ---
+
+export interface ProviderCfgInput { token?: string; sandbox?: boolean; signature?: boolean; legalStorage?: boolean }
+
+// Salva la config del provider: i segreti (token) sono cifrati come token_enc.
+// Token vuoto = mantieni quello già salvato.
+export async function saveProviderCredentials(admin: SupabaseClient, tenantId: string, provider: string, cfg: ProviderCfgInput): Promise<{ ok: boolean; message: string }> {
+  const { data: existing } = await admin.from("provider_credentials").select("config").eq("tenant_id", tenantId).eq("provider", provider).maybeSingle();
+  const prev = (existing?.config as Record<string, unknown>) ?? {};
+  const config: Record<string, unknown> = { ...prev, sandbox: !!cfg.sandbox, signature: !!cfg.signature, legalStorage: !!cfg.legalStorage };
+  if (cfg.token) config.token_enc = encryptCred(cfg.token);
+  const { error } = await admin.from("provider_credentials").upsert({ tenant_id: tenantId, provider, config, updated_at: new Date().toISOString() }, { onConflict: "tenant_id,provider" });
+  return { ok: !error, message: error ? error.message : "Credenziali salvate ✓" };
+}
+
+// Stato (senza esporre il token): se è presente e le opzioni.
+export async function providerCredStatus(admin: SupabaseClient, tenantId: string, provider: string): Promise<{ hasToken: boolean; sandbox: boolean; signature: boolean; legalStorage: boolean }> {
+  const { data } = await admin.from("provider_credentials").select("config").eq("tenant_id", tenantId).eq("provider", provider).maybeSingle();
+  const c = (data?.config as Record<string, unknown>) ?? {};
+  return { hasToken: !!c.token_enc, sandbox: !!c.sandbox, signature: !!c.signature, legalStorage: !!c.legalStorage };
+}
+
+// Verifica le credenziali con una chiamata leggera all'intermediario.
+export async function testProvider(admin: SupabaseClient, tenantId: string, provider: string): Promise<{ ok: boolean; message: string }> {
+  const { data } = await admin.from("provider_credentials").select("config").eq("tenant_id", tenantId).eq("provider", provider).maybeSingle();
+  const cfg = decryptProviderCfg((data?.config as Record<string, unknown>) ?? {});
+  try {
+    await getProvider(provider, cfg).listNotifications();
+    return { ok: true, message: "Connessione all'intermediario riuscita." };
+  } catch (e) { return { ok: false, message: (e as Error)?.message ?? "Errore di connessione." }; }
 }

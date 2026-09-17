@@ -1,7 +1,8 @@
 // Astrazione dell'intermediario di fatturazione elettronica (SDI-as-a-service).
-// Xenora NON genera l'XML FatturaPA né parla con lo SdI: manda un payload
-// strutturato all'intermediario, che produce/firma/trasmette l'XML e restituisce
-// esiti e ricevute. Qui: interfaccia + mock (dev/test) + scheletro Openapi.
+// Xenora costruisce l'XML FatturaPA e lo consegna all'intermediario, che lo
+// trasmette allo SdI e restituisce esiti/ricevute. Qui: interfaccia + mock
+// (dev/test) + provider REALE Openapi.it + scheletro Fatture in Cloud.
+import { buildFatturaPaXml, fatturaPaFileName } from "./fatturapa";
 
 export type ProviderName = "mock" | "openapi" | "fattureincloud";
 
@@ -85,37 +86,100 @@ export class MockProvider implements EInvoiceProvider {
 // sceglie il provider e sono disponibili le credenziali cifrate del tenant.
 // I punti da completare sono marcati con TODO.
 // ---------------------------------------------------------------------------
-export interface OpenapiConfig { token?: string; sandbox?: boolean }
+export interface OpenapiConfig { token?: string; sandbox?: boolean; signature?: boolean; legalStorage?: boolean }
+
+// Mappa gli stati/notifiche SdI di Openapi nei nostri stati.
+//  - scarto (NS)            → scartata
+//  - consegna (RC) / mancata consegna (MC) / decorrenza termini (DT) → consegnata
+//  - altrimenti             → inviata_intermediario
+function mapSdiStatus(raw: string | undefined | null): DocStatus {
+  const s = (raw || "").toString().toLowerCase();
+  if (/scart|ns\b|rifiut|error/.test(s)) return "scartata";
+  if (/conseg|rc\b|mc\b|mancata|decorrenz|dt\b|accett|delivered/.test(s)) return "consegnata";
+  return "inviata_intermediario";
+}
 
 export class OpenapiProvider implements EInvoiceProvider {
   readonly name = "openapi" as const;
   constructor(private cfg: OpenapiConfig) {}
 
-  // TODO(openapi): base URL sandbox/produzione dalla doc Openapi "Fatture / SDI".
-  private base() { return this.cfg.sandbox ? "https://test.oauth.openapi.it" : "https://oauth.openapi.it"; }
-  // TODO(openapi): header di autenticazione (Bearer token dell'account intermediario).
-  private headers() { return { "Content-Type": "application/json", Authorization: `Bearer ${this.cfg.token ?? ""}` }; }
+  private base() { return this.cfg.sandbox ? "https://test.sdi.openapi.it" : "https://sdi.openapi.it"; }
+  private headers() { return { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${this.cfg.token ?? ""}` }; }
+  // Endpoint di invio in base alle opzioni (firma / conservazione a norma).
+  private sendPath() {
+    const s = this.cfg.signature, l = this.cfg.legalStorage;
+    if (s && l) return "/invoices_signature_legal_storage";
+    if (s) return "/invoices_signature";
+    if (l) return "/invoices_legal_storage";
+    return "/invoices";
+  }
 
-  async send(_payload: EInvoicePayload): Promise<SendResult> {
-    void _payload; void this.base; void this.headers;
-    // TODO(openapi): POST del payload all'endpoint di emissione/invio; mappare la
-    // risposta (id documento intermediario) in providerRef + stato.
-    throw new Error("openapi_provider_not_configured");
+  private async req(method: string, path: string, body?: unknown): Promise<{ ok: boolean; status: number; json: Record<string, unknown> }> {
+    if (!this.cfg.token) throw new Error("openapi_token_mancante");
+    const res = await fetch(`${this.base()}${path}`, { method, headers: this.headers(), body: body != null ? JSON.stringify(body) : undefined });
+    const text = await res.text();
+    let json: Record<string, unknown> = {};
+    try { json = text ? JSON.parse(text) : {}; } catch { json = { message: text }; }
+    return { ok: res.ok, status: res.status, json };
+  }
+  // Openapi incapsula in { success, data, message, error }: estrae data se presente.
+  private data(json: Record<string, unknown>): Record<string, unknown> {
+    const d = json.data;
+    return (d && typeof d === "object") ? d as Record<string, unknown> : json;
+  }
+  private msg(json: Record<string, unknown>): string {
+    return (json.message as string) || (json.error as string) || "";
+  }
+
+  async send(payload: EInvoicePayload): Promise<SendResult> {
+    const xml = buildFatturaPaXml(payload);
+    const body = { file_name: fatturaPaFileName(payload), payload: Buffer.from(xml, "utf8").toString("base64") };
+    const r = await this.req("POST", this.sendPath(), body);
+    if (!r.ok) throw new Error(`Openapi ${r.status}: ${this.msg(r.json) || "invio non riuscito"}`);
+    const d = this.data(r.json);
+    const uuid = (d.uuid as string) || (d.id as string) || "";
+    if (!uuid) throw new Error(`Openapi: risposta senza uuid — ${this.msg(r.json)}`);
+    return { providerRef: `openapi:${uuid}`, status: "inviata_intermediario", message: this.msg(r.json) || "Fattura trasmessa allo SdI." };
   }
   async sendCreditNote(payload: EInvoicePayload): Promise<SendResult> { return this.send(payload); }
-  async getStatus(_ref: string): Promise<StatusResult> {
-    void _ref;
-    // TODO(openapi): GET stato/notifiche SdI (RC/NS/MC…) e mappa nei nostri stati.
-    throw new Error("openapi_provider_not_configured");
+
+  private uuidOf(ref: string) { return ref.replace(/^openapi:/, ""); }
+
+  async getStatus(providerRef: string): Promise<StatusResult> {
+    const uuid = this.uuidOf(providerRef);
+    const r = await this.req("GET", `/invoices/${encodeURIComponent(uuid)}`);
+    if (!r.ok) throw new Error(`Openapi ${r.status}: ${this.msg(r.json) || "stato non disponibile"}`);
+    const d = this.data(r.json);
+    // Alcune risposte annidano lo stato in campi diversi: prova più chiavi.
+    const rawStatus = (d.status as string) || (d.state as string) || (d.last_update_status as string) || (d.sdi_status as string) || "";
+    const status = mapSdiStatus(rawStatus);
+    return { status, message: rawStatus ? `Stato SdI: ${rawStatus}` : "In elaborazione presso lo SdI.", xmlAvailable: true, raw: r.json };
   }
-  async getXml(_ref: string): Promise<string | null> {
-    void _ref;
-    // TODO(openapi): GET dell'XML FatturaPA prodotto dall'intermediario.
-    throw new Error("openapi_provider_not_configured");
+
+  async getXml(providerRef: string): Promise<string | null> {
+    const uuid = this.uuidOf(providerRef);
+    const r = await this.req("GET", `/invoices_download/${encodeURIComponent(uuid)}`);
+    if (!r.ok) return null;
+    const d = this.data(r.json);
+    const raw = (d.payload as string) || (d.xml as string) || (d.file as string) || "";
+    if (!raw) return null;
+    // Il payload può tornare base64 o XML in chiaro.
+    if (raw.trimStart().startsWith("<")) return raw;
+    try { return Buffer.from(raw, "base64").toString("utf8"); } catch { return raw; }
   }
-  async listNotifications(): Promise<ProviderNotification[]> {
-    // TODO(openapi): elenco notifiche da elaborare nel job di polling.
-    throw new Error("openapi_provider_not_configured");
+
+  async listNotifications(since?: string): Promise<ProviderNotification[]> {
+    const q = since ? `?updated_after=${encodeURIComponent(since)}` : "";
+    const r = await this.req("GET", `/invoices_notifications${q}`);
+    if (!r.ok) return [];
+    const d = this.data(r.json);
+    const arr = Array.isArray(d) ? d : (Array.isArray(d.notifications) ? d.notifications : (Array.isArray(d.items) ? d.items : []));
+    return (arr as Record<string, unknown>[]).map((n) => ({
+      providerRef: `openapi:${(n.uuid as string) || (n.invoice_uuid as string) || ""}`,
+      status: mapSdiStatus((n.type as string) || (n.status as string)),
+      message: (n.message as string) || (n.type as string) || "notifica SdI",
+      ts: (n.date as string) || (n.created_at as string) || new Date().toISOString(),
+    }));
   }
 }
 
