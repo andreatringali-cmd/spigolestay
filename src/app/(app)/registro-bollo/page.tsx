@@ -3,25 +3,28 @@
 // Registro bollo virtuale: riepilogo dei bolli (2€) sulle fatture emesse, per anno e trimestre.
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useData } from "@/lib/store";
 import { PageHeader, Card } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 
-interface Row { id: string; number_label: string | null; issue_date: string | null; bollo_cents: number; counterpart: { name?: string } | null }
+interface Row { id: string; number_label: string | null; issue_date: string | null; bollo_cents: number; counterpart: { name?: string } | null; structure_id: string | null }
 
 export default function RegistroBolloPage() {
+  const { activeStructureId } = useData();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
     if (!supabase) { setLoading(false); return; }
-    supabase.from("documents").select("id, number_label, issue_date, bollo_cents, counterpart").gt("bollo_cents", 0).order("issue_date", { ascending: false })
+    supabase.from("documents").select("id, number_label, issue_date, bollo_cents, counterpart, structure_id").gt("bollo_cents", 0).order("issue_date", { ascending: false })
       .then(({ data }) => { setRows((data ?? []) as Row[]); setLoading(false); });
   }, []);
 
-  const years = useMemo(() => Array.from(new Set(rows.map((r) => (r.issue_date ?? "").slice(0, 4)).filter(Boolean))).sort().reverse(), [rows]);
-  const ofYear = rows.filter((r) => (r.issue_date ?? "").slice(0, 4) === String(year));
+  const scoped = useMemo(() => rows.filter((r) => activeStructureId === "all" || r.structure_id === activeStructureId), [rows, activeStructureId]);
+  const years = useMemo(() => Array.from(new Set(scoped.map((r) => (r.issue_date ?? "").slice(0, 4)).filter(Boolean))).sort().reverse(), [scoped]);
+  const ofYear = scoped.filter((r) => (r.issue_date ?? "").slice(0, 4) === String(year));
   const quarters = [1, 2, 3, 4].map((q) => {
     const list = ofYear.filter((r) => { const m = Number((r.issue_date ?? "").slice(5, 7)); return Math.ceil(m / 3) === q; });
     return { q, count: list.length, cents: list.reduce((a, r) => a + r.bollo_cents, 0) };

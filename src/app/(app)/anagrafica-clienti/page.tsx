@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/authsync";
 import { PageHeader, Card } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 interface CP { id: string; kind: string; name: string; vat: string | null; tax_code: string | null; address: string | null; city: string | null; cap: string | null; province: string | null; country: string | null; sdi_code: string | null; pec: string | null; email: string | null }
 const KIND: Record<string, string> = { privato: "Privato", societa: "Società", estero: "Estero", ota: "OTA / Agenzia" };
@@ -14,6 +15,7 @@ const emptyForm = () => ({ id: "", kind: "societa", name: "", vat: "", tax_code:
 
 export default function AnagraficaClientiPage() {
   const { user } = useAuth();
+  const ask = useConfirm();
   const [list, setList] = useState<CP[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -38,7 +40,7 @@ export default function AnagraficaClientiPage() {
     const res = edit.id ? await supabase.from("counterparts").update(row).eq("id", edit.id) : await supabase.from("counterparts").insert(row);
     setSaving(false); if (!res.error) { setEdit(null); load(); }
   };
-  const del = async () => { if (!supabase || !edit?.id) return; if (!confirm("Eliminare questo intestatario?")) return; await supabase.from("counterparts").delete().eq("id", edit.id); setEdit(null); load(); };
+  const del = async () => { if (!supabase || !edit?.id) return; if (!(await ask({ message: "Eliminare questo intestatario?", danger: true, confirmLabel: "Elimina" }))) return; await supabase.from("counterparts").delete().eq("id", edit.id); setEdit(null); load(); };
 
   const sel = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";

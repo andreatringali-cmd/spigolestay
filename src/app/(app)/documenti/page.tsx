@@ -47,6 +47,7 @@ export default function DocumentiPage() {
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return rows.filter((r) => {
+      if (activeStructureId !== "all" && r.structure_id !== activeStructureId) return false;
       if (year !== "all") { const y = (r.issue_date ?? r.created_at ?? "").slice(0, 4); if (y !== String(year)) return false; }
       if (kind !== "all" && r.doc_kind !== kind) return false;
       if (stato !== "all" && r.stato !== stato) return false;
@@ -56,7 +57,7 @@ export default function DocumentiPage() {
       }
       return true;
     });
-  }, [rows, q, year, kind, stato]);
+  }, [rows, q, year, kind, stato, activeStructureId]);
 
   const exportCsv = () => {
     const head = ["Data", "Struttura", "Tipo", "Numero", "Cliente", "Prenotazione", "Imponibile", "IVA", "Tassa soggiorno", "Totale", "Da incassare", "Stato"];

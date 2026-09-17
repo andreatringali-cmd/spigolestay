@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/authsync";
 import { PageHeader, Card } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { eur } from "@/lib/format";
 
 const CATEGORIES = ["Pulizie", "Utenze", "Manutenzione", "OTA / commissioni", "Forniture", "Consulenze", "Tasse e tributi", "Marketing", "Assicurazioni", "Altro"];
@@ -24,6 +25,7 @@ const emptyForm = () => ({ id: "" as string, supplierName: "", supplierId: null 
 
 export default function FatturePassivePage() {
   const { user } = useAuth();
+  const ask = useConfirm();
   const [docs, setDocs] = useState<Doc[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,7 +99,7 @@ export default function FatturePassivePage() {
   };
   const del = async () => {
     if (!supabase || !edit?.id) return;
-    if (!confirm("Eliminare questa fattura passiva?")) return;
+    if (!(await ask({ message: "Eliminare questa fattura passiva?", danger: true, confirmLabel: "Elimina" }))) return;
     await supabase.from("purchase_documents").delete().eq("id", edit.id);
     setEdit(null); await load();
   };

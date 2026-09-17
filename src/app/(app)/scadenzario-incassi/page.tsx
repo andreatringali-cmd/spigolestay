@@ -4,24 +4,26 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useData } from "@/lib/store";
 import { PageHeader, Card } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 
-interface Doc { id: string; number_label: string | null; issue_date: string | null; due_date: string | null; total_cents: number; counterpart: { name?: string } | null; booking_code: string | null }
+interface Doc { id: string; number_label: string | null; issue_date: string | null; due_date: string | null; total_cents: number; counterpart: { name?: string } | null; booking_code: string | null; structure_id: string | null }
 
 export default function ScadenzarioIncassiPage() {
   const router = useRouter();
+  const { activeStructureId } = useData();
   const [docs, setDocs] = useState<Doc[]>([]);
   const [paid, setPaid] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
-  const [scope, setScope] = useState("open"); // open | overdue | all
+  const [scope, setScope] = useState("all"); // all | overdue | open(=non scaduti)
 
   useEffect(() => {
     if (!supabase) { setLoading(false); return; }
     (async () => {
       const [d, p] = await Promise.all([
-        supabase.from("documents").select("id, number_label, issue_date, due_date, total_cents, counterpart, booking_code").in("stato", ["emessa", "inviata_intermediario", "consegnata"]),
+        supabase.from("documents").select("id, number_label, issue_date, due_date, total_cents, counterpart, booking_code, structure_id").in("stato", ["emessa", "inviata_intermediario", "consegnata"]),
         supabase.from("document_payments").select("document_id, amount_cents"),
       ]);
       setDocs((d.data ?? []) as Doc[]);
@@ -33,8 +35,9 @@ export default function ScadenzarioIncassiPage() {
   const t = new Date().toISOString().slice(0, 10);
   const rows = useMemo(() => docs.map((d) => ({ ...d, residuo: d.total_cents - (paid[d.id] ?? 0), overdue: !!(d.due_date && d.due_date < t) }))
     .filter((r) => r.residuo > 0)
-    .filter((r) => scope === "all" ? true : scope === "overdue" ? r.overdue : true)
-    .sort((a, b) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999")), [docs, paid, scope, t]);
+    .filter((r) => activeStructureId === "all" || r.structure_id === activeStructureId)
+    .filter((r) => scope === "overdue" ? r.overdue : scope === "open" ? !r.overdue : true)
+    .sort((a, b) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999")), [docs, paid, scope, t, activeStructureId]);
   const totalOpen = rows.reduce((a, r) => a + r.residuo, 0);
   const overdueTot = rows.filter((r) => r.overdue).reduce((a, r) => a + r.residuo, 0);
   const cents = (c: number) => c / 100;
@@ -43,7 +46,7 @@ export default function ScadenzarioIncassiPage() {
   return (
     <div>
       <PageHeader title="Scadenzario incassi" subtitle="Documenti emessi ancora da incassare, per scadenza"
-        actions={<select value={scope} onChange={(e) => setScope(e.target.value)} className={sel}><option value="open">Da incassare</option><option value="overdue">Scaduti</option><option value="all">Tutti</option></select>} />
+        actions={<select value={scope} onChange={(e) => setScope(e.target.value)} className={sel}><option value="all">Tutti da incassare</option><option value="overdue">Solo scaduti</option><option value="open">Non ancora scaduti</option></select>} />
 
       <div className="mb-4 grid grid-cols-2 gap-3">
         <Card><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Totale da incassare</div><div className="font-mono text-lg font-bold text-txt">{eur(cents(totalOpen))}</div></Card>

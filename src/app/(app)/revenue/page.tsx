@@ -60,7 +60,8 @@ export default function RevenuePage() {
       const iso = addDays(start, i);
       const sold = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId) && b.checkIn <= iso && b.checkOut > iso).length;
       const hasEvent = events.some((e) => iso >= e.from && iso < e.to);
-      const base = rateOverrides[iso] ?? avgBase;
+      // Prezzo attuale = media effettiva per tipologia (include gli override applicati con chiave tipo|iso).
+      const base = rts.length ? Math.round(rts.reduce((a, rt) => a + rateForType(rt.id, iso), 0) / rts.length) : avgBase;
       out.push({ iso, occ: sold / totalUnits, sold, hasEvent, base });
     }
     return out;
