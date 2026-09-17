@@ -160,16 +160,27 @@ async function getToken(c: AlloggiatiCreds): Promise<string> {
 }
 
 export async function testConnection(admin: SupabaseClient, tenantId: string, structureId: string): Promise<{ ok: boolean; message: string }> {
-  const { c, live } = await creds(admin, tenantId, structureId);
+  const { data } = await admin.from("alloggiati_settings").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).maybeSingle();
   let res: { ok: boolean; message: string };
-  if (live) {
-    try {
-      const token = await getToken(c);
-      const auth = await authenticationTest(c.username!, token);
-      res = { ok: auth.esito, message: auth.esito ? "Connessione al portale Alloggiati riuscita." : (auth.errorDes || "Token non valido.") };
-    } catch (e) { res = { ok: false, message: (e as Error)?.message ?? "Errore di connessione al portale." }; }
+  if (!data) {
+    res = { ok: false, message: `Nessuna credenziale salvata per questa struttura (${structureId.slice(0, 8)}…). Seleziona questa struttura e salva Username, Password e Webservice Code.` };
   } else {
-    res = await getAlloggiatiProvider("mock").test(c);
+    const c: AlloggiatiCreds = { username: data.username, password: decryptCred(data.password_enc), wsCode: decryptCred(data.ws_code_enc) };
+    const hasEnc = !!data.password_enc && !!data.ws_code_enc;
+    const complete = !!c.username && !!c.password && !!c.wsCode;
+    if (!complete && hasEnc) {
+      res = { ok: false, message: "Credenziali salvate ma NON decifrabili: la chiave del server (CRED_SECRET) non coincide con quella usata al salvataggio. Reinserisci e salva di nuovo Password e Webservice Code." };
+    } else if (!complete) {
+      res = { ok: false, message: "Credenziali incomplete: inserisci Username, Password e Webservice Code, poi Salva." };
+    } else if (!LIVE) {
+      res = { ok: true, message: "Credenziali presenti ma invio reale non attivo (ALLOGGIATI_LIVE). Contatta l'amministratore." };
+    } else {
+      try {
+        const token = await getToken(c);
+        const auth = await authenticationTest(c.username!, token);
+        res = { ok: auth.esito, message: auth.esito ? "Connessione al portale Alloggiati riuscita ✓" : (auth.errorDes || "Token non valido.") };
+      } catch (e) { res = { ok: false, message: (e as Error)?.message ?? "Errore di connessione al portale." }; }
+    }
   }
   await admin.from("alloggiati_settings").update({ status: res.ok ? "attivata" : "errore", status_msg: res.message, last_test_at: new Date().toISOString() }).eq("tenant_id", tenantId).eq("structure_id", structureId);
   return res;
