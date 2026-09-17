@@ -409,8 +409,8 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
 
   return (
     <Modal title={unit ? t("Scheda camera") : t("Nuova camera")} onClose={onClose}>
-      <div className="grid grid-cols-2 gap-3">
-        <label className={`${lbl} col-span-2`}>{t("Nome camera")} *<input value={f.name ?? ""} onChange={(e) => set("name", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. Camera Ortigia")} /></label>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className={`${lbl} sm:col-span-2`}>{t("Nome camera")} *<input value={f.name ?? ""} onChange={(e) => set("name", e.target.value)} className={`${inp} mt-1`} placeholder={t("Es. Camera Ortigia")} /></label>
         <label className={lbl}>{t("Codice")} <span className="font-normal text-faint">({t("automatico")})</span><input value={autoCode} readOnly title={t("Generato da tipologia + numero")} className={`${inp} mt-1 cursor-not-allowed bg-wash text-dim`} placeholder="—" /></label>
         <label className={lbl}>{t("Tipologia")}<select value={f.roomTypeId ?? ""} onChange={(e) => { const rid = e.target.value; if (unit) { setF((p) => ({ ...p, roomTypeId: rid, amenities: Array.from(new Set([...amenitiesFor(rid), ...(p.amenities ?? [])])) })); } else { const nr = nextRoom(rid); setF((p) => ({ ...p, roomTypeId: rid, name: nr.name, amenities: [...amenitiesFor(rid)] })); } }} className={`${inp} mt-1`}>{types.length === 0 && <option value="">{t("Crea prima una tipologia")}</option>}{types.map((rt) => <option key={rt.id} value={rt.id}>{rt.name}</option>)}</select></label>
         <label className={lbl}>{t("Piano")}<input value={f.floor ?? ""} onChange={(e) => set("floor", e.target.value)} className={`${inp} mt-1`} placeholder={t("Terra / 1° / 2°")} /></label>
