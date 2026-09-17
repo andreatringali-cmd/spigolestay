@@ -143,6 +143,17 @@ export class OpenapiProvider implements EInvoiceProvider {
   }
   async sendCreditNote(payload: EInvoicePayload): Promise<SendResult> { return this.send(payload); }
 
+  // Invia un XML FatturaPA già costruito (es. autofattura TD17 reverse charge).
+  async sendRawXml(xml: string, fileName: string): Promise<SendResult> {
+    const body = { file_name: fileName, payload: Buffer.from(xml, "utf8").toString("base64") };
+    const r = await this.req("POST", this.sendPath(), body);
+    if (!r.ok) throw new Error(`Openapi ${r.status}: ${this.msg(r.json) || "invio non riuscito"}`);
+    const d = this.data(r.json);
+    const uuid = (d.uuid as string) || (d.id as string) || "";
+    if (!uuid) throw new Error(`Openapi: risposta senza uuid — ${this.msg(r.json)}`);
+    return { providerRef: `openapi:${uuid}`, status: "inviata_intermediario", message: this.msg(r.json) || "Documento trasmesso allo SdI." };
+  }
+
   private uuidOf(ref: string) { return ref.replace(/^openapi:/, ""); }
 
   async getStatus(providerRef: string): Promise<StatusResult> {

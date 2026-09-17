@@ -10,6 +10,7 @@ import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { eur } from "@/lib/format";
+import { apiPost } from "@/lib/invoicing/client";
 
 const CATEGORIES = ["Pulizie", "Utenze", "Manutenzione", "OTA / commissioni", "Forniture", "Consulenze", "Tasse e tributi", "Marketing", "Assicurazioni", "Altro"];
 const TIPI: Record<string, string> = { fattura: "Fattura", nota_credito: "Nota di credito", ricevuta: "Ricevuta", spesa: "Spesa" };
@@ -18,7 +19,7 @@ const numv = (v: string | number) => { const n = Number(String(v).replace(",", "
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const YEARS = (() => { const y = new Date().getFullYear(); return [y, y - 1, y - 2]; })();
 
-interface Doc { id: string; supplier_id: string | null; supplier_name: string | null; doc_number: string | null; doc_date: string | null; doc_type: string; category: string | null; taxable_cents: number; vat_cents: number; total_cents: number; due_date: string | null; paid: boolean; paid_at: string | null; payment_method: string | null; notes: string | null }
+interface Doc { id: string; supplier_id: string | null; supplier_name: string | null; doc_number: string | null; doc_date: string | null; doc_type: string; category: string | null; taxable_cents: number; vat_cents: number; total_cents: number; due_date: string | null; paid: boolean; paid_at: string | null; payment_method: string | null; notes: string | null; selfinvoice_number: string | null; selfinvoice_status: string | null }
 interface Supplier { id: string; name: string; vat: string | null; category: string | null }
 
 const emptyForm = () => ({ id: "" as string, supplierName: "", supplierId: null as string | null, doc_number: "", doc_date: todayISO(), doc_type: "fattura", category: "", taxableEur: "", vatEur: "", due_date: "", paid: false, paid_at: "", payment_method: "Bonifico bancario", notes: "" });
@@ -39,6 +40,10 @@ export default function FatturePassivePage() {
   // editor
   const [edit, setEdit] = useState<ReturnType<typeof emptyForm> | null>(null);
   const [saving, setSaving] = useState(false);
+  // autofattura (reverse charge TD17) del documento selezionato
+  const [af, setAf] = useState<{ number?: string; status?: string }>({});
+  const [afBusy, setAfBusy] = useState("");
+  const [afMsg, setAfMsg] = useState("");
 
   const load = useCallback(async () => {
     if (!supabase) { setErr("Devi essere connesso."); setLoading(false); return; }
@@ -69,8 +74,23 @@ export default function FatturePassivePage() {
 
   const totals = useMemo(() => filtered.reduce((a, r) => ({ imp: a.imp + r.taxable_cents, iva: a.iva + r.vat_cents, tot: a.tot + r.total_cents, unpaid: a.unpaid + (r.paid ? 0 : r.total_cents) }), { imp: 0, iva: 0, tot: 0, unpaid: 0 }), [filtered]);
 
-  const openNew = () => setEdit(emptyForm());
-  const openEdit = (r: Doc) => setEdit({ id: r.id, supplierName: r.supplier_name ?? "", supplierId: r.supplier_id, doc_number: r.doc_number ?? "", doc_date: r.doc_date ?? todayISO(), doc_type: r.doc_type, category: r.category ?? "", taxableEur: String(cents(r.taxable_cents)), vatEur: String(cents(r.vat_cents)), due_date: r.due_date ?? "", paid: r.paid, paid_at: r.paid_at ?? "", payment_method: r.payment_method ?? "Bonifico bancario", notes: r.notes ?? "" });
+  const openNew = () => { setEdit(emptyForm()); setAf({}); setAfMsg(""); };
+  const openEdit = (r: Doc) => { setEdit({ id: r.id, supplierName: r.supplier_name ?? "", supplierId: r.supplier_id, doc_number: r.doc_number ?? "", doc_date: r.doc_date ?? todayISO(), doc_type: r.doc_type, category: r.category ?? "", taxableEur: String(cents(r.taxable_cents)), vatEur: String(cents(r.vat_cents)), due_date: r.due_date ?? "", paid: r.paid, paid_at: r.paid_at ?? "", payment_method: r.payment_method ?? "Bonifico bancario", notes: r.notes ?? "" }); setAf({ number: r.selfinvoice_number ?? undefined, status: r.selfinvoice_status ?? undefined }); setAfMsg(""); };
+
+  // Genera (ed eventualmente invia) l'autofattura TD17 reverse charge.
+  const genAutofattura = async () => {
+    if (!edit?.id) return;
+    if (!(await ask({ title: "Autofattura reverse charge", message: "Generare l'autofattura TD17 per questa fattura estera? Se il provider SdI è configurato verrà anche trasmessa.", confirmLabel: "Genera" }))) return;
+    setAfBusy("gen"); setAfMsg("");
+    try { const r = await apiPost<{ ok: boolean; message?: string; number?: string; status?: string }>("invoicing/autofattura", { purchaseDocId: edit.id }); setAfMsg(r.message || ""); if (r.number) setAf({ number: r.number, status: r.status }); await load(); }
+    catch (e) { setAfMsg(e instanceof Error ? e.message : "Errore"); } finally { setAfBusy(""); }
+  };
+  const dlAutofattura = async () => {
+    if (!edit?.id) return;
+    setAfBusy("xml"); setAfMsg("");
+    try { const r = await apiPost<{ xml: string }>("invoicing/autofattura", { purchaseDocId: edit.id, action: "xml" }); const blob = new Blob([r.xml], { type: "application/xml" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `autofattura-${(af.number ?? edit.id).replace(/[^\w-]/g, "_")}.xml`; a.click(); URL.revokeObjectURL(a.href); }
+    catch (e) { setAfMsg(e instanceof Error ? e.message : "Errore"); } finally { setAfBusy(""); }
+  };
 
   const save = async () => {
     if (!supabase || !user || !edit) return;
@@ -201,6 +221,20 @@ export default function FatturePassivePage() {
               <label className="sm:col-span-2 flex items-center gap-2 pt-1"><input type="checkbox" checked={edit.paid} onChange={(e) => setEdit({ ...edit, paid: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /><span className="text-sm text-txt">Pagata</span>{edit.paid && <input type="date" value={edit.paid_at || todayISO()} onChange={(e) => setEdit({ ...edit, paid_at: e.target.value })} className="ml-auto rounded-lg border border-line bg-paper px-2 py-1 text-sm" />}</label>
               <label className={`${lbl} sm:col-span-2`}>Note<textarea value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} rows={2} className={inp} /></label>
             </div>
+            {edit.id && (
+              <div className="mt-3 rounded-lg border border-line bg-wash/50 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-txt">Autofattura reverse charge (TD17)</span>
+                  {af.status && <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${af.status === "scartata" ? "var(--err)" : af.status === "generata" ? "var(--warn)" : "var(--ok)"} 16%, transparent)`, color: af.status === "scartata" ? "var(--err)" : af.status === "generata" ? "var(--warn)" : "var(--ok)" }}>{af.number ? `${af.number} · ` : ""}{af.status}</span>}
+                </div>
+                <p className="mt-1 text-[11px] text-faint">Per commissioni/servizi da fornitori esteri (OTA) va emessa l&apos;autofattura in reverse charge. L&apos;imponibile è l&apos;importo indicato sopra; IVA 22%.</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button onClick={genAutofattura} disabled={!!afBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{afBusy === "gen" ? "Genero…" : af.status ? "Rigenera autofattura" : "Genera autofattura TD17"}</button>
+                  {af.status && <button onClick={dlAutofattura} disabled={!!afBusy} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{afBusy === "xml" ? "Scarico…" : "Scarica XML"}</button>}
+                </div>
+                {afMsg && <p className="mt-2 text-[12px] text-dim">{afMsg}</p>}
+              </div>
+            )}
             <div className="mt-3 flex items-center gap-2">
               <button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? "Salvo…" : "Salva"}</button>
               {edit.id && <button onClick={del} className="rounded-lg px-3 py-2 text-sm font-medium text-faint hover:text-[color:var(--err)]">Elimina</button>}

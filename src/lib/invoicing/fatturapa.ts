@@ -146,3 +146,98 @@ export function fatturaPaFileName(p: EInvoicePayload): string {
   const id = (p.emittente.vat || p.emittente.taxCode || "00000000000").replace(/[^A-Za-z0-9]/g, "");
   return `IT${id}_${progressivo(p.docId).slice(0, 5).padStart(5, "0")}.xml`;
 }
+
+// ---------------------------------------------------------------------------
+// AUTOFATTURA / INTEGRAZIONE reverse charge (TD17: acquisto servizi dall'estero,
+// es. commissioni OTA). Il cedente è il FORNITORE ESTERO, il cessionario è l'host
+// italiano, che è anche il trasmittente e il destinatario (self-delivery).
+// ---------------------------------------------------------------------------
+export interface AutofatturaInput {
+  host: { denominazione?: string; vat?: string; taxCode?: string; address?: string; city?: string; cap?: string; province?: string; country?: string; regimeFiscale?: string; sdiCode?: string; pec?: string };
+  supplier: { name: string; vat?: string | null; country?: string | null; address?: string | null; city?: string | null; cap?: string | null; province?: string | null };
+  number: string;      // numero autofattura (sezionale host)
+  date: string;        // data ISO
+  imponibileCents: number;
+  vatRate: number;     // es. 22
+  sdiType?: string;    // default TD17
+  causale?: string;
+  seed?: string;       // per il ProgressivoInvio
+}
+
+export function buildAutofatturaXml(a: AutofatturaInput): string {
+  const host = a.host;
+  const sup = a.supplier;
+  const vatCents = Math.round(a.imponibileCents * (a.vatRate / 100));
+  const totCents = a.imponibileCents + vatCents;
+  const supCountry = (sup.country || "").toUpperCase() || "EE"; // EE = estero se non indicato
+  const supVat = (sup.vat || "").trim() || "OO99999999999";     // convenzione SdI se P.IVA estera assente
+  const codDest = (host.sdiCode && host.sdiCode.trim()) ? host.sdiCode.trim().toUpperCase() : "0000000";
+  const pecDest = codDest === "0000000" && host.pec ? `<PECDestinatario>${esc(host.pec)}</PECDestinatario>` : "";
+
+  const header =
+    `<FatturaElettronicaHeader>` +
+    `<DatiTrasmissione>` +
+    `<IdTrasmittente><IdPaese>IT</IdPaese><IdCodice>${esc(host.vat || host.taxCode || "")}</IdCodice></IdTrasmittente>` +
+    `<ProgressivoInvio>${esc(progressivo(a.seed || a.number))}</ProgressivoInvio>` +
+    `<FormatoTrasmissione>FPR12</FormatoTrasmissione>` +
+    `<CodiceDestinatario>${esc(codDest)}</CodiceDestinatario>` +
+    pecDest +
+    `</DatiTrasmissione>` +
+    // Cedente = fornitore ESTERO
+    `<CedentePrestatore>` +
+    `<DatiAnagrafici>` +
+    `<IdFiscaleIVA><IdPaese>${esc(supCountry)}</IdPaese><IdCodice>${esc(supVat)}</IdCodice></IdFiscaleIVA>` +
+    `<Anagrafica><Denominazione>${esc((sup.name || "Fornitore estero").slice(0, 80))}</Denominazione></Anagrafica>` +
+    `<RegimeFiscale>RF18</RegimeFiscale>` +
+    `</DatiAnagrafici>` +
+    sede({ address: sup.address, cap: sup.cap, city: sup.city, province: sup.province, country: supCountry }) +
+    `</CedentePrestatore>` +
+    // Cessionario = HOST italiano
+    `<CessionarioCommittente>` +
+    `<DatiAnagrafici>` +
+    idFiscaleIva(host.country || "IT", host.vat) +
+    (host.taxCode ? `<CodiceFiscale>${esc(host.taxCode)}</CodiceFiscale>` : "") +
+    `<Anagrafica><Denominazione>${esc((host.denominazione || "").slice(0, 80))}</Denominazione></Anagrafica>` +
+    `</DatiAnagrafici>` +
+    sede({ address: host.address, cap: host.cap, city: host.city, province: host.province, country: host.country || "IT" }) +
+    `</CessionarioCommittente>` +
+    `</FatturaElettronicaHeader>`;
+
+  const body =
+    `<FatturaElettronicaBody>` +
+    `<DatiGenerali><DatiGeneraliDocumento>` +
+    `<TipoDocumento>${esc(a.sdiType || "TD17")}</TipoDocumento>` +
+    `<Divisa>EUR</Divisa>` +
+    `<Data>${ymd(a.date)}</Data>` +
+    `<Numero>${esc(a.number)}</Numero>` +
+    `<ImportoTotaleDocumento>${eur(totCents)}</ImportoTotaleDocumento>` +
+    (a.causale ? `<Causale>${esc(a.causale.slice(0, 200))}</Causale>` : "") +
+    `</DatiGeneraliDocumento></DatiGenerali>` +
+    `<DatiBeniServizi>` +
+    `<DettaglioLinee>` +
+    `<NumeroLinea>1</NumeroLinea>` +
+    `<Descrizione>${esc((a.causale || "Servizi da soggetto estero - reverse charge").slice(0, 1000))}</Descrizione>` +
+    `<Quantita>1.00</Quantita>` +
+    `<PrezzoUnitario>${eur(a.imponibileCents)}</PrezzoUnitario>` +
+    `<PrezzoTotale>${eur(a.imponibileCents)}</PrezzoTotale>` +
+    `<AliquotaIVA>${rate(a.vatRate)}</AliquotaIVA>` +
+    `</DettaglioLinee>` +
+    `<DatiRiepilogo>` +
+    `<AliquotaIVA>${rate(a.vatRate)}</AliquotaIVA>` +
+    `<ImponibileImporto>${eur(a.imponibileCents)}</ImponibileImporto>` +
+    `<Imposta>${eur(vatCents)}</Imposta>` +
+    `<EsigibilitaIVA>I</EsigibilitaIVA>` +
+    `</DatiRiepilogo>` +
+    `</DatiBeniServizi>` +
+    `</FatturaElettronicaBody>`;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>` +
+    `<p:FatturaElettronica versione="FPR12" xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">` +
+    header + body +
+    `</p:FatturaElettronica>`;
+}
+
+export function autofatturaFileName(hostVatOrCf: string, number: string): string {
+  const id = (hostVatOrCf || "00000000000").replace(/[^A-Za-z0-9]/g, "");
+  return `IT${id}_${progressivo(number).slice(0, 5).padStart(5, "0")}.xml`;
+}

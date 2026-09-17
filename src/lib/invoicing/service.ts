@@ -13,7 +13,8 @@ import { nights } from "@/lib/dates";
 import {
   buildDocumentDraft, toCents, type FolioLine, type Regime, type DocKind,
 } from "./folio";
-import { getProvider, type EInvoicePayload } from "./provider";
+import { getProvider, OpenapiProvider, type EInvoicePayload } from "./provider";
+import { buildAutofatturaXml, autofatturaFileName } from "./fatturapa";
 import { logBookingEvent } from "@/lib/booking-events";
 import { decryptCred, encryptCred } from "@/lib/crypto-creds";
 
@@ -370,6 +371,65 @@ export async function getDocumentXml(admin: SupabaseClient, tenantId: string, do
   const { providerCfg } = await buildPayload(admin, tenantId, documentId);
   const provider = getProvider((doc.provider as string) || "mock", providerCfg);
   return provider.getXml(doc.provider_ref as string);
+}
+
+// --- Autofattura / integrazione reverse charge (TD17) da fattura passiva estera ---
+
+// Numero autofattura progressivo per anno (sezionale "AF").
+async function nextAutofatturaNumber(admin: SupabaseClient, tenantId: string, year: number): Promise<string> {
+  const { count } = await admin.from("purchase_documents").select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId).not("selfinvoice_number", "is", null)
+    .gte("selfinvoice_at", `${year}-01-01`).lte("selfinvoice_at", `${year}-12-31T23:59:59`);
+  return `AF/${year}/${String((count ?? 0) + 1).padStart(4, "0")}`;
+}
+
+export interface AutofatturaOutcome { ok: boolean; message: string; number?: string; status?: string }
+
+// Genera (ed eventualmente invia allo SdI) l'autofattura TD17 da una fattura passiva.
+export async function createAutofattura(admin: SupabaseClient, tenantId: string, purchaseDocId: string, vatRate = 22): Promise<AutofatturaOutcome> {
+  const { data: pd } = await admin.from("purchase_documents").select("*").eq("id", purchaseDocId).eq("tenant_id", tenantId).maybeSingle();
+  if (!pd) return { ok: false, message: "Fattura passiva non trovata." };
+  if (pd.selfinvoice_status === "inviata" || pd.selfinvoice_status === "consegnata") return { ok: false, message: `Autofattura già emessa (${pd.selfinvoice_number}).` };
+
+  const { data: settings } = await admin.from("tenant_invoice_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
+  if (!settings?.vat && !settings?.tax_code) return { ok: false, message: "Completa prima i dati emittente in Impostazioni fattura (P.IVA)." };
+  const { data: sup } = pd.supplier_id ? await admin.from("suppliers").select("*").eq("id", pd.supplier_id).maybeSingle() : { data: null };
+
+  const imponibileCents = (pd.taxable_cents && pd.taxable_cents > 0) ? pd.taxable_cents : (pd.total_cents ?? 0);
+  if (imponibileCents <= 0) return { ok: false, message: "Imponibile a zero: indica l'importo della commissione." };
+
+  const year = new Date().getFullYear();
+  const number = pd.selfinvoice_number || await nextAutofatturaNumber(admin, tenantId, year);
+  const dateISO = new Date().toISOString().slice(0, 10);
+  const causale = `Autofattura reverse charge (TD17) — ${pd.supplier_name || sup?.name || "fornitore estero"}${pd.doc_number ? ` rif. ${pd.doc_number}` : ""}`;
+
+  const xml = buildAutofatturaXml({
+    host: { denominazione: settings.denominazione, vat: settings.vat, taxCode: settings.tax_code, address: settings.address, city: settings.city, cap: settings.cap, province: settings.province, country: settings.country || "IT", sdiCode: settings.sdi, pec: settings.pec },
+    supplier: { name: pd.supplier_name || sup?.name || "Fornitore estero", vat: sup?.vat ?? null, country: sup?.country ?? null, address: sup?.address ?? null, city: sup?.city ?? null, cap: sup?.cap ?? null, province: sup?.province ?? null },
+    number, date: dateISO, imponibileCents, vatRate, causale, seed: purchaseDocId,
+  });
+
+  // Prova l'invio se il provider Openapi è configurato; altrimenti salva come "generata".
+  let status = "generata"; let ref: string | null = null; let message = "Autofattura generata (XML pronto). Provider SdI non configurato: invio manuale.";
+  const provider = (settings.default_provider as string) || "mock";
+  if (provider === "openapi") {
+    const { data: cred } = await admin.from("provider_credentials").select("config").eq("tenant_id", tenantId).eq("provider", "openapi").maybeSingle();
+    const cfg = decryptProviderCfg((cred?.config as Record<string, unknown>) ?? {});
+    if (cfg.token) {
+      try {
+        const res = await new OpenapiProvider(cfg as { token?: string; sandbox?: boolean; signature?: boolean; legalStorage?: boolean }).sendRawXml(xml, autofatturaFileName(settings.vat || settings.tax_code || "", number));
+        status = "inviata"; ref = res.providerRef; message = res.message || "Autofattura trasmessa allo SdI.";
+      } catch (e) { message = `XML generato ma invio fallito: ${(e as Error)?.message}`; }
+    }
+  }
+
+  await admin.from("purchase_documents").update({ selfinvoice_number: number, selfinvoice_xml: xml, selfinvoice_status: status, selfinvoice_ref: ref, selfinvoice_at: new Date().toISOString() }).eq("id", purchaseDocId);
+  return { ok: true, message, number, status };
+}
+
+export async function getAutofatturaXml(admin: SupabaseClient, tenantId: string, purchaseDocId: string): Promise<string | null> {
+  const { data } = await admin.from("purchase_documents").select("selfinvoice_xml").eq("id", purchaseDocId).eq("tenant_id", tenantId).maybeSingle();
+  return (data?.selfinvoice_xml as string) || null;
 }
 
 // --- Credenziali intermediario (token cifrato) ---
