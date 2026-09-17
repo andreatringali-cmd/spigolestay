@@ -3,10 +3,8 @@
 import { useEffect, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
-import { useToast } from "@/components/ToastProvider";
 import { useLang } from "@/lib/i18n";
 import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
-import { apiPost } from "@/lib/invoicing/client";
 import VarLegend, { MSG_VARS } from "@/components/VarLegend";
 
 type Lang = "it" | "en" | "fr" | "de" | "es";
@@ -30,23 +28,7 @@ const triggerDesc = (tpl: MsgTemplate, tr: (s: string) => string) => {
 // Modelli & automazioni: crea i messaggi riutilizzabili (tab di /messaggi).
 export default function ModelliPanel() {
   const ask = useConfirm();
-  const toast = useToast();
   const { t } = useLang();
-  // Collegamento WhatsApp Cloud API (invio reale). Token cifrato lato server.
-  const [wa, setWa] = useState({ connected: false, phoneId: "" });
-  const [waTok, setWaTok] = useState("");
-  const [waBusy, setWaBusy] = useState("");
-  useEffect(() => { apiPost<{ connected: boolean; phoneId: string }>("whatsapp/settings", { action: "status" }).then((r) => setWa({ connected: r.connected, phoneId: r.phoneId })).catch(() => {}); }, []);
-  const waSave = async () => {
-    setWaBusy("save");
-    try { const r = await apiPost<{ ok: boolean; message?: string }>("whatsapp/settings", { action: "save", token: waTok || undefined, phoneId: wa.phoneId }); toast(r.message || "Salvato", "success"); setWaTok(""); const st = await apiPost<{ connected: boolean; phoneId: string }>("whatsapp/settings", { action: "status" }); setWa({ connected: st.connected, phoneId: st.phoneId }); }
-    catch (e) { toast(e instanceof Error ? e.message : "Errore", "error"); } finally { setWaBusy(""); }
-  };
-  const waTest = async () => {
-    setWaBusy("test");
-    try { const r = await apiPost<{ ok: boolean; message?: string }>("whatsapp/settings", { action: "test" }); toast(r.message || (r.ok ? "OK" : "Errore"), r.ok ? "success" : "error"); }
-    catch (e) { toast(e instanceof Error ? e.message : "Errore", "error"); } finally { setWaBusy(""); }
-  };
   const [templates, setTemplates] = useState<MsgTemplate[]>([]);
   const [ready, setReady] = useState(false);
   const [search, setSearch] = useState("");
@@ -77,23 +59,6 @@ export default function ModelliPanel() {
 
   return (
     <div>
-      {/* Collegamento WhatsApp Cloud API: invio automatico reale dei messaggi */}
-      <Card className="mb-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-txt">📲 {t("Collega WhatsApp")}</span>
-            <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${wa.connected ? "var(--ok)" : "var(--faint)"} 16%, transparent)`, color: wa.connected ? "var(--ok)" : "var(--dim)" }}>{wa.connected ? t("collegato") : t("non collegato")}</span>
-          </div>
-          <span className="text-[11px] text-faint">{t("Invio reale dall'app (Cloud API di Meta). Senza collegamento resta l'invio via wa.me.")}</span>
-        </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
-          <input value={wa.phoneId} onChange={(e) => setWa((w) => ({ ...w, phoneId: e.target.value }))} placeholder={t("Phone Number ID")} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-          <input type="password" value={waTok} onChange={(e) => setWaTok(e.target.value)} placeholder={wa.connected ? t("Token (salvato — vuoto = non cambiare)") : t("Token Meta")} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-          <button onClick={waSave} disabled={!!waBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{waBusy === "save" ? t("Salvo…") : t("Salva")}</button>
-          <button onClick={waTest} disabled={!!waBusy || !wa.connected} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{waBusy === "test" ? t("Test…") : t("Test")}</button>
-        </div>
-      </Card>
-
       {/* Riga filtri (stile barra come le altre pagine): campo cerca a sinistra + filtri */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Cerca un modello…")} className="min-w-[180px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />

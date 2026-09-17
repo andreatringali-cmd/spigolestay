@@ -117,10 +117,23 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const addTo = (gid: string, dir: "out" | "in", text: string, via?: string) => { if (!text.trim()) return; setThreads((tt) => ({ ...tt, [gid]: [...(tt[gid] ?? []), { id: uid(), dir, text: text.trim(), ts: Date.now(), via }] })); playSound(dir === "out" ? "sent" : "received"); };
   const add = (dir: "out" | "in", text: string, via?: string) => { if (sel) addTo(sel, dir, text, via); };
 
-  // Stato collegamento WhatsApp Cloud API: se attivo, invio reale dall'app.
-  const [waOn, setWaOn] = useState(false);
-  useEffect(() => { apiPost<{ connected: boolean }>("whatsapp/settings", { action: "status" }).then((r) => setWaOn(!!r.connected)).catch(() => {}); }, []);
+  // Collegamento WhatsApp Cloud API: se attivo, invio reale dall'app.
+  const [wa, setWa] = useState({ connected: false, phoneId: "" });
+  const [waTok, setWaTok] = useState("");
+  const [waBusy, setWaBusy] = useState("");
+  const waOn = wa.connected;
+  useEffect(() => { apiPost<{ connected: boolean; phoneId: string }>("whatsapp/settings", { action: "status" }).then((r) => setWa({ connected: !!r.connected, phoneId: r.phoneId || "" })).catch(() => {}); }, []);
   const waSendReal = async (to: string, text: string) => { try { const r = await apiPost<{ ok: boolean }>("whatsapp/send", { to, text }); return !!r.ok; } catch { return false; } };
+  const waSave = async () => {
+    setWaBusy("save");
+    try { const r = await apiPost<{ ok: boolean; message?: string }>("whatsapp/settings", { action: "save", token: waTok || undefined, phoneId: wa.phoneId }); window.alert(r.message || "Salvato"); setWaTok(""); const st = await apiPost<{ connected: boolean; phoneId: string }>("whatsapp/settings", { action: "status" }); setWa({ connected: !!st.connected, phoneId: st.phoneId || "" }); }
+    catch (e) { window.alert(e instanceof Error ? e.message : "Errore"); } finally { setWaBusy(""); }
+  };
+  const waTest = async () => {
+    setWaBusy("test");
+    try { const r = await apiPost<{ ok: boolean; message?: string }>("whatsapp/settings", { action: "test" }); window.alert(r.message || (r.ok ? "OK" : "Errore")); }
+    catch (e) { window.alert(e instanceof Error ? e.message : "Errore"); } finally { setWaBusy(""); }
+  };
 
   const digits = (current?.phone ?? "").replace(/\D/g, "");
   const sendWa = async () => {
@@ -233,9 +246,11 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const chipBase = "inline-flex items-center gap-1 rounded-full border border-line bg-paper px-2 py-0.5 text-[11px] text-dim";
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-      {/* Elenco (su cellulare: nascosto quando una conversazione/invii è aperta) */}
-      <div className={`${(current || showInvii) ? "hidden lg:flex" : "flex"} h-[calc(100vh-15rem)] min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm`}>
+    <>
+    <div className="grid gap-4 lg:grid-cols-3 lg:gap-3">
+      {/* Elenco (su cellulare: nascosto quando una conversazione/invii è aperta).
+          Larghezza = 1/3 con gap-3 → allineata alla tab "Conversazioni" sopra. */}
+      <div className={`${(current || showInvii) ? "hidden lg:flex" : "flex"} h-[calc(100vh-15rem)] min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm lg:col-span-1`}>
         <div className="border-b border-line p-2">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca ospite…")} className="w-full rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
         </div>
@@ -282,7 +297,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       </div>
 
       {/* Thread + invii programmati (su cellulare: visibile solo quando selezioni una conversazione/invii) */}
-      <div className={`${(current || showInvii) ? "flex" : "hidden lg:flex"} h-[calc(100vh-15rem)] min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm`}>
+      <div className={`${(current || showInvii) ? "flex" : "hidden lg:flex"} h-[calc(100vh-15rem)] min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm lg:col-span-2`}>
         {!current ? (
           !showInvii ? (
             // Nessun ospite selezionato → placeholder pulito (gli invii si aprono col pulsante).
@@ -425,5 +440,23 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
         )}
       </div>
     </div>
+
+    {/* Collega WhatsApp — sotto il box messaggi */}
+    <div className="mt-4 rounded-xl border border-line bg-surface p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-txt">📲 {t("Collega WhatsApp")}</span>
+          <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${wa.connected ? "var(--ok)" : "var(--faint)"} 16%, transparent)`, color: wa.connected ? "var(--ok)" : "var(--dim)" }}>{wa.connected ? t("collegato") : t("non collegato")}</span>
+        </div>
+        <span className="text-[11px] text-faint">{t("Invio reale dall'app (Cloud API di Meta). Senza collegamento resta l'invio via wa.me.")}</span>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+        <input value={wa.phoneId} onChange={(e) => setWa((w) => ({ ...w, phoneId: e.target.value }))} placeholder={t("Phone Number ID")} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+        <input type="password" value={waTok} onChange={(e) => setWaTok(e.target.value)} placeholder={wa.connected ? t("Token (salvato — vuoto = non cambiare)") : t("Token Meta")} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+        <button onClick={waSave} disabled={!!waBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{waBusy === "save" ? t("Salvo…") : t("Salva")}</button>
+        <button onClick={waTest} disabled={!!waBusy || !wa.connected} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{waBusy === "test" ? t("Test…") : t("Test")}</button>
+      </div>
+    </div>
+    </>
   );
 }
