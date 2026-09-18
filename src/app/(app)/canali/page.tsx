@@ -14,13 +14,30 @@ import { apiPost } from "@/lib/invoicing/client";
 
 // Portali gestiti dal Channel Manager.
 const OTAS = [
-  { key: "booking", label: "Booking.com", color: "#003580", commission: 15 },
-  { key: "airbnb", label: "Airbnb", color: "#FF5A5F", commission: 15 },
-  { key: "expedia", label: "Expedia", color: "#FFC72C", commission: 18 },
-  { key: "vrbo", label: "Vrbo", color: "#1668E3", commission: 8 },
-  { key: "agoda", label: "Agoda", color: "#5A2D8C", commission: 17 },
+  { key: "booking", label: "Booking.com", color: "#003580", commission: 15, domain: "booking.com" },
+  { key: "airbnb", label: "Airbnb", color: "#FF5A5F", commission: 15, domain: "airbnb.com" },
+  { key: "expedia", label: "Expedia", color: "#FFC72C", commission: 18, domain: "expedia.com" },
+  { key: "vrbo", label: "Vrbo", color: "#1668E3", commission: 8, domain: "vrbo.com" },
+  { key: "agoda", label: "Agoda", color: "#5A2D8C", commission: 17, domain: "agoda.com" },
 ] as const;
 type OtaKey = typeof OTAS[number]["key"];
+
+// Logo ufficiale del portale (favicon del brand) su tile bianca; se non carica
+// mostra la lettera iniziale sul colore del brand. Nessuna dipendenza esterna
+// bloccante: l'immagine è un semplice <img> con fallback onError.
+function OtaLogo({ o, size = 36, radius = 12 }: { o: { label: string; color: string; domain?: string }; size?: number; radius?: number }) {
+  const [err, setErr] = useState(false);
+  if (o.domain && !err) {
+    const g = Math.round(size * 0.62);
+    return (
+      <span className="grid shrink-0 place-items-center overflow-hidden bg-white" style={{ width: size, height: size, borderRadius: radius, boxShadow: "inset 0 0 0 1px var(--line)" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={`https://www.google.com/s2/favicons?domain=${o.domain}&sz=64`} alt={o.label} width={g} height={g} loading="lazy" onError={() => setErr(true)} />
+      </span>
+    );
+  }
+  return <span className="grid shrink-0 place-items-center font-bold text-white" style={{ width: size, height: size, borderRadius: radius, backgroundColor: o.color, fontSize: Math.round(size * 0.42) }}>{o.label[0]}</span>;
+}
 
 interface Conn {
   connected: boolean; auto: boolean; lastSync?: string;
@@ -309,7 +326,7 @@ export default function CanaliPage() {
               return (
                 <button key={o.key} onClick={() => setConfiguring(o.key)} className="group rounded-2xl border bg-surface p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md" style={{ borderColor: c.connected ? o.color : "var(--line)" }}>
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-sm font-bold text-txt"><span className="grid h-9 w-9 place-items-center rounded-xl text-sm font-bold text-white" style={{ backgroundColor: o.color }}>{o.label[0]}</span>{o.label}</span>
+                    <span className="flex items-center gap-2 text-sm font-bold text-txt"><OtaLogo o={o} size={36} radius={12} />{o.label}</span>
                     <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={c.connected ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{c.connected ? t("Connesso") : t("Da collegare")}</span>
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -341,7 +358,7 @@ export default function CanaliPage() {
                 <tbody>
                   {OTAS.map((o) => { const c = getConn(o.key); return (
                     <tr key={o.key} onClick={() => setConfiguring(o.key)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
-                      <td className="px-3 py-2.5"><span className="flex items-center gap-2 font-semibold text-txt"><span className="grid h-6 w-6 place-items-center rounded-md text-[11px] font-bold text-white" style={{ backgroundColor: o.color }}>{o.label[0]}</span>{o.label}</span></td>
+                      <td className="px-3 py-2.5"><span className="flex items-center gap-2 font-semibold text-txt"><OtaLogo o={o} size={24} radius={7} />{o.label}</span></td>
                       <td className="px-3 py-2.5"><span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={c.connected ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{c.connected ? t("Connesso") : t("Da collegare")}</span></td>
                       <td className="px-3 py-2.5 text-center font-mono text-dim">{mappedCount(o.key)}/{types.length}</td>
                       <td className="px-3 py-2.5 text-center font-mono text-dim">{corrLabel(o.key)}</td>
@@ -392,7 +409,7 @@ export default function CanaliPage() {
             <button aria-label={t("Chiudi")} onClick={() => setConfiguring(null)} className="absolute inset-0 bg-black/40" />
             <div className="relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="mb-4 flex items-center justify-between">
-                <span className="flex items-center gap-2 text-lg font-bold text-txt"><span className="grid h-8 w-8 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: o.color }}>{o.label[0]}</span>{o.label}</span>
+                <span className="flex items-center gap-2 text-lg font-bold text-txt"><OtaLogo o={o} size={32} radius={9} />{o.label}</span>
                 <button onClick={() => setConfiguring(null)} className="rounded-lg p-1 text-faint hover:text-txt">✕</button>
               </div>
 
