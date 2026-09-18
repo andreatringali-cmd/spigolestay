@@ -90,18 +90,34 @@ export default function CanaliPage() {
     } catch (e) { setImpSync({ running: false, ok: false, msg: e instanceof Error ? e.message : "errore di rete" }); }
   };
   useEffect(() => { try { const m = localStorage.getItem("spigolestay:channexmap"); if (m) setChxMap(JSON.parse(m)); } catch {} }, []);
-  // Allinea al server la mappatura Channex già presente nel browser (per le
-  // strutture collegate prima, così il webhook/import sa a chi assegnare le prenotazioni).
-  const mapPushed = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    Object.entries(chxMap).forEach(([sid, m]) => {
-      if (!m?.propertyId || mapPushed.current.has(sid)) return;
-      mapPushed.current.add(sid);
-      const rooms: Record<string, string> = {};
-      Object.entries(m.rooms || {}).forEach(([xid, r]) => { if (r?.roomTypeId) rooms[r.roomTypeId] = xid; });
-      apiPost("channex/map", { structureId: sid, propertyId: m.propertyId, rooms }).catch(() => {});
-    });
-  }, [chxMap]);
+  // Ricostruisce sul server la mappatura Channex↔Xenora (abbinando per nome le
+  // property già su Channex) così webhook/import sanno a chi assegnare le prenotazioni.
+  // Robusto: non dipende dal localStorage. Gira una volta all'apertura.
+  const relinkDone = useRef(false);
+  const [relink, setRelink] = useState<{ running: boolean; msg?: string; ok?: boolean }>({ running: false });
+  const doRelink = async (manual = false) => {
+    setRelink({ running: true, msg: manual ? "Ricollego la mappatura…" : undefined });
+    try {
+      type Linked = { property: string; structure: string; structureId: string; propertyId: string; rooms: number; roomsMap?: Record<string, string> };
+      const j = await apiPost<{ ok: boolean; linked?: Linked[]; unmatched?: string[]; error?: string }>("channex/relink", {});
+      if (!j.ok) { setRelink({ running: false, ok: false, msg: manual ? (j.error || "Ricollegamento non riuscito") : undefined }); return; }
+      const linked = j.linked ?? [];
+      // Riflette la mappatura del server nello stato locale: la struttura risulta
+      // "collegata" e il pulsante «Sincronizza» sparisce (niente doppioni).
+      if (linked.length) {
+        const next = { ...chxMap };
+        for (const l of linked) {
+          const rooms: Record<string, { roomTypeId: string; ratePlanId?: string }> = {};
+          for (const [chxRt, xid] of Object.entries(l.roomsMap || {})) rooms[xid] = { roomTypeId: chxRt };
+          next[l.structureId] = { propertyId: l.propertyId, rooms, at: new Date().toISOString() };
+        }
+        setChxMap(next); try { localStorage.setItem("spigolestay:channexmap", JSON.stringify(next)); } catch {}
+      }
+      const n = linked.length;
+      setRelink({ running: false, ok: true, msg: manual ? (n ? `Mappatura allineata ✓ · ${n} strutture` : "Nessuna struttura Channex abbinata per nome.") : undefined });
+    } catch (e) { setRelink({ running: false, ok: false, msg: manual ? (e instanceof Error ? e.message : "errore") : undefined }); }
+  };
+  useEffect(() => { if (relinkDone.current) return; relinkDone.current = true; doRelink(false); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const unlinkChannex = () => {
     const sid = effStructure;
     const next = { ...chxMap }; delete next[sid];
@@ -241,6 +257,7 @@ export default function CanaliPage() {
             {chxSync.msg && <div className="mt-1 text-[11px] font-semibold" style={{ color: chxSync.ok === false ? "var(--err)" : chxSync.ok ? "var(--ok)" : "var(--dim)" }}>{chxSync.msg}</div>}
             {ariSync.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: ariSync.ok === false ? "var(--err)" : ariSync.ok ? "var(--ok)" : "var(--dim)" }}>{ariSync.msg}</div>}
             {impSync.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: impSync.ok === false ? "var(--err)" : impSync.ok ? "var(--ok)" : "var(--dim)" }}>{impSync.msg}</div>}
+            {relink.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: relink.ok === false ? "var(--err)" : relink.ok ? "var(--ok)" : "var(--dim)" }}>{relink.msg}</div>}
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {chxMap[effStructure] ? (
@@ -250,7 +267,11 @@ export default function CanaliPage() {
                 <button onClick={unlinkChannex} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Scollega")}</button>
               </>
             ) : (
-              <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{chxSync.running ? t("Sincronizzo…") : t("Sincronizza con Channex")}</button>
+              <>
+                {/* «Ricollega» abbina la property GIÀ esistente su Channex (nessun doppione). Da preferire se la struttura è già su Channex. */}
+                <button onClick={() => doRelink(true)} disabled={relink.running} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{relink.running ? t("Ricollego…") : "⟳ " + t("Ricollega")}</button>
+                <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{chxSync.running ? t("Sincronizzo…") : t("Sincronizza con Channex")}</button>
+              </>
             )}
           </div>
         </div>

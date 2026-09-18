@@ -47,9 +47,13 @@ export async function channex<T = unknown>(path: string, init?: RequestInit): Pr
   }
 }
 
-// Elenco proprietà (usato per il test connessione).
+// Elenco proprietà (usato per il test connessione e per ricostruire la mappatura).
 export async function listProperties() {
   return channex<{ data: { id: string; attributes?: { title?: string } }[] }>("/properties");
+}
+// Elenco tipologie camera di una property (per abbinarle alle tipologie Xenora per nome).
+export async function listRoomTypesFor(propertyId: string) {
+  return channex<{ data: { id: string; attributes?: { title?: string } }[] }>(`/room_types?filter[property_id]=${encodeURIComponent(propertyId)}`);
 }
 
 type Created = { data?: { id?: string } };
