@@ -179,40 +179,62 @@ export default function BookingDrawer() {
       ["Pulizia finale", money(cleanV)],
     ];
     if (taxV > 0) rows.push(["Tassa di soggiorno", money(taxV)]);
-    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Ricevuta ${bookingCode(booking)}</title>
+    const paidV = Math.max(0, totalV - balanceV);
+    const accent = structure?.photoColor || "#285f92";
+    const esc = (s: unknown) => String(s ?? "").replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] || c));
+    const contacts = [structure?.email, structure?.phone, structure?.website].filter(Boolean).map(esc).join(" · ");
+    const addr = [structure?.address, structure?.streetNumber, structure?.city].filter(Boolean).map(esc).join(" ");
+    const ids = [structure?.cin ? `CIN ${esc(structure.cin)}` : "", structure?.vat ? `P.IVA ${esc(structure.vat)}` : ""].filter(Boolean).join(" · ");
+    const logo = structure?.logo
+      ? `<img src="${structure.logo}" alt="" style="height:56px;width:auto;max-width:180px;object-fit:contain"/>`
+      : `<div style="height:56px;width:56px;border-radius:12px;background:${accent};color:#fff;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;font-weight:800;font-size:22px">${esc((structure?.name ?? "XN").slice(0, 2).toUpperCase())}</div>`;
+    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Ricevuta ${esc(bookingCode(booking))}</title>
     <style>
-      *{box-sizing:border-box} body{font-family:Georgia,'Times New Roman',serif;color:#1a2131;margin:0;padding:48px 54px;font-size:14px;line-height:1.5}
-      .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #4f46e5;padding-bottom:18px;margin-bottom:26px}
-      .brand{font-size:26px;font-weight:700;letter-spacing:-.4px;color:#4f46e5}
-      .meta{font-size:12px;color:#5c6479;text-align:right;line-height:1.6}
-      h1{font-size:15px;letter-spacing:2px;text-transform:uppercase;color:#5c6479;margin:0 0 4px}
-      .sub{color:#5c6479;font-size:12px;margin-bottom:26px}
-      .box{background:#f5f6fa;border:1px solid #e3e6ef;border-radius:10px;padding:16px 18px;margin-bottom:24px}
-      .box b{display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#9aa2b6;margin-bottom:4px;font-family:Arial,sans-serif}
-      table{width:100%;border-collapse:collapse;margin-top:8px}
-      td{padding:11px 4px;border-bottom:1px solid #e3e6ef}
+      *{box-sizing:border-box} body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2131;margin:0;padding:52px 58px;font-size:14px;line-height:1.55}
+      .head{display:flex;justify-content:space-between;align-items:center;gap:18px;padding-bottom:20px;margin-bottom:6px;border-bottom:3px solid ${accent}}
+      .brandwrap{display:flex;align-items:center;gap:14px}
+      .brand{font-size:22px;font-weight:800;letter-spacing:-.3px;color:#1a2131}
+      .brandsub{font-size:12px;color:#6b7280;margin-top:3px}
+      .meta{font-size:12px;color:#6b7280;text-align:right;line-height:1.7}
+      .ids{font-size:10.5px;color:#9aa2b6;margin-top:2px}
+      h1{font-size:13px;letter-spacing:2.5px;text-transform:uppercase;color:${accent};margin:26px 0 2px;font-weight:700}
+      .sub{color:#6b7280;font-size:12px;margin-bottom:22px}
+      .box{background:#f7f8fb;border:1px solid #e6e9f0;border-radius:12px;padding:15px 18px;margin-bottom:22px}
+      .box b{display:block;font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:#9aa2b6;margin-bottom:5px}
+      table{width:100%;border-collapse:collapse;margin-top:6px}
+      td{padding:11px 4px;border-bottom:1px solid #eceef4}
       td.amt{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-      tr.tot td{border-top:2px solid #1a2131;border-bottom:none;font-weight:700;font-size:17px;padding-top:14px}
-      .note{margin-top:34px;font-size:11px;color:#9aa2b6;border-top:1px solid #e3e6ef;padding-top:14px}
-      @media print{body{padding:24px 30px}}
+      tr.tot td{border-top:2px solid #1a2131;border-bottom:none;font-weight:800;font-size:17px;padding-top:14px}
+      tr.pay td{border-bottom:none;padding:6px 4px;color:#4b5563;font-size:13px}
+      tr.pay td.amt.paid{color:#0e7c4a;font-weight:700}
+      tr.pay td.amt.due{color:${accent};font-weight:800}
+      .stamp{display:inline-block;margin-top:20px;border:2px solid ${paidV >= totalV && totalV > 0 ? "#0e7c4a" : "#c98a12"};color:${paidV >= totalV && totalV > 0 ? "#0e7c4a" : "#c98a12"};border-radius:8px;padding:4px 12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;font-size:12px;transform:rotate(-3deg)}
+      .note{margin-top:30px;font-size:10.5px;color:#9aa2b6;border-top:1px solid #eceef4;padding-top:14px}
+      .foot{margin-top:6px;font-size:10.5px;color:#b6bccb;text-align:center}
+      @media print{body{padding:26px 32px}}
     </style></head><body>
       <div class="head">
-        <div>
-          <div class="brand">${structure?.name ?? "Xenora"}</div>
-          <div style="font-size:12px;color:#5c6479;margin-top:4px">${structure?.address ?? "Siracusa"}${structure?.phone ? " · " + structure.phone : ""}</div>
-          ${structure?.cin ? `<div style="font-size:11px;color:#9aa2b6;margin-top:2px">CIN ${structure.cin}</div>` : ""}
-        </div>
-        <div class="meta">Ricevuta n. <b style="color:#1a2131">${bookingCode(booking)}</b><br>${today}</div>
+        <div class="brandwrap">${logo}<div>
+          <div class="brand">${esc(structure?.name ?? "Xenora")}</div>
+          ${addr ? `<div class="brandsub">${addr}</div>` : ""}
+          ${contacts ? `<div class="brandsub">${contacts}</div>` : ""}
+          ${ids ? `<div class="ids">${ids}</div>` : ""}
+        </div></div>
+        <div class="meta">Ricevuta n.<br><b style="color:#1a2131;font-size:15px">${esc(bookingCode(booking))}</b><br>${today}</div>
       </div>
-      <h1>Ricevuta di pagamento</h1>
-      <div class="sub">Soggiorno turistico · ${ch.label}</div>
-      <div class="box"><b>Ospite</b>${guest?.fullName ?? "—"}${guest?.email ? " · " + guest.email : ""}${guest?.phone ? " · " + guest.phone : ""}<br>
-      <span style="color:#5c6479;font-size:13px">${roomType?.name ?? ""}${unitV?.name ? " — " + unitV.name : ""} · ${booking.adults} adulti${booking.children ? " · " + booking.children + " bambini" : ""}</span></div>
+      <h1>Ricevuta di soggiorno</h1>
+      <div class="sub">Soggiorno turistico · ${esc(ch.label)}</div>
+      <div class="box"><b>Ospite</b>${esc(guest?.fullName ?? "—")}${guest?.email ? " · " + esc(guest.email) : ""}${guest?.phone ? " · " + esc(guest.phone) : ""}<br>
+      <span style="color:#6b7280;font-size:13px">${esc(roomType?.name ?? "")}${unitV?.name ? " — " + esc(unitV.name) : ""} · ${booking.adults} adulti${booking.children ? " · " + booking.children + " bambini" : ""}</span></div>
       <table>
-        ${rows.map((r) => `<tr><td>${r[0]}</td><td class="amt">${r[1]}</td></tr>`).join("")}
+        ${rows.map((r) => `<tr><td>${esc(r[0])}</td><td class="amt">${r[1]}</td></tr>`).join("")}
         <tr class="tot"><td>Totale</td><td class="amt">${money(totalV)}</td></tr>
+        <tr class="pay"><td>Incassato</td><td class="amt paid">${money(paidV)}</td></tr>
+        <tr class="pay"><td>Saldo dovuto</td><td class="amt due">${money(balanceV)}</td></tr>
       </table>
-      <div class="note">Documento non fiscale, rilasciato a titolo di ricevuta. La tassa di soggiorno è versata al Comune di Siracusa. ${structure?.name ?? "Xenora"}.</div>
+      <div class="stamp">${paidV >= totalV && totalV > 0 ? "Pagato" : "Saldo a saldo"}</div>
+      <div class="note">Documento non fiscale, rilasciato a titolo di ricevuta. La tassa di soggiorno è versata al Comune${structure?.city ? " di " + esc(structure.city) : ""}.</div>
+      <div class="foot">Generato con Xenora · Digital Solution</div>
       <script>window.onload=function(){window.print()}<\/script>
     </body></html>`);
     w.document.close();
