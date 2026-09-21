@@ -206,8 +206,13 @@ function Engine() {
     w.document.close();
   };
 
-  // Link "Torna alla home": sul sito pubblico va all'indirizzo pulito /<slug>.
-  const homeHref = isPublicMode() && publicSlug() ? `/${publicSlug()}` : `/sito-web?s=${structureId}`;
+  // Link "Torna alla home":
+  //  1) se il link lo specifica (?home=<url>) → torna lì (es. il tuo sito WordPress ufficiale);
+  //  2) altrimenti il sito ufficiale impostato sulla struttura (structure.website);
+  //  3) altrimenti il mini-sito pubblico /<slug>.
+  const homeOverride = (() => { const h = qp("home"); return h && /^https?:\/\//i.test(h) ? h : ""; })();
+  const structWebsite = (() => { const w = (structure as { website?: string } | undefined)?.website; return w && /^https?:\/\//i.test(w) ? w : ""; })();
+  const homeHref = homeOverride || structWebsite || (isPublicMode() && publicSlug() ? `/${publicSlug()}` : `/sito-web?s=${structureId}`);
 
   // ---- Header ----
   const header = (
@@ -258,11 +263,12 @@ function Engine() {
   // ---- Search bar ----
   const searchBar = (
     <div className={`${box} mb-4 p-3`}>
-      <div className="grid gap-2 sm:grid-cols-4">
+      <div className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto_auto_auto]">
         <label className="block text-xs font-medium text-dim">Arrivo<input type="date" value={checkIn} min={today} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(addDays(e.target.value, 1)); setSearched(false); }} className={`${field} mt-1`} /></label>
         <label className="block text-xs font-medium text-dim">Partenza<input type="date" value={checkOut} min={addDays(checkIn, 1)} onChange={(e) => { setCheckOut(e.target.value); setSearched(false); }} className={`${field} mt-1`} /></label>
         <label className="block text-xs font-medium text-dim">Adulti<Stepper value={adults} min={1} onChange={(v) => { setAdults(v); setSearched(false); }} /></label>
         <label className="block text-xs font-medium text-dim">Bambini<Stepper value={children} min={0} onChange={(v) => { setChildrenN(v); setSearched(false); }} /></label>
+        <button onClick={() => setSearched(true)} className="h-[42px] whitespace-nowrap rounded-lg px-5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>Verifica disponibilità</button>
       </div>
       {children > 0 && (
         <div className="mt-2">
@@ -288,9 +294,9 @@ function Engine() {
 
   if (step === "done") {
     return (
-      <div className="flex min-h-full flex-col bg-wash">
+      <div className="flex min-h-screen flex-col bg-wash">
         {header}
-        <div className="mx-auto max-w-2xl px-4 py-10">
+        <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-10">
           <div className={`${box} p-8 text-center`}>
             <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full text-white" style={{ backgroundColor: "var(--ok)" }}><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" /></svg></div>
             <h1 className="font-display text-2xl font-bold text-txt">Prenotazione confermata!</h1>
@@ -317,9 +323,9 @@ function Engine() {
   }
 
   return (
-    <div className="flex min-h-full flex-col bg-wash">
+    <div className="flex min-h-screen flex-col bg-wash">
       {header}
-      <div className="mx-auto max-w-7xl px-4 py-6">
+      <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
         {step === "rooms" && (
           <>
             <h1 className="mb-3 font-display text-xl font-bold text-txt">Verifica disponibilità</h1>
