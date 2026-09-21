@@ -268,7 +268,7 @@ function Engine() {
         <label className="block text-xs font-medium text-dim">Partenza<input type="date" value={checkOut} min={addDays(checkIn, 1)} onChange={(e) => { setCheckOut(e.target.value); setSearched(false); }} className={`${field} mt-1`} /></label>
         <label className="block text-xs font-medium text-dim">Adulti<Stepper value={adults} min={1} onChange={(v) => { setAdults(v); setSearched(false); }} /></label>
         <label className="block text-xs font-medium text-dim">Bambini<Stepper value={children} min={0} onChange={(v) => { setChildrenN(v); setSearched(false); }} /></label>
-        <button onClick={() => setSearched(true)} className="h-[42px] whitespace-nowrap rounded-lg px-5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>Verifica disponibilità</button>
+        <button onClick={() => setSearched(true)} className="h-[42px] whitespace-nowrap rounded-lg bg-focus px-5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Verifica disponibilità</button>
       </div>
       {children > 0 && (
         <div className="mt-2">
@@ -501,7 +501,7 @@ function Stepper({ value, min = 0, onChange, compact }: { value: number; min?: n
   return (
     <div className={`mt-1 flex items-center ${compact ? "" : "w-full"} overflow-hidden rounded-lg border border-line`}>
       <button onClick={() => onChange(Math.max(min, value - 1))} className="px-3 py-1.5 text-dim hover:bg-wash">−</button>
-      <span className={`${compact ? "w-8" : "flex-1"} bg-paper py-1.5 text-center font-mono text-sm text-txt`}>{value}</span>
+      <span className={`${compact ? "w-8" : "flex-1"} bg-paper py-1.5 text-center font-mono text-sm font-bold text-txt`}>{value}</span>
       <button onClick={() => onChange(value + 1)} className="px-3 py-1.5 text-dim hover:bg-wash">+</button>
     </div>
   );

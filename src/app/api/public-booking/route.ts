@@ -110,6 +110,7 @@ export async function POST(req: Request) {
       paid: deposit,
       cityTaxPaid: false,
       extId,
+      code: String((body as { code?: string })?.code || "").trim().slice(0, 40) || undefined,
       note: note || "Prenotazione dal sito",
     };
     bookings.push(booking);
@@ -133,6 +134,33 @@ export async function POST(req: Request) {
       const { error: wErr2 } = await admin.from("app_state").update({ data: blob2, updated_at: new Date().toISOString() }).eq("user_id", ownerId);
       if (wErr2) return NextResponse.json({ error: "write_error", message: wErr2.message }, { status: 500 });
     }
+
+    // 4) Email di conferma AUTOMATICA all'ospite (best-effort: non blocca la prenotazione).
+    try {
+      const st = (Array.isArray(data.structures) ? data.structures : []).find((s) => (s as { id?: string }).id === sid) as (Record<string, unknown>) | undefined;
+      const rtObj = (Array.isArray(data.roomTypes) ? data.roomTypes : []).find((r) => (r as { id?: string }).id === rt) as (Record<string, unknown>) | undefined;
+      if (gEmail && st) {
+        const origin = req.headers.get("origin") || new URL(req.url).origin;
+        const nN = Math.max(1, Math.round((Date.parse(co) - Date.parse(ci)) / 86400000));
+        const g = (k: string) => (st[k] as string) || undefined;
+        await fetch(`${origin}/api/email`, {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            kind: "voucher",
+            checkinUrl: `${origin}/checkin?b=${encodeURIComponent(booking.id)}`,
+            booking: {
+              code: (booking.code as string) || booking.id.slice(0, 8).toUpperCase(),
+              structureName: g("name"), structureEmail: g("email"), color: g("photoColor"),
+              guestName: `${gFirst} ${gLast}`.trim() || gEmail, guestEmail: gEmail,
+              roomType: (rtObj?.name as string) || undefined, checkIn: ci, checkOut: co, nights: nN,
+              adults, children, total, currency: g("currency") || "€",
+              checkInFrom: g("checkInFrom"), checkOutBy: g("checkOutBy"),
+              address: [g("address"), g("streetNumber"), g("city")].filter(Boolean).join(" "), phone: g("phone"),
+            },
+          }),
+        });
+      }
+    } catch { /* email non critica */ }
 
     return NextResponse.json({ ok: true });
   } catch (e) {
