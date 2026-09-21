@@ -152,6 +152,25 @@ export async function POST(req: Request) {
       const { error: wErr2 } = await admin.from("app_state").update({ data: blob2, updated_at: new Date().toISOString() }).eq("user_id", ownerId);
       if (wErr2) return NextResponse.json({ error: "write_error", message: wErr2.message }, { status: 500 });
     }
+
+    // Fee di piattaforma: se la sessione portava una fee (source='direct' con application_fee),
+    // registra la riga nel ledger. Idempotente per payment_intent (unique index).
+    try {
+      const feeTotal = parseInt((m.fee_total || "0"), 10) || 0;
+      if (feeTotal > 0 && (m.source || "direct") === "direct") {
+        const pi = typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent?.id ?? null);
+        await admin.from("platform_fees").upsert({
+          tenant_id: ownerId, org_id: null, structure_id: sid, booking_id: booking.id, source: "direct",
+          currency: "EUR", gross_amount_cents: (session.amount_total ?? amountPaid * 100),
+          fee_base_cents: parseInt((m.fee_base || "0"), 10) || 0,
+          fee_vat_cents: parseInt((m.fee_vat || "0"), 10) || 0,
+          fee_total_cents: feeTotal,
+          stripe_account_id: acct || null, stripe_payment_intent_id: pi,
+          status: "collected", collected_at: new Date().toISOString(),
+        }, { onConflict: "stripe_payment_intent_id" });
+      }
+    } catch { /* il ledger fee non deve mai bloccare la conferma prenotazione */ }
+
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: "server_error", message: (e as Error)?.message ?? "errore" }, { status: 500 });
