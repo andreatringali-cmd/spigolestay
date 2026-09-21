@@ -103,9 +103,9 @@ export default function XenoraBookPage() {
   return (
     <>
       {/* ── HERO d'impatto ── */}
-      <section className="relative mb-24 overflow-hidden rounded-3xl sm:mb-16" style={{ background: "linear-gradient(135deg,#1E3A46 0%,#2E5B63 42%,#BE5D38 100%)" }}>
+      <section className="relative overflow-hidden rounded-3xl" style={{ background: "linear-gradient(135deg,#1E3A46 0%,#2E5B63 42%,#BE5D38 100%)" }}>
         <HeroDeco />
-        <div className="relative px-6 py-12 sm:px-10 sm:py-16">
+        <div className="relative px-6 py-12 sm:px-10 sm:pt-16 sm:pb-24">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-white backdrop-blur">✦ Solo strutture verificate</div>
           <h1 className="mt-4 max-w-[16ch] font-serif text-[clamp(30px,5.4vw,52px)] font-bold leading-[1.05] text-white" style={{ textWrap: "balance" }}>Dormi solo dove la qualità è garantita.</h1>
           <p className="mt-3 max-w-[48ch] text-[15px] leading-relaxed text-white/85">La selezione curata di Xenora in Sicilia sud-orientale: case, B&amp;B e dimore verificate per recensioni, accoglienza e regolarità. Niente caos — solo strutture di cui fidarti.</p>
@@ -115,10 +115,11 @@ export default function XenoraBookPage() {
             ))}
           </div>
         </div>
+      </section>
 
-        {/* Barra di ricerca sovrapposta (stile OTA) */}
-        <div className="relative px-4 pb-4 sm:absolute sm:inset-x-6 sm:-bottom-9 sm:px-0 sm:pb-0">
-          <div className="rounded-2xl border border-line bg-surface p-2 shadow-xl">
+      {/* Barra di ricerca: sotto la copertina, con leggero incastro (non la copre) */}
+      <div className="relative z-10 mb-5 -mt-7 px-2 sm:-mt-16 sm:px-6">
+        <div className="rounded-2xl border border-line bg-surface p-2 shadow-xl">
             <div className="grid gap-2 md:grid-cols-[1.4fr_1fr_1fr_1.1fr_auto]">
               <label className="rounded-xl px-3 py-2 hover:bg-wash">
                 <div className="text-[11px] font-bold uppercase tracking-wide text-faint">Destinazione</div>
@@ -158,7 +159,6 @@ export default function XenoraBookPage() {
             </div>
           </div>
         </div>
-      </section>
 
       {/* ── Filtri rapidi (servizi) + tipologia + toggle vista ── */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
