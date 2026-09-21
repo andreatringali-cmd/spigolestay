@@ -62,6 +62,10 @@ function Engine() {
   // Le camere compaiono SOLO dopo "Verifica disponibilità" (come Octorate). Se il link porta
   // già date esplicite (?ci&co, es. dal mini-sito), mostra subito i risultati.
   const [searched, setSearched] = useState<boolean>(() => !!(qp("ci") && qp("co")));
+  const [processing, setProcessing] = useState(false); // invio prenotazione / redirect pagamento
+  // Riepilogo per la schermata di conferma dopo il ritorno dal pagamento Stripe (lo stato
+  // del form si perde nel redirect: lo ripristiniamo da sessionStorage).
+  const [doneSummary, setDoneSummary] = useState<null | { code: string; structureName?: string; roomName?: string; ci: string; co: string; total: number; deposit: number; guestFirst?: string; email?: string }>(null);
   const [adults, setAdults] = useState(() => Number(qp("ad")) || 2);
   const [children, setChildren] = useState(() => Number(qp("ch")) || 0);
   const [childAges, setChildAges] = useState<number[]>(() => {
@@ -128,8 +132,8 @@ function Engine() {
 
   const guestValid = guest.firstName.trim() && guest.lastName.trim() && guest.email.trim() && guest.phone.trim() && privacy;
 
-  const confirm = () => {
-    if (!selRt || !guestValid) return;
+  const confirm = async () => {
+    if (!selRt || !guestValid || processing) return;
     const unit = availUnitsFor(selRt)[0]; // le derivate usano le camere della tipologia madre
     // Evita doppioni in anagrafica: riusa l'ospite esistente (stessa email, o stesso nome con telefono compatibile).
     const norm = (s?: string) => (s ?? "").trim().toLowerCase();
@@ -148,26 +152,44 @@ function Engine() {
     }
     const chosenExtras = extras.filter((x) => (extraQty[x.id] ?? 0) > 0).map((x) => `${extraQty[x.id]}× ${x.name}`);
     const note = [`Sito diretto · ${selPlan?.name}`, appliedPromo ? `Promo ${appliedPromo.code} (−${appliedPromo.pct}%)` : "", chosenExtras.length ? `Extra: ${chosenExtras.join(", ")}` : "", wantsCot ? "🍼 Culla richiesta" : "", guest.arrival !== "Non lo so" ? `Arrivo ~${guest.arrival}` : "", guest.requests.trim()].filter(Boolean).join(" · ");
-    // Sito PUBBLICO: la prenotazione non sta nel browser del visitatore ma va
-    // inviata al server, che la scrive nel calendario del proprietario.
+    const bkCode = `SPG-${new Date().getFullYear()}-${Math.abs([...(gid + checkIn)].reduce((a, c) => a + c.charCodeAt(0), 0)) % 100000}`;
+    // Sito PUBBLICO: prima si tenta il PAGAMENTO online (Stripe della struttura); la
+    // prenotazione si registra solo dopo l'incasso. Se Stripe non è collegato o non è
+    // previsto un importo, si registra direttamente ("paga in struttura").
     if (isPublicMode() && publicSlug()) {
       const token = (globalThis.crypto?.randomUUID?.() ?? String(Date.now()));
-      fetch("/api/public-booking", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          slug: publicSlug(), token, rt: selRt.id, ci: checkIn, co: checkOut,
-          adults, children, childAges, total: accommodation, deposit, note,
-          guest: { firstName: guest.firstName.trim(), lastName: guest.lastName.trim(), email: guest.email.trim(), phone: guest.phone.trim(), country: guest.country },
-        }),
-      }).catch(() => {});
+      const guestBody = { firstName: guest.firstName.trim(), lastName: guest.lastName.trim(), email: guest.email.trim(), phone: guest.phone.trim(), country: guest.country };
+      try { sessionStorage.setItem("xn-lastbooking", JSON.stringify({ code: bkCode, structureName: structure?.name, roomName: `${selRt.name}${selPlan ? " · " + selPlan.name : ""}`, ci: checkIn, co: checkOut, total, deposit, guestFirst: guest.firstName.trim(), email: guest.email.trim() })); } catch {}
+      setProcessing(true);
+      try {
+        const r = await fetch("/api/stripe/book", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), s: structureId, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges, total: accommodation, deposit, note, code: bkCode, token, guest: guestBody }) });
+        const j = await r.json().catch(() => ({}));
+        if (j?.payment && j?.url) { window.location.href = j.url as string; return; } // → Stripe
+        await fetch("/api/public-booking", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), token, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges, total: accommodation, deposit, note, code: bkCode, guest: guestBody }) });
+      } catch { /* rete assente: mostra comunque la conferma */ }
+      setProcessing(false);
     } else {
       addBooking({ structureId, roomTypeId: selRt.id, unitId: unit?.id ?? null, guestId: gid, channel: "direct", status: "confirmed", checkIn, checkOut, adults, children, childAges: childAges.length ? childAges : undefined, total: accommodation, cleaningFee: 0, paid: deposit, cityTaxPaid: false, note });
       addActivity("booking", `Prenotazione dal sito — ${guest.firstName} ${guest.lastName}`);
     }
-    setCode(`SPG-${new Date().getFullYear()}-${Math.abs([...(gid + checkIn)].reduce((a, c) => a + c.charCodeAt(0), 0)) % 100000}`);
+    setCode(bkCode);
     setStep("done");
     window.scrollTo(0, 0);
   };
+
+  // Ritorno dal pagamento Stripe: verifica l'incasso, registra la prenotazione e mostra la conferma.
+  useEffect(() => {
+    const u = new URL(window.location.href);
+    if (u.searchParams.get("paid") === "1" && u.searchParams.get("session_id")) {
+      const sessId = u.searchParams.get("session_id") as string;
+      const slug = u.searchParams.get("site") || publicSlug() || "";
+      try { const s = JSON.parse(sessionStorage.getItem("xn-lastbooking") || "null"); if (s && s.code) { setDoneSummary(s); setCode(s.code); } } catch {}
+      setStep("done"); window.scrollTo(0, 0);
+      fetch("/api/stripe/book/confirm", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ session_id: sessId, slug }) })
+        .finally(() => { try { window.history.replaceState({}, "", `/prenota?site=${encodeURIComponent(slug)}`); } catch {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Riepilogo prenotazione (per email e PDF).
   const bookingLines = () => ([
@@ -183,10 +205,6 @@ function Engine() {
     ["Saldo in struttura", eur(Math.max(0, total - deposit))],
   ] as [string, string][]);
 
-  const emailConfirm = () => {
-    const body = [`Ciao ${guest.firstName},`, "", "grazie per la tua prenotazione. Ecco il riepilogo:", "", ...bookingLines().map(([k, v]) => `${k}: ${v}`), "", `A presto,`, structure?.name ?? "Xenora"].join("\n");
-    window.open(`mailto:${encodeURIComponent(guest.email)}?subject=${encodeURIComponent(`Conferma prenotazione ${code} · ${structure?.name ?? ""}`)}&body=${encodeURIComponent(body)}`);
-  };
   const printPdf = () => {
     const w = window.open("", "_blank", "width=820,height=940");
     if (!w) return;
@@ -290,6 +308,12 @@ function Engine() {
   );
 
   if (step === "done") {
+    const dCode = doneSummary?.code || code;
+    const dStruct = doneSummary?.structureName || structure?.name;
+    const dRoom = doneSummary?.roomName || selRt?.name;
+    const dCi = doneSummary?.ci || checkIn, dCo = doneSummary?.co || checkOut;
+    const dTotal = doneSummary?.total ?? total, dDeposit = doneSummary?.deposit ?? deposit;
+    const dFirst = doneSummary?.guestFirst || guest.firstName, dEmail = doneSummary?.email || guest.email;
     return (
       <div className="flex min-h-screen flex-col bg-wash">
         {header}
@@ -297,21 +321,20 @@ function Engine() {
           <div className={`${box} p-8 text-center`}>
             <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full text-white" style={{ backgroundColor: "var(--ok)" }}><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" /></svg></div>
             <h1 className="font-display text-2xl font-bold text-txt">Prenotazione confermata!</h1>
-            <p className="mt-1 text-sm text-dim">Grazie {guest.firstName}. Ti abbiamo inviato la conferma a <b className="text-txt">{guest.email}</b>.</p>
+            <p className="mt-1 text-sm text-dim">Grazie {dFirst}. Ti abbiamo inviato la conferma a <b className="text-txt">{dEmail}</b>.</p>
             <div className="mx-auto mt-5 max-w-sm rounded-xl border border-line bg-wash p-4 text-left text-sm">
-              <div className="flex justify-between"><span className="text-dim">Codice</span><span className="font-mono font-bold text-txt">{code}</span></div>
-              <div className="mt-1 flex justify-between"><span className="text-dim">Struttura</span><span className="text-txt">{structure?.name}</span></div>
-              <div className="mt-1 flex justify-between"><span className="text-dim">Camera</span><span className="text-txt">{selRt?.name}</span></div>
-              <div className="mt-1 flex justify-between"><span className="text-dim">Soggiorno</span><span className="text-txt">{new Date(checkIn).toLocaleDateString("it-IT")} → {new Date(checkOut).toLocaleDateString("it-IT")}</span></div>
-              <div className="mt-2 flex justify-between border-t border-line pt-2"><span className="font-semibold text-txt">Totale</span><span className="font-mono font-bold text-txt">{eur(total)}</span></div>
-              {deposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">Acconto versato</span><span className="font-mono text-txt">{eur(deposit)}</span></div>}
-              {total - deposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">Saldo in struttura</span><span className="font-mono text-txt">{eur(total - deposit)}</span></div>}
+              <div className="flex justify-between"><span className="text-dim">Codice</span><span className="font-mono font-bold text-txt">{dCode}</span></div>
+              <div className="mt-1 flex justify-between"><span className="text-dim">Struttura</span><span className="text-txt">{dStruct}</span></div>
+              <div className="mt-1 flex justify-between"><span className="text-dim">Camera</span><span className="text-txt">{dRoom}</span></div>
+              <div className="mt-1 flex justify-between"><span className="text-dim">Soggiorno</span><span className="text-txt">{new Date(dCi).toLocaleDateString("it-IT")} → {new Date(dCo).toLocaleDateString("it-IT")}</span></div>
+              <div className="mt-2 flex justify-between border-t border-line pt-2"><span className="font-semibold text-txt">Totale</span><span className="font-mono font-bold text-txt">{eur(dTotal)}</span></div>
+              {dDeposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">Acconto pagato</span><span className="font-mono text-txt">{eur(dDeposit)}</span></div>}
+              {dTotal - dDeposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">Saldo in struttura</span><span className="font-mono text-txt">{eur(dTotal - dDeposit)}</span></div>}
             </div>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
-              <button onClick={printPdf} className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg> Scarica PDF</button>
-              <button onClick={emailConfirm} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg> Ricevi via email</button>
+              <button onClick={printPdf} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg> Scarica PDF</button>
             </div>
-            <p className="mt-4 text-xs text-faint">Ti abbiamo inviato la conferma via email. Puoi anche scaricare il PDF con tutti i dettagli. La prenotazione è entrata nel gestionale della struttura (calendario, cassa e registro attività).</p>
+            <p className="mt-4 text-xs text-faint">Conferma inviata via email in automatico. Puoi scaricare il PDF con tutti i dettagli. La prenotazione è entrata nel gestionale della struttura (calendario, cassa e registro attività).</p>
           </div>
         </div>
         {footer}
