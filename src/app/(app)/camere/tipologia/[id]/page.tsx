@@ -81,6 +81,9 @@ export default function TipologiaSchedaPage() {
   // Imposta il numero esatto di camere della tipologia: crea o rimuove le unità per arrivare al totale.
   const [targetRooms, setTargetRooms] = useState<string>(String(nUnits || 1));
   const [roomMsg, setRoomMsg] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);        // selettore "quali camere rimuovere"
+  const [removeSel, setRemoveSel] = useState<Set<string>>(new Set());
+  const hasActiveBooking = (unitId: string) => bookings.some((b) => b.unitId === unitId && b.status !== "cancelled");
   const numFromName = (n: string) => { const m = n.match(/(\d+)\s*$/); return m ? Number(m[1]) : 0; };
   const applyRoomCount = async () => {
     if (!existing) return;
@@ -102,21 +105,24 @@ export default function TipologiaSchedaPage() {
       }
       setRoomMsg(`${t("Aggiunte")} ${add} ${t("camere")} · ${t("totale")} ${target}.`);
     } else {
+      // Riduzione: apri il selettore così l'utente sceglie QUALI camere rimuovere.
+      // Suggerisco già le ultime rimovibili (senza prenotazioni) fino a raggiungere il target.
       const toRemove = cur - target;
-      const removable = mine.filter((u) => !bookings.some((b) => b.unitId === u.id && b.status !== "cancelled"));
-      const victims = removable.slice(-toRemove);
-      const blocked = toRemove - victims.length;
-      const ok = await ask({
-        title: t("Riduci camere"),
-        message: blocked > 0
-          ? `${t("Posso rimuovere")} ${victims.length} ${t("camere su")} ${toRemove}: ${t("le altre hanno prenotazioni e restano.")} ${t("Procedo?")}`
-          : `${t("Rimuovere")} ${toRemove} ${t("camere di")} ${existing.name}?`,
-        danger: true, confirmLabel: t("Rimuovi"),
-      });
-      if (!ok) return;
-      victims.forEach((u) => deleteUnit(u.id));
-      setRoomMsg(`${t("Rimosse")} ${victims.length} ${t("camere")}.${blocked > 0 ? ` ${blocked} ${t("non rimosse (prenotazioni attive).")}` : ""}`);
+      const removable = mine.filter((u) => !hasActiveBooking(u.id));
+      setRemoveSel(new Set(removable.slice(-toRemove).map((u) => u.id)));
+      setPickerOpen(true);
     }
+  };
+  // Elimina le camere selezionate nel picker (salta quelle con prenotazioni attive per sicurezza).
+  const confirmRemove = () => {
+    if (!existing) return;
+    const ids = [...removeSel].filter((id) => !hasActiveBooking(id));
+    ids.forEach((id) => deleteUnit(id));
+    setPickerOpen(false);
+    setRemoveSel(new Set());
+    const remaining = units.filter((u) => u.roomTypeId === existing.id).length - ids.length;
+    setTargetRooms(String(Math.max(0, remaining)));
+    setRoomMsg(`${t("Rimosse")} ${ids.length} ${t("camere")}. ${t("Totale")}: ${Math.max(0, remaining)}.`);
   };
 
   return (
@@ -280,6 +286,41 @@ export default function TipologiaSchedaPage() {
           </Card>
         </div>
       </div>
+
+      {/* Selettore: quali camere rimuovere */}
+      {pickerOpen && existing && (() => {
+        const myUnits = units.filter((u) => u.roomTypeId === existing.id)
+          .sort((a, b) => (Number(a.name.match(/\d+/)?.[0] ?? 0)) - (Number(b.name.match(/\d+/)?.[0] ?? 0)));
+        const selCount = [...removeSel].filter((id) => !hasActiveBooking(id)).length;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setPickerOpen(false)}>
+            <div className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div className="text-lg font-bold text-txt">{t("Quali camere rimuovere?")}</div>
+              <p className="mt-1 text-xs text-dim">{t("Spunta le camere da eliminare. Quelle con prenotazioni attive non sono selezionabili.")}</p>
+              <div className="mt-3 max-h-72 space-y-1 overflow-y-auto">
+                {myUnits.map((u) => {
+                  const blocked = hasActiveBooking(u.id);
+                  const on = removeSel.has(u.id);
+                  return (
+                    <label key={u.id} className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${blocked ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:bg-wash"} ${on && !blocked ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : "border-line"}`}>
+                      <input type="checkbox" disabled={blocked} checked={on && !blocked} onChange={(e) => setRemoveSel((p) => { const n = new Set(p); if (e.target.checked) n.add(u.id); else n.delete(u.id); return n; })} />
+                      <span className="flex-1 text-sm text-txt">{t("Camera")} {u.name} {u.code && <span className="text-faint">· {u.code}</span>}</span>
+                      {blocked && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]">{t("prenotazioni attive")}</span>}
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-xs text-dim">{t("Rimarranno")}: <b className="text-txt">{myUnits.length - selCount}</b> {t("camere")}</span>
+                <div className="flex gap-2">
+                  <button onClick={() => setPickerOpen(false)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla")}</button>
+                  <button onClick={confirmRemove} disabled={selCount === 0} className="rounded-lg px-3 py-2 text-sm font-semibold text-white disabled:opacity-40" style={{ backgroundColor: "var(--err)" }}>{t("Rimuovi")} {selCount > 0 ? `(${selCount})` : ""}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
