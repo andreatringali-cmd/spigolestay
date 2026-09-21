@@ -15,12 +15,14 @@ type Unit = { id: string; roomTypeId: string; structureId?: string; outOfService
 const overlaps = (b: { checkIn: string; checkOut: string }, ci: string, co: string) => b.checkIn < co && b.checkOut > ci;
 const uid = () => (globalThis.crypto?.randomUUID?.() ?? `x_${Date.now()}_${Math.random().toString(36).slice(2)}`);
 
-export interface ChannexMapRow { channex_property_id: string; tenant_id: string; structure_id: string; rooms: Record<string, string> }
+export interface ChannexMapRow { channex_property_id: string; tenant_id: string; structure_id: string; rooms: Record<string, string>; org_id?: string | null }
 
-// Salva/aggiorna la mappatura Channex↔Xenora per una struttura (chiamata dopo il sync).
-export async function saveChannexMap(admin: SupabaseClient, tenantId: string, structureId: string, propertyId: string, rooms: Record<string, string>) {
+// Salva/aggiorna la mappatura Channex↔Xenora per una struttura (chiamata dopo il sync/relink).
+// Se la struttura è condivisa (socio), passa orgId: le prenotazioni in entrata verranno
+// scritte in org_state(orgId) e non nel blob personale del tenant. Vedi struttura-condivisa.
+export async function saveChannexMap(admin: SupabaseClient, tenantId: string, structureId: string, propertyId: string, rooms: Record<string, string>, orgId?: string | null) {
   const { error } = await admin.from("channex_map").upsert({
-    channex_property_id: propertyId, tenant_id: tenantId, structure_id: structureId, rooms, updated_at: new Date().toISOString(),
+    channex_property_id: propertyId, tenant_id: tenantId, structure_id: structureId, rooms, org_id: orgId ?? null, updated_at: new Date().toISOString(),
   }, { onConflict: "channex_property_id" });
   return { ok: !error, error: error?.message };
 }
@@ -52,23 +54,26 @@ export async function importBookings(admin: SupabaseClient, opts: { propertyId?:
 
   // Risolvi le property coinvolte in un colpo solo.
   const propIds = Array.from(new Set(feed.revisions.map((r) => r.property_id).filter(Boolean))) as string[];
-  const { data: maps } = await admin.from("channex_map").select("channex_property_id, tenant_id, structure_id, rooms").in("channex_property_id", propIds);
+  const { data: maps } = await admin.from("channex_map").select("channex_property_id, tenant_id, structure_id, rooms, org_id").in("channex_property_id", propIds);
   const mapByProp = new Map<string, ChannexMapRow>((maps ?? []).map((m) => [m.channex_property_id as string, m as ChannexMapRow]));
 
-  // Raggruppa le revision per tenant (property mappata). Le non mappate: skip SENZA ack.
-  const byTenant = new Map<string, { rev: ChxRevision; map: ChannexMapRow }[]>();
+  // Raggruppa le revision per STORE di destinazione. Struttura condivisa → org_state(org_id);
+  // struttura personale → app_state(tenant_id). Le property non mappate: skip SENZA ack.
+  const byStore = new Map<string, { target: StoreTarget; items: { rev: ChxRevision; map: ChannexMapRow }[] }>();
   for (const rev of feed.revisions) {
     const map = rev.property_id ? mapByProp.get(rev.property_id) : undefined;
     if (!map) { out.skipped++; continue; }
-    const arr = byTenant.get(map.tenant_id) ?? []; arr.push({ rev, map }); byTenant.set(map.tenant_id, arr);
+    const target: StoreTarget = map.org_id ? { kind: "org", id: map.org_id } : { kind: "user", id: map.tenant_id };
+    const key = `${target.kind}:${target.id}`;
+    const g = byStore.get(key) ?? { target, items: [] }; g.items.push({ rev, map }); byStore.set(key, g);
   }
 
   const ackIds: string[] = [];
-  for (const [tenantId, items] of byTenant) {
+  for (const [key, { target, items }] of byStore) {
     try {
-      const applied = await applyToTenant(admin, tenantId, items, out);
+      const applied = await applyToStore(admin, target, items, out);
       for (const it of applied) ackIds.push(it.rev.id);
-    } catch (e) { out.errors.push(`tenant ${tenantId.slice(0, 8)}: ${(e as Error)?.message}`); }
+    } catch (e) { out.errors.push(`${key.slice(0, 12)}: ${(e as Error)?.message}`); }
   }
 
   // ACK + audit delle revision applicate.
@@ -85,10 +90,17 @@ export async function importBookings(admin: SupabaseClient, opts: { propertyId?:
   return out;
 }
 
-// Applica le revision di UN tenant alla sua app_state (una lettura + una scrittura, con retry su rev).
-async function applyToTenant(admin: SupabaseClient, tenantId: string, items: { rev: ChxRevision; map: ChannexMapRow }[], out: ImportSummary): Promise<{ rev: ChxRevision }[]> {
+// Store di destinazione: blob personale (app_state per user_id) o org condivisa (org_state per org_id).
+type StoreTarget = { kind: "user" | "org"; id: string };
+const storeTable = (t: StoreTarget) => (t.kind === "org" ? "org_state" : "app_state");
+const storeKeyCol = (t: StoreTarget) => (t.kind === "org" ? "org_id" : "user_id");
+
+// Applica le revision a UNO store (una lettura + una scrittura, con retry su rev).
+// Identico per app_state e org_state: cambiano solo tabella e colonna chiave.
+async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: { rev: ChxRevision; map: ChannexMapRow }[], out: ImportSummary): Promise<{ rev: ChxRevision }[]> {
+  const table = storeTable(target); const keyCol = storeKeyCol(target);
   const applyOnce = async (): Promise<{ ok: boolean; conflict?: boolean; applied: { rev: ChxRevision }[] }> => {
-    const { data: row, error } = await admin.from("app_state").select("data, rev").eq("user_id", tenantId).maybeSingle();
+    const { data: row, error } = await admin.from(table).select("data, rev").eq(keyCol, target.id).maybeSingle();
     if (error) return { ok: false, applied: [] };
     const blob = ((row?.data ?? {}) as Record<string, string>) || {};
     const rev = typeof (row as { rev?: number } | null)?.rev === "number" ? (row as { rev: number }).rev : null;
@@ -145,17 +157,19 @@ async function applyToTenant(admin: SupabaseClient, tenantId: string, items: { r
     }
 
     data.bookings = bookings; data.guests = guests; blob[DATA_KEY] = JSON.stringify(data);
-    let write = admin.from("app_state").update({ data: blob, updated_at: new Date().toISOString() }).eq("user_id", tenantId);
+    let write = admin.from(table).update({ data: blob, updated_at: new Date().toISOString() }).eq(keyCol, target.id);
     if (rev !== null) write = write.eq("rev", rev);
     const { data: updated, error: wErr } = await write.select("rev");
     if (wErr) return { ok: false, applied: [] };
     if ((!updated || updated.length === 0) && rev !== null) return { ok: false, conflict: true, applied: [] };
-    await admin.from("channex_map").update({ last_import_at: new Date().toISOString() }).eq("tenant_id", tenantId);
+    // Segna l'ultimo import sulle righe di mappatura di questo store.
+    const mapUpd = admin.from("channex_map").update({ last_import_at: new Date().toISOString() });
+    await (target.kind === "org" ? mapUpd.eq("org_id", target.id) : mapUpd.eq("tenant_id", target.id).is("org_id", null));
     return { ok: true, applied };
   };
 
   let res = await applyOnce();
   if (!res.ok && res.conflict) res = await applyOnce(); // un retry sul conflitto di rev
-  if (!res.ok) throw new Error("scrittura app_state fallita");
+  if (!res.ok) throw new Error(`scrittura ${table} fallita`);
   return res.applied;
 }

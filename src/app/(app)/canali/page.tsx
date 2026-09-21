@@ -115,7 +115,7 @@ export default function CanaliPage() {
   const doRelink = async (manual = false) => {
     setRelink({ running: true, msg: manual ? "Ricollego la mappatura…" : undefined });
     try {
-      type Linked = { property: string; structure: string; structureId: string; propertyId: string; rooms: number; roomsMap?: Record<string, string> };
+      type Linked = { property: string; structure: string; structureId: string; propertyId: string; orgId?: string | null; rooms: number; roomsMap?: Record<string, string> };
       const j = await apiPost<{ ok: boolean; linked?: Linked[]; unmatched?: string[]; error?: string }>("channex/relink", {});
       if (!j.ok) { setRelink({ running: false, ok: false, msg: manual ? (j.error || "Ricollegamento non riuscito") : undefined }); return; }
       const linked = j.linked ?? [];
