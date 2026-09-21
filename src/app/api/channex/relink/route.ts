@@ -70,7 +70,11 @@ export async function POST(req: Request) {
   if (!props.ok) return NextResponse.json({ ok: false, error: props.error || "Errore lettura property Channex" }, { status: 200 });
   const propList = props.data?.data ?? [];
 
-  const linked: { property: string; structure: string; structureId: string; propertyId: string; orgId: string | null; rooms: number; roomsMap: Record<string, string> }[] = [];
+  // Per ogni property Channex trova la struttura per nome e le camere abbinate. Se PIÙ property
+  // combaciano con la stessa struttura (doppioni su Channex), tengo solo la più COMPLETA
+  // (più camere abbinate) per non creare mappature doppie.
+  type Match = { c: Candidate; propertyId: string; propertyTitle: string; rooms: Record<string, string>; count: number };
+  const bestByStruct = new Map<string, Match>();
   const unmatched: string[] = [];
   for (const p of propList) {
     const title = norm(p.attributes?.title);
@@ -82,8 +86,20 @@ export async function POST(req: Request) {
       const x = c.roomTypes.find((r) => norm(r.name) === norm(cr.attributes?.title));
       if (x) rooms[cr.id] = x.id;
     }
-    await saveChannexMap(auth.admin, auth.tenantId, c.structureId, p.id, rooms, c.orgId);
-    linked.push({ property: p.attributes?.title || p.id, structure: c.name || c.structureId, structureId: c.structureId, propertyId: p.id, orgId: c.orgId, rooms: Object.keys(rooms).length, roomsMap: rooms });
+    const count = Object.keys(rooms).length;
+    const cur = bestByStruct.get(c.structureId);
+    if (!cur || count > cur.count) bestByStruct.set(c.structureId, { c, propertyId: p.id, propertyTitle: p.attributes?.title || p.id, rooms, count });
+  }
+
+  const linked: { property: string; structure: string; structureId: string; propertyId: string; orgId: string | null; rooms: number; roomsMap: Record<string, string> }[] = [];
+  for (const [sid, m] of bestByStruct) {
+    await saveChannexMap(auth.admin, auth.tenantId, sid, m.propertyId, m.rooms, m.c.orgId);
+    // Auto-pulizia doppioni: rimuovi altre mappature per la STESSA struttura che puntano a
+    // una property Channex diversa da quella scelta.
+    let del = auth.admin.from("channex_map").delete().eq("structure_id", sid).neq("channex_property_id", m.propertyId);
+    del = m.c.orgId ? del.eq("org_id", m.c.orgId) : del.eq("tenant_id", auth.tenantId).is("org_id", null);
+    await del;
+    linked.push({ property: m.propertyTitle, structure: m.c.name || sid, structureId: sid, propertyId: m.propertyId, orgId: m.c.orgId, rooms: m.count, roomsMap: m.rooms });
   }
 
   return NextResponse.json({ ok: true, linked, unmatched });
