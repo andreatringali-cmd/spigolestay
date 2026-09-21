@@ -267,13 +267,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
       },
       deleteRoomType: (id) => {
         const nm = roomTypes.find((rt) => rt.id === id)?.name;
-        const unitIds = units.filter((u) => u.roomTypeId === id).map((u) => u.id);
-        const bIds = bookings.filter((b) => b.roomTypeId === id || unitIds.includes(b.unitId ?? "")).map((b) => b.id);
-        tomb("roomTypes", id); tomb("units", ...unitIds); tomb("bookings", ...bIds);
-        setBookings((prev) => prev.filter((b) => b.roomTypeId !== id && !unitIds.includes(b.unitId ?? "")));
-        setUnits((prev) => prev.filter((u) => u.roomTypeId !== id));
-        setRoomTypes((prev) => prev.filter((rt) => rt.id !== id));
-        logAct("config", `Tipologia eliminata${nm ? " — " + nm : ""}`);
+        // Cascata: la tipologia + TUTTE le tariffe derivate che pendono da lei (anche a più
+        // livelli, es. Matrimoniale → Dus Tripla). Così sparisce anche da "Tariffe".
+        const ids = new Set<string>([id]);
+        let grew = true;
+        while (grew) {
+          grew = false;
+          for (const rt of roomTypes) {
+            const parent = (rt as { deriveFrom?: string }).deriveFrom;
+            if (parent && ids.has(parent) && !ids.has(rt.id)) { ids.add(rt.id); grew = true; }
+          }
+        }
+        const idList = [...ids];
+        const unitIds = units.filter((u) => idList.includes(u.roomTypeId)).map((u) => u.id);
+        const bIds = bookings.filter((b) => idList.includes(b.roomTypeId) || unitIds.includes(b.unitId ?? "")).map((b) => b.id);
+        tomb("roomTypes", ...idList); tomb("units", ...unitIds); tomb("bookings", ...bIds);
+        setBookings((prev) => prev.filter((b) => !idList.includes(b.roomTypeId) && !unitIds.includes(b.unitId ?? "")));
+        setUnits((prev) => prev.filter((u) => !idList.includes(u.roomTypeId)));
+        setRoomTypes((prev) => prev.filter((rt) => !idList.includes(rt.id)));
+        // Pulisci i prezzi manuali (rateOverrides "roomTypeId|ISO") delle tipologie rimosse.
+        setRateOverrides((prev) => { const c = { ...prev }; for (const k of Object.keys(c)) { const rtId = k.includes("|") ? k.split("|")[0] : ""; if (idList.includes(rtId)) delete c[k]; } return c; });
+        const extra = idList.length - 1;
+        logAct("config", `Tipologia eliminata${nm ? " — " + nm : ""}${extra > 0 ? ` (+${extra} tariffe derivate)` : ""}`);
       },
       deleteUnit: (id) => {
         const nm = units.find((u) => u.id === id)?.name;

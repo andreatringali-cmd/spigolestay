@@ -159,11 +159,11 @@ export default function TariffeDerivatePage() {
                           const mClosed = effectiveClosed(rt, roomTypes);
                           return (
                             <Fragment key={rt.id}>
-                              <tr className="border-b border-line last:border-0">
+                              <tr onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                                 <td className="px-3 py-2.5">
                                   <div className="flex min-w-0 items-center gap-2">
                                     {kids.length > 0 ? (
-                                      <button onClick={() => toggleDeriv(rt.id)} className="shrink-0 text-faint hover:text-txt" title={open ? t("Comprimi") : t("Espandi")}>
+                                      <button onClick={(e) => { e.stopPropagation(); toggleDeriv(rt.id); }} className="shrink-0 text-faint hover:text-txt" title={open ? t("Comprimi") : t("Espandi")}>
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="transition-transform" style={{ transform: open ? "rotate(90deg)" : "none" }}><polyline points="9 18 15 12 9 6" /></svg>
                                       </button>
                                     ) : <span className="inline-block w-3 shrink-0" />}
@@ -182,13 +182,12 @@ export default function TariffeDerivatePage() {
                                   : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)", color: "var(--ok)" }}>{t("In vendita")}</span>}</td>
                                 <td className="px-3 py-2.5">
                                   <div className="flex items-center justify-end gap-1.5">
-                                    <button onClick={() => setDerivModal({ structureId: s.id, parentId: rt.id })} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-wash">＋ {t("Derivata")}</button>
-                                    <button onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="rounded-md border border-line px-2 py-1 text-[11px] font-medium text-dim hover:bg-wash">{t("Modifica")}</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setDerivModal({ structureId: s.id, parentId: rt.id }); }} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-wash">＋ {t("Derivata")}</button>
                                   </div>
                                 </td>
                               </tr>
                               {open && kids.map((k) => { const kMin = effectiveMinStay(k, roomTypes); const kClosed = effectiveClosed(k, roomTypes); return (
-                                <tr key={k.id} className="border-b border-line bg-[color:color-mix(in_srgb,var(--focus)_4%,transparent)] last:border-0">
+                                <tr key={k.id} onClick={() => setDerivModal({ structureId: s.id, editId: k.id })} className="cursor-pointer border-b border-line bg-[color:color-mix(in_srgb,var(--focus)_4%,transparent)] last:border-0 hover:bg-[color:color-mix(in_srgb,var(--focus)_9%,transparent)]">
                                   <td className="px-3 py-2.5">
                                     <div className="flex min-w-0 items-center gap-2 pl-6">
                                       <span className="shrink-0 text-focus" title={t("Condivide le camere della tipologia madre")}><Catena /></span>
@@ -214,8 +213,7 @@ export default function TariffeDerivatePage() {
                                   </td>
                                   <td className="px-3 py-2.5">
                                     <div className="flex items-center justify-end gap-1.5">
-                                      <button onClick={() => setDerivModal({ structureId: s.id, editId: k.id })} className="rounded-md border border-line px-2 py-1 text-[11px] font-medium text-dim hover:bg-wash">{t("Modifica")}</button>
-                                      <button onClick={async () => { if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${k.name}"?`, danger: true, confirmLabel: t("Elimina") })) deleteRoomType(k.id); }} title={t("Elimina")} className="rounded-md border border-line px-2 py-1 text-[11px] font-medium text-[color:var(--err)] hover:bg-wash">✕</button>
+                                      <button onClick={async (e) => { e.stopPropagation(); if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${k.name}"?`, danger: true, confirmLabel: t("Elimina") })) deleteRoomType(k.id); }} title={t("Elimina")} className="rounded-md border border-line px-2 py-1 text-[11px] font-medium text-[color:var(--err)] hover:bg-wash">✕</button>
                                     </div>
                                   </td>
                                 </tr>
