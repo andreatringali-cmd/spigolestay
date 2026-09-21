@@ -285,10 +285,7 @@ function Engine() {
           </label>
         </div>
       )}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs text-dim">{nights} {nights === 1 ? "notte" : "notti"} · {adults} adulti{children ? ` · ${children} bambini` : ""}</span>
-        <button onClick={() => setSearched(true)} className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>Verifica disponibilità</button>
-      </div>
+      <div className="mt-2 text-xs text-dim">{nights} {nights === 1 ? "notte" : "notti"} · {adults} adulti{children ? ` · ${children} bambini` : ""}</div>
     </div>
   );
 
