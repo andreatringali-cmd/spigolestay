@@ -182,7 +182,7 @@ export async function POST(req: Request) {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({
             kind: "voucher",
-            checkinUrl: `${origin}/checkin?b=${encodeURIComponent(booking.id)}`,
+            checkinUrl: `${origin}/checkin?site=${encodeURIComponent(slug)}&b=${encodeURIComponent(booking.id)}`,
             manageUrl: `${origin}/gestisci?site=${encodeURIComponent(slug)}&b=${encodeURIComponent(booking.id)}`,
             booking: {
               code: (booking.code as string) || booking.id.slice(0, 8).toUpperCase(),

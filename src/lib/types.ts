@@ -312,6 +312,7 @@ export interface Booking {
   stripePaymentIntent?: string;
   stripeSessionId?: string;
   stripeAccountId?: string; // conto connesso su cui è avvenuto il pagamento
+  paidSessions?: string[];  // id sessioni Stripe già registrate come incasso (idempotenza saldo)
   // Ciclo di vita dell'annullamento self-service.
   cancelledAt?: string;    // ISO datetime dell'annullamento
   cancelledBy?: "guest" | "host";

@@ -107,7 +107,7 @@ function Engine() {
   const cancelled = b.status === "cancelled";
   const nights = (() => { try { return Math.max(1, Math.round((Date.parse(b.checkOut) - Date.parse(b.checkIn)) / 86400000)); } catch { return 1; } })();
   const balance = Math.max(0, (b.total || 0) - (b.paid || 0));
-  const checkinUrl = `/checkin?b=${encodeURIComponent(params.b)}`;
+  const checkinUrl = `/checkin?site=${encodeURIComponent(params.slug)}&b=${encodeURIComponent(params.b)}`;
 
   return (
     <div className="min-h-full bg-wash pb-16">{header}

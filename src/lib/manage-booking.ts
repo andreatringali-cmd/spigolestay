@@ -76,34 +76,39 @@ export async function findBookingStore(admin: SupabaseClient, slug: string, book
   return null;
 }
 
-// Scrive la prenotazione modificata nello stesso store, con lucchetto sul rev (una volta).
-// patch viene applicata all'oggetto prenotazione. Ritorna true se scritto.
+// Applica una mutazione al contenuto dello store e scrive con lucchetto sul rev.
+// mutate riceve (data, bookingIndex) e modifica in place; deve essere ri-applicabile
+// perché in caso di conflitto rileggiamo lo stato fresco e ri-mutiamo una volta.
+export async function mutateStore(admin: SupabaseClient, store: BookingStore, mutate: (data: Json, bookingIndex: number) => boolean): Promise<boolean> {
+  const bookingId = String((store.booking as { id?: string }).id || "");
+  const writeOnce = async (data: Json, idx: number, blob: Record<string, string>, keyCol: "user_id" | "org_id", keyVal: string, rev: number | null) => {
+    if (!mutate(data, idx)) return "skip" as const;
+    const nb = { ...blob, [DATA_KEY]: JSON.stringify(data) };
+    let w = admin.from(store.table).update({ data: nb, updated_at: new Date().toISOString() }).eq(keyCol, keyVal);
+    if (rev !== null) w = w.eq("rev", rev);
+    const { data: updated, error } = await w.select("rev");
+    if (error) throw new Error(error.message);
+    return updated && updated.length > 0 ? ("ok" as const) : ("conflict" as const);
+  };
+  const r1 = await writeOnce(store.data, store.bookingIndex, store.blob, store.keyCol, store.keyVal, store.rev);
+  if (r1 === "ok") return true;
+  if (r1 === "skip") return false;
+  // Conflitto: rileggi fresco e riprova una volta.
+  const fresh = await scan(admin, store.table, store.keyCol, store.keyVal, bookingId);
+  if (!fresh) return false;
+  const r2 = await writeOnce(fresh.data, fresh.bookingIndex, fresh.blob, fresh.keyCol, fresh.keyVal, fresh.rev);
+  return r2 === "ok";
+}
+
+// Scrive una patch sull'oggetto prenotazione (rev-locked, un retry).
 export async function writeBookingPatch(admin: SupabaseClient, store: BookingStore, patch: Json): Promise<boolean> {
-  const apply = (data: Json, idx: number) => {
+  return mutateStore(admin, store, (data, idx) => {
     const bookings = arr(data.bookings);
     if (idx < 0 || idx >= bookings.length) return false;
     bookings[idx] = { ...(bookings[idx] as Json), ...patch };
     data.bookings = bookings;
     return true;
-  };
-  if (!apply(store.data, store.bookingIndex)) return false;
-  const blob = { ...store.blob, [DATA_KEY]: JSON.stringify(store.data) };
-  let w = admin.from(store.table).update({ data: blob, updated_at: new Date().toISOString() }).eq(store.keyCol, store.keyVal);
-  if (store.rev !== null) w = w.eq("rev", store.rev);
-  const { data: updated, error } = await w.select("rev");
-  if (error) throw new Error(error.message);
-  if (updated && updated.length > 0) return true;
-
-  // Conflitto di rev: rileggi, riapplica sull'indice aggiornato, riscrivi una volta.
-  const fresh = await scan(admin, store.table, store.keyCol, store.keyVal, String((store.booking as { id?: string }).id || ""));
-  if (!fresh) return false;
-  if (!apply(fresh.data, fresh.bookingIndex)) return false;
-  const blob2 = { ...fresh.blob, [DATA_KEY]: JSON.stringify(fresh.data) };
-  let w2 = admin.from(store.table).update({ data: blob2, updated_at: new Date().toISOString() }).eq(store.keyCol, store.keyVal);
-  if (fresh.rev !== null) w2 = w2.eq("rev", fresh.rev);
-  const { data: u2, error: e2 } = await w2.select("rev");
-  if (e2) throw new Error(e2.message);
-  return !!(u2 && u2.length > 0);
+  });
 }
 
 // Valuta la politica di rimborso: entro la finestra gratuita?
