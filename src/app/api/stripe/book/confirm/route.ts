@@ -48,9 +48,11 @@ export async function POST(req: Request) {
     if (!resolved?.acct) return NextResponse.json({ ok: false, error: "no_stripe_account" }, { status: 400 });
 
     const stripe = new Stripe(key);
-    const session = await stripe.checkout.sessions.retrieve(sessionId, undefined, { stripeAccount: resolved.acct });
+    const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["payment_intent"] }, { stripeAccount: resolved.acct });
     if (session.payment_status !== "paid") return NextResponse.json({ ok: false, error: "not_paid", status: session.payment_status }, { status: 402 });
     const m = (session.metadata ?? {}) as Record<string, string>;
+    const pi = session.payment_intent;
+    const paymentIntent = typeof pi === "string" ? pi : (pi?.id || "");
 
     // Registra la prenotazione tramite public-booking (scrittura idempotente + email).
     const origin = req.headers.get("origin") || new URL(req.url).origin;
@@ -61,6 +63,8 @@ export async function POST(req: Request) {
         adults: Number(m.ad) || 1, children: Number(m.ch) || 0,
         total: Number(m.tot) || 0, deposit: Number(m.dep) || 0,
         note: m.note || "", code: m.code || "", token: m.token || sessionId,
+        planName: m.rpn || "", refundable: m.ref === "1", cancelDays: Number(m.cd) || 0,
+        stripePaymentIntent: paymentIntent, stripeSessionId: session.id, stripeAccountId: resolved.acct,
         guest: { firstName: (m.gn || "").split(" ")[0] || "", lastName: (m.gn || "").split(" ").slice(1).join(" "), email: m.ge || "", phone: m.gp || "", country: m.gc || "" },
       }),
     });

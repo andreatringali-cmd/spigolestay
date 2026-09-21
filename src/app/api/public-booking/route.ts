@@ -38,6 +38,13 @@ export async function POST(req: Request) {
     const deposit = Math.round(Number(body?.deposit) || 0) || 0;
     const note = String(body?.note || "").slice(0, 500);
     const token = String(body?.token || "").trim().slice(0, 80);
+    // Politica di cancellazione + riferimenti pagamento Stripe (per rimborso self-service)
+    const planName = String(body?.planName || "").slice(0, 60);
+    const refundable = body?.refundable === true;
+    const cancelDays = Math.max(0, parseInt(String(body?.cancelDays ?? "0"), 10) || 0);
+    const stripePaymentIntent = String(body?.stripePaymentIntent || "").slice(0, 120);
+    const stripeSessionId = String(body?.stripeSessionId || "").slice(0, 120);
+    const stripeAccountId = String(body?.stripeAccountId || "").slice(0, 120);
     const g = (body?.guest ?? {}) as Record<string, string>;
     const gFirst = String(g.firstName || "").trim();
     const gLast = String(g.lastName || "").trim();
@@ -112,6 +119,12 @@ export async function POST(req: Request) {
       extId,
       code: String((body as { code?: string })?.code || "").trim().slice(0, 40) || undefined,
       note: note || "Prenotazione dal sito",
+      ratePlanName: planName || undefined,
+      refundable: refundable || undefined,
+      cancelDays: cancelDays || undefined,
+      stripePaymentIntent: stripePaymentIntent || undefined,
+      stripeSessionId: stripeSessionId || undefined,
+      stripeAccountId: stripeAccountId || undefined,
     };
     bookings.push(booking);
     data.bookings = bookings;
@@ -161,11 +174,16 @@ export async function POST(req: Request) {
         const origin = req.headers.get("origin") || new URL(req.url).origin;
         const nN = Math.max(1, Math.round((Date.parse(co) - Date.parse(ci)) / 86400000));
         const g = (k: string) => (st[k] as string) || undefined;
+        // Testo della politica di cancellazione (per email + pagina di gestione).
+        const cancelPolicy = refundable
+          ? (cancelDays > 0 ? `Cancellazione gratuita fino a ${cancelDays} giorni prima dell'arrivo.` : "Cancellazione gratuita.")
+          : "Tariffa non rimborsabile.";
         await fetch(`${origin}/api/email`, {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({
             kind: "voucher",
             checkinUrl: `${origin}/checkin?b=${encodeURIComponent(booking.id)}`,
+            manageUrl: `${origin}/gestisci?site=${encodeURIComponent(slug)}&b=${encodeURIComponent(booking.id)}`,
             booking: {
               code: (booking.code as string) || booking.id.slice(0, 8).toUpperCase(),
               structureName: g("name"), structureEmail: g("email"), color: g("photoColor"),
@@ -174,6 +192,7 @@ export async function POST(req: Request) {
               adults, children, total, currency: g("currency") || "€",
               checkInFrom: g("checkInFrom"), checkOutBy: g("checkOutBy"),
               address: [g("address"), g("streetNumber"), g("city")].filter(Boolean).join(" "), phone: g("phone"),
+              ratePlan: planName || undefined, cancelPolicy,
             },
           }),
         });

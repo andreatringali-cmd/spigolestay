@@ -303,6 +303,20 @@ export interface Booking {
   primaryGuest?: { firstName?: string; lastName?: string; sex?: "M" | "F"; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string }; // dati ospite principale conservati sulla prenotazione (es. se l'anagrafica viene eliminata) — per Alloggiati Web
   extras?: { name: string; price: number }[]; // servizi/consumi extra aggiunti alla prenotazione
   invoiceRequest?: InvoiceRequest; // "richiedo fattura" raccolto al check-in online (dati intestazione)
+  // Politica di cancellazione applicata alla prenotazione (dal piano tariffario scelto).
+  // Salvata sulla prenotazione così la gestione ospite può valutare il rimborso anche a distanza di tempo.
+  ratePlanName?: string;   // nome del piano scelto (es. "Flessibile", "Non rimborsabile")
+  refundable?: boolean;    // il piano prevede la cancellazione gratuita
+  cancelDays?: number;     // cancellazione gratuita fino a N giorni prima del check-in (se refundable)
+  // Riferimenti Stripe del pagamento online (necessari per il rimborso automatico).
+  stripePaymentIntent?: string;
+  stripeSessionId?: string;
+  stripeAccountId?: string; // conto connesso su cui è avvenuto il pagamento
+  // Ciclo di vita dell'annullamento self-service.
+  cancelledAt?: string;    // ISO datetime dell'annullamento
+  cancelledBy?: "guest" | "host";
+  refundedAmount?: number; // € rimborsati (0 se fuori policy)
+  changeRequest?: { at: string; ci?: string; co?: string; adults?: number; children?: number; message?: string }; // richiesta di modifica date inviata al gestore
 }
 
 // Dati di intestazione fattura raccolti dall'ospite al check-in (usati dal modulo Documenti).

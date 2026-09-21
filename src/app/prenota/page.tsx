@@ -162,10 +162,11 @@ function Engine() {
       try { sessionStorage.setItem("xn-lastbooking", JSON.stringify({ code: bkCode, structureName: structure?.name, roomName: `${selRt.name}${selPlan ? " · " + selPlan.name : ""}`, ci: checkIn, co: checkOut, total, deposit, guestFirst: guest.firstName.trim(), email: guest.email.trim() })); } catch {}
       setProcessing(true);
       try {
-        const r = await fetch("/api/stripe/book", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), s: structureId, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges, total: accommodation, deposit, note, code: bkCode, token, guest: guestBody }) });
+        const policy = { planName: selPlan?.name, refundable: !!selPlan?.refundable, cancelDays: selPlan?.cancelDays ?? 0 };
+        const r = await fetch("/api/stripe/book", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), s: structureId, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges, total: accommodation, deposit, note, code: bkCode, token, guest: guestBody, ...policy }) });
         const j = await r.json().catch(() => ({}));
         if (j?.payment && j?.url) { window.location.href = j.url as string; return; } // → Stripe
-        await fetch("/api/public-booking", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), token, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges, total: accommodation, deposit, note, code: bkCode, guest: guestBody }) });
+        await fetch("/api/public-booking", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), token, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges, total: accommodation, deposit, note, code: bkCode, guest: guestBody, ...policy }) });
       } catch { /* rete assente: mostra comunque la conferma */ }
       setProcessing(false);
     } else {

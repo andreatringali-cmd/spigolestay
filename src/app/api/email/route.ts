@@ -17,6 +17,7 @@ interface BookingPayload {
   roomType?: string; unitName?: string; checkIn?: string; checkOut?: string; nights?: number;
   adults?: number; children?: number; total?: number; currency?: string;
   checkInFrom?: string; checkOutBy?: string; address?: string; phone?: string; color?: string;
+  ratePlan?: string; cancelPolicy?: string; refunded?: number;
 }
 
 function shell(title: string, accent: string, inner: string) {
@@ -36,7 +37,7 @@ function row(label: string, value: string) {
   return `<tr><td style="padding:7px 0;color:#6b7280;font-size:13px;">${esc(label)}</td><td style="padding:7px 0;text-align:right;font-size:14px;font-weight:600;color:#1f2430;">${value}</td></tr>`;
 }
 
-function voucherHtml(b: BookingPayload, checkinUrl: string) {
+function voucherHtml(b: BookingPayload, checkinUrl: string, manageUrl?: string) {
   const accent = b.color || "#285f92";
   const cur = b.currency || "€";
   const people = `${b.adults ?? 1} adulti${b.children ? ` · ${b.children} bambini` : ""}`;
@@ -53,16 +54,46 @@ function voucherHtml(b: BookingPayload, checkinUrl: string) {
       ${row("Check-in", esc(fmtDate(b.checkIn)) + (b.checkInFrom ? ` <span style="color:#9aa1ac;font-weight:400;">dalle ${esc(b.checkInFrom)}</span>` : ""))}
       ${row("Check-out", esc(fmtDate(b.checkOut)) + (b.checkOutBy ? ` <span style="color:#9aa1ac;font-weight:400;">entro ${esc(b.checkOutBy)}</span>` : ""))}
       ${row("Ospiti", esc(people))}
+      ${b.ratePlan ? row("Tariffa", esc(b.ratePlan)) : ""}
       ${typeof b.total === "number" && b.total > 0 ? row("Totale soggiorno", `${cur} ${b.total.toLocaleString("it-IT")}`) : ""}
     </table>
+    ${b.cancelPolicy ? `<div style="margin:14px 0 0;background:#f8f9fb;border:1px solid #eceef1;border-radius:10px;padding:12px 14px;font-size:12px;color:#4b5563;"><b style="color:#1f2430;">Condizioni di cancellazione</b><br>${esc(b.cancelPolicy)}</div>` : ""}
     <div style="margin:22px 0 6px;">
       <a href="${esc(checkinUrl)}" style="display:block;text-align:center;background:${accent};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:10px;">Fai il check-in online →</a>
     </div>
     <p style="margin:8px 0 0;font-size:12px;color:#9aa1ac;text-align:center;">Compila i dati prima dell'arrivo: risparmi tempo al tuo check-in.</p>
+    ${manageUrl ? `<div style="margin:12px 0 6px;">
+      <a href="${esc(manageUrl)}" style="display:block;text-align:center;background:#fff;border:1px solid ${accent};color:${accent};text-decoration:none;font-weight:700;font-size:14px;padding:12px;border-radius:10px;">Gestisci la prenotazione (modifica o annulla)</a>
+    </div>` : ""}
     ${b.address ? `<p style="margin:18px 0 0;font-size:13px;color:#4b5563;">📍 ${esc(b.address)}</p>` : ""}
     ${b.phone ? `<p style="margin:4px 0 0;font-size:13px;color:#4b5563;">📞 ${esc(b.phone)}</p>` : ""}
   `;
   return shell(`${b.structureName || "Conferma prenotazione"}`, accent, inner);
+}
+
+// Email di annullamento (all'ospite): conferma la cancellazione ed eventuale rimborso.
+function cancelHtml(b: BookingPayload) {
+  const accent = b.color || "#b4472e";
+  const cur = b.currency || "€";
+  const refunded = typeof b.refunded === "number" ? b.refunded : 0;
+  const inner = `
+    <p style="margin:0 0 4px;font-size:16px;">Ciao <b>${esc((b.guestName || "").split(" ")[0] || "ospite")}</b>,</p>
+    <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">la tua prenotazione presso <b>${esc(b.structureName)}</b> è stata <b>annullata</b>.</p>
+    <table style="width:100%;border-collapse:collapse;">
+      ${row("Codice", `<span style="font-family:monospace;">${esc(b.code || "")}</span>`)}
+      ${row("Struttura", esc(b.structureName))}
+      ${row("Periodo", esc(fmtDate(b.checkIn)) + " → " + esc(fmtDate(b.checkOut)))}
+    </table>
+    <div style="margin:16px 0 0;background:#f8f9fb;border:1px solid #eceef1;border-radius:10px;padding:14px 16px;">
+      ${refunded > 0
+        ? `<div style="font-size:14px;color:#0E7C4A;font-weight:700;">Rimborso emesso: ${cur} ${refunded.toLocaleString("it-IT")}</div>
+           <div style="margin-top:4px;font-size:12px;color:#6b7280;">L'importo tornerà sul metodo di pagamento usato entro 5–10 giorni lavorativi (tempi della banca).</div>`
+        : `<div style="font-size:14px;color:#1f2430;font-weight:700;">Nessun rimborso previsto</div>
+           <div style="margin-top:4px;font-size:12px;color:#6b7280;">${esc(b.cancelPolicy || "Secondo le condizioni della tariffa prenotata.")}</div>`}
+    </div>
+    <p style="margin:18px 0 0;font-size:13px;color:#4b5563;">Ci dispiace vederti annullare. Sarai sempre il benvenuto in futuro.</p>
+  `;
+  return shell("Prenotazione annullata", accent, inner);
 }
 
 interface CheckinGuest { role?: string; firstName?: string; lastName?: string; sex?: string; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string; docPlace?: string }
@@ -107,14 +138,20 @@ async function send(to: string, subject: string, html: string, replyTo?: string)
 
 export async function POST(req: Request) {
   if (!KEY) return NextResponse.json({ ok: false, error: "RESEND_API_KEY non configurata" }, { status: 500 });
-  let body: { kind?: string; booking?: BookingPayload; checkinUrl?: string; guests?: CheckinGuest[]; arrival?: string; operatorEmail?: string; to?: string; subject?: string; text?: string; accent?: string; replyTo?: string; ctaUrl?: string; ctaLabel?: string };
+  let body: { kind?: string; booking?: BookingPayload; checkinUrl?: string; manageUrl?: string; guests?: CheckinGuest[]; arrival?: string; operatorEmail?: string; to?: string; subject?: string; text?: string; accent?: string; replyTo?: string; ctaUrl?: string; ctaLabel?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "JSON non valido" }, { status: 400 }); }
   const b = body.booking || {};
   try {
     if (body.kind === "voucher") {
       if (!b.guestEmail) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
       const subject = `Conferma prenotazione ${b.code || ""} · ${b.structureName || "Xenora"}`.trim();
-      const data = await send(b.guestEmail, subject, voucherHtml(b, body.checkinUrl || ""), b.structureEmail);
+      const data = await send(b.guestEmail, subject, voucherHtml(b, body.checkinUrl || "", body.manageUrl), b.structureEmail);
+      return NextResponse.json({ ok: true, id: data?.id });
+    }
+    if (body.kind === "cancel") {
+      if (!b.guestEmail) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
+      const subject = `Prenotazione annullata ${b.code || ""} · ${b.structureName || "Xenora"}`.trim();
+      const data = await send(b.guestEmail, subject, cancelHtml(b), b.structureEmail);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "checkin") {

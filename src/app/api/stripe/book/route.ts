@@ -49,6 +49,9 @@ export async function POST(req: Request) {
     const deposit = Math.round(Number(b?.deposit) || 0);
     const note = String(b?.note || "").slice(0, 480);
     const code = String(b?.code || "").slice(0, 40);
+    const planName = String(b?.planName || "").slice(0, 60);
+    const refundable = b?.refundable ? "1" : "0";
+    const cancelDays = String(Math.max(0, parseInt(String(b?.cancelDays ?? "0"), 10) || 0));
     const g = (b?.guest ?? {}) as Record<string, string>;
     const token = String(b?.token || "").slice(0, 80) || (globalThis.crypto?.randomUUID?.() ?? String(Date.now()));
     if (!slug || !sid || !rt || !ci || !co) return NextResponse.json({ ok: false, error: "missing_params" }, { status: 400 });
@@ -67,6 +70,7 @@ export async function POST(req: Request) {
     const meta: Record<string, string> = {
       kind: "book", slug, s: sid, rt, ci, co, ad: String(adults), ch: String(children),
       tot: String(total), dep: String(deposit), note, code, token,
+      rpn: planName, ref: refundable, cd: cancelDays,
       gn: `${g.firstName || ""} ${g.lastName || ""}`.trim(), ge: g.email || "", gp: g.phone || "", gc: g.country || "",
     };
     const stripe = new Stripe(key);
