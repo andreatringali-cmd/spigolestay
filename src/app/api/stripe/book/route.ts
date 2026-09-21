@@ -13,18 +13,20 @@ const arr = (x: unknown): Json[] => (Array.isArray(x) ? (x as Json[]) : []);
 // e le organizzazioni condivise di cui è membro.
 async function findStructure(admin: SupabaseClient, ownerId: string, sid: string): Promise<Json | null> {
   const parse = (data: unknown): Json => { const blob = ((data ?? {}) as Record<string, string>) || {}; try { return JSON.parse(blob[DATA_KEY] || "{}") as Json; } catch { return {}; } };
-  const { data: row } = await admin.from("app_state").select("data").eq("user_id", ownerId).maybeSingle();
-  const p = parse((row as { data?: unknown } | null)?.data);
-  let st = arr(p.structures).find((s) => s.id === sid) || null;
-  if (st && st.stripeAccount) return st;
+  // 1) ORGANIZZAZIONI CONDIVISE per prime: sono la fonte di verità per le strutture in società
+  //    (evita di prendere una copia personale vecchia con lo stripeAccount di test).
   const { data: ms } = await admin.from("memberships").select("org_id").eq("user_id", ownerId);
+  let orgSt: Json | null = null;
   for (const m of arr(ms)) {
     const { data: os } = await admin.from("org_state").select("data").eq("org_id", m.org_id as string).maybeSingle();
-    const od = parse((os as { data?: unknown } | null)?.data);
-    const found = arr(od.structures).find((s) => s.id === sid);
-    if (found) { st = found; if (found.stripeAccount) return found; }
+    const found = arr(parse((os as { data?: unknown } | null)?.data).structures).find((s) => s.id === sid);
+    if (found) { orgSt = found; if (found.stripeAccount) return found; }
   }
-  return st;
+  // 2) personale
+  const { data: row } = await admin.from("app_state").select("data").eq("user_id", ownerId).maybeSingle();
+  const perSt = arr(parse((row as { data?: unknown } | null)?.data).structures).find((s) => s.id === sid) || null;
+  if (perSt?.stripeAccount) return perSt;
+  return orgSt || perSt;
 }
 
 // Crea la sessione di pagamento (caparra o totale) sul conto Stripe della struttura.

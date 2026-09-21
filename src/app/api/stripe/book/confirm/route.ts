@@ -16,15 +16,16 @@ async function acctForSlug(admin: SupabaseClient, slug: string): Promise<{ owner
   const ownerId = (s0?.user_id as string) || ""; const sid = (s0?.structure_id as string) || "";
   if (!ownerId || !sid) return null;
   const parse = (data: unknown): Json => { const blob = ((data ?? {}) as Record<string, string>) || {}; try { return JSON.parse(blob[DATA_KEY] || "{}") as Json; } catch { return {}; } };
-  const { data: row } = await admin.from("app_state").select("data").eq("user_id", ownerId).maybeSingle();
-  let st = arr(parse((row as { data?: unknown } | null)?.data).structures).find((s) => s.id === sid) || null;
-  if (st?.stripeAccount) return { ownerId, sid, acct: String(st.stripeAccount) };
+  // ORG condivise per prime (fonte di verità), poi personale: evita account Stripe vecchi/di test.
   const { data: ms } = await admin.from("memberships").select("org_id").eq("user_id", ownerId);
   for (const m of arr(ms)) {
     const { data: os } = await admin.from("org_state").select("data").eq("org_id", m.org_id as string).maybeSingle();
     const found = arr(parse((os as { data?: unknown } | null)?.data).structures).find((s) => s.id === sid);
-    if (found) { st = found; if (found.stripeAccount) return { ownerId, sid, acct: String(found.stripeAccount) }; }
+    if (found?.stripeAccount) return { ownerId, sid, acct: String(found.stripeAccount) };
   }
+  const { data: row } = await admin.from("app_state").select("data").eq("user_id", ownerId).maybeSingle();
+  const perSt = arr(parse((row as { data?: unknown } | null)?.data).structures).find((s) => s.id === sid) || null;
+  if (perSt?.stripeAccount) return { ownerId, sid, acct: String(perSt.stripeAccount) };
   return { ownerId, sid, acct: "" };
 }
 
