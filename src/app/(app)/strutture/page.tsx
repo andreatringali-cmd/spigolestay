@@ -11,14 +11,17 @@ import { planStructureLimit, planName } from "@/lib/plan";
 
 export default function StrutturePage() {
   const router = useRouter();
-  const { structures, roomTypes, units } = useData();
+  const { structures, roomTypes, units, activeStructureId } = useData();
   const { t } = useLang();
 
   const limit = planStructureLimit();
   const overLimit = structures.length >= limit; // piano al completo di strutture
 
-  const owned = structures.filter((x) => !x.orgId);
-  const shared = structures.filter((x) => !!x.orgId);
+  // Rispetta il filtro struttura in alto a destra: se è selezionata una singola struttura
+  // mostra solo quella; con "Tutte" le mostra tutte.
+  const visible = activeStructureId !== "all" ? structures.filter((x) => x.id === activeStructureId) : structures;
+  const owned = visible.filter((x) => !x.orgId);
+  const shared = visible.filter((x) => !!x.orgId);
   const groups = [
     { key: "own", title: t("Di mia proprietà"), desc: "", list: owned, empty: t("Nessuna struttura di tua proprietà.") },
     { key: "shared", title: t("Condivise"), desc: "", list: shared, empty: t("Nessuna struttura condivisa. Per condividerne una, apri la scheda della struttura e invita il socio.") },
@@ -98,7 +101,7 @@ export default function StrutturePage() {
             </tr>
           </thead>
           <tbody>
-            {groups.map((g) => (
+            {groups.filter((g) => activeStructureId === "all" || g.list.length > 0).map((g) => (
               <Fragment key={g.key}>
                 <tr className="bg-wash">
                   <td colSpan={10} className="px-3 py-2 text-[13px] font-bold tracking-tight text-txt">{g.title} <span className="font-normal text-faint">· {g.list.length}</span></td>
