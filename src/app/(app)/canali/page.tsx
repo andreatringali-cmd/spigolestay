@@ -11,16 +11,15 @@ import { useLang } from "@/lib/i18n";
 import Icon from "@/components/Icon";
 import IcalSyncPanel from "@/components/IcalSyncPanel";
 import { apiPost } from "@/lib/invoicing/client";
+import { OTA_CATALOG, findOta, otaColor, type OtaDef } from "@/lib/ota-catalog";
 
-// Portali gestiti dal Channel Manager.
-const OTAS = [
-  { key: "booking", label: "Booking.com", color: "#003580", commission: 15, domain: "booking.com" },
-  { key: "airbnb", label: "Airbnb", color: "#FF5A5F", commission: 15, domain: "airbnb.com" },
-  { key: "expedia", label: "Expedia", color: "#FFC72C", commission: 18, domain: "expedia.com" },
-  { key: "vrbo", label: "Vrbo", color: "#1668E3", commission: 8, domain: "vrbo.com" },
-  { key: "agoda", label: "Agoda", color: "#5A2D8C", commission: 17, domain: "agoda.com" },
-] as const;
-type OtaKey = typeof OTAS[number]["key"];
+// I portali sono ora un CATALOGO completo (lista Channex): l'utente sceglie quali attivare
+// da un menu a tendina. I 5 principali sono attivi di default per compatibilità.
+type OtaKey = string;
+type Ota = { key: string; label: string; color: string; commission: number; domain?: string };
+const DEFAULT_ENABLED = ["booking", "airbnb", "expedia", "vrbo", "agoda"];
+const ENABLED_KEY = "spigolestay:canali:enabled";
+function toOta(d: OtaDef): Ota { return { key: d.key, label: d.label, color: otaColor(d), commission: d.commission ?? 15, domain: d.domain }; }
 
 // Logo ufficiale del portale (favicon del brand) su tile bianca; se non carica
 // mostra la lettera iniziale sul colore del brand. Nessuna dipendenza esterna
@@ -87,6 +86,26 @@ export default function CanaliPage() {
   const saveConn = (next: Record<string, Conn>) => { setConn(next); try { localStorage.setItem(CONN_KEY, JSON.stringify(next)); } catch {} };
   const saveMap = (next: Record<string, MapEntry>) => { setMap(next); try { localStorage.setItem(MAP_KEY, JSON.stringify(next)); } catch {} };
   const saveLog = (next: LogEntry[]) => { setLog(next); try { localStorage.setItem(LOG_KEY, JSON.stringify(next.slice(0, 40))); } catch {} };
+
+  // Canali ATTIVI (scelti dal catalogo Channex). Default: i 5 principali.
+  const [enabledKeys, setEnabledKeys] = useState<string[]>(DEFAULT_ENABLED);
+  useEffect(() => { try { const e = localStorage.getItem(ENABLED_KEY); if (e) { const a = JSON.parse(e); if (Array.isArray(a) && a.length) setEnabledKeys(a as string[]); } } catch {} }, []);
+  const saveEnabled = (next: string[]) => { setEnabledKeys(next); try { localStorage.setItem(ENABLED_KEY, JSON.stringify(next)); } catch {} };
+  const channels = useMemo<Ota[]>(() => enabledKeys.map((k) => toOta(findOta(k) ?? { key: k, label: k })), [enabledKeys]);
+  const [addKey, setAddKey] = useState("");
+  const addChannel = (k: string) => {
+    if (!k || enabledKeys.includes(k)) { setAddKey(""); return; }
+    saveEnabled([...enabledKeys, k]);
+    const d = findOta(k);
+    saveLog([{ id: uid(), ts: Date.now(), text: `${t("Canale aggiunto")} — ${d?.label ?? k}`, color: otaColor(d ?? { key: k }) }, ...log]);
+    setAddKey("");
+  };
+  const removeChannel = (k: string) => {
+    saveEnabled(enabledKeys.filter((x) => x !== k));
+    setConfiguring(null);
+    const d = findOta(k);
+    saveLog([{ id: uid(), ts: Date.now(), text: `${t("Canale rimosso")} — ${d?.label ?? k}`, color: "var(--dim)" }, ...log]);
+  };
 
   const [configuring, setConfiguring] = useState<OtaKey | null>(null);
   const [view, setView] = useState<"card" | "list">("list");
@@ -228,19 +247,19 @@ export default function CanaliPage() {
   const importRooms = (ota: OtaKey) => {
     const rooms = types.map((rt) => ({ id: `${ota}-${rt.id.slice(0, 6)}`, name: rt.name }));
     patchConn(ota, { otaRooms: rooms });
-    const o = OTAS.find((x) => x.key === ota)!;
+    const o = channels.find((x) => x.key === ota)!;
     saveLog([{ id: uid(), ts: Date.now(), text: `${rooms.length} ${t("camere importate da")} ${o.label}`, color: o.color }, ...log]);
   };
   const getMap = (rt: string, ota: string): MapEntry => map[`${rt}:${ota}`] ?? { on: getConn(ota).connected, listingId: "", adjMode: "amount", adj: 0 };
   const setMapEntry = (rt: string, ota: string, patch: Partial<MapEntry>) => saveMap({ ...map, [`${rt}:${ota}`]: { ...getMap(rt, ota), ...patch } });
 
-  const toggleConn = (k: OtaKey) => { const cur = getConn(k); const next = { ...conn, [k]: { ...cur, connected: !cur.connected, lastSync: !cur.connected ? new Date().toISOString() : cur.lastSync } }; saveConn(next); const ota = OTAS.find((o) => o.key === k)!; saveLog([{ id: uid(), ts: Date.now(), text: `${!cur.connected ? t("Collegato") : t("Scollegato")} ${ota.label}`, color: ota.color }, ...log]); };
+  const toggleConn = (k: OtaKey) => { const cur = getConn(k); const next = { ...conn, [k]: { ...cur, connected: !cur.connected, lastSync: !cur.connected ? new Date().toISOString() : cur.lastSync } }; saveConn(next); const ota = channels.find((o) => o.key === k)!; saveLog([{ id: uid(), ts: Date.now(), text: `${!cur.connected ? t("Collegato") : t("Scollegato")} ${ota.label}`, color: ota.color }, ...log]); };
   const toggleAuto = (k: OtaKey) => { const cur = getConn(k); saveConn({ ...conn, [k]: { ...cur, auto: !cur.auto } }); };
 
-  const connectedOtas = OTAS.filter((o) => getConn(o.key).connected);
+  const connectedOtas = channels.filter((o) => getConn(o.key).connected);
   const types = roomTypes.filter((rt) => effStructure === "all" || rt.structureId === effStructure);
-  const mappedTypes = types.filter((rt) => OTAS.some((o) => getConn(o.key).connected && getMap(rt.id, o.key).on)).length;
-  const lastSyncTs = useMemo(() => { const ts = OTAS.map((o) => getConn(o.key).lastSync).filter(Boolean).map((s) => new Date(s!).getTime()); return ts.length ? Math.max(...ts) : null; }, [conn]);
+  const mappedTypes = types.filter((rt) => channels.some((o) => getConn(o.key).connected && getMap(rt.id, o.key).on)).length;
+  const lastSyncTs = useMemo(() => { const ts = channels.map((o) => getConn(o.key).lastSync).filter(Boolean).map((s) => new Date(s!).getTime()); return ts.length ? Math.max(...ts) : null; }, [conn]);
   const otaBookings = bookings.filter((b) => b.channel !== "direct" && b.channel !== "blocked" && (effStructure === "all" || b.structureId === effStructure)).length;
 
   return (
@@ -302,7 +321,7 @@ export default function CanaliPage() {
 
       {/* KPI */}
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Canali connessi")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{connectedOtas.length}<span className="text-sm font-normal text-faint">/{OTAS.length}</span></div></Card>
+        <Card className="!p-4"><div className="text-xs text-dim">{t("Canali connessi")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{connectedOtas.length}<span className="text-sm font-normal text-faint">/{channels.length}</span></div></Card>
         <Card className="!p-4"><div className="text-xs text-dim">{t("Tipologie mappate")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{mappedTypes}<span className="text-sm font-normal text-faint">/{types.length}</span></div></Card>
         <Card className="!p-4"><div className="text-xs text-dim">{t("Ultima sincronizzazione")}</div><div className="mt-1 text-lg font-bold text-txt">{lastSyncTs ? relTime(lastSyncTs) : "—"}</div></Card>
         <Card className="!p-4"><div className="text-xs text-dim">{t("Prenotazioni via OTA")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{otaBookings}</div></Card>
@@ -318,9 +337,21 @@ export default function CanaliPage() {
           </div>
         </div>
 
+        {/* Aggiungi un canale dal catalogo Channex tramite menu a tendina */}
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-line bg-surface p-3">
+          <span className="text-sm font-semibold text-txt">➕ {t("Aggiungi canale")}</span>
+          <select value={addKey} onChange={(e) => addChannel(e.target.value)} className="min-w-[240px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+            <option value="">{t("— scegli un portale dal catalogo —")}</option>
+            {OTA_CATALOG.filter((d) => !enabledKeys.includes(d.key)).map((d) => (
+              <option key={d.key} value={d.key}>{d.label}{d.category === "Strumento esterno" ? " · strumento" : ""}</option>
+            ))}
+          </select>
+          <span className="text-[11px] text-faint">{OTA_CATALOG.filter((d) => !enabledKeys.includes(d.key)).length} {t("portali disponibili")}</span>
+        </div>
+
         {view === "card" ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {OTAS.map((o) => {
+            {channels.map((o) => {
               const c = getConn(o.key);
               const mc = mappedCount(o.key);
               return (
@@ -356,7 +387,7 @@ export default function CanaliPage() {
                   <th className="px-3 py-2 text-right font-semibold"></th>
                 </tr></thead>
                 <tbody>
-                  {OTAS.map((o) => { const c = getConn(o.key); return (
+                  {channels.map((o) => { const c = getConn(o.key); return (
                     <tr key={o.key} onClick={() => setConfiguring(o.key)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                       <td className="px-3 py-2.5"><span className="flex items-center gap-2 font-semibold text-txt"><OtaLogo o={o} size={24} radius={7} />{o.label}</span></td>
                       <td className="px-3 py-2.5"><span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={c.connected ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{c.connected ? t("Connesso") : t("Da collegare")}</span></td>
@@ -397,7 +428,7 @@ export default function CanaliPage() {
 
       {/* Pannello di connessione per canale */}
       {configuring && (() => {
-        const o = OTAS.find((x) => x.key === configuring)!;
+        const o = channels.find((x) => x.key === configuring) ?? toOta(findOta(configuring) ?? { key: configuring, label: configuring });
         const c = getConn(o.key);
         const mode = c.priceAdjMode ?? "percent";
         const adj = c.priceAdj ?? 0;
@@ -522,6 +553,7 @@ export default function CanaliPage() {
               <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
                 <button onClick={() => importRooms(o.key)} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">⬇ {t("Importa camere")}</button>
                 <button disabled={!c.connected} onClick={() => { patchConn(o.key, { lastSync: new Date().toISOString() }); saveLog([{ id: uid(), ts: Date.now(), text: `${t("Tariffe e disponibilità inviate a")} ${o.label}`, color: o.color }, ...log]); }} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">↻ {t("Sincronizza ora")}</button>
+                <button onClick={async () => { if (await ask({ message: `${t("Rimuovere il canale")} ${o.label}?`, danger: true, confirmLabel: t("Rimuovi") })) removeChannel(o.key); }} className="rounded-lg border px-3 py-2 text-sm font-medium hover:bg-wash" style={{ borderColor: "var(--line)", color: "var(--err)" }}>🗑 {t("Rimuovi canale")}</button>
                 <button onClick={() => setConfiguring(null)} className="ml-auto rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: o.color }}>💾 {t("Salva e chiudi")}</button>
               </div>
               <p className="mt-2 text-[11px] text-faint">{t("Le modifiche si salvano automaticamente. Impostazioni dimostrative salvate nel browser.")}</p>
