@@ -19,6 +19,12 @@ export async function POST(req: Request) {
     const stripe = new Stripe(key) as any;
 
     let acct = typeof body?.accountId === "string" && body.accountId ? body.accountId : "";
+    // Se c'è già un account salvato ma NON è accessibile con la chiave attuale (tipico
+    // passaggio test→live: l'account era di test), lo scartiamo e ne creiamo uno nuovo.
+    if (acct) {
+      try { await stripe.v2.core.accounts.retrieve(acct, { include: ["configuration.merchant"] }); }
+      catch { acct = ""; }
+    }
     if (!acct) {
       const account = await stripe.v2.core.accounts.create({
         contact_email: email,
