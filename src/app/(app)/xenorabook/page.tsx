@@ -1,44 +1,14 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
-
-// ── Immagine segnaposto originale (skyline + arco) colorata per hue ──
-function StructImg({ hue, initial }: { hue: number; initial: string }) {
-  const h2 = (hue + 28) % 360; const id = `sb${hue}`;
-  return (
-    <svg viewBox="0 0 400 300" className="h-full w-full object-cover" preserveAspectRatio="xMidYMid slice">
-      <defs><linearGradient id={id} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={`hsl(${hue},46%,58%)`} /><stop offset="1" stopColor={`hsl(${h2},42%,44%)`} /></linearGradient></defs>
-      <rect width="400" height="300" fill={`url(#${id})`} />
-      <g fill="none" stroke="#fff" strokeOpacity="0.85" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M96 210 v-70 a56 56 0 0 1 112 0 v70" /><path d="M150 210 v-42 a26 26 0 0 1 52 0 v42" />
-        <path d="M232 210 v-96 l58 -34 v130" /><line x1="70" y1="212" x2="318" y2="212" />
-      </g>
-      <circle cx="316" cy="70" r="20" fill="#fff" fillOpacity="0.9" />
-      <text x="316" y="77" textAnchor="middle" fontFamily="Georgia,serif" fontSize="22" fontWeight="700" fill={`hsl(${hue},46%,40%)`}>{initial}</text>
-    </svg>
-  );
-}
-
-type StructType = "B&B" | "Casa vacanze" | "Appartamento" | "Affittacamere" | "Hotel";
-interface Listing { id: string; name: string; area: string; city: string; type: StructType; starClass: number; rating: number; reviews: number; price: number; hue: number; amen: string[]; capacity: number; beds: number; available: boolean; x: number; y: number; mine?: boolean }
-
-const SAMPLES: Listing[] = [
-  { id: "s1", name: "Casa del Càrrubo", area: "Ragusa · Ibla", city: "Ragusa", type: "Casa vacanze", starClass: 4, rating: 4.9, reviews: 97, price: 134, hue: 96, amen: ["Terrazza", "Self check-in", "Wi-Fi"], capacity: 4, beds: 3, available: true, x: 26, y: 63 },
-  { id: "s2", name: "Le Terrazze di Ortigia", area: "Siracusa · Ortigia", city: "Ortigia", type: "B&B", starClass: 4, rating: 4.7, reviews: 76, price: 150, hue: 38, amen: ["Vista mare", "A/C", "Colazione"], capacity: 3, beds: 2, available: true, x: 74, y: 33 },
-  { id: "s3", name: "Dimora San Giovanni", area: "Siracusa · Neapolis", city: "Siracusa", type: "Affittacamere", starClass: 3, rating: 4.8, reviews: 58, price: 88, hue: 268, amen: ["Parcheggio", "Animali ok", "Wi-Fi"], capacity: 2, beds: 1, available: true, x: 66, y: 28 },
-  { id: "s4", name: "Il Baglio di Marzamemi", area: "Noto · Marzamemi", city: "Noto", type: "Hotel", starClass: 5, rating: 4.9, reviews: 143, price: 172, hue: 150, amen: ["Vista mare", "Piscina", "Colazione"], capacity: 6, beds: 4, available: true, x: 60, y: 86 },
-  { id: "s5", name: "Corte Barocca", area: "Noto · centro", city: "Noto", type: "Appartamento", starClass: 3, rating: 4.8, reviews: 64, price: 112, hue: 20, amen: ["Colazione", "A/C", "Self check-in"], capacity: 4, beds: 2, available: false, x: 48, y: 72 },
-  { id: "s6", name: "Blu di Ortigia", area: "Siracusa · Ortigia", city: "Ortigia", type: "B&B", starClass: 4, rating: 4.9, reviews: 121, price: 165, hue: 205, amen: ["Vista mare", "Wi-Fi", "A/C"], capacity: 2, beds: 1, available: true, x: 78, y: 38 },
-];
-const CITIES = ["Tutte", "Siracusa", "Ortigia", "Ragusa", "Noto"];
-const AMEN_FILTERS = ["Vista mare", "Colazione", "Self check-in", "Parcheggio", "Piscina", "A/C", "Wi-Fi", "Animali ok"];
-const TYPES: StructType[] = ["B&B", "Casa vacanze", "Appartamento", "Affittacamere", "Hotel"];
-const stars = (n: number) => "★★★★★".slice(0, Math.round(n)) + "☆☆☆☆☆".slice(0, 5 - Math.round(n));
+import { type Listing, type StructType, SAMPLES, CITIES, AMEN_FILTERS, TYPES, stars, StructImg, mineListings } from "@/lib/xenorabook/data";
 
 export default function XenoraBookPage() {
+  const router = useRouter();
   const { structures } = useData();
   const [city, setCity] = useState("Tutte");
   const [amen, setAmen] = useState<string[]>([]);
@@ -65,16 +35,7 @@ export default function XenoraBookPage() {
     document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const all: Listing[] = useMemo(() => {
-    const mine: Listing[] = structures.slice(0, 2).map((s, i) => ({
-      id: `mine-${s.id}`, name: s.name, area: "Siracusa · Ortigia", city: i === 0 ? "Ortigia" : "Siracusa",
-      type: "B&B" as StructType, starClass: 4,
-      rating: [4.9, 4.8][i] ?? 4.8, reviews: [184, 132][i] ?? 90, price: [118, 96][i] ?? 100,
-      hue: [18, 196][i] ?? 40, amen: ["Self check-in", "Colazione", "Wi-Fi"], capacity: 4, beds: 3, available: true,
-      x: [72, 68][i] ?? 70, y: [36, 30][i] ?? 33, mine: true,
-    }));
-    return [...mine, ...SAMPLES];
-  }, [structures]);
+  const all: Listing[] = useMemo(() => [...mineListings(structures), ...SAMPLES], [structures]);
 
   const guestsTot = adults + children;
   const results = useMemo(() => {
@@ -95,6 +56,7 @@ export default function XenoraBookPage() {
   }, [all, city, guestsTot, amen, sort, minRating, starClass, minBeds, types, onlyAvail]);
   const activeCount = (minRating ? 1 : 0) + (starClass ? 1 : 0) + (minBeds ? 1 : 0) + types.length + (onlyAvail ? 1 : 0);
 
+  const go = (id: string) => router.push(`/xenorabook/${id}?from=${from}&to=${to}&adults=${adults}&children=${children}`);
   const toggleAmen = (a: string) => setAmen((p) => p.includes(a) ? p.filter((x) => x !== a) : [...p, a]);
   const toggleType = (t: StructType) => setTypes((p) => p.includes(t) ? p.filter((x) => x !== t) : [...p, t]);
   const resetFilters = () => { setMinRating(0); setStarClass(0); setMinBeds(0); setTypes([]); setOnlyAvail(false); setAmen([]); };
@@ -226,8 +188,8 @@ export default function XenoraBookPage() {
       <div className={view === "mappa" ? "grid gap-4 lg:grid-cols-[1fr_1fr]" : ""}>
         <div className={`grid gap-4 ${view === "mappa" ? "sm:grid-cols-1 xl:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3"}`}>
           {results.map((l) => (
-            <article key={l.id} onMouseEnter={() => setHovered(l.id)} onMouseLeave={() => setHovered("")}
-              className={`group overflow-hidden rounded-2xl border bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${hovered === l.id ? "border-focus" : "border-line"}`}>
+            <article key={l.id} onMouseEnter={() => setHovered(l.id)} onMouseLeave={() => setHovered("")} onClick={() => go(l.id)}
+              className={`group cursor-pointer overflow-hidden rounded-2xl border bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${hovered === l.id ? "border-focus" : "border-line"}`}>
               <div className="relative aspect-[4/3] w-full overflow-hidden bg-wash">
                 <StructImg hue={l.hue} initial={l.name[0]} />
                 <span className="absolute left-3 top-3 flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold text-white shadow" style={{ backgroundColor: "#3F7A5B" }}>✦ Verificata</span>
@@ -243,7 +205,7 @@ export default function XenoraBookPage() {
                 <div className="mt-1 flex flex-wrap gap-1.5">{l.amen.map((a) => <span key={a} className="rounded-md border border-line bg-wash px-2 py-0.5 text-[11px] text-dim">{a}</span>)}</div>
                 <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2.5">
                   <div><span className="text-lg font-extrabold text-txt">€{l.price}</span> <span className="text-xs font-semibold text-dim">/ notte · €{l.price * nights} tot.</span></div>
-                  <button className="rounded-lg bg-wash px-3 py-1.5 text-[13px] font-bold text-focus hover:bg-focus hover:text-white">Vedi →</button>
+                  <button onClick={(e) => { e.stopPropagation(); go(l.id); }} className="rounded-lg bg-wash px-3 py-1.5 text-[13px] font-bold text-focus hover:bg-focus hover:text-white">Vedi camere →</button>
                 </div>
               </div>
             </article>
