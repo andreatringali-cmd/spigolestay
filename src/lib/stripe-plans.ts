@@ -8,10 +8,11 @@ export interface StripePlan {
   amount: number; // €/mese
 }
 
+// IMPORTANTE: allineati ai prezzi mostrati in /abbonamento (src/lib/plans.ts TIERS).
 export const STRIPE_PLANS: StripePlan[] = [
   { key: "basic", name: "Basic", amount: 29 },
-  { key: "pro", name: "Pro", amount: 49 },
-  { key: "ultimate", name: "Ultimate", amount: 89 },
+  { key: "pro", name: "Pro", amount: 59 },
+  { key: "ultimate", name: "Ultimate", amount: 99 },
 ];
 
 export const planByKey = (k?: string | null): StripePlan | undefined =>
