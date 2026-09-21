@@ -367,7 +367,7 @@ export default function WidgetPage() {
           </div>
           </div>
           </div>
-          <p className="mt-2 text-center text-xs text-faint">{t("Anteprima reale: “Prenota ora” crea la prenotazione nel calendario.")}</p>
+          <p className="mt-2 text-center text-xs text-faint">{t("Anteprima grafica del widget. Le prenotazioni reali passano dal motore /prenota del tuo Xenosite.")}</p>
         </Card>
       </div>
     </div>

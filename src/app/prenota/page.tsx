@@ -489,7 +489,7 @@ function Engine() {
                     <button key={k} onClick={() => setPay(k)} className={`rounded-lg border p-3 text-center text-sm font-medium transition ${pay === k ? "border-focus ring-1 ring-[color:var(--focus)] text-txt" : "border-line text-dim hover:bg-wash"}`}>{label}</button>
                   ))}
                 </div>
-                <p className="mt-3 text-xs text-dim">{deposit > 0 ? <>Per confermare è richiesto un acconto di <b className="text-txt">{eur(deposit)}</b>{selPlan.refundable ? "" : " (intero importo, tariffa non rimborsabile)"}. Il saldo si versa in struttura.</> : <>Nessun acconto richiesto: l&apos;intero importo si salda in struttura.</>} Nessun dato di pagamento viene raccolto in questa demo.</p>
+                <p className="mt-3 text-xs text-dim">{deposit > 0 ? <>Per confermare è richiesto un acconto di <b className="text-txt">{eur(deposit)}</b>{selPlan.refundable ? "" : " (intero importo, tariffa non rimborsabile)"}. Il saldo si versa in struttura.</> : <>Nessun acconto richiesto: l&apos;intero importo si salda in struttura.</>} Il pagamento è gestito in modo sicuro da Stripe.</p>
                 <label className="mt-3 flex items-start gap-2 text-xs text-dim"><input type="checkbox" checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" /> Dichiaro di aver preso visione dell'informativa privacy e accetto i termini di prenotazione.</label>
               </div>
             </div>
