@@ -57,18 +57,28 @@ export async function importBookings(admin: SupabaseClient, opts: { propertyId?:
   const { data: maps } = await admin.from("channex_map").select("channex_property_id, tenant_id, structure_id, rooms, org_id").in("channex_property_id", propIds);
   const mapByProp = new Map<string, ChannexMapRow>((maps ?? []).map((m) => [m.channex_property_id as string, m as ChannexMapRow]));
 
+  // Solo soggiorni CORRENTI/FUTURI: le prenotazioni già concluse (check-out < oggi) NON
+  // vengono importate all'attivazione (così non entra lo storico). Le "scarichiamo" comunque
+  // dal feed con l'ack, per non riprocessarle a ogni ciclo. Le cancellazioni passano sempre.
+  const today = new Date().toISOString().slice(0, 10);
+  const pastAckIds: string[] = [];
+
   // Raggruppa le revision per STORE di destinazione. Struttura condivisa → org_state(org_id);
   // struttura personale → app_state(tenant_id). Le property non mappate: skip SENZA ack.
   const byStore = new Map<string, { target: StoreTarget; items: { rev: ChxRevision; map: ChannexMapRow }[] }>();
   for (const rev of feed.revisions) {
     const map = rev.property_id ? mapByProp.get(rev.property_id) : undefined;
     if (!map) { out.skipped++; continue; }
+    const dep = rev.departure_date || rev.arrival_date || "";
+    if (rev.status !== "cancelled" && /^\d{4}-\d{2}-\d{2}$/.test(dep) && dep < today) {
+      out.skipped++; pastAckIds.push(rev.id); continue; // soggiorno concluso: ignora + scarica dal feed
+    }
     const target: StoreTarget = map.org_id ? { kind: "org", id: map.org_id } : { kind: "user", id: map.tenant_id };
     const key = `${target.kind}:${target.id}`;
     const g = byStore.get(key) ?? { target, items: [] }; g.items.push({ rev, map }); byStore.set(key, g);
   }
 
-  const ackIds: string[] = [];
+  const ackIds: string[] = [...pastAckIds];
   for (const [key, { target, items }] of byStore) {
     try {
       const applied = await applyToStore(admin, target, items, out);
