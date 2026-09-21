@@ -70,7 +70,7 @@ export const NAV: NavItem[] = [
   // Configurazione: impostazioni della struttura e dell'account.
   { label: "Strutture", href: "/strutture", group: "Configurazione", icon: "building", perm: "impostazioni", module: "pms" },
   { label: "Utenti", href: "/utenti", group: "Configurazione", icon: "users", perm: "utenti", module: "pms" },
-  { label: "Guida ospiti", href: "/guida-ospiti", group: "Configurazione", icon: "share", perm: "webconcierge", module: "guide" },
+  { label: "Guida ospiti", href: "/guida-ospiti", group: "Booking Engine", icon: "share", perm: "webconcierge", module: "guide" },
   { label: "Impostazioni fattura", href: "/impostazioni-fattura", group: "Configurazione", icon: "receipt", perm: "webconcierge", module: "concierge" },
   { label: "Registro attività", href: "/registro", group: "Configurazione", icon: "clipboard", perm: "impostazioni", module: "pms" },
   { label: "Impostazioni", href: "/impostazioni", group: "Configurazione", icon: "settings", perm: "impostazioni", module: "pms" },

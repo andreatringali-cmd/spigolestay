@@ -11,7 +11,7 @@ import { planStructureLimit, planName } from "@/lib/plan";
 
 export default function StrutturePage() {
   const router = useRouter();
-  const { structures, roomTypes, units, activeStructureId } = useData();
+  const { structures, roomTypes, units, activeStructureId, moveStructure } = useData();
   const { t } = useLang();
 
   const limit = planStructureLimit();
@@ -55,7 +55,13 @@ export default function StrutturePage() {
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: s.active === false ? "var(--faint)" : "var(--ok)" }} />{s.active === false ? t("Disattiva") : t("Attiva")}
           </span>
         </td>
-        <td className="px-3 py-2.5 text-right text-faint">›</td>
+        <td className="px-3 py-2.5 text-right">
+          <span className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <button title={t("Sposta su")} onClick={() => moveStructure(s.id, "up")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↑</button>
+            <button title={t("Sposta giù")} onClick={() => moveStructure(s.id, "down")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↓</button>
+            <span className="text-faint">›</span>
+          </span>
+        </td>
       </tr>
     );
   };
@@ -76,15 +82,15 @@ export default function StrutturePage() {
         <table className="w-full min-w-[820px] table-fixed text-sm">
           <colgroup>
             <col style={{ width: "19%" }} />{/* Struttura */}
-            <col style={{ width: "10%" }} />{/* Città */}
-            <col style={{ width: "15%" }} />{/* Indirizzo */}
+            <col style={{ width: "8%" }} />{/* Città */}
+            <col style={{ width: "11%" }} />{/* Indirizzo */}
             <col style={{ width: "9%" }} />{/* Tipo */}
             <col style={{ width: "11%" }} />{/* Gruppo */}
             <col style={{ width: "9%" }} />{/* Camere */}
             <col style={{ width: "8%" }} />{/* Posti letto */}
             <col style={{ width: "9%" }} />{/* CIN */}
             <col style={{ width: "7%" }} />{/* Stato */}
-            <col style={{ width: "3%" }} />{/* freccia */}
+            <col style={{ width: "9%" }} />{/* riordino + freccia */}
           </colgroup>
           <thead>
             <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">

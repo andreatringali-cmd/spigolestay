@@ -26,6 +26,7 @@ export interface Structure {
   name: string;
   groupName: string; // "Spigole Rooms" | "Central Perk"
   orgId?: string; // se presente, la struttura è CONDIVISA (in comune con un socio): vive in org_state, non nel personale
+  order?: number; // ordine di visualizzazione scelto dall'utente (calendario, elenchi, menu)
   city?: string;
   address?: string;
   phone?: string;

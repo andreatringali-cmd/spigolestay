@@ -54,6 +54,7 @@ interface DataContextValue {
   // Azioni inventario
   addStructure: (s: { name: string; groupName: string; city?: string; address?: string; services?: string[] }) => string;
   updateStructure: (id: string, patch: Partial<Structure>) => void;
+  moveStructure: (id: string, dir: "up" | "down") => void;
   addRoomType: (rt: { structureId: string; name: string; beds: number; basePrice: number }) => string;
   updateRoomType: (id: string, patch: Partial<RoomType>) => void;
   addUnit: (u: { structureId: string; roomTypeId: string; name: string }) => string;
@@ -220,8 +221,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [ready, structures, activeStructureId]);
 
   const value = useMemo<DataContextValue>(() => {
+    // Strutture ordinate secondo la preferenza dell'utente (campo order), poi per nome.
+    // Un unico punto di ordinamento: vale ovunque (calendario, elenchi, menu a tendina).
+    const sortedStructures = [...structures].sort((a, b) => {
+      const oa = typeof a.order === "number" ? a.order : 1e9;
+      const ob = typeof b.order === "number" ? b.order : 1e9;
+      return oa !== ob ? oa - ob : (a.name || "").localeCompare(b.name || "", "it");
+    });
     return {
-      structures,
+      structures: sortedStructures,
       roomTypes,
       units,
       guests,
@@ -244,6 +252,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       addStructure: (s) => { const id = uid(); setStructures((prev) => [...prev, { id, city: "Siracusa", checkOutBy: "10:30", ...s }]); logAct("config", `Struttura creata — ${s.name}`); return id; },
       updateStructure: (id, patch) => setStructures((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x))),
+      // Sposta una struttura su/giù nell'ordine di visualizzazione. Normalizza il campo
+      // order su TUTTE le strutture (0..n) così l'ordine è stabile ovunque.
+      moveStructure: (id, dir) => setStructures((prev) => {
+        const ordered = [...prev].sort((a, b) => {
+          const oa = typeof a.order === "number" ? a.order : 1e9;
+          const ob = typeof b.order === "number" ? b.order : 1e9;
+          return oa !== ob ? oa - ob : (a.name || "").localeCompare(b.name || "", "it");
+        });
+        const i = ordered.findIndex((s) => s.id === id);
+        if (i < 0) return prev;
+        const j = dir === "up" ? i - 1 : i + 1;
+        if (j < 0 || j >= ordered.length) return prev;
+        [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+        const orderById = new Map(ordered.map((s, idx) => [s.id, idx]));
+        return prev.map((s) => ({ ...s, order: orderById.get(s.id) ?? s.order }));
+      }),
       addRoomType: (rt) => { const id = uid(); setRoomTypes((prev) => [...prev, { id, ...rt }]); logAct("config", `Tipologia creata — ${rt.name}`); return id; },
       updateRoomType: (id, patch) => setRoomTypes((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x))),
       addUnit: (u) => { const id = uid(); setUnits((prev) => [...prev, { id, ...u }]); logAct("config", `Camera aggiunta — ${u.name}`); return id; },

@@ -283,6 +283,7 @@ export default function BookingDrawer() {
       </div>
       <div className="rounded-xl bg-wash px-3 py-2.5">
         <div className="flex items-baseline justify-between gap-4"><span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span><span className="font-mono text-lg font-bold tabular-nums text-txt">{eur(totalV)}</span></div>
+        <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Incassato")}</span><span className="font-mono text-sm font-semibold tabular-nums" style={{ color: "var(--ok)" }}>{eur(Math.max(0, totalV - balanceV))}</span></div>
         <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Saldo dovuto")}</span><span className="font-mono text-sm font-bold tabular-nums" style={{ color: balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span></div>
       </div>
       {balanceV > 0 && (
@@ -699,7 +700,7 @@ export default function BookingDrawer() {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <button aria-label={t("Chiudi")} onClick={closeBooking} className="fixed inset-0 bg-black/40" />
 
-      <div className={`anim-in relative z-10 flex max-h-[85vh] w-full flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl transition-[max-width] ${expanded || mode === "edit" ? "max-w-2xl" : "max-w-md"}`}>
+      <div className={`anim-in relative z-10 flex max-h-[85vh] w-full flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl transition-[max-width] ${expanded || mode === "edit" ? "max-w-2xl" : "max-w-lg"}`}>
         {/* Accento canale */}
         <div className="h-1 w-full shrink-0" style={{ background: `var(${ch.cssVar})` }} />
         {/* Intestazione */}
