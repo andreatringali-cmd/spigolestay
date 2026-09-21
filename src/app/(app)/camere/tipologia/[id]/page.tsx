@@ -181,7 +181,7 @@ export default function TipologiaSchedaPage() {
                 <label className={lbl}>{t("Numero camere")}
                   <input type="number" min={0} value={targetRooms} onChange={(e) => setTargetRooms(e.target.value.replace(/\D/g, ""))} className={`${inp} mt-1 w-28`} />
                 </label>
-                <button type="button" onClick={applyRoomCount} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Applica")}</button>
+                <button type="button" onClick={applyRoomCount} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{(Number(targetRooms) || 0) !== nUnits ? `${t("Applica")} · ${nUnits} → ${Number(targetRooms) || 0}` : t("Applica")}</button>
                 <span className="text-xs text-faint">{t("Attualmente")}: <b className="text-dim">{nUnits}</b></span>
               </div>
               {roomMsg && <div className="mt-2 rounded-lg bg-wash px-3 py-2 text-xs text-dim">{roomMsg}</div>}
