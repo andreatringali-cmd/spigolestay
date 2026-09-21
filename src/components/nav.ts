@@ -58,6 +58,7 @@ export const NAV: NavItem[] = [
   { label: "Cassa · Prima Nota", href: "/cassa", group: "Amministrazione", icon: "receipt", perm: "cassa", module: "cassa" },
   { label: "Chiusura cassa", href: "/chiusura-cassa", group: "Amministrazione", icon: "receipt", perm: "cassa", module: "cassa" },
   { label: "Clienti / Agenzie", href: "/anagrafica-clienti", group: "Amministrazione", icon: "users", perm: "prenotazioni", module: "pms" },
+  { label: "Forniture", href: "/forniture", group: "Amministrazione", icon: "box", perm: "cassa", module: "pms" },
 
   // Adempimenti PA: cosa mandi agli enti (Questura, ISTAT, Comune).
   { label: "Alloggiati", href: "/alloggiati", group: "Adempimenti PA", icon: "id", perm: "alloggiati", module: "pms" },
