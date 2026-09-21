@@ -137,8 +137,26 @@ export async function POST(req: Request) {
 
     // 4) Email di conferma AUTOMATICA all'ospite (best-effort: non blocca la prenotazione).
     try {
-      const st = (Array.isArray(data.structures) ? data.structures : []).find((s) => (s as { id?: string }).id === sid) as (Record<string, unknown>) | undefined;
-      const rtObj = (Array.isArray(data.roomTypes) ? data.roomTypes : []).find((r) => (r as { id?: string }).id === rt) as (Record<string, unknown>) | undefined;
+      // La struttura può essere PERSONALE (app_state del proprietario) oppure CONDIVISA
+      // (org_state di un'organizzazione di cui il proprietario è membro). Cerchiamo in
+      // entrambi: senza questo, per una struttura in società "st" resta undefined e
+      // l'email non parte mai.
+      let st = (Array.isArray(data.structures) ? data.structures : []).find((s) => (s as { id?: string }).id === sid) as (Record<string, unknown>) | undefined;
+      let rtObj = (Array.isArray(data.roomTypes) ? data.roomTypes : []).find((r) => (r as { id?: string }).id === rt) as (Record<string, unknown>) | undefined;
+      if (!st) {
+        const { data: ms } = await admin.from("memberships").select("org_id").eq("user_id", ownerId);
+        for (const m of (Array.isArray(ms) ? ms : [])) {
+          const { data: os } = await admin.from("org_state").select("data").eq("org_id", (m as { org_id?: string }).org_id as string).maybeSingle();
+          const oblob = (((os as { data?: unknown } | null)?.data ?? {}) as Record<string, string>) || {};
+          let od: Json = {}; try { od = JSON.parse(oblob[DATA_KEY] || "{}") as Json; } catch { od = {}; }
+          const found = (Array.isArray(od.structures) ? od.structures : []).find((s) => (s as { id?: string }).id === sid) as (Record<string, unknown>) | undefined;
+          if (found) {
+            st = found;
+            rtObj = rtObj || ((Array.isArray(od.roomTypes) ? od.roomTypes : []).find((r) => (r as { id?: string }).id === rt) as (Record<string, unknown>) | undefined);
+            break;
+          }
+        }
+      }
       if (gEmail && st) {
         const origin = req.headers.get("origin") || new URL(req.url).origin;
         const nN = Math.max(1, Math.round((Date.parse(co) - Date.parse(ci)) / 86400000));
