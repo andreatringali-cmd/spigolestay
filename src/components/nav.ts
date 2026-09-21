@@ -30,6 +30,7 @@ export const NAV: NavItem[] = [
 
   // Booking Engine: vendita diretta (motore, sito, offerte, extra).
   { label: "Booking Engine", href: "/booking-engine", group: "Booking Engine", icon: "eye", perm: "sito", module: "booking" },
+  { label: "XenoraBook · portale", href: "/xenorabook", group: "Booking Engine", icon: "share", perm: "sito", module: "pms" },
   { label: "Widget sito", href: "/widget", group: "Booking Engine", icon: "eye", perm: "sito", module: "booking" },
   { label: "Xenosite", href: "/sito", group: "Booking Engine", icon: "grid", perm: "sito", module: "site" },
   { label: "Preventivi", href: "/preventivi", group: "Booking Engine", icon: "fileText", perm: "webconcierge", module: "concierge" },
