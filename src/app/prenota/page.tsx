@@ -59,6 +59,9 @@ function Engine() {
   const today = toISO(new Date());
   const [checkIn, setCheckIn] = useState(() => qp("ci") || addDays(today, 7));
   const [checkOut, setCheckOut] = useState(() => qp("co") || addDays(today, 8));
+  // Le camere compaiono SOLO dopo "Verifica disponibilità" (come Octorate). Se il link porta
+  // già date esplicite (?ci&co, es. dal mini-sito), mostra subito i risultati.
+  const [searched, setSearched] = useState<boolean>(() => !!(qp("ci") && qp("co")));
   const [adults, setAdults] = useState(() => Number(qp("ad")) || 2);
   const [children, setChildren] = useState(() => Number(qp("ch")) || 0);
   const [childAges, setChildAges] = useState<number[]>(() => {
@@ -256,10 +259,10 @@ function Engine() {
   const searchBar = (
     <div className={`${box} mb-4 p-3`}>
       <div className="grid gap-2 sm:grid-cols-4">
-        <label className="block text-xs font-medium text-dim">Arrivo<input type="date" value={checkIn} min={today} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(addDays(e.target.value, 1)); }} className={`${field} mt-1`} /></label>
-        <label className="block text-xs font-medium text-dim">Partenza<input type="date" value={checkOut} min={addDays(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className={`${field} mt-1`} /></label>
-        <label className="block text-xs font-medium text-dim">Adulti<Stepper value={adults} min={1} onChange={setAdults} /></label>
-        <label className="block text-xs font-medium text-dim">Bambini<Stepper value={children} min={0} onChange={setChildrenN} /></label>
+        <label className="block text-xs font-medium text-dim">Arrivo<input type="date" value={checkIn} min={today} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(addDays(e.target.value, 1)); setSearched(false); }} className={`${field} mt-1`} /></label>
+        <label className="block text-xs font-medium text-dim">Partenza<input type="date" value={checkOut} min={addDays(checkIn, 1)} onChange={(e) => { setCheckOut(e.target.value); setSearched(false); }} className={`${field} mt-1`} /></label>
+        <label className="block text-xs font-medium text-dim">Adulti<Stepper value={adults} min={1} onChange={(v) => { setAdults(v); setSearched(false); }} /></label>
+        <label className="block text-xs font-medium text-dim">Bambini<Stepper value={children} min={0} onChange={(v) => { setChildrenN(v); setSearched(false); }} /></label>
       </div>
       {children > 0 && (
         <div className="mt-2">
@@ -276,7 +279,10 @@ function Engine() {
           </label>
         </div>
       )}
-      <div className="mt-2 text-xs text-dim">{nights} {nights === 1 ? "notte" : "notti"} · {adults} adulti{children ? ` · ${children} bambini` : ""}</div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs text-dim">{nights} {nights === 1 ? "notte" : "notti"} · {adults} adulti{children ? ` · ${children} bambini` : ""}</span>
+        <button onClick={() => setSearched(true)} className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: structure?.photoColor ?? "#4F46E5" }}>Verifica disponibilità</button>
+      </div>
     </div>
   );
 
@@ -318,6 +324,12 @@ function Engine() {
           <>
             <h1 className="mb-3 font-display text-xl font-bold text-txt">Verifica disponibilità</h1>
             {searchBar}
+            {!searched && (
+              <div className={`${box} p-8 text-center`}>
+                <p className="text-sm text-dim">Seleziona date e ospiti, poi premi <b className="text-txt">Verifica disponibilità</b> per vedere le camere.</p>
+              </div>
+            )}
+            {searched && (
             <div className={`${box} mb-3 flex flex-wrap items-center gap-2 p-3`}>
               <span className="text-sm font-medium text-dim">Hai un codice sconto?</span>
               <input value={promoInput} onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoErr(""); }} placeholder="CODICE" className="w-40 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm uppercase text-txt outline-none focus:border-focus" />
@@ -325,8 +337,9 @@ function Engine() {
               {appliedPromo && <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--ok)" }}>✓ {appliedPromo.name || appliedPromo.code} · −{appliedPromo.pct}%<button onClick={() => { setAppliedPromo(null); setPromoInput(""); }} className="text-xs font-normal text-faint hover:text-[color:var(--err)]">rimuovi</button></span>}
               {promoErr && <span className="text-sm text-[color:var(--err)]">{promoErr}</span>}
             </div>
+            )}
             <div className="flex flex-col gap-3">
-              {masters.map((rt) => {
+              {(searched ? masters : []).map((rt) => {
                 const free = availUnitsFor(rt).length;
                 const pax = adults + children;
                 // Varianti = madre + tariffe derivate; ognuna con i suoi piani applicabili.
