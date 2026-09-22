@@ -4,6 +4,7 @@
 // Stripe e NON passano dall'app: qui si mostra solo lo stato e i dati di fatturazione.
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
@@ -88,10 +89,12 @@ export default function PagamentoPage() {
             <div className="grid h-10 w-14 place-items-center rounded-md bg-wash text-dim"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg></div>
             <div className="flex-1">
               <div className="text-sm font-semibold text-txt">{customer ? t("Carta gestita su Stripe") : t("Nessuna carta salvata")}</div>
-              <div className="text-[11px] text-faint">{customer ? t("Apri il portale per vedere o cambiare la carta.") : t("Aggiungi una carta per attivare il pagamento automatico dell'abbonamento.")}</div>
+              <div className="text-[11px] text-faint">{customer ? t("Apri il portale per vedere o cambiare la carta.") : t("La carta si aggiunge quando attivi un piano (il pagamento è gestito da Stripe).")}</div>
             </div>
           </div>
-          <button onClick={addCard} disabled={busy} className="mt-3 w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60">{busy ? t("Attendi…") : (customer ? t("Gestisci carta su Stripe") : `＋ ${t("Aggiungi metodo di pagamento")}`)}</button>
+          {customer
+            ? <button onClick={addCard} disabled={busy} className="mt-3 w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60">{busy ? t("Attendi…") : t("Gestisci carta su Stripe")}</button>
+            : <Link href="/abbonamento" className="mt-3 block w-full rounded-lg bg-focus py-2 text-center text-sm font-semibold text-white transition hover:opacity-90">{t("Scegli un piano")} →</Link>}
           <div className="mt-3 border-t border-line pt-3">
             <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Metodi accettati")}</div>
             <div className="flex flex-wrap gap-1.5">
