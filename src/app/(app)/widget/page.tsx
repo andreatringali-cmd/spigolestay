@@ -7,6 +7,8 @@ import { nights, toISO, shiftISO } from "@/lib/dates";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { supabase } from "@/lib/supabase";
+import { slugify } from "@/lib/publicdata";
 
 const ACCENTS = ["#4F46E5", "#0E7C66", "#B4531F", "#B3453A", "#0891B2", "#DB2777"];
 const FONTS: [string, string][] = [
@@ -31,6 +33,7 @@ interface Cfg {
   payCard: boolean; payPaypal: boolean; payTransfer: boolean; payOnsite: boolean;
   deposit: "none" | "firstNight" | "percent"; depositPct: number;
   adjMode: "none" | "fixed" | "percent"; adjValue: number;
+  embedMinHeight: number; embedInheritAccent: boolean;
 }
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now() + Math.random()));
 const makeCfg = (structureId: string, name: string): Cfg => ({
@@ -43,6 +46,7 @@ const makeCfg = (structureId: string, name: string): Cfg => ({
   payCard: true, payPaypal: true, payTransfer: true, payOnsite: false,
   deposit: "percent", depositPct: 30,
   adjMode: "none", adjValue: 0,
+  embedMinHeight: 640, embedInheritAccent: true,
 });
 const THEME_LABEL = (th: string) => (th === "rounded" ? "Arrotondato" : "Squadrato");
 const LAYOUT_LABEL = (l: Layout) => LAYOUTS.find((x) => x.key === l)?.label ?? l;
@@ -126,6 +130,19 @@ export default function WidgetPage() {
     return () => ro.disconnect();
   }, [editingId]);
 
+  // Slug pubblicato della struttura (per lo snippet embed reale). Se la struttura
+  // non è ancora pubblicata su Xenosite, lo slug resta null e mostriamo l'avviso.
+  const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
+  const [slugChecked, setSlugChecked] = useState(false);
+  useEffect(() => {
+    setPublishedSlug(null); setSlugChecked(false);
+    if (!structureId || !supabase) { setSlugChecked(true); return; }
+    let alive = true;
+    supabase.from("public_sites").select("slug").eq("structure_id", structureId).maybeSingle()
+      .then(({ data }) => { if (alive) { setPublishedSlug((data?.slug as string) ?? null); setSlugChecked(true); } });
+    return () => { alive = false; };
+  }, [structureId]);
+
   const structure = structures.find((s) => s.id === structureId);
   const rt = roomTypes.find((r) => r.id === rtId);
   const n = Math.max(1, nights(ci, co));
@@ -192,6 +209,21 @@ export default function WidgetPage() {
   const copy = (k: string, txt: string) => { navigator.clipboard?.writeText(txt); setCopied(k); window.setTimeout(() => setCopied(""), 1500); };
   const radius = c.theme === "rounded" ? 16 : 4;
   const previewScale = availW ? Math.min(1, availW / lay.w) : 1;
+
+  // ── Snippet EMBED reale (motore /prenota → route pubblica /embed/<slug>) ──
+  const PUBLIC_HOST = "xenora.it";
+  const publicBase = `https://${PUBLIC_HOST}`;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const minH = c.embedMinHeight ?? 640;
+  const inheritAccent = c.embedInheritAccent ?? true;
+  // Slug reale se pubblicato; altrimenti l'anteprima dello slug per far vedere la forma dello snippet.
+  const embedSlug = publishedSlug || slugify(structure?.name || "") || "la-tua-struttura";
+  const embedUrl = `${publicBase}/embed/${embedSlug}`;
+  const iframeEmbed = `<iframe src="${embedUrl}" style="width:100%;border:0;min-height:${minH}px" title="Prenota — ${structure?.name ?? ""}"></iframe>`;
+  const scriptEmbed = `<script src="${publicBase}/embed.js" data-site="${embedSlug}"${minH !== 640 ? ` data-min-height="${minH}"` : ""}${!inheritAccent ? ` data-accent="${c.accent}"` : ""}></script>`;
+  // Anteprima dal vivo: usa il motore in modalità embed con i dati locali del proprietario
+  // (nessuna pubblicazione necessaria per vedere l'anteprima).
+  const embedPreviewSrc = `${origin}/prenota?embed=1&s=${encodeURIComponent(structureId)}${!inheritAccent ? `&accent=${encodeURIComponent(c.accent)}` : ""}`;
 
   return (
     <div>
@@ -297,6 +329,57 @@ export default function WidgetPage() {
               <button onClick={() => copy("i", iframe)} className="shrink-0 rounded-lg border border-line px-3 py-2 text-xs font-medium text-txt hover:bg-wash">{copied === "i" ? "✓" : t("Copia")}</button>
             </div>
             <p className="mt-2 text-xs text-faint">{t("C'è anche il")} <b className="text-dim">{t("plugin WordPress")}</b> {t("(in arrivo): installalo e incolla la sitekey.")}</p>
+          </Card>
+
+          <Card>
+            <SectionTitle>{t("Incorpora sul tuo sito")}</SectionTitle>
+            <p className="mb-3 text-xs text-dim">{t("Mostra il motore di prenotazione di")} <b className="text-txt">{structure?.name ?? t("la tua struttura")}</b> {t("dentro il tuo sito esterno. Le prenotazioni arrivano dirette nel gestionale.")}</p>
+
+            {/* Stato pubblicazione */}
+            {slugChecked && (publishedSlug ? (
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash px-3 py-2 text-xs">
+                <span className="rounded-full px-2 py-0.5 font-semibold text-white" style={{ backgroundColor: "var(--ok)" }}>{t("Online")}</span>
+                <span className="text-dim">{PUBLIC_HOST}/embed/</span><span className="font-mono font-semibold text-txt">{publishedSlug}</span>
+              </div>
+            ) : (
+              <div className="mb-3 rounded-lg border border-line bg-wash px-3 py-2 text-xs text-dim">
+                {t("Questa struttura non è ancora pubblicata.")} <a href="/sito" className="font-semibold text-focus hover:underline">{t("Pubblica il tuo Xenosite")}</a> {t("per attivare l'indirizzo dello snippet.")}
+              </div>
+            ))}
+
+            {/* Opzioni */}
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-xs font-medium text-dim">{t("Altezza minima (px)")}
+                <input type="number" min={200} step={20} value={minH} onChange={(e) => set("embedMinHeight", Math.max(200, +e.target.value || 640))} className={`mt-1 ${inp}`} />
+              </label>
+              <div className="block text-xs font-medium text-dim">{t("Colore accento")}
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="h-9 w-9 shrink-0 rounded-lg border border-line" style={{ backgroundColor: inheritAccent ? (structure?.photoColor ?? c.accent) : c.accent }} />
+                  <label className="flex items-center gap-1.5 text-[11px] font-normal text-dim"><Toggle on={inheritAccent} onChange={(v) => set("embedInheritAccent", v)} /> {t("Eredita dalla struttura")}</label>
+                </div>
+              </div>
+            </div>
+
+            {/* Snippet A: iframe */}
+            <div className="mt-3 text-xs font-medium text-dim">{t("1. Iframe semplice")}</div>
+            <div className="mt-1 flex items-start gap-2">
+              <textarea readOnly value={iframeEmbed} rows={2} className="w-full resize-none rounded-lg border border-line bg-paper p-2 font-mono text-[11px] text-txt" />
+              <button onClick={() => copy("ei", iframeEmbed)} className="shrink-0 rounded-lg border border-line px-3 py-2 text-xs font-medium text-txt hover:bg-wash">{copied === "ei" ? "✓" : t("Copia")}</button>
+            </div>
+
+            {/* Snippet B: script responsivo */}
+            <div className="mt-3 text-xs font-medium text-dim">{t("2. Script responsivo")} <span className="font-normal text-faint">{t("(altezza automatica)")}</span></div>
+            <div className="mt-1 flex items-start gap-2">
+              <textarea readOnly value={scriptEmbed} rows={2} className="w-full resize-none rounded-lg border border-line bg-paper p-2 font-mono text-[11px] text-txt" />
+              <button onClick={() => copy("es2", scriptEmbed)} className="shrink-0 rounded-lg border border-line px-3 py-2 text-xs font-medium text-txt hover:bg-wash">{copied === "es2" ? "✓" : t("Copia")}</button>
+            </div>
+            <p className="mt-2 text-xs text-faint">{t("Lo script adatta l'altezza da solo e resta responsivo. L'iframe è più semplice ma con altezza fissa.")}</p>
+
+            {/* Anteprima dal vivo */}
+            <div className="mt-3 text-xs font-medium text-dim">{t("Anteprima dal vivo")}</div>
+            <div className="mt-1 overflow-hidden rounded-lg border border-line bg-surface">
+              <iframe key={embedPreviewSrc} src={embedPreviewSrc} title={t("Anteprima embed")} style={{ width: "100%", height: minH, border: 0, display: "block" }} />
+            </div>
           </Card>
 
           <Card>

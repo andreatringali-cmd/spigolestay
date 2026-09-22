@@ -19,6 +19,39 @@ const fmtD = (iso: string) => { try { return new Date(iso + "T00:00:00").toLocal
 interface DocData { firstName: string; lastName: string; sex: string; birthDate: string; birthPlace: string; citizenship: string; docType: string; docNumber: string; docPlace: string }
 const emptyExtra = () => ({ firstName: "", lastName: "", sex: "", birthDate: "", birthPlace: "", citizenship: "", docType: DOC_TYPES[0], docNumber: "", docPlace: "", photoFront: "", photoBack: "" });
 
+// Controllo di upload di UNA faccia del documento (fronte o retro), riusato per
+// l'ospite principale e per ogni co-ospite. Se `onReread` è passato, mostra il
+// pulsante "✨ Rileggi dal documento" (solo quando l'AI è attiva).
+function DocFace({ label, photo, onPick, onRemove, onReread, extracting, aiOff }: {
+  label: string;
+  photo?: string;
+  onPick: (file: File | undefined) => void;
+  onRemove: () => void;
+  onReread?: () => void;
+  extracting: boolean;
+  aiOff: boolean;
+}) {
+  if (photo) {
+    return (
+      <div className="flex items-center gap-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={photo} alt={label} className="h-14 w-24 shrink-0 rounded border border-line object-cover" />
+        <div className="flex flex-col items-start gap-1">
+          <span className="text-[11px] font-medium text-dim">{label}</span>
+          {onReread && !aiOff && <button type="button" onClick={onReread} disabled={extracting} className="text-xs font-semibold text-focus hover:underline disabled:opacity-50">{extracting ? "Leggo…" : "✨ Rileggi dal documento"}</button>}
+          <button type="button" onClick={onRemove} className="text-[11px] text-dim hover:text-[color:var(--err)]">Rimuovi</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>
+      {extracting && onReread ? "Leggo…" : `${aiOff || !onReread ? "📷" : "✨"} ${label}`}
+      <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => onPick(e.target.files?.[0])} />
+    </label>
+  );
+}
+
 interface Info {
   aiEnabled?: boolean;
   returning?: boolean;
@@ -55,7 +88,6 @@ function Engine() {
   const [submitErr, setSubmitErr] = useState("");
   const [done, setDone] = useState(false);
   const [paidNow, setPaidNow] = useState(false);
-  const frontRef = useRef<HTMLInputElement>(null);
   const onPhoto = async (file: File | undefined, set: (v: string) => void, extract = false) => {
     if (!file || !file.type.startsWith("image/")) return;
     try { const dl = await downscaleImage(file, 900, 0.72); set(dl); if (extract) void extractDoc(dl); } catch {}
@@ -95,6 +127,10 @@ function Engine() {
   const onExtraPhoto = async (file: File | undefined, i: number) => {
     if (!file || !file.type.startsWith("image/")) return;
     try { const dl = await downscaleImage(file, 900, 0.72); setExtra(i, "photoFront", dl); void extractExtra(dl, i); } catch {}
+  };
+  const onExtraPhotoBack = async (file: File | undefined, i: number) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    try { const dl = await downscaleImage(file, 900, 0.72); setExtra(i, "photoBack", dl); } catch {}
   };
 
   // Carica la prenotazione dal server.
@@ -289,23 +325,12 @@ function Engine() {
               <label className={`${lbl} sm:col-span-2`}>Luogo di rilascio<input value={doc.docPlace} onChange={(e) => setD("docPlace", e.target.value)} className={`${field} mt-1`} /></label>
             </div>
           )}
-          {/* Foto documento + auto-compilazione, in fondo alla scheda */}
+          {/* Foto documento (fronte + retro) + auto-compilazione, in fondo alla scheda */}
           <div className="mt-3 border-t border-line pt-3">
-            {photoFront ? (
-              <div className="flex items-center gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photoFront} alt="documento" className="h-14 w-24 shrink-0 rounded border border-line object-cover" />
-                <div className="flex flex-col items-start gap-1">
-                  {!aiOff && <button type="button" onClick={() => extractDoc(photoFront)} disabled={extracting} className="text-xs font-semibold text-focus hover:underline disabled:opacity-50">{extracting ? "Leggo…" : "✨ Rileggi dal documento"}</button>}
-                  <button type="button" onClick={() => setPhotoFront(undefined)} className="text-[11px] text-dim hover:text-[color:var(--err)]">Rimuovi foto</button>
-                </div>
-              </div>
-            ) : (
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>
-                {extracting ? "Leggo…" : (aiOff ? "📷 Allega foto del documento" : "✨ Compila dai documenti")}
-                <input ref={frontRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onPhoto(e.target.files?.[0], setPhotoFront, true)} />
-              </label>
-            )}
+            <div className="flex flex-wrap items-start gap-4">
+              <DocFace label="Fronte documento" photo={photoFront} onPick={(f) => onPhoto(f, setPhotoFront, true)} onRemove={() => setPhotoFront(undefined)} onReread={() => { if (photoFront) extractDoc(photoFront); }} extracting={extracting} aiOff={aiOff} />
+              <DocFace label="Retro documento" photo={photoBack} onPick={(f) => onPhoto(f, setPhotoBack)} onRemove={() => setPhotoBack(undefined)} extracting={extracting} aiOff={aiOff} />
+            </div>
             {extractMsg && <div className="mt-2 text-[11px]" style={{ color: "var(--focus)" }}>✨ {extractMsg}</div>}
             {!aiOff && !photoFront && <p className="mt-1 text-[11px] text-faint">Fotografa il documento: i campi qui sopra si compilano da soli.</p>}
           </div>
@@ -335,20 +360,10 @@ function Engine() {
                     <input value={e.docNumber} onChange={(ev) => setExtra(i, "docNumber", ev.target.value)} placeholder="Numero documento" className={field} />
                     <input value={e.docPlace ?? ""} onChange={(ev) => setExtra(i, "docPlace", ev.target.value)} placeholder="Luogo di rilascio" className={`${field} sm:col-span-2`} />
                   </div>
-                  {/* Foto documento + auto-compilazione, in fondo alla scheda dell'ospite */}
-                  <div className="mt-2">
-                    {e.photoFront ? (
-                      <div className="flex items-center gap-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={e.photoFront} alt="doc" className="h-12 w-20 rounded border border-line object-cover" />
-                        <button onClick={() => setExtra(i, "photoFront", "")} className="text-[11px] text-dim hover:text-[color:var(--err)]">Rimuovi foto</button>
-                      </div>
-                    ) : (
-                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>
-                        {extracting ? "Leggo…" : (aiOff ? "📷 Allega foto del documento" : "✨ Compila dai documenti")}
-                        <input type="file" accept="image/*" capture="environment" hidden onChange={(ev) => onExtraPhoto(ev.target.files?.[0], i)} />
-                      </label>
-                    )}
+                  {/* Foto documento (fronte + retro) + auto-compilazione, in fondo alla scheda dell'ospite */}
+                  <div className="mt-2 flex flex-wrap items-start gap-3">
+                    <DocFace label="Fronte documento" photo={e.photoFront || undefined} onPick={(f) => onExtraPhoto(f, i)} onRemove={() => setExtra(i, "photoFront", "")} onReread={() => { if (e.photoFront) extractExtra(e.photoFront, i); }} extracting={extracting} aiOff={aiOff} />
+                    <DocFace label="Retro documento" photo={e.photoBack || undefined} onPick={(f) => onExtraPhotoBack(f, i)} onRemove={() => setExtra(i, "photoBack", "")} extracting={extracting} aiOff={aiOff} />
                   </div>
                 </div>
               ))}

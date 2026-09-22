@@ -46,7 +46,7 @@ export default function PagamentoPage() {
       const res = await fetch("/api/stripe/portal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ customerId: customer }) });
       const d = await res.json().catch(() => ({}));
       if (d?.url) { window.location.href = d.url; return; }
-      setNotice(t("Non è stato possibile aprire il portale pagamenti. Riprova."));
+      setNotice(d?.message ? `${t("Non è stato possibile aprire il portale pagamenti.")} (${d.message})` : t("Non è stato possibile aprire il portale pagamenti. Riprova."));
     } catch { setNotice(t("Errore di rete. Riprova.")); }
     setBusy(false);
   };

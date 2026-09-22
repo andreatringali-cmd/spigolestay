@@ -33,17 +33,28 @@ export default function PrenotaPage() {
   // Se si arriva da un Xenosite pubblico (xenora.it/<slug> → ?site=<slug>), carica
   // i dati pubblicati dal server prima di montare lo store.
   const [ready, setReady] = useState(false);
+  const [embed, setEmbed] = useState(false);
+  const [accent, setAccent] = useState<string | null>(null);
   useEffect(() => {
     let slug: string | null = null;
-    try { slug = new URLSearchParams(window.location.search).get("site"); } catch {}
+    let em = false;
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      slug = sp.get("site"); em = sp.get("embed") === "1";
+      const a = sp.get("accent"); if (a && /^#?[0-9a-fA-F]{3,8}$/.test(a)) setAccent(a.startsWith("#") ? a : `#${a}`);
+    } catch {}
+    setEmbed(em);
     if (slug) loadPublicSite(slug).finally(() => setReady(true));
     else setReady(true);
   }, []);
   if (!ready) return null;
-  return <DataProvider><Engine /></DataProvider>;
+  const engine = <Engine embed={embed} />;
+  return <DataProvider>{accent ? <div style={{ ["--focus" as string]: accent } as React.CSSProperties}>{engine}</div> : engine}</DataProvider>;
 }
 
-function Engine() {
+// `embed`: versione compatta per l'iframe incorporato sul sito del gestore
+// (niente header/footer, sfondo trasparente, comunica l'altezza al parent).
+export function Engine({ embed = false }: { embed?: boolean }) {
   const { structures, roomTypes, units, bookings, guests, rateOverrides, addGuest, updateGuest, addBooking, addActivity, getStructure } = useData();
 
   // Config salvata (piani, weekend) — fallback ai default.
@@ -52,16 +63,22 @@ function Engine() {
   const promos = useMemo(() => { try { return loadPromos(); } catch { return []; } }, []);
 
   const qp = (k: string) => { try { return new URLSearchParams(window.location.search).get(k); } catch { return null; } };
-  const [structureId, setStructureId] = useState(() => qp("s") || structures[0]?.id || "");
+  // Deep link dai comparatori (Meta Search): ?rt=<id>&checkin=&checkout=. Se manca la
+  // struttura (?s), la ricavo dalla tipologia richiesta così la camera è già visibile.
+  const rtParam = qp("rt");
+  const [structureId, setStructureId] = useState(() => qp("s") || (rtParam ? roomTypes.find((r) => r.id === rtParam)?.structureId : "") || structures[0]?.id || "");
   const structure = getStructure(structureId);
   const extras: ExtraService[] = (structure?.extras && structure.extras.length ? structure.extras : DEFAULT_EXTRAS).filter((e) => e.active !== false);
 
   const today = toISO(new Date());
-  const [checkIn, setCheckIn] = useState(() => qp("ci") || addDays(today, 7));
-  const [checkOut, setCheckOut] = useState(() => qp("co") || addDays(today, 8));
+  // Accetta sia gli alias brevi (?ci/?co, mini-sito) sia quelli lunghi (?checkin/?checkout,
+  // deep link dei comparatori Meta Search).
+  const [checkIn, setCheckIn] = useState(() => qp("ci") || qp("checkin") || addDays(today, 7));
+  const [checkOut, setCheckOut] = useState(() => qp("co") || qp("checkout") || addDays(today, 8));
   // Le camere compaiono SOLO dopo "Verifica disponibilità" (come Octorate). Se il link porta
-  // già date esplicite (?ci&co, es. dal mini-sito), mostra subito i risultati.
-  const [searched, setSearched] = useState<boolean>(() => !!(qp("ci") && qp("co")));
+  // già date esplicite (?ci&co o ?checkin&checkout) o una tipologia (?rt, deep link
+  // metasearch), mostra subito i risultati.
+  const [searched, setSearched] = useState<boolean>(() => !!((qp("ci") || qp("checkin")) && (qp("co") || qp("checkout"))) || !!rtParam);
   const [processing, setProcessing] = useState(false); // invio prenotazione / redirect pagamento
   // Riepilogo per la schermata di conferma dopo il ritorno dal pagamento Stripe (lo stato
   // del form si perde nel redirect: lo ripristiniamo da sessionStorage).
@@ -192,6 +209,33 @@ function Engine() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Deep link Meta Search con ?rt=<id>: porta la tipologia richiesta in vista.
+  useEffect(() => {
+    if (!rtParam || !searched || step !== "rooms") return;
+    const timer = setTimeout(() => { try { document.getElementById(`rt-${rtParam}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch {} }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searched, step]);
+
+  // Modalità EMBED: comunica l'altezza del contenuto al sito ospite, così lo
+  // script /embed.js adatta l'iframe senza scrollbar interne (ResizeObserver +
+  // qualche invio ritardato per attendere font/immagini).
+  useEffect(() => {
+    if (!embed) return;
+    const send = () => {
+      try {
+        const h = Math.ceil(Math.max(document.documentElement.scrollHeight, document.body.scrollHeight));
+        window.parent?.postMessage({ type: "xenora-embed-height", height: h }, "*");
+      } catch {}
+    };
+    send();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(send) : null;
+    ro?.observe(document.body);
+    const timers = [120, 400, 900, 1600].map((ms) => window.setTimeout(send, ms));
+    window.addEventListener("resize", send);
+    return () => { ro?.disconnect(); timers.forEach((t) => window.clearTimeout(t)); window.removeEventListener("resize", send); };
+  }, [embed]);
+
   // Riepilogo prenotazione (per email e PDF).
   const bookingLines = () => ([
     ["Codice prenotazione", code],
@@ -319,9 +363,9 @@ function Engine() {
     const dTotal = doneSummary?.total ?? total, dDeposit = doneSummary?.deposit ?? deposit;
     const dFirst = doneSummary?.guestFirst || guest.firstName, dEmail = doneSummary?.email || guest.email;
     return (
-      <div className="flex min-h-screen flex-col bg-wash">
-        {header}
-        <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-10">
+      <div className={embed ? "flex flex-col" : "flex min-h-screen flex-col bg-wash"}>
+        {!embed && header}
+        <div className={`mx-auto w-full max-w-2xl flex-1 ${embed ? "px-3 py-5" : "px-4 py-10"}`}>
           <div className={`${box} p-8 text-center`}>
             <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full text-white" style={{ backgroundColor: "var(--ok)" }}><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" /></svg></div>
             <h1 className="font-display text-2xl font-bold text-txt">Prenotazione confermata!</h1>
@@ -341,15 +385,15 @@ function Engine() {
             <p className="mt-4 text-xs text-faint">Conferma inviata via email in automatico. Puoi scaricare il PDF con tutti i dettagli. La prenotazione è entrata nel gestionale della struttura (calendario, cassa e registro attività).</p>
           </div>
         </div>
-        {footer}
+        {!embed && footer}
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-wash">
-      {header}
-      <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
+    <div className={embed ? "flex flex-col" : "flex min-h-screen flex-col bg-wash"}>
+      {!embed && header}
+      <div className={`mx-auto w-full max-w-7xl flex-1 ${embed ? "px-3 py-4" : "px-4 py-6"}`}>
         {step === "rooms" && (
           <>
             <h1 className="mb-3 font-display text-xl font-bold text-txt">Verifica disponibilità</h1>
@@ -384,7 +428,7 @@ function Engine() {
                 const tooSmall = variants.length > 0 && sellable.length === 0; // esistono tariffe ma nessuna adatta agli ospiti
                 const noRate = variants.length === 0;
                 return (
-                  <div key={rt.id} className={`${box} overflow-hidden`}>
+                  <div key={rt.id} id={`rt-${rt.id}`} className={`${box} overflow-hidden`}>
                     <div className="flex flex-col gap-3 p-4 sm:flex-row">
                       {(() => { const cover = getImages(`rt:${rt.id}`)[0]; return cover ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -532,7 +576,7 @@ function Engine() {
           </div>
         )}
       </div>
-      {footer}
+      {!embed && footer}
     </div>
   );
 }

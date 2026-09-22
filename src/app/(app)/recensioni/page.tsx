@@ -1,48 +1,186 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { parseISO } from "@/lib/dates";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { parseISO, toISO } from "@/lib/dates";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
+import { useData } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import type { NormalizedReview } from "@/lib/reviews/google";
 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" });
 
-// Fonti recensioni: OTA + Google. Il collegamento reale (API) arriva con il white-label.
+// Fonti recensioni: Google (reale via API) + OTA (collegamento partner in arrivo, per ora inserimento manuale).
 const SOURCES = [
-  { k: "google", label: "Google", color: "#4285F4", note: "Recensioni + risposta diretta (Business Profile)." },
-  { k: "booking", label: "Booking.com", color: "#003580", note: "Via connessione partner / channel manager." },
-  { k: "airbnb", label: "Airbnb", color: "#FF5A5F", note: "Copertura parziale (nessuna API pubblica)." },
-  { k: "expedia", label: "Expedia", color: "#FFC72C", note: "Dipende dal contratto." },
-  { k: "tripadvisor", label: "Tripadvisor", color: "#00AA6C", note: "Via Content/Review API." },
-  { k: "direct", label: "Diretta", color: "#7A8450", note: "Recensioni dei tuoi ospiti diretti." },
+  { k: "google", label: "Google", color: "#4285F4", note: "Recensioni reali via Google Places API." },
+  { k: "booking", label: "Booking.com", color: "#003580", note: "Collegamento partner in arrivo · inserimento manuale." },
+  { k: "airbnb", label: "Airbnb", color: "#FF5A5F", note: "Collegamento partner in arrivo · inserimento manuale." },
+  { k: "expedia", label: "Expedia", color: "#FFC72C", note: "Collegamento partner in arrivo · inserimento manuale." },
+  { k: "tripadvisor", label: "Tripadvisor", color: "#00AA6C", note: "Collegamento partner in arrivo · inserimento manuale." },
+  { k: "direct", label: "Diretta", color: "#7A8450", note: "Recensioni dei tuoi ospiti diretti · inserimento manuale." },
 ] as const;
 type SourceKey = typeof SOURCES[number]["k"];
 const SRC = Object.fromEntries(SOURCES.map((s) => [s.k, s])) as Record<SourceKey, typeof SOURCES[number]>;
-const CONN_KEY = "spigolestay:reviewsources";
+// Fonti per cui è possibile l'inserimento manuale (tutte tranne Google, che è reale).
+const MANUAL_SOURCES = SOURCES.filter((s) => s.k !== "google");
+
+const PLACEID_KEY = (structureId: string) => `spigolestay:reviews:placeid:${structureId}`;
+const MANUAL_KEY = "spigolestay:reviews:manual";
+const PLACE_ID_FINDER = "https://developers.google.com/maps/documentation/places/web-service/place-id";
+
+type ManualReview = NormalizedReview; // stessa forma; source ≠ "google"
+
+const bucketOf = (r10: number): "pos" | "neu" | "neg" => (r10 >= 8 ? "pos" : r10 >= 6 ? "neu" : "neg");
+
+interface GoogleState {
+  loading: boolean;
+  configured: boolean | null; // null = ancora ignoto
+  reviews: NormalizedReview[];
+  rating?: number;
+  total?: number;
+  name?: string;
+  truncated?: boolean;
+  error?: string;
+}
 
 export default function RecensioniPage() {
+  const { structures, activeStructureId } = useData();
+
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState<Record<string, string>>({});
-  const [conn, setConn] = useState<Record<string, boolean>>({}); // nessuna fonte collegata di default: niente dati finti
   const [filter, setFilter] = useState<"all" | SourceKey>("all");
+
+  // Struttura selezionata per configurazione/visualizzazione recensioni.
+  const [selStructureId, setSelStructureId] = useState<string>("");
+  const [placeId, setPlaceId] = useState<string>(""); // salvato per la struttura selezionata
+  const [placeIdInput, setPlaceIdInput] = useState<string>("");
+
+  const [google, setGoogle] = useState<GoogleState>({ loading: false, configured: null, reviews: [] });
+  const [manual, setManual] = useState<ManualReview[]>([]);
+
+  // Form inserimento manuale
+  const [showManual, setShowManual] = useState(false);
+  const [mForm, setMForm] = useState<{ source: SourceKey; guest: string; date: string; rating: number; text: string }>({
+    source: "booking", guest: "", date: toISO(new Date()), rating: 9, text: "",
+  });
+
+  // Struttura effettiva: se l'utente ha scelto "tutte", usa la prima; altrimenti quella attiva.
+  useEffect(() => {
+    if (selStructureId && structures.some((s) => s.id === selStructureId)) return;
+    const fallback = activeStructureId !== "all" ? activeStructureId : structures[0]?.id ?? "";
+    setSelStructureId(fallback);
+  }, [structures, activeStructureId, selStructureId]);
+
+  // Segui il cambio di struttura attiva dal selettore globale.
+  useEffect(() => {
+    if (activeStructureId !== "all") setSelStructureId(activeStructureId);
+  }, [activeStructureId]);
+
+  // Carica risposte + recensioni manuali una volta.
   useEffect(() => {
     try { const r = localStorage.getItem("spigolestay:reviews"); if (r) setReplies(JSON.parse(r)); } catch {}
-    try { const c = localStorage.getItem(CONN_KEY); if (c) setConn(JSON.parse(c)); } catch {}
+    try { const m = localStorage.getItem(MANUAL_KEY); if (m) setManual(JSON.parse(m)); } catch {}
   }, []);
-  const persist = (n: Record<string, string>) => { setReplies(n); try { localStorage.setItem("spigolestay:reviews", JSON.stringify(n)); } catch {} };
-  const toggleConn = (k: SourceKey) => setConn((p) => { const n = { ...p, [k]: !p[k] }; try { localStorage.setItem(CONN_KEY, JSON.stringify(n)); } catch {} return n; });
 
-  const connectedSources = SOURCES.filter((s) => conn[s.k]).map((s) => s.k);
+  // Quando cambia la struttura selezionata, leggi il Place ID salvato.
+  useEffect(() => {
+    if (!selStructureId) { setPlaceId(""); setPlaceIdInput(""); return; }
+    let saved = "";
+    try { saved = localStorage.getItem(PLACEID_KEY(selStructureId)) || ""; } catch {}
+    setPlaceId(saved);
+    setPlaceIdInput(saved);
+  }, [selStructureId]);
 
-  // Recensioni REALI: arrivano dal collegamento alle fonti (Google/Booking/…). Nessun dato finto.
-  type Review = { id: string; guest: string; date: string; rating: number; text: string; bucket: "pos" | "neu" | "neg"; source: SourceKey };
-  const reviews: Review[] = [];
+  const persistReplies = (n: Record<string, string>) => { setReplies(n); try { localStorage.setItem("spigolestay:reviews", JSON.stringify(n)); } catch {} };
+  const persistManual = (n: ManualReview[]) => { setManual(n); try { localStorage.setItem(MANUAL_KEY, JSON.stringify(n)); } catch {} };
+
+  const savePlaceId = () => {
+    const v = placeIdInput.trim();
+    setPlaceId(v);
+    try { if (v) localStorage.setItem(PLACEID_KEY(selStructureId), v); else localStorage.removeItem(PLACEID_KEY(selStructureId)); } catch {}
+  };
+  const clearPlaceId = () => { setPlaceId(""); setPlaceIdInput(""); try { localStorage.removeItem(PLACEID_KEY(selStructureId)); } catch {} };
+
+  // Carica le recensioni Google reali dalla route API.
+  const loadGoogle = useCallback(async (pid: string, sid: string) => {
+    setGoogle((g) => ({ ...g, loading: true, error: undefined }));
+    try {
+      const token = supabase ? (await supabase.auth.getSession())?.data.session?.access_token : undefined;
+      const params = new URLSearchParams();
+      if (pid) params.set("placeId", pid);
+      if (sid) params.set("structureId", sid);
+      const r = await fetch(`/api/reviews?${params.toString()}`, {
+        cache: "no-store",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      const j = await r.json().catch(() => ({}));
+      setGoogle({
+        loading: false,
+        configured: typeof j.configured === "boolean" ? j.configured : null,
+        reviews: Array.isArray(j.reviews) ? j.reviews : [],
+        rating: j.rating,
+        total: j.total,
+        name: j.name,
+        truncated: j.truncated,
+        error: j.error,
+      });
+    } catch {
+      setGoogle({ loading: false, configured: null, reviews: [], error: "network" });
+    }
+  }, []);
+
+  // Ricarica quando cambia il Place ID salvato (o la struttura).
+  useEffect(() => {
+    if (!selStructureId) return;
+    loadGoogle(placeId, selStructureId);
+  }, [placeId, selStructureId, loadGoogle]);
+
+  const googleConnected = Boolean(placeId) && google.configured === true && !google.error;
+  const keyMissing = google.configured === false;
+
+  // Recensioni manuali della struttura selezionata (le salviamo con structureId nel campo id? no:
+  // le teniamo globali ma filtriamo per struttura via prefisso). Per semplicità: manuali globali.
+  const manualReviews = manual;
+
+  // Insieme completo delle recensioni mostrate (Google reali + manuali).
+  type Review = NormalizedReview;
+  const reviews: Review[] = useMemo(() => {
+    const g = placeId && google.configured ? google.reviews : [];
+    return [...g, ...manualReviews];
+  }, [google.reviews, google.configured, placeId, manualReviews]);
+
+  const connectedSources = useMemo(() => {
+    const set = new Set<SourceKey>();
+    if (googleConnected) set.add("google");
+    for (const r of manualReviews) set.add(r.source as SourceKey);
+    return SOURCES.filter((s) => set.has(s.k)).map((s) => s.k);
+  }, [googleConnected, manualReviews]);
 
   const shown = filter === "all" ? reviews : reviews.filter((r) => r.source === filter);
-  const avg = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : 0;
+  const avg = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : (google.rating ?? 0);
+  const totalCount = google.total && googleConnected ? google.total : reviews.length;
   const unanswered = reviews.filter((r) => !replies[r.id]).length;
   const bySource = connectedSources.map((c) => { const rs = reviews.filter((r) => r.source === c); return { c, n: rs.length, avg: rs.length ? rs.reduce((a, r) => a + r.rating, 0) / rs.length : 0 }; }).filter((x) => x.n);
-  const dist = [10, 9, 8, 7, 6, 5].map((v) => ({ v, n: reviews.filter((r) => r.rating === v).length }));
+  const dist = [10, 9, 8, 7, 6, 5, 4, 3, 2].map((v) => ({ v, n: reviews.filter((r) => r.rating === v).length })).filter((d) => d.v >= 5 || d.n > 0);
+
+  const addManual = () => {
+    const guest = mForm.guest.trim() || "Ospite";
+    const text = mForm.text.trim();
+    const r10 = Math.max(0, Math.min(10, Math.round(mForm.rating)));
+    const rev: ManualReview = {
+      id: `manual-${Date.now()}`,
+      guest,
+      date: mForm.date || toISO(new Date()),
+      rating: r10,
+      text,
+      source: mForm.source,
+      bucket: bucketOf(r10),
+    };
+    persistManual([rev, ...manual]);
+    setShowManual(false);
+    setMForm({ source: "booking", guest: "", date: toISO(new Date()), rating: 9, text: "" });
+  };
+  const removeManual = (id: string) => persistManual(manual.filter((m) => m.id !== id));
 
   const suggest = (r: { guest: string; bucket: string }) => {
     const first = r.guest.split(" ")[0];
@@ -55,28 +193,91 @@ export default function RecensioniPage() {
 
   return (
     <div>
-      <PageHeader title="Recensioni & reputazione" subtitle="Tutte le recensioni delle OTA e di Google in un posto, con risposte suggerite dall'AI" />
+      <PageHeader title="Recensioni & reputazione" subtitle="Recensioni Google reali e OTA in un posto, con risposte suggerite dall'AI" />
 
       <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Media</div><div className="font-mono text-lg font-bold text-txt">{avg.toFixed(1)}<span className="text-xs text-faint">/10</span></div></div>
-        <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Recensioni</div><div className="font-mono text-lg font-bold text-txt">{reviews.length}</div></div>
+        <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Recensioni</div><div className="font-mono text-lg font-bold text-txt">{totalCount}{googleConnected && google.total && google.total > reviews.length ? <span className="text-xs text-faint"> ({reviews.length} qui)</span> : null}</div></div>
         <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Da rispondere</div><div className="font-mono text-lg font-bold" style={{ color: unanswered ? "var(--warn)" : "var(--ok)" }}>{unanswered}</div></div>
         <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Positive</div><div className="font-mono text-lg font-bold text-[color:var(--ok)]">{reviews.length ? Math.round(reviews.filter((r) => r.bucket === "pos").length / reviews.length * 100) : 0}%</div></div>
       </div>
 
+      {/* Configurazione Google Place ID */}
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <SectionTitle>Recensioni Google</SectionTitle>
+          {structures.length > 1 && (
+            <select value={selStructureId} onChange={(e) => setSelStructureId(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1 text-xs font-semibold text-txt outline-none focus:border-focus">
+              {structures.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+            </select>
+          )}
+        </div>
+
+        {keyMissing ? (
+          <div className="rounded-lg border p-3 text-sm" style={{ borderColor: "var(--warn)", background: "color-mix(in srgb, var(--warn) 8%, transparent)" }}>
+            <div className="flex items-start gap-2">
+              <Icon name="alertTriangle" size={16} style={{ color: "var(--warn)", flexShrink: 0, marginTop: 2 }} />
+              <div>
+                <div className="font-semibold text-txt">Import Google non ancora attivo</div>
+                <p className="mt-0.5 text-dim">Per importare le recensioni Google serve configurare <code className="rounded bg-wash px-1 py-0.5 font-mono text-[11px]">GOOGLE_PLACES_API_KEY</code> lato server (variabile d&apos;ambiente). Una volta impostata, incolla qui sotto il Place ID della struttura.</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mt-3">
+          <label className="text-[11px] font-semibold uppercase tracking-wide text-faint">Google Place ID {selStructureId && structures.find((s) => s.id === selStructureId) ? `· ${structures.find((s) => s.id === selStructureId)?.name}` : ""}</label>
+          <div className="mt-1 flex flex-wrap gap-2">
+            <input
+              value={placeIdInput}
+              onChange={(e) => setPlaceIdInput(e.target.value)}
+              placeholder="es. ChIJ...."
+              className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 font-mono text-sm text-txt outline-none focus:border-focus"
+            />
+            <button onClick={savePlaceId} disabled={!selStructureId || placeIdInput.trim() === placeId} className="rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">Salva</button>
+            {placeId ? <button onClick={clearPlaceId} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-dim hover:bg-wash">Rimuovi</button> : null}
+          </div>
+          <p className="mt-1.5 text-[11px] text-faint">
+            Non conosci il Place ID? Trovalo con il <a href={PLACE_ID_FINDER} target="_blank" rel="noopener noreferrer" className="font-semibold text-focus hover:underline">Google Place ID Finder</a> cercando il nome della struttura.
+            {" "}Google Places espone solo le <strong>~5 recensioni più recenti</strong>: la media e il numero totale restano completi, l&apos;elenco è parziale.
+          </p>
+        </div>
+
+        {/* Stato collegamento Google */}
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          {google.loading ? (
+            <span className="text-faint">Caricamento recensioni Google…</span>
+          ) : googleConnected ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-white" style={{ backgroundColor: "var(--ok)" }}><span className="h-1.5 w-1.5 rounded-full bg-white" /> Google collegato</span>
+              {google.name ? <span className="text-dim">{google.name}</span> : null}
+              {typeof google.rating === "number" ? <span className="font-mono font-semibold text-txt">{google.rating.toFixed(1)}/10</span> : null}
+              {typeof google.total === "number" ? <span className="text-faint">· {google.total} recensioni totali</span> : null}
+            </>
+          ) : placeId && google.error ? (
+            <span className="text-[color:var(--err)]">Impossibile caricare da Google ({google.error}). Verifica il Place ID e la chiave.</span>
+          ) : placeId && google.configured === false ? (
+            <span className="text-faint">Place ID salvato. Attivo appena la chiave server sarà configurata.</span>
+          ) : !placeId && google.configured === true ? (
+            <span className="text-faint">Chiave server pronta. Incolla il Place ID per importare le recensioni.</span>
+          ) : null}
+        </div>
+      </Card>
+
       <div className="mb-4 grid gap-4 sm:grid-cols-2">
-        <Card><SectionTitle>Media per fonte</SectionTitle><div className="space-y-2">{bySource.length === 0 ? <p className="text-sm text-faint">Collega una fonte per vedere i dati.</p> : bySource.map((x) => (<div key={x.c} className="flex items-center gap-2"><span className="w-24 text-sm text-txt">{SRC[x.c].label}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${x.avg * 10}%`, backgroundColor: SRC[x.c].color }} /></div><span className="w-16 text-right font-mono text-sm font-semibold text-txt">{x.avg.toFixed(1)} <span className="text-[10px] text-faint">({x.n})</span></span></div>))}</div></Card>
+        <Card><SectionTitle>Media per fonte</SectionTitle><div className="space-y-2">{bySource.length === 0 ? <p className="text-sm text-faint">Nessuna recensione ancora.</p> : bySource.map((x) => (<div key={x.c} className="flex items-center gap-2"><span className="w-24 text-sm text-txt">{SRC[x.c].label}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${x.avg * 10}%`, backgroundColor: SRC[x.c].color }} /></div><span className="w-16 text-right font-mono text-sm font-semibold text-txt">{x.avg.toFixed(1)} <span className="text-[10px] text-faint">({x.n})</span></span></div>))}</div></Card>
         <Card><SectionTitle>Distribuzione voti</SectionTitle><div className="space-y-1.5">{dist.map((d) => (<div key={d.v} className="flex items-center gap-2"><span className="w-6 text-right font-mono text-sm text-dim">{d.v}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full bg-focus" style={{ width: `${reviews.length ? (d.n / reviews.length) * 100 : 0}%` }} /></div><span className="w-8 text-right font-mono text-sm text-dim">{d.n}</span></div>))}</div></Card>
       </div>
 
-      {/* Fonti recensioni: OTA + Google */}
+      {/* Fonti recensioni */}
       <div className="mb-2 flex items-center justify-between gap-2">
         <SectionTitle>Fonti recensioni</SectionTitle>
-        <span className="text-[11px] font-semibold text-faint">{connectedSources.length}/{SOURCES.length} collegate</span>
+        <span className="text-[11px] font-semibold text-faint">{connectedSources.length}/{SOURCES.length} attive</span>
       </div>
       <div className="mb-5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
         {SOURCES.map((s) => {
-          const on = !!conn[s.k];
+          const on = connectedSources.includes(s.k);
+          const isGoogle = s.k === "google";
           return (
             <div key={s.k} className="flex items-center gap-3 rounded-xl border p-3 shadow-sm" style={{ borderColor: on ? s.color : "var(--line)" }}>
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: s.color }}>{s.label[0]}</span>
@@ -84,20 +285,60 @@ export default function RecensioniPage() {
                 <div className="text-sm font-semibold text-txt">{s.label}</div>
                 <div className="truncate text-[11px] text-faint">{s.note}</div>
               </div>
-              <button onClick={() => toggleConn(s.k)} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${on ? "text-white" : "border border-line text-dim hover:bg-wash"}`} style={on ? { backgroundColor: "var(--ok)" } : undefined}>{on ? "Collegato" : "Collega"}</button>
+              {isGoogle ? (
+                <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold" style={on ? { backgroundColor: "var(--ok)", color: "#fff" } : { border: "1px solid var(--line)", color: "var(--dim)" }}>{on ? "Collegato" : "Non collegato"}</span>
+              ) : (
+                <span className="shrink-0 rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-faint">Partner in arrivo</span>
+              )}
             </div>
           );
         })}
       </div>
 
-      {/* Filtro per fonte */}
+      {/* Filtro per fonte + aggiunta manuale */}
       <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <span className="mr-1 text-xs font-semibold text-faint">Fonte:</span>
         <button onClick={() => setFilter("all")} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${filter === "all" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Tutte</button>
         {connectedSources.map((c) => (
           <button key={c} onClick={() => setFilter(c)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${filter === c ? "text-white" : "text-dim hover:bg-wash"}`} style={filter === c ? { backgroundColor: SRC[c].color } : undefined}>{SRC[c].label}</button>
         ))}
+        <button onClick={() => setShowManual((v) => !v)} className="ml-auto flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash"><Icon name="plus" size={13} /> Aggiungi a mano</button>
       </div>
+
+      {/* Form inserimento manuale */}
+      {showManual && (
+        <Card className="mb-3">
+          <SectionTitle>Nuova recensione manuale</SectionTitle>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <label className="text-sm">
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-faint">Fonte</span>
+              <select value={mForm.source} onChange={(e) => setMForm((f) => ({ ...f, source: e.target.value as SourceKey }))} className="w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
+                {MANUAL_SOURCES.map((s) => (<option key={s.k} value={s.k}>{s.label}</option>))}
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-faint">Ospite</span>
+              <input value={mForm.guest} onChange={(e) => setMForm((f) => ({ ...f, guest: e.target.value }))} placeholder="Nome ospite" className="w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-faint">Data</span>
+              <input type="date" value={mForm.date} onChange={(e) => setMForm((f) => ({ ...f, date: e.target.value }))} className="w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-faint">Voto (0–10): {mForm.rating}</span>
+              <input type="range" min={0} max={10} step={1} value={mForm.rating} onChange={(e) => setMForm((f) => ({ ...f, rating: Number(e.target.value) }))} className="w-full accent-[color:var(--focus)]" />
+            </label>
+            <label className="text-sm sm:col-span-2">
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-faint">Testo</span>
+              <textarea value={mForm.text} onChange={(e) => setMForm((f) => ({ ...f, text: e.target.value }))} rows={3} placeholder="Testo della recensione…" className="w-full resize-y rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+            </label>
+          </div>
+          <div className="mt-2.5 flex gap-2">
+            <button onClick={addManual} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-white hover:opacity-90">Salva recensione</button>
+            <button onClick={() => setShowManual(false)} className="rounded-lg border border-line px-3.5 py-1.5 text-sm font-semibold text-dim hover:bg-wash">Annulla</button>
+          </div>
+        </Card>
+      )}
 
       <div className="space-y-3">
         {shown.map((r) => (
@@ -105,29 +346,40 @@ export default function RecensioniPage() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color(r.bucket) }} />
               <span className="font-semibold text-txt">{r.guest}</span>
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ backgroundColor: SRC[r.source].color }}>{SRC[r.source].label}</span>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ backgroundColor: SRC[r.source as SourceKey]?.color ?? "var(--dim)" }}>{SRC[r.source as SourceKey]?.label ?? r.source}</span>
               <span className="text-sm" style={{ color: color(r.bucket) }}>{star(r.rating)}</span>
               <span className="font-mono text-sm text-dim">{r.rating}/10</span>
+              {r.id.startsWith("manual-") && <span className="rounded-full border border-line px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">manuale</span>}
               <span className="ml-auto text-xs text-faint">{fmt(r.date)}</span>
+              {r.id.startsWith("manual-") && <button onClick={() => removeManual(r.id)} className="text-faint hover:text-[color:var(--err)]" title="Elimina recensione manuale"><Icon name="trash" size={14} /></button>}
             </div>
-            <p className="mt-2 text-sm text-txt">{r.text}</p>
+            {r.text && <p className="mt-2 text-sm text-txt">{r.text}</p>}
             {replies[r.id] ? (
-              <div className="mt-2 rounded-lg border border-line bg-wash p-2.5 text-sm text-dim"><span className="text-[10px] font-semibold uppercase tracking-wide text-faint">La tua risposta</span><div className="mt-0.5 text-txt">{replies[r.id]}</div><button onClick={() => { const n = { ...replies }; delete n[r.id]; persist(n); }} className="mt-1 text-[11px] text-faint hover:text-[color:var(--err)]">Rimuovi</button></div>
+              <div className="mt-2 rounded-lg border border-line bg-wash p-2.5 text-sm text-dim"><span className="text-[10px] font-semibold uppercase tracking-wide text-faint">La tua risposta</span><div className="mt-0.5 text-txt">{replies[r.id]}</div><button onClick={() => { const n = { ...replies }; delete n[r.id]; persistReplies(n); }} className="mt-1 text-[11px] text-faint hover:text-[color:var(--err)]">Rimuovi</button></div>
             ) : (
               <div className="mt-2">
                 <textarea value={draft[r.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [r.id]: e.target.value }))} rows={2} placeholder="Scrivi una risposta…" className="w-full resize-y rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
                 <div className="mt-1.5 flex gap-2">
                   <button onClick={() => setDraft((d) => ({ ...d, [r.id]: suggest(r) }))} className="flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash"><Icon name="sparkles" size={13} /> Suggerisci risposta AI</button>
-                  <button onClick={() => { if ((draft[r.id] ?? "").trim()) persist({ ...replies, [r.id]: draft[r.id].trim() }); }} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">Pubblica risposta</button>
+                  <button onClick={() => { if ((draft[r.id] ?? "").trim()) persistReplies({ ...replies, [r.id]: draft[r.id].trim() }); }} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">Pubblica risposta</button>
                 </div>
               </div>
             )}
           </Card>
         ))}
-        {connectedSources.length === 0 && <Card className="py-8 text-center text-sm text-faint">Collega una fonte (Google, Booking…) per importare qui le recensioni.</Card>}
-        {connectedSources.length > 0 && shown.length === 0 && <Card className="py-8 text-center text-sm text-faint">Nessuna recensione ancora: verranno importate dalle fonti collegate.</Card>}
+        {reviews.length === 0 && (
+          <Card className="py-8 text-center text-sm text-faint">
+            {keyMissing
+              ? "Configura GOOGLE_PLACES_API_KEY e incolla il Place ID per importare le recensioni Google, oppure aggiungine una a mano."
+              : placeId
+              ? "Nessuna recensione ancora: verranno importate da Google, oppure aggiungine una a mano."
+              : "Incolla il Place ID di Google per importare le recensioni, oppure aggiungine una a mano."}
+          </Card>
+        )}
+        {reviews.length > 0 && shown.length === 0 && <Card className="py-8 text-center text-sm text-faint">Nessuna recensione per questa fonte.</Card>}
       </div>
-      <p className="mt-3 text-[11px] text-faint">Le recensioni vengono importate dalle fonti collegate (Google, Booking, Tripadvisor…). Il collegamento reale alle API verrà attivato con il white-label.</p>
+
+      <p className="mt-3 text-[11px] text-faint">Google è collegato via Google Places API (recensioni reali, ~5 più recenti). Le altre fonti (Booking, Airbnb, Expedia, Tripadvisor) avranno il collegamento partner: nel frattempo puoi inserirle a mano.</p>
     </div>
   );
 }

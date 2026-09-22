@@ -6,6 +6,7 @@
 // l'animazione è decorativa. Sfondo scuro "neural" per un effetto scenografico.
 import { useEffect, useRef, useMemo } from "react";
 import AssistantCore from "./AssistantCore";
+import { useTheme } from "@/lib/theme";
 
 export interface ShellInput { label: string; value: string; tone: string; q?: string }
 type CoreState = "idle" | "listen" | "speak";
@@ -26,6 +27,9 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 200, on
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputsRef = useRef(inputs);
   useEffect(() => { inputsRef.current = inputs; }, [inputs]);
+  // Versione CHIARA in tema chiaro, CONSOLE SCURA in tema scuro.
+  const { theme } = useTheme();
+  const light = theme !== "dark";
 
   // Divide le card tra colonna sinistra e destra (il core resta al centro).
   const { left, right } = useMemo(() => {
@@ -83,7 +87,7 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 200, on
       const drawSide = (arr: { x: number; y: number }[]) => {
         arr.forEach((a, i) => {
           const col = flowCols[i % flowCols.length];
-          ctx.strokeStyle = rgba(col, 0.28); ctx.lineWidth = 1.3;
+          ctx.strokeStyle = rgba(col, light ? 0.42 : 0.28); ctx.lineWidth = 1.3;
           ctx.beginPath();
           for (let t = 0; t <= 1; t += 0.05) { const p = bez(a, C, t); if (t === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); }
           ctx.stroke();
@@ -115,22 +119,22 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 200, on
       // Alone del core (assorbimento)
       const glow = 0.6 + 0.4 * Math.sin(tk * (state === "listen" ? 4 : state === "speak" ? 3 : 1.6));
       const g = ctx.createRadialGradient(C.x, C.y, 0, C.x, C.y, coreSize * 0.75);
-      g.addColorStop(0, rgba(focus, 0.16 * glow)); g.addColorStop(1, rgba(focus, 0));
+      g.addColorStop(0, rgba(focus, (light ? 0.12 : 0.16) * glow)); g.addColorStop(1, rgba(focus, 0));
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(C.x, C.y, coreSize * 0.75, 0, Math.PI * 2); ctx.fill();
 
       if (!reduce) raf = requestAnimationFrame(draw);
     };
     draw();
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
-  }, [state, coreSize]);
+  }, [state, coreSize, light]);
 
   const mono = "font-mono";
   const tile = (it: ShellInput, align: "left" | "right") => (
     <button key={it.label} data-tile data-side={align === "left" ? "l" : "r"} onClick={() => it.q && onInput?.(it.q)}
-      className={`pointer-events-auto group rounded-xl border border-white/10 bg-white/[0.06] px-3.5 py-3 backdrop-blur-md transition hover:border-white/30 hover:bg-white/[0.12] ${align === "right" ? "text-right" : "text-left"}`}
-      style={{ boxShadow: "0 2px 14px rgba(0,0,0,.28)" }}>
-      <div className={`${mono} text-[9.5px] font-semibold uppercase tracking-wider`} style={{ color: "rgba(200,214,240,.65)" }}>{it.label}</div>
-      <div className={`${mono} mt-0.5 text-xl font-bold leading-tight`} style={{ color: it.tone, textShadow: `0 0 16px ${it.tone}55` }}>{it.value}</div>
+      className={`pointer-events-auto group rounded-xl border px-3.5 py-3 backdrop-blur-md transition ${light ? "border-black/10 bg-white/70 hover:border-black/25 hover:bg-white/90" : "border-white/10 bg-white/[0.06] hover:border-white/30 hover:bg-white/[0.12]"} ${align === "right" ? "text-right" : "text-left"}`}
+      style={{ boxShadow: light ? "0 2px 14px rgba(30,45,80,.10)" : "0 2px 14px rgba(0,0,0,.28)" }}>
+      <div className={`${mono} text-[9.5px] font-semibold uppercase tracking-wider`} style={{ color: light ? "rgba(60,75,110,.72)" : "rgba(200,214,240,.65)" }}>{it.label}</div>
+      <div className={`${mono} mt-0.5 text-xl font-bold leading-tight`} style={{ color: it.tone, textShadow: light ? "none" : `0 0 16px ${it.tone}55` }}>{it.value}</div>
     </button>
   );
 
@@ -139,13 +143,13 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 200, on
   const minH = Math.max(460, 64 + rows * 82);
 
   return (
-    <div ref={wrapRef} className="relative w-full overflow-hidden rounded-2xl border" style={{ minHeight: minH, borderColor: "rgba(120,140,190,.18)", background: "radial-gradient(120% 90% at 50% 40%, #101827 0%, #0a0f1a 55%, #070b13 100%)" }}>
+    <div ref={wrapRef} className="relative w-full overflow-hidden rounded-2xl border" style={{ minHeight: minH, borderColor: light ? "rgba(120,140,190,.32)" : "rgba(120,140,190,.18)", background: light ? "radial-gradient(120% 90% at 50% 40%, #ffffff 0%, #f2f5fa 55%, #e9edf4 100%)" : "radial-gradient(120% 90% at 50% 40%, #101827 0%, #0a0f1a 55%, #070b13 100%)" }}>
       <canvas ref={canvasRef} className="pointer-events-none absolute inset-0" aria-hidden />
 
       {/* Intestazione stile terminale */}
       <div className="relative flex items-center justify-between px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.16em]">
-        <span className={mono} style={{ color: "rgba(180,198,230,.75)" }}>XENORA · NEURAL SHELL</span>
-        <span className={`${mono} inline-flex items-center gap-1.5`} style={{ color: "#2dd4bf" }}><span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: "#2dd4bf", boxShadow: "0 0 8px #2dd4bf" }} />{state === "listen" ? "ASCOLTO" : state === "speak" ? "OUTPUT" : "LIVE"}</span>
+        <span className={mono} style={{ color: light ? "rgba(45,60,95,.72)" : "rgba(180,198,230,.75)" }}>XENORA · NEURAL SHELL</span>
+        <span className={`${mono} inline-flex items-center gap-1.5`} style={{ color: light ? "#0d9488" : "#2dd4bf" }}><span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: light ? "#0d9488" : "#2dd4bf", boxShadow: light ? "0 0 8px #0d948866" : "0 0 8px #2dd4bf" }} />{state === "listen" ? "ASCOLTO" : state === "speak" ? "OUTPUT" : "LIVE"}</span>
       </div>
 
       {/* Colonna sinistra (niente scrollbar: l'altezza si adatta) */}

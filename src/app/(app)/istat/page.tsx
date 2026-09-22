@@ -58,6 +58,17 @@ export default function IstatPage() {
   };
 
   const pending = rows.filter((r) => r.stato === "pending").length;
+  // Export CSV del movimento (utilizzabile subito: riconciliazione/caricamento manuale sul portale regionale).
+  const exportCsv = () => {
+    const head = ["Arrivo", "Partenza", "Provenienza", "Ospiti", "Stato"];
+    const esc = (v: unknown) => { const s = String(v ?? ""); return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const lines = [head.join(";"), ...rows.map((r) => [r.arrival, r.departure, r.provenance, r.guests, STA(r.stato).l].map(esc).join(";"))];
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const st = structures.find((x) => x.id === sid);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `movimento-istat-${(st?.name || "struttura").replace(/[^A-Za-z0-9_-]/g, "_")}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(a.href);
+  };
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
 
@@ -88,6 +99,7 @@ export default function IstatPage() {
           <div className="mb-2 flex flex-wrap gap-2">
             <button onClick={() => call("sync", "sync")} disabled={!!busy} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "sync" ? "Sincronizzo…" : "Sincronizza dagli arrivi"}</button>
             <button onClick={() => call("close", "close")} disabled={!!busy || pending === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "close" ? "Invio…" : `Invia / chiudi (${pending})`}</button>
+            <button onClick={exportCsv} disabled={rows.length === 0} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Scarica il movimento in CSV per caricarlo/riconciliarlo sul portale regionale">↓ Scarica CSV</button>
           </div>
           <div className="max-h-[52vh] overflow-y-auto">
             {rows.map((r) => { const st = STA(r.stato); return (
