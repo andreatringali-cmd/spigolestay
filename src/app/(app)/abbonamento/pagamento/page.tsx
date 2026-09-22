@@ -38,13 +38,34 @@ export default function PagamentoPage() {
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(b)); } catch {} setSaved(true); window.setTimeout(() => setSaved(false), 2000); };
 
   // Aggiungi/gestisci carta: la carta è gestita da Stripe (non passa dall'app).
+  const openPortal = async (cid: string) => {
+    const res = await fetch("/api/stripe/portal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ customerId: cid }) });
+    return res.json().catch(() => ({} as { url?: string; message?: string; error?: string }));
+  };
   const addCard = async () => {
     setNotice("");
     if (!customer) { setNotice(t("Per aggiungere la carta scegli prima un piano: la carta si inserisce al pagamento (gestito da Stripe).")); setTimeout(() => router.push("/abbonamento"), 1400); return; }
     setBusy(true);
     try {
-      const res = await fetch("/api/stripe/portal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ customerId: customer }) });
-      const d = await res.json().catch(() => ({}));
+      let d = await openPortal(customer);
+      // ID cliente obsoleto (creato in un'altra modalità/account Stripe): azzera, ri-cerca per email, riprova.
+      if (!d?.url && /no such customer/i.test(String(d?.message || ""))) {
+        try { localStorage.removeItem("spigolestay:stripecustomer"); } catch {}
+        setCustomer(null);
+        let found: string | null = null;
+        if (user?.email) {
+          const look = await fetch(`/api/stripe/customer?email=${encodeURIComponent(user.email)}`).then((r) => r.json()).catch(() => ({}));
+          if (look?.customerId && look.customerId !== customer) found = look.customerId as string;
+        }
+        if (found) {
+          setCustomer(found); try { localStorage.setItem("spigolestay:stripecustomer", found); } catch {}
+          d = await openPortal(found);
+        } else {
+          setNotice(t("Non risulta ancora un cliente Stripe per questo account: attiva un piano per creare il metodo di pagamento."));
+          setTimeout(() => router.push("/abbonamento"), 1600);
+          setBusy(false); return;
+        }
+      }
       if (d?.url) { window.location.href = d.url; return; }
       setNotice(d?.message ? `${t("Non è stato possibile aprire il portale pagamenti.")} (${d.message})` : t("Non è stato possibile aprire il portale pagamenti. Riprova."));
     } catch { setNotice(t("Errore di rete. Riprova.")); }

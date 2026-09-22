@@ -8,7 +8,7 @@ import { useEffect, useRef, useMemo } from "react";
 import AssistantCore from "./AssistantCore";
 import { useTheme } from "@/lib/theme";
 
-export interface ShellInput { label: string; value: string; tone: string; q?: string }
+export interface ShellInput { label: string; value: string; tone: string; q?: string; spark?: number[] }
 type CoreState = "idle" | "listen" | "speak";
 
 function rgba(hex: string, a: number) {
@@ -139,6 +139,14 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 200, on
       style={{ boxShadow: light ? "0 2px 14px rgba(30,45,80,.10)" : "0 2px 14px rgba(0,0,0,.28)" }}>
       <div className={`${mono} text-[9.5px] font-semibold uppercase tracking-wider`} style={{ color: light ? "rgba(90,93,99,.75)" : "rgba(200,214,240,.65)" }}>{it.label}</div>
       <div className={`${mono} mt-0.5 text-xl font-bold leading-tight`} style={{ color: it.tone, textShadow: light ? "none" : `0 0 16px ${it.tone}55` }}>{it.value}</div>
+      {it.spark && it.spark.length > 1 && (() => {
+        const max = Math.max(1, ...it.spark!); const n = it.spark!.length; const w = n * 4;
+        return (
+          <svg viewBox={`0 0 ${w} 22`} preserveAspectRatio="none" className="mt-1.5 h-5 w-full" aria-hidden>
+            {it.spark!.map((v, i) => { const h = Math.max(1.2, (v / max) * 20); return <rect key={i} x={i * 4 + (align === "right" ? 1 : 0)} y={22 - h} width={2.6} height={h} rx={0.8} fill={it.tone} opacity={0.28 + 0.6 * (v / max)} />; })}
+          </svg>
+        );
+      })()}
     </button>
   );
 

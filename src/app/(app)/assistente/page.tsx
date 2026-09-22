@@ -212,21 +212,29 @@ export default function AssistentePage() {
     const unpaid = active.filter((b) => { const tot = bookingGrandTotal(b, getStructure(b.structureId)); return tot > 0 && (b.paid ?? 0) < tot - 0.01; }).length;
     const cityTaxDue = active.filter((b) => b.checkOut >= t && !b.cityTaxPaid).length;
     const weekArr = active.filter((b) => b.checkIn > t && b.checkIn <= new Date(Date.parse(t) + 7 * 86400000).toISOString().slice(0, 10)).length;
+    // ── Serie giornaliere reali per i mini-grafici (stile HUD) ──
+    const dayISO = (off: number) => { const d = new Date(t + "T00:00:00"); d.setDate(d.getDate() + off); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+    const arrNext7 = Array.from({ length: 7 }, (_, i) => { const day = dayISO(i); return active.filter((b) => b.checkIn === day).length; });
+    const depNext7 = Array.from({ length: 7 }, (_, i) => { const day = dayISO(i); return active.filter((b) => b.checkOut === day).length; });
+    const inHouse7 = Array.from({ length: 7 }, (_, i) => { const day = dayISO(i); return active.filter((b) => b.checkIn <= day && day < b.checkOut && b.unitId).length; });
+    const occ14 = Array.from({ length: 14 }, (_, i) => { const day = dayISO(i); const occ = active.filter((b) => b.checkIn <= day && day < b.checkOut && b.unitId).length; return totUnits > 0 ? Math.round((occ / totUnits) * 100) : 0; });
+    const arrLast14 = Array.from({ length: 14 }, (_, i) => { const day = dayISO(i - 13); return active.filter((b) => b.checkIn === day).length; });
+    const revLast6mo = Array.from({ length: 6 }, (_, i) => { const d = new Date(t + "T00:00:00"); d.setMonth(d.getMonth() - (5 - i)); const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; return Math.round(active.filter((b) => monthOf(b.checkIn) === m).reduce((a, b) => a + bookingGrandTotal(b, getStructure(b.structureId)), 0)); });
     return [
-      { label: "Arrivi oggi", value: String(answers.arrivalsToday.length), tone: "var(--ok)", q: "arrivi oggi" },
-      { label: "Partenze oggi", value: String(answers.departuresToday.length), tone: "var(--warn)", q: "partenze" },
-      { label: "In casa ora", value: String(inHouse.length), tone: "#38bdf8", q: "chi è in casa" },
+      { label: "Arrivi oggi", value: String(answers.arrivalsToday.length), tone: "var(--ok)", q: "arrivi oggi", spark: arrNext7 },
+      { label: "Partenze oggi", value: String(answers.departuresToday.length), tone: "var(--warn)", q: "partenze", spark: depNext7 },
+      { label: "In casa ora", value: String(inHouse.length), tone: "#38bdf8", q: "chi è in casa", spark: inHouse7 },
       { label: "Check-in mancanti", value: String(answers.noCheckin.length), tone: "var(--focus)", q: "check-in mancanti" },
       { label: "Camere da pulire", value: String(cleanUnits.size), tone: "#a78bfa", q: "pulizie" },
-      { label: "Occupazione oggi", value: `${occPct}%`, tone: occPct >= 80 ? "var(--ok)" : occPct >= 40 ? "var(--warn)" : "var(--err)", q: "occupazione" },
-      { label: "Arrivi 7 giorni", value: String(weekArr), tone: "#2dd4bf", q: "prossimi arrivi" },
+      { label: "Occupazione oggi", value: `${occPct}%`, tone: occPct >= 80 ? "var(--ok)" : occPct >= 40 ? "var(--warn)" : "var(--err)", q: "occupazione", spark: occ14 },
+      { label: "Arrivi 7 giorni", value: String(weekArr), tone: "#2dd4bf", q: "prossimi arrivi", spark: arrNext7 },
       { label: "Prossimo arrivo", value: nextLabel, tone: "#38bdf8", q: "prossimo arrivo" },
-      { label: "Prenotazioni mese", value: String(monthArr.length), tone: "var(--focus)", q: "prenotazioni del mese" },
+      { label: "Prenotazioni mese", value: String(monthArr.length), tone: "var(--focus)", q: "prenotazioni del mese", spark: arrLast14 },
       { label: "Da incassare", value: dueCents != null ? eur(dueCents / 100) : "—", tone: "var(--err)", q: "da incassare" },
       { label: "Prenotazioni non saldate", value: String(unpaid), tone: "var(--warn)", q: "da incassare" },
       { label: "Tassa soggiorno da incassare", value: String(cityTaxDue), tone: "#f59e0b", q: "tassa di soggiorno" },
       { label: "Incassato mese", value: answers.incassato.value ?? "—", tone: "var(--ok)", q: "incassato" },
-      { label: "Ricavo previsto", value: answers.ricavo.value ?? "—", tone: "var(--focus)", q: "ricavo" },
+      { label: "Ricavo previsto", value: answers.ricavo.value ?? "—", tone: "var(--focus)", q: "ricavo", spark: revLast6mo },
     ];
   }, [answers, dueCents, active, t, ym, units, getStructure]);
 
