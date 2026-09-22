@@ -26,7 +26,6 @@ const MANUAL_SOURCES = SOURCES.filter((s) => s.k !== "google");
 
 const PLACEID_KEY = (structureId: string) => `spigolestay:reviews:placeid:${structureId}`;
 const MANUAL_KEY = "spigolestay:reviews:manual";
-const PLACE_ID_FINDER = "https://developers.google.com/maps/documentation/places/web-service/place-id";
 
 type ManualReview = NormalizedReview; // stessa forma; source ≠ "google"
 
@@ -49,6 +48,7 @@ export default function RecensioniPage() {
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<"all" | SourceKey>("all");
+  const [ratingFilter, setRatingFilter] = useState<"all" | "pos" | "neu" | "neg">("all");
 
   // Struttura selezionata per configurazione/visualizzazione recensioni.
   const [selStructureId, setSelStructureId] = useState<string>("");
@@ -101,6 +101,7 @@ export default function RecensioniPage() {
   };
   const clearPlaceId = () => { setPlaceId(""); setPlaceIdInput(""); try { localStorage.removeItem(PLACEID_KEY(selStructureId)); } catch {} };
 
+  const [cfgOpen, setCfgOpen] = useState(false); // finestra di configurazione Google (ricerca + Place ID)
   // Ricerca automatica della struttura su Google → candidati con Place ID (niente ricerca manuale).
   const [findQ, setFindQ] = useState("");
   const [finding, setFinding] = useState(false);
@@ -175,7 +176,9 @@ export default function RecensioniPage() {
     return SOURCES.filter((s) => set.has(s.k)).map((s) => s.k);
   }, [googleConnected, manualReviews]);
 
-  const shown = filter === "all" ? reviews : reviews.filter((r) => r.source === filter);
+  const shown = reviews
+    .filter((r) => filter === "all" || r.source === filter)
+    .filter((r) => ratingFilter === "all" || r.bucket === ratingFilter);
   const avg = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : (google.rating ?? 0);
   const totalCount = google.total && googleConnected ? google.total : reviews.length;
   const unanswered = reviews.filter((r) => !replies[r.id]).length;
@@ -201,6 +204,25 @@ export default function RecensioniPage() {
   };
   const removeManual = (id: string) => persistManual(manual.filter((m) => m.id !== id));
 
+  // Risposta AI REALE (Claude): personalizzata sul testo/voto; fallback al template se non disponibile.
+  const [aiBusy, setAiBusy] = useState<Record<string, boolean>>({});
+  const structureName = structures.find((s) => s.id === selStructureId)?.name || "la struttura";
+  const aiReply = async (r: Review) => {
+    setAiBusy((b) => ({ ...b, [r.id]: true }));
+    try {
+      const token = supabase ? (await supabase.auth.getSession())?.data.session?.access_token : undefined;
+      const res = await fetch("/api/reviews/reply", { method: "POST", headers: { "content-type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ guest: r.guest, rating: r.rating, text: r.text, structureName, source: r.source }) });
+      const j = await res.json().catch(() => ({}));
+      setDraft((d) => ({ ...d, [r.id]: j?.ok && j.reply ? j.reply : suggest(r) }));
+    } catch { setDraft((d) => ({ ...d, [r.id]: suggest(r) })); }
+    finally { setAiBusy((b) => ({ ...b, [r.id]: false })); }
+  };
+  // Bridge per pubblicare su Google: copia la risposta e apre la gestione recensioni di Google Business.
+  const publishOnGoogle = (id: string) => {
+    try { navigator.clipboard?.writeText(replies[id] || "").catch(() => {}); } catch {}
+    window.open("https://business.google.com/reviews", "_blank", "noopener");
+  };
+
   const suggest = (r: { guest: string; bucket: string }) => {
     const first = r.guest.split(" ")[0];
     if (r.bucket === "pos") return `Grazie di cuore ${first}! Siamo felicissimi che il soggiorno sia stato all'altezza. Ti aspettiamo di nuovo a Siracusa — alla prossima con una sorpresa riservata a chi torna. 🌊`;
@@ -225,12 +247,17 @@ export default function RecensioniPage() {
       <Card className="mb-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <SectionTitle>Recensioni Google</SectionTitle>
-          {/* Il menu struttura serve solo quando in alto è selezionato "Tutte": se è già scelta una struttura, la seguiamo e nascondiamo il doppione. */}
-          {structures.length > 1 && activeStructureId === "all" && (
-            <select value={selStructureId} onChange={(e) => setSelStructureId(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1 text-xs font-semibold text-txt outline-none focus:border-focus">
-              {structures.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
-            </select>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Il menu struttura serve solo quando in alto è selezionato "Tutte". */}
+            {structures.length > 1 && activeStructureId === "all" && (
+              <select value={selStructureId} onChange={(e) => setSelStructureId(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1 text-xs font-semibold text-txt outline-none focus:border-focus">
+                {structures.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+              </select>
+            )}
+            <button onClick={() => { setCandidates(null); setCfgOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">
+              <Icon name="settings" size={14} /> {placeId ? "Modifica" : "Collega Google"}
+            </button>
+          </div>
         </div>
 
         {keyMissing ? (
@@ -244,50 +271,6 @@ export default function RecensioniPage() {
             </div>
           </div>
         ) : null}
-
-        {/* Ricerca automatica: trova la struttura su Google e imposta il Place ID senza cercarlo a mano */}
-        <div className="mt-3">
-          <label className="text-[11px] font-semibold uppercase tracking-wide text-faint">Trova la tua struttura su Google</label>
-          <div className="mt-1 flex flex-wrap gap-2">
-            <input
-              value={findQ}
-              onChange={(e) => setFindQ(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") runFind(); }}
-              placeholder="es. Spigolehouse Siracusa"
-              className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus"
-            />
-            <button onClick={runFind} disabled={finding} className="rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{finding ? "Cerco…" : "Cerca"}</button>
-          </div>
-          {candidates && (
-            <div className="mt-2 space-y-1.5">
-              {candidates.length === 0 && <p className="text-[12px] text-faint">Nessun risultato. Prova col nome esatto + città, oppure incolla il Place ID sotto.</p>}
-              {candidates.map((c) => (
-                <button key={c.id} onClick={() => pickCandidate(c.id)} className="flex w-full items-center justify-between gap-3 rounded-lg border border-line bg-paper px-3 py-2 text-left transition hover:border-focus hover:bg-wash">
-                  <span className="min-w-0"><span className="block truncate text-sm font-semibold text-txt">{c.name}</span>{c.address && <span className="block truncate text-[11px] text-faint">{c.address}</span>}</span>
-                  <span className="shrink-0 text-xs font-semibold text-focus">Usa questa →</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="mt-3">
-          <label className="text-[11px] font-semibold uppercase tracking-wide text-faint">Google Place ID {selStructureId && structures.find((s) => s.id === selStructureId) ? `· ${structures.find((s) => s.id === selStructureId)?.name}` : ""}</label>
-          <div className="mt-1 flex flex-wrap gap-2">
-            <input
-              value={placeIdInput}
-              onChange={(e) => setPlaceIdInput(e.target.value)}
-              placeholder="es. ChIJ...."
-              className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 font-mono text-sm text-txt outline-none focus:border-focus"
-            />
-            <button onClick={savePlaceId} disabled={!selStructureId || placeIdInput.trim() === placeId} className="rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">Salva</button>
-            {placeId ? <button onClick={clearPlaceId} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-dim hover:bg-wash">Rimuovi</button> : null}
-          </div>
-          <p className="mt-1.5 text-[11px] text-faint">
-            Non conosci il Place ID? Trovalo con il <a href={PLACE_ID_FINDER} target="_blank" rel="noopener noreferrer" className="font-semibold text-focus hover:underline">Google Place ID Finder</a> cercando il nome della struttura.
-            {" "}Google Places espone solo le <strong>~5 recensioni più recenti</strong>: la media e il numero totale restano completi, l&apos;elenco è parziale.
-          </p>
-        </div>
 
         {/* Stato collegamento Google */}
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
@@ -309,6 +292,59 @@ export default function RecensioniPage() {
           ) : null}
         </div>
       </Card>
+
+      {/* Finestra di configurazione Google: ricerca struttura + Place ID */}
+      {cfgOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setCfgOpen(false)}>
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="font-display text-lg font-bold text-txt">Collega Google</div>
+                <div className="mt-0.5 text-xs text-dim">Trova la struttura o incolla il Place ID{selStructureId && structures.find((s) => s.id === selStructureId) ? ` · ${structures.find((s) => s.id === selStructureId)?.name}` : ""}</div>
+              </div>
+              <button onClick={() => setCfgOpen(false)} className="rounded-lg p-1 text-faint hover:bg-wash hover:text-txt">✕</button>
+            </div>
+
+            {keyMissing && (
+              <div className="mt-3 rounded-lg border p-3 text-sm" style={{ borderColor: "var(--warn)", background: "color-mix(in srgb, var(--warn) 8%, transparent)" }}>
+                <div className="font-semibold text-txt">Import Google non ancora attivo</div>
+                <p className="mt-0.5 text-dim">Serve <code className="rounded bg-wash px-1 py-0.5 font-mono text-[11px]">GOOGLE_PLACES_API_KEY</code> lato server. Una volta impostata, cerca la struttura o incolla il Place ID.</p>
+              </div>
+            )}
+
+            {/* Ricerca automatica */}
+            <div className="mt-3">
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-faint">Trova la tua struttura</label>
+              <div className="mt-1 flex flex-wrap gap-2">
+                <input value={findQ} onChange={(e) => setFindQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") runFind(); }} placeholder="es. Spigolehouse Siracusa" className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+                <button onClick={runFind} disabled={finding} className="rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{finding ? "Cerco…" : "Cerca"}</button>
+              </div>
+              {candidates && (
+                <div className="mt-2 space-y-1.5">
+                  {candidates.length === 0 && <p className="text-[12px] text-faint">Nessun risultato. Prova col nome esatto + città, oppure incolla il Place ID sotto.</p>}
+                  {candidates.map((c) => (
+                    <button key={c.id} onClick={() => { pickCandidate(c.id); setCfgOpen(false); }} className="flex w-full items-center justify-between gap-3 rounded-lg border border-line bg-paper px-3 py-2 text-left transition hover:border-focus hover:bg-wash">
+                      <span className="min-w-0"><span className="block truncate text-sm font-semibold text-txt">{c.name}</span>{c.address && <span className="block truncate text-[11px] text-faint">{c.address}</span>}</span>
+                      <span className="shrink-0 text-xs font-semibold text-focus">Usa questa →</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Place ID manuale */}
+            <div className="mt-4 border-t border-line pt-3">
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-faint">Oppure incolla il Google Place ID</label>
+              <div className="mt-1 flex flex-wrap gap-2">
+                <input value={placeIdInput} onChange={(e) => setPlaceIdInput(e.target.value)} placeholder="es. ChIJ...." className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 font-mono text-sm text-txt outline-none focus:border-focus" />
+                <button onClick={() => { savePlaceId(); setCfgOpen(false); }} disabled={!selStructureId || placeIdInput.trim() === placeId} className="rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">Salva</button>
+                {placeId ? <button onClick={clearPlaceId} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-dim hover:bg-wash">Rimuovi</button> : null}
+              </div>
+              <p className="mt-1.5 text-[11px] text-faint">Google Places espone solo le <strong>~5 recensioni più recenti</strong>: media e totale restano completi, l&apos;elenco è parziale.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2">
         <Card><SectionTitle>Media per fonte</SectionTitle><div className="space-y-2">{bySource.length === 0 ? <p className="text-sm text-faint">Nessuna recensione ancora.</p> : bySource.map((x) => (<div key={x.c} className="flex items-center gap-2"><span className="w-24 text-sm text-txt">{SRC[x.c].label}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${x.avg * 10}%`, backgroundColor: SRC[x.c].color }} /></div><span className="w-16 text-right font-mono text-sm font-semibold text-txt">{x.avg.toFixed(1)} <span className="text-[10px] text-faint">({x.n})</span></span></div>))}</div></Card>
@@ -349,6 +385,14 @@ export default function RecensioniPage() {
           <button key={c} onClick={() => setFilter(c)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${filter === c ? "text-white" : "text-dim hover:bg-wash"}`} style={filter === c ? { backgroundColor: SRC[c].color } : undefined}>{SRC[c].label}</button>
         ))}
         <button onClick={() => setShowManual((v) => !v)} className="ml-auto flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash"><Icon name="plus" size={13} /> Aggiungi a mano</button>
+      </div>
+
+      {/* Filtro per punteggio */}
+      <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
+        <span className="mr-1 text-xs font-semibold text-faint">Punteggio:</span>
+        {([["all", "Tutte", "var(--focus)"], ["pos", "Positive (8-10)", "var(--ok)"], ["neu", "Neutre (6-7)", "var(--warn)"], ["neg", "Negative (<6)", "var(--err)"]] as const).map(([k, label, col]) => (
+          <button key={k} onClick={() => setRatingFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${ratingFilter === k ? "text-white" : "text-dim hover:bg-wash"}`} style={ratingFilter === k ? { backgroundColor: col } : undefined}>{label}</button>
+        ))}
       </div>
 
       {/* Form inserimento manuale */}
@@ -401,12 +445,17 @@ export default function RecensioniPage() {
             </div>
             {r.text && <p className="mt-2 text-sm text-txt">{r.text}</p>}
             {replies[r.id] ? (
-              <div className="mt-2 rounded-lg border border-line bg-wash p-2.5 text-sm text-dim"><span className="text-[10px] font-semibold uppercase tracking-wide text-faint">La tua risposta</span><div className="mt-0.5 text-txt">{replies[r.id]}</div><button onClick={() => { const n = { ...replies }; delete n[r.id]; persistReplies(n); }} className="mt-1 text-[11px] text-faint hover:text-[color:var(--err)]">Rimuovi</button></div>
+              <div className="mt-2 rounded-lg border border-line bg-wash p-2.5 text-sm text-dim"><span className="text-[10px] font-semibold uppercase tracking-wide text-faint">La tua risposta</span><div className="mt-0.5 text-txt">{replies[r.id]}</div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  {r.source === "google" && <button onClick={() => publishOnGoogle(r.id)} className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-surface" title="Copia la risposta e apri la gestione recensioni di Google">📋 Copia e rispondi su Google →</button>}
+                  <button onClick={() => { const n = { ...replies }; delete n[r.id]; persistReplies(n); }} className="text-[11px] text-faint hover:text-[color:var(--err)]">Rimuovi</button>
+                </div>
+              </div>
             ) : (
               <div className="mt-2">
                 <textarea value={draft[r.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [r.id]: e.target.value }))} rows={2} placeholder="Scrivi una risposta…" className="w-full resize-y rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
                 <div className="mt-1.5 flex gap-2">
-                  <button onClick={() => setDraft((d) => ({ ...d, [r.id]: suggest(r) }))} className="flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash"><Icon name="sparkles" size={13} /> Suggerisci risposta AI</button>
+                  <button onClick={() => aiReply(r)} disabled={!!aiBusy[r.id]} className="flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-50"><Icon name="sparkles" size={13} /> {aiBusy[r.id] ? "Scrivo…" : "Suggerisci risposta AI"}</button>
                   <button onClick={() => { if ((draft[r.id] ?? "").trim()) persistReplies({ ...replies, [r.id]: draft[r.id].trim() }); }} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">Pubblica risposta</button>
                 </div>
               </div>
