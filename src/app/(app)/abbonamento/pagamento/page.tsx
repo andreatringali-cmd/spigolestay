@@ -4,7 +4,6 @@
 // Stripe e NON passano dall'app: qui si mostra solo lo stato e i dati di fatturazione.
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
@@ -15,7 +14,6 @@ const empty: Billing = { businessName: "", vat: "", taxCode: "", address: "", st
 
 export default function PagamentoPage() {
   const { t } = useLang();
-  const router = useRouter();
   const { user } = useAuth();
   const [b, setB] = useState<Billing>(empty);
   const [saved, setSaved] = useState(false);
@@ -48,7 +46,7 @@ export default function PagamentoPage() {
   };
   const addCard = async () => {
     setNotice("");
-    if (!customer) { setNotice(t("Per aggiungere la carta scegli prima un piano: la carta si inserisce al pagamento (gestito da Stripe).")); setTimeout(() => router.push("/abbonamento"), 1400); return; }
+    if (!customer) { setNotice(t("Non hai ancora un abbonamento Xenora attivo: la carta si imposta al momento dell'attivazione di un piano. Vai su «Abbonamento» per scegliere il piano.")); return; }
     setBusy(true);
     try {
       let d = await openPortal(customer);
@@ -65,8 +63,7 @@ export default function PagamentoPage() {
           setCustomer(found); try { localStorage.setItem("spigolestay:stripecustomer", found); } catch {}
           d = await openPortal(found);
         } else {
-          setNotice(t("Non risulta ancora un cliente Stripe per questo account: attiva un piano per creare il metodo di pagamento."));
-          setTimeout(() => router.push("/abbonamento"), 1600);
+          setNotice(t("Non risulta ancora un cliente Stripe per l'abbonamento Xenora: attiva un piano da «Abbonamento» per creare il metodo di pagamento."));
           setBusy(false); return;
         }
       }
