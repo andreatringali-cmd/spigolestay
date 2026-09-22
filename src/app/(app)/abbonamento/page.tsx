@@ -97,7 +97,7 @@ export default function AbbonamentoPage() {
   const [pendingAddon, setPendingAddon] = useState<string | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [stripeCustomer, setStripeCustomer] = useState<string | null>(null);
+  const [hasRealSub, setHasRealSub] = useState(false); // abbonamento Stripe REALE attivo (non solo il flag locale)
   useEffect(() => {
     try {
       const r = localStorage.getItem("spigolestay:plan") || localStorage.getItem("spigolestay:tier");
@@ -126,7 +126,6 @@ export default function AbbonamentoPage() {
 
   // Stripe: cliente salvato + gestione del ritorno dal pagamento.
   useEffect(() => {
-    try { const c = localStorage.getItem("spigolestay:stripecustomer"); if (c) setStripeCustomer(c); } catch {}
     try {
       const sp = new URLSearchParams(window.location.search);
       const co = sp.get("checkout");
@@ -137,7 +136,7 @@ export default function AbbonamentoPage() {
             .then((r) => r.json())
             .then((d) => {
               if (d?.plan) choose(d.plan);
-              if (d?.customerId) { try { localStorage.setItem("spigolestay:stripecustomer", d.customerId); } catch {} setStripeCustomer(d.customerId); }
+              if (d?.customerId) { try { localStorage.setItem("spigolestay:stripecustomer", d.customerId); } catch {} }
               setNotice("Abbonamento attivato ✅ Grazie! La prova di 5 giorni è iniziata.");
             })
             .catch(() => setNotice("Pagamento ricevuto. Aggiornamento in corso…"));
@@ -151,17 +150,22 @@ export default function AbbonamentoPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Recupera il cliente Stripe dall'email se non è memorizzato: così l'app riconosce una carta
-  // già salvata (anche aggiunta fuori dall'app) e il cambio piano non richiede un nuovo pagamento.
+  // Stato autorevole dal server: cliente + abbonamento XENORA reale (filtrato per metadata plan/userId).
+  // Se non c'è un abbonamento reale, hasRealSub = false → i piani si attivano con un PAGAMENTO vero.
   useEffect(() => {
-    if (stripeCustomer || !user?.email) return;
+    if (!user?.email) return;
     let cancel = false;
-    fetch(`/api/stripe/customer?email=${encodeURIComponent(user.email)}`)
+    fetch(`/api/stripe/customer?email=${encodeURIComponent(user.email)}${user.id ? `&userId=${encodeURIComponent(user.id)}` : ""}`)
       .then((r) => r.json())
-      .then((d) => { if (!cancel && d?.customerId) { setStripeCustomer(d.customerId); try { localStorage.setItem("spigolestay:stripecustomer", d.customerId); } catch {} } })
+      .then((d) => {
+        if (cancel) return;
+        const active = d?.subscriptionStatus === "active" || d?.subscriptionStatus === "trialing" || d?.subscriptionStatus === "past_due";
+        if (d?.customerId && active) { setHasRealSub(true); try { localStorage.setItem("spigolestay:stripecustomer", d.customerId); } catch {} }
+        else { setHasRealSub(false); try { localStorage.removeItem("spigolestay:stripecustomer"); } catch {} }
+      })
       .catch(() => {});
     return () => { cancel = true; };
-  }, [user?.email, stripeCustomer]);
+  }, [user?.email, user?.id]);
 
   const startCheckout = async (planKey: string) => {
     setNotice(null); setCheckoutBusy(true);
@@ -240,7 +244,7 @@ export default function AbbonamentoPage() {
             <div key={tr.key} className={`flex flex-col rounded-xl border p-4 transition ${on ? "xn-active border-focus bg-surface ring-2 ring-[color:var(--focus)]" : "border-line"}`} style={on ? undefined : { boxShadow: tierShadow }}>
               <div className="flex items-center justify-between gap-2">
                 <span className="font-display text-lg font-bold text-txt">{tr.name}</span>
-                {on ? <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-2 py-0.5 text-[10px] font-bold uppercase text-focus">{t("Attivo")}</span>
+                {on ? <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-2 py-0.5 text-[10px] font-bold uppercase text-focus">{hasRealSub ? t("Attivo") : t("Selezionato")}</span>
                   : tr.key === suggested ? <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-bold uppercase text-dim">{t("Consigliato")}</span> : null}
               </div>
               <div className="mt-0.5 text-xs text-dim">{t(tr.tagline)}</div>
@@ -253,7 +257,7 @@ export default function AbbonamentoPage() {
                   <li key={m.key} className="flex items-start gap-1.5"><span className="text-[color:var(--ok)]">✓</span>{t(m.name)}</li>
                 ))}
               </ul>
-              <button onClick={() => setPendingTier(tr.key)} disabled={on} className={`mt-4 rounded-lg py-2 text-sm font-semibold transition ${on ? "cursor-default border border-line text-dim" : "bg-focus text-white hover:opacity-90"}`}>{on ? t("Piano attivo") : t("Scegli")} {tr.name}</button>
+              <button onClick={() => setPendingTier(tr.key)} disabled={on && hasRealSub} className={`mt-4 rounded-lg py-2 text-sm font-semibold transition ${on && hasRealSub ? "cursor-default border border-line text-dim" : "bg-focus text-white hover:opacity-90"}`}>{on && hasRealSub ? t("Piano attivo") : on ? `${t("Attiva")} ${tr.name}` : `${t("Scegli")} ${tr.name}`}</button>
             </div>
           );
         })}
@@ -419,12 +423,12 @@ export default function AbbonamentoPage() {
               </div>
               <div className="mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-[12px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 9%, transparent)", color: "var(--dim)" }}>
                 <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: "var(--focus)" }}>i</span>
-                <span>{stripeCustomer ? t("Hai già una carta salvata: il nuovo piano si attiva dal prossimo rinnovo, senza nuovo pagamento. L'addebito aggiornato parte dal prossimo mese.") : t("Il piano si attiva con un pagamento (prova gratuita di 5 giorni). Puoi disdire quando vuoi.")}</span>
+                <span>{hasRealSub ? t("Hai già una carta salvata: il nuovo piano si attiva dal prossimo rinnovo, senza nuovo pagamento. L'addebito aggiornato parte dal prossimo mese.") : t("Il piano si attiva con un pagamento (prova gratuita di 5 giorni). Puoi disdire quando vuoi.")}</span>
               </div>
               <p className="mt-2 text-[11px] text-faint">{t("I moduli attivi verranno riportati a quelli inclusi nel piano; gli eventuali add-on li riaggiungi dopo.")}</p>
               <div className="mt-4 flex gap-2">
                 <button onClick={() => setPendingTier(null)} className="flex-1 rounded-lg border border-line py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
-                <button disabled={checkoutBusy} onClick={() => { const k = pendingTier!; if (stripeCustomer) { choose(k); setPendingTier(null); setNotice(`${t("Piano aggiornato a")} ${pt.name} — ${t("attivo dal prossimo rinnovo, senza nuovo pagamento (usiamo la carta salvata).")}`); } else { setPendingTier(null); startCheckout(k); } }} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">{checkoutBusy ? t("Attendi…") : (stripeCustomer ? t("Conferma cambio") : t("Vai al pagamento"))}</button>
+                <button disabled={checkoutBusy} onClick={() => { const k = pendingTier!; if (hasRealSub) { choose(k); setPendingTier(null); setNotice(`${t("Piano aggiornato a")} ${pt.name} — ${t("attivo dal prossimo rinnovo, senza nuovo pagamento (usiamo la carta salvata).")}`); } else { setPendingTier(null); startCheckout(k); } }} className="flex-1 rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">{checkoutBusy ? t("Attendi…") : (hasRealSub ? t("Conferma cambio") : t("Vai al pagamento"))}</button>
               </div>
             </div>
           </div>
