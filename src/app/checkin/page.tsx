@@ -20,8 +20,10 @@ interface DocData { firstName: string; lastName: string; sex: string; birthDate:
 const emptyExtra = () => ({ firstName: "", lastName: "", birthDate: "", birthPlace: "", citizenship: "", docType: DOC_TYPES[0], docNumber: "" });
 
 interface Info {
+  aiEnabled?: boolean;
+  returning?: boolean;
   booking: { id: string; code: string; status: string; checkIn: string; checkOut: string; adults: number; children: number; total: number; paid: number; cleaningFee: number; cityTax: number; cityTaxExempt: boolean; webCheckin: boolean; arrivalTime: string; guestRequests: string; extras: { name: string; price: number }[]; extraGuests: DocData[]; docPhotoFront: string | null; docPhotoBack: string | null; signature: string | null; invoiceRequest: Record<string, unknown> | null };
-  guest: { firstName: string; lastName: string; email: string; phone: string; sex: string; birthDate: string; birthPlace: string; citizenship: string; docType: string; docNumber: string; docPlace: string };
+  guest: { firstName: string; lastName: string; email: string; phone: string; sex: string; birthDate: string; birthPlace: string; citizenship: string; docType: string; docNumber: string; docPlace: string; docPhotoFront?: string | null; docPhotoBack?: string | null };
   roomType: { name: string };
   unit: { name: string; accessInfo: string } | null;
   structure: { name: string; color: string; phone: string; email: string; address: string; streetNumber: string; city: string; checkInFrom: string; checkOutBy: string; accessInfo: string; currency: string; stripeAccount: string; stripeChargesEnabled: boolean; extras: { id: string; name: string; desc: string; price: number; per: string }[] };
@@ -101,7 +103,9 @@ function Engine() {
         setDoc({ firstName: g.firstName || "", lastName: g.lastName || "", sex: g.sex || "", birthDate: g.birthDate || "", birthPlace: g.birthPlace || "", citizenship: g.citizenship || "", docType: g.docType || DOC_TYPES[0], docNumber: g.docNumber || "", docPlace: g.docPlace || "" });
         setArrival(b.arrivalTime || "Non lo so");
         setGuestReq(b.guestRequests || "");
-        setPhotoFront(b.docPhotoFront || undefined); setPhotoBack(b.docPhotoBack || undefined); setSignature(b.signature || undefined);
+        // Ospite di ritorno: se questa prenotazione non ha ancora foto, riusa quelle dell'anagrafica.
+        setPhotoFront(b.docPhotoFront || g.docPhotoFront || undefined); setPhotoBack(b.docPhotoBack || g.docPhotoBack || undefined); setSignature(b.signature || undefined);
+        setAiOff(d.aiEnabled === false);
         const need = Math.max(0, (b.adults || 1) - 1);
         setExtras(b.extraGuests?.length ? b.extraGuests.map((e) => ({ ...emptyExtra(), ...e })) : Array.from({ length: need }, emptyExtra));
         if (b.invoiceRequest) setInv((p) => ({ ...p, ...Object.fromEntries(Object.entries(b.invoiceRequest!).filter(([, v]) => v != null).map(([k, v]) => [k, v as string | boolean])) }));
@@ -148,8 +152,10 @@ function Engine() {
   const balance = Math.max(0, grand - paid);
   const canPay = !!st?.stripeChargesEnabled && !!st?.stripeAccount && balance > 0;
 
-  const submit = async () => {
-    if (!info || !doc || !valid || submitting) return;
+  const submit = async (opts?: { assumeConsent?: boolean }) => {
+    const consented = opts?.assumeConsent || consent;
+    const reqOk = !!doc && !!doc.firstName.trim() && !!doc.lastName.trim() && !!doc.birthDate && !!doc.docNumber.trim();
+    if (!info || !doc || !reqOk || !consented || submitting) return;
     setSubmitting(true); setSubmitErr("");
     try {
       const r = await fetch("/api/checkin", {
@@ -247,10 +253,23 @@ function Engine() {
           {info.booking.webCheckin && <div className="mt-2 rounded-lg bg-[color:color-mix(in_srgb,var(--ok)_12%,transparent)] px-3 py-1.5 text-xs font-medium text-[color:var(--ok)]">Check-in già inviato — puoi aggiornare i dati e reinviare.</div>}
         </div>
 
+        {/* Bentornato: check-in veloce per ospiti di ritorno */}
+        {info.returning && !info.booking.webCheckin && (
+          <div className={`${box} mb-4 p-4`} style={{ borderColor: "var(--ok)" }}>
+            <div className="flex items-center gap-2"><span className="text-lg">👋</span><h2 className="font-display text-base font-bold text-txt">Bentornato, {info.guest.firstName || doc?.firstName}!</h2></div>
+            <p className="mt-1 text-xs text-dim">Abbiamo già i tuoi dati e il documento del soggiorno precedente. Controlla che sia tutto corretto qui sotto e conferma — oppure invia subito.</p>
+            <button onClick={() => submit({ assumeConsent: true })} disabled={submitting} className="mt-3 w-full rounded-lg py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--ok)" }}>{submitting ? "Invio…" : "Confermo: i dati sono corretti → invia check-in"}</button>
+            <p className="mt-2 text-center text-[10px] text-faint">Confermando dichiari che i dati sono corretti e acconsenti al trattamento per la registrazione alla Questura.</p>
+          </div>
+        )}
+
         {/* Dati ospite principale */}
         <div className={`${box} mb-4 p-4`}>
-          <h2 className="mb-1 font-display text-lg font-bold text-txt">I tuoi dati</h2>
-          <p className="mb-3 text-xs text-dim">Richiesti per legge per la comunicazione degli alloggiati alla Questura. I documenti restano riservati.</p>
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-display text-lg font-bold text-txt">I tuoi dati</h2>
+            {!aiOff && <button type="button" onClick={() => frontRef.current?.click()} disabled={extracting} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--focus)" }}>{extracting ? "Leggo…" : "✨ Compila dai documenti"}</button>}
+          </div>
+          <p className="mb-3 text-xs text-dim">{aiOff ? "Richiesti per legge per la comunicazione degli alloggiati alla Questura. I documenti restano riservati." : "Fotografa il documento col pulsante ✨ e i campi si compilano da soli. Restano riservati."}</p>
           {doc && (
             <div className="grid gap-3 sm:grid-cols-2">
               <label className={lbl}>Nome *<input value={doc.firstName} onChange={(e) => setD("firstName", e.target.value)} className={`${field} mt-1`} /></label>
@@ -412,7 +431,7 @@ function Engine() {
             <span>Confermo che i dati sono corretti e acconsento al trattamento dei dati personali e del documento ai fini della registrazione degli alloggiati (Questura) e degli adempimenti di legge.</span>
           </label>
           {submitErr && <div className="mt-3 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)", color: "var(--err)" }}>{submitErr}</div>}
-          <button onClick={submit} disabled={!valid || submitting} className="mt-4 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{submitting ? "Invio…" : "Invia il check-in"}</button>
+          <button onClick={() => submit()} disabled={!valid || submitting} className="mt-4 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{submitting ? "Invio…" : "Invia il check-in"}</button>
           {!valid && <div className="mt-2 text-center text-[11px] text-faint">Compila nome, cognome, data di nascita, numero documento e spunta il consenso.</div>}
         </div>
       </div>

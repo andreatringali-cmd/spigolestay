@@ -232,6 +232,8 @@ export interface Guest {
   docNumber?: string;   // numero documento
   docPlace?: string;    // luogo di rilascio
   docExpiry?: string;   // scadenza documento (ISO)
+  docPhotoFront?: string; // foto documento fronte (dataURL) — salvata dal check-in, riusata al ritorno
+  docPhotoBack?: string;  // foto documento retro (dataURL)
   address?: string;     // residenza (via/indirizzo)
   streetNumber?: string; // numero civico
   province?: string;    // provincia (es. SR)

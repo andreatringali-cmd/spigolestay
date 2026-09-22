@@ -211,6 +211,22 @@ export default function OspiteSchedaPage() {
               <label className={lbl}>{t("Luogo di rilascio")}<input value={g.docPlace ?? ""} onChange={(e) => set("docPlace", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Scadenza")}<input type="date" value={g.docExpiry ?? ""} onChange={(e) => set("docExpiry", e.target.value)} className={`${inp} mt-1`} /></label>
             </div>
+            {(g.docPhotoFront || g.docPhotoBack) ? (
+              <div className="mt-3">
+                <div className="mb-1.5 text-xs font-medium text-dim">{t("Foto documento")} <span className="text-faint">{t("(dal check-in online)")}</span></div>
+                <div className="grid grid-cols-2 gap-2">
+                  {([["Fronte", g.docPhotoFront], ["Retro", g.docPhotoBack]] as const).filter(([, v]) => !!v).map(([label, v]) => (
+                    <a key={label} href={v!} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-line">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={v!} alt={label} className="aspect-[1.586] w-full object-cover" />
+                      <div className="px-2 py-1 text-[11px] text-faint">{t(label)}</div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-faint">{t("Nessuna foto documento ancora. Verrà salvata quando l'ospite completa il check-in online.")}</p>
+            )}
           </Card>
         </div>
 

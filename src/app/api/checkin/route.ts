@@ -40,6 +40,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       ok: true,
+      aiEnabled: !!process.env.ANTHROPIC_API_KEY, // l'auto-compilazione dal documento è attiva?
       booking: {
         id: s(b.id), code: s(b.code) || s(b.id).slice(0, 8).toUpperCase(), status: s(b.status),
         checkIn: s(b.checkIn), checkOut: s(b.checkOut), adults: n(b.adults) || 1, children: n(b.children),
@@ -50,7 +51,9 @@ export async function GET(req: Request) {
         docPhotoFront: s(b.docPhotoFront) || null, docPhotoBack: s(b.docPhotoBack) || null, signature: s(b.signature) || null,
         invoiceRequest: (b.invoiceRequest as Json) || null,
       },
-      guest: { firstName: s(g.firstName) || s(g.fullName).split(" ")[0] || "", lastName: s(g.lastName) || s(g.fullName).split(" ").slice(1).join(" ") || "", email: s(g.email), phone: s(g.phone), sex: s(g.sex), birthDate: s(g.birthDate), birthPlace: s(g.birthPlace), citizenship: s(g.citizenship) || s(g.country), docType: s(g.docType), docNumber: s(g.docNumber), docPlace: s(g.docPlace) },
+      guest: { firstName: s(g.firstName) || s(g.fullName).split(" ")[0] || "", lastName: s(g.lastName) || s(g.fullName).split(" ").slice(1).join(" ") || "", email: s(g.email), phone: s(g.phone), sex: s(g.sex), birthDate: s(g.birthDate), birthPlace: s(g.birthPlace), citizenship: s(g.citizenship) || s(g.country), docType: s(g.docType), docNumber: s(g.docNumber), docPlace: s(g.docPlace), docPhotoFront: s(g.docPhotoFront) || null, docPhotoBack: s(g.docPhotoBack) || null },
+      // Ospite "di ritorno": ha già dati documento da un soggiorno precedente → check-in veloce.
+      returning: !!(s(g.docNumber) && s(g.firstName) && (s(g.docPhotoFront) || s(b.docPhotoFront))),
       roomType: { name: s(rt.name) },
       unit: unit ? { name: s(unit.name), accessInfo: s(unit.accessInfo) } : null,
       structure: {
@@ -121,7 +124,12 @@ export async function POST(req: Request) {
       const guests = arr(data.guests);
       const gi = guests.findIndex((x) => (x as { id?: string }).id === guestId);
       if (gi >= 0) {
-        guests[gi] = { ...(guests[gi] as Json), firstName: s(doc.firstName).trim(), lastName: s(doc.lastName).trim(), fullName: `${s(doc.firstName)} ${s(doc.lastName)}`.trim(), sex: (doc.sex || undefined), birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: s(doc.docNumber).trim(), docPlace: doc.docPlace, updatedAt: Date.now() };
+        const gcur = guests[gi] as Json;
+        guests[gi] = { ...gcur, firstName: s(doc.firstName).trim(), lastName: s(doc.lastName).trim(), fullName: `${s(doc.firstName)} ${s(doc.lastName)}`.trim(), sex: (doc.sex || undefined), birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: s(doc.docNumber).trim(), docPlace: doc.docPlace,
+          // Salva le foto documento SULL'ANAGRAFICA ospite: visibili nella scheda ospite e
+          // riusabili al prossimo soggiorno (check-in veloce). Solo se fornite ora.
+          docPhotoFront: docPhotoFront ?? gcur.docPhotoFront, docPhotoBack: docPhotoBack ?? gcur.docPhotoBack,
+          updatedAt: Date.now() };
         data.guests = guests;
       }
       return true;
