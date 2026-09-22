@@ -18,7 +18,8 @@ export async function GET() {
   if (key) {
     try {
       const stripe = new Stripe(key);
-      const a = await stripe.accounts.retrieve();
+      // Recupera l'account della chiave stessa (nessun id = account collegato alla secret key).
+      const a = await (stripe.accounts.retrieve as (id?: string) => Promise<Stripe.Account>)();
       account = { id: a.id, name: a.business_profile?.name ?? a.settings?.dashboard?.display_name ?? null, email: a.email ?? null, country: a.country ?? null };
     } catch { account = null; }
   }
