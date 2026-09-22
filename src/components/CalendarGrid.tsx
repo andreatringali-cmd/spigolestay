@@ -121,6 +121,12 @@ export default function CalendarGrid() {
   const [barStyle, setBarStyle] = useState<"dentro" | "sotto">("dentro");
   useEffect(() => { try { const s = localStorage.getItem("spigolestay:calbars"); if (s === "sotto" || s === "dentro") setBarStyle(s); } catch {} }, []);
   const setBars = (s: "dentro" | "sotto") => { setBarStyle(s); try { localStorage.setItem("spigolestay:calbars", s); } catch {} };
+
+  // Icone di stato camera (arrivo/partenza, pulizia, lenzuola) nell'etichetta riga: nascoste di
+  // default (si vede solo il nome/numero), mostrabili con un interruttore. Preferenza per-dispositivo.
+  const [showRoomIcons, setShowRoomIcons] = useState(false);
+  useEffect(() => { try { setShowRoomIcons(localStorage.getItem("spigolestay:cal:roomicons") === "1"); } catch {} }, []);
+  const toggleRoomIcons = () => setShowRoomIcons((v) => { const n = !v; try { localStorage.setItem("spigolestay:cal:roomicons", n ? "1" : "0"); } catch {} return n; });
   // Ultimo aggiornamento + stato connessione dei canali OTA (per legenda e spunte).
   const [lastRun, setLastRun] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
@@ -628,9 +634,7 @@ export default function CalendarGrid() {
     return (
       <div key={unit.id} className="flex border-b border-line">
         <div className="sticky left-0 z-10 flex min-w-0 shrink-0 items-center gap-1.5 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: rowH }}>
-          {statusEl}
-          {cleanEl}
-          {linenEl}
+          {showRoomIcons && <>{statusEl}{cleanEl}{linenEl}</>}
           <button onClick={() => setRoomInfoId(unit.id)} title="Apri scheda camera" className={`min-w-0 flex-1 truncate whitespace-nowrap text-left text-[13px] font-medium hover:text-focus hover:underline ${unit.outOfService ? "text-faint line-through" : "text-txt"}`}>{unit.name}</button>
           {vw.group === "type" && <span className="shrink-0 rounded px-1 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, ${s.photoColor ?? "var(--faint)"} 20%, transparent)`, color: s.photoColor ?? "var(--dim)" }} title={s.name}>{initials(s.name)}</span>}
         </div>
@@ -898,6 +902,10 @@ export default function CalendarGrid() {
           <button onClick={() => setStart((d) => addDays(d, 1))} title="Giorno successivo" aria-label="Giorno successivo" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">›</button>
         </div>
         <div className="order-4 ml-auto flex items-center gap-2">
+          {/* Icone stato camera nelle etichette: mostra/nascondi */}
+          <button onClick={toggleRoomIcons} title={showRoomIcons ? "Nascondi icone camera (mostra solo i nomi)" : "Mostra icone camera (arrivo/partenza, pulizia, lenzuola)"} aria-label="Icone camera" className={`grid h-9 w-9 place-items-center rounded-lg border border-line transition ${showRoomIcons ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h18" /><path d="M3 12h18" /><path d="M3 17h18" /></svg>
+          </button>
           {/* Selettore card Insights (mostra/nascondi) */}
           {/* Toggle card: un click mostra tutte / nasconde tutte (come le altre sezioni) */}
           <button onClick={() => (INSIGHT_CARDS.some((c) => showCard(c.key)) ? persistCards(new Set(INSIGHT_CARDS.map((c) => c.key))) : persistCards(new Set()))} title={INSIGHT_CARDS.some((c) => showCard(c.key)) ? "Nascondi le card" : "Mostra le card"} className={`grid h-9 w-9 place-items-center rounded-lg border border-line transition ${INSIGHT_CARDS.some((c) => showCard(c.key)) ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
