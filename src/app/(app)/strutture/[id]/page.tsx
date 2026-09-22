@@ -12,6 +12,7 @@ import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useToast } from "@/components/ToastProvider";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
@@ -44,6 +45,7 @@ export default function StrutturaSchedaPage() {
   const isNew = params.id === "nuovo";
   const { structures, roomTypes, units, addStructure, updateStructure, setActiveStructure, addActivity } = useData();
   const { t } = useLang();
+  const ask = useConfirm();
   const toast = useToast();
   const { moduleOn, user } = useAccess();
   const { user: authUser } = useAuth();
@@ -82,7 +84,7 @@ export default function StrutturaSchedaPage() {
   const [invites, setInvites] = useState<{ code: string; email: string; status: string; created_at: string; accepted_at?: string | null }[]>([]);
   const revokeInvite = async (code: string) => {
     if (!supabase) return;
-    if (!confirm(t("Eliminare questo invito in attesa?"))) return;
+    if (!(await ask({ message: t("Eliminare questo invito in attesa?"), danger: true, confirmLabel: t("Elimina") }))) return;
     try {
       const token = (await supabase.auth.getSession())?.data.session?.access_token;
       if (!token) return;
@@ -123,7 +125,7 @@ export default function StrutturaSchedaPage() {
   // Rimuove la condivisione: riporta la struttura nel tuo account personale e rimuove il socio.
   const [unshare, setUnshare] = useState<{ loading?: boolean; ok?: boolean; msg?: string }>({});
   const removeSharing = async () => {
-    if (!confirm(t("Rimuovere la condivisione? La struttura tornerà solo nel tuo account e il socio perderà l'accesso. Le prenotazioni restano."))) return;
+    if (!(await ask({ title: t("Rimuovi condivisione"), message: t("Rimuovere la condivisione? La struttura tornerà solo nel tuo account e il socio perderà l'accesso. Le prenotazioni restano."), danger: true, confirmLabel: t("Rimuovi condivisione") }))) return;
     setUnshare({ loading: true });
     try {
       const token = (await supabase?.auth.getSession())?.data.session?.access_token;
@@ -161,7 +163,7 @@ export default function StrutturaSchedaPage() {
   };
   useEffect(() => { if (!isNew && f.orgId) loadShare(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [f.orgId]);
   const leaveShare = async () => {
-    if (!confirm(t("Abbandonare questa struttura condivisa? Non la vedrai più nel tuo account (potrà reinvitarti il proprietario)."))) return;
+    if (!(await ask({ title: t("Abbandona condivisione"), message: t("Abbandonare questa struttura condivisa? Non la vedrai più nel tuo account (potrà reinvitarti il proprietario)."), danger: true, confirmLabel: t("Abbandona") }))) return;
     setLeaving({ loading: true });
     try {
       const token = await bearer(); if (!token) { setLeaving({ loading: false, msg: t("Devi essere connesso") }); return; }
@@ -649,7 +651,7 @@ export default function StrutturaSchedaPage() {
                                 {CO_LEVELS.map((l) => <option key={l.key} value={l.key}>{l.label}</option>)}
                               </select>
                               <button onClick={() => setMember(m.userId, { active: !m.active })} title={m.active ? t("Metti in pausa") : t("Riattiva")} className="rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-dim hover:bg-wash">{m.active ? "⏸" : "▶"}</button>
-                              <button onClick={() => { if (confirm(t("Rimuovere questo co-gestore?"))) setMember(m.userId, { remove: true }); }} title={t("Rimuovi")} className="rounded-lg border border-line px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)]">✕</button>
+                              <button onClick={async () => { if (await ask({ title: t("Rimuovi co-gestore"), message: t("Rimuovere questo co-gestore? Perderà l'accesso alla struttura."), danger: true, confirmLabel: t("Rimuovi") })) setMember(m.userId, { remove: true }); }} title={t("Rimuovi")} className="rounded-lg border border-line px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)]">✕</button>
                             </div>
                           </div>
                           <div className="mt-1 text-[11px] text-faint">{CO_LEVELS.find((l) => l.key === levelOf(m.permissions))?.desc}</div>

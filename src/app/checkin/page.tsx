@@ -88,10 +88,10 @@ function Engine() {
 
   // Carica la prenotazione dal server.
   const load = async () => {
-    if (!params.slug || !params.b) { setLoadErr("Link non valido: apri il check-in dal link ricevuto via email."); setLoading(false); return; }
+    if (!params.b) { setLoadErr("Link non valido: apri il check-in dal link ricevuto via email."); setLoading(false); return; }
     setLoading(true);
     try {
-      const r = await fetch(`/api/checkin?slug=${encodeURIComponent(params.slug)}&b=${encodeURIComponent(params.b)}`);
+      const r = await fetch(`/api/checkin?b=${encodeURIComponent(params.b)}${params.slug ? `&slug=${encodeURIComponent(params.slug)}` : ""}`);
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j?.ok) { setLoadErr(j?.error === "not_found" ? "Prenotazione non trovata." : "Impossibile caricare la prenotazione."); setInfo(null); }
       else {

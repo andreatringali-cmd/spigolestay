@@ -100,6 +100,25 @@ export async function mutateStore(admin: SupabaseClient, store: BookingStore, mu
   return r2 === "ok";
 }
 
+// Trova la prenotazione col SOLO id (senza slug): cerca prima nelle organizzazioni
+// condivise (poche righe), poi negli stati personali. Serve ai link di check-in che
+// non portano lo slug (link interni / email vecchie). L'id prenotazione è un UUID.
+// Nota: a grande scala converrà una tabella-indice booking→store; per ora scan diretto.
+export async function findBookingStoreById(admin: SupabaseClient, bookingId: string): Promise<BookingStore | null> {
+  if (!bookingId) return null;
+  const { data: orgs } = await admin.from("org_state").select("org_id").limit(5000);
+  for (const o of arr(orgs)) {
+    const hit = await scan(admin, "org_state", "org_id", String((o as { org_id?: string }).org_id || ""), bookingId);
+    if (hit) return hit;
+  }
+  const { data: users } = await admin.from("app_state").select("user_id").limit(10000);
+  for (const u of arr(users)) {
+    const hit = await scan(admin, "app_state", "user_id", String((u as { user_id?: string }).user_id || ""), bookingId);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 // Scrive una patch sull'oggetto prenotazione (rev-locked, un retry).
 export async function writeBookingPatch(admin: SupabaseClient, store: BookingStore, patch: Json): Promise<boolean> {
   return mutateStore(admin, store, (data, idx) => {

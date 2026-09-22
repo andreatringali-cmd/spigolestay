@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { findBookingStore, mutateStore } from "@/lib/manage-booking";
+import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manage-booking";
 import { cityTaxOf } from "@/lib/booking";
 import type { Structure } from "@/lib/types";
 
@@ -21,10 +21,12 @@ export async function GET(req: Request) {
     const u = new URL(req.url);
     const slug = (u.searchParams.get("slug") || "").trim();
     const bid = (u.searchParams.get("b") || "").trim();
-    if (!slug || !bid) return NextResponse.json({ error: "missing_params" }, { status: 400 });
+    if (!bid) return NextResponse.json({ error: "missing_params" }, { status: 400 });
 
     const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
-    const store = await findBookingStore(admin, slug, bid);
+    // Con lo slug è più veloce; senza slug (link interni/email vecchie) si cerca per id.
+    let store = slug ? await findBookingStore(admin, slug, bid) : null;
+    if (!store) store = await findBookingStoreById(admin, bid);
     if (!store) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
     const b = store.booking as Json;
@@ -76,7 +78,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const slug = String(body?.slug || "").trim();
     const bid = String(body?.b || "").trim();
-    if (!slug || !bid) return NextResponse.json({ ok: false, error: "missing_params" }, { status: 400 });
+    if (!bid) return NextResponse.json({ ok: false, error: "missing_params" }, { status: 400 });
 
     const doc = (body?.doc ?? {}) as DocIn;
     if (!s(doc.firstName).trim() || !s(doc.lastName).trim()) return NextResponse.json({ ok: false, error: "missing_name" }, { status: 400 });
@@ -94,7 +96,8 @@ export async function POST(req: Request) {
     const chosenExtras = arr(body?.chosenExtras).map((e) => ({ name: s((e as Json).name).slice(0, 120), price: n((e as Json).price) })).filter((e) => e.name);
 
     const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
-    const store = await findBookingStore(admin, slug, bid);
+    let store = slug ? await findBookingStore(admin, slug, bid) : null;
+    if (!store) store = await findBookingStoreById(admin, bid);
     if (!store) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
     const guestId = s((store.booking as Json).guestId);
 
