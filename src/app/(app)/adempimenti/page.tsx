@@ -157,13 +157,27 @@ export default function AdempimentiPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* 1 · Sollecita il check-in online dell'ospite (azione diretta in-scheda) */}
         <StepCard n={1} tone="var(--warn)" label="Arrivi senza check-in online" sub="Da sollecitare" count={arrivalsNoCheckin.length} action="Tutte le prenotazioni" onAction={() => router.push("/prenotazioni")}>
-          {arrivalsNoCheckin.length > 0
-            ? arrivalsNoCheckin.slice(0, 5).map((b) => (
-                <ArrivalRow key={b.id} b={b} g={getGuest(b.guestId)} st={getStructure(b.structureId)} origin={origin} />
-              ))
-            : (arrivalsCheckedIn.length > 0 || inHouseNow.length > 0)
-              ? <div className="rounded-lg border border-line bg-paper px-2.5 py-2 text-[12.5px] text-dim">✓ <b className="text-txt">{arrivalsCheckedIn.length}</b> check-in completati oggi{inHouseNow.length ? <> · <b className="text-txt">{inHouseNow.length}</b> in casa ora</> : null}. Le schedine sono pronte da inviare 👇</div>
-              : undefined}
+          {(arrivalsNoCheckin.length > 0 || arrivalsCheckedIn.length > 0) ? (
+            <>
+              {arrivalsNoCheckin.length > 0 && (
+                <>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Da completare ({arrivalsNoCheckin.length})</div>
+                  {arrivalsNoCheckin.slice(0, 5).map((b) => (
+                    <ArrivalRow key={b.id} b={b} g={getGuest(b.guestId)} st={getStructure(b.structureId)} origin={origin} />
+                  ))}
+                </>
+              )}
+              {arrivalsCheckedIn.length > 0 && (
+                <>
+                  <div className={`text-[10px] font-semibold uppercase tracking-wide text-faint ${arrivalsNoCheckin.length > 0 ? "mt-2" : ""}`}>Check-in fatti ({arrivalsCheckedIn.length}) · schedine pronte</div>
+                  {arrivalsCheckedIn.slice(0, 6).map((b) => {
+                    const g = getGuest(b.guestId); const st = getStructure(b.structureId);
+                    return <div key={b.id} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-[12.5px]"><span className="text-[color:var(--ok)]">✓</span><span className="truncate font-medium text-txt">{g?.fullName || "Ospite"}</span><span className="truncate text-faint">· {st?.name ?? ""}</span></div>;
+                  })}
+                </>
+              )}
+            </>
+          ) : undefined}
         </StepCard>
 
         {/* 2 · Schedine alla Questura */}
