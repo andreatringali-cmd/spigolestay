@@ -79,6 +79,14 @@ export default function StrutturaSchedaPage() {
       setStripeSt({ msg: j?.message || t("Errore") });
     } catch { setStripeSt({ loading: false, msg: t("Rete non disponibile") }); }
   };
+  // Scollega l'account Stripe attuale (es. collegato per errore all'account sbagliato): azzera
+  // il riferimento sulla struttura, così il prossimo "Collega Stripe" ne crea/collega uno nuovo.
+  const disconnectStripe = () => {
+    if (typeof window !== "undefined" && !window.confirm(t("Scollegare questo account Stripe dalla struttura? Potrai poi collegare quello corretto. (L'account su Stripe non viene eliminato.)"))) return;
+    updateStructure(params.id as string, { stripeAccount: "" });
+    setF((p) => ({ ...p, stripeAccount: "" }));
+    setStripeSt({ enabled: false, msg: t("Account scollegato. Ora premi «Collega Stripe» e completa con i dati della struttura.") });
+  };
   // Gestione condivisa: invita un socio a co-gestire questa struttura.
   const [socio, setSocio] = useState<{ email: string; loading?: boolean; ok?: boolean; msg?: string }>({ email: "" });
   const [invites, setInvites] = useState<{ code: string; email: string; status: string; created_at: string; accepted_at?: string | null }[]>([]);
@@ -603,8 +611,12 @@ export default function StrutturaSchedaPage() {
                   <div><div className="text-sm font-semibold text-txt">{t("Pagamenti online (Stripe)")}</div><div className="text-[11px] text-faint">{t("Gli ospiti pagano preventivi e prenotazioni; l'incasso arriva sul tuo Stripe.")}</div></div>
                   {f.stripeAccount && <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: stripeSt.enabled ? "color-mix(in srgb, var(--ok) 15%, transparent)" : "color-mix(in srgb, var(--warn) 15%, transparent)", color: stripeSt.enabled ? "var(--ok)" : "var(--warn)" }}>{stripeSt.enabled ? t("Collegato ✓") : t("Da completare")}</span>}
                 </div>
-                <button onClick={connectStripe} disabled={stripeSt.loading} className="mt-2 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{stripeSt.loading ? t("Attendi…") : f.stripeAccount ? (stripeSt.enabled ? t("Gestisci su Stripe") : t("Completa collegamento")) : t("Collega Stripe")}</button>
-                {stripeSt.msg && <p className="mt-1 text-[11px]" style={{ color: "var(--err)" }}>{stripeSt.msg}</p>}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button onClick={connectStripe} disabled={stripeSt.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{stripeSt.loading ? t("Attendi…") : f.stripeAccount ? (stripeSt.enabled ? t("Gestisci su Stripe") : t("Completa collegamento")) : t("Collega Stripe")}</button>
+                  {f.stripeAccount && <button onClick={disconnectStripe} disabled={stripeSt.loading} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{t("Scollega / cambia account")}</button>}
+                </div>
+                {f.stripeAccount && <p className="mt-1.5 text-[11px] text-faint">{t("Account collegato")}: <span className="font-mono">{f.stripeAccount}</span></p>}
+                {stripeSt.msg && <p className="mt-1 text-[11px]" style={{ color: stripeSt.enabled === false && /scolleg/i.test(stripeSt.msg) ? "var(--dim)" : "var(--err)" }}>{stripeSt.msg}</p>}
               </div>
             )}
           </Card>
