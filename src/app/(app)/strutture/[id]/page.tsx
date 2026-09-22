@@ -119,6 +119,24 @@ export default function StrutturaSchedaPage() {
       }
     } catch { setSocio((s) => ({ ...s, loading: false, ok: false, msg: t("Rete non disponibile") })); }
   };
+  // Rimuove la condivisione: riporta la struttura nel tuo account personale e rimuove il socio.
+  const [unshare, setUnshare] = useState<{ loading?: boolean; ok?: boolean; msg?: string }>({});
+  const removeSharing = async () => {
+    if (!confirm(t("Rimuovere la condivisione? La struttura tornerà solo nel tuo account e il socio perderà l'accesso. Le prenotazioni restano."))) return;
+    setUnshare({ loading: true });
+    try {
+      const token = (await supabase?.auth.getSession())?.data.session?.access_token;
+      if (!token) { setUnshare({ loading: false, ok: false, msg: t("Devi essere connesso") }); return; }
+      const r = await fetch("/api/org/unshare", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ structureId: params.id }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j?.ok) {
+        updateStructure(params.id as string, { orgId: undefined });
+        setF((p) => ({ ...p, orgId: undefined }));
+        setUnshare({ loading: false, ok: true, msg: t("Condivisione rimossa. Ricarico…") });
+        setTimeout(() => { try { window.location.reload(); } catch {} }, 900);
+      } else setUnshare({ loading: false, ok: false, msg: j?.message || t("Impossibile rimuovere la condivisione") });
+    } catch { setUnshare({ loading: false, ok: false, msg: t("Rete non disponibile") }); }
+  };
   const num = (v: string) => (v === "" ? undefined : Number(v.replace(",", ".")));
 
   // La pagina può montarsi PRIMA che lo store abbia caricato i dati: quando la struttura diventa
@@ -558,6 +576,11 @@ export default function StrutturaSchedaPage() {
                     <input value={socio.email} onChange={(e) => setSocio((s) => ({ ...s, email: e.target.value }))} placeholder={t("email di un altro socio")} className={`${inp} flex-1`} type="email" />
                     <button onClick={inviteSocio} disabled={socio.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{socio.loading ? t("Invio…") : t("Invita ancora")}</button>
                   </div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+                    <span className="text-[11px] text-faint">{t("Vuoi tornare a gestirla da solo?")}</span>
+                    <button onClick={removeSharing} disabled={unshare.loading} className="rounded-lg border px-3 py-2 text-sm font-medium hover:bg-wash disabled:opacity-50" style={{ borderColor: "var(--line)", color: "var(--err)" }}>{unshare.loading ? t("Rimuovo…") : "🔒 " + t("Rimuovi condivisione")}</button>
+                  </div>
+                  {unshare.msg && <p className="mt-2 text-[11px]" style={{ color: unshare.ok ? "var(--ok)" : "var(--err)" }}>{unshare.msg}</p>}
                 </div>
               ) : (
                 <div className="flex flex-wrap items-end gap-2">
