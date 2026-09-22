@@ -202,8 +202,11 @@ function Engine() {
     ["Check-out", new Date(checkOut).toLocaleDateString("it-IT")],
     ["Ospiti", `${adults} adulti${children ? ` · ${children} bambini` : ""}`],
     ["Totale", eur(total)],
-    ["Acconto versato", eur(deposit)],
-    ["Saldo in struttura", eur(Math.max(0, total - deposit))],
+    ...((deposit > 0 && deposit < total
+      ? [["Acconto versato", eur(deposit)], ["Saldo in struttura", eur(total - deposit)]]
+      : deposit >= total && deposit > 0
+        ? [["Importo pagato", eur(deposit)]]
+        : [["Saldo in struttura", eur(total)]]) as [string, string][]),
   ] as [string, string][]);
 
   const printPdf = () => {
@@ -329,7 +332,7 @@ function Engine() {
               <div className="mt-1 flex justify-between"><span className="text-dim">Camera</span><span className="text-txt">{dRoom}</span></div>
               <div className="mt-1 flex justify-between"><span className="text-dim">Soggiorno</span><span className="text-txt">{new Date(dCi).toLocaleDateString("it-IT")} → {new Date(dCo).toLocaleDateString("it-IT")}</span></div>
               <div className="mt-2 flex justify-between border-t border-line pt-2"><span className="font-semibold text-txt">Totale</span><span className="font-mono font-bold text-txt">{eur(dTotal)}</span></div>
-              {dDeposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">Acconto pagato</span><span className="font-mono text-txt">{eur(dDeposit)}</span></div>}
+              {dDeposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">{dDeposit < dTotal ? "Acconto pagato" : "Importo pagato"}</span><span className="font-mono text-txt">{eur(dDeposit)}</span></div>}
               {dTotal - dDeposit > 0 && <div className="mt-1 flex justify-between"><span className="text-dim">Saldo in struttura</span><span className="font-mono text-txt">{eur(dTotal - dDeposit)}</span></div>}
             </div>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
@@ -489,7 +492,12 @@ function Engine() {
                     <button key={k} onClick={() => setPay(k)} className={`rounded-lg border p-3 text-center text-sm font-medium transition ${pay === k ? "border-focus ring-1 ring-[color:var(--focus)] text-txt" : "border-line text-dim hover:bg-wash"}`}>{label}</button>
                   ))}
                 </div>
-                <p className="mt-3 text-xs text-dim">{deposit > 0 ? <>Per confermare è richiesto un acconto di <b className="text-txt">{eur(deposit)}</b>{selPlan.refundable ? "" : " (intero importo, tariffa non rimborsabile)"}. Il saldo si versa in struttura.</> : <>Nessun acconto richiesto: l&apos;intero importo si salda in struttura.</>} Il pagamento è gestito in modo sicuro da Stripe.</p>
+                <p className="mt-3 text-xs text-dim">{deposit <= 0
+                  ? <>Nessun acconto richiesto: l&apos;intero importo si salda in struttura.</>
+                  : deposit < total
+                    ? <>Per confermare è richiesto un acconto di <b className="text-txt">{eur(deposit)}</b>. Il saldo di <b className="text-txt">{eur(total - deposit)}</b> si versa in struttura.</>
+                    : <>Per confermare è richiesto il pagamento dell&apos;intero importo di <b className="text-txt">{eur(total)}</b>{selPlan.refundable ? "" : " (tariffa non rimborsabile)"}.</>
+                } Il pagamento è gestito in modo sicuro da Stripe.</p>
                 {deposit > 0 && (
                   <div className="mt-2 rounded-lg border border-line bg-wash px-3 py-2">
                     <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-dim"><span>💳 Carta</span><span className="text-faint">·</span><span>Google Pay / Apple Pay</span><span className="text-faint">·</span><span>PayPal</span><span className="text-faint">·</span><span>Klarna</span></div>
@@ -514,7 +522,7 @@ function Engine() {
                 {discount > 0 && <div className="mt-1 flex items-baseline justify-between gap-3 text-xs" style={{ color: "var(--ok)" }}><span className="min-w-0">Sconto{appliedPromo?.code ? ` ${appliedPromo.code}` : ""} (−{appliedPromo?.pct}%)</span><span className="shrink-0 font-mono">−{eur(discount)}</span></div>}
                 <div className="my-2 border-t border-line" />
                 <div className="flex items-baseline justify-between"><span className="text-sm font-semibold text-txt">Totale</span><span className="font-mono text-xl font-bold text-txt">{eur(total)}</span></div>
-                {deposit > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">Acconto adesso</span><span className="font-mono font-semibold text-txt">{eur(deposit)}</span></div>}
+                {deposit > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">{deposit < total ? "Acconto adesso" : "Da pagare adesso"}</span><span className="font-mono font-semibold text-txt">{eur(deposit)}</span></div>}
                 <div className="mt-1 text-[11px]" style={{ color: selPlan.refundable ? "var(--ok)" : "var(--warn)" }}>{cancelText(selPlan)}</div>
                 <button onClick={confirm} disabled={!guestValid} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">Conferma prenotazione</button>
                 {!guestValid && <div className="mt-2 text-center text-[11px] text-faint">Compila nome, cognome, telefono, email e accetta la privacy.</div>}

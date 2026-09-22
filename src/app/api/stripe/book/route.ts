@@ -75,7 +75,9 @@ export async function POST(req: Request) {
     };
     const stripe = new Stripe(key);
     const origin = req.headers.get("origin") || new URL(req.url).origin;
-    const label = `${st?.name || "Prenotazione"} · ${ci} → ${co}${deposit > 0 ? " (caparra)" : ""}`;
+    // "(caparra)" solo se è un acconto PARZIALE; se si paga l'intero importo non è una caparra.
+    const isPartial = deposit > 0 && deposit < total;
+    const label = `${st?.name || "Prenotazione"} · ${ci} → ${co}${isPartial ? " (caparra)" : ""}`;
     const success = `${origin}/prenota?site=${encodeURIComponent(slug)}&s=${encodeURIComponent(sid)}&paid=1&session_id={CHECKOUT_SESSION_ID}`;
     const cancel = `${origin}/prenota?site=${encodeURIComponent(slug)}&s=${encodeURIComponent(sid)}&canceled=1`;
     const session = await stripe.checkout.sessions.create({
