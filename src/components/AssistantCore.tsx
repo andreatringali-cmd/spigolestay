@@ -1,21 +1,26 @@
 "use client";
 
-// Core dell'Assistente in stile HUD "J.A.R.V.I.S.": anelli concentrici sottili, un quadrante di
-// tacche ordinato, un arco rotante con gap e cap arrotondati, un segmento caldo d'accento e il
-// wordmark XENORA. al centro. Una sola animazione orchestrata e discreta (respiro + rotazione lenta).
-// Theme-aware: cyan "arc-reactor" in tema scuro, GRIGI neutri caldi (niente azzurrino) in chiaro.
+// NUCLEO dell'Assistente Xenora — un core "osservatorio" caldo e vivo, non un HUD freddo.
+// Una sfera di luce con anelli orbitali inclinati (profondità 3D), un "signal ring" ondulato che
+// reagisce alla voce (idle = respiro, listen = increspatura, speak = onda) e il wordmark XENORA. al
+// centro. Regia UNICA: una sola animazione orchestrata; lo stato è letto via ref (l'effetto non viene
+// ricostruito a ogni transizione). Palette theme-aware: greige + terracotta/oro in chiaro (niente
+// azzurrino), notte calda con ambra/terracotta in scuro. Rispetta prefers-reduced-motion.
 import { useEffect, useRef } from "react";
 import { useTheme } from "@/lib/theme";
 
 type CoreState = "idle" | "listen" | "speak";
 
 function rgba(hex: string, a: number) {
-  const h = (hex || "#38bdf8").replace("#", "");
+  const h = (hex || "#B65C3C").replace("#", "");
   const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
-  return `rgba(${isNaN(r) ? 56 : r},${isNaN(g) ? 189 : g},${isNaN(b) ? 248 : b},${Math.max(0, Math.min(1, a))})`;
+  return `rgba(${isNaN(r) ? 182 : r},${isNaN(g) ? 92 : g},${isNaN(b) ? 60 : b},${Math.max(0, Math.min(1, a))})`;
+}
+function cssVar(name: string, fallback: string) {
+  try { const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return v || fallback; } catch { return fallback; }
 }
 
-export default function AssistantCore({ state = "idle", size = 200 }: { state?: CoreState; size?: number }) {
+export default function AssistantCore({ state = "idle", size = 220 }: { state?: CoreState; size?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<CoreState>(state);
   useEffect(() => { stateRef.current = state; }, [state]);
@@ -32,78 +37,130 @@ export default function AssistantCore({ state = "idle", size = 200 }: { state?: 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const cx = W / 2, cy = H / 2;
 
-    // Palette: GRIGI neutri caldi in chiaro (armonizzati col greige dell'app), cyan "arc-reactor" in
-    // scuro. Un solo accento caldo (oro in chiaro, ambra in scuro) per i marker e il segmento vivo.
-    const primary = light ? "#8C857A" : "#38bdf8";
-    const secondary = light ? "#B4AEA4" : "#7dd3fc";
-    const faint = light ? "#CBC5BB" : "#4A6070";
-    const accent = light ? "#B8934E" : "#fbbf24";
+    // Palette calda: terracotta protagonista, oro/ambra come luce, neutri greige per gli anelli.
+    // Un solo accento freddo (--focus) usato con parsimonia come contrappunto nel nucleo.
+    const focus = cssVar("--focus", light ? "#2F6BB0" : "#6FA3DC");
+    const terra = light ? "#B65C3C" : "#E08A5B";
+    const amber = light ? "#C79544" : "#E7B968";
+    const neutral = light ? "#9C9488" : "#8A8478";
+    const faint = light ? "#C9C1B5" : "#4A4137";
+    // Nucleo: gradiente sfera (alto-sinistra chiaro -> bordo caldo scuro).
+    const sphereHi = light ? "#FDFBF7" : "#3A2E26";
+    const sphereMid = light ? "#EFE7DB" : "#2A211B";
+    const sphereLo = light ? "#DED2C2" : "#160F0B";
 
     const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    const spd: Record<CoreState, number> = { idle: 0.0045, listen: 0.011, speak: 0.008 };
+
+    // Energia della voce: lerp morbido verso il target dello stato (nessun salto al cambio stato).
+    const target: Record<CoreState, number> = { idle: 0.16, listen: 1, speak: 0.72 };
+    let energy = target[stateRef.current];
     let raf = 0, t = 0, ang = 0;
 
-    const ringArc = (r: number, a0: number, a1: number, w: number, col: string, alpha: number, glow = 0, cap: CanvasLineCap = "round") => {
-      if (glow && !light) { ctx.shadowColor = rgba(col, 0.8); ctx.shadowBlur = glow; }
-      ctx.strokeStyle = rgba(col, alpha); ctx.lineWidth = w; ctx.lineCap = cap;
-      ctx.beginPath(); ctx.arc(cx, cy, r, a0, a1); ctx.stroke();
-      ctx.shadowBlur = 0;
+    // Anelli orbitali inclinati: (rx, ry, rotazione di fase, verso, colore).
+    const orbits = [
+      { rx: 0.96, ry: 0.34, spd: 0.006, tilt: -0.18, col: neutral, a: light ? 0.5 : 0.62 },
+      { rx: 0.78, ry: 0.92, spd: -0.0044, tilt: 0.42, col: neutral, a: light ? 0.4 : 0.5 },
+      { rx: 0.62, ry: 0.5, spd: 0.009, tilt: 1.15, col: amber, a: light ? 0.55 : 0.72 },
+    ];
+    // Particelle orbitanti (poche, luminose) distribuite sugli anelli.
+    const sats = Array.from({ length: 5 }, (_, i) => ({ orbit: i % orbits.length, ph: Math.random() * Math.PI * 2, sp: 0.5 + Math.random() * 0.9 }));
+
+    // Signal ring ondulato attorno alla sfera (la "voce" resa visibile).
+    const wavePath = (baseR: number, amp: number, k: number, phase: number) => {
+      ctx.beginPath();
+      const steps = 120;
+      for (let i = 0; i <= steps; i++) {
+        const a = (i / steps) * Math.PI * 2;
+        const r = baseR + amp * Math.sin(k * a + phase) + amp * 0.4 * Math.sin(k * 2 * a - phase * 1.3);
+        const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
     };
 
     const draw = () => {
       const s = stateRef.current;
-      t += 0.03; ang += spd[s];
-      const pulse = 0.5 + 0.5 * Math.sin(t * (s === "listen" ? 3.0 : s === "speak" ? 2.4 : 1.25));
-      const breathe = 1 + (s === "listen" ? 0.022 : 0.014) * Math.sin(t * 1.5);
-      const R = size * 0.45 * breathe;
+      energy += (target[s] - energy) * 0.06;
+      const dt = 0.016;
+      t += dt;
+      ang += 0.004 + 0.006 * energy;
+      const pulse = 0.5 + 0.5 * Math.sin(t * (1.2 + 1.8 * energy));
+      const breathe = 1 + (0.012 + 0.02 * energy) * Math.sin(t * 1.6);
+      const R = size * 0.46 * breathe;
       ctx.clearRect(0, 0, W, H);
 
-      // Alone centrale morbido (respiro)
-      const halo = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R);
-      halo.addColorStop(0, rgba(primary, (light ? 0.09 : 0.20) * (0.55 + 0.45 * pulse)));
-      halo.addColorStop(1, rgba(primary, 0));
-      ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+      // ── 1. Alone volumetrico caldo (respiro) ──
+      const halo = ctx.createRadialGradient(cx, cy, R * 0.15, cx, cy, R * 1.02);
+      halo.addColorStop(0, rgba(terra, (light ? 0.10 : 0.22) * (0.5 + 0.5 * pulse)));
+      halo.addColorStop(0.55, rgba(amber, (light ? 0.05 : 0.10) * (0.5 + 0.5 * pulse)));
+      halo.addColorStop(1, rgba(amber, 0));
+      ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(cx, cy, R * 1.02, 0, Math.PI * 2); ctx.fill();
 
-      // Anello esterno sottile
-      ringArc(R * 0.97, 0, Math.PI * 2, 1, primary, light ? 0.24 : 0.30);
-
-      // Quadrante di tacche ordinato: 72 tacche, "medie" ogni 6, "cardinali" ogni 18 (4 assi).
-      const ticks = 72;
-      for (let i = 0; i < ticks; i++) {
-        const th = (i / ticks) * Math.PI * 2 - Math.PI / 2;
-        const cardinal = i % 18 === 0, major = i % 6 === 0;
-        const len = cardinal ? R * 0.11 : major ? R * 0.07 : R * 0.035;
-        const r1 = R * 0.94, r0 = r1 - len;
-        const col = cardinal ? secondary : major ? primary : faint;
-        ctx.strokeStyle = rgba(col, cardinal ? (light ? 0.55 : 0.7) : major ? (light ? 0.32 : 0.42) : (light ? 0.16 : 0.2));
-        ctx.lineWidth = cardinal ? 1.5 : major ? 1.1 : 0.8;
-        ctx.beginPath(); ctx.moveTo(cx + Math.cos(th) * r0, cy + Math.sin(th) * r0); ctx.lineTo(cx + Math.cos(th) * r1, cy + Math.sin(th) * r1); ctx.stroke();
-      }
-
-      // Arco rotante principale con gap e cap arrotondati + arco secondario controrotante
-      ringArc(R * 0.80, ang, ang + Math.PI * 1.2, 2.6, primary, light ? 0.75 : 0.9, 12);
-      ringArc(R * 0.80, ang + Math.PI * 1.42, ang + Math.PI * 1.72, 2.6, primary, light ? 0.4 : 0.55);
-      ringArc(R * 0.68, -ang * 1.25, -ang * 1.25 + Math.PI * 0.62, 1.6, secondary, light ? 0.5 : 0.75);
-
-      // Segmento caldo d'accento (l'arco "vivo" del riferimento)
-      ringArc(R * 0.88, ang * 0.55, ang * 0.55 + Math.PI * 0.24, 3, accent, light ? 0.85 : 0.95, 10);
-
-      // Marker che scorrono lungo un anello (pochi, eleganti)
-      const dots = 3;
-      for (let i = 0; i < dots; i++) {
-        const th = -Math.PI / 2 + ang * 0.55 + (i / dots) * 0.7, rr = R * 0.88;
-        const x = cx + Math.cos(th) * rr, y = cy + Math.sin(th) * rr, gl = 0.55 + 0.45 * Math.sin(t * 2.6 + i);
-        if (!light) { ctx.shadowColor = rgba(accent, 0.9); ctx.shadowBlur = 8; }
-        ctx.fillStyle = rgba(accent, light ? 0.85 : 0.9); ctx.beginPath(); ctx.arc(x, y, 1.8 + 1 * gl, 0, Math.PI * 2); ctx.fill();
+      // ── 2. Anelli orbitali inclinati (profondità) + satelliti luminosi ──
+      orbits.forEach((o) => {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(o.tilt + ang * o.spd * 12);
+        ctx.strokeStyle = rgba(o.col, o.a * (light ? 0.7 : 0.85));
+        ctx.lineWidth = 1.1;
+        if (!light) { ctx.shadowColor = rgba(o.col, 0.5); ctx.shadowBlur = 6; }
+        ctx.beginPath(); ctx.ellipse(0, 0, R * o.rx, R * o.ry, 0, 0, Math.PI * 2); ctx.stroke();
         ctx.shadowBlur = 0;
-      }
+        ctx.restore();
+      });
+      sats.forEach((p) => {
+        const o = orbits[p.orbit];
+        const th = p.ph + t * p.sp * (0.5 + energy);
+        const lx = Math.cos(th) * R * o.rx, ly = Math.sin(th) * R * o.ry;
+        const rot = o.tilt + ang * o.spd * 12;
+        const x = cx + lx * Math.cos(rot) - ly * Math.sin(rot);
+        const y = cy + lx * Math.sin(rot) + ly * Math.cos(rot);
+        const depth = 0.5 + 0.5 * Math.sin(th); // davanti = più luminoso
+        ctx.fillStyle = rgba(amber, (light ? 0.55 : 0.7) * (0.35 + 0.65 * depth));
+        if (!light) { ctx.shadowColor = rgba(amber, 0.9); ctx.shadowBlur = 8 * depth; }
+        ctx.beginPath(); ctx.arc(x, y, 1.3 + 1.8 * depth, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+      });
 
-      // Anello interno fine + anello tratteggiato attorno al wordmark
-      ringArc(R * 0.545, 0, Math.PI * 2, 1, primary, (light ? 0.22 : 0.32) + 0.16 * pulse);
+      // ── 3. Sfera del nucleo: gradiente con highlight (vetro/gemma) ──
+      const sphereR = R * 0.5;
+      const sph = ctx.createRadialGradient(cx - sphereR * 0.4, cy - sphereR * 0.45, sphereR * 0.1, cx, cy, sphereR);
+      sph.addColorStop(0, sphereHi);
+      sph.addColorStop(0.5, sphereMid);
+      sph.addColorStop(1, sphereLo);
+      ctx.fillStyle = sph; ctx.beginPath(); ctx.arc(cx, cy, sphereR, 0, Math.PI * 2); ctx.fill();
+      // Bordo caldo del nucleo
+      ctx.strokeStyle = rgba(terra, light ? 0.4 : 0.55); ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.arc(cx, cy, sphereR, 0, Math.PI * 2); ctx.stroke();
+      // Riflesso speculare (in alto a sinistra)
+      const spec = ctx.createRadialGradient(cx - sphereR * 0.42, cy - sphereR * 0.46, 0, cx - sphereR * 0.42, cy - sphereR * 0.46, sphereR * 0.7);
+      spec.addColorStop(0, rgba("#FFFFFF", light ? 0.55 : 0.16));
+      spec.addColorStop(1, rgba("#FFFFFF", 0));
+      ctx.fillStyle = spec; ctx.beginPath(); ctx.arc(cx, cy, sphereR, 0, Math.PI * 2); ctx.fill();
+
+      // ── 4. Signal ring ondulato (la voce) — due tracciati controrotanti ──
+      const amp = R * (0.012 + 0.055 * energy) * (0.7 + 0.3 * Math.sin(t * (4 + 6 * energy)));
+      wavePath(R * 0.66, amp, 7, t * (0.8 + 1.6 * energy));
+      ctx.strokeStyle = rgba(terra, light ? 0.85 : 0.95); ctx.lineWidth = 2.2;
+      if (!light) { ctx.shadowColor = rgba(terra, 0.7); ctx.shadowBlur = 10; }
+      ctx.stroke(); ctx.shadowBlur = 0;
+      wavePath(R * 0.71, amp * 0.7, 11, -t * (0.6 + 1.2 * energy) + 1.7);
+      ctx.strokeStyle = rgba(amber, light ? 0.5 : 0.65); ctx.lineWidth = 1.2; ctx.stroke();
+
+      // ── 5. Anello sottile tratteggiato che ruota (fine dettaglio strumentale) ──
       ctx.save();
-      ctx.setLineDash([2, 7]); ctx.lineDashOffset = -ang * 8;
-      ringArc(R * 0.60, 0, Math.PI * 2, 1, faint, light ? 0.4 : 0.4);
+      ctx.setLineDash([1.5, 8]); ctx.lineDashOffset = -ang * 26;
+      ctx.strokeStyle = rgba(focus, light ? 0.22 : 0.3); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.84, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
+
+      // ── 6. Marker cardinali discreti ──
+      for (let i = 0; i < 4; i++) {
+        const th = (i / 4) * Math.PI * 2 + ang * 0.3;
+        const x = cx + Math.cos(th) * R * 0.92, y = cy + Math.sin(th) * R * 0.92;
+        ctx.fillStyle = rgba(neutral, light ? 0.5 : 0.6);
+        ctx.beginPath(); ctx.arc(x, y, 1.4, 0, Math.PI * 2); ctx.fill();
+      }
 
       if (!reduce) raf = requestAnimationFrame(draw);
     };
@@ -118,14 +175,14 @@ export default function AssistantCore({ state = "idle", size = 200 }: { state?: 
         <span
           className="font-display font-bold"
           style={{
-            fontSize: Math.round(size * 0.118),
-            letterSpacing: "0.16em",
-            paddingLeft: "0.16em",
-            color: light ? "#33302A" : "#EAF6FF",
-            textShadow: light ? "none" : "0 0 18px rgba(56,189,248,.5)",
+            fontSize: Math.round(size * 0.108),
+            letterSpacing: "0.18em",
+            paddingLeft: "0.18em",
+            color: light ? "#2A2620" : "#F3E9DE",
+            textShadow: light ? "0 1px 1px rgba(255,255,255,.6)" : "0 0 18px rgba(224,138,91,.4)",
           }}
         >
-          XENORA<span style={{ color: light ? "#B8934E" : "#fbbf24" }}>.</span>
+          XENORA<span style={{ color: light ? "#B65C3C" : "#E08A5B" }}>.</span>
         </span>
       </div>
     </div>

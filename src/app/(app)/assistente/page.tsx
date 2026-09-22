@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/authsync";
+import { useTheme } from "@/lib/theme";
 import { PageHeader, Card } from "@/components/ui";
 import Icon from "@/components/Icon";
 import NeuralShell from "@/components/NeuralShell";
@@ -401,6 +402,11 @@ export default function AssistentePage() {
 
   const state = listening ? "listen" : speaking ? "speak" : "idle";
 
+  // Accento caldo dell'identità Assistente (terracotta) — coerente col nucleo, theme-aware.
+  const { theme } = useTheme();
+  const accent = theme === "dark" ? "#E08A5B" : "#B65C3C";
+  const accentInk = theme === "dark" ? "#1B1510" : "#FFFFFF";
+
   return (
     <div>
       <PageHeader title="Assistente Xenora" subtitle="Chiedi a voce o scrivi — rispondo con i tuoi numeri" />
@@ -410,62 +416,63 @@ export default function AssistentePage() {
         <NeuralShell inputs={tiles} state={state} onInput={(q) => { setQ(q); ask(q); }} />
       </div>
 
-      {/* Output del core: briefing del giorno + comandi voce */}
-      <Card className="mb-4">
+      {/* Output del nucleo: briefing del giorno + comandi voce */}
+      <Card className="mb-4 overflow-hidden">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-faint">
-              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-focus" /> Core output · Briefing del giorno
+            <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: accent }} /> Nucleo · Briefing del giorno
             </div>
             <p className="mt-1.5 font-display text-lg font-semibold leading-snug tracking-tight text-txt sm:text-xl">{briefing}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {micAvailable && (
-              <button onClick={toggleListening} title={listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare"} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition active:scale-95" style={{ backgroundColor: listening ? "var(--err)" : "var(--focus)" }}><Icon name="chat" size={14} /> {listening ? "Ascolto…" : "Parla"}</button>
+              <button onClick={toggleListening} title={listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare"} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition active:scale-95" style={{ backgroundColor: listening ? "var(--err)" : accent, color: listening ? "#fff" : accentInk }}><Icon name="chat" size={14} /> {listening ? "Ascolto…" : "Parla"}</button>
             )}
             <button onClick={() => speak(briefing)} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash"><Icon name="chat" size={14} /> Ascolta</button>
-            <button onClick={toggleVoice} title="Attiva/disattiva la voce nelle risposte" className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${voiceOn ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}>{voiceOn ? "🔊 Voce attiva" : "🔇 Voce spenta"}</button>
+            <button onClick={toggleVoice} title="Attiva/disattiva la voce nelle risposte" className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition" style={voiceOn ? { borderColor: accent, color: accent } : undefined}>{voiceOn ? "🔊 Voce attiva" : "🔇 Voce spenta"}</button>
           </div>
         </div>
         {(!micAvailable || micHint) && <p className="mt-2 text-xs font-medium" style={{ color: micHint ? "var(--err)" : "var(--faint)" }}>{micHint || "🎙 La voce in entrata si attiva aprendo Xenora in Chrome/Edge"}</p>}
       </Card>
 
-      {/* Input + chips */}
+      {/* Barra di comando + suggerimenti */}
       <Card className="mb-4">
         <form onSubmit={(e) => { e.preventDefault(); ask(q); }} className="flex items-center gap-2">
           {micAvailable && (
             <button type="button" onClick={toggleListening} title="Parla" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash" style={listening ? { borderColor: "var(--err)", color: "var(--err)" } : undefined}><Icon name="chat" size={18} /></button>
           )}
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={listening ? "Sto ascoltando…" : "Es. quanto ho incassato questo mese?"} className="min-w-0 flex-1 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-          <button type="submit" className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Chiedi</button>
+          <input value={q} onChange={(e) => setQ(e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = accent; }} onBlur={(e) => { e.currentTarget.style.borderColor = ""; }} placeholder={listening ? "Sto ascoltando…" : "Es. quanto ho incassato questo mese?"} className="min-w-0 flex-1 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-txt outline-none transition-colors" />
+          <button type="submit" className="rounded-lg px-4 py-2 text-sm font-semibold transition hover:opacity-90 active:scale-95" style={{ backgroundColor: accent, color: accentInk }}>Chiedi</button>
         </form>
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {CHIPS.map((c) => <button key={c.q} onClick={() => { setQ(c.label); ask(c.q); }} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition-colors hover:border-focus hover:text-focus">{c.label}</button>)}
+          {CHIPS.map((c) => <button key={c.q} onClick={() => { setQ(c.label); ask(c.q); }} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition-all hover:-translate-y-px" onMouseEnter={(e) => { e.currentTarget.style.borderColor = accent; e.currentTarget.style.color = accent; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = ""; e.currentTarget.style.color = ""; }}>{c.label}</button>)}
         </div>
       </Card>
 
       {ans && (
-        <Card>
-          <div className="flex items-start justify-between gap-2">
+        <Card className="anim-pop relative overflow-hidden">
+          <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1" style={{ backgroundColor: accent }} />
+          <div className="flex items-start justify-between gap-2 pl-1.5">
             <div className="min-w-0">
-              <div className="text-xs font-semibold uppercase tracking-wide text-faint">{ans.title}</div>
-              {ans.value && <div className="mt-1 font-mono text-3xl font-bold text-txt">{ans.value}</div>}
-              {ans.detail && <p className="mt-1 text-sm leading-relaxed text-dim">{ans.detail}</p>}
+              <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>{ans.title}</div>
+              {ans.value && <div className="mt-1 font-mono text-3xl font-bold tabular-nums text-txt">{ans.value}</div>}
+              {ans.detail && <p className="mt-1.5 text-sm leading-relaxed text-dim">{ans.detail}</p>}
             </div>
-            <button onClick={() => speak(ans.speech ?? [ans.title, ans.value, ans.detail].filter(Boolean).join(". "))} title="Rileggi ad alta voce" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash"><Icon name="chat" size={16} /></button>
+            <button onClick={() => speak(ans.speech ?? [ans.title, ans.value, ans.detail].filter(Boolean).join(". "))} title="Rileggi ad alta voce" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash"><Icon name="chat" size={16} /></button>
           </div>
           {ans.list && ans.list.length > 0 && (
-            <div className="mt-3 flex flex-col gap-1.5">
-              <button onClick={() => readAllList(ans.list!)} className="mb-1 inline-flex items-center justify-center gap-1.5 self-start rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"><Icon name="chat" size={14} /> Leggimi tutti</button>
+            <div className="mt-3 flex flex-col gap-1.5 pl-1.5">
+              <button onClick={() => readAllList(ans.list!)} className="mb-1 inline-flex items-center justify-center gap-1.5 self-start rounded-lg px-3 py-1.5 text-xs font-semibold transition hover:opacity-90 active:scale-95" style={{ backgroundColor: accent, color: accentInk }}><Icon name="chat" size={14} /> Leggimi tutti</button>
               {ans.list.map((it) => (
-                <button key={it.id} onClick={() => pickBooking(it.id)} className="flex items-center justify-between gap-3 rounded-lg border border-line px-3 py-2 text-left transition hover:bg-wash">
+                <button key={it.id} onClick={() => pickBooking(it.id)} className="group flex items-center justify-between gap-3 rounded-lg border border-line px-3 py-2 text-left transition hover:bg-wash" onMouseEnter={(e) => { e.currentTarget.style.borderColor = accent; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = ""; }}>
                   <span className="min-w-0"><span className="block truncate text-sm font-semibold text-txt">{it.label}</span>{it.sub && <span className="block truncate text-[11px] text-faint">{it.sub}</span>}</span>
-                  <span className="shrink-0 text-xs font-semibold text-focus">Dettagli →</span>
+                  <span className="shrink-0 text-xs font-semibold" style={{ color: accent }}>Dettagli →</span>
                 </button>
               ))}
             </div>
           )}
-          {ans.go && <button onClick={() => router.push(ans.go!.href)} className="mt-3 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{ans.go.label} →</button>}
+          {ans.go && <button onClick={() => router.push(ans.go!.href)} className="mt-3 ml-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt transition hover:bg-wash">{ans.go.label} →</button>}
         </Card>
       )}
 

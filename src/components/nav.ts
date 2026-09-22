@@ -10,10 +10,10 @@ export interface NavItem {
 export const NAV: NavItem[] = [
   // In cima, senza categoria: le cose che apri ogni giorno.
   { label: "Dashboard", href: "/", group: "", icon: "grid" },
-  { label: "Assistente", href: "/assistente", group: "", icon: "sparkles", perm: "prenotazioni", module: "pms" },
   { label: "Adempimenti oggi", href: "/adempimenti", group: "", icon: "clipboard", perm: "prenotazioni", module: "pms" },
 
   // PMS: la gestione quotidiana della struttura (il cuore del gestionale).
+  { label: "Assistente", href: "/assistente", group: "PMS", icon: "sparkles", perm: "prenotazioni", module: "pms" },
   { label: "Prenotazioni", href: "/prenotazioni", group: "PMS", icon: "clipboard", perm: "prenotazioni", module: "pms" },
   { label: "Calendario", href: "/calendario", group: "PMS", icon: "calendar", perm: "calendario", module: "pms" },
   { label: "Camere", href: "/camere", group: "PMS", icon: "bed", perm: "camere", module: "pms" },
