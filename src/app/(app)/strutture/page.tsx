@@ -59,9 +59,9 @@ export default function StrutturePage() {
           <span className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <button title={t("Sposta su")} onClick={() => moveStructure(s.id, "up")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↑</button>
             <button title={t("Sposta giù")} onClick={() => moveStructure(s.id, "down")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↓</button>
-            <span className="text-faint">›</span>
           </span>
         </td>
+        <td className="px-3 py-2.5 text-right text-faint">›</td>
       </tr>
     );
   };
@@ -90,7 +90,8 @@ export default function StrutturePage() {
             <col style={{ width: "8%" }} />{/* Posti letto */}
             <col style={{ width: "9%" }} />{/* CIN */}
             <col style={{ width: "7%" }} />{/* Stato */}
-            <col style={{ width: "9%" }} />{/* riordino + freccia */}
+            <col style={{ width: "7%" }} />{/* Ordina */}
+            <col style={{ width: "3%" }} />{/* apri (›) */}
           </colgroup>
           <thead>
             <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
@@ -104,16 +105,17 @@ export default function StrutturePage() {
               <th className="px-3 py-2 font-semibold">CIN</th>
               <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
               <th className="px-3 py-2 text-center font-semibold">{t("Ordina")}</th>
+              <th className="px-3 py-2 font-semibold"></th>
             </tr>
           </thead>
           <tbody>
             {groups.filter((g) => activeStructureId === "all" || g.list.length > 0).map((g) => (
               <Fragment key={g.key}>
                 <tr className="bg-wash">
-                  <td colSpan={10} className="px-3 py-2 text-[13px] font-bold tracking-tight text-txt">{g.title} <span className="font-normal text-faint">· {g.list.length}</span></td>
+                  <td colSpan={11} className="px-3 py-2 text-[13px] font-bold tracking-tight text-txt">{g.title} <span className="font-normal text-faint">· {g.list.length}</span></td>
                 </tr>
                 {g.list.length === 0
-                  ? <tr className="border-b border-line last:border-0"><td colSpan={10}><EmptyState title={g.empty} /></td></tr>
+                  ? <tr className="border-b border-line last:border-0"><td colSpan={11}><EmptyState title={g.empty} /></td></tr>
                   : g.list.map((s) => renderRow(s))}
               </Fragment>
             ))}
