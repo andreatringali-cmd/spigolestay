@@ -285,10 +285,12 @@ function Engine() {
           )}
         </div>
 
-        {/* Co-ospiti */}
-        {extras.length > 0 && (
-          <div className={`${box} mb-4 p-4`}>
+        {/* Co-ospiti (sezione sempre visibile: si può sempre aggiungere un ospite) */}
+        <div className={`${box} mb-4 p-4`}>
             <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">Altri ospiti</h2><button onClick={() => setExtras((p) => [...p, emptyExtra()])} className="rounded-md border border-line px-2 py-1 text-xs font-medium text-focus hover:bg-wash">＋ Aggiungi</button></div>
+            {extras.length === 0 ? (
+              <p className="text-xs text-faint">Se con te soggiornano altre persone, aggiungile con &ldquo;＋ Aggiungi&rdquo;.</p>
+            ) : (
             <div className="flex flex-col gap-3">
               {extras.map((e, i) => (
                 <div key={i} className="rounded-lg border border-line p-3">
@@ -304,8 +306,8 @@ function Engine() {
                 </div>
               ))}
             </div>
+            )}
           </div>
-        )}
 
         {/* Foto del documento */}
         <div className={`${box} mb-4 p-4`}>
