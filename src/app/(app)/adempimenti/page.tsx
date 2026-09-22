@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { PageHeader } from "@/components/ui";
 import { eur } from "@/lib/format";
-import { centsEur } from "@/lib/invoicing/client";
+import { centsEur, apiPost } from "@/lib/invoicing/client";
 import type { Booking, Guest, Structure } from "@/lib/types";
 
 // Data locale (NON UTC): altrimenti vicino a mezzanotte "oggi" sfasa di un giorno.
@@ -50,6 +50,21 @@ function MiniRow({ left, right }: { left: string; right?: string }) {
   );
 }
 
+// Riga "fatto" (spuntata) per la sezione Fatti di ogni card.
+function DoneRow({ left, right }: { left: string; right?: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-[12.5px]">
+      <span className="truncate text-dim"><span className="text-[color:var(--ok)]">✓</span> {left}</span>
+      {right && <span className="shrink-0 font-mono text-faint">{right}</span>}
+    </div>
+  );
+}
+
+// Etichetta di sezione (Da fare / Fatti) dentro una card.
+function SubHead({ children, mt }: { children: React.ReactNode; mt?: boolean }) {
+  return <div className={`text-[10px] font-semibold uppercase tracking-wide text-faint ${mt ? "mt-2" : ""}`}>{children}</div>;
+}
+
 // Riga arrivo senza check-in: WhatsApp (link), Email diretta (server) e "Compila tu" (apri il form).
 function ArrivalRow({ b, g, st, origin }: { b: Booking; g?: Guest; st?: Structure; origin: string }) {
   const [mail, setMail] = useState<"idle" | "sending" | "sent" | "err">("idle");
@@ -89,42 +104,77 @@ export default function AdempimentiPage() {
   const [istat, setIstat] = useState<{ id: string; arrival: string; stato: string }[]>([]);
   const [docs, setDocs] = useState<{ id: string; number_label: string | null; stato: string; total_cents: number; counterpart: { name?: string } | null }[]>([]);
   const [pays, setPays] = useState<{ document_id: string; amount_cents: number }[]>([]);
-  const [passive, setPassive] = useState<{ id: string; supplier_name: string | null; due_date: string | null; total_cents: number }[]>([]);
+  const [passive, setPassive] = useState<{ id: string; supplier_name: string | null; due_date: string | null; total_cents: number; paid: boolean }[]>([]);
 
-  useEffect(() => {
+  // Carica tutti i dati (anche il lato "fatti") in modo da poter aggiornare le schede dopo un'azione.
+  const loadData = useCallback(async () => {
     if (!supabase) return;
-    (async () => {
-      const [a, i, d, p, pv] = await Promise.all([
-        supabase.from("alloggiati_schedine").select("id, arrival, stato").neq("stato", "inviata"),
-        supabase.from("istat_rows").select("id, arrival, stato").eq("stato", "pending"),
-        supabase.from("documents").select("id, number_label, stato, total_cents, counterpart").in("stato", ["scartata", "emessa", "inviata_intermediario", "consegnata"]),
-        supabase.from("document_payments").select("document_id, amount_cents"),
-        supabase.from("purchase_documents").select("id, supplier_name, due_date, total_cents").eq("paid", false),
-      ]);
-      setSched((a.data ?? []) as typeof sched); setIstat((i.data ?? []) as typeof istat);
-      setDocs((d.data ?? []) as typeof docs); setPays((p.data ?? []) as typeof pays);
-      setPassive((pv.data ?? []) as typeof passive);
-    })();
+    const [a, i, d, p, pv] = await Promise.all([
+      supabase.from("alloggiati_schedine").select("id, arrival, stato"),
+      supabase.from("istat_rows").select("id, arrival, stato").in("stato", ["pending", "sent"]),
+      supabase.from("documents").select("id, number_label, stato, total_cents, counterpart").in("stato", ["scartata", "emessa", "inviata_intermediario", "consegnata"]),
+      supabase.from("document_payments").select("document_id, amount_cents"),
+      supabase.from("purchase_documents").select("id, supplier_name, due_date, total_cents, paid"),
+    ]);
+    setSched((a.data ?? []) as typeof sched); setIstat((i.data ?? []) as typeof istat);
+    setDocs((d.data ?? []) as typeof docs); setPays((p.data ?? []) as typeof pays);
+    setPassive((pv.data ?? []) as typeof passive);
   }, []);
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // "Passaggio di palla" passo 1 → 2: genera/aggiorna le schedine dagli arrivi con check-in fatto.
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
+  const transferToSchedine = async () => {
+    setSyncing(true); setSyncMsg("");
+    try {
+      const r = await apiPost<{ count?: number }>("alloggiati/sync", {});
+      await loadData();
+      setSyncMsg(`✓ Trasferite alle schedine${typeof r?.count === "number" ? `: ${r.count}` : ""}.`);
+    } catch (e) { setSyncMsg(e instanceof Error ? e.message : "Errore nel trasferimento."); }
+    finally { setSyncing(false); }
+  };
+  // "Passaggio di palla" arrivi → ISTAT: genera i movimenti turistici dagli arrivi.
+  const [syncingIstat, setSyncingIstat] = useState(false);
+  const [istatMsg, setIstatMsg] = useState("");
+  const transferToIstat = async () => {
+    setSyncingIstat(true); setIstatMsg("");
+    try {
+      const r = await apiPost<{ count?: number }>("istat/sync", {});
+      await loadData();
+      setIstatMsg(`✓ Movimenti ISTAT generati${typeof r?.count === "number" ? `: ${r.count}` : ""}.`);
+    } catch (e) { setIstatMsg(e instanceof Error ? e.message : "Errore nella generazione."); }
+    finally { setSyncingIstat(false); }
+  };
 
   const t = today();
   // Arrivi di oggi senza check-in online.
   const arrivalsNoCheckin = useMemo(() => bookings.filter((b) => b.checkIn === t && b.status !== "cancelled" && b.channel !== "blocked" && !b.webCheckin), [bookings, t]);
   // Check-in di oggi GIÀ completati + ospiti attualmente in casa (per il messaggio positivo).
   const arrivalsCheckedIn = useMemo(() => bookings.filter((b) => b.checkIn === t && b.status !== "cancelled" && b.channel !== "blocked" && b.webCheckin), [bookings, t]);
-  const inHouseNow = useMemo(() => bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.checkIn <= t && t < b.checkOut), [bookings, t]);
-  // Schedine a rischio (arrivo entro ieri, non inviate → 24h).
-  const schedRisk = sched.filter((s) => s.arrival && s.arrival <= t);
-  const schedToday = sched.filter((s) => s.arrival === t);
-  const istatPending = istat.length;
-  const docsRejected = docs.filter((d) => d.stato === "scartata");
   const paidByDoc = useMemo(() => { const m = new Map<string, number>(); for (const p of pays) m.set(p.document_id, (m.get(p.document_id) ?? 0) + p.amount_cents); return m; }, [pays]);
-  const docsUnpaid = docs.filter((d) => d.stato !== "scartata" && d.total_cents - (paidByDoc.get(d.id) ?? 0) > 0);
-  const passiveOverdue = passive.filter((p) => p.due_date && p.due_date <= t);
+  const balanceOf = (d: { id: string; total_cents: number }) => d.total_cents - (paidByDoc.get(d.id) ?? 0);
+  // 2 · Schedine Questura — da inviare (non "inviata") vs inviate.
+  const schedToSend = sched.filter((s) => s.stato !== "inviata");
+  const schedSent = sched.filter((s) => s.stato === "inviata");
+  const schedToday = schedToSend.filter((s) => s.arrival === t);
+  // 3 · ISTAT — pending vs inviati.
+  const istatPend = istat.filter((s) => s.stato === "pending");
+  const istatSent = istat.filter((s) => s.stato === "sent");
+  // 4 · Incassi — documenti non saldati vs saldati.
+  const docsUnpaid = docs.filter((d) => d.stato !== "scartata" && balanceOf(d) > 0);
+  const docsPaid = docs.filter((d) => d.stato !== "scartata" && balanceOf(d) <= 0);
+  // 5 · SdI — scartati vs consegnati/emessi.
+  const docsRejected = docs.filter((d) => d.stato === "scartata");
+  const docsSdiOk = docs.filter((d) => d.stato !== "scartata");
+  // 6 · Fornitori — scadute da pagare vs pagate.
+  const passiveUnpaid = passive.filter((p) => !p.paid);
+  const passivePaid = passive.filter((p) => p.paid);
+  const passiveOverdue = passiveUnpaid.filter((p) => p.due_date && p.due_date <= t);
 
-  const allClear = arrivalsNoCheckin.length === 0 && schedRisk.length === 0 && istatPending === 0 && docsRejected.length === 0 && docsUnpaid.length === 0 && passiveOverdue.length === 0;
-  const totalTasks = arrivalsNoCheckin.length + schedRisk.length + istatPending + docsUnpaid.length + docsRejected.length + passiveOverdue.length;
-  const urgent = schedRisk.length + docsRejected.length + passiveOverdue.length; // scadenze/rifiuti = priorità alta
+  const allClear = arrivalsNoCheckin.length === 0 && schedToSend.length === 0 && istatPend.length === 0 && docsRejected.length === 0 && docsUnpaid.length === 0 && passiveOverdue.length === 0;
+  const totalTasks = arrivalsNoCheckin.length + schedToSend.length + istatPend.length + docsUnpaid.length + docsRejected.length + passiveOverdue.length;
+  const urgent = schedToSend.length + docsRejected.length + passiveOverdue.length; // scadenze/rifiuti = priorità alta
   const toDo = totalTasks - urgent;
   const headTone = allClear ? "var(--ok)" : urgent > 0 ? "var(--err)" : "var(--focus)";
   const dateStr = new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
@@ -155,13 +205,13 @@ export default function AdempimentiPage() {
 
       {/* Ordine CRONOLOGICO: 1) check-in → 2) schedine Questura → 3) ISTAT → 4) incasso → 5) fattura/SdI → 6) fornitori */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {/* 1 · Sollecita il check-in online dell'ospite (azione diretta in-scheda) */}
-        <StepCard n={1} tone="var(--warn)" label="Arrivi senza check-in online" sub="Da sollecitare" count={arrivalsNoCheckin.length} action="Tutte le prenotazioni" onAction={() => router.push("/prenotazioni")}>
-          {(arrivalsNoCheckin.length > 0 || arrivalsCheckedIn.length > 0) ? (
+        {/* 1 · Check-in online → poi "passaggio di palla" alle schedine */}
+        <StepCard n={1} tone="var(--warn)" label="Arrivi senza check-in online" sub="Da sollecitare" count={arrivalsNoCheckin.length} action={syncing ? "Trasferisco…" : "↪ Trasferisci alle schedine"} onAction={transferToSchedine}>
+          {(arrivalsNoCheckin.length > 0 || arrivalsCheckedIn.length > 0 || syncMsg) ? (
             <>
               {arrivalsNoCheckin.length > 0 && (
                 <>
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Da completare ({arrivalsNoCheckin.length})</div>
+                  <SubHead>Da completare ({arrivalsNoCheckin.length})</SubHead>
                   {arrivalsNoCheckin.slice(0, 5).map((b) => (
                     <ArrivalRow key={b.id} b={b} g={getGuest(b.guestId)} st={getStructure(b.structureId)} origin={origin} />
                   ))}
@@ -169,38 +219,97 @@ export default function AdempimentiPage() {
               )}
               {arrivalsCheckedIn.length > 0 && (
                 <>
-                  <div className={`text-[10px] font-semibold uppercase tracking-wide text-faint ${arrivalsNoCheckin.length > 0 ? "mt-2" : ""}`}>Check-in fatti ({arrivalsCheckedIn.length}) · schedine pronte</div>
+                  <SubHead mt={arrivalsNoCheckin.length > 0}>Check-in fatti ({arrivalsCheckedIn.length}) · pronti per le schedine</SubHead>
                   {arrivalsCheckedIn.slice(0, 6).map((b) => {
                     const g = getGuest(b.guestId); const st = getStructure(b.structureId);
-                    return <div key={b.id} className="flex items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-[12.5px]"><span className="text-[color:var(--ok)]">✓</span><span className="truncate font-medium text-txt">{g?.fullName || "Ospite"}</span><span className="truncate text-faint">· {st?.name ?? ""}</span></div>;
+                    return <DoneRow key={b.id} left={`${g?.fullName || "Ospite"} · ${st?.name ?? ""}`} />;
                   })}
                 </>
               )}
+              {syncMsg && <div className="text-[11px] font-medium" style={{ color: syncMsg.startsWith("✓") ? "var(--ok)" : "var(--err)" }}>{syncMsg}</div>}
             </>
           ) : undefined}
         </StepCard>
 
         {/* 2 · Schedine alla Questura */}
-        <StepCard n={2} tone="var(--err)" label="Schedine alla Questura (Alloggiati Web)" sub="Pronte da inviare" count={schedRisk.length} action="Invia schedine" onAction={() => router.push("/alloggiati-web")}>
-          {schedRisk.length > 0 ? <div className="text-[12.5px] text-dim">Generate dai check-in · in arrivo oggi: <b className="text-txt">{schedToday.length}</b></div> : undefined}
+        <StepCard n={2} tone="var(--err)" label="Schedine alla Questura (Alloggiati Web)" sub="Da inviare" count={schedToSend.length} action="Invia alla Questura" onAction={() => router.push("/alloggiati-web")}>
+          {(schedToSend.length > 0 || schedSent.length > 0) ? (
+            <>
+              {schedToSend.length > 0 && (<>
+                <SubHead>Da inviare ({schedToSend.length}) · in arrivo oggi: {schedToday.length}</SubHead>
+                {schedToSend.slice(0, 4).map((sc) => <MiniRow key={sc.id} left={`Arrivo ${sc.arrival ? new Date(sc.arrival).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—"}`} />)}
+              </>)}
+              {schedSent.length > 0 && (<>
+                <SubHead mt={schedToSend.length > 0}>Inviate ({schedSent.length})</SubHead>
+                {schedSent.slice(0, 3).map((sc) => <DoneRow key={sc.id} left={`Arrivo ${sc.arrival ? new Date(sc.arrival).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—"}`} />)}
+              </>)}
+            </>
+          ) : undefined}
         </StepCard>
 
-        {/* 3 · ISTAT */}
-        <StepCard n={3} tone="var(--warn)" label="Movimenti ISTAT da inviare" sub="Da inviare" count={istatPending} action="Invia a ISTAT" onAction={() => router.push("/istat")} />
+        {/* 3 · ISTAT — passaggio di palla: genera dai arrivi, poi invia */}
+        <StepCard n={3} tone="var(--warn)" label="Movimenti ISTAT" sub="Da inviare" count={istatPend.length} action={syncingIstat ? "Genero…" : "↪ Genera da arrivi"} onAction={transferToIstat}>
+          {(istatPend.length > 0 || istatSent.length > 0 || istatMsg) ? (
+            <>
+              {istatPend.length > 0 && (<>
+                <SubHead>Da inviare ({istatPend.length})</SubHead>
+                {istatPend.slice(0, 4).map((r) => <MiniRow key={r.id} left={`Arrivo ${r.arrival ? new Date(r.arrival).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—"}`} />)}
+              </>)}
+              {istatSent.length > 0 && (<>
+                <SubHead mt={istatPend.length > 0}>Inviati ({istatSent.length})</SubHead>
+                {istatSent.slice(0, 3).map((r) => <DoneRow key={r.id} left={`Arrivo ${r.arrival ? new Date(r.arrival).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—"}`} />)}
+              </>)}
+              {istatMsg && <div className="text-[11px] font-medium" style={{ color: istatMsg.startsWith("✓") ? "var(--ok)" : "var(--err)" }}>{istatMsg} <button onClick={() => router.push("/istat")} className="underline">apri ISTAT →</button></div>}
+            </>
+          ) : undefined}
+        </StepCard>
 
         {/* 4 · Incassi */}
         <StepCard n={4} tone="var(--focus)" label="Fatture/ricevute da incassare" sub="Da incassare" count={docsUnpaid.length} action="Registra incassi" onAction={() => router.push("/scadenzario-incassi")}>
-          {docsUnpaid.length > 0 ? docsUnpaid.slice(0, 4).map((d) => <MiniRow key={d.id} left={`${d.number_label ?? "—"} · ${d.counterpart?.name ?? ""}`} right={eur(centsEur(d.total_cents - (paidByDoc.get(d.id) ?? 0)))} />) : undefined}
+          {(docsUnpaid.length > 0 || docsPaid.length > 0) ? (
+            <>
+              {docsUnpaid.length > 0 && (<>
+                <SubHead>Da incassare ({docsUnpaid.length})</SubHead>
+                {docsUnpaid.slice(0, 4).map((d) => <MiniRow key={d.id} left={`${d.number_label ?? "—"} · ${d.counterpart?.name ?? ""}`} right={eur(centsEur(balanceOf(d)))} />)}
+              </>)}
+              {docsPaid.length > 0 && (<>
+                <SubHead mt={docsUnpaid.length > 0}>Incassati ({docsPaid.length})</SubHead>
+                {docsPaid.slice(0, 3).map((d) => <DoneRow key={d.id} left={`${d.number_label ?? "—"} · ${d.counterpart?.name ?? ""}`} right={eur(centsEur(d.total_cents))} />)}
+              </>)}
+            </>
+          ) : undefined}
         </StepCard>
 
         {/* 5 · Fatture scartate SdI */}
-        <StepCard n={5} tone="var(--err)" label="Fatture scartate dallo SdI" sub="Da correggere" count={docsRejected.length} action="Correggi e reinvia" onAction={() => router.push("/documenti")}>
-          {docsRejected.length > 0 ? docsRejected.slice(0, 4).map((d) => <MiniRow key={d.id} left={`${d.number_label ?? "—"} · ${d.counterpart?.name ?? ""}`} />) : undefined}
+        <StepCard n={5} tone="var(--err)" label="Fatture elettroniche (SdI)" sub="Da correggere" count={docsRejected.length} action="Correggi e reinvia" onAction={() => router.push("/documenti")}>
+          {(docsRejected.length > 0 || docsSdiOk.length > 0) ? (
+            <>
+              {docsRejected.length > 0 && (<>
+                <SubHead>Scartate ({docsRejected.length})</SubHead>
+                {docsRejected.slice(0, 4).map((d) => <MiniRow key={d.id} left={`${d.number_label ?? "—"} · ${d.counterpart?.name ?? ""}`} />)}
+              </>)}
+              {docsSdiOk.length > 0 && (<>
+                <SubHead mt={docsRejected.length > 0}>Trasmesse ({docsSdiOk.length})</SubHead>
+                {docsSdiOk.slice(0, 3).map((d) => <DoneRow key={d.id} left={`${d.number_label ?? "—"} · ${d.counterpart?.name ?? ""}`} />)}
+              </>)}
+            </>
+          ) : undefined}
         </StepCard>
 
         {/* 6 · Fatture fornitori */}
         <StepCard n={6} tone="var(--err)" label="Fatture fornitori scadute" sub="Scadute" count={passiveOverdue.length} action="Paga / registra" onAction={() => router.push("/fatture-passive")}>
-          {passiveOverdue.length > 0 ? passiveOverdue.slice(0, 4).map((p) => <MiniRow key={p.id} left={p.supplier_name ?? "Fornitore"} right={eur(centsEur(p.total_cents))} />) : undefined}
+          {(passiveOverdue.length > 0 || passivePaid.length > 0) ? (
+            <>
+              {passiveOverdue.length > 0 && (<>
+                <SubHead>Scadute ({passiveOverdue.length})</SubHead>
+                {passiveOverdue.slice(0, 4).map((p) => <MiniRow key={p.id} left={p.supplier_name ?? "Fornitore"} right={eur(centsEur(p.total_cents))} />)}
+              </>)}
+              {passivePaid.length > 0 && (<>
+                <SubHead mt={passiveOverdue.length > 0}>Pagate ({passivePaid.length})</SubHead>
+                {passivePaid.slice(0, 3).map((p) => <DoneRow key={p.id} left={p.supplier_name ?? "Fornitore"} right={eur(centsEur(p.total_cents))} />)}
+              </>)}
+            </>
+          ) : undefined}
         </StepCard>
       </div>
 
