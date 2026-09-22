@@ -225,7 +225,8 @@ export default function RecensioniPage() {
       <Card className="mb-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <SectionTitle>Recensioni Google</SectionTitle>
-          {structures.length > 1 && (
+          {/* Il menu struttura serve solo quando in alto è selezionato "Tutte": se è già scelta una struttura, la seguiamo e nascondiamo il doppione. */}
+          {structures.length > 1 && activeStructureId === "all" && (
             <select value={selStructureId} onChange={(e) => setSelStructureId(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1 text-xs font-semibold text-txt outline-none focus:border-focus">
               {structures.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
             </select>
