@@ -125,7 +125,7 @@ export default function AdempimentiPage() {
         </Card>
 
         {/* 2 · Schedine alla Questura (dopo i check-in) */}
-        <Tile n={schedRisk.length} label="2 · Schedine da inviare (Alloggiati Web)" tone="var(--err)" action="Invia schedine" onClick={() => router.push("/alloggiati-web")}>
+        <Tile n={schedRisk.length} label="2 · Schedine da inviare alla Questura (Alloggiati Web)" tone="var(--err)" action="Invia schedine" onClick={() => router.push("/alloggiati-web")}>
           {schedRisk.length > 0 ? <div>a rischio 24h · in arrivo oggi: {schedToday.length}</div> : <div className="text-faint">nessuna in ritardo</div>}
         </Tile>
 
@@ -138,7 +138,7 @@ export default function AdempimentiPage() {
         </Tile>
 
         {/* 5 · Fatture scartate SdI */}
-        <Tile n={docsRejected.length} label="5 · Documenti scartati dallo SdI" tone="var(--err)" action="Correggi e reinvia" onClick={() => router.push("/documenti")}>
+        <Tile n={docsRejected.length} label="5 · Fatture scartate dallo SdI" tone="var(--err)" action="Correggi e reinvia" onClick={() => router.push("/documenti")}>
           {docsRejected.slice(0, 4).map((d) => <div key={d.id} className="truncate">{d.number_label} · {d.counterpart?.name ?? ""}</div>)}
         </Tile>
 
