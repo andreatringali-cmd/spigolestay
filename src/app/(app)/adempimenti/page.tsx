@@ -110,6 +110,9 @@ export default function AdempimentiPage() {
   const t = today();
   // Arrivi di oggi senza check-in online.
   const arrivalsNoCheckin = useMemo(() => bookings.filter((b) => b.checkIn === t && b.status !== "cancelled" && b.channel !== "blocked" && !b.webCheckin), [bookings, t]);
+  // Check-in di oggi GIÀ completati + ospiti attualmente in casa (per il messaggio positivo).
+  const arrivalsCheckedIn = useMemo(() => bookings.filter((b) => b.checkIn === t && b.status !== "cancelled" && b.channel !== "blocked" && b.webCheckin), [bookings, t]);
+  const inHouseNow = useMemo(() => bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.checkIn <= t && t < b.checkOut), [bookings, t]);
   // Schedine a rischio (arrivo entro ieri, non inviate → 24h).
   const schedRisk = sched.filter((s) => s.arrival && s.arrival <= t);
   const schedToday = sched.filter((s) => s.arrival === t);
@@ -154,14 +157,18 @@ export default function AdempimentiPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* 1 · Sollecita il check-in online dell'ospite (azione diretta in-scheda) */}
         <StepCard n={1} tone="var(--warn)" label="Arrivi senza check-in online" sub="Da sollecitare" count={arrivalsNoCheckin.length} action="Tutte le prenotazioni" onAction={() => router.push("/prenotazioni")}>
-          {arrivalsNoCheckin.length > 0 ? arrivalsNoCheckin.slice(0, 5).map((b) => (
-            <ArrivalRow key={b.id} b={b} g={getGuest(b.guestId)} st={getStructure(b.structureId)} origin={origin} />
-          )) : undefined}
+          {arrivalsNoCheckin.length > 0
+            ? arrivalsNoCheckin.slice(0, 5).map((b) => (
+                <ArrivalRow key={b.id} b={b} g={getGuest(b.guestId)} st={getStructure(b.structureId)} origin={origin} />
+              ))
+            : (arrivalsCheckedIn.length > 0 || inHouseNow.length > 0)
+              ? <div className="rounded-lg border border-line bg-paper px-2.5 py-2 text-[12.5px] text-dim">✓ <b className="text-txt">{arrivalsCheckedIn.length}</b> check-in completati oggi{inHouseNow.length ? <> · <b className="text-txt">{inHouseNow.length}</b> in casa ora</> : null}. Le schedine sono pronte da inviare 👇</div>
+              : undefined}
         </StepCard>
 
         {/* 2 · Schedine alla Questura */}
-        <StepCard n={2} tone="var(--err)" label="Schedine alla Questura (Alloggiati Web)" sub="A rischio 24h" count={schedRisk.length} action="Invia schedine" onAction={() => router.push("/alloggiati-web")}>
-          {schedRisk.length > 0 ? <div className="text-[12.5px] text-dim">In arrivo oggi: <b className="text-txt">{schedToday.length}</b></div> : undefined}
+        <StepCard n={2} tone="var(--err)" label="Schedine alla Questura (Alloggiati Web)" sub="Pronte da inviare" count={schedRisk.length} action="Invia schedine" onAction={() => router.push("/alloggiati-web")}>
+          {schedRisk.length > 0 ? <div className="text-[12.5px] text-dim">Generate dai check-in · in arrivo oggi: <b className="text-txt">{schedToday.length}</b></div> : undefined}
         </StepCard>
 
         {/* 3 · ISTAT */}

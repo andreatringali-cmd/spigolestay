@@ -142,6 +142,13 @@ export async function POST(req: Request) {
     });
     if (!wrote) return NextResponse.json({ ok: false, error: "write_conflict" }, { status: 409 });
 
+    // Genera la schedina Alloggiati Web per questa struttura (best-effort): così dopo il check-in
+    // online la schedina risulta subito "pronta da inviare" alla Questura (niente sync manuale).
+    try {
+      const { syncSchedine } = await import("@/lib/alloggiati/service");
+      await syncSchedine(admin, store.ownerId, { structureId: store.sid });
+    } catch { /* generazione schedina non critica */ }
+
     // Avvisa il gestore (best-effort).
     try {
       const st = (store.structure ?? {}) as Json;
