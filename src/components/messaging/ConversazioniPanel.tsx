@@ -20,6 +20,13 @@ const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? cry
 const relTime = (ts: number, t: (s: string) => string) => { const d = Math.floor((Date.now() - ts) / 60000); if (d < 1) return t("adesso"); if (d < 60) return `${d} ${t("min fa")}`; if (d < 1440) return `${Math.floor(d / 60)} ${t("h fa")}`; return `${Math.floor(d / 1440)} ${t("g fa")}`; };
 const initials = (n: string) => n.split(/\s+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 const fmtD = (iso: string) => (iso ? new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—");
+// Colore avatar deterministico dal nome (piccolo accento — palette curata, tenue/elegante).
+const AVATAR_COLORS = ["#C15B57", "#C58A3B", "#3F9E82", "#3E7CB8", "#8A6EBE", "#B85C8E", "#4E9B5C", "#C77A3E", "#5A8FB0", "#9C7BAE"];
+const avatarColor = (n: string) => { let h = 0; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0; return AVATAR_COLORS[h % AVATAR_COLORS.length]; };
+// Etichetta giorno per i separatori del thread: Oggi / Ieri / data lunga.
+const dayLabel = (ts: number, t: (s: string) => string) => { const d = new Date(ts); const now = new Date(); const y = new Date(); y.setDate(now.getDate() - 1); if (d.toDateString() === now.toDateString()) return t("Oggi"); if (d.toDateString() === y.toDateString()) return t("Ieri"); return d.toLocaleDateString("it-IT", { day: "2-digit", month: "long" }); };
+// Anteprima ultimo messaggio per la lista (prefisso "Tu:" se in uscita), su una riga.
+const preview = (m: Msg | undefined, t: (s: string) => string) => (m ? `${m.dir === "out" ? `${t("Tu")}: ` : ""}${m.text.replace(/\s+/g, " ").trim()}` : "");
 
 // ── Invii programmati (ex "Centro messaggi"), ora dentro le conversazioni ──
 type Lang = "it" | "en" | "fr" | "de" | "es";
@@ -250,9 +257,12 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     <div className="grid gap-4 lg:grid-cols-3 lg:gap-3">
       {/* Elenco (su cellulare: nascosto quando una conversazione/invii è aperta).
           Larghezza = 1/3 con gap-3 → allineata alla tab "Conversazioni" sopra. */}
-      <div className={`${(current || showInvii) ? "hidden lg:flex" : "flex"} h-[calc(100vh-15rem)] min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm lg:col-span-1`}>
-        <div className="border-b border-line p-2">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca ospite…")} className="w-full rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
+      <div className={`${(current || showInvii) ? "hidden lg:flex" : "flex"} h-[calc(100vh-15rem)] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm lg:col-span-1`}>
+        <div className="border-b border-line p-2.5">
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-faint">🔍</span>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca ospite…")} className="w-full rounded-xl border border-line bg-paper py-2 pl-9 pr-3 text-sm text-txt outline-none transition placeholder:text-faint focus:border-focus focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--focus)_20%,transparent)]" />
+          </div>
         </div>
         {(showArchived || archivedCount > 0) && (
           <button onClick={() => setShowArchived((v) => !v)} className="flex w-full items-center gap-2 border-b border-line px-3 py-2 text-left text-xs font-semibold text-dim hover:bg-wash">
@@ -266,21 +276,24 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
             const th = threads[p.id] ?? []; const last = th[th.length - 1];
             const needsReply = !!last && last.dir === "in";
             const showHeader = activeStructureId === "all" && (i === 0 || people[i - 1].struct !== p.struct);
+            const isSelected = sel === p.id;
+            const sub = last ? preview(last, t) : `${fmtD(p.b.checkIn)} → ${fmtD(p.b.checkOut)} · ${CHANNELS[p.b.channel]?.label ?? ""}`;
             return (
               <div key={p.id}>
-                {showHeader && <div className="sticky top-0 z-10 border-b border-line bg-wash px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-faint">{p.struct || "—"}</div>}
-                <div className={`group flex w-full items-center border-b border-line pr-1 ${sel === p.id ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : "hover:bg-wash"}`}>
-                  <button onClick={() => setSel(p.id)} className="flex min-w-0 flex-1 items-center gap-2.5 py-2.5 pl-3 text-left">
+                {showHeader && <div className="sticky top-0 z-10 border-b border-line bg-wash px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">{p.struct || "—"}</div>}
+                <div className={`group relative flex w-full items-center border-b border-[color:color-mix(in_srgb,var(--line)_55%,transparent)] pr-1 transition-colors ${isSelected ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : "hover:bg-wash"}`}>
+                  {isSelected && <span className="absolute inset-y-1 left-0 w-[3px] rounded-full" style={{ backgroundColor: "var(--focus)" }} />}
+                  <button onClick={() => setSel(p.id)} className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3.5 text-left">
                     <span className="relative shrink-0">
-                      <span className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-[color:var(--focus)] to-[color:color-mix(in_srgb,var(--focus)_70%,#000)] text-xs font-bold text-white">{initials(p.name)}</span>
-                      <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-surface p-[1.5px] shadow-sm"><ChannelLogo channel={p.b.channel} size={12} /></span>
+                      <span className="grid h-11 w-11 place-items-center rounded-full text-sm font-bold text-white shadow-sm ring-1 ring-black/5" style={{ backgroundColor: avatarColor(p.name) }}>{initials(p.name)}</span>
+                      <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-surface p-[2px] shadow-sm ring-1 ring-line"><ChannelLogo channel={p.b.channel} size={12} /></span>
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2">
-                        <span className={`truncate text-sm text-txt ${needsReply ? "font-bold" : "font-medium"}`}>{p.name}</span>
-                        <span className="flex shrink-0 items-center gap-1.5">{last && <span className={`text-[10px] ${needsReply ? "font-semibold text-[color:var(--ok)]" : "text-faint"}`}>{relTime(last.ts, t)}</span>}{needsReply && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--ok)" }} title={t("Da rispondere")} />}</span>
+                        <span className={`truncate text-sm text-txt ${needsReply ? "font-bold" : "font-semibold"}`}>{p.name}</span>
+                        <span className="flex shrink-0 items-center gap-1.5">{last && <span className={`text-[10px] ${needsReply ? "font-semibold text-[color:var(--ok)]" : "text-faint"}`}>{relTime(last.ts, t)}</span>}{needsReply && <span className="h-2 w-2 rounded-full ring-2 ring-[color:color-mix(in_srgb,var(--ok)_30%,transparent)]" style={{ backgroundColor: "var(--ok)" }} title={t("Da rispondere")} />}</span>
                       </span>
-                      <span className={`mt-0.5 block truncate text-xs ${needsReply ? "font-medium text-txt" : "text-dim"}`}>{`${fmtD(p.b.checkIn)} → ${fmtD(p.b.checkOut)} · ${CHANNELS[p.b.channel]?.label ?? ""}`}</span>
+                      <span className={`mt-0.5 block truncate text-xs ${needsReply ? "font-medium text-txt" : "text-dim"}`}>{sub}</span>
                     </span>
                   </button>
                   <button onClick={() => toggleArch(p.id)} title={isArch(p.id) ? t("Ripristina dalla archiviazione") : t("Archivia conversazione")} className={`shrink-0 rounded-lg px-1.5 py-1.5 text-sm text-faint transition hover:bg-line hover:text-txt ${isArch(p.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>{isArch(p.id) ? "⬆" : "🗄"}</button>
@@ -288,7 +301,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
               </div>
             );
           })}
-          {people.length === 0 && <div className="px-3 py-6 text-center text-sm text-faint">{t("Nessun ospite.")}</div>}
+          {people.length === 0 && <div className="px-3 py-10 text-center text-sm text-faint">{t("Nessun ospite.")}</div>}
         </div>
         {/* Accesso agli invii programmati, in fondo alla colonna conversazioni */}
         <button onClick={() => { setSel(null); setShowInvii(true); }} className={`flex items-center justify-center gap-2 border-t border-line px-3 py-2.5 text-xs font-semibold transition ${!current && showInvii ? "bg-wash text-focus" : "text-focus hover:bg-wash"}`}>
@@ -297,15 +310,15 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       </div>
 
       {/* Thread + invii programmati (su cellulare: visibile solo quando selezioni una conversazione/invii) */}
-      <div className={`${(current || showInvii) ? "flex" : "hidden lg:flex"} h-[calc(100vh-15rem)] min-h-[420px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm lg:col-span-2`}>
+      <div className={`${(current || showInvii) ? "flex" : "hidden lg:flex"} h-[calc(100vh-15rem)] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm lg:col-span-2`}>
         {!current ? (
           !showInvii ? (
             // Nessun ospite selezionato → placeholder pulito (gli invii si aprono col pulsante).
             <div className="grid flex-1 place-items-center p-8 text-center">
               <div>
-                <div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-2xl bg-wash text-3xl">💬</div>
+                <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl text-3xl shadow-sm ring-1 ring-line" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 8%, var(--surface))" }}>💬</div>
                 <p className="text-sm font-semibold text-txt">{t("Le tue conversazioni")}</p>
-                <p className="mx-auto mt-1 max-w-xs text-[12px] text-faint">{t("Scegli un ospite dall'elenco a sinistra per aprire la chat e i dettagli della prenotazione.")}</p>
+                <p className="mx-auto mt-1.5 max-w-xs text-[12px] leading-relaxed text-faint">{t("Scegli un ospite dall'elenco a sinistra per aprire la chat e i dettagli della prenotazione.")}</p>
               </div>
             </div>
           ) : (
@@ -350,12 +363,18 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
           )
         ) : (
           <>
-            <div className="border-b border-line px-4 py-2.5">
-              <div className="flex items-center gap-2.5">
+            <div className="border-b border-line bg-surface px-4 py-3">
+              <div className="flex items-center gap-3">
                 <button onClick={() => setSel(null)} title={t("Torna alle conversazioni")} className="shrink-0 rounded-lg border border-line px-2 py-1 text-sm text-dim hover:bg-wash lg:hidden">←</button>
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-focus text-xs font-bold text-white">{initials(current.name)}</span>
-                <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2"><span className="shrink-0 text-sm font-semibold text-txt">{current.name}</span><span className="truncate text-[11px] text-faint">{[current.phone, current.email].filter(Boolean).join(" · ") || t("nessun contatto")}</span></div>
-                <button onClick={() => toggleArch(current.id)} title={isArch(current.id) ? t("Ripristina") : t("Archivia")} className="shrink-0 rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-dim hover:bg-wash">{isArch(current.id) ? `⬆ ${t("Ripristina")}` : `🗄 ${t("Archivia")}`}</button>
+                <span className="relative shrink-0">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-bold text-white shadow-sm ring-1 ring-black/5" style={{ backgroundColor: avatarColor(current.name) }}>{initials(current.name)}</span>
+                  {current.b && <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-surface p-[2px] shadow-sm ring-1 ring-line"><ChannelLogo channel={current.b.channel} size={12} /></span>}
+                </span>
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm font-semibold text-txt">{current.name}</span>
+                  <span className="truncate text-[11px] text-faint">{[current.b ? (CHANNELS[current.b.channel]?.label ?? current.b.channel) : null, current.phone, current.email].filter(Boolean).join(" · ") || t("nessun contatto")}</span>
+                </div>
+                <button onClick={() => toggleArch(current.id)} title={isArch(current.id) ? t("Ripristina") : t("Archivia")} className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim transition hover:bg-wash">{isArch(current.id) ? `⬆ ${t("Ripristina")}` : `🗄 ${t("Archivia")}`}</button>
               </div>
               {current.b && (() => {
                 const b = current.b;
@@ -390,20 +409,33 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
               })()}
             </div>
 
-            <div ref={scrollRef} className="flex-1 space-y-1.5 overflow-y-auto p-4" style={{ background: "color-mix(in srgb, var(--focus) 4%, var(--wash))" }}>
+            <div ref={scrollRef} className="flex-1 space-y-0.5 overflow-y-auto px-4 py-4" style={{ background: "color-mix(in srgb, var(--focus) 4%, var(--wash))" }}>
               {msgs.length === 0 && <div className="mt-6 text-center text-xs text-faint">{t("Nessun messaggio. Scrivi qui sotto per iniziare.")}</div>}
               {msgs.map((m, i) => {
                 const prev = msgs[i - 1];
+                const next = msgs[i + 1];
                 const showDay = !prev || new Date(prev.ts).toDateString() !== new Date(m.ts).toDateString();
-                const dayLabel = new Date(m.ts).toLocaleDateString("it-IT", { day: "2-digit", month: "long" });
+                const out = m.dir === "out";
+                // Ultimo di un gruppo consecutivo dello stesso mittente → mostra coda + orario.
+                const groupEnd = !next || next.dir !== m.dir || new Date(next.ts).toDateString() !== new Date(m.ts).toDateString();
                 const hhmm = new Date(m.ts).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
                 return (
                   <div key={m.id}>
-                    {showDay && <div className="my-3 flex justify-center"><span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)] px-3 py-1 text-[10px] font-semibold capitalize text-dim">{dayLabel}</span></div>}
-                    <div className={`flex ${m.dir === "out" ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm ${m.dir === "out" ? "rounded-br-md text-white" : "rounded-bl-md border border-line bg-surface text-txt"}`} style={m.dir === "out" ? { background: "linear-gradient(135deg, var(--focus), color-mix(in srgb, var(--focus) 80%, #000))" } : undefined}>
-                        <div className="whitespace-pre-wrap break-words">{m.text}</div>
-                        <div className={`mt-1 text-right text-[10px] ${m.dir === "out" ? "text-white/75" : "text-faint"}`}>{hhmm}{m.via ? ` · ${m.via}` : ""}</div>
+                    {showDay && <div className="my-4 flex justify-center"><span className="rounded-full border border-line bg-surface px-3 py-1 text-[10px] font-semibold capitalize text-dim shadow-sm">{dayLabel(m.ts, t)}</span></div>}
+                    <div className={`flex ${groupEnd ? "mb-2.5" : "mb-0.5"} ${out ? "justify-end" : "justify-start"}`}>
+                      <div className={`flex max-w-[78%] flex-col ${out ? "items-end" : "items-start"}`}>
+                        <div
+                          className={`relative rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-sm ${out ? `text-white ${groupEnd ? "rounded-br-sm" : ""}` : `border border-line bg-surface text-txt ${groupEnd ? "rounded-bl-sm" : ""}`}`}
+                          style={out ? { backgroundColor: "var(--focus)" } : undefined}
+                        >
+                          {groupEnd && (
+                            out
+                              ? <span className="absolute -right-1 bottom-0 h-3 w-3 [clip-path:polygon(0_0,0_100%,100%_100%)]" style={{ backgroundColor: "var(--focus)" }} />
+                              : <span className="absolute -left-1 bottom-0 h-3 w-3 border-b border-l border-line bg-surface [clip-path:polygon(100%_0,0_100%,100%_100%)]" />
+                          )}
+                          <div className="whitespace-pre-wrap break-words">{m.text}</div>
+                        </div>
+                        {groupEnd && <div className="mt-1 px-1 text-[10px] text-faint">{hhmm}{m.via ? ` · ${m.via}` : ""}</div>}
                       </div>
                     </div>
                   </div>
@@ -427,22 +459,24 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
               </div>
             )}
 
-            <div className="border-t border-line p-2.5">
-              <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                <select onChange={(e) => { const v = e.target.value; e.target.value = ""; if (v === "__manage__") { if (onManageTemplates) onManageTemplates(); else router.push("/modelli"); } else if (v) insertTemplate(v); }} defaultValue="" className="rounded-lg border border-line bg-paper px-2 py-1 text-xs text-txt outline-none focus:border-focus">
+            <div className="border-t border-line bg-surface p-3">
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <select onChange={(e) => { const v = e.target.value; e.target.value = ""; if (v === "__manage__") { if (onManageTemplates) onManageTemplates(); else router.push("/modelli"); } else if (v) insertTemplate(v); }} defaultValue="" className="rounded-full border border-line bg-paper px-3 py-1 text-xs text-dim outline-none transition hover:bg-wash focus:border-focus">
                   <option value="">{t("Inserisci un modello…")}</option>
                   {templates.map((tp) => (<option key={tp.id} value={tp.id}>{tp.name}</option>))}
                   {templates.length > 0 && <option disabled>──────────</option>}
                   <option value="__manage__">✎ {t("Gestisci modelli…")}</option>
                 </select>
-                <button onClick={insertGuide} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-txt hover:bg-wash">{t("+ Guida ospiti")}</button>
-                {current.b && <button onClick={insertCheckin} title={t("Invia il link per il check-in online (compila la schedina alloggiati)")} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-txt hover:bg-wash">📝 {t("Check-in online")}</button>}
+                <button onClick={insertGuide} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition hover:bg-wash hover:text-txt">📖 {t("Guida ospiti")}</button>
+                {current.b && <button onClick={insertCheckin} title={t("Invia il link per il check-in online (compila la schedina alloggiati)")} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition hover:bg-wash hover:text-txt">📝 {t("Check-in online")}</button>}
               </div>
-              <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder={t("Scrivi un messaggio…")} className="w-full resize-none rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <button onClick={sendWa} disabled={!draft.trim()} className="rounded-lg px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</button>
-                <button onClick={sendMail} disabled={!draft.trim() || !current.email} className="rounded-lg bg-focus px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40">✉ Email</button>
-                <button onClick={logIn} className="ml-auto rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-dim hover:bg-wash" title={t("Registra una risposta arrivata dall'ospite")}>＋ {t("Risposta ricevuta")}</button>
+              <div className="rounded-2xl border border-line bg-paper p-2 transition focus-within:border-focus focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--focus)_18%,transparent)]">
+                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder={t("Scrivi un messaggio…")} className="w-full resize-none bg-transparent px-1.5 py-1 text-sm text-txt outline-none placeholder:text-faint" />
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <button onClick={sendWa} disabled={!draft.trim()} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</button>
+                  <button onClick={sendMail} disabled={!draft.trim() || !current.email} className="inline-flex items-center gap-1.5 rounded-full bg-focus px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40">✉ Email</button>
+                  <button onClick={logIn} className="ml-auto rounded-full border border-line px-3 py-1.5 text-sm font-medium text-dim transition hover:bg-wash hover:text-txt" title={t("Registra una risposta arrivata dall'ospite")}>＋ {t("Risposta ricevuta")}</button>
+                </div>
               </div>
             </div>
           </>

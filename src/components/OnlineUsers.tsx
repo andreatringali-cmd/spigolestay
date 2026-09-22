@@ -41,7 +41,7 @@ export default function OnlineUsers() {
   const selfOnline = netOnline && !!user?.id;
 
   const md = (user?.user_metadata ?? {}) as Record<string, unknown>;
-  const myName = (md.full_name as string) || `${localUser?.firstName ?? ""} ${localUser?.lastName ?? ""}`.trim() || (user?.email ?? "").split("@")[0] || t("Tu");
+  const myName = (md.full_name as string) || [md.first_name, md.last_name].filter(Boolean).join(" ") || `${localUser?.firstName ?? ""} ${localUser?.lastName ?? ""}`.trim() || (user?.email ?? "").split("@")[0] || t("Tu");
 
   useEffect(() => {
     if (!supabase || !user?.id) return;
@@ -83,7 +83,8 @@ export default function OnlineUsers() {
   }, [user?.id]);
 
   const online = [
-    { id: user?.id || "me", name: myName, role: t("Tu"), you: true, photo: localUser?.photo },
+    // Per me stesso mostro l'email come sottotitolo (così riconosco l'account) ed evito il "tu" doppio.
+    { id: user?.id || "me", name: myName, role: user?.email ?? "", you: true, photo: localUser?.photo },
     ...peers.map((p) => ({ id: p.userId, name: p.name, role: t("Socio"), you: false, photo: undefined as string | undefined })),
   ];
 

@@ -80,12 +80,6 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 200, on
       const { L, R, C } = anchors();
       ctx.clearRect(0, 0, W, H);
 
-      // Griglia tenue in movimento
-      ctx.strokeStyle = "rgba(120,140,190,0.10)"; ctx.lineWidth = 1;
-      const step = 36;
-      for (let x = (tk * 8) % step; x < W; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-      for (let y = (tk * 4) % step; y < H; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-
       const drawSide = (arr: { x: number; y: number }[]) => {
         arr.forEach((a, i) => {
           const col = flowCols[i % flowCols.length];

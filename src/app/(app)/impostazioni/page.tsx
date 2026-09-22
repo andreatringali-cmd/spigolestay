@@ -7,6 +7,8 @@ import { useTheme } from "@/lib/theme";
 import { useLang } from "@/lib/i18n";
 import Icon from "@/components/Icon";
 import StyleChooser from "@/components/StyleChooser";
+import { useAuth } from "@/lib/authsync";
+import { supabase } from "@/lib/supabase";
 
 export default function ImpostazioniPage() {
   const { theme, setTheme } = useTheme();
@@ -46,8 +48,12 @@ export default function ImpostazioniPage() {
   return (
     <div>
       <PageHeader title={t("Impostazioni")} subtitle={t("Preferenze generali dell'account")} />
+
+      {/* Account: nome e cognome mostrati nel gestionale (badge in alto, utenti online, ricevute) */}
+      <AccountCard />
+
       {/* Tema */}
-      <Card>
+      <Card className="mt-4">
         <SectionTitle>{t("Tema")}</SectionTitle>
         <div className="mt-1 flex items-center rounded-lg border border-line p-0.5" style={{ width: "fit-content" }}>
           <ThemeBtn active={theme === "light"} onClick={() => setTheme("light")} icon="sun" label={t("Chiaro")} />
@@ -102,6 +108,56 @@ export default function ImpostazioniPage() {
 
       <p className="mt-3 text-xs text-faint">{t("Dimostrativo. Le preferenze saranno salvate per utente sul backend; il backup include tutti i dati locali dell'app.")}</p>
     </div>
+  );
+}
+
+function AccountCard() {
+  const { t } = useLang();
+  const { user } = useAuth();
+  const md = (user?.user_metadata ?? {}) as Record<string, unknown>;
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+  // Precompila col nome già registrato (full_name), altrimenti nome+cognome separati se presenti.
+  useEffect(() => {
+    const full = (md.full_name as string) || [md.first_name, md.last_name].filter(Boolean).join(" ") || "";
+    setName(full);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  const save = async () => {
+    if (!supabase || !user) return;
+    const full_name = name.trim();
+    setSaving(true); setDone(false);
+    try {
+      await supabase.auth.updateUser({ data: { full_name } });
+      // Tiene allineata anche la tabella profiles (usata da back-office e soci).
+      try { await supabase.from("profiles").upsert({ user_id: user.id, email: user.email, full_name }, { onConflict: "user_id" }); } catch {}
+      setDone(true);
+      // Ricarico così il badge in alto e gli altri punti mostrano subito il nuovo nome.
+      setTimeout(() => location.reload(), 700);
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Card>
+      <SectionTitle>{t("Account")}</SectionTitle>
+      <p className="mb-3 text-xs text-dim">{t("Il tuo nome compare in alto (utenti online), sulle ricevute e per i tuoi soci.")}</p>
+      <div className="grid gap-3 sm:max-w-md">
+        <label className="block">
+          <span className="mb-1 block text-sm text-dim">{t("Nome e cognome")}</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("Es. Mario Rossi")} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm text-dim">{t("Email")}</span>
+          <input value={user?.email ?? ""} disabled className="w-full rounded-lg border border-line bg-wash px-3 py-2 text-sm text-faint outline-none" />
+        </label>
+        <div className="flex items-center gap-3">
+          <button onClick={save} disabled={saving || !name.trim()} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? t("Salvataggio…") : t("Salva nome")}</button>
+          {done && <span className="text-xs font-medium text-[color:var(--ok)]">✓ {t("Salvato")}</span>}
+        </div>
+      </div>
+    </Card>
   );
 }
 
