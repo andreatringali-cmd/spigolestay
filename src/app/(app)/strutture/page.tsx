@@ -55,7 +55,7 @@ export default function StrutturePage() {
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: s.active === false ? "var(--faint)" : "var(--ok)" }} />{s.active === false ? t("Disattiva") : t("Attiva")}
           </span>
         </td>
-        <td className="px-3 py-2.5 text-right">
+        <td className="px-3 py-2.5 text-center">
           <span className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <button title={t("Sposta su")} onClick={() => moveStructure(s.id, "up")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↑</button>
             <button title={t("Sposta giù")} onClick={() => moveStructure(s.id, "down")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↓</button>
@@ -103,7 +103,7 @@ export default function StrutturePage() {
               <th className="px-3 py-2 font-semibold">{t("Posti letto")}</th>
               <th className="px-3 py-2 font-semibold">CIN</th>
               <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
-              <th className="px-3 py-2 font-semibold"></th>
+              <th className="px-3 py-2 text-center font-semibold">{t("Ordina")}</th>
             </tr>
           </thead>
           <tbody>

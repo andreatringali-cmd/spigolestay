@@ -56,7 +56,6 @@ function Engine() {
   const [done, setDone] = useState(false);
   const [paidNow, setPaidNow] = useState(false);
   const frontRef = useRef<HTMLInputElement>(null);
-  const backRef = useRef<HTMLInputElement>(null);
   const onPhoto = async (file: File | undefined, set: (v: string) => void, extract = false) => {
     if (!file || !file.type.startsWith("image/")) return;
     try { const dl = await downscaleImage(file, 900, 0.72); set(dl); if (extract) void extractDoc(dl); } catch {}
@@ -204,14 +203,14 @@ function Engine() {
   const accent = st?.color || "#4F46E5";
   const header = (
     <div className="border-b border-line bg-surface">
-      <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3">
+      <div className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-3">
         <div className="grid h-9 w-9 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: accent }}>{(st?.name ?? "SS").slice(0, 2).toUpperCase()}</div>
         <div className="leading-tight"><div className="text-sm font-bold text-txt">{st?.name ?? "Xenora"}</div><div className="text-[11px] text-faint">Check-in online</div></div>
       </div>
     </div>
   );
 
-  if (loading) return <div className="min-h-full bg-wash">{header}<div className="mx-auto max-w-3xl px-4 py-16 text-center text-sm text-dim">Carico la prenotazione…</div></div>;
+  if (loading) return <div className="min-h-full bg-wash">{header}<div className="mx-auto max-w-5xl px-4 py-16 text-center text-sm text-dim">Carico la prenotazione…</div></div>;
 
   if (!info) return (
     <div className="min-h-full bg-wash">{header}
@@ -250,7 +249,7 @@ function Engine() {
 
   return (
     <div className="min-h-full bg-wash pb-16">{header}
-      <div className="mx-auto max-w-3xl px-4 py-6">
+      <div className="mx-auto max-w-5xl px-4 py-6">
         {/* Riepilogo prenotazione */}
         <div className={`${box} mb-4 p-4`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -275,11 +274,8 @@ function Engine() {
 
         {/* Dati ospite principale */}
         <div className={`${box} mb-4 p-4`}>
-          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-display text-lg font-bold text-txt">I tuoi dati</h2>
-            {!aiOff && <button type="button" onClick={() => frontRef.current?.click()} disabled={extracting} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--focus)" }}>{extracting ? "Leggo…" : "✨ Compila dai documenti"}</button>}
-          </div>
-          <p className="mb-3 text-xs text-dim">{aiOff ? "Richiesti per legge per la comunicazione degli alloggiati alla Questura. I documenti restano riservati." : "Fotografa il documento col pulsante ✨ e i campi si compilano da soli. Restano riservati."}</p>
+          <h2 className="mb-1 font-display text-lg font-bold text-txt">I tuoi dati</h2>
+          <p className="mb-3 text-xs text-dim">Richiesti per legge per la comunicazione degli alloggiati alla Questura. I documenti restano riservati.</p>
           {doc && (
             <div className="grid gap-3 sm:grid-cols-2">
               <label className={lbl}>Nome *<input value={doc.firstName} onChange={(e) => setD("firstName", e.target.value)} className={`${field} mt-1`} /></label>
@@ -293,6 +289,26 @@ function Engine() {
               <label className={`${lbl} sm:col-span-2`}>Luogo di rilascio<input value={doc.docPlace} onChange={(e) => setD("docPlace", e.target.value)} className={`${field} mt-1`} /></label>
             </div>
           )}
+          {/* Foto documento + auto-compilazione, in fondo alla scheda */}
+          <div className="mt-3 border-t border-line pt-3">
+            {photoFront ? (
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoFront} alt="documento" className="h-14 w-24 shrink-0 rounded border border-line object-cover" />
+                <div className="flex flex-col items-start gap-1">
+                  {!aiOff && <button type="button" onClick={() => extractDoc(photoFront)} disabled={extracting} className="text-xs font-semibold text-focus hover:underline disabled:opacity-50">{extracting ? "Leggo…" : "✨ Rileggi dal documento"}</button>}
+                  <button type="button" onClick={() => setPhotoFront(undefined)} className="text-[11px] text-dim hover:text-[color:var(--err)]">Rimuovi foto</button>
+                </div>
+              </div>
+            ) : (
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>
+                {extracting ? "Leggo…" : (aiOff ? "📷 Allega foto del documento" : "✨ Compila dai documenti")}
+                <input ref={frontRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onPhoto(e.target.files?.[0], setPhotoFront, true)} />
+              </label>
+            )}
+            {extractMsg && <div className="mt-2 text-[11px]" style={{ color: "var(--focus)" }}>✨ {extractMsg}</div>}
+            {!aiOff && !photoFront && <p className="mt-1 text-[11px] text-faint">Fotografa il documento: i campi qui sopra si compilano da soli.</p>}
+          </div>
         </div>
 
         {/* Co-ospiti (sezione sempre visibile: si può sempre aggiungere un ospite) */}
@@ -306,10 +322,7 @@ function Engine() {
                 <div key={i} className="rounded-lg border border-line p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-xs font-semibold text-dim">Ospite {i + 2}</span>
-                    <div className="flex items-center gap-2">
-                      {!aiOff && <label className="cursor-pointer rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>{extracting ? "Leggo…" : "✨ Compila dai documenti"}<input type="file" accept="image/*" capture="environment" hidden onChange={(ev) => onExtraPhoto(ev.target.files?.[0], i)} /></label>}
-                      <button onClick={() => setExtras((p) => p.filter((_, j) => j !== i))} className="text-faint hover:text-[color:var(--err)]">✕</button>
-                    </div>
+                    <button onClick={() => setExtras((p) => p.filter((_, j) => j !== i))} className="text-faint hover:text-[color:var(--err)]">✕</button>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <input value={e.firstName} onChange={(ev) => setExtra(i, "firstName", ev.target.value)} placeholder="Nome" className={field} />
@@ -322,48 +335,26 @@ function Engine() {
                     <input value={e.docNumber} onChange={(ev) => setExtra(i, "docNumber", ev.target.value)} placeholder="Numero documento" className={field} />
                     <input value={e.docPlace ?? ""} onChange={(ev) => setExtra(i, "docPlace", ev.target.value)} placeholder="Luogo di rilascio" className={`${field} sm:col-span-2`} />
                   </div>
-                  {e.photoFront && (
-                    <div className="mt-2 flex items-center gap-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={e.photoFront} alt="doc" className="h-12 w-20 rounded border border-line object-cover" />
-                      <button onClick={() => setExtra(i, "photoFront", "")} className="text-[11px] text-dim hover:text-[color:var(--err)]">Rimuovi foto</button>
-                    </div>
-                  )}
+                  {/* Foto documento + auto-compilazione, in fondo alla scheda dell'ospite */}
+                  <div className="mt-2">
+                    {e.photoFront ? (
+                      <div className="flex items-center gap-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={e.photoFront} alt="doc" className="h-12 w-20 rounded border border-line object-cover" />
+                        <button onClick={() => setExtra(i, "photoFront", "")} className="text-[11px] text-dim hover:text-[color:var(--err)]">Rimuovi foto</button>
+                      </div>
+                    ) : (
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>
+                        {extracting ? "Leggo…" : (aiOff ? "📷 Allega foto del documento" : "✨ Compila dai documenti")}
+                        <input type="file" accept="image/*" capture="environment" hidden onChange={(ev) => onExtraPhoto(ev.target.files?.[0], i)} />
+                      </label>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
             )}
           </div>
-
-        {/* Foto del documento */}
-        <div className={`${box} mb-4 p-4`}>
-          <h2 className="mb-1 font-display text-lg font-bold text-txt">Foto del documento</h2>
-          <p className="mb-3 text-xs text-dim">{aiOff ? "Fotografa il documento (fronte e, se serve, retro). Serve per la registrazione; resta riservato." : "Fotografa il fronte del documento: i campi qui sopra si compileranno da soli. Resta tutto riservato."}</p>
-          {!aiOff && (extracting || extractMsg) && (
-            <div className="mb-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)", color: "var(--focus)" }}>
-              {extracting ? <><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" /> Leggo i dati dal documento…</> : <>✨ {extractMsg}</>}
-            </div>
-          )}
-          <div className="grid gap-3 sm:grid-cols-2">
-            {([["Fronte", photoFront, setPhotoFront, frontRef], ["Retro", photoBack, setPhotoBack, backRef]] as const).map(([label, val, set, ref]) => (
-              <div key={label}>
-                <button type="button" onClick={() => ref.current?.click()} className="relative flex aspect-[1.586] w-full items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-line bg-paper text-faint transition hover:border-focus hover:text-focus">
-                  {val
-                    ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={val} alt={label} className="h-full w-full object-cover" />)
-                    : <span className="text-center text-xs leading-tight">📷<br />{label} documento</span>}
-                </button>
-                <div className="mt-1 flex items-center justify-between text-[11px]">
-                  <span className="text-faint">{label}</span>
-                  <span className="flex items-center gap-2">
-                    {label === "Fronte" && val && !aiOff && <button type="button" onClick={() => extractDoc(val)} disabled={extracting} className="text-focus hover:underline disabled:opacity-50">✨ Rileggi dati</button>}
-                    {val && <button type="button" onClick={() => set(undefined)} className="text-dim hover:text-[color:var(--err)]">Rimuovi</button>}
-                  </span>
-                </div>
-                <input ref={ref} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onPhoto(e.target.files?.[0], set, label === "Fronte")} />
-              </div>
-            ))}
-          </div>
-        </div>
 
         {/* Servizi extra (upsell) */}
         {offer.length > 0 && (

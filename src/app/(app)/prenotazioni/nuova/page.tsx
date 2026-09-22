@@ -609,18 +609,19 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
           <Card className="mx-auto mb-10 max-w-xl text-center">
             <div className="mx-auto mb-2 grid h-12 w-12 place-items-center rounded-full" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}><Icon name="check" size={24} /></div>
             <h3 className="font-display text-lg font-bold text-txt">{mode === "preventivo" ? "Opzione creata" : "Prenotazione creata"}</h3>
-            <p className="mt-1 text-sm text-dim">Invia all'ospite la conferma con il <b className="text-txt">link per gestire la prenotazione</b>: documenti, self check-in e note. Il link è anche nel QR del voucher PDF.</p>
+            <p className="mt-1 text-sm text-dim">{sendConfirm && g?.email ? <>La <b className="text-txt">conferma via email</b> è stata inviata all'ospite. Puoi anche condividere il link o il voucher.</> : <>Invia all'ospite la conferma con il <b className="text-txt">link per gestire la prenotazione</b>: documenti, self check-in e note. Il link è anche nel QR del voucher PDF.</>}</p>
+
+            {sendConfirm && g?.email && (
+              <div className="mx-auto mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }}><Icon name="mail" size={14} /> Email di conferma inviata a {g.email}</div>
+            )}
 
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <a href={wa || undefined} target="_blank" rel="noreferrer" className={`flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 ${wa ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={15} /> WhatsApp</a>
-              <button onClick={async () => {
-                if (!g?.email) { setEmailState({ ok: false, msg: "L'ospite non ha un'email" }); return; }
-                setEmailState({ sending: true });
-                const r = await sendVoucher(created, { getStructure, getGuest, getRoomType, getUnit });
-                setEmailState({ sending: false, ok: r.ok, msg: r.ok ? `Inviata a ${g.email}` : (r.error || "Errore invio") });
-              }} disabled={emailState.sending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"><Icon name="mail" size={15} /> {emailState.sending ? "Invio…" : "Invia email"}</button>
               <button onClick={() => printVoucher(url)} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Voucher PDF (QR)</button>
               <button onClick={async () => { try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} }} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="copy" size={15} /> {copied ? "Link copiato ✓" : "Copia link"}</button>
+              {!sendConfirm && g?.email && (
+                <button onClick={async () => { setEmailState({ sending: true }); const r = await sendVoucher(created, { getStructure, getGuest, getRoomType, getUnit }); setEmailState({ sending: false, ok: r.ok, msg: r.ok ? `Inviata a ${g.email}` : (r.error || "Errore invio") }); }} disabled={emailState.sending} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash disabled:opacity-60"><Icon name="mail" size={15} /> {emailState.sending ? "Invio…" : "Invia email"}</button>
+              )}
             </div>
 
             {emailState.msg && (

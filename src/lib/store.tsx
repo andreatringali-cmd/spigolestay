@@ -224,6 +224,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // Strutture ordinate secondo la preferenza dell'utente (campo order), poi per nome.
     // Un unico punto di ordinamento: vale ovunque (calendario, elenchi, menu a tendina).
     const sortedStructures = [...structures].sort((a, b) => {
+      // Stesso ordine della pagina Strutture: prima le PROPRIE (senza orgId), poi le CONDIVISE;
+      // dentro ciascun gruppo per "order" impostato (frecce su/giù) e infine per nome.
+      const pa = a.orgId ? 1 : 0, pb = b.orgId ? 1 : 0;
+      if (pa !== pb) return pa - pb;
       const oa = typeof a.order === "number" ? a.order : 1e9;
       const ob = typeof b.order === "number" ? b.order : 1e9;
       return oa !== ob ? oa - ob : (a.name || "").localeCompare(b.name || "", "it");
