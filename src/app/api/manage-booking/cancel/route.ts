@@ -63,6 +63,7 @@ export async function POST(req: Request) {
       status: "cancelled",
       cancelledAt: now,
       cancelledBy: "guest",
+      updatedAt: Date.now(),
       refundedAmount: refunded || undefined,
       note: [s(b.note), `Annullata dall'ospite il ${now.slice(0, 10)}${refunded > 0 ? ` — rimborso €${refunded}` : ""}`].filter(Boolean).join(" · "),
     });

@@ -47,7 +47,7 @@ export async function POST(req: Request) {
       const bk = bookings[idx] as Json;
       const sessions = arr(bk.paidSessions).map(String);
       if (sessions.includes(session.id)) return false; // già registrata
-      bookings[idx] = { ...bk, paid: n(bk.paid) + amount, paidSessions: [...sessions, session.id] };
+      bookings[idx] = { ...bk, paid: n(bk.paid) + amount, paidSessions: [...sessions, session.id], updatedAt: Date.now() };
       data.bookings = bookings;
       return true;
     });

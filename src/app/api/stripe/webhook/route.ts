@@ -83,8 +83,8 @@ async function reconcileRefund(paymentIntent: string, account: string, isDispute
     const idx = bookings.findIndex((b) => (b as { stripePaymentIntent?: string }).stripePaymentIntent === paymentIntent);
     if (idx < 0) return false;
     const bk = bookings[idx] as Json;
-    if (isDispute) bookings[idx] = { ...bk, dispute: true, note: [String(bk.note || ""), "⚠ Dispute Stripe aperta"].filter(Boolean).join(" · ") };
-    else bookings[idx] = { ...bk, status: "cancelled", cancelledBy: (bk.cancelledBy as string) || "host", cancelledAt: (bk.cancelledAt as string) || new Date().toISOString() };
+    if (isDispute) bookings[idx] = { ...bk, dispute: true, updatedAt: Date.now(), note: [String(bk.note || ""), "⚠ Dispute Stripe aperta"].filter(Boolean).join(" · ") };
+    else bookings[idx] = { ...bk, status: "cancelled", cancelledBy: (bk.cancelledBy as string) || "host", cancelledAt: (bk.cancelledAt as string) || new Date().toISOString(), updatedAt: Date.now() };
     d.bookings = bookings;
     const nb = { ...blob, [DATA_KEY]: JSON.stringify(d) };
     const rev = (row as { rev?: number }).rev;

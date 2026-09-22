@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     if (s(b.status) === "cancelled") return NextResponse.json({ ok: false, error: "cancelled" }, { status: 400 });
 
     const now = new Date().toISOString();
-    const wrote = await writeBookingPatch(admin, store, { changeRequest: { at: now, ci, co, message: message || undefined } });
+    const wrote = await writeBookingPatch(admin, store, { changeRequest: { at: now, ci, co, message: message || undefined }, updatedAt: Date.now() });
     if (!wrote) return NextResponse.json({ ok: false, error: "write_conflict" }, { status: 409 });
 
     // Avvisa il gestore.

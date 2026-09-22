@@ -250,8 +250,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       activeStructureId,
       setActiveStructure: (id) => { setActiveStructureId(id); try { localStorage.setItem("spigolestay:activestruct", id); } catch {} },
 
-      addStructure: (s) => { const id = uid(); setStructures((prev) => [...prev, { id, city: "Siracusa", checkOutBy: "10:30", ...s }]); logAct("config", `Struttura creata — ${s.name}`); return id; },
-      updateStructure: (id, patch) => setStructures((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x))),
+      addStructure: (s) => { const id = uid(); setStructures((prev) => [...prev, { id, city: "Siracusa", checkOutBy: "10:30", ...s, updatedAt: Date.now() }]); logAct("config", `Struttura creata — ${s.name}`); return id; },
+      updateStructure: (id, patch) => setStructures((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch, updatedAt: Date.now() } : x))),
       // Sposta una struttura su/giù nell'ordine di visualizzazione. Normalizza il campo
       // order su TUTTE le strutture (0..n) così l'ordine è stabile ovunque.
       moveStructure: (id, dir) => setStructures((prev) => {
@@ -266,12 +266,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (j < 0 || j >= ordered.length) return prev;
         [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
         const orderById = new Map(ordered.map((s, idx) => [s.id, idx]));
-        return prev.map((s) => ({ ...s, order: orderById.get(s.id) ?? s.order }));
+        const now = Date.now();
+        return prev.map((s) => ({ ...s, order: orderById.get(s.id) ?? s.order, updatedAt: now }));
       }),
-      addRoomType: (rt) => { const id = uid(); setRoomTypes((prev) => [...prev, { id, ...rt }]); logAct("config", `Tipologia creata — ${rt.name}`); return id; },
-      updateRoomType: (id, patch) => setRoomTypes((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x))),
-      addUnit: (u) => { const id = uid(); setUnits((prev) => [...prev, { id, ...u }]); logAct("config", `Camera aggiunta — ${u.name}`); return id; },
-      updateUnit: (id, patch) => setUnits((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x))),
+      addRoomType: (rt) => { const id = uid(); setRoomTypes((prev) => [...prev, { id, ...rt, updatedAt: Date.now() }]); logAct("config", `Tipologia creata — ${rt.name}`); return id; },
+      updateRoomType: (id, patch) => setRoomTypes((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch, updatedAt: Date.now() } : x))),
+      addUnit: (u) => { const id = uid(); setUnits((prev) => [...prev, { id, ...u, updatedAt: Date.now() }]); logAct("config", `Camera aggiunta — ${u.name}`); return id; },
+      updateUnit: (id, patch) => setUnits((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch, updatedAt: Date.now() } : x))),
       setUnitRoomType: (unitId, roomTypeId) =>
         setUnits((prev) => prev.map((u) => (u.id === unitId ? { ...u, roomTypeId } : u))),
       toggleOutOfService: (unitId) =>
@@ -326,10 +327,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addGuest: (g) => {
         const id = uid();
         const fullName = g.fullName ?? `${g.firstName ?? ""} ${g.lastName ?? ""}`.trim();
-        setGuests((prev) => [...prev, { id, ...g, fullName }]);
+        setGuests((prev) => [...prev, { id, ...g, fullName, updatedAt: Date.now() }]);
         return id;
       },
-      updateGuest: (id, patch) => setGuests((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g))),
+      updateGuest: (id, patch) => setGuests((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch, updatedAt: Date.now() } : g))),
       deleteGuest: (id) => {
         // Conserva i dati dell'ospite sulla prenotazione (per Alloggiati Web) prima di sganciarlo.
         const g = guests.find((x) => x.id === id);
@@ -353,7 +354,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const maxN = bookings.reduce((mx, x) => (x.code?.startsWith(prefix) ? Math.max(mx, Number(x.code.slice(prefix.length)) || 0) : mx), 0);
         const code = b.code ?? `${prefix}${String(maxN + 1).padStart(4, "0")}`;
         // "Prenotata il" = oggi di default (se non fornita, es. import/iCal la passano esplicita).
-        const rec: Booking = { id: uid(), bookedOn: new Date().toISOString().slice(0, 10), ...b, code };
+        const rec: Booking = { id: uid(), bookedOn: new Date().toISOString().slice(0, 10), ...b, code, updatedAt: Date.now() };
         setBookings((prev) => [...prev, rec]);
         const gName = guests.find((g) => g.id === b.guestId)?.fullName;
         if (b.channel === "blocked") logAct("block", `Fuori servizio${b.note ? " — " + b.note : ""}`);
@@ -361,7 +362,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return rec;
       },
       updateBooking: (id, patch) => {
-        setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+        setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch, updatedAt: Date.now() } : b)));
         if (patch.status === "cancelled") logAct("cancel", "Prenotazione annullata");
       },
       moveBooking: (id, to) => {

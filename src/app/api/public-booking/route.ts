@@ -116,6 +116,7 @@ export async function POST(req: Request) {
       cleaningFee: 0,
       paid: deposit,
       cityTaxPaid: false,
+      updatedAt: Date.now(),
       extId,
       code: String((body as { code?: string })?.code || "").trim().slice(0, 40) || undefined,
       note: note || "Prenotazione dal sito",

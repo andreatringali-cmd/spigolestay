@@ -111,13 +111,14 @@ export async function POST(req: Request) {
         ...bk, webCheckin: true, arrivalTime: arrival || bk.arrivalTime, guestRequests: guestRequests || undefined,
         extraGuests, docPhotoFront: docPhotoFront ?? bk.docPhotoFront, docPhotoBack: docPhotoBack ?? bk.docPhotoBack,
         signature: signature ?? bk.signature, invoiceRequest: invoiceRequest ?? bk.invoiceRequest, extras: merged, primaryGuest,
+        updatedAt: Date.now(),
       };
       data.bookings = bookings;
       // Aggiorna l'anagrafica ospite.
       const guests = arr(data.guests);
       const gi = guests.findIndex((x) => (x as { id?: string }).id === guestId);
       if (gi >= 0) {
-        guests[gi] = { ...(guests[gi] as Json), firstName: s(doc.firstName).trim(), lastName: s(doc.lastName).trim(), fullName: `${s(doc.firstName)} ${s(doc.lastName)}`.trim(), sex: (doc.sex || undefined), birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: s(doc.docNumber).trim(), docPlace: doc.docPlace };
+        guests[gi] = { ...(guests[gi] as Json), firstName: s(doc.firstName).trim(), lastName: s(doc.lastName).trim(), fullName: `${s(doc.firstName)} ${s(doc.lastName)}`.trim(), sex: (doc.sex || undefined), birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: s(doc.docNumber).trim(), docPlace: doc.docPlace, updatedAt: Date.now() };
         data.guests = guests;
       }
       return true;

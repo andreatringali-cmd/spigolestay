@@ -23,6 +23,7 @@ export type BookingStatus = "confirmed" | "tentative" | "cancelled" | "no_show";
 
 export interface Structure {
   id: string;
+  updatedAt?: number; // epoch ms dell'ultima modifica — usato dalla sync per il last-write-wins
   name: string;
   groupName: string; // "Spigole Rooms" | "Central Perk"
   orgId?: string; // se presente, la struttura è CONDIVISA (in comune con un socio): vive in org_state, non nel personale
@@ -139,6 +140,7 @@ export const ROOM_TYPE_OPTIONS = [
 
 export interface RoomType {
   id: string;
+  updatedAt?: number; // epoch ms ultima modifica (sync last-write-wins)
   structureId: string;
   name: string; // "Camera matrimoniale", "Appartamento"
   beds: number; // posti letto
@@ -187,6 +189,7 @@ export const VIEW_OPTIONS = ["Interna", "Vista strada", "Vista cortile", "Vista 
 
 export interface Unit {
   id: string;
+  updatedAt?: number; // epoch ms ultima modifica (sync last-write-wins)
   structureId: string;
   roomTypeId: string;
   name: string; // "Allegra", "Ortigia"
@@ -212,6 +215,7 @@ export interface Unit {
 
 export interface Guest {
   id: string;
+  updatedAt?: number; // epoch ms ultima modifica (sync last-write-wins)
   fullName: string;
   email?: string;
   phone?: string;
@@ -267,6 +271,7 @@ export const EVENT_COLORS = ["#E0552B", "#E0A21C", "#7C3AED", "#0E9F6E", "#2563E
 
 export interface Booking {
   id: string;
+  updatedAt?: number; // epoch ms ultima modifica (sync last-write-wins)
   code?: string; // codice leggibile per l'ospite (es. "XEN-2026-0001"), generato alla creazione
   groupId?: string; // se presente, la prenotazione fa parte di un gruppo (prenotazione multipla/di gruppo)
   structureId: string;
