@@ -81,8 +81,8 @@ export default function StrutturaSchedaPage() {
   };
   // Scollega l'account Stripe attuale (es. collegato per errore all'account sbagliato): azzera
   // il riferimento sulla struttura, così il prossimo "Collega Stripe" ne crea/collega uno nuovo.
-  const disconnectStripe = () => {
-    if (typeof window !== "undefined" && !window.confirm(t("Scollegare questo account Stripe dalla struttura? Potrai poi collegare quello corretto. (L'account su Stripe non viene eliminato.)"))) return;
+  const disconnectStripe = async () => {
+    if (!(await ask({ title: t("Scollega account Stripe"), message: t("Scollegare questo account Stripe dalla struttura? Potrai poi collegare quello corretto. L'account su Stripe non viene eliminato."), danger: true, confirmLabel: t("Scollega") }))) return;
     updateStructure(params.id as string, { stripeAccount: "" });
     setF((p) => ({ ...p, stripeAccount: "" }));
     setStripeSt({ enabled: false, msg: t("Account scollegato. Ora premi «Collega Stripe» e completa con i dati della struttura.") });
