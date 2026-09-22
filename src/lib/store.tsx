@@ -137,6 +137,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   //    `ready` è uno STATE (non un ref): sotto StrictMode il doppio-invoke degli effetti
   //    non riesce così a salvare il seed sovrascrivendo i dati appena caricati.
   const [ready, setReady] = useState(false);
+  const readyRef = useRef(false);
+  useEffect(() => { readyRef.current = ready; }, [ready]);
   useEffect(() => {
     // Modalità sito pubblico (xenora.it/<slug>): i dati arrivano dallo snapshot in
     // memoria, non dal localStorage. Non si esegue reset/onboarding e NON si salva.
@@ -205,6 +207,40 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (!ready || isPublicMode()) return; // in pubblico non si scrive nel browser del visitatore
     try { localStorage.setItem(KEY, JSON.stringify({ structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, _deleted: deletedRef.current })); } catch {}
   }, [ready, structures, roomTypes, units, guests, bookings, events, rateOverrides, activities]);
+
+  // Ri-idratazione IN-PLACE: quando la sincronizzazione col server aggiorna i dati (anche solo
+  // un campo, es. webCheckin/paid/status) o quando si torna sulla scheda, rileggiamo il blocco
+  // salvato e aggiorniamo lo stato SENZA ricaricare la pagina. Così le card (Adempimenti, ecc.)
+  // riflettono subito le modifiche fatte altrove (es. check-in completato in un altro tab).
+  useEffect(() => {
+    if (isPublicMode()) return;
+    const rehydrate = () => {
+      if (!readyRef.current) return;
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (!raw) return;
+        const d = JSON.parse(raw);
+        if (Array.isArray(d.structures)) setStructures(d.structures);
+        if (Array.isArray(d.roomTypes)) setRoomTypes(d.roomTypes);
+        if (Array.isArray(d.units)) setUnits(d.units);
+        if (Array.isArray(d.guests)) setGuests(d.guests);
+        if (Array.isArray(d.bookings)) setBookings(d.bookings);
+        if (Array.isArray(d.events)) setEvents(d.events);
+        if (d.rateOverrides && typeof d.rateOverrides === "object") setRateOverrides(d.rateOverrides);
+        if (Array.isArray(d.activities)) setActivities(d.activities);
+        if (d._deleted && typeof d._deleted === "object") deletedRef.current = d._deleted as Record<string, string[]>;
+      } catch {}
+    };
+    const onVis = () => { if (document.visibilityState === "visible") rehydrate(); };
+    window.addEventListener("spigolestay:datasync", rehydrate);
+    window.addEventListener("focus", rehydrate);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("spigolestay:datasync", rehydrate);
+      window.removeEventListener("focus", rehydrate);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, []);
   // Registra l'accesso al gestionale una volta per sessione del browser.
   useEffect(() => {
     if (!ready) return;

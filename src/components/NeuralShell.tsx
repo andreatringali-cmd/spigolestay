@@ -55,7 +55,11 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 200, on
     const ro = new ResizeObserver(resize); ro.observe(wrap);
 
     const focus = cssVar("--focus", "#5B74E6");
-    const flowCols = [focus, "#38bdf8", "#2dd4bf", "#a78bfa", "#f59e0b", "#f472b6"];
+    // In tema chiaro: palette di GRIGI (niente azzurrino). In scuro: flussi colorati "neural".
+    const flowCols = light
+      ? ["#9ca3af", "#6b7280", "#4b5563", "#a1a1aa", "#71717a", "#52525b"]
+      : [focus, "#38bdf8", "#2dd4bf", "#a78bfa", "#f59e0b", "#f472b6"];
+    const glowCol = light ? "#9ca3af" : focus;
 
     const parts = Array.from({ length: 70 }, () => ({ side: Math.random() < 0.5 ? 0 : 1, line: 0, t: Math.random(), spd: 0.0026 + Math.random() * 0.0044, r: 1 + Math.random() * 1.8 }));
 
@@ -119,7 +123,7 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 200, on
       // Alone del core (assorbimento)
       const glow = 0.6 + 0.4 * Math.sin(tk * (state === "listen" ? 4 : state === "speak" ? 3 : 1.6));
       const g = ctx.createRadialGradient(C.x, C.y, 0, C.x, C.y, coreSize * 0.75);
-      g.addColorStop(0, rgba(focus, (light ? 0.12 : 0.16) * glow)); g.addColorStop(1, rgba(focus, 0));
+      g.addColorStop(0, rgba(glowCol, (light ? 0.12 : 0.16) * glow)); g.addColorStop(1, rgba(glowCol, 0));
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(C.x, C.y, coreSize * 0.75, 0, Math.PI * 2); ctx.fill();
 
       if (!reduce) raf = requestAnimationFrame(draw);
@@ -133,7 +137,7 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 200, on
     <button key={it.label} data-tile data-side={align === "left" ? "l" : "r"} onClick={() => it.q && onInput?.(it.q)}
       className={`pointer-events-auto group rounded-xl border px-3.5 py-3 backdrop-blur-md transition ${light ? "border-black/10 bg-white/70 hover:border-black/25 hover:bg-white/90" : "border-white/10 bg-white/[0.06] hover:border-white/30 hover:bg-white/[0.12]"} ${align === "right" ? "text-right" : "text-left"}`}
       style={{ boxShadow: light ? "0 2px 14px rgba(30,45,80,.10)" : "0 2px 14px rgba(0,0,0,.28)" }}>
-      <div className={`${mono} text-[9.5px] font-semibold uppercase tracking-wider`} style={{ color: light ? "rgba(60,75,110,.72)" : "rgba(200,214,240,.65)" }}>{it.label}</div>
+      <div className={`${mono} text-[9.5px] font-semibold uppercase tracking-wider`} style={{ color: light ? "rgba(90,93,99,.75)" : "rgba(200,214,240,.65)" }}>{it.label}</div>
       <div className={`${mono} mt-0.5 text-xl font-bold leading-tight`} style={{ color: it.tone, textShadow: light ? "none" : `0 0 16px ${it.tone}55` }}>{it.value}</div>
     </button>
   );
@@ -143,12 +147,12 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 200, on
   const minH = Math.max(460, 64 + rows * 82);
 
   return (
-    <div ref={wrapRef} className="relative w-full overflow-hidden rounded-2xl border" style={{ minHeight: minH, borderColor: light ? "rgba(120,140,190,.32)" : "rgba(120,140,190,.18)", background: light ? "radial-gradient(120% 90% at 50% 40%, #ffffff 0%, #f2f5fa 55%, #e9edf4 100%)" : "radial-gradient(120% 90% at 50% 40%, #101827 0%, #0a0f1a 55%, #070b13 100%)" }}>
+    <div ref={wrapRef} className="relative w-full overflow-hidden rounded-2xl border" style={{ minHeight: minH, borderColor: light ? "rgba(140,142,148,.34)" : "rgba(120,140,190,.18)", background: light ? "radial-gradient(120% 90% at 50% 40%, #ffffff 0%, #f4f5f6 55%, #eceeef 100%)" : "radial-gradient(120% 90% at 50% 40%, #101827 0%, #0a0f1a 55%, #070b13 100%)" }}>
       <canvas ref={canvasRef} className="pointer-events-none absolute inset-0" aria-hidden />
 
       {/* Intestazione stile terminale */}
       <div className="relative flex items-center justify-between px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.16em]">
-        <span className={mono} style={{ color: light ? "rgba(45,60,95,.72)" : "rgba(180,198,230,.75)" }}>XENORA · NEURAL SHELL</span>
+        <span className={mono} style={{ color: light ? "rgba(75,78,84,.78)" : "rgba(180,198,230,.75)" }}>XENORA · NEURAL SHELL</span>
         <span className={`${mono} inline-flex items-center gap-1.5`} style={{ color: light ? "#0d9488" : "#2dd4bf" }}><span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: light ? "#0d9488" : "#2dd4bf", boxShadow: light ? "0 0 8px #0d948866" : "0 0 8px #2dd4bf" }} />{state === "listen" ? "ASCOLTO" : state === "speak" ? "OUTPUT" : "LIVE"}</span>
       </div>
 
