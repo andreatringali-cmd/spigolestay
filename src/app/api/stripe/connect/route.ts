@@ -23,14 +23,14 @@ export async function POST(req: Request) {
     // Capability richieste: carte + Klarna (pagamento a rate per l'ospite). Google Pay/Apple Pay
     // non sono una capability separata (viaggiano su card_payments). Klarna comparirà al checkout
     // dell'ospite una volta approvata da Stripe (può richiedere una verifica aggiuntiva).
-    const CAPS = { card_payments: { requested: true }, transfers: { requested: true }, klarna_payments: { requested: true } };
+    const CAPS = { card_payments: { requested: true }, transfers: { requested: true }, klarna_payments: { requested: true }, paypal_payments: { requested: true } };
     // Se c'è già un account salvato ma NON è accessibile con la chiave attuale (tipico
     // passaggio test→live, o account creato con un'altra API), lo scartiamo e ne creiamo uno nuovo.
     if (acct) {
       try {
         await stripe.accounts.retrieve(acct);
-        // Account esistente: richiedi Klarna se non già attiva (best-effort, non blocca).
-        try { await stripe.accounts.update(acct, { capabilities: { klarna_payments: { requested: true } } }); } catch {}
+        // Account esistente: richiedi Klarna + PayPal se non già attive (best-effort, non blocca).
+        try { await stripe.accounts.update(acct, { capabilities: { klarna_payments: { requested: true }, paypal_payments: { requested: true } } }); } catch {}
       } catch { acct = ""; }
     }
     if (!acct) {

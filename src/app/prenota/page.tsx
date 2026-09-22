@@ -492,7 +492,7 @@ function Engine() {
                 <p className="mt-3 text-xs text-dim">{deposit > 0 ? <>Per confermare è richiesto un acconto di <b className="text-txt">{eur(deposit)}</b>{selPlan.refundable ? "" : " (intero importo, tariffa non rimborsabile)"}. Il saldo si versa in struttura.</> : <>Nessun acconto richiesto: l&apos;intero importo si salda in struttura.</>} Il pagamento è gestito in modo sicuro da Stripe.</p>
                 {deposit > 0 && (
                   <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-line bg-wash px-3 py-2 text-[11px] text-dim">
-                    <span>💳 Carta</span><span className="text-faint">·</span><span> Google Pay / Apple Pay</span><span className="text-faint">·</span>
+                    <span>💳 Carta</span><span className="text-faint">·</span><span>Google Pay / Apple Pay</span><span className="text-faint">·</span><span>PayPal</span><span className="text-faint">·</span>
                     <span className="font-semibold text-txt">Klarna — paga in 3 rate senza interessi</span>
                     <span className="text-faint">(dove disponibile)</span>
                   </div>
