@@ -24,9 +24,11 @@ function StepCard({ n, tone, label, sub, count, action, onAction, children }: {
       <div className="h-1 w-full" style={{ background: active ? tone : "var(--line)" }} />
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[13px] font-bold" style={{ background: active ? soft(tone) : "var(--wash)", color: active ? tone : "var(--faint)" }}>{n}</span>
-          <h3 className="min-w-0 flex-1 pt-1 text-[13.5px] font-semibold leading-snug text-txt">{label}</h3>
-          <span className="shrink-0 font-mono text-[26px] font-bold leading-none" style={{ color: active ? tone : "var(--faint)" }}>{count}</span>
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl font-mono text-xl font-bold" style={{ background: active ? soft(tone) : "var(--wash)", color: active ? tone : "var(--faint)" }}>{count}</span>
+          <div className="min-w-0 flex-1 pt-0.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Passo {n}</div>
+            <h3 className="mt-0.5 text-[13.5px] font-semibold leading-snug text-txt">{label}</h3>
+          </div>
         </div>
         <div className="mt-2.5">
           <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={active ? { background: soft(tone), color: tone } : { background: soft("var(--ok)"), color: "var(--ok)" }}>{active ? sub : "✓ In ordine"}</span>
