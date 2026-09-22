@@ -67,6 +67,14 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   // struttura (?s), la ricavo dalla tipologia richiesta così la camera è già visibile.
   const rtParam = qp("rt");
   const [structureId, setStructureId] = useState(() => qp("s") || (rtParam ? roomTypes.find((r) => r.id === rtParam)?.structureId : "") || structures[0]?.id || "");
+  // Nel motore pubblico (mini-sito / embed) i dati arrivano DOPO il mount: appena compaiono le
+  // strutture, se non ne ho una valida selezionata la imposto (da ?s, da ?rt, o la prima).
+  useEffect(() => {
+    if (structureId && structures.some((s) => s.id === structureId)) return;
+    const next = qp("s") || (rtParam ? roomTypes.find((r) => r.id === rtParam)?.structureId : "") || structures[0]?.id || "";
+    if (next && next !== structureId) setStructureId(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structures, roomTypes]);
   const structure = getStructure(structureId);
   const extras: ExtraService[] = (structure?.extras && structure.extras.length ? structure.extras : DEFAULT_EXTRAS).filter((e) => e.active !== false);
 
