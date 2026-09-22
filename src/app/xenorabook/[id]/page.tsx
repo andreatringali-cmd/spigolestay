@@ -1,28 +1,32 @@
 "use client";
 
-import { useMemo, useState } from "react";
+// Dettaglio struttura PUBBLICO di XenoraBook (xenora.it/xenorabook/[id]) — a tutta pagina.
+import { Suspense, useMemo, useState } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { useData } from "@/lib/store";
+import Link from "next/link";
 import { Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
-import { getListing, roomsFor, StructImg, stars, type Room } from "@/lib/xenorabook/data";
+import { getListing, roomsFor, StructImg, type Room } from "@/lib/xenorabook/data";
 
 const c = (n: number) => `€${n}`;
 
-export default function StructurePage() {
+export default function StructurePublicPage() {
+  return <Suspense fallback={null}><Engine /></Suspense>;
+}
+
+function Engine() {
   const router = useRouter();
   const params = useParams();
   const qp = useSearchParams();
-  const { structures } = useData();
   const id = String((params as { id?: string }).id || "");
-  const listing = useMemo(() => getListing(structures, id), [structures, id]);
+  const listing = useMemo(() => getListing([], id), [id]);
 
   const today = new Date().toISOString().slice(0, 10);
   const [from, setFrom] = useState(qp.get("from") || today);
   const [to, setTo] = useState(qp.get("to") || today);
   const [adults, setAdults] = useState(Number(qp.get("adults")) || 2);
   const [children, setChildren] = useState(Number(qp.get("children")) || 0);
-  const [sel, setSel] = useState<Record<string, number>>({}); // roomId → qty
+  const [sel, setSel] = useState<Record<string, number>>({});
   const [step, setStep] = useState<"rooms" | "checkout" | "done">("rooms");
   const [guest, setGuest] = useState({ firstName: "", lastName: "", email: "", phone: "", note: "" });
   const [code, setCode] = useState("");
@@ -32,9 +36,25 @@ export default function StructurePage() {
   const selLines = rooms.filter((r) => (sel[r.id] ?? 0) > 0).map((r) => ({ room: r, qty: sel[r.id] }));
   const roomsTotal = selLines.reduce((s, l) => s + l.room.price * l.qty * nights, 0);
   const guestsTot = adults + children;
-  const cityTax = guestsTot * Math.min(nights, 7) * 2; // esempio: €2 a persona/notte, max 7 notti
+  const cityTax = guestsTot * Math.min(nights, 7) * 2;
 
-  if (!listing) return (
+  const shell = (inner: React.ReactNode) => (
+    <div className="min-h-screen bg-wash">
+      <header className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+          <Link href="/xenorabook" className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/xenora-mark.png" alt="Xenora" width={26} height={26} style={{ width: 26, height: 26, objectFit: "contain" }} />
+            <span className="font-display text-lg font-bold text-txt">XenoraBook</span>
+          </Link>
+          <a href="https://xenora.it" className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash">Sei una struttura? Accedi</a>
+        </div>
+      </header>
+      <main className="mx-auto max-w-6xl px-4 py-6">{inner}</main>
+    </div>
+  );
+
+  if (!listing) return shell(
     <div className="py-10 text-center">
       <div className="text-sm text-dim">Struttura non trovata.</div>
       <button onClick={() => router.push("/xenorabook")} className="mt-3 text-sm font-semibold text-focus">← Torna al portale</button>
@@ -43,20 +63,16 @@ export default function StructurePage() {
 
   const setQty = (rid: string, q: number, max = 5) => setSel((p) => ({ ...p, [rid]: Math.max(0, Math.min(max, q)) }));
   const gallery = [listing.hue, (listing.hue + 40) % 360, (listing.hue + 80) % 360, (listing.hue + 200) % 360];
+  const confirm = () => { setCode(`XB-${Math.random().toString(36).slice(2, 7).toUpperCase()}`); setStep("done"); };
 
-  const confirm = () => {
-    setCode(`XB-${Math.random().toString(36).slice(2, 7).toUpperCase()}`);
-    setStep("done");
-  };
-
-  return (
+  return shell(
     <>
       <button onClick={() => router.push("/xenorabook")} className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-dim hover:text-txt"><Icon name="chevron" size={14} style={{ transform: "rotate(180deg)" }} /> Portale</button>
 
       {step === "done" ? (
         <Card className="mx-auto max-w-lg text-center">
           <div className="mx-auto grid h-14 w-14 place-items-center rounded-full text-2xl" style={{ backgroundColor: "#E3F0E7", color: "#3F7A5B" }}>✓</div>
-          <h1 className="mt-3 text-2xl font-bold text-txt">Prenotazione confermata</h1>
+          <h1 className="mt-3 text-2xl font-bold text-txt">Richiesta inviata</h1>
           <p className="mt-1 text-sm text-dim">Codice <b className="font-mono text-txt">{code}</b> · {listing.name}</p>
           <div className="mt-4 rounded-xl border border-line bg-wash p-4 text-left text-sm">
             <div className="flex justify-between py-0.5"><span className="text-dim">Soggiorno</span><span className="font-semibold text-txt">{from} → {to} · {nights} notti</span></div>
@@ -64,14 +80,12 @@ export default function StructurePage() {
             {selLines.map((l) => <div key={l.room.id} className="flex justify-between py-0.5"><span className="text-dim">{l.qty}× {l.room.name}</span><span className="font-semibold text-txt">{c(l.room.price * l.qty * nights)}</span></div>)}
             <div className="mt-1 flex justify-between border-t border-line pt-1 font-bold text-txt"><span>Totale</span><span>{c(roomsTotal)}</span></div>
           </div>
-          <p className="mt-3 text-xs text-faint">Anteprima: nel portale pubblico la prenotazione arriverà direttamente nel gestionale della struttura. Tassa di soggiorno €{cityTax} da pagare in loco.</p>
+          <p className="mt-3 text-xs text-faint">Anteprima del portale. Tassa di soggiorno €{cityTax} da pagare in loco.</p>
           <button onClick={() => router.push("/xenorabook")} className="mt-4 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white">Torna al portale</button>
         </Card>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-          {/* colonna sinistra */}
           <div className="min-w-0">
-            {/* galleria */}
             <div className="grid grid-cols-4 gap-2 overflow-hidden rounded-2xl border border-line">
               <div className="col-span-4 sm:col-span-2 sm:row-span-2"><div className="aspect-[4/3] h-full w-full sm:aspect-auto"><StructImg hue={gallery[0]} initial={listing.name[0]} /></div></div>
               {gallery.slice(1).map((h, i) => <div key={i} className="hidden aspect-[4/3] sm:block"><StructImg hue={h} initial={listing.name[0]} /></div>)}
@@ -129,7 +143,6 @@ export default function StructurePage() {
             )}
           </div>
 
-          {/* colonna destra: riepilogo prenotazione */}
           <div>
             <Card className="sticky top-4">
               <div className="grid grid-cols-2 gap-2">
@@ -140,7 +153,6 @@ export default function StructurePage() {
                 <div className="flex items-center justify-between rounded-lg border border-line px-2.5 py-1.5"><span className="text-dim">Adulti</span><span className="flex items-center gap-2"><button onClick={() => setAdults(Math.max(1, adults - 1))} className="text-dim">−</button><b>{adults}</b><button onClick={() => setAdults(adults + 1)} className="text-dim">+</button></span></div>
                 <div className="flex items-center justify-between rounded-lg border border-line px-2.5 py-1.5"><span className="text-dim">Bambini</span><span className="flex items-center gap-2"><button onClick={() => setChildren(Math.max(0, children - 1))} className="text-dim">−</button><b>{children}</b><button onClick={() => setChildren(children + 1)} className="text-dim">+</button></span></div>
               </div>
-
               <div className="mt-3 border-t border-line pt-3 text-sm">
                 {selLines.length === 0 ? (
                   <div className="text-xs text-dim">Seleziona almeno una camera per continuare.</div>
@@ -154,7 +166,6 @@ export default function StructurePage() {
                   </>
                 )}
               </div>
-
               {step === "rooms" ? (
                 <button disabled={selLines.length === 0} onClick={() => setStep("checkout")} className="mt-3 w-full rounded-lg bg-focus px-4 py-2.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-40">Prenota</button>
               ) : (

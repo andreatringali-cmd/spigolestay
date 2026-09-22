@@ -53,18 +53,22 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 200, on
     const focus = cssVar("--focus", "#5B74E6");
     const flowCols = [focus, "#38bdf8", "#2dd4bf", "#a78bfa", "#f59e0b", "#f472b6"];
 
-    const parts = Array.from({ length: 70 }, () => ({ side: Math.random() < 0.5 ? 0 : 1, line: 0, t: Math.random(), spd: 0.004 + Math.random() * 0.007, r: 1 + Math.random() * 1.8 }));
+    const parts = Array.from({ length: 70 }, () => ({ side: Math.random() < 0.5 ? 0 : 1, line: 0, t: Math.random(), spd: 0.0026 + Math.random() * 0.0044, r: 1 + Math.random() * 1.8 }));
 
     let raf = 0, tk = 0;
+    // Gli ancoraggi sono i CENTRI reali delle card (misurati dal DOM), così le linee di flusso
+    // partono esattamente dal centro di ogni card, qualunque sia altezza/numero.
     const anchors = () => {
-      const nL = Math.max(0, inputsRef.current.length ? Math.ceil(inputsRef.current.length / 2) : 0);
-      const nR = Math.max(0, inputsRef.current.length - nL);
-      const narrow = W < 640;
-      const C = { x: W * 0.5, y: narrow ? H * 0.42 : H * 0.5 };
-      const colY = (n: number, i: number) => { const top = H * 0.16, bot = H * 0.16, us = H - top - bot; return top + (n <= 1 ? us / 2 : (us * i) / (n - 1)); };
-      const L = Array.from({ length: nL }, (_, i) => ({ x: W * (narrow ? 0.12 : 0.20), y: colY(nL, i) }));
-      const R = Array.from({ length: nR }, (_, i) => ({ x: W * (narrow ? 0.88 : 0.80), y: colY(nR, i) }));
-      return { L, R, C };
+      const wr = wrap.getBoundingClientRect();
+      const L: { x: number; y: number }[] = [];
+      const R: { x: number; y: number }[] = [];
+      wrap.querySelectorAll<HTMLElement>("[data-tile]").forEach((el) => {
+        const r = el.getBoundingClientRect();
+        const cy = r.top - wr.top + r.height / 2;
+        if (el.getAttribute("data-side") === "l") L.push({ x: r.right - wr.left, y: cy });
+        else R.push({ x: r.left - wr.left, y: cy });
+      });
+      return { L, R, C: { x: W * 0.5, y: H * 0.52 } };
     };
     const bez = (a: { x: number; y: number }, c: { x: number; y: number }, t: number) => {
       const cpx = (a.x + c.x) / 2, cpy = a.y; const u = 1 - t;
@@ -128,16 +132,20 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 200, on
 
   const mono = "font-mono";
   const tile = (it: ShellInput, align: "left" | "right") => (
-    <button key={it.label} onClick={() => it.q && onInput?.(it.q)}
-      className={`pointer-events-auto group rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 backdrop-blur-md transition hover:border-white/30 hover:bg-white/[0.12] ${align === "right" ? "text-right" : "text-left"}`}
+    <button key={it.label} data-tile data-side={align === "left" ? "l" : "r"} onClick={() => it.q && onInput?.(it.q)}
+      className={`pointer-events-auto group rounded-xl border border-white/10 bg-white/[0.06] px-3.5 py-3 backdrop-blur-md transition hover:border-white/30 hover:bg-white/[0.12] ${align === "right" ? "text-right" : "text-left"}`}
       style={{ boxShadow: "0 2px 14px rgba(0,0,0,.28)" }}>
-      <div className={`${mono} text-[9px] font-semibold uppercase tracking-wider`} style={{ color: "rgba(200,214,240,.65)" }}>{it.label}</div>
-      <div className={`${mono} text-lg font-bold leading-tight`} style={{ color: it.tone, textShadow: `0 0 14px ${it.tone}55` }}>{it.value}</div>
+      <div className={`${mono} text-[9.5px] font-semibold uppercase tracking-wider`} style={{ color: "rgba(200,214,240,.65)" }}>{it.label}</div>
+      <div className={`${mono} mt-0.5 text-xl font-bold leading-tight`} style={{ color: it.tone, textShadow: `0 0 16px ${it.tone}55` }}>{it.value}</div>
     </button>
   );
 
+  // Altezza dinamica: la console cresce quanto basta a contenere tutte le card senza scroll.
+  const rows = Math.max(left.length, right.length);
+  const minH = Math.max(460, 64 + rows * 82);
+
   return (
-    <div ref={wrapRef} className="relative w-full overflow-hidden rounded-2xl border" style={{ minHeight: 440, borderColor: "rgba(120,140,190,.18)", background: "radial-gradient(120% 90% at 50% 40%, #101827 0%, #0a0f1a 55%, #070b13 100%)" }}>
+    <div ref={wrapRef} className="relative w-full overflow-hidden rounded-2xl border" style={{ minHeight: minH, borderColor: "rgba(120,140,190,.18)", background: "radial-gradient(120% 90% at 50% 40%, #101827 0%, #0a0f1a 55%, #070b13 100%)" }}>
       <canvas ref={canvasRef} className="pointer-events-none absolute inset-0" aria-hidden />
 
       {/* Intestazione stile terminale */}
@@ -146,12 +154,12 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 200, on
         <span className={`${mono} inline-flex items-center gap-1.5`} style={{ color: "#2dd4bf" }}><span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: "#2dd4bf", boxShadow: "0 0 8px #2dd4bf" }} />{state === "listen" ? "ASCOLTO" : state === "speak" ? "OUTPUT" : "LIVE"}</span>
       </div>
 
-      {/* Colonna sinistra */}
-      <div className="pointer-events-none absolute left-0 top-11 bottom-3 z-10 flex w-[38%] flex-col justify-center gap-2 overflow-y-auto px-3 sm:w-[26%]">
+      {/* Colonna sinistra (niente scrollbar: l'altezza si adatta) */}
+      <div className="pointer-events-none absolute left-0 top-11 bottom-3 z-10 flex w-[40%] flex-col justify-center gap-2.5 px-3 sm:w-[27%]">
         {left.map((it) => tile(it, "left"))}
       </div>
       {/* Colonna destra */}
-      <div className="pointer-events-none absolute right-0 top-11 bottom-3 z-10 flex w-[38%] flex-col justify-center gap-2 overflow-y-auto px-3 sm:w-[26%]">
+      <div className="pointer-events-none absolute right-0 top-11 bottom-3 z-10 flex w-[40%] flex-col justify-center gap-2.5 px-3 sm:w-[27%]">
         {right.map((it) => tile(it, "right"))}
       </div>
 

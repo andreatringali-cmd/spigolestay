@@ -874,6 +874,9 @@ export default function CalendarGrid() {
                 <button onClick={() => setBars("dentro")} className={`rounded-md py-1 text-xs font-semibold transition ${barStyle === "dentro" ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>Dentro</button>
                 <button onClick={() => setBars("sotto")} className={`rounded-md py-1 text-xs font-semibold transition ${barStyle === "sotto" ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>Sotto</button>
               </div>
+              <div className="my-1 border-t border-line" />
+              <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Etichette camera</div>
+              <MenuToggle label="Icone (arrivo/partenza, pulizia, lenzuola)" on={showRoomIcons} onClick={toggleRoomIcons} />
             </div>
           )}
         </div>
@@ -900,12 +903,6 @@ export default function CalendarGrid() {
           <button onClick={() => setStart((d) => addDays(d, 1))} title="Giorno successivo" aria-label="Giorno successivo" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">›</button>
         </div>
         <div className="order-4 ml-auto flex items-center gap-2">
-          {/* Icone stato camera nelle etichette: freccetta per aprire/chiudere */}
-          <button onClick={toggleRoomIcons} title={showRoomIcons ? "Nascondi le icone camera (mostra solo i nomi)" : "Mostra le icone camera (arrivo/partenza, pulizia, lenzuola)"} aria-label="Icone camera" className={`flex h-9 items-center gap-1.5 rounded-lg border border-line px-2.5 text-xs font-semibold transition ${showRoomIcons ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 4L9.5 14.5" /><path d="M13 8l3 3" /><path d="M9.5 14.5l-4.5 1 -1 4.5 4.5 -1 4.5 -1 -3.5 -3.5z" /></svg>
-            <span className="hidden sm:inline">Icone</span>
-            <span className="text-[10px]">{showRoomIcons ? "▾" : "▸"}</span>
-          </button>
           {/* Selettore card Insights (mostra/nascondi) */}
           {/* Toggle card: un click mostra tutte / nasconde tutte (come le altre sezioni) */}
           <button onClick={() => (INSIGHT_CARDS.some((c) => showCard(c.key)) ? persistCards(new Set(INSIGHT_CARDS.map((c) => c.key))) : persistCards(new Set()))} title={INSIGHT_CARDS.some((c) => showCard(c.key)) ? "Nascondi le card" : "Mostra le card"} className={`grid h-9 w-9 place-items-center rounded-lg border border-line transition ${INSIGHT_CARDS.some((c) => showCard(c.key)) ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>

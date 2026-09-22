@@ -1,15 +1,16 @@
 "use client";
 
+// XenoraBook PUBBLICO (fuori dal gestionale): xenora.it/xenorabook — portale a tutta pagina
+// come lo vede un ospite dall'esterno. Nessun login, nessuna sidebar. Catalogo verificato.
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useData } from "@/lib/store";
+import Link from "next/link";
 import { Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
-import { type Listing, type StructType, SAMPLES, CITIES, AMEN_FILTERS, TYPES, stars, StructImg, mineListings } from "@/lib/xenorabook/data";
+import { type Listing, type StructType, SAMPLES, CITIES, AMEN_FILTERS, TYPES, stars, StructImg } from "@/lib/xenorabook/data";
 
-export default function XenoraBookPage() {
+export default function XenoraBookPublicPage() {
   const router = useRouter();
-  const { structures } = useData();
   const [city, setCity] = useState("Tutte");
   const [amen, setAmen] = useState<string[]>([]);
   const [sort, setSort] = useState<"consigliate" | "prezzo" | "rating">("consigliate");
@@ -19,11 +20,11 @@ export default function XenoraBookPage() {
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [rooms, setRooms] = useState(1);
-  const [minRating, setMinRating] = useState(0);   // recensioni
-  const [starClass, setStarClass] = useState(0);   // stelle struttura
-  const [minBeds, setMinBeds] = useState(0);        // posti letto
-  const [types, setTypes] = useState<StructType[]>([]); // tipologia
-  const [onlyAvail, setOnlyAvail] = useState(false);   // disponibilità
+  const [minRating, setMinRating] = useState(0);
+  const [starClass, setStarClass] = useState(0);
+  const [minBeds, setMinBeds] = useState(0);
+  const [types, setTypes] = useState<StructType[]>([]);
+  const [onlyAvail, setOnlyAvail] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
   const [from, setFrom] = useState(today);
@@ -35,7 +36,8 @@ export default function XenoraBookPage() {
     document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const all: Listing[] = useMemo(() => [...mineListings(structures), ...SAMPLES], [structures]);
+  // Catalogo pubblico: le strutture verificate (per ora dataset curato).
+  const all: Listing[] = useMemo(() => [...SAMPLES], []);
 
   const guestsTot = adults + children;
   const results = useMemo(() => {
@@ -63,7 +65,20 @@ export default function XenoraBookPage() {
   const nights = Math.max(1, Math.round((Date.parse(to) - Date.parse(from)) / 86400000) || 1);
 
   return (
-    <>
+    <div className="min-h-screen bg-wash">
+      {/* Barra pubblica */}
+      <header className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+          <Link href="/xenorabook" className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/xenora-mark.png" alt="Xenora" width={26} height={26} style={{ width: 26, height: 26, objectFit: "contain" }} />
+            <span className="font-display text-lg font-bold text-txt">XenoraBook</span>
+          </Link>
+          <a href="https://xenora.it" className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash">Sei una struttura? Accedi</a>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-7xl px-4 py-6">
       {/* ── HERO d'impatto ── */}
       <section className="relative overflow-hidden rounded-3xl" style={{ background: "linear-gradient(135deg,#1E3A46 0%,#2E5B63 42%,#BE5D38 100%)" }}>
         <HeroDeco />
@@ -79,7 +94,7 @@ export default function XenoraBookPage() {
         </div>
       </section>
 
-      {/* Barra di ricerca: sotto la copertina, con leggero incastro (non la copre) */}
+      {/* Barra di ricerca */}
       <div className="relative z-10 mb-5 -mt-7 px-2 sm:-mt-16 sm:px-6">
         <div className="rounded-2xl border border-line bg-surface p-2 shadow-xl">
             <div className="grid gap-2 md:grid-cols-[1.4fr_1fr_1fr_1.1fr_auto]">
@@ -122,21 +137,18 @@ export default function XenoraBookPage() {
           </div>
         </div>
 
-      {/* ── Filtri rapidi (servizi) + tipologia + toggle vista ── */}
+      {/* Filtri rapidi */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {TYPES.map((t) => (
           <button key={t} onClick={() => toggleType(t)} className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${types.includes(t) ? "bg-focus text-white" : "border border-line bg-surface text-dim hover:text-txt"}`}>{t}</button>
         ))}
-        <button onClick={() => setMoreOpen((o) => !o)} className="whitespace-nowrap rounded-full border border-line bg-surface px-3 py-1.5 text-[12.5px] font-semibold text-txt hover:bg-wash">
-          ⚙ Filtri{activeCount ? ` · ${activeCount}` : ""}
-        </button>
+        <button onClick={() => setMoreOpen((o) => !o)} className="whitespace-nowrap rounded-full border border-line bg-surface px-3 py-1.5 text-[12.5px] font-semibold text-txt hover:bg-wash">⚙ Filtri{activeCount ? ` · ${activeCount}` : ""}</button>
         <div className="ml-auto inline-flex rounded-lg border border-line bg-surface p-0.5">
           <button onClick={() => setView("lista")} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${view === "lista" ? "bg-focus text-white" : "text-dim"}`}>Lista</button>
           <button onClick={() => setView("mappa")} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${view === "mappa" ? "bg-focus text-white" : "text-dim"}`}>Mappa</button>
         </div>
       </div>
 
-      {/* ── Pannello filtri avanzati ── */}
       {moreOpen && (
         <Card className="mb-3">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -184,7 +196,6 @@ export default function XenoraBookPage() {
         </select>
       </div>
 
-      {/* ── Layout: lista o lista+mappa ── */}
       <div className={view === "mappa" ? "grid gap-4 lg:grid-cols-[1fr_1fr]" : ""}>
         <div className={`grid gap-4 ${view === "mappa" ? "sm:grid-cols-1 xl:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3"}`}>
           {results.map((l) => (
@@ -193,7 +204,6 @@ export default function XenoraBookPage() {
               <div className="relative aspect-[4/3] w-full overflow-hidden bg-wash">
                 <StructImg hue={l.hue} initial={l.name[0]} />
                 <span className="absolute left-3 top-3 flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold text-white shadow" style={{ backgroundColor: "#3F7A5B" }}>✦ Verificata</span>
-                {l.mine && <span className="absolute right-3 top-3 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white">La tua struttura</span>}
               </div>
               <div className="flex flex-col gap-1.5 p-4">
                 <div className="flex items-baseline justify-between gap-2">
@@ -220,7 +230,6 @@ export default function XenoraBookPage() {
         )}
       </div>
 
-      {/* criteri */}
       <Card className="mt-6">
         <SectionTitle>Cosa significa «Verificata»</SectionTitle>
         <p className="mt-1 text-sm text-dim">Una struttura entra in XenoraBook solo se rispetta — in automatico, ricontrollati ogni mese — tutti questi requisiti.</p>
@@ -233,23 +242,22 @@ export default function XenoraBookPage() {
           ))}
         </div>
       </Card>
-    </>
+      </main>
+
+      <footer className="border-t border-line bg-surface">
+        <div className="mx-auto max-w-7xl px-4 py-6 text-center text-xs text-faint">XenoraBook · Digital Solution — solo strutture verificate. <a href="https://xenora.it" className="text-focus hover:underline">Gestisci la tua struttura con Xenora</a></div>
+      </footer>
+    </div>
   );
 }
 
-// ── Decorazione hero: sole, mare e skyline stilizzati (SVG originale) ──
 function HeroDeco() {
   return (
     <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1200 420" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       <circle cx="1010" cy="120" r="72" fill="#fff" opacity="0.14" />
       <circle cx="1010" cy="120" r="46" fill="#fff" opacity="0.16" />
-      <g fill="#fff" opacity="0.10">
-        <path d="M0 360 q150 -46 300 0 t300 0 t300 0 t300 0 v60 H0 Z" />
-      </g>
-      <g fill="#fff" opacity="0.07">
-        <path d="M0 392 q160 -34 320 0 t320 0 t320 0 t320 0 v40 H0 Z" />
-      </g>
-      {/* skyline stilizzato (cupole + torre, forma astratta) */}
+      <g fill="#fff" opacity="0.10"><path d="M0 360 q150 -46 300 0 t300 0 t300 0 t300 0 v60 H0 Z" /></g>
+      <g fill="#fff" opacity="0.07"><path d="M0 392 q160 -34 320 0 t320 0 t320 0 t320 0 v40 H0 Z" /></g>
       <g fill="none" stroke="#fff" strokeOpacity="0.16" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
         <path d="M120 356 v-58 a44 44 0 0 1 88 0 v58" />
         <path d="M188 356 v-34 a20 20 0 0 1 40 0 v34" />
@@ -260,35 +268,26 @@ function HeroDeco() {
   );
 }
 
-// ── Mappa stilizzata (SVG originale della Sicilia sud-orientale) con pin-prezzo ──
 function MapPanel({ results, hovered, setHovered }: { results: Listing[]; hovered: string; setHovered: (id: string) => void }) {
   return (
     <div className="relative h-full w-full">
       <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
-        {/* mare */}
         <defs>
           <linearGradient id="sea" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#AECBD6" /><stop offset="1" stopColor="#8FB6C4" /></linearGradient>
           <linearGradient id="land" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#E9E2CE" /><stop offset="1" stopColor="#D9CFB4" /></linearGradient>
         </defs>
         <rect width="100" height="100" fill="url(#sea)" />
-        {/* terraferma stilizzata (forma astratta, non geografica) */}
         <path d="M-5 8 Q20 6 34 16 Q46 24 44 40 Q42 58 52 70 Q60 80 56 96 L-5 100 Z" fill="url(#land)" stroke="#C9BE9F" strokeWidth="0.6" />
         <path d="M56 96 Q60 80 52 70 Q42 58 44 40 Q46 24 34 16" fill="none" stroke="#fff" strokeOpacity="0.5" strokeWidth="0.5" />
-        {/* etichette città */}
         {[["Siracusa", 60, 24], ["Ortigia", 80, 34], ["Noto", 46, 74], ["Ragusa", 20, 60]].map(([n, x, y]) => (
           <text key={n as string} x={x as number} y={y as number} fontSize="2.4" fontWeight="700" fill="#7A6E55" opacity="0.8">{n}</text>
         ))}
-        {/* rosa dei venti */}
         <g transform="translate(90,90)" opacity="0.6"><circle r="3.4" fill="none" stroke="#7A6E55" strokeWidth="0.4" /><path d="M0 -3.4 L0.9 0 L0 3.4 L-0.9 0 Z" fill="#BE5D38" /></g>
       </svg>
-
-      {/* pin-prezzo (HTML sovrapposto per interattività) */}
       {results.map((l) => (
         <button key={l.id} onMouseEnter={() => setHovered(l.id)} onMouseLeave={() => setHovered("")}
           className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full px-2 py-0.5 text-[11px] font-bold shadow transition ${hovered === l.id ? "z-20 scale-110 bg-focus text-white" : "z-10 bg-surface text-txt"}`}
-          style={{ left: `${l.x}%`, top: `${l.y}%`, border: "1px solid var(--line)" }} title={l.name}>
-          €{l.price}
-        </button>
+          style={{ left: `${l.x}%`, top: `${l.y}%`, border: "1px solid var(--line)" }} title={l.name}>€{l.price}</button>
       ))}
     </div>
   );
