@@ -329,6 +329,22 @@ export interface Booking {
   changeRequest?: { at: string; ci?: string; co?: string; adults?: number; children?: number; message?: string }; // richiesta di modifica date inviata al gestore
 }
 
+// Recensione DIRETTA: lasciata da un ospite sul mini-sito pubblico (Xenosite).
+// Sono dati NOSTRI (non Google/OTA): il gestore può rispondere e la risposta si
+// pubblica davvero sul mini-sito. Vivono nel blob dati del proprietario (app_state).
+export interface DirectReview {
+  id: string;
+  updatedAt?: number;  // epoch ms ultima modifica (sync last-write-wins: es. quando si pubblica la risposta)
+  structureId: string;
+  guest: string;       // nome ospite (o "Ospite")
+  date: string;        // ISO "YYYY-MM-DD" (giorno di invio)
+  rating: number;      // 0..10 (le stelle 1..5 del sito vengono normalizzate ×2)
+  text: string;
+  source: "direct";
+  reply?: string;      // risposta pubblica del gestore (pubblicata sul mini-sito)
+  createdAt: number;   // epoch ms
+}
+
 // Dati di intestazione fattura raccolti dall'ospite al check-in (usati dal modulo Documenti).
 export interface InvoiceRequest {
   wants: boolean;

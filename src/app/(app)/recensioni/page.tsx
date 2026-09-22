@@ -6,6 +6,7 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
 import { useData } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
+import { DATA_KEY } from "@/lib/publicdata";
 import type { NormalizedReview } from "@/lib/reviews/google";
 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" });
@@ -17,12 +18,13 @@ const SOURCES = [
   { k: "airbnb", label: "Airbnb", color: "#FF5A5F", note: "Collegamento partner in arrivo · inserimento manuale." },
   { k: "expedia", label: "Expedia", color: "#FFC72C", note: "Collegamento partner in arrivo · inserimento manuale." },
   { k: "tripadvisor", label: "Tripadvisor", color: "#00AA6C", note: "Collegamento partner in arrivo · inserimento manuale." },
-  { k: "direct", label: "Diretta", color: "#7A8450", note: "Recensioni dei tuoi ospiti diretti · inserimento manuale." },
+  { k: "direct", label: "Diretta", color: "#7A8450", note: "Recensioni lasciate dagli ospiti sul tuo mini-sito · rispondi e pubblica." },
 ] as const;
 type SourceKey = typeof SOURCES[number]["k"];
 const SRC = Object.fromEntries(SOURCES.map((s) => [s.k, s])) as Record<SourceKey, typeof SOURCES[number]>;
-// Fonti per cui è possibile l'inserimento manuale (tutte tranne Google, che è reale).
-const MANUAL_SOURCES = SOURCES.filter((s) => s.k !== "google");
+// Fonti per cui è possibile l'inserimento manuale: tutte tranne Google (reale via API)
+// e Diretta (le lasciano gli ospiti dal mini-sito, non si inseriscono a mano).
+const MANUAL_SOURCES = SOURCES.filter((s) => s.k !== "google" && s.k !== "direct");
 
 const PLACEID_KEY = (structureId: string) => `spigolestay:reviews:placeid:${structureId}`;
 const MANUAL_KEY = "spigolestay:reviews:manual";
@@ -43,7 +45,7 @@ interface GoogleState {
 }
 
 export default function RecensioniPage() {
-  const { structures, activeStructureId, updateStructure } = useData();
+  const { structures, activeStructureId, updateStructure, directReviews, setDirectReviewReply } = useData();
 
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -176,19 +178,41 @@ export default function RecensioniPage() {
   // le teniamo globali ma filtriamo per struttura via prefisso). Per semplicità: manuali globali.
   const manualReviews = manual;
 
-  // Insieme completo delle recensioni mostrate (Google reali + manuali).
+  // Recensioni DIRETTE REALI della struttura selezionata (dal blob sincronizzato / store),
+  // normalizzate nella stessa forma delle altre così entrano in media/distribuzione/filtri/lista.
+  const directList: NormalizedReview[] = useMemo(() => {
+    return (directReviews || [])
+      .filter((r) => r.structureId === selStructureId)
+      .map((r) => ({ id: r.id, guest: r.guest || "Ospite", date: r.date, rating: r.rating, text: r.text || "", source: "direct" as const, bucket: bucketOf(r.rating) }))
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  }, [directReviews, selStructureId]);
+
+  // Insieme completo delle recensioni mostrate (Google reali + dirette reali + manuali).
   type Review = NormalizedReview;
   const reviews: Review[] = useMemo(() => {
     const g = placeId && google.configured ? google.reviews : [];
-    return [...g, ...manualReviews];
-  }, [google.reviews, google.configured, placeId, manualReviews]);
+    return [...g, ...directList, ...manualReviews];
+  }, [google.reviews, google.configured, placeId, directList, manualReviews]);
 
   const connectedSources = useMemo(() => {
     const set = new Set<SourceKey>();
     if (googleConnected) set.add("google");
+    for (const r of directList) set.add(r.source as SourceKey);
     for (const r of manualReviews) set.add(r.source as SourceKey);
     return SOURCES.filter((s) => set.has(s.k)).map((s) => s.k);
-  }, [googleConnected, manualReviews]);
+  }, [googleConnected, directList, manualReviews]);
+
+  // Precarica nel pannello risposte le risposte GIÀ pubblicate sulle recensioni dirette,
+  // così compaiono come "La tua risposta" (fonte di verità = campo reply della recensione).
+  useEffect(() => {
+    const withReply = (directReviews || []).filter((r) => r.reply && r.reply.trim());
+    if (!withReply.length) return;
+    setReplies((prev) => {
+      let changed = false; const n = { ...prev };
+      for (const r of withReply) if (n[r.id] === undefined) { n[r.id] = r.reply!; changed = true; }
+      return changed ? n : prev;
+    });
+  }, [directReviews]);
 
   const shown = reviews
     .filter((r) => filter === "all" || r.source === filter)
@@ -232,10 +256,60 @@ export default function RecensioniPage() {
     } catch { setDraft((d) => ({ ...d, [r.id]: suggest(r) })); }
     finally { setAiBusy((b) => ({ ...b, [r.id]: false })); }
   };
+  // Aggiorna lo snapshot pubblico (public_sites) della struttura con la recensione diretta
+  // + risposta, così la risposta compare SUBITO sul mini-sito. Best-effort: se il sito non è
+  // pubblicato o la scrittura fallisce, la risposta resta salvata e comparirà alla prossima
+  // pubblicazione del sito (buildPublishData include tutte le recensioni dirette).
+  const pushDirectToSnapshot = async (reviewId: string, reply: string) => {
+    if (!supabase) return;
+    const rev = (directReviews || []).find((r) => r.id === reviewId);
+    if (!rev) return;
+    try {
+      const { data: site } = await supabase.from("public_sites").select("data").eq("structure_id", rev.structureId).maybeSingle();
+      if (!site?.data) return; // sito non pubblicato: niente snapshot da aggiornare
+      const blob = { ...(site.data as Record<string, string>) };
+      let d: Record<string, unknown> = {};
+      try { d = JSON.parse(blob[DATA_KEY] || "{}"); } catch { d = {}; }
+      const list = (Array.isArray(d.directReviews) ? d.directReviews : []) as Record<string, unknown>[];
+      const merged = { ...rev, reply, updatedAt: Date.now() };
+      const i = list.findIndex((x) => (x as { id?: string }).id === reviewId);
+      if (i >= 0) list[i] = { ...list[i], ...merged }; else list.push(merged);
+      d.directReviews = list;
+      blob[DATA_KEY] = JSON.stringify(d);
+      await supabase.from("public_sites").update({ data: blob, updated_at: new Date().toISOString() }).eq("structure_id", rev.structureId);
+    } catch { /* best-effort */ }
+  };
+
   // Bridge per pubblicare su Google: copia la risposta e apre la gestione recensioni di Google Business.
   const publishOnGoogle = (id: string) => {
     try { navigator.clipboard?.writeText(replies[id] || "").catch(() => {}); } catch {}
     window.open("https://business.google.com/reviews", "_blank", "noopener");
+  };
+
+  // Salvataggio "solo locale" della risposta (Google/OTA manuali).
+  const saveLocalReply = (id: string) => {
+    const t = (draft[id] ?? "").trim();
+    if (t) persistReplies({ ...replies, [id]: t });
+  };
+  // Google: salva la bozza e apre Google Business (la vera pubblicazione su Google non è via API).
+  const publishGoogleFromDraft = (id: string) => {
+    const t = (draft[id] ?? "").trim();
+    if (t) persistReplies({ ...replies, [id]: t });
+    try { navigator.clipboard?.writeText(t || replies[id] || "").catch(() => {}); } catch {}
+    window.open("https://business.google.com/reviews", "_blank", "noopener");
+  };
+  // Diretta: pubblica DAVVERO (salva la reply sulla recensione nel blob + snapshot pubblico → mini-sito).
+  const publishDirect = async (id: string) => {
+    const t = (draft[id] ?? "").trim();
+    if (!t) return;
+    persistReplies({ ...replies, [id]: t });
+    setDirectReviewReply(id, t);          // → salvata nel blob (app_state) al prossimo sync
+    await pushDirectToSnapshot(id, t);    // → visibile subito sul mini-sito
+  };
+  // Rimuove la risposta salvata; per le dirette la ritira anche dal mini-sito.
+  const removeReply = async (r: Review) => {
+    const n = { ...replies }; delete n[r.id]; persistReplies(n);
+    if (r.source === "direct") { setDirectReviewReply(r.id, ""); await pushDirectToSnapshot(r.id, ""); }
   };
 
   const suggest = (r: { guest: string; bucket: string }) => {
@@ -361,12 +435,18 @@ export default function RecensioniPage() {
 
             <div className="mt-3 rounded-lg border border-line bg-wash p-3 text-[13px] text-dim">
               {srcCfg === "direct"
-                ? "Le recensioni dei tuoi ospiti diretti le raccogli e le inserisci qui. In futuro potrai chiederle in automatico via email post-soggiorno."
+                ? "Gli ospiti lasciano le recensioni dal tuo mini-sito (Xenosite): le trovi qui sotto la fonte «Diretta». Sono dati tuoi, quindi puoi rispondere e — con «Pubblica risposta» — la risposta compare davvero sul mini-sito. Puoi anche aggiungerne una a mano."
                 : `${SRC[srcCfg].label} non espone un'API pubblica self-service per le recensioni: il collegamento avverrà tramite connettore partner (in arrivo). Nel frattempo puoi inserire le recensioni a mano — restano salvate e rientrano in media, distribuzione e risposte AI.`}
             </div>
 
-            <button onClick={() => { setMForm((f) => ({ ...f, source: srcCfg })); setShowManual(true); setSrcCfg(null); }} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90">＋ Aggiungi recensione {SRC[srcCfg].label} a mano</button>
-            <p className="mt-2 text-center text-[11px] text-faint">Il connettore automatico {SRC[srcCfg].label} arriverà con le integrazioni partner.</p>
+            {srcCfg === "direct" ? (
+              <p className="mt-3 text-center text-[11px] text-faint">Le recensioni dirette arrivano dal mini-sito (Xenosite) e compaiono qui automaticamente.</p>
+            ) : (
+              <>
+                <button onClick={() => { setMForm((f) => ({ ...f, source: srcCfg })); setShowManual(true); setSrcCfg(null); }} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90">＋ Aggiungi recensione {SRC[srcCfg].label} a mano</button>
+                <p className="mt-2 text-center text-[11px] text-faint">Il connettore automatico {SRC[srcCfg].label} arriverà con le integrazioni partner.</p>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -439,15 +519,22 @@ export default function RecensioniPage() {
               <div className="mt-2 rounded-lg border border-line bg-wash p-2.5 text-sm text-dim"><span className="text-[10px] font-semibold uppercase tracking-wide text-faint">La tua risposta</span><div className="mt-0.5 text-txt">{replies[r.id]}</div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   {r.source === "google" && <button onClick={() => publishOnGoogle(r.id)} className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-surface" title="Copia la risposta e apri la gestione recensioni di Google">📋 Copia e rispondi su Google →</button>}
-                  <button onClick={() => { const n = { ...replies }; delete n[r.id]; persistReplies(n); }} className="text-[11px] text-faint hover:text-[color:var(--err)]">Rimuovi</button>
+                  {r.source === "direct" && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title="La risposta è pubblicata sul tuo mini-sito">✓ Pubblicata sul mini-sito</span>}
+                  <button onClick={() => removeReply(r)} className="text-[11px] text-faint hover:text-[color:var(--err)]">Rimuovi</button>
                 </div>
               </div>
             ) : (
               <div className="mt-2">
                 <textarea value={draft[r.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [r.id]: e.target.value }))} rows={2} placeholder="Scrivi una risposta…" className="w-full resize-y rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
-                <div className="mt-1.5 flex gap-2">
+                <div className="mt-1.5 flex flex-wrap gap-2">
                   <button onClick={() => aiReply(r)} disabled={!!aiBusy[r.id]} className="flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-50"><Icon name="sparkles" size={13} /> {aiBusy[r.id] ? "Scrivo…" : "Suggerisci risposta AI"}</button>
-                  <button onClick={() => { if ((draft[r.id] ?? "").trim()) persistReplies({ ...replies, [r.id]: draft[r.id].trim() }); }} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">Pubblica risposta</button>
+                  {r.source === "google" ? (
+                    <button onClick={() => publishGoogleFromDraft(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="inline-flex items-center gap-1 rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title="Copia la risposta e apri la gestione recensioni di Google (Google non consente la pubblicazione via API)">📋 Copia e rispondi su Google →</button>
+                  ) : r.source === "direct" ? (
+                    <button onClick={() => publishDirect(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title="Pubblica la risposta sul tuo mini-sito">Pubblica risposta</button>
+                  ) : (
+                    <button onClick={() => saveLocalReply(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title="Salva la risposta (solo in locale, per tua memoria)">Salva risposta</button>
+                  )}
                 </div>
               </div>
             )}
@@ -465,7 +552,7 @@ export default function RecensioniPage() {
         {reviews.length > 0 && shown.length === 0 && <Card className="py-8 text-center text-sm text-faint">Nessuna recensione per questa fonte.</Card>}
       </div>
 
-      <p className="mt-3 text-[11px] text-faint">Google è collegato via Google Places API (recensioni reali, ~5 più recenti). Le altre fonti (Booking, Airbnb, Expedia, Tripadvisor) avranno il collegamento partner: nel frattempo puoi inserirle a mano.</p>
+      <p className="mt-3 text-[11px] text-faint">Google è collegato via Google Places API (recensioni reali, ~5 più recenti). Le recensioni <strong>Dirette</strong> le lasciano gli ospiti dal tuo mini-sito e qui puoi rispondere e pubblicare davvero la risposta. Le altre fonti (Booking, Airbnb, Expedia, Tripadvisor) avranno il collegamento partner: nel frattempo puoi inserirle a mano.</p>
     </div>
   );
 }

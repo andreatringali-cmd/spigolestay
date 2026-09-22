@@ -94,6 +94,7 @@ export function buildPublishData(structureId: string): Record<string, string> | 
     bookings?: Record<string, unknown>[];
     events?: Record<string, unknown>[];
     rateOverrides?: Record<string, number>;
+    directReviews?: Record<string, unknown>[];
   } = {};
   try { blob = JSON.parse(localStorage.getItem(DATA_KEY) || "{}"); } catch { return null; }
 
@@ -126,6 +127,10 @@ export function buildPublishData(structureId: string): Record<string, string> | 
     }));
   const events = (blob.events ?? []).filter((e) => (e as { structureId?: string }).structureId === structureId);
 
+  // Recensioni dirette della struttura: pubblicate sul mini-sito (con l'eventuale
+  // risposta del gestore). Sono dati NOSTRI, quindi possono comparire pubblicamente.
+  const directReviews = (blob.directReviews ?? []).filter((r) => (r as { structureId?: string }).structureId === structureId);
+
   out[DATA_KEY] = JSON.stringify({
     structures: cleanStructs,
     roomTypes,
@@ -135,6 +140,7 @@ export function buildPublishData(structureId: string): Record<string, string> | 
     events,
     rateOverrides: blob.rateOverrides ?? {},
     activities: [],
+    directReviews,
   });
 
   // Chiavi ausiliarie: copiate così come sono (foto/promo/piani/regole/config).

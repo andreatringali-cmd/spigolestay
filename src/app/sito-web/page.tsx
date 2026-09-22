@@ -8,7 +8,7 @@ import { getImages } from "@/lib/images";
 import { loadPromos } from "@/lib/promos";
 import { eur } from "@/lib/format";
 import { amenityIcon } from "@/lib/amenities";
-import { isPublicMode, publicSlug, lsGet } from "@/lib/publicdata";
+import { isPublicMode, publicSlug, lsGet, DATA_KEY } from "@/lib/publicdata";
 
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
 const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return toISO(d); };
@@ -43,6 +43,16 @@ const SITE_DICT: Record<string, Record<string, string>> = {
   "Le recensioni non sono disponibili al momento.": { en: "Reviews are not available at the moment.", fr: "Les avis ne sont pas disponibles pour le moment.", de: "Bewertungen sind derzeit nicht verfügbar.", es: "Las opiniones no están disponibles en este momento." },
   "Vedi tutte su Google": { en: "See all on Google", fr: "Voir tout sur Google", de: "Alle auf Google ansehen", es: "Ver todas en Google" },
   "Leggi le recensioni su Google": { en: "Read reviews on Google", fr: "Lire les avis sur Google", de: "Bewertungen auf Google lesen", es: "Ver opiniones en Google" },
+  "Lascia una recensione": { en: "Leave a review", fr: "Laisser un avis", de: "Bewertung abgeben", es: "Deja una opinión" },
+  "Hai soggiornato da noi? Raccontaci com'è andata.": { en: "Did you stay with us? Tell us how it went.", fr: "Vous avez séjourné chez nous ? Dites-nous comment ça s'est passé.", de: "Waren Sie bei uns zu Gast? Erzählen Sie uns, wie es war.", es: "¿Te alojaste con nosotros? Cuéntanos qué tal fue." },
+  "Il tuo nome": { en: "Your name", fr: "Votre nom", de: "Ihr Name", es: "Tu nombre" },
+  "La tua valutazione": { en: "Your rating", fr: "Votre note", de: "Ihre Bewertung", es: "Tu valoración" },
+  "La tua recensione": { en: "Your review", fr: "Votre avis", de: "Ihre Bewertung", es: "Tu opinión" },
+  "Racconta la tua esperienza…": { en: "Tell us about your experience…", fr: "Racontez votre expérience…", de: "Erzählen Sie von Ihrem Aufenthalt…", es: "Cuéntanos tu experiencia…" },
+  "Invia recensione": { en: "Send review", fr: "Envoyer l'avis", de: "Bewertung senden", es: "Enviar opinión" },
+  "Grazie per la tua recensione!": { en: "Thanks for your review!", fr: "Merci pour votre avis !", de: "Danke für Ihre Bewertung!", es: "¡Gracias por tu opinión!" },
+  "La pubblicheremo a breve.": { en: "We'll publish it shortly.", fr: "Nous la publierons bientôt.", de: "Wir veröffentlichen sie in Kürze.", es: "La publicaremos en breve." },
+  "Risposta della struttura": { en: "Response from the property", fr: "Réponse de l'établissement", de: "Antwort der Unterkunft", es: "Respuesta del alojamiento" },
   "Domande frequenti": { en: "FAQ", fr: "FAQ", de: "Häufige Fragen", es: "Preguntas frecuentes" },
   "Come arrivare": { en: "How to reach us", fr: "Comment nous rejoindre", de: "Anfahrt", es: "Cómo llegar" },
   "Indicazioni stradali": { en: "Directions", fr: "Itinéraire", de: "Wegbeschreibung", es: "Cómo llegar" },
@@ -220,6 +230,46 @@ export function Site() {
   const gTotal = gReviews?.total ?? gReviews?.items.length ?? 0;
   const gStars = (r10: number) => "★".repeat(Math.round(r10 / 2)) + "☆".repeat(5 - Math.round(r10 / 2));
   const gDate = (iso?: string) => { if (!iso) return ""; try { return new Date(iso).toLocaleDateString(lang === "it" ? "it-IT" : lang, { month: "short", year: "numeric" }); } catch { return ""; } };
+
+  // Recensioni DIRETTE già pubblicate (dallo snapshot pubblico): lasciate dagli ospiti
+  // su questo mini-sito, con l'eventuale risposta del gestore. Sono dati NOSTRI.
+  interface DRev { id: string; guest: string; date?: string; rating: number; text: string; reply?: string }
+  const directReviews = useMemo<DRev[]>(() => {
+    try {
+      const raw = lsGet(DATA_KEY);
+      if (!raw) return [];
+      const d = JSON.parse(raw);
+      const arr = Array.isArray(d.directReviews) ? d.directReviews : [];
+      return arr
+        .filter((r: { structureId?: string }) => r && r.structureId === sid)
+        .map((r: { id?: string; guest?: string; date?: string; rating?: number; text?: string; reply?: string }, i: number) => ({
+          id: String(r.id ?? i), guest: String(r.guest || "Ospite"), date: r.date, rating: Number(r.rating) || 0, text: String(r.text || ""), reply: r.reply ? String(r.reply) : undefined,
+        }))
+        .sort((a: DRev, b: DRev) => (b.date || "").localeCompare(a.date || ""))
+        .slice(0, 24);
+    } catch { return []; }
+  }, [sid]);
+  const dAvg = directReviews.length ? directReviews.reduce((a, r) => a + r.rating, 0) / directReviews.length : 0;
+
+  // Form "Lascia una recensione" (valutazione a stelle 1..5).
+  const [rev, setRev] = useState({ name: "", rating: 5, text: "" });
+  const [revHover, setRevHover] = useState(0);
+  const [revDone, setRevDone] = useState(false);
+  const [revBusy, setRevBusy] = useState(false);
+  const revValid = rev.rating >= 1 && rev.rating <= 5;
+  const revSubmit = async () => {
+    if (!revValid || revBusy) return;
+    setRevBusy(true);
+    try {
+      if (isPublicMode() && publicSlug()) {
+        await fetch("/api/public-review", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ slug: publicSlug(), structureId: sid, guest: rev.name.trim(), rating: rev.rating, text: rev.text.trim() }),
+        }).catch(() => {});
+      }
+      setRevDone(true); setRev({ name: "", rating: 5, text: "" });
+    } finally { setRevBusy(false); }
+  };
 
   const field = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
@@ -576,6 +626,66 @@ export function Site() {
                 )}
               </div>
             )}
+          </section>
+        )}
+
+        {/* Recensioni DIRETTE: già pubblicate (con risposta del gestore) + form "Lascia una recensione" */}
+        {cfg.recensioni && (
+          <section className="mt-10">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-display text-xl font-bold text-txt">{T("Dicono di noi")}{directReviews.length > 0 && <span className="ml-1 text-sm font-normal text-dim">★ {dAvg.toFixed(1)}/10 · {directReviews.length} {T("recensioni")}</span>}</h2>
+            </div>
+
+            {directReviews.length > 0 && (
+              <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {directReviews.map((r) => (
+                  <figure key={r.id} className="flex flex-col rounded-xl border border-line bg-surface p-4 shadow-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm" style={{ color: "#E0A21C" }}>{gStars(r.rating)}</span>
+                      {r.date && <span className="text-[11px] text-faint">{gDate(r.date)}</span>}
+                    </div>
+                    {r.text && <blockquote className="mt-2 flex-1 text-sm leading-relaxed text-txt">“{r.text}”</blockquote>}
+                    <figcaption className="mt-3 flex items-center gap-2 border-t border-line pt-2.5">
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: accent }}>{r.guest.slice(0, 1).toUpperCase()}</span>
+                      <span className="min-w-0 text-xs font-medium text-dim">{r.guest}</span>
+                    </figcaption>
+                    {r.reply && r.reply.trim() && (
+                      <div className="mt-2.5 rounded-lg bg-wash p-2.5">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{T("Risposta della struttura")}</div>
+                        <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-relaxed text-dim">{r.reply}</p>
+                      </div>
+                    )}
+                  </figure>
+                ))}
+              </div>
+            )}
+
+            {/* Form: lascia una recensione */}
+            <div className="rounded-xl border border-line bg-surface p-4 sm:p-5">
+              <h3 className="font-display text-lg font-bold text-txt">{T("Lascia una recensione")}</h3>
+              <p className="mt-1 text-sm text-dim">{T("Hai soggiornato da noi? Raccontaci com'è andata.")}</p>
+              {revDone ? (
+                <div className="mt-3 rounded-lg border border-line bg-paper p-4 text-center">
+                  <div className="text-sm font-semibold text-[color:var(--ok)]">✓ {T("Grazie per la tua recensione!")}</div>
+                  <div className="mt-0.5 text-xs text-dim">{T("La pubblicheremo a breve.")}</div>
+                </div>
+              ) : (
+                <div className="mt-3 grid gap-3">
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] font-medium text-dim">{T("La tua valutazione")}</span>
+                    <div className="flex items-center gap-1" onMouseLeave={() => setRevHover(0)}>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <button key={n} type="button" onClick={() => setRev((f) => ({ ...f, rating: n }))} onMouseEnter={() => setRevHover(n)} aria-label={`${n}/5`} className="text-2xl leading-none transition-transform hover:scale-110" style={{ color: n <= (revHover || rev.rating) ? "#E0A21C" : "var(--line)" }}>★</button>
+                      ))}
+                      <span className="ml-2 text-sm font-semibold text-dim">{rev.rating}/5</span>
+                    </div>
+                  </label>
+                  <input value={rev.name} onChange={(e) => setRev((f) => ({ ...f, name: e.target.value }))} placeholder={T("Il tuo nome")} className={field} />
+                  <textarea value={rev.text} onChange={(e) => setRev((f) => ({ ...f, text: e.target.value }))} rows={3} placeholder={T("Racconta la tua esperienza…")} className={`${field} resize-y`} />
+                  <button onClick={revSubmit} disabled={!revValid || revBusy} className="rounded-lg py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: accent }}>{T("Invia recensione")}</button>
+                </div>
+              )}
+            </div>
           </section>
         )}
 

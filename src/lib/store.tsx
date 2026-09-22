@@ -4,7 +4,7 @@
 // In produzione questi dati arriveranno da Supabase.
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { Structure, RoomType, Unit, Guest, Booking, Channel, CalEvent } from "./types";
+import type { Structure, RoomType, Unit, Guest, Booking, Channel, CalEvent, DirectReview } from "./types";
 import { playSound } from "./sound";
 import { loadUsers } from "./users";
 import { isPublicMode, lsGet, DATA_KEY } from "./publicdata";
@@ -35,7 +35,9 @@ interface DataContextValue {
   events: CalEvent[];
   rateOverrides: Record<string, number>; // tariffa forzata per giorno (ISO → €)
   activities: Activity[]; // registro attività
+  directReviews: DirectReview[]; // recensioni dirette lasciate dagli ospiti sul mini-sito
   addActivity: (type: ActivityType, text: string) => void;
+  setDirectReviewReply: (id: string, reply: string) => void; // salva/pubblica la risposta a una recensione diretta
 
   // Scheda prenotazione (drawer globale)
   selectedBookingId: string | null;
@@ -110,6 +112,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [rateOverrides, setRateOverrides] = useState<Record<string, number>>({});
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [directReviews, setDirectReviews] = useState<DirectReview[]>([]);
   // Lapidi (tombstone): id delle entità cancellate qui. Servono a impedire che la fusione a 3 vie
   // con il server le "resusciti" al refresh (la base di fusione è vuota alla prima idratazione).
   const deletedRef = useRef<Record<string, string[]>>({});
@@ -154,6 +157,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           if (Array.isArray(d.bookings)) setBookings(d.bookings);
           if (Array.isArray(d.events)) setEvents(d.events);
           if (d.rateOverrides && typeof d.rateOverrides === "object") setRateOverrides(d.rateOverrides);
+          if (Array.isArray(d.directReviews)) setDirectReviews(d.directReviews);
         }
       } catch {}
       setReady(true);
@@ -192,6 +196,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (Array.isArray(d.events)) setEvents(d.events);
         if (d.rateOverrides && typeof d.rateOverrides === "object") setRateOverrides(zeroPrices ? {} : d.rateOverrides);
         if (Array.isArray(d.activities)) setActivities(d.activities);
+        if (Array.isArray(d.directReviews)) setDirectReviews(d.directReviews);
       } else if (!onboarded) {
         // Primo accesso / reset: si parte vuoti, sarà l'onboarding a creare struttura e camere.
         setStructures([]); setRoomTypes([]); setUnits([]); setGuests([]); setBookings([]); setEvents([]); setRateOverrides({});
@@ -205,8 +210,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // 2) Salvataggio ad ogni cambiamento, solo dopo il caricamento iniziale.
   useEffect(() => {
     if (!ready || isPublicMode()) return; // in pubblico non si scrive nel browser del visitatore
-    try { localStorage.setItem(KEY, JSON.stringify({ structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, _deleted: deletedRef.current })); } catch {}
-  }, [ready, structures, roomTypes, units, guests, bookings, events, rateOverrides, activities]);
+    try { localStorage.setItem(KEY, JSON.stringify({ structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews, _deleted: deletedRef.current })); } catch {}
+  }, [ready, structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews]);
 
   // Ri-idratazione IN-PLACE: quando la sincronizzazione col server aggiorna i dati (anche solo
   // un campo, es. webCheckin/paid/status) o quando si torna sulla scheda, rileggiamo il blocco
@@ -228,6 +233,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (Array.isArray(d.events)) setEvents(d.events);
         if (d.rateOverrides && typeof d.rateOverrides === "object") setRateOverrides(d.rateOverrides);
         if (Array.isArray(d.activities)) setActivities(d.activities);
+        if (Array.isArray(d.directReviews)) setDirectReviews(d.directReviews);
         if (d._deleted && typeof d._deleted === "object") deletedRef.current = d._deleted as Record<string, string[]>;
       } catch {}
     };
@@ -277,7 +283,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       events,
       rateOverrides,
       activities,
+      directReviews,
       addActivity: logAct,
+      setDirectReviewReply: (id, reply) => setDirectReviews((prev) => prev.map((r) => (r.id === id ? { ...r, reply, updatedAt: Date.now() } : r))),
 
       selectedBookingId,
       openBooking: (id) => setSelectedBookingId(id),
@@ -457,7 +465,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       getGuest: (id) => guests.find((g) => g.id === id),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, selectedBookingId, newBooking, activeStructureId]);
+  }, [structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews, selectedBookingId, newBooking, activeStructureId]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }

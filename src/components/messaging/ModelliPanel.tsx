@@ -15,6 +15,13 @@ const TRIGGERS: [Trigger, string][] = [["manual", "Manuale"], ["before_arrival",
 const needsDays = (t: Trigger) => t === "before_arrival" || t === "after_arrival" || t === "after_checkout";
 const LINKABLE: [string, string][] = [["", "Nessuna"], ["selfcheckin", "Self check-in"], ["guida", "Guida ospiti"], ["info", "Info e codici d'ingresso"], ["checkout", "Messaggio di check-out"], ["recensione", "Richiesta recensione"]];
 
+// Fasi del ciclo ospite in ordine cronologico: usate per ordinare e raggruppare i modelli.
+const PHASE_SEQUENCE: Trigger[] = ["before_arrival", "on_arrival", "after_arrival", "on_checkout", "after_checkout", "manual"];
+const PHASE_ORDER: Record<Trigger, number> = { before_arrival: 0, on_arrival: 1, after_arrival: 2, on_checkout: 3, after_checkout: 4, manual: 5 };
+const PHASE_LABEL: Record<Trigger, string> = { before_arrival: "Prima dell'arrivo", on_arrival: "All'arrivo", after_arrival: "Durante il soggiorno", on_checkout: "Alla partenza", after_checkout: "Dopo il soggiorno", manual: "Altri messaggi" };
+// Ordine cronologico interno alla fase: "giorni prima" più alti = più presto; "giorni dopo" più alti = più tardi.
+const chronoKey = (tp: MsgTemplate) => (tp.trigger === "before_arrival" ? -tp.days : tp.trigger === "after_arrival" || tp.trigger === "after_checkout" ? tp.days : 0);
+
 interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; trigger: Trigger; days: number; time: string; active: boolean; srcId?: string; order?: number }
 const emptyTpl = (): MsgTemplate => ({ id: (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random())), name: "", texts: { it: "", en: "", fr: "", de: "", es: "" }, trigger: "manual", days: 1, time: "10:00", active: true });
 const triggerDesc = (tpl: MsgTemplate, tr: (s: string) => string) => {
@@ -51,11 +58,19 @@ export default function ModelliPanel() {
   const del = async (tpl: MsgTemplate) => { if (await ask({ title: t("Elimina modello"), message: `${t("Eliminare il modello")} "${tpl.name}"? ${t("L'operazione non è reversibile.")}`, danger: true, confirmLabel: t("Elimina") })) setTemplates((p) => p.filter((x) => x.id !== tpl.id)); };
   const isAuto = (tp: MsgTemplate) => tp.trigger !== "manual"; // "automatico" = ha un orario/trigger (a prescindere se è in pausa)
   const shown = [...templates]
-    .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999) || a.name.localeCompare(b.name, "it", { sensitivity: "base" }))
+    .sort((a, b) =>
+      PHASE_ORDER[a.trigger] - PHASE_ORDER[b.trigger] ||
+      (a.order ?? 9999) - (b.order ?? 9999) ||
+      chronoKey(a) - chronoKey(b) ||
+      (a.time ?? "").localeCompare(b.time ?? "") ||
+      a.name.localeCompare(b.name, "it", { sensitivity: "base" })
+    )
     .filter((tp) =>
       (search.trim() === "" || tp.name.toLowerCase().includes(search.trim().toLowerCase())) &&
       (flt === "all" || (flt === "auto" ? isAuto(tp) : !isAuto(tp)))
     );
+  // Modelli raggruppati per fase del ciclo ospite (solo le fasi non vuote), nell'ordine cronologico.
+  const groups = PHASE_SEQUENCE.map((ph) => ({ ph, items: shown.filter((tp) => tp.trigger === ph) })).filter((g) => g.items.length > 0);
 
   return (
     <div>
@@ -69,33 +84,43 @@ export default function ModelliPanel() {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        {shown.map((tpl) => (
-          <Card key={tpl.id}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5"><span className="font-display text-base font-bold text-txt">{tpl.name}</span>{tpl.srcId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-focus" title={t("Collegato a un'attività del «Da fare oggi»")}>{t("Da fare oggi")}</span>}</div>
-                <div className="mt-0.5 text-xs text-dim">{triggerDesc(tpl, t)}</div>
-              </div>
-              {(() => {
-                const auto = tpl.trigger !== "manual";
-                const col = auto ? (tpl.active ? "var(--ok)" : "var(--warn)") : "var(--faint)";
-                const label = auto ? (tpl.active ? t("Automatico") : `${t("Automatico")} · ${t("in pausa")}`) : t("Manuale");
-                return <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${col} 18%, transparent)`, color: col }}>{label}</span>;
-              })()}
+      {/* Modelli raggruppati per fase del ciclo ospite, in ordine cronologico */}
+      <div className="space-y-6">
+        {groups.map((g) => (
+          <section key={g.ph}>
+            <SectionTitle>{t(PHASE_LABEL[g.ph])}</SectionTitle>
+            <div className="grid gap-3 md:grid-cols-2">
+              {g.items.map((tpl) => (
+                <Card key={tpl.id}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5"><span className="font-display text-base font-bold text-txt">{tpl.name}</span>{tpl.srcId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-focus" title={t("Collegato a un'attività del «Da fare oggi»")}>{t("Da fare oggi")}</span>}</div>
+                      <div className="mt-0.5 text-xs text-dim">{triggerDesc(tpl, t)}</div>
+                    </div>
+                    {(() => {
+                      const auto = tpl.trigger !== "manual";
+                      const col = auto ? (tpl.active ? "var(--ok)" : "var(--warn)") : "var(--faint)";
+                      const label = auto ? (tpl.active ? t("Automatico") : `${t("Automatico")} · ${t("in pausa")}`) : t("Manuale");
+                      return <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${col} 18%, transparent)`, color: col }}>{label}</span>;
+                    })()}
+                  </div>
+                  <div className="mt-2 line-clamp-2 text-xs text-dim">{tpl.texts.it || tpl.texts.en || "—"}</div>
+                  <div className="mt-2 flex gap-2">
+                    <button onClick={() => { setEditing({ ...tpl, texts: { ...tpl.texts } }); setEditLang("it"); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-txt hover:bg-wash">{t("Modifica")}</button>
+                    <button onClick={() => del(tpl)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>
+                  </div>
+                </Card>
+              ))}
             </div>
-            <div className="mt-2 line-clamp-2 text-xs text-dim">{tpl.texts.it || tpl.texts.en || "—"}</div>
-            <div className="mt-2 flex gap-2">
-              <button onClick={() => { setEditing({ ...tpl, texts: { ...tpl.texts } }); setEditLang("it"); }} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-txt hover:bg-wash">{t("Modifica")}</button>
-              <button onClick={() => del(tpl)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina")}</button>
-            </div>
-          </Card>
+          </section>
         ))}
         {/* Card "aggiungi" tratteggiata, stessa dimensione dei modelli */}
-        <button onClick={() => { setEditing(emptyTpl()); setEditLang("it"); }} className="flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line text-dim transition hover:border-focus hover:text-focus" style={{ background: "var(--surface)" }}>
-          <span className="grid h-11 w-11 place-items-center rounded-full border-2 border-current text-2xl font-light leading-none">+</span>
-          <span className="text-sm font-semibold">{t("Nuovo modello")}</span>
-        </button>
+        <div className="grid gap-3 md:grid-cols-2">
+          <button onClick={() => { setEditing(emptyTpl()); setEditLang("it"); }} className="flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line text-dim transition hover:border-focus hover:text-focus" style={{ background: "var(--surface)" }}>
+            <span className="grid h-11 w-11 place-items-center rounded-full border-2 border-current text-2xl font-light leading-none">+</span>
+            <span className="text-sm font-semibold">{t("Nuovo modello")}</span>
+          </button>
+        </div>
       </div>
 
       {/* Editor */}
