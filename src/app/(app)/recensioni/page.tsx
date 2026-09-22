@@ -412,15 +412,12 @@ export default function RecensioniPage() {
         {connectedSources.map((c) => (
           <button key={c} onClick={() => setFilter(c)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${filter === c ? "text-white" : "text-dim hover:bg-wash"}`} style={filter === c ? { backgroundColor: SRC[c].color } : undefined}>{SRC[c].label}</button>
         ))}
-        <button onClick={() => setShowManual((v) => !v)} className="ml-auto flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash"><Icon name="plus" size={13} /> Aggiungi a mano</button>
-      </div>
-
-      {/* Filtro per punteggio */}
-      <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
-        <span className="mr-1 text-xs font-semibold text-faint">Punteggio:</span>
+        <span className="mx-1 h-4 w-px bg-line" />
+        <span className="mr-1 text-xs font-semibold text-faint">Voto:</span>
         {([["all", "Tutte", "var(--focus)"], ["pos", "Positive (8-10)", "var(--ok)"], ["neu", "Neutre (6-7)", "var(--warn)"], ["neg", "Negative (<6)", "var(--err)"]] as const).map(([k, label, col]) => (
           <button key={k} onClick={() => setRatingFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${ratingFilter === k ? "text-white" : "text-dim hover:bg-wash"}`} style={ratingFilter === k ? { backgroundColor: col } : undefined}>{label}</button>
         ))}
+        <button onClick={() => setShowManual((v) => !v)} className="ml-auto flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash"><Icon name="plus" size={13} /> Aggiungi a mano</button>
       </div>
 
       {/* Form inserimento manuale */}
