@@ -1,31 +1,37 @@
 "use client";
 
-// "Neural Shell" dell'Assistente: a SINISTRA i dati delle varie sessioni (ingest),
-// che fluiscono lungo linee curve con particelle verso il CORE astratto a DESTRA
-// (l'AI che "studia" e restituisce). Sfondo chiaro, stile terminale futuristico.
-// Grafica scenografica: i numeri sono reali, l'animazione è decorativa.
-import { useEffect, useRef } from "react";
+// "Neural Shell" dell'Assistente: una CONSOLE futuristica. I dati delle sessioni entrano
+// da SINISTRA e da DESTRA come card glass e fluiscono lungo linee curve con particelle verso
+// il CORE astratto al CENTRO (l'AI che "studia" e restituisce). I numeri sono reali,
+// l'animazione è decorativa. Sfondo scuro "neural" per un effetto scenografico.
+import { useEffect, useRef, useMemo } from "react";
 import AssistantCore from "./AssistantCore";
 
 export interface ShellInput { label: string; value: string; tone: string; q?: string }
 type CoreState = "idle" | "listen" | "speak";
 
 function rgba(hex: string, a: number) {
-  const h = (hex || "#BE5D38").replace("#", "");
+  const h = (hex || "#5B74E6").replace("#", "");
   const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
-  return `rgba(${r || 190},${g || 93},${b || 56},${Math.max(0, Math.min(1, a))})`;
+  return `rgba(${r || 91},${g || 116},${b || 230},${Math.max(0, Math.min(1, a))})`;
 }
 function cssVar(name: string, fallback: string) {
   try { const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return v || fallback; } catch { return fallback; }
 }
 
-export default function NeuralShell({ inputs, state = "idle", coreSize = 190, onInput }: {
+export default function NeuralShell({ inputs, state = "idle", coreSize = 200, onInput }: {
   inputs: ShellInput[]; state?: CoreState; coreSize?: number; onInput?: (q: string) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputsRef = useRef(inputs);
   useEffect(() => { inputsRef.current = inputs; }, [inputs]);
+
+  // Divide le card tra colonna sinistra e destra (il core resta al centro).
+  const { left, right } = useMemo(() => {
+    const half = Math.ceil(inputs.length / 2);
+    return { left: inputs.slice(0, half), right: inputs.slice(half) };
+  }, [inputs]);
 
   useEffect(() => {
     const wrap = wrapRef.current, canvas = canvasRef.current;
@@ -44,78 +50,75 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 190, on
     resize();
     const ro = new ResizeObserver(resize); ro.observe(wrap);
 
-    const focus = cssVar("--focus", "#BE5D38");
-    const flowCols = [focus, "#E7962E", "#2F9E6F", "#5B74E6", "#C9662F"];
+    const focus = cssVar("--focus", "#5B74E6");
+    const flowCols = [focus, "#38bdf8", "#2dd4bf", "#a78bfa", "#f59e0b", "#f472b6"];
 
-    // Particelle: fase casuale per ogni connessione.
-    const ROWS = () => Math.max(1, inputsRef.current.length);
-    const parts = Array.from({ length: 46 }, () => ({ line: 0, t: Math.random(), spd: 0.003 + Math.random() * 0.006, r: 1 + Math.random() * 1.6 }));
+    const parts = Array.from({ length: 70 }, () => ({ side: Math.random() < 0.5 ? 0 : 1, line: 0, t: Math.random(), spd: 0.004 + Math.random() * 0.007, r: 1 + Math.random() * 1.8 }));
 
     let raf = 0, tk = 0;
     const anchors = () => {
-      const n = ROWS();
-      const isNarrow = W < 640;
-      const leftX = isNarrow ? W * 0.5 : W * 0.30;
-      const coreX = isNarrow ? W * 0.5 : W * 0.72;
-      const coreY = isNarrow ? H * 0.62 : H * 0.5;
-      const topPad = isNarrow ? H * 0.06 : H * 0.12;
-      const botPad = isNarrow ? H * 0.5 : H * 0.12;
-      const usable = H - topPad - botPad;
-      const A = Array.from({ length: n }, (_, i) => ({ x: leftX, y: topPad + (n === 1 ? usable / 2 : (usable * i) / (n - 1)) }));
-      return { A, C: { x: coreX, y: coreY }, isNarrow };
+      const nL = Math.max(0, inputsRef.current.length ? Math.ceil(inputsRef.current.length / 2) : 0);
+      const nR = Math.max(0, inputsRef.current.length - nL);
+      const narrow = W < 640;
+      const C = { x: W * 0.5, y: narrow ? H * 0.42 : H * 0.5 };
+      const colY = (n: number, i: number) => { const top = H * 0.16, bot = H * 0.16, us = H - top - bot; return top + (n <= 1 ? us / 2 : (us * i) / (n - 1)); };
+      const L = Array.from({ length: nL }, (_, i) => ({ x: W * (narrow ? 0.12 : 0.20), y: colY(nL, i) }));
+      const R = Array.from({ length: nR }, (_, i) => ({ x: W * (narrow ? 0.88 : 0.80), y: colY(nR, i) }));
+      return { L, R, C };
     };
-    // Punto lungo la curva bezier A→C (control point che dà la "piega").
     const bez = (a: { x: number; y: number }, c: { x: number; y: number }, t: number) => {
-      const mx = (a.x + c.x) / 2, cpx = mx, cpy = a.y; // curva orizzontale morbida
-      const u = 1 - t;
+      const cpx = (a.x + c.x) / 2, cpy = a.y; const u = 1 - t;
       return { x: u * u * a.x + 2 * u * t * cpx + t * t * c.x, y: u * u * a.y + 2 * u * t * cpy + t * t * c.y };
     };
 
     const draw = () => {
       tk += 0.016;
-      const { A, C } = anchors();
+      const { L, R, C } = anchors();
       ctx.clearRect(0, 0, W, H);
 
-      // Griglia tenue di sfondo
-      ctx.strokeStyle = rgba(cssVar("--line", "#e7ded3").startsWith("#") ? cssVar("--line", "#e7ded3") : "#e7ded3", 0.5);
-      ctx.lineWidth = 1;
-      const step = 34;
-      ctx.globalAlpha = 0.35;
-      for (let x = (tk * 6) % step; x < W; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-      for (let y = 0; y < H; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-      ctx.globalAlpha = 1;
+      // Griglia tenue in movimento
+      ctx.strokeStyle = "rgba(120,140,190,0.10)"; ctx.lineWidth = 1;
+      const step = 36;
+      for (let x = (tk * 8) % step; x < W; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+      for (let y = (tk * 4) % step; y < H; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
 
-      // Linee di flusso A→C
-      A.forEach((a, i) => {
-        const col = flowCols[i % flowCols.length];
-        ctx.strokeStyle = rgba(col, 0.22); ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        for (let t = 0; t <= 1; t += 0.05) { const p = bez(a, C, t); if (t === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); }
-        ctx.stroke();
-        // Nodo sorgente pulsante
-        const pulse = 0.5 + 0.5 * Math.sin(tk * 2 + i);
-        ctx.fillStyle = rgba(col, 0.5 + 0.4 * pulse);
-        ctx.beginPath(); ctx.arc(a.x, a.y, 2.5 + 1.6 * pulse, 0, Math.PI * 2); ctx.fill();
-      });
+      const drawSide = (arr: { x: number; y: number }[]) => {
+        arr.forEach((a, i) => {
+          const col = flowCols[i % flowCols.length];
+          ctx.strokeStyle = rgba(col, 0.28); ctx.lineWidth = 1.3;
+          ctx.beginPath();
+          for (let t = 0; t <= 1; t += 0.05) { const p = bez(a, C, t); if (t === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); }
+          ctx.stroke();
+          const pulse = 0.5 + 0.5 * Math.sin(tk * 2 + i);
+          ctx.fillStyle = rgba(col, 0.55 + 0.4 * pulse);
+          ctx.shadowColor = rgba(col, 0.8); ctx.shadowBlur = 8;
+          ctx.beginPath(); ctx.arc(a.x, a.y, 2.6 + 1.6 * pulse, 0, Math.PI * 2); ctx.fill();
+          ctx.shadowBlur = 0;
+        });
+      };
+      drawSide(L); drawSide(R);
 
-      // Particelle che viaggiano verso il core
-      const n = A.length;
+      // Particelle bidirezionali
+      const nL = L.length, nR = R.length;
       for (const pt of parts) {
         if (!reduce) pt.t += pt.spd;
-        if (pt.t >= 1) { pt.t = 0; pt.line = Math.floor(Math.random() * n); }
-        const li = pt.line % n; const a = A[li]; if (!a) continue;
-        const col = flowCols[li % flowCols.length];
+        const arr = pt.side === 0 ? L : R; const n = arr.length || 1;
+        if (pt.t >= 1) { pt.t = 0; pt.side = Math.random() < 0.5 ? 0 : 1; const nn = (pt.side === 0 ? nL : nR) || 1; pt.line = Math.floor(Math.random() * nn); }
+        const a = arr[pt.line % n]; if (!a) continue;
+        const col = flowCols[(pt.line + (pt.side ? 3 : 0)) % flowCols.length];
         const p = bez(a, C, pt.t);
         const fade = pt.t < 0.1 ? pt.t / 0.1 : pt.t > 0.85 ? (1 - pt.t) / 0.15 : 1;
-        ctx.fillStyle = rgba(col, 0.9 * fade);
+        ctx.fillStyle = rgba(col, 0.95 * fade);
+        ctx.shadowColor = rgba(col, 0.9); ctx.shadowBlur = 6;
         ctx.beginPath(); ctx.arc(p.x, p.y, pt.r, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
       }
 
-      // Alone di "assorbimento" attorno al core (dove i dati arrivano)
+      // Alone del core (assorbimento)
       const glow = 0.6 + 0.4 * Math.sin(tk * (state === "listen" ? 4 : state === "speak" ? 3 : 1.6));
-      const g = ctx.createRadialGradient(C.x, C.y, 0, C.x, C.y, coreSize * 0.62);
-      g.addColorStop(0, rgba(focus, 0.10 * glow)); g.addColorStop(1, rgba(focus, 0));
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(C.x, C.y, coreSize * 0.62, 0, Math.PI * 2); ctx.fill();
+      const g = ctx.createRadialGradient(C.x, C.y, 0, C.x, C.y, coreSize * 0.75);
+      g.addColorStop(0, rgba(focus, 0.16 * glow)); g.addColorStop(1, rgba(focus, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(C.x, C.y, coreSize * 0.75, 0, Math.PI * 2); ctx.fill();
 
       if (!reduce) raf = requestAnimationFrame(draw);
     };
@@ -124,30 +127,36 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 190, on
   }, [state, coreSize]);
 
   const mono = "font-mono";
+  const tile = (it: ShellInput, align: "left" | "right") => (
+    <button key={it.label} onClick={() => it.q && onInput?.(it.q)}
+      className={`pointer-events-auto group rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 backdrop-blur-md transition hover:border-white/30 hover:bg-white/[0.12] ${align === "right" ? "text-right" : "text-left"}`}
+      style={{ boxShadow: "0 2px 14px rgba(0,0,0,.28)" }}>
+      <div className={`${mono} text-[9px] font-semibold uppercase tracking-wider`} style={{ color: "rgba(200,214,240,.65)" }}>{it.label}</div>
+      <div className={`${mono} text-lg font-bold leading-tight`} style={{ color: it.tone, textShadow: `0 0 14px ${it.tone}55` }}>{it.value}</div>
+    </button>
+  );
+
   return (
-    <div ref={wrapRef} className="relative w-full overflow-hidden rounded-2xl border border-line bg-surface" style={{ minHeight: 360 }}>
+    <div ref={wrapRef} className="relative w-full overflow-hidden rounded-2xl border" style={{ minHeight: 440, borderColor: "rgba(120,140,190,.18)", background: "radial-gradient(120% 90% at 50% 40%, #101827 0%, #0a0f1a 55%, #070b13 100%)" }}>
       <canvas ref={canvasRef} className="pointer-events-none absolute inset-0" aria-hidden />
 
       {/* Intestazione stile terminale */}
-      <div className="relative flex items-center justify-between px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
-        <span className={mono}>XENORA · NEURAL SHELL</span>
-        <span className={mono} style={{ color: "var(--ok)" }}>● {state === "listen" ? "ASCOLTO" : state === "speak" ? "OUTPUT" : "LIVE"}</span>
+      <div className="relative flex items-center justify-between px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.16em]">
+        <span className={mono} style={{ color: "rgba(180,198,230,.75)" }}>XENORA · NEURAL SHELL</span>
+        <span className={`${mono} inline-flex items-center gap-1.5`} style={{ color: "#2dd4bf" }}><span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: "#2dd4bf", boxShadow: "0 0 8px #2dd4bf" }} />{state === "listen" ? "ASCOLTO" : state === "speak" ? "OUTPUT" : "LIVE"}</span>
       </div>
 
-      {/* Colonna sinistra: gli input dalle sessioni */}
-      <div className="pointer-events-none absolute left-0 top-10 bottom-0 z-10 flex w-[46%] flex-col justify-evenly gap-1 px-3 sm:w-[30%]">
-        {inputs.map((it) => (
-          <button key={it.label} onClick={() => it.q && onInput?.(it.q)}
-            className="pointer-events-auto rounded-lg border border-line bg-paper/80 px-2.5 py-1.5 text-left backdrop-blur-sm transition hover:border-focus"
-            style={{ boxShadow: "0 1px 6px rgba(40,30,20,.05)" }}>
-            <div className={`${mono} text-[9px] font-semibold uppercase tracking-wide text-faint`}>{it.label}</div>
-            <div className={`${mono} text-lg font-bold leading-tight`} style={{ color: it.tone }}>{it.value}</div>
-          </button>
-        ))}
+      {/* Colonna sinistra */}
+      <div className="pointer-events-none absolute left-0 top-11 bottom-3 z-10 flex w-[38%] flex-col justify-center gap-2 overflow-y-auto px-3 sm:w-[26%]">
+        {left.map((it) => tile(it, "left"))}
+      </div>
+      {/* Colonna destra */}
+      <div className="pointer-events-none absolute right-0 top-11 bottom-3 z-10 flex w-[38%] flex-col justify-center gap-2 overflow-y-auto px-3 sm:w-[26%]">
+        {right.map((it) => tile(it, "right"))}
       </div>
 
-      {/* Core a destra */}
-      <div className="pointer-events-none absolute right-[2%] top-[46px] bottom-0 z-10 grid w-[40%] place-items-center sm:right-[6%]">
+      {/* Core al CENTRO */}
+      <div className="pointer-events-none absolute inset-x-0 top-11 bottom-0 z-0 grid place-items-center">
         <AssistantCore state={state} size={coreSize} />
       </div>
     </div>
