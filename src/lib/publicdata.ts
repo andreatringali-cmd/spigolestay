@@ -101,7 +101,8 @@ export function buildPublishData(structureId: string): Record<string, string> | 
   if (!structures.length) return null;
   const rtIds = new Set((blob.roomTypes ?? []).filter((rt) => rt.structureId === structureId).map((rt) => rt.id));
 
-  // Struttura: rimuovo i campi privati.
+  // Struttura: rimuovo i campi privati. Restano i dati pubblici, incluso
+  // googlePlaceId (serve al sito pubblico per mostrare le recensioni Google).
   const cleanStructs = structures.map((s) => {
     const c = { ...s };
     for (const k of STRUCT_PRIVATE) delete c[k];

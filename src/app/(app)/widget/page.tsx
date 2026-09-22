@@ -160,7 +160,29 @@ export default function WidgetPage() {
           {shownWidgets.length === 0 ? (
             <div className="py-10 text-center text-sm text-faint">{t("Nessun widget per questa struttura. Creane uno con “+ Crea un nuovo widget”.")}</div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              {/* Telefono: lista a schede (tap affidabile; niente tabella larga da scorrere) */}
+              <div className="flex flex-col gap-2 md:hidden">
+                {shownWidgets.map((w) => (
+                  <button key={w.id} onClick={() => setEditingId(w.id)} className="block w-full rounded-xl border border-line bg-surface p-3 text-left shadow-sm active:bg-wash">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-semibold text-txt">{w.name || "—"}</span>
+                      <span className="shrink-0 text-faint">›</span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-dim">
+                      <span>{structures.find((s) => s.id === w.structureId)?.name ?? "—"}</span>
+                      <span className="text-faint">·</span>
+                      <span>{t(THEME_LABEL(w.theme))}</span>
+                      <span className="text-faint">·</span>
+                      <span>{t(LAYOUT_LABEL(w.layout))}</span>
+                      <span className="text-faint">·</span>
+                      <span className="inline-flex items-center gap-1"><span className="h-3.5 w-3.5 shrink-0 rounded-full border border-line" style={{ backgroundColor: w.accent }} /><span className="uppercase">{w.lang}</span></span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {/* Tabella (tablet/desktop) */}
+              <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[680px] text-sm">
                 <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
                   <th className="py-2 pr-3 font-semibold">{t("Nome")}</th><th className="py-2 pr-3 font-semibold">{t("Struttura")}</th><th className="py-2 pr-3 font-semibold">{t("Tema")}</th><th className="py-2 pr-3 font-semibold">Layout</th><th className="py-2 pr-3 font-semibold">{t("Colore")}</th><th className="py-2 pr-3 font-semibold">Font</th><th className="py-2 pr-3 font-semibold">{t("Lingua")}</th><th className="py-2 text-right font-semibold"></th>
@@ -180,7 +202,8 @@ export default function WidgetPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </Card>
       </div>

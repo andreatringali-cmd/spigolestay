@@ -43,7 +43,7 @@ interface GoogleState {
 }
 
 export default function RecensioniPage() {
-  const { structures, activeStructureId } = useData();
+  const { structures, activeStructureId, updateStructure } = useData();
 
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -83,13 +83,15 @@ export default function RecensioniPage() {
   }, []);
 
   // Quando cambia la struttura selezionata, leggi il Place ID salvato.
+  // Se manca in localStorage, ripiega su quello salvato sulla struttura (googlePlaceId).
   useEffect(() => {
     if (!selStructureId) { setPlaceId(""); setPlaceIdInput(""); return; }
     let saved = "";
     try { saved = localStorage.getItem(PLACEID_KEY(selStructureId)) || ""; } catch {}
+    if (!saved) saved = structures.find((s) => s.id === selStructureId)?.googlePlaceId || "";
     setPlaceId(saved);
     setPlaceIdInput(saved);
-  }, [selStructureId]);
+  }, [selStructureId, structures]);
 
   const persistReplies = (n: Record<string, string>) => { setReplies(n); try { localStorage.setItem("spigolestay:reviews", JSON.stringify(n)); } catch {} };
   const persistManual = (n: ManualReview[]) => { setManual(n); try { localStorage.setItem(MANUAL_KEY, JSON.stringify(n)); } catch {} };
@@ -98,8 +100,14 @@ export default function RecensioniPage() {
     const v = placeIdInput.trim();
     setPlaceId(v);
     try { if (v) localStorage.setItem(PLACEID_KEY(selStructureId), v); else localStorage.removeItem(PLACEID_KEY(selStructureId)); } catch {}
+    // Salva anche sulla struttura, così il sito pubblico (Xenosite) conosce il Place ID.
+    if (selStructureId) updateStructure(selStructureId, { googlePlaceId: v || undefined, updatedAt: Date.now() });
   };
-  const clearPlaceId = () => { setPlaceId(""); setPlaceIdInput(""); try { localStorage.removeItem(PLACEID_KEY(selStructureId)); } catch {} };
+  const clearPlaceId = () => {
+    setPlaceId(""); setPlaceIdInput("");
+    try { localStorage.removeItem(PLACEID_KEY(selStructureId)); } catch {}
+    if (selStructureId) updateStructure(selStructureId, { googlePlaceId: undefined, updatedAt: Date.now() });
+  };
 
   const [cfgOpen, setCfgOpen] = useState(false); // finestra di configurazione Google (ricerca + Place ID)
   const [srcCfg, setSrcCfg] = useState<SourceKey | null>(null); // impostazioni di una fonte OTA
@@ -120,7 +128,7 @@ export default function RecensioniPage() {
     } catch { setCandidates([]); }
     finally { setFinding(false); }
   };
-  const pickCandidate = (id: string) => { setPlaceIdInput(id); setPlaceId(id); try { if (selStructureId) localStorage.setItem(PLACEID_KEY(selStructureId), id); } catch {} setCandidates(null); };
+  const pickCandidate = (id: string) => { setPlaceIdInput(id); setPlaceId(id); try { if (selStructureId) localStorage.setItem(PLACEID_KEY(selStructureId), id); } catch {} if (selStructureId) updateStructure(selStructureId, { googlePlaceId: id, updatedAt: Date.now() }); setCandidates(null); };
 
   // Carica le recensioni Google reali dalla route API.
   const loadGoogle = useCallback(async (pid: string, sid: string) => {

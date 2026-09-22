@@ -37,7 +37,11 @@ const SITE_DICT: Record<string, Record<string, string>> = {
   "Offerte": { en: "Offers", fr: "Offres", de: "Angebote", es: "Ofertas" },
   "Codice": { en: "Code", fr: "Code", de: "Code", es: "Código" },
   "Dicono di noi": { en: "Reviews", fr: "Avis", de: "Bewertungen", es: "Opiniones" },
+  "Recensioni": { en: "Reviews", fr: "Avis", de: "Bewertungen", es: "Opiniones" },
   "recensioni": { en: "reviews", fr: "avis", de: "Bewertungen", es: "opiniones" },
+  "Recensioni verificate su Google": { en: "Verified reviews on Google", fr: "Avis vérifiés sur Google", de: "Verifizierte Bewertungen auf Google", es: "Opiniones verificadas en Google" },
+  "Le recensioni non sono disponibili al momento.": { en: "Reviews are not available at the moment.", fr: "Les avis ne sont pas disponibles pour le moment.", de: "Bewertungen sind derzeit nicht verfügbar.", es: "Las opiniones no están disponibles en este momento." },
+  "Vedi tutte su Google": { en: "See all on Google", fr: "Voir tout sur Google", de: "Alle auf Google ansehen", es: "Ver todas en Google" },
   "Leggi le recensioni su Google": { en: "Read reviews on Google", fr: "Lire les avis sur Google", de: "Bewertungen auf Google lesen", es: "Ver opiniones en Google" },
   "Domande frequenti": { en: "FAQ", fr: "FAQ", de: "Häufige Fragen", es: "Preguntas frecuentes" },
   "Come arrivare": { en: "How to reach us", fr: "Comment nous rejoindre", de: "Anfahrt", es: "Cómo llegar" },
@@ -186,6 +190,36 @@ export function Site() {
     } catch { return []; }
   }, [sid]);
   const reviewsAvg = reviews.length ? (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length) : 0;
+
+  // Recensioni Google REALI: se la struttura ha un Place ID (googlePlaceId), le
+  // leggiamo lato client dall'endpoint pubblico /api/reviews/public (nessun dato
+  // sensibile: sono recensioni pubbliche). Google Places espone ~5 recensioni;
+  // media e totale restano completi.
+  interface GReview { id: string; guest: string; date?: string; rating: number; text: string }
+  const [gReviews, setGReviews] = useState<{ loading: boolean; rating?: number; total?: number; items: GReview[] } | null>(null);
+  const placeId = structure?.googlePlaceId?.trim() || "";
+  useEffect(() => {
+    if (!placeId) { setGReviews(null); return; }
+    let alive = true;
+    setGReviews({ loading: true, items: [] });
+    fetch(`/api/reviews/public?placeId=${encodeURIComponent(placeId)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!alive) return;
+        const items: GReview[] = Array.isArray(j?.reviews)
+          ? j.reviews.map((r: { id?: string; guest?: string; date?: string; rating?: number; text?: string }, i: number) => ({
+              id: String(r.id ?? i), guest: String(r.guest || "Ospite Google"), date: r.date, rating: Number(r.rating) || 0, text: String(r.text || ""),
+            }))
+          : [];
+        setGReviews({ loading: false, rating: typeof j?.rating === "number" ? j.rating : undefined, total: typeof j?.total === "number" ? j.total : undefined, items });
+      })
+      .catch(() => { if (alive) setGReviews({ loading: false, items: [] }); });
+    return () => { alive = false; };
+  }, [placeId]);
+  const gAvg = gReviews?.rating ?? (gReviews?.items.length ? gReviews.items.reduce((a, r) => a + r.rating, 0) / gReviews.items.length : 0);
+  const gTotal = gReviews?.total ?? gReviews?.items.length ?? 0;
+  const gStars = (r10: number) => "★".repeat(Math.round(r10 / 2)) + "☆".repeat(5 - Math.round(r10 / 2));
+  const gDate = (iso?: string) => { if (!iso) return ""; try { return new Date(iso).toLocaleDateString(lang === "it" ? "it-IT" : lang, { month: "short", year: "numeric" }); } catch { return ""; } };
 
   const field = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
@@ -473,6 +507,74 @@ export function Site() {
               </div>
             ) : (
               <p className="text-sm text-dim">{T("Leggi le recensioni su Google")}.</p>
+            )}
+          </section>
+        )}
+
+        {/* Recensioni Google REALI (via Place ID della struttura) */}
+        {cfg.recensioni && placeId && (
+          <section className="mt-10">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <svg width="22" height="22" viewBox="0 0 48 48" aria-hidden><path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-2.8-.4-4H24v7.3h12.1c-.2 1.9-1.6 4.8-4.5 6.7l-.1.3 6.5 5 .4.1c4.2-3.8 6.2-9.5 6.2-15.4Z"/><path fill="#34A853" d="M24 46c5.9 0 10.9-1.9 14.5-5.3l-6.9-5.4c-1.9 1.3-4.4 2.2-7.6 2.2-5.8 0-10.7-3.8-12.5-9.1l-.3.1-6.7 5.2-.1.3C7.5 41 15.1 46 24 46Z"/><path fill="#FBBC05" d="M11.5 28.4c-.5-1.4-.7-2.9-.7-4.4 0-1.5.3-3 .7-4.4v-.3l-6.8-5.3-.2.1A22.3 22.3 0 0 0 2 24c0 3.6.9 7 2.4 10l7.1-5.6Z"/><path fill="#EA4335" d="M24 10.5c4.1 0 6.9 1.8 8.5 3.3l6.2-6C34.9 4.3 29.9 2 24 2 15.1 2 7.5 7 4.4 14l7.1 5.6C13.3 14.3 18.2 10.5 24 10.5Z"/></svg>
+                <h2 className="font-display text-xl font-bold text-txt">{T("Recensioni")}</h2>
+              </div>
+              {gReviews && !gReviews.loading && gTotal > 0 && (
+                <div className="flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3.5 py-2 shadow-sm">
+                  <span className="font-display text-2xl font-bold text-txt">{gAvg.toFixed(1)}<span className="text-sm font-normal text-faint">/10</span></span>
+                  <span className="flex flex-col leading-tight">
+                    <span className="text-sm" style={{ color: "#E0A21C" }}>{gStars(gAvg)}</span>
+                    <span className="text-[11px] text-faint">{gTotal} {T("recensioni")} · Google</span>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {gReviews?.loading ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="animate-pulse rounded-xl border border-line bg-surface p-4">
+                    <div className="h-3 w-20 rounded bg-wash" />
+                    <div className="mt-3 h-3 w-full rounded bg-wash" />
+                    <div className="mt-1.5 h-3 w-4/5 rounded bg-wash" />
+                    <div className="mt-3 h-2.5 w-24 rounded bg-wash" />
+                  </div>
+                ))}
+              </div>
+            ) : gReviews && gReviews.items.length > 0 ? (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {gReviews.items.map((r) => (
+                    <figure key={r.id} className="flex flex-col rounded-xl border border-line bg-surface p-4 shadow-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm" style={{ color: "#E0A21C" }}>{gStars(r.rating)}</span>
+                        {r.date && <span className="text-[11px] text-faint">{gDate(r.date)}</span>}
+                      </div>
+                      {r.text && <blockquote className="mt-2 flex-1 text-sm leading-relaxed text-txt">“{r.text}”</blockquote>}
+                      <figcaption className="mt-3 flex items-center gap-2 border-t border-line pt-2.5">
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: accent }}>{r.guest.slice(0, 1).toUpperCase()}</span>
+                        <span className="min-w-0 text-xs font-medium text-dim">{r.guest}</span>
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+                {cfg.googleUrl && (
+                  <div className="mt-4 text-center">
+                    <a href={cfg.googleUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-txt transition hover:shadow-sm">
+                      {T("Vedi tutte su Google")} ↗
+                    </a>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="rounded-xl border border-dashed border-line bg-surface p-6 text-center text-sm text-dim">
+                {T("Le recensioni non sono disponibili al momento.")}
+                {cfg.googleUrl && (
+                  <div className="mt-3">
+                    <a href={cfg.googleUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt transition hover:shadow-sm">{T("Leggi le recensioni su Google")} ↗</a>
+                  </div>
+                )}
+              </div>
             )}
           </section>
         )}

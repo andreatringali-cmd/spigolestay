@@ -372,16 +372,18 @@ export default function AssistentePage() {
       <PageHeader title="Assistente Xenora" subtitle="Chiedi a voce o scrivi — rispondo con i tuoi numeri" />
 
       {/* Neural Shell: i dati delle sessioni (sinistra) fluiscono nel core (destra) */}
-      <div className="mb-4">
+      <div className="mb-5">
         <NeuralShell inputs={tiles} state={state} onInput={(q) => { setQ(q); ask(q); }} />
       </div>
 
       {/* Output del core: briefing del giorno + comandi voce */}
       <Card className="mb-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">Core output · Briefing del giorno</div>
-            <p className="mt-1 text-lg font-semibold leading-snug text-txt">{briefing}</p>
+            <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-faint">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-focus" /> Core output · Briefing del giorno
+            </div>
+            <p className="mt-1.5 font-display text-lg font-semibold leading-snug tracking-tight text-txt sm:text-xl">{briefing}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {micAvailable && (
@@ -403,8 +405,8 @@ export default function AssistentePage() {
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={listening ? "Sto ascoltando…" : "Es. quanto ho incassato questo mese?"} className="min-w-0 flex-1 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
           <button type="submit" className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Chiedi</button>
         </form>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {CHIPS.map((c) => <button key={c.q} onClick={() => { setQ(c.label); ask(c.q); }} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim hover:bg-wash">{c.label}</button>)}
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {CHIPS.map((c) => <button key={c.q} onClick={() => { setQ(c.label); ask(c.q); }} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition-colors hover:border-focus hover:text-focus">{c.label}</button>)}
         </div>
       </Card>
 
