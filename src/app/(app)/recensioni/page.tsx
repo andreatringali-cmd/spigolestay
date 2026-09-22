@@ -102,6 +102,7 @@ export default function RecensioniPage() {
   const clearPlaceId = () => { setPlaceId(""); setPlaceIdInput(""); try { localStorage.removeItem(PLACEID_KEY(selStructureId)); } catch {} };
 
   const [cfgOpen, setCfgOpen] = useState(false); // finestra di configurazione Google (ricerca + Place ID)
+  const [srcCfg, setSrcCfg] = useState<SourceKey | null>(null); // impostazioni di una fonte OTA
   // Ricerca automatica della struttura su Google → candidati con Place ID (niente ricerca manuale).
   const [findQ, setFindQ] = useState("");
   const [finding, setFinding] = useState(false);
@@ -361,21 +362,48 @@ export default function RecensioniPage() {
           const on = connectedSources.includes(s.k);
           const isGoogle = s.k === "google";
           return (
-            <div key={s.k} className="flex items-center gap-3 rounded-xl border p-3 shadow-sm" style={{ borderColor: on ? s.color : "var(--line)" }}>
+            <button key={s.k} onClick={() => (isGoogle ? setCfgOpen(true) : setSrcCfg(s.k))} className="flex items-center gap-3 rounded-xl border p-3 text-left shadow-sm transition hover:shadow-md hover:border-[color:var(--focus)]" style={{ borderColor: on ? s.color : "var(--line)" }} title="Apri impostazioni">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: s.color }}>{s.label[0]}</span>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-txt">{s.label}</div>
                 <div className="truncate text-[11px] text-faint">{s.note}</div>
               </div>
               {isGoogle ? (
-                <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold" style={on ? { backgroundColor: "var(--ok)", color: "#fff" } : { border: "1px solid var(--line)", color: "var(--dim)" }}>{on ? "Collegato" : "Non collegato"}</span>
+                <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold" style={on ? { backgroundColor: "var(--ok)", color: "#fff" } : { border: "1px solid var(--line)", color: "var(--dim)" }}>{on ? "Collegato" : "Configura"}</span>
               ) : (
-                <span className="shrink-0 rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-faint">Partner in arrivo</span>
+                <span className="shrink-0 rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-faint">Impostazioni</span>
               )}
-            </div>
+            </button>
           );
         })}
       </div>
+
+      {/* Impostazioni di una fonte OTA (Booking/Airbnb/…): come Google, ma via connettore partner o inserimento manuale */}
+      {srcCfg && srcCfg !== "google" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setSrcCfg(null)}>
+          <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: SRC[srcCfg].color }}>{SRC[srcCfg].label[0]}</span>
+                <div>
+                  <div className="font-display text-lg font-bold text-txt">{SRC[srcCfg].label}</div>
+                  <div className="text-xs text-dim">Impostazioni recensioni</div>
+                </div>
+              </div>
+              <button onClick={() => setSrcCfg(null)} className="rounded-lg p-1 text-faint hover:bg-wash hover:text-txt">✕</button>
+            </div>
+
+            <div className="mt-3 rounded-lg border border-line bg-wash p-3 text-[13px] text-dim">
+              {srcCfg === "direct"
+                ? "Le recensioni dei tuoi ospiti diretti le raccogli e le inserisci qui. In futuro potrai chiederle in automatico via email post-soggiorno."
+                : `${SRC[srcCfg].label} non espone un'API pubblica self-service per le recensioni: il collegamento avverrà tramite connettore partner (in arrivo). Nel frattempo puoi inserire le recensioni a mano — restano salvate e rientrano in media, distribuzione e risposte AI.`}
+            </div>
+
+            <button onClick={() => { setMForm((f) => ({ ...f, source: srcCfg })); setShowManual(true); setSrcCfg(null); }} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90">＋ Aggiungi recensione {SRC[srcCfg].label} a mano</button>
+            <p className="mt-2 text-center text-[11px] text-faint">Il connettore automatico {SRC[srcCfg].label} arriverà con le integrazioni partner.</p>
+          </div>
+        </div>
+      )}
 
       {/* Filtro per fonte + aggiunta manuale */}
       <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
