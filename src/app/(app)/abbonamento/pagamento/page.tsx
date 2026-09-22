@@ -23,17 +23,21 @@ export default function PagamentoPage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   useEffect(() => { try { const r = localStorage.getItem(KEY); if (r) setB({ ...empty, ...JSON.parse(r) }); } catch {} }, []);
-  useEffect(() => { try { const c = localStorage.getItem("spigolestay:stripecustomer"); if (c) setCustomer(c); } catch {} }, []);
-  // Recupera il cliente Stripe dall'email se non memorizzato (riconosce la carta già salvata).
+  // Cliente Stripe dell'ABBONAMENTO XENORA, autorevole dal server: evita di aprire per errore
+  // un tuo cliente omonimo (stessa email ma non Xenora). Se non c'è abbonamento, customer = null.
   useEffect(() => {
-    if (customer || !user?.email) return;
+    if (!user?.email) return;
     let cancel = false;
-    fetch(`/api/stripe/customer?email=${encodeURIComponent(user.email)}`)
+    fetch(`/api/stripe/customer?email=${encodeURIComponent(user.email)}${user.id ? `&userId=${encodeURIComponent(user.id)}` : ""}`)
       .then((r) => r.json())
-      .then((d) => { if (!cancel && d?.customerId) { setCustomer(d.customerId); try { localStorage.setItem("spigolestay:stripecustomer", d.customerId); } catch {} } })
+      .then((d) => {
+        if (cancel) return;
+        if (d?.customerId) { setCustomer(d.customerId); try { localStorage.setItem("spigolestay:stripecustomer", d.customerId); } catch {} }
+        else { setCustomer(null); try { localStorage.removeItem("spigolestay:stripecustomer"); } catch {} }
+      })
       .catch(() => {});
     return () => { cancel = true; };
-  }, [user?.email, customer]);
+  }, [user?.email, user?.id]);
   const set = (k: keyof Billing, v: string) => setB((p) => ({ ...p, [k]: v }));
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(b)); } catch {} setSaved(true); window.setTimeout(() => setSaved(false), 2000); };
 
@@ -54,7 +58,7 @@ export default function PagamentoPage() {
         setCustomer(null);
         let found: string | null = null;
         if (user?.email) {
-          const look = await fetch(`/api/stripe/customer?email=${encodeURIComponent(user.email)}`).then((r) => r.json()).catch(() => ({}));
+          const look = await fetch(`/api/stripe/customer?email=${encodeURIComponent(user.email)}${user.id ? `&userId=${encodeURIComponent(user.id)}` : ""}`).then((r) => r.json()).catch(() => ({}));
           if (look?.customerId && look.customerId !== customer) found = look.customerId as string;
         }
         if (found) {
