@@ -87,11 +87,17 @@ export async function POST(req: Request) {
     if (!s(doc.firstName).trim() || !s(doc.lastName).trim()) return NextResponse.json({ ok: false, error: "missing_name" }, { status: 400 });
     const arrival = String(body?.arrival || "").slice(0, 40);
     const guestRequests = String(body?.guestRequests || "").slice(0, 800);
-    const extraGuests = arr(body?.extraGuests).map((e) => ({
-      firstName: s((e as Json).firstName).slice(0, 80), lastName: s((e as Json).lastName).slice(0, 80),
-      birthDate: s((e as Json).birthDate).slice(0, 20), birthPlace: s((e as Json).birthPlace).slice(0, 120),
-      citizenship: s((e as Json).citizenship).slice(0, 80), docType: s((e as Json).docType).slice(0, 60), docNumber: s((e as Json).docNumber).slice(0, 60),
-    })).filter((e) => e.firstName && e.lastName);
+    const extraGuests = arr(body?.extraGuests).map((e) => {
+      const g = e as Json;
+      const pf = typeof g.docPhotoFront === "string" ? g.docPhotoFront : (typeof g.photoFront === "string" ? g.photoFront : "");
+      const pb = typeof g.docPhotoBack === "string" ? g.docPhotoBack : (typeof g.photoBack === "string" ? g.photoBack : "");
+      return {
+        firstName: s(g.firstName).slice(0, 80), lastName: s(g.lastName).slice(0, 80), sex: s(g.sex).slice(0, 1),
+        birthDate: s(g.birthDate).slice(0, 20), birthPlace: s(g.birthPlace).slice(0, 120),
+        citizenship: s(g.citizenship).slice(0, 80), docType: s(g.docType).slice(0, 60), docNumber: s(g.docNumber).slice(0, 60), docPlace: s(g.docPlace).slice(0, 120),
+        docPhotoFront: pf || undefined, docPhotoBack: pb || undefined,
+      };
+    }).filter((e) => e.firstName && e.lastName);
     const docPhotoFront = typeof body?.docPhotoFront === "string" ? body.docPhotoFront : undefined;
     const docPhotoBack = typeof body?.docPhotoBack === "string" ? body.docPhotoBack : undefined;
     const signature = typeof body?.signature === "string" ? body.signature : undefined;

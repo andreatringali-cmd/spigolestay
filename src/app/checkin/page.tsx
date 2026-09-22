@@ -17,12 +17,12 @@ const lbl = "block text-xs font-medium text-dim";
 const fmtD = (iso: string) => { try { return new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; } };
 
 interface DocData { firstName: string; lastName: string; sex: string; birthDate: string; birthPlace: string; citizenship: string; docType: string; docNumber: string; docPlace: string }
-const emptyExtra = () => ({ firstName: "", lastName: "", birthDate: "", birthPlace: "", citizenship: "", docType: DOC_TYPES[0], docNumber: "" });
+const emptyExtra = () => ({ firstName: "", lastName: "", sex: "", birthDate: "", birthPlace: "", citizenship: "", docType: DOC_TYPES[0], docNumber: "", docPlace: "", photoFront: "", photoBack: "" });
 
 interface Info {
   aiEnabled?: boolean;
   returning?: boolean;
-  booking: { id: string; code: string; status: string; checkIn: string; checkOut: string; adults: number; children: number; total: number; paid: number; cleaningFee: number; cityTax: number; cityTaxExempt: boolean; webCheckin: boolean; arrivalTime: string; guestRequests: string; extras: { name: string; price: number }[]; extraGuests: DocData[]; docPhotoFront: string | null; docPhotoBack: string | null; signature: string | null; invoiceRequest: Record<string, unknown> | null };
+  booking: { id: string; code: string; status: string; checkIn: string; checkOut: string; adults: number; children: number; total: number; paid: number; cleaningFee: number; cityTax: number; cityTaxExempt: boolean; webCheckin: boolean; arrivalTime: string; guestRequests: string; extras: { name: string; price: number }[]; extraGuests: (DocData & { docPhotoFront?: string; docPhotoBack?: string })[]; docPhotoFront: string | null; docPhotoBack: string | null; signature: string | null; invoiceRequest: Record<string, unknown> | null };
   guest: { firstName: string; lastName: string; email: string; phone: string; sex: string; birthDate: string; birthPlace: string; citizenship: string; docType: string; docNumber: string; docPlace: string; docPhotoFront?: string | null; docPhotoBack?: string | null };
   roomType: { name: string };
   unit: { name: string; accessInfo: string } | null;
@@ -66,26 +66,36 @@ function Engine() {
   const [extracting, setExtracting] = useState(false);
   const [extractMsg, setExtractMsg] = useState("");
   const [aiOff, setAiOff] = useState(false);
-  const extractDoc = async (img: string) => {
+  // Estrazione generica: legge il documento e passa i campi a `apply` (riempie solo i vuoti).
+  const runExtract = async (img: string, apply: (f: Record<string, string>) => void) => {
     if (!img || extracting) return;
     setExtracting(true); setExtractMsg("");
     try {
       const r = await fetch("/api/checkin/extract", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ image: img }) });
       const j = await r.json().catch(() => ({}));
       if (r.status === 503 && j?.error === "ai_not_configured") { setAiOff(true); setExtracting(false); return; }
-      if (r.ok && j?.ok && j.fields) {
-        const f = j.fields as Partial<DocData>;
-        setDoc((p) => {
-          const base = p ?? { firstName: "", lastName: "", sex: "", birthDate: "", birthPlace: "", citizenship: "", docType: DOC_TYPES[0], docNumber: "", docPlace: "" };
-          // Riempi solo i campi vuoti, per non sovrascrivere ciò che l'ospite ha già corretto.
-          const merged = { ...base } as DocData;
-          (Object.keys(f) as (keyof DocData)[]).forEach((k) => { if (f[k] && !String(base[k] || "").trim()) merged[k] = String(f[k]); });
-          return merged;
-        });
-        setExtractMsg("Dati compilati dal documento — controllali prima di inviare.");
-      } else setExtractMsg("Non sono riuscito a leggere il documento: compila i campi a mano.");
+      if (r.ok && j?.ok && j.fields) { apply(j.fields as Record<string, string>); setExtractMsg("Dati compilati dal documento — controllali prima di inviare."); }
+      else setExtractMsg("Non sono riuscito a leggere il documento: compila i campi a mano.");
     } catch { setExtractMsg("Lettura non riuscita: compila i campi a mano."); }
     setExtracting(false);
+  };
+  // Ospite principale.
+  const extractDoc = (img: string) => runExtract(img, (f) => setDoc((p) => {
+    const base = p ?? { firstName: "", lastName: "", sex: "", birthDate: "", birthPlace: "", citizenship: "", docType: DOC_TYPES[0], docNumber: "", docPlace: "" };
+    const merged = { ...base } as DocData;
+    (Object.keys(f) as (keyof DocData)[]).forEach((k) => { if (f[k] && !String(base[k] || "").trim()) merged[k] = String(f[k]); });
+    return merged;
+  }));
+  // Co-ospite i-esimo: riempie solo i campi ancora vuoti di quell'ospite.
+  const extractExtra = (img: string, i: number) => runExtract(img, (f) => setExtras((prev) => prev.map((e, j) => {
+    if (j !== i) return e;
+    const merged = { ...e } as Record<string, string>;
+    Object.keys(f).forEach((k) => { if (f[k] && !String(merged[k] || "").trim()) merged[k] = String(f[k]); });
+    return merged as typeof e;
+  })));
+  const onExtraPhoto = async (file: File | undefined, i: number) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    try { const dl = await downscaleImage(file, 900, 0.72); setExtra(i, "photoFront", dl); void extractExtra(dl, i); } catch {}
   };
 
   // Carica la prenotazione dal server.
@@ -107,7 +117,7 @@ function Engine() {
         setPhotoFront(b.docPhotoFront || g.docPhotoFront || undefined); setPhotoBack(b.docPhotoBack || g.docPhotoBack || undefined); setSignature(b.signature || undefined);
         setAiOff(d.aiEnabled === false);
         const need = Math.max(0, (b.adults || 1) - 1);
-        setExtras(b.extraGuests?.length ? b.extraGuests.map((e) => ({ ...emptyExtra(), ...e })) : Array.from({ length: need }, emptyExtra));
+        setExtras(b.extraGuests?.length ? b.extraGuests.map((e) => ({ ...emptyExtra(), ...e, photoFront: e.docPhotoFront || "", photoBack: e.docPhotoBack || "" })) : Array.from({ length: need }, emptyExtra));
         if (b.invoiceRequest) setInv((p) => ({ ...p, ...Object.fromEntries(Object.entries(b.invoiceRequest!).filter(([, v]) => v != null).map(([k, v]) => [k, v as string | boolean])) }));
       }
     } catch { setLoadErr("Errore di rete."); }
@@ -294,15 +304,31 @@ function Engine() {
             <div className="flex flex-col gap-3">
               {extras.map((e, i) => (
                 <div key={i} className="rounded-lg border border-line p-3">
-                  <div className="mb-2 flex items-center justify-between"><span className="text-xs font-semibold text-dim">Ospite {i + 2}</span><button onClick={() => setExtras((p) => p.filter((_, j) => j !== i))} className="text-faint hover:text-[color:var(--err)]">✕</button></div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-dim">Ospite {i + 2}</span>
+                    <div className="flex items-center gap-2">
+                      {!aiOff && <label className="cursor-pointer rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>{extracting ? "Leggo…" : "✨ Compila dai documenti"}<input type="file" accept="image/*" capture="environment" hidden onChange={(ev) => onExtraPhoto(ev.target.files?.[0], i)} /></label>}
+                      <button onClick={() => setExtras((p) => p.filter((_, j) => j !== i))} className="text-faint hover:text-[color:var(--err)]">✕</button>
+                    </div>
+                  </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <input value={e.firstName} onChange={(ev) => setExtra(i, "firstName", ev.target.value)} placeholder="Nome" className={field} />
                     <input value={e.lastName} onChange={(ev) => setExtra(i, "lastName", ev.target.value)} placeholder="Cognome" className={field} />
+                    <select value={e.sex ?? ""} onChange={(ev) => setExtra(i, "sex", ev.target.value)} className={field}><option value="">Sesso</option><option value="M">Maschile</option><option value="F">Femminile</option></select>
                     <input type="date" value={e.birthDate} onChange={(ev) => setExtra(i, "birthDate", ev.target.value)} className={field} />
+                    <input value={e.birthPlace} onChange={(ev) => setExtra(i, "birthPlace", ev.target.value)} placeholder="Luogo di nascita" className={field} />
                     <input value={e.citizenship} onChange={(ev) => setExtra(i, "citizenship", ev.target.value)} placeholder="Cittadinanza" className={field} />
                     <select value={e.docType} onChange={(ev) => setExtra(i, "docType", ev.target.value)} className={field}>{DOC_TYPES.map((d) => <option key={d} value={d}>{d}</option>)}</select>
                     <input value={e.docNumber} onChange={(ev) => setExtra(i, "docNumber", ev.target.value)} placeholder="Numero documento" className={field} />
+                    <input value={e.docPlace ?? ""} onChange={(ev) => setExtra(i, "docPlace", ev.target.value)} placeholder="Luogo di rilascio" className={`${field} sm:col-span-2`} />
                   </div>
+                  {e.photoFront && (
+                    <div className="mt-2 flex items-center gap-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={e.photoFront} alt="doc" className="h-12 w-20 rounded border border-line object-cover" />
+                      <button onClick={() => setExtra(i, "photoFront", "")} className="text-[11px] text-dim hover:text-[color:var(--err)]">Rimuovi foto</button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
