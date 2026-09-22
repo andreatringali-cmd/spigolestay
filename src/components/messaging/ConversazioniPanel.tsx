@@ -390,16 +390,25 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
               })()}
             </div>
 
-            <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto bg-wash p-4">
+            <div ref={scrollRef} className="flex-1 space-y-1.5 overflow-y-auto p-4" style={{ background: "color-mix(in srgb, var(--focus) 4%, var(--wash))" }}>
               {msgs.length === 0 && <div className="mt-6 text-center text-xs text-faint">{t("Nessun messaggio. Scrivi qui sotto per iniziare.")}</div>}
-              {msgs.map((m) => (
-                <div key={m.id} className={`flex ${m.dir === "out" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[78%] rounded-2xl px-3 py-2 text-sm shadow-sm ${m.dir === "out" ? "rounded-br-md bg-focus text-white" : "rounded-bl-md border border-line bg-surface text-txt"}`}>
-                    <div className="whitespace-pre-wrap break-words">{m.text}</div>
-                    <div className={`mt-0.5 text-[10px] ${m.dir === "out" ? "text-white/70" : "text-faint"}`}>{relTime(m.ts, t)}{m.via ? ` · ${m.via}` : ""}</div>
+              {msgs.map((m, i) => {
+                const prev = msgs[i - 1];
+                const showDay = !prev || new Date(prev.ts).toDateString() !== new Date(m.ts).toDateString();
+                const dayLabel = new Date(m.ts).toLocaleDateString("it-IT", { day: "2-digit", month: "long" });
+                const hhmm = new Date(m.ts).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+                return (
+                  <div key={m.id}>
+                    {showDay && <div className="my-3 flex justify-center"><span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)] px-3 py-1 text-[10px] font-semibold capitalize text-dim">{dayLabel}</span></div>}
+                    <div className={`flex ${m.dir === "out" ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm ${m.dir === "out" ? "rounded-br-md text-white" : "rounded-bl-md border border-line bg-surface text-txt"}`} style={m.dir === "out" ? { background: "linear-gradient(135deg, var(--focus), color-mix(in srgb, var(--focus) 80%, #000))" } : undefined}>
+                        <div className="whitespace-pre-wrap break-words">{m.text}</div>
+                        <div className={`mt-1 text-right text-[10px] ${m.dir === "out" ? "text-white/75" : "text-faint"}`}>{hhmm}{m.via ? ` · ${m.via}` : ""}</div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Invii programmati per QUESTO ospite */}

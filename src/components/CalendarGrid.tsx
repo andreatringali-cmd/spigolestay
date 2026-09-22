@@ -612,13 +612,11 @@ export default function CalendarGrid() {
     const statusEl = unit.outOfService
       ? <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full border text-[10px] font-bold leading-none text-dim" style={{ borderColor: "var(--dim)" }} title="Fuori servizio">!</span>
       : <span className="flex shrink-0 items-center gap-0.5">{inArrow}{outArrow}</span>;
-    // Pulizia guidata dalla scheda: turnover (arrivo/partenza), rassetto ogni N giorni durante il soggiorno, giorni di servizio.
-    const wdToday = ["Do", "Lu", "Ma", "Me", "Gi", "Ve", "Sa"][new Date().getDay()];
-    const svcToday = (unit.serviceDays ?? []).includes(wdToday);
-    const tidyN = freqDays(unit.tidyFreq);
+    // Pulizia: ALLINEATA alla pagina Pulizie (fonte di verità) → serve se c'è arrivo, partenza
+    // o un soggiorno in corso (riassetto). Niente più logica separata su giorni-di-servizio,
+    // che creava incongruenze tra Calendario e Pulizie.
     const daysIn = stayNow ? Math.round((Date.parse(todayIso) - Date.parse(stayNow.checkIn)) / 86400000) : 0;
-    const midStayClean = !!stayNow && tidyN > 0 && daysIn > 0 && daysIn % tidyN === 0;
-    const needsClean = !unit.outOfService && (arrToday || depToday || midStayClean || svcToday);
+    const needsClean = !unit.outOfService && (arrToday || depToday || !!stayNow);
     const cleanedToday = !!cleanDone[`${unit.id}:${todayIso}`];
     const broom = <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 4L9.5 14.5" /><path d="M13 8l3 3" /><path d="M9.5 14.5l-4.5 1 -1 4.5 4.5 -1 4.5 -1 -3.5 -3.5z" /><path d="M6 16l2 2" /></svg>;
     const cleanColor = !needsClean ? "var(--faint)" : cleanedToday ? "var(--ok)" : "var(--warn)";
