@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { buildVoucherPdf } from "@/lib/voucher-pdf";
 
 export const runtime = "nodejs";
 
@@ -125,11 +126,11 @@ function checkinHtml(b: BookingPayload, guests: CheckinGuest[], arrival?: string
   return shell("Check-in ricevuto", accent, inner);
 }
 
-async function send(to: string, subject: string, html: string, replyTo?: string) {
+async function send(to: string, subject: string, html: string, replyTo?: string, attachments?: { filename: string; content: string }[]) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: `Xenora <${FROM}>`, to: [to], subject, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
+    body: JSON.stringify({ from: `Xenora <${FROM}>`, to: [to], subject, html, ...(replyTo ? { reply_to: replyTo } : {}), ...(attachments && attachments.length ? { attachments } : {}) }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || `Resend ${res.status}`);
@@ -145,7 +146,13 @@ export async function POST(req: Request) {
     if (body.kind === "voucher") {
       if (!b.guestEmail) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
       const subject = `Conferma prenotazione ${b.code || ""} · ${b.structureName || "Xenora"}`.trim();
-      const data = await send(b.guestEmail, subject, voucherHtml(b, body.checkinUrl || "", body.manageUrl), b.structureEmail);
+      // Allega il voucher in PDF (carta intestata). Se la generazione fallisce, invia comunque l'email.
+      let attachments: { filename: string; content: string }[] | undefined;
+      try {
+        const pdf = await buildVoucherPdf({ ...b, manageUrl: body.manageUrl });
+        attachments = [{ filename: `voucher-${(b.code || "prenotazione").replace(/[^A-Za-z0-9_-]/g, "")}.pdf`, content: Buffer.from(pdf).toString("base64") }];
+      } catch { attachments = undefined; }
+      const data = await send(b.guestEmail, subject, voucherHtml(b, body.checkinUrl || "", body.manageUrl), b.structureEmail, attachments);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "cancel") {
