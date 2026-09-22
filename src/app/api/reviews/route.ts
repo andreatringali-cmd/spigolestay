@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { fetchGoogleReviews } from "@/lib/reviews/google";
+import { fetchGoogleReviews, searchPlaces } from "@/lib/reviews/google";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +33,13 @@ async function ensureAuth(req: NextRequest): Promise<NextResponse | null> {
 export async function GET(req: NextRequest) {
   const gate = await ensureAuth(req);
   if (gate) return gate;
+
+  // Ricerca struttura per nome/indirizzo → candidati con Place ID (così l'utente non lo cerca a mano).
+  const find = (req.nextUrl.searchParams.get("find") || "").trim();
+  if (find) {
+    const res = await searchPlaces(find);
+    return NextResponse.json(res, { status: res.configured && res.error ? 502 : 200 });
+  }
 
   const placeId = (req.nextUrl.searchParams.get("placeId") || "").trim();
   const structureId = (req.nextUrl.searchParams.get("structureId") || "").trim();

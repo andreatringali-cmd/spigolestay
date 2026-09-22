@@ -148,6 +148,32 @@ async function fetchLegacy(id: string, key: string): Promise<GoogleReviewsResult
   } finally { clearTimeout(timer); }
 }
 
+// Cerca una struttura per nome/indirizzo e restituisce i candidati (id + nome + indirizzo),
+// così l'utente non deve trovare il Place ID a mano. Usa Places API (New) Text Search.
+export interface PlaceCandidate { id: string; name: string; address?: string }
+export async function searchPlaces(query: string): Promise<{ configured: boolean; candidates?: PlaceCandidate[]; error?: string }> {
+  const key = process.env.GOOGLE_PLACES_API_KEY;
+  if (!key) return { configured: false };
+  const q = (query || "").trim();
+  if (!q) return { configured: true, candidates: [] };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const r = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST", signal: ctrl.signal, cache: "no-store",
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key, "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress" },
+      body: JSON.stringify({ textQuery: q, languageCode: "it", regionCode: "IT" }),
+    });
+    if (!r.ok) return { configured: true, error: `http_${r.status}` };
+    const j = (await r.json().catch(() => null)) as { places?: { id?: string; displayName?: { text?: string }; formattedAddress?: string }[] } | null;
+    const candidates: PlaceCandidate[] = (j?.places ?? []).slice(0, 6).map((p) => ({ id: p.id || "", name: p.displayName?.text || "(senza nome)", address: p.formattedAddress })).filter((c) => c.id);
+    return { configured: true, candidates };
+  } catch (e) {
+    const aborted = (e as Error)?.name === "AbortError";
+    return { configured: true, error: aborted ? "timeout" : "fetch_failed" };
+  } finally { clearTimeout(timer); }
+}
+
 export async function fetchGoogleReviews(placeId: string): Promise<GoogleReviewsResult> {
   const key = process.env.GOOGLE_PLACES_API_KEY;
   if (!key) return { configured: false };

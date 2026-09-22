@@ -101,6 +101,25 @@ export default function RecensioniPage() {
   };
   const clearPlaceId = () => { setPlaceId(""); setPlaceIdInput(""); try { localStorage.removeItem(PLACEID_KEY(selStructureId)); } catch {} };
 
+  // Ricerca automatica della struttura su Google → candidati con Place ID (niente ricerca manuale).
+  const [findQ, setFindQ] = useState("");
+  const [finding, setFinding] = useState(false);
+  const [candidates, setCandidates] = useState<{ id: string; name: string; address?: string }[] | null>(null);
+  const runFind = async () => {
+    const st = structures.find((s) => s.id === selStructureId);
+    const q = (findQ.trim() || [st?.name, st?.city].filter(Boolean).join(" ")).trim();
+    if (!q) return;
+    setFinding(true); setCandidates(null);
+    try {
+      const token = supabase ? (await supabase.auth.getSession())?.data.session?.access_token : undefined;
+      const r = await fetch(`/api/reviews?find=${encodeURIComponent(q)}`, { cache: "no-store", headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+      const j = await r.json().catch(() => ({}));
+      setCandidates(Array.isArray(j.candidates) ? j.candidates : []);
+    } catch { setCandidates([]); }
+    finally { setFinding(false); }
+  };
+  const pickCandidate = (id: string) => { setPlaceIdInput(id); setPlaceId(id); try { if (selStructureId) localStorage.setItem(PLACEID_KEY(selStructureId), id); } catch {} setCandidates(null); };
+
   // Carica le recensioni Google reali dalla route API.
   const loadGoogle = useCallback(async (pid: string, sid: string) => {
     setGoogle((g) => ({ ...g, loading: true, error: undefined }));
@@ -224,6 +243,32 @@ export default function RecensioniPage() {
             </div>
           </div>
         ) : null}
+
+        {/* Ricerca automatica: trova la struttura su Google e imposta il Place ID senza cercarlo a mano */}
+        <div className="mt-3">
+          <label className="text-[11px] font-semibold uppercase tracking-wide text-faint">Trova la tua struttura su Google</label>
+          <div className="mt-1 flex flex-wrap gap-2">
+            <input
+              value={findQ}
+              onChange={(e) => setFindQ(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") runFind(); }}
+              placeholder="es. Spigolehouse Siracusa"
+              className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus"
+            />
+            <button onClick={runFind} disabled={finding} className="rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{finding ? "Cerco…" : "Cerca"}</button>
+          </div>
+          {candidates && (
+            <div className="mt-2 space-y-1.5">
+              {candidates.length === 0 && <p className="text-[12px] text-faint">Nessun risultato. Prova col nome esatto + città, oppure incolla il Place ID sotto.</p>}
+              {candidates.map((c) => (
+                <button key={c.id} onClick={() => pickCandidate(c.id)} className="flex w-full items-center justify-between gap-3 rounded-lg border border-line bg-paper px-3 py-2 text-left transition hover:border-focus hover:bg-wash">
+                  <span className="min-w-0"><span className="block truncate text-sm font-semibold text-txt">{c.name}</span>{c.address && <span className="block truncate text-[11px] text-faint">{c.address}</span>}</span>
+                  <span className="shrink-0 text-xs font-semibold text-focus">Usa questa →</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="mt-3">
           <label className="text-[11px] font-semibold uppercase tracking-wide text-faint">Google Place ID {selStructureId && structures.find((s) => s.id === selStructureId) ? `· ${structures.find((s) => s.id === selStructureId)?.name}` : ""}</label>
