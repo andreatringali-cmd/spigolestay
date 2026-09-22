@@ -8,6 +8,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { usePathname } from "next/navigation";
 import { loadUsers, saveUsers, type User, type PermLevel } from "./users";
 import { TIERS } from "./plans";
+import { supabase } from "./supabase";
 
 interface AccessValue {
   user: User | null;
@@ -28,6 +29,9 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   const [userId, setUid] = useState<string>("");
   const [modules, setModules] = useState<Record<string, boolean>>({});
   const [planIncludes, setPlanIncludes] = useState<string[]>([]);
+  // Ruolo/permessi dell'utente sulle strutture CONDIVISE (per limitare i co-gestori invitati).
+  const [share, setShare] = useState<Record<string, { role: string; active: boolean; permissions: Record<string, PermLevel> | null }>>({});
+  const [activeOrgId, setActiveOrgId] = useState<string>("");
 
   const reload = () => {
     try {
@@ -71,11 +75,63 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, [userId]);
 
+  // Carica il mio ruolo/permessi sulle strutture condivise (una volta / al cambio pagina).
+  useEffect(() => {
+    let stop = false;
+    (async () => {
+      try {
+        const token = (await supabase?.auth.getSession())?.data.session?.access_token;
+        if (!token) return;
+        const r = await fetch("/api/org/access", { headers: { Authorization: `Bearer ${token}` } });
+        const j = await r.json().catch(() => ({}));
+        if (stop || !j?.orgs) return;
+        const map: Record<string, { role: string; active: boolean; permissions: Record<string, PermLevel> | null }> = {};
+        for (const o of j.orgs) map[o.orgId] = { role: o.role, active: o.active !== false, permissions: (o.permissions as Record<string, PermLevel>) || null };
+        setShare(map);
+      } catch {}
+    })();
+    return () => { stop = true; };
+  }, [pathname]);
+  // Ricava l'org della struttura ATTIVA (per applicare i limiti del co-gestore).
+  useEffect(() => {
+    const compute = () => {
+      try {
+        const act = localStorage.getItem("spigolestay:activestruct") || "all";
+        if (act === "all") { setActiveOrgId(""); return; }
+        const raw = localStorage.getItem("spigolestay:data:v1");
+        const d = raw ? JSON.parse(raw) : {};
+        const s = (Array.isArray(d.structures) ? d.structures : []).find((x: { id?: string }) => x.id === act);
+        setActiveOrgId((s?.orgId as string) || "");
+      } catch { setActiveOrgId(""); }
+    };
+    compute();
+    const h = () => compute();
+    window.addEventListener("spigolestay:activestruct", h);
+    window.addEventListener("storage", h);
+    return () => { window.removeEventListener("spigolestay:activestruct", h); window.removeEventListener("storage", h); };
+  }, [pathname]);
+
   const setUserId = (id: string) => { setUid(id); try { localStorage.setItem(CUR_KEY, id); } catch {} };
   const user = users.find((u) => u.id === userId) ?? users[0] ?? null;
 
-  const level = (perm?: string): PermLevel => { if (!perm || !user) return "edit"; return (user.perms?.[perm] as PermLevel) ?? "none"; };
-  const can = (perm?: string) => !perm || !user || level(perm) !== "none";
+  // Limite del co-gestore: attivo SOLO se la struttura attiva è di un'org di cui sono "member"
+  // (mai per il proprietario né per le strutture personali).
+  const sh = activeOrgId ? share[activeOrgId] : undefined;
+  const restriction = sh && sh.role === "member" ? { paused: sh.active === false, perms: sh.permissions } : null;
+  const ORD: Record<string, number> = { none: 0, view: 1, edit: 2 };
+  const minLvl = (a: PermLevel, b: PermLevel): PermLevel => (ORD[a] <= ORD[b] ? a : b);
+
+  const level = (perm?: string): PermLevel => {
+    if (!perm) return "edit";
+    const own: PermLevel = user ? ((user.perms?.[perm] as PermLevel) ?? "none") : "edit";
+    if (restriction) {
+      if (restriction.paused) return "none";                              // accesso in pausa dal proprietario
+      const g = ((restriction.perms?.[perm] as PermLevel) ?? "none");
+      return minLvl(own, g);
+    }
+    return own;
+  };
+  const can = (perm?: string) => level(perm) !== "none";
   const hasModules = Object.keys(modules).length > 0;
   const hasInfo = hasModules || planIncludes.length > 0;
   const moduleOn = (m?: string) => {

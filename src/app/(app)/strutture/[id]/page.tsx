@@ -15,6 +15,7 @@ import { useToast } from "@/components/ToastProvider";
 import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
+import { CO_LEVELS, coManagerPerms, levelOf, type CoLevel } from "@/lib/comanager";
 import { loadDeposit, saveDeposit, type DepositCfg } from "@/lib/deposit";
 
 function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
@@ -137,6 +138,51 @@ export default function StrutturaSchedaPage() {
       } else setUnshare({ loading: false, ok: false, msg: j?.message || t("Impossibile rimuovere la condivisione") });
     } catch { setUnshare({ loading: false, ok: false, msg: t("Rete non disponibile") }); }
   };
+
+  // Ruolo dell'utente su QUESTA struttura condivisa (owner = proprietario, member = invitato)
+  // + elenco co-gestori (solo per il proprietario).
+  const [myShare, setMyShare] = useState<{ role: string; ownerEmail: string; active: boolean } | null>(null);
+  const [members, setMembers] = useState<{ userId: string; email: string; name: string; role: string; active: boolean; permissions: Record<string, unknown> | null }[]>([]);
+  const [leaving, setLeaving] = useState<{ loading?: boolean; msg?: string }>({});
+  const bearer = async () => (await supabase?.auth.getSession())?.data.session?.access_token || "";
+  const loadShare = async () => {
+    try {
+      const token = await bearer(); if (!token) return;
+      const r = await fetch("/api/org/access", { headers: { Authorization: `Bearer ${token}` } });
+      const j = await r.json().catch(() => ({}));
+      const mine = (j?.orgs || []).find((o: { structureId?: string; orgId?: string }) => o.structureId === params.id);
+      setMyShare(mine ? { role: mine.role, ownerEmail: mine.ownerEmail || "", active: mine.active !== false } : null);
+      if (mine?.role === "owner") {
+        const rm = await fetch(`/api/org/members?structureId=${encodeURIComponent(params.id as string)}`, { headers: { Authorization: `Bearer ${token}` } });
+        const jm = await rm.json().catch(() => ({}));
+        if (jm?.ok) setMembers(jm.members || []);
+      }
+    } catch {}
+  };
+  useEffect(() => { if (!isNew && f.orgId) loadShare(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [f.orgId]);
+  const leaveShare = async () => {
+    if (!confirm(t("Abbandonare questa struttura condivisa? Non la vedrai più nel tuo account (potrà reinvitarti il proprietario)."))) return;
+    setLeaving({ loading: true });
+    try {
+      const token = await bearer(); if (!token) { setLeaving({ loading: false, msg: t("Devi essere connesso") }); return; }
+      const r = await fetch("/api/org/leave", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ structureId: params.id }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j?.ok) { setLeaving({ loading: false, msg: t("Fatto. Ricarico…") }); setTimeout(() => { try { window.location.href = "/strutture"; } catch {} }, 700); }
+      else setLeaving({ loading: false, msg: j?.message || t("Operazione non riuscita") });
+    } catch { setLeaving({ loading: false, msg: t("Rete non disponibile") }); }
+  };
+  const setMember = async (userId: string, patch: { level?: string; active?: boolean; remove?: boolean }) => {
+    try {
+      const token = await bearer(); if (!token) return;
+      const body: Record<string, unknown> = { structureId: params.id, userId };
+      if (patch.level) body.permissions = coManagerPerms(patch.level as CoLevel);
+      if (typeof patch.active === "boolean") body.active = patch.active;
+      if (patch.remove) body.remove = true;
+      await fetch("/api/org/members", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+      loadShare();
+    } catch {}
+  };
+
   const num = (v: string) => (v === "" ? undefined : Number(v.replace(",", ".")));
 
   // La pagina può montarsi PRIMA che lo store abbia caricato i dati: quando la struttura diventa
@@ -565,28 +611,58 @@ export default function StrutturaSchedaPage() {
           {!isNew && (
             <Card>
               <SectionTitle>{t("Gestione condivisa")}</SectionTitle>
-              <p className="mb-3 text-xs text-dim">{t("Invita un socio a co-gestire questa struttura: la vedrete e modificherete entrambi (calendario, tariffe, prenotazioni). Le tue altre strutture restano private.")}</p>
-              {f.orgId ? (
+              {!f.orgId ? (
+                <>
+                  <p className="mb-3 text-xs text-dim">{t("Invita un altro proprietario a co-gestire questa struttura. Decidi tu cosa può vedere e modificare; solo tu potrai revocare.")}</p>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label className={`${lbl} flex-1`}>{t("Email del socio")}<input value={socio.email} onChange={(e) => setSocio((s) => ({ ...s, email: e.target.value }))} placeholder="socio@esempio.it" className={`${inp} mt-1`} type="email" /></label>
+                    <button onClick={inviteSocio} disabled={socio.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{socio.loading ? t("Invio…") : t("Invita un socio")}</button>
+                  </div>
+                </>
+              ) : myShare?.role === "member" ? (
                 <div className="rounded-lg border border-line bg-paper p-3">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)", color: "var(--ok)" }}>{t("Condivisa ✓")}</span>
-                    <span className="text-xs text-dim">{t("Questa struttura è in gestione condivisa.")}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 15%, transparent)", color: "var(--focus)" }}>{t("Condivisa con te")}</span>
+                    {myShare.ownerEmail && <span className="text-xs text-dim">{t("da")} {myShare.ownerEmail}</span>}
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <input value={socio.email} onChange={(e) => setSocio((s) => ({ ...s, email: e.target.value }))} placeholder={t("email di un altro socio")} className={`${inp} flex-1`} type="email" />
-                    <button onClick={inviteSocio} disabled={socio.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{socio.loading ? t("Invio…") : t("Invita ancora")}</button>
+                  <p className="mt-2 text-xs text-dim">{t("Sei co-gestore di questa struttura. I permessi li imposta il proprietario; solo lui può revocare la condivisione.")}</p>
+                  {myShare.active === false && <p className="mt-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}>{t("Il proprietario ha messo in pausa il tuo accesso.")}</p>}
+                  <button onClick={leaveShare} disabled={leaving.loading} className="mt-3 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-wash disabled:opacity-50" style={{ borderColor: "var(--line)", color: "var(--err)" }}>{leaving.loading ? t("Attendi…") : t("Abbandona la condivisione")}</button>
+                  {leaving.msg && <p className="mt-2 text-[11px] text-dim">{leaving.msg}</p>}
+                </div>
+              ) : (
+                <>
+                  <p className="mb-3 text-xs text-dim">{t("Struttura condivisa. Gestisci i co-gestori: cosa vedono, cosa modificano, sospendi o rimuovi. Solo tu (proprietario) puoi farlo.")}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input value={socio.email} onChange={(e) => setSocio((s) => ({ ...s, email: e.target.value }))} placeholder={t("email di un altro proprietario")} className={`${inp} flex-1`} type="email" />
+                    <button onClick={inviteSocio} disabled={socio.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{socio.loading ? t("Invio…") : t("Invita")}</button>
                   </div>
+                  {members.length > 0 && (
+                    <div className="mt-3 flex flex-col gap-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Co-gestori")}</div>
+                      {members.map((m) => (
+                        <div key={m.userId} className="rounded-lg border border-line bg-paper p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0"><div className="truncate text-sm font-semibold text-txt">{m.email || m.name || m.userId.slice(0, 8)}</div><div className="text-[11px] text-faint">{m.active ? t("Attivo") : t("In pausa")}</div></div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <select value={levelOf(m.permissions)} onChange={(e) => setMember(m.userId, { level: e.target.value })} className="rounded-lg border border-line bg-surface px-2 py-1.5 text-xs text-txt outline-none focus:border-focus">
+                                {CO_LEVELS.map((l) => <option key={l.key} value={l.key}>{l.label}</option>)}
+                              </select>
+                              <button onClick={() => setMember(m.userId, { active: !m.active })} title={m.active ? t("Metti in pausa") : t("Riattiva")} className="rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-dim hover:bg-wash">{m.active ? "⏸" : "▶"}</button>
+                              <button onClick={() => { if (confirm(t("Rimuovere questo co-gestore?"))) setMember(m.userId, { remove: true }); }} title={t("Rimuovi")} className="rounded-lg border border-line px-2 py-1.5 text-xs text-faint hover:text-[color:var(--err)]">✕</button>
+                            </div>
+                          </div>
+                          <div className="mt-1 text-[11px] text-faint">{CO_LEVELS.find((l) => l.key === levelOf(m.permissions))?.desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
                     <span className="text-[11px] text-faint">{t("Vuoi tornare a gestirla da solo?")}</span>
                     <button onClick={removeSharing} disabled={unshare.loading} className="rounded-lg border px-3 py-2 text-sm font-medium hover:bg-wash disabled:opacity-50" style={{ borderColor: "var(--line)", color: "var(--err)" }}>{unshare.loading ? t("Rimuovo…") : "🔒 " + t("Rimuovi condivisione")}</button>
                   </div>
                   {unshare.msg && <p className="mt-2 text-[11px]" style={{ color: unshare.ok ? "var(--ok)" : "var(--err)" }}>{unshare.msg}</p>}
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-end gap-2">
-                  <label className={`${lbl} flex-1`}>{t("Email del socio")}<input value={socio.email} onChange={(e) => setSocio((s) => ({ ...s, email: e.target.value }))} placeholder="socio@esempio.it" className={`${inp} mt-1`} type="email" /></label>
-                  <button onClick={inviteSocio} disabled={socio.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{socio.loading ? t("Invio…") : t("Invita un socio")}</button>
-                </div>
+                </>
               )}
               {socio.msg && <p className="mt-2 text-[11px]" style={{ color: socio.ok ? "var(--ok)" : "var(--err)" }}>{socio.msg}</p>}
               {invites.length > 0 && (

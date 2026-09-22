@@ -248,7 +248,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       closeNewBooking: () => setNewBooking(null),
 
       activeStructureId,
-      setActiveStructure: (id) => { setActiveStructureId(id); try { localStorage.setItem("spigolestay:activestruct", id); } catch {} },
+      setActiveStructure: (id) => { setActiveStructureId(id); try { localStorage.setItem("spigolestay:activestruct", id); window.dispatchEvent(new Event("spigolestay:activestruct")); } catch {} },
 
       addStructure: (s) => { const id = uid(); setStructures((prev) => [...prev, { id, city: "Siracusa", checkOutBy: "10:30", ...s, updatedAt: Date.now() }]); logAct("config", `Struttura creata — ${s.name}`); return id; },
       updateStructure: (id, patch) => setStructures((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch, updatedAt: Date.now() } : x))),

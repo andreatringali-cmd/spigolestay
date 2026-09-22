@@ -491,10 +491,11 @@ function Engine() {
                 </div>
                 <p className="mt-3 text-xs text-dim">{deposit > 0 ? <>Per confermare è richiesto un acconto di <b className="text-txt">{eur(deposit)}</b>{selPlan.refundable ? "" : " (intero importo, tariffa non rimborsabile)"}. Il saldo si versa in struttura.</> : <>Nessun acconto richiesto: l&apos;intero importo si salda in struttura.</>} Il pagamento è gestito in modo sicuro da Stripe.</p>
                 {deposit > 0 && (
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-line bg-wash px-3 py-2 text-[11px] text-dim">
-                    <span>💳 Carta</span><span className="text-faint">·</span><span>Google Pay / Apple Pay</span><span className="text-faint">·</span><span>PayPal</span><span className="text-faint">·</span>
-                    <span className="font-semibold text-txt">Klarna — paga in 3 rate senza interessi</span>
-                    <span className="text-faint">(dove disponibile)</span>
+                  <div className="mt-2 rounded-lg border border-line bg-wash px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-dim"><span>💳 Carta</span><span className="text-faint">·</span><span>Google Pay / Apple Pay</span><span className="text-faint">·</span><span>PayPal</span><span className="text-faint">·</span><span>Klarna</span></div>
+                    <div className="mt-1.5 flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 12%, transparent)", color: "var(--focus)" }}>
+                      <span>🛍️</span><span>Con <b>Klarna</b> puoi pagare in <b>3 rate senza interessi</b></span><span className="font-normal text-faint">(dove disponibile)</span>
+                    </div>
                   </div>
                 )}
                 <label className="mt-3 flex items-start gap-2 text-xs text-dim"><input type="checkbox" checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" /> Dichiaro di aver preso visione dell'informativa privacy e accetto i termini di prenotazione.</label>
