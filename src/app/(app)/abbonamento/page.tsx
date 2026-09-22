@@ -302,40 +302,63 @@ export default function AbbonamentoPage() {
 
       {/* Form di contatto "Su misura" */}
       {contactOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setContactOpen(false)}>
-          <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="font-display text-lg font-bold text-txt">{t("Parla con noi")}</div>
-                <div className="mt-0.5 text-xs text-dim">{t("Piano Su misura per catene e gruppi. Ti ricontattiamo a breve.")}</div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setContactOpen(false)}>
+          <div className="relative max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setContactOpen(false)} aria-label={t("Chiudi")} className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-lg text-faint hover:bg-wash hover:text-txt">✕</button>
+            <div className="grid md:grid-cols-[0.82fr_1fr]">
+              {/* Pannello valore (enterprise) */}
+              <div className="relative hidden flex-col justify-between overflow-hidden p-6 text-white md:flex" style={{ background: "linear-gradient(155deg, var(--focus) 0%, color-mix(in srgb, var(--focus) 62%, #0b1220) 100%)" }}>
+                <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+                <div className="relative">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/70">Xenora · {t("Su misura")}</div>
+                  <h2 className="mt-2 font-display text-2xl font-bold leading-tight">{t("Costruito per catene e gruppi")}</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-white/85">{t("Il channel manager più avanzato, configurato sulle tue esigenze. Un partner, non solo un software.")}</p>
+                  <ul className="mt-5 space-y-2.5 text-sm">
+                    {[t("Account manager dedicato"), t("White-label completo + API"), t("Onboarding e migrazione dati assistiti"), t("Strutture e camere illimitate"), t("SLA e supporto prioritario")].map((x) => (
+                      <li key={x} className="flex items-start gap-2"><span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-white/20 text-[10px] font-bold">✓</span><span className="text-white/95">{x}</span></li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="relative mt-6 flex items-center gap-2 rounded-xl bg-white/12 px-3 py-2.5 text-xs text-white/90 backdrop-blur-sm">
+                  <span className="text-base">⚡</span><span>{t("Ti ricontattiamo")} <b>{t("entro 24 ore")}</b>.</span>
+                </div>
               </div>
-              <button onClick={() => setContactOpen(false)} className="rounded-lg p-1 text-faint hover:bg-wash hover:text-txt">✕</button>
+
+              {/* Form */}
+              <div className="p-6">
+                <div className="mb-4">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-focus md:hidden">Xenora · {t("Su misura")}</div>
+                  <h3 className="mt-1 font-display text-xl font-bold text-txt">{t("Parla con noi")}</h3>
+                  <p className="mt-0.5 text-xs text-dim">{t("Compila e ti prepariamo una proposta su misura.")}</p>
+                </div>
+                {contactState === "sent" ? (
+                  <div className="flex flex-col items-center justify-center rounded-xl border border-line bg-wash p-8 text-center">
+                    <div className="grid h-12 w-12 place-items-center rounded-full text-xl text-white" style={{ background: "var(--ok)" }}>✓</div>
+                    <div className="mt-3 text-base font-bold text-txt">{t("Richiesta inviata!")}</div>
+                    <div className="mt-1 text-sm text-dim">{t("Grazie. Ti ricontattiamo entro 24 ore.")}</div>
+                    <button onClick={() => setContactOpen(false)} className="mt-4 rounded-lg bg-focus px-5 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Chiudi")}</button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Nome")} *</span><input value={contact.firstName} onChange={(e) => setContact((p) => ({ ...p, firstName: e.target.value }))} className={cinp} /></label>
+                      <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Cognome")}</span><input value={contact.lastName} onChange={(e) => setContact((p) => ({ ...p, lastName: e.target.value }))} className={cinp} /></label>
+                    </div>
+                    <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Email")} *</span><input type="email" value={contact.email} onChange={(e) => setContact((p) => ({ ...p, email: e.target.value }))} className={cinp} placeholder="nome@azienda.it" /></label>
+                    <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Telefono")} *</span><input type="tel" value={contact.phone} onChange={(e) => setContact((p) => ({ ...p, phone: e.target.value }))} className={cinp} placeholder="+39 …" /></label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Azienda / struttura")}</span><input value={contact.company} onChange={(e) => setContact((p) => ({ ...p, company: e.target.value }))} className={cinp} /></label>
+                      <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("N° strutture")}</span><input type="number" min={1} value={contact.structures} onChange={(e) => setContact((p) => ({ ...p, structures: e.target.value }))} className={cinp} placeholder="es. 12" /></label>
+                    </div>
+                    <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Come possiamo aiutarti?")}</span><textarea rows={3} value={contact.note} onChange={(e) => setContact((p) => ({ ...p, note: e.target.value }))} className={`${cinp} resize-y`} placeholder={t("Raccontaci il tuo progetto: quante strutture, quali OTA, cosa ti serve…")} /></label>
+                    <label className="flex items-start gap-2 text-[12px] text-dim"><input type="checkbox" checked={contact.privacy} onChange={(e) => setContact((p) => ({ ...p, privacy: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" /><span>{t("Acconsento al trattamento dei dati per essere ricontattato.")} *</span></label>
+                    {contactState === "err" && <p className="text-xs font-medium" style={{ color: "var(--err)" }}>{t("Compila Nome, Email, Telefono e il consenso. Se persiste, riprova.")}</p>}
+                    <button onClick={submitContact} disabled={contactState === "sending"} className="w-full rounded-xl bg-focus py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60">{contactState === "sending" ? t("Invio…") : t("Invia richiesta")}</button>
+                    <p className="text-center text-[11px] text-faint">{t("Nessun impegno · Risposta entro 24 ore")}</p>
+                  </div>
+                )}
+              </div>
             </div>
-            {contactState === "sent" ? (
-              <div className="mt-4 rounded-xl border border-line bg-wash p-4 text-center">
-                <div className="text-2xl">✓</div>
-                <div className="mt-1 text-sm font-semibold text-txt">{t("Richiesta inviata!")}</div>
-                <div className="mt-0.5 text-xs text-dim">{t("Ti ricontattiamo al più presto.")}</div>
-                <button onClick={() => setContactOpen(false)} className="mt-3 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Chiudi")}</button>
-              </div>
-            ) : (
-              <div className="mt-3 space-y-2.5">
-                <div className="grid grid-cols-2 gap-2.5">
-                  <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Nome")} *</span><input value={contact.firstName} onChange={(e) => setContact((p) => ({ ...p, firstName: e.target.value }))} className={cinp} /></label>
-                  <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Cognome")}</span><input value={contact.lastName} onChange={(e) => setContact((p) => ({ ...p, lastName: e.target.value }))} className={cinp} /></label>
-                </div>
-                <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Email")} *</span><input type="email" value={contact.email} onChange={(e) => setContact((p) => ({ ...p, email: e.target.value }))} className={cinp} /></label>
-                <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Telefono")} *</span><input type="tel" value={contact.phone} onChange={(e) => setContact((p) => ({ ...p, phone: e.target.value }))} className={cinp} /></label>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Azienda / struttura")}</span><input value={contact.company} onChange={(e) => setContact((p) => ({ ...p, company: e.target.value }))} className={cinp} /></label>
-                  <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("N° strutture")}</span><input type="number" min={1} value={contact.structures} onChange={(e) => setContact((p) => ({ ...p, structures: e.target.value }))} className={cinp} /></label>
-                </div>
-                <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Note")}</span><textarea rows={3} value={contact.note} onChange={(e) => setContact((p) => ({ ...p, note: e.target.value }))} className={`${cinp} resize-y`} placeholder={t("Raccontaci cosa ti serve…")} /></label>
-                <label className="flex items-start gap-2 text-[12px] text-dim"><input type="checkbox" checked={contact.privacy} onChange={(e) => setContact((p) => ({ ...p, privacy: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" /><span>{t("Acconsento al trattamento dei dati per essere ricontattato.")} *</span></label>
-                {contactState === "err" && <p className="text-xs font-medium" style={{ color: "var(--err)" }}>{t("Compila Nome, Email, Telefono e il consenso. Se persiste, riprova.")}</p>}
-                <button onClick={submitContact} disabled={contactState === "sending"} className="w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">{contactState === "sending" ? t("Invio…") : t("Invia richiesta")}</button>
-              </div>
-            )}
           </div>
         </div>
       )}
