@@ -7,9 +7,41 @@ import { useData } from "@/lib/store";
 import { PageHeader, Card } from "@/components/ui";
 import { eur } from "@/lib/format";
 import { centsEur } from "@/lib/invoicing/client";
+import type { Booking, Guest, Structure } from "@/lib/types";
 
 // Data locale (NON UTC): altrimenti vicino a mezzanotte "oggi" sfasa di un giorno.
 const today = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; };
+
+// Riga arrivo senza check-in: WhatsApp (link), Email diretta (server) e "Compila tu" (apri il form).
+function ArrivalRow({ b, g, st, origin }: { b: Booking; g?: Guest; st?: Structure; origin: string }) {
+  const [mail, setMail] = useState<"idle" | "sending" | "sent" | "err">("idle");
+  const link = `${origin}/checkin?b=${b.id}`;
+  const msg = `Ciao ${g?.firstName || ""}, completa il check-in online per il tuo soggiorno${st ? ` a ${st.name}` : ""}: ${link}`;
+  const wa = g?.phone ? `https://wa.me/${g.phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}` : "";
+  const sendMail = async () => {
+    if (!g?.email) return;
+    setMail("sending");
+    try {
+      const r = await fetch("/api/email", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "checkin_reminder", checkinUrl: link, booking: { code: b.code, structureName: st?.name, structureEmail: st?.email, guestName: g?.fullName, guestEmail: g?.email, checkIn: b.checkIn, checkInFrom: st?.checkInFrom, color: st?.photoColor, address: st?.address, phone: st?.phone } }),
+      });
+      const j = await r.json().catch(() => ({}));
+      setMail(r.ok && j?.ok ? "sent" : "err");
+    } catch { setMail("err"); }
+  };
+  const compila = () => { const w = window.open(link, "_blank"); if (!w) window.location.href = link; };
+  return (
+    <div className="rounded-lg border border-line bg-paper px-2.5 py-1.5">
+      <div className="truncate text-[13px] font-medium text-txt">{g?.fullName || "Ospite"} <span className="text-faint">· {st?.name ?? ""}</span></div>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        {wa && <a href={wa} target="_blank" rel="noreferrer" className="rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>💬 Sollecita</a>}
+        {g?.email && <button onClick={sendMail} disabled={mail === "sending" || mail === "sent"} className={`rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-70 ${mail === "sent" ? "bg-[color:var(--ok)]" : mail === "err" ? "bg-[color:var(--err)]" : "bg-focus"}`}>{mail === "sent" ? "✓ Inviata" : mail === "sending" ? "Invio…" : mail === "err" ? "Riprova" : "✉ Email"}</button>}
+        <button onClick={compila} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-txt hover:bg-wash">Compila tu</button>
+      </div>
+    </div>
+  );
+}
 
 export default function AdempimentiPage() {
   const router = useRouter();
@@ -85,23 +117,9 @@ export default function AdempimentiPage() {
           </div>
           <div className="mt-2 flex-1 space-y-1.5">
             {arrivalsNoCheckin.length === 0 && <div className="text-[13px] text-faint">Tutti gli arrivi di oggi hanno fatto il check-in.</div>}
-            {arrivalsNoCheckin.slice(0, 5).map((b) => {
-              const g = getGuest(b.guestId); const st = getStructure(b.structureId);
-              const link = `${origin}/checkin?b=${b.id}`;
-              const msg = `Ciao ${g?.firstName || ""}, completa il check-in online per il tuo soggiorno${st ? ` a ${st.name}` : ""}: ${link}`;
-              const wa = g?.phone ? `https://wa.me/${g.phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}` : "";
-              const mail = g?.email ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(g.email)}&su=${encodeURIComponent("Completa il check-in online")}&body=${encodeURIComponent(msg)}` : "";
-              return (
-                <div key={b.id} className="rounded-lg border border-line bg-paper px-2.5 py-1.5">
-                  <div className="truncate text-[13px] font-medium text-txt">{g?.fullName || "Ospite"} <span className="text-faint">· {st?.name ?? ""}</span></div>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    {wa && <a href={wa} target="_blank" rel="noreferrer" className="rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>💬 Sollecita</a>}
-                    {mail && <a href={mail} target="_blank" rel="noreferrer" className="rounded-md bg-focus px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90">✉ Email</a>}
-                    <button onClick={() => router.push(`/checkin?b=${b.id}`)} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-txt hover:bg-wash">Compila tu</button>
-                  </div>
-                </div>
-              );
-            })}
+            {arrivalsNoCheckin.slice(0, 5).map((b) => (
+              <ArrivalRow key={b.id} b={b} g={getGuest(b.guestId)} st={getStructure(b.structureId)} origin={origin} />
+            ))}
           </div>
           <button onClick={() => router.push("/prenotazioni")} className="mt-3 self-start rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Tutte le prenotazioni →</button>
         </Card>
@@ -115,7 +133,7 @@ export default function AdempimentiPage() {
         <Tile n={istatPending} label="3 · Movimenti ISTAT da inviare" tone="var(--warn)" action="Invia a ISTAT" onClick={() => router.push("/istat")} />
 
         {/* 4 · Incassi */}
-        <Tile n={docsUnpaid.length} label="4 · Documenti da incassare" tone="var(--focus)" action="Registra incassi" onClick={() => router.push("/scadenzario-incassi")}>
+        <Tile n={docsUnpaid.length} label="4 · Fatture/ricevute da incassare" tone="var(--focus)" action="Registra incassi" onClick={() => router.push("/scadenzario-incassi")}>
           {docsUnpaid.slice(0, 4).map((d) => <div key={d.id} className="flex justify-between gap-2"><span className="truncate">{d.number_label} · {d.counterpart?.name ?? ""}</span><span className="shrink-0 font-mono">{eur(centsEur(d.total_cents - (paidByDoc.get(d.id) ?? 0)))}</span></div>)}
         </Tile>
 

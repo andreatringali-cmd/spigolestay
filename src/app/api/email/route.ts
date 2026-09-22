@@ -126,6 +126,26 @@ function checkinHtml(b: BookingPayload, guests: CheckinGuest[], arrival?: string
   return shell("Check-in ricevuto", accent, inner);
 }
 
+// Sollecito check-in all'OSPITE: email diretta con il link per compilare il check-in online.
+function reminderHtml(b: BookingPayload, checkinUrl: string) {
+  const accent = b.color || "#0E9F6E";
+  const inner = `
+    <p style="margin:0 0 4px;font-size:16px;">Ciao <b>${esc((b.guestName || "").split(" ")[0] || "ospite")}</b>,</p>
+    <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">manca poco al tuo arrivo presso <b>${esc(b.structureName)}</b>. Completa il <b>check-in online</b> adesso: è veloce e al tuo arrivo eviti l'attesa.</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
+      ${b.code ? row("Codice", `<span style="font-family:monospace;">${esc(b.code)}</span>`) : ""}
+      ${b.checkIn ? row("Arrivo", esc(fmtDate(b.checkIn)) + (b.checkInFrom ? ` <span style="color:#9aa1ac;font-weight:400;">dalle ${esc(b.checkInFrom)}</span>` : "")) : ""}
+    </table>
+    <div style="margin:20px 0 6px;">
+      <a href="${esc(checkinUrl)}" style="display:block;text-align:center;background:${accent};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:10px;">Fai il check-in online →</a>
+    </div>
+    <p style="margin:8px 0 0;font-size:12px;color:#9aa1ac;text-align:center;">Compila i dati prima dell'arrivo: risparmi tempo al check-in.</p>
+    ${b.address ? `<p style="margin:18px 0 0;font-size:13px;color:#4b5563;">📍 ${esc(b.address)}</p>` : ""}
+    ${b.phone ? `<p style="margin:4px 0 0;font-size:13px;color:#4b5563;">📞 ${esc(b.phone)}</p>` : ""}
+  `;
+  return shell(`${b.structureName || "Completa il check-in"}`, accent, inner);
+}
+
 async function send(to: string, subject: string, html: string, replyTo?: string, attachments?: { filename: string; content: string }[]) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -166,6 +186,12 @@ export async function POST(req: Request) {
       if (!to) return NextResponse.json({ ok: false, error: "Email struttura mancante" }, { status: 400 });
       const subject = `Check-in online · ${b.code || ""} · ${b.guestName || ""}`.trim();
       const data = await send(to, subject, checkinHtml(b, body.guests || [], body.arrival), b.guestEmail);
+      return NextResponse.json({ ok: true, id: data?.id });
+    }
+    if (body.kind === "checkin_reminder") {
+      if (!b.guestEmail) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
+      const subject = `Completa il check-in online · ${b.structureName || "Xenora"}`.trim();
+      const data = await send(b.guestEmail, subject, reminderHtml(b, body.checkinUrl || ""), b.structureEmail);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "quote") {
