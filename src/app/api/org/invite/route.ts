@@ -71,6 +71,21 @@ export async function POST(req: Request) {
     }
     if (!S) return NextResponse.json({ error: "structure_not_found", message: "Struttura non trovata nel tuo account. Ricarica la pagina e riprova." }, { status: 404 });
 
+    // PREVENZIONE DOPPIONI: se questa struttura è GIÀ in un'organizzazione (magari creata in un
+    // tentativo precedente, anche di un'org di cui non risulto membro), RIUSALA invece di crearne
+    // una nuova — evita org duplicate per la stessa struttura (causa storica di "cancellazioni che risorgono").
+    if (!orgId) {
+      const { data: allOrgs } = await admin.from("org_state").select("org_id, data");
+      for (const r of arr(allOrgs)) {
+        let od: J = {}; try { od = JSON.parse((((r as J).data ?? {}) as Record<string, string>)[DATA_KEY] || "{}") as J; } catch { od = {}; }
+        if (arr(od.structures).some((s) => s?.id === structureId)) { orgId = (r as J).org_id as string; break; }
+      }
+      if (orgId) {
+        const { data: mem } = await admin.from("memberships").select("user_id").eq("org_id", orgId).eq("user_id", caller.id).maybeSingle();
+        if (!mem) await admin.from("memberships").insert({ org_id: orgId, user_id: caller.id, role: "owner" });
+      }
+    }
+
     // Prima condivisione: crea org + membership owner e migra la struttura in org_state.
     if (!orgId) {
       const { data: org, error: orgErr } = await admin.from("organizations")
