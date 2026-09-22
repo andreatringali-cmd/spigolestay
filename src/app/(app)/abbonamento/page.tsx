@@ -98,6 +98,29 @@ export default function AbbonamentoPage() {
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [hasRealSub, setHasRealSub] = useState(false); // abbonamento Stripe REALE attivo (non solo il flag locale)
+  // Form di contatto per il piano "Su misura".
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactState, setContactState] = useState<"idle" | "sending" | "sent" | "err">("idle");
+  const [contact, setContact] = useState({ firstName: "", lastName: "", email: "", phone: "", company: "", structures: "", note: "", privacy: false });
+  const submitContact = async () => {
+    if (!contact.firstName.trim() || !contact.email.trim() || !contact.phone.trim() || !contact.privacy) { setContactState("err"); return; }
+    setContactState("sending");
+    const text = [
+      `Richiesta piano "Su misura" da Xenora`,
+      `Nome e cognome: ${contact.firstName} ${contact.lastName}`.trim(),
+      `Email: ${contact.email}`,
+      `Telefono: ${contact.phone}`,
+      contact.company ? `Azienda / struttura: ${contact.company}` : "",
+      contact.structures ? `Numero strutture: ${contact.structures}` : "",
+      contact.note ? `Note: ${contact.note}` : "",
+    ].filter(Boolean).join("\n");
+    try {
+      const r = await fetch("/api/email", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "quote", to: "sales@xenora.app", subject: `Su misura — ${contact.firstName} ${contact.lastName}`.trim(), text, replyTo: contact.email }) });
+      const j = await r.json().catch(() => ({}));
+      setContactState(r.ok && j?.ok ? "sent" : "err");
+    } catch { setContactState("err"); }
+  };
+  const cinp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   useEffect(() => {
     try {
       const r = localStorage.getItem("spigolestay:plan") || localStorage.getItem("spigolestay:tier");
@@ -273,9 +296,49 @@ export default function AbbonamentoPage() {
             <li className="flex items-start gap-1.5"><span className="text-[color:var(--ok)]">✓</span>{t("Account manager dedicato")}</li>
             <li className="flex items-start gap-1.5"><span className="text-[color:var(--ok)]">✓</span>{t("White-label e API")}</li>
           </ul>
-          <a href="mailto:sales@xenora.app?subject=Piano%20Su%20misura" className="mt-4 rounded-lg border border-focus py-2 text-center text-sm font-semibold text-focus transition hover:bg-wash">{t("Parla con noi")}</a>
+          <button onClick={() => { setContactState("idle"); setContact((p) => ({ ...p, email: p.email || user?.email || "" })); setContactOpen(true); }} className="mt-4 rounded-lg border border-focus py-2 text-center text-sm font-semibold text-focus transition hover:bg-wash">{t("Parla con noi")}</button>
         </div>
       </div>
+
+      {/* Form di contatto "Su misura" */}
+      {contactOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setContactOpen(false)}>
+          <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="font-display text-lg font-bold text-txt">{t("Parla con noi")}</div>
+                <div className="mt-0.5 text-xs text-dim">{t("Piano Su misura per catene e gruppi. Ti ricontattiamo a breve.")}</div>
+              </div>
+              <button onClick={() => setContactOpen(false)} className="rounded-lg p-1 text-faint hover:bg-wash hover:text-txt">✕</button>
+            </div>
+            {contactState === "sent" ? (
+              <div className="mt-4 rounded-xl border border-line bg-wash p-4 text-center">
+                <div className="text-2xl">✓</div>
+                <div className="mt-1 text-sm font-semibold text-txt">{t("Richiesta inviata!")}</div>
+                <div className="mt-0.5 text-xs text-dim">{t("Ti ricontattiamo al più presto.")}</div>
+                <button onClick={() => setContactOpen(false)} className="mt-3 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Chiudi")}</button>
+              </div>
+            ) : (
+              <div className="mt-3 space-y-2.5">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Nome")} *</span><input value={contact.firstName} onChange={(e) => setContact((p) => ({ ...p, firstName: e.target.value }))} className={cinp} /></label>
+                  <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Cognome")}</span><input value={contact.lastName} onChange={(e) => setContact((p) => ({ ...p, lastName: e.target.value }))} className={cinp} /></label>
+                </div>
+                <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Email")} *</span><input type="email" value={contact.email} onChange={(e) => setContact((p) => ({ ...p, email: e.target.value }))} className={cinp} /></label>
+                <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Telefono")} *</span><input type="tel" value={contact.phone} onChange={(e) => setContact((p) => ({ ...p, phone: e.target.value }))} className={cinp} /></label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Azienda / struttura")}</span><input value={contact.company} onChange={(e) => setContact((p) => ({ ...p, company: e.target.value }))} className={cinp} /></label>
+                  <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("N° strutture")}</span><input type="number" min={1} value={contact.structures} onChange={(e) => setContact((p) => ({ ...p, structures: e.target.value }))} className={cinp} /></label>
+                </div>
+                <label className="block"><span className="mb-1 block text-xs font-medium text-dim">{t("Note")}</span><textarea rows={3} value={contact.note} onChange={(e) => setContact((p) => ({ ...p, note: e.target.value }))} className={`${cinp} resize-y`} placeholder={t("Raccontaci cosa ti serve…")} /></label>
+                <label className="flex items-start gap-2 text-[12px] text-dim"><input type="checkbox" checked={contact.privacy} onChange={(e) => setContact((p) => ({ ...p, privacy: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-[color:var(--focus)]" /><span>{t("Acconsento al trattamento dei dati per essere ricontattato.")} *</span></label>
+                {contactState === "err" && <p className="text-xs font-medium" style={{ color: "var(--err)" }}>{t("Compila Nome, Email, Telefono e il consenso. Se persiste, riprova.")}</p>}
+                <button onClick={submitContact} disabled={contactState === "sending"} className="w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">{contactState === "sending" ? t("Invio…") : t("Invia richiesta")}</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
 
       {/* Cosa include ogni piano */}
