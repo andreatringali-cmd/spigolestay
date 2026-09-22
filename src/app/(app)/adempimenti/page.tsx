@@ -14,6 +14,7 @@ const today = () => { const t = new Date(); return `${t.getFullYear()}-${String(
 export default function AdempimentiPage() {
   const router = useRouter();
   const { bookings, getGuest, getStructure } = useData();
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const [sched, setSched] = useState<{ id: string; arrival: string; stato: string }[]>([]);
   const [istat, setIstat] = useState<{ id: string; arrival: string; stato: string }[]>([]);
   const [docs, setDocs] = useState<{ id: string; number_label: string | null; stato: string; total_cents: number; counterpart: { name?: string } | null }[]>([]);
@@ -70,26 +71,61 @@ export default function AdempimentiPage() {
 
       {allClear && <Card className="mb-4"><p className="text-sm font-medium text-[color:var(--ok)]">✓ Tutto in ordine per oggi.</p></Card>}
 
+      {/* Ordine CRONOLOGICO del lavoro: dalla prenotazione all'invio di tutto.
+          1) check-in ospite → 2) schedine Questura → 3) ISTAT → 4) incasso → 5) fattura/SdI → 6) fornitori */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Tile n={arrivalsNoCheckin.length} label="Arrivi senza check-in online" tone="var(--warn)" action="Prenotazioni" onClick={() => router.push("/prenotazioni")}>
-          {arrivalsNoCheckin.slice(0, 4).map((b) => <div key={b.id} className="truncate">{getGuest(b.guestId)?.fullName || "Ospite"} · {getStructure(b.structureId)?.name ?? ""}</div>)}
+        {/* 1 · Sollecita il check-in online dell'ospite (azione diretta) */}
+        <Card className="flex flex-col">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="font-mono text-3xl font-bold" style={{ color: arrivalsNoCheckin.length > 0 ? "var(--warn)" : "var(--faint)" }}>{arrivalsNoCheckin.length}</div>
+              <div className="mt-0.5 text-sm font-semibold text-txt">1 · Arrivi senza check-in online</div>
+            </div>
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: arrivalsNoCheckin.length > 0 ? "var(--warn)" : "var(--line)" }}>1</span>
+          </div>
+          <div className="mt-2 flex-1 space-y-1.5">
+            {arrivalsNoCheckin.length === 0 && <div className="text-[13px] text-faint">Tutti gli arrivi di oggi hanno fatto il check-in.</div>}
+            {arrivalsNoCheckin.slice(0, 5).map((b) => {
+              const g = getGuest(b.guestId); const st = getStructure(b.structureId);
+              const link = `${origin}/checkin?b=${b.id}`;
+              const msg = `Ciao ${g?.firstName || ""}, completa il check-in online per il tuo soggiorno${st ? ` a ${st.name}` : ""}: ${link}`;
+              const wa = g?.phone ? `https://wa.me/${g.phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}` : "";
+              const mail = g?.email ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(g.email)}&su=${encodeURIComponent("Completa il check-in online")}&body=${encodeURIComponent(msg)}` : "";
+              return (
+                <div key={b.id} className="rounded-lg border border-line bg-paper px-2.5 py-1.5">
+                  <div className="truncate text-[13px] font-medium text-txt">{g?.fullName || "Ospite"} <span className="text-faint">· {st?.name ?? ""}</span></div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {wa && <a href={wa} target="_blank" rel="noreferrer" className="rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>💬 Sollecita</a>}
+                    {mail && <a href={mail} target="_blank" rel="noreferrer" className="rounded-md bg-focus px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90">✉ Email</a>}
+                    <button onClick={() => router.push(`/checkin?b=${b.id}`)} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-txt hover:bg-wash">Compila tu</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <button onClick={() => router.push("/prenotazioni")} className="mt-3 self-start rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Tutte le prenotazioni →</button>
+        </Card>
+
+        {/* 2 · Schedine alla Questura (dopo i check-in) */}
+        <Tile n={schedRisk.length} label="2 · Schedine da inviare (Alloggiati Web)" tone="var(--err)" action="Invia schedine" onClick={() => router.push("/alloggiati-web")}>
+          {schedRisk.length > 0 ? <div>a rischio 24h · in arrivo oggi: {schedToday.length}</div> : <div className="text-faint">nessuna in ritardo</div>}
         </Tile>
 
-        <Tile n={schedRisk.length} label="Schedine da inviare (rischio 24h)" tone="var(--err)" action="Alloggiati Web" onClick={() => router.push("/alloggiati-web")}>
-          {schedRisk.length > 0 ? <div>di cui in arrivo oggi: {schedToday.length}</div> : <div className="text-faint">nessuna in ritardo</div>}
-        </Tile>
+        {/* 3 · ISTAT */}
+        <Tile n={istatPending} label="3 · Movimenti ISTAT da inviare" tone="var(--warn)" action="Invia a ISTAT" onClick={() => router.push("/istat")} />
 
-        <Tile n={istatPending} label="Movimenti ISTAT da inviare" tone="var(--warn)" action="ISTAT · Turist@t" onClick={() => router.push("/istat")} />
-
-        <Tile n={docsRejected.length} label="Documenti scartati dallo SdI" tone="var(--err)" action="Documenti" onClick={() => router.push("/documenti")}>
-          {docsRejected.slice(0, 4).map((d) => <div key={d.id} className="truncate">{d.number_label} · {d.counterpart?.name ?? ""}</div>)}
-        </Tile>
-
-        <Tile n={docsUnpaid.length} label="Documenti da incassare" tone="var(--focus)" action="Scadenzario" onClick={() => router.push("/scadenzario-incassi")}>
+        {/* 4 · Incassi */}
+        <Tile n={docsUnpaid.length} label="4 · Documenti da incassare" tone="var(--focus)" action="Registra incassi" onClick={() => router.push("/scadenzario-incassi")}>
           {docsUnpaid.slice(0, 4).map((d) => <div key={d.id} className="flex justify-between gap-2"><span className="truncate">{d.number_label} · {d.counterpart?.name ?? ""}</span><span className="shrink-0 font-mono">{eur(centsEur(d.total_cents - (paidByDoc.get(d.id) ?? 0)))}</span></div>)}
         </Tile>
 
-        <Tile n={passiveOverdue.length} label="Fatture fornitori scadute" tone="var(--err)" action="Fatture passive" onClick={() => router.push("/fatture-passive")}>
+        {/* 5 · Fatture scartate SdI */}
+        <Tile n={docsRejected.length} label="5 · Documenti scartati dallo SdI" tone="var(--err)" action="Correggi e reinvia" onClick={() => router.push("/documenti")}>
+          {docsRejected.slice(0, 4).map((d) => <div key={d.id} className="truncate">{d.number_label} · {d.counterpart?.name ?? ""}</div>)}
+        </Tile>
+
+        {/* 6 · Fatture fornitori */}
+        <Tile n={passiveOverdue.length} label="6 · Fatture fornitori scadute" tone="var(--err)" action="Paga / registra" onClick={() => router.push("/fatture-passive")}>
           {passiveOverdue.slice(0, 4).map((p) => <div key={p.id} className="flex justify-between gap-2"><span className="truncate">{p.supplier_name ?? "Fornitore"}</span><span className="shrink-0 font-mono">{eur(centsEur(p.total_cents))}</span></div>)}
         </Tile>
       </div>

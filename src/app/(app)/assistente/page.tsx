@@ -25,7 +25,7 @@ type Ans = { title: string; value?: string; detail?: string; speech?: string; li
 
 export default function AssistentePage() {
   const router = useRouter();
-  const { bookings, roomTypes, getGuest, getStructure, getUnit } = useData();
+  const { bookings, roomTypes, units, getGuest, getStructure, getUnit } = useData();
   const { user } = useAuth();
   const [q, setQ] = useState("");
   const [ans, setAns] = useState<Ans | null>(null);
@@ -198,15 +198,37 @@ export default function AssistentePage() {
     speak(full);
   }, [bookings, narrate, speak]);
 
-  // Briefing "distribuito": ogni numero è una tessera a sé.
-  const tiles = useMemo(() => [
-    { label: "Arrivi oggi", value: String(answers.arrivalsToday.length), tone: "var(--ok)", q: "arrivi oggi" },
-    { label: "Partenze oggi", value: String(answers.departuresToday.length), tone: "var(--warn)", q: "partenze" },
-    { label: "Check-in mancanti", value: String(answers.noCheckin.length), tone: "var(--focus)", q: "check-in mancanti" },
-    { label: "Da incassare", value: dueCents != null ? eur(dueCents / 100) : "—", tone: "var(--err)", q: "da incassare" },
-    { label: "Incassato mese", value: answers.incassato.value ?? "—", tone: "var(--ok)", q: "incassato" },
-    { label: "Ricavo previsto", value: answers.ricavo.value ?? "—", tone: "var(--focus)", q: "ricavo" },
-  ], [answers, dueCents]);
+  // Briefing "distribuito": ogni numero è una tessera a sé. Set ricco di indicatori reali.
+  const tiles = useMemo(() => {
+    const inHouse = active.filter((b) => b.checkIn <= t && t < b.checkOut);
+    const cleanUnits = new Set<string>();
+    for (const b of active) { if (b.checkOut === t || b.checkIn === t || (b.checkIn < t && t < b.checkOut)) if (b.unitId) cleanUnits.add(b.unitId); }
+    const totUnits = units.filter((u) => !u.outOfService).length;
+    const occToday = active.filter((b) => b.checkIn <= t && t < b.checkOut && b.unitId).length;
+    const occPct = totUnits > 0 ? Math.round((occToday / totUnits) * 100) : 0;
+    const monthArr = active.filter((b) => monthOf(b.checkIn) === ym);
+    const next = active.filter((b) => b.checkIn > t).sort((a, b) => a.checkIn.localeCompare(b.checkIn))[0];
+    const nextLabel = next ? new Date(next.checkIn + "T00:00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—";
+    const unpaid = active.filter((b) => { const tot = bookingGrandTotal(b, getStructure(b.structureId)); return tot > 0 && (b.paid ?? 0) < tot - 0.01; }).length;
+    const cityTaxDue = active.filter((b) => b.checkOut >= t && !b.cityTaxPaid).length;
+    const weekArr = active.filter((b) => b.checkIn > t && b.checkIn <= new Date(Date.parse(t) + 7 * 86400000).toISOString().slice(0, 10)).length;
+    return [
+      { label: "Arrivi oggi", value: String(answers.arrivalsToday.length), tone: "var(--ok)", q: "arrivi oggi" },
+      { label: "Partenze oggi", value: String(answers.departuresToday.length), tone: "var(--warn)", q: "partenze" },
+      { label: "In casa ora", value: String(inHouse.length), tone: "#38bdf8", q: "chi è in casa" },
+      { label: "Check-in mancanti", value: String(answers.noCheckin.length), tone: "var(--focus)", q: "check-in mancanti" },
+      { label: "Camere da pulire", value: String(cleanUnits.size), tone: "#a78bfa", q: "pulizie" },
+      { label: "Occupazione oggi", value: `${occPct}%`, tone: occPct >= 80 ? "var(--ok)" : occPct >= 40 ? "var(--warn)" : "var(--err)", q: "occupazione" },
+      { label: "Arrivi 7 giorni", value: String(weekArr), tone: "#2dd4bf", q: "prossimi arrivi" },
+      { label: "Prossimo arrivo", value: nextLabel, tone: "#38bdf8", q: "prossimo arrivo" },
+      { label: "Prenotazioni mese", value: String(monthArr.length), tone: "var(--focus)", q: "prenotazioni del mese" },
+      { label: "Da incassare", value: dueCents != null ? eur(dueCents / 100) : "—", tone: "var(--err)", q: "da incassare" },
+      { label: "Prenotazioni non saldate", value: String(unpaid), tone: "var(--warn)", q: "da incassare" },
+      { label: "Tassa soggiorno da incassare", value: String(cityTaxDue), tone: "#f59e0b", q: "tassa di soggiorno" },
+      { label: "Incassato mese", value: answers.incassato.value ?? "—", tone: "var(--ok)", q: "incassato" },
+      { label: "Ricavo previsto", value: answers.ricavo.value ?? "—", tone: "var(--focus)", q: "ricavo" },
+    ];
+  }, [answers, dueCents, active, t, ym, units, getStructure]);
 
   // ── Motore risposte (parole chiave) ──
   const answer = useCallback(async (text: string): Promise<Ans> => {
