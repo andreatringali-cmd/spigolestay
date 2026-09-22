@@ -259,7 +259,41 @@ export default function AssistentePage() {
       const intro = n === 0 ? "Tutti gli arrivi di oggi hanno già fatto il check-in online." : `Ci ${n === 1 ? "è" : "sono"} ${n} arriv${n === 1 ? "o" : "i"} senza check-in online. Scegline uno e ti dico tutto.`;
       return { title: "Check-in da completare", value: String(n), detail: intro, speech: intro, list: itemsOf(bs) };
     }
-    if (/partenz|check[\s-]?out|pulizi/.test(s)) {
+    // Valori "dashboard": gestiti PRIMA delle keyword generiche (arriv/partenz) per evitare il misrouting dei tile.
+    const weekEndISO = new Date(Date.parse(t) + 7 * 86400000).toISOString().slice(0, 10);
+    const weekArrList = active.filter((b) => b.checkIn > t && b.checkIn <= weekEndISO);
+    const inHouseList = active.filter((b) => b.checkIn <= t && t < b.checkOut);
+    const cityTaxDue = active.filter((b) => b.checkOut >= t && !b.cityTaxPaid).length;
+    const totUnits = units.filter((u) => !u.outOfService).length;
+    const occToday = active.filter((b) => b.checkIn <= t && t < b.checkOut && b.unitId).length;
+    const occPct = totUnits > 0 ? Math.round((occToday / totUnits) * 100) : 0;
+    const cleanSet = new Set<string>(); for (const b of active) { if ((b.checkOut === t || b.checkIn === t || (b.checkIn < t && t < b.checkOut)) && b.unitId) cleanSet.add(b.unitId); }
+
+    if (/tassa|soggiorno/.test(s)) {
+      const intro = cityTaxDue === 0 ? "Nessuna tassa di soggiorno da incassare al momento." : `Ci sono ${cityTaxDue} soggiorni con tassa di soggiorno ancora da incassare.`;
+      return { title: "Tassa di soggiorno", value: String(cityTaxDue), detail: intro, speech: intro, go: { label: "Tassa soggiorno", href: "/tassa-soggiorno" } };
+    }
+    if (/occupaz/.test(s)) {
+      const intro = `Oggi sei al ${occPct}% di occupazione: ${occToday} camere occupate su ${totUnits}.`;
+      return { title: "Occupazione oggi", value: `${occPct}%`, detail: intro, speech: intro, go: { label: "Calendario", href: "/calendario" } };
+    }
+    if (/in casa|in struttura|presenti|chi c'?è ora/.test(s)) {
+      const n = inHouseList.length;
+      const intro = n === 0 ? "In questo momento non c'è nessun ospite in casa." : `In casa adesso ci ${n === 1 ? "è" : "sono"} ${n} ospit${n === 1 ? "e" : "i"}.`;
+      return { title: "In casa ora", value: String(n), detail: intro, speech: intro, list: itemsOf(inHouseList) };
+    }
+    if (/pulizi|da pulire|riassett/.test(s)) {
+      const n = cleanSet.size;
+      const intro = n === 0 ? "Nessuna camera da pulire oggi." : `Oggi ci ${n === 1 ? "è" : "sono"} ${n} camer${n === 1 ? "a" : "e"} da pulire.`;
+      return { title: "Camere da pulire", value: String(n), detail: intro, speech: intro, go: { label: "Pulizie", href: "/pulizie" } };
+    }
+    if (/prossimi arriv|arrivi 7|7 giorni|settiman/.test(s)) {
+      const n = weekArrList.length;
+      const intro = n === 0 ? "Nessun arrivo nei prossimi 7 giorni." : `Nei prossimi 7 giorni ci ${n === 1 ? "è" : "sono"} ${n} arriv${n === 1 ? "o" : "i"}.`;
+      return { title: "Arrivi · prossimi 7 giorni", value: String(n), detail: intro, speech: intro, list: itemsOf(weekArrList) };
+    }
+    if (/prossimo arrivo/.test(s)) return answers.prossimo;
+    if (/partenz|check[\s-]?out/.test(s)) {
       const bs = answers.departuresToday, n = bs.length;
       const intro = n === 0 ? `${firstName ? firstName + ", o" : "O"}ggi non ci sono partenze.` : `Oggi ${n === 1 ? "parte" : "partono"} ${n} ospit${n === 1 ? "e" : "i"}. Toccane uno per i dettagli.`;
       return { title: "Partenze di oggi", value: String(n), detail: intro, speech: intro, list: itemsOf(bs) };
@@ -284,7 +318,7 @@ export default function AssistentePage() {
       return { title: "Fatture fornitori da pagare", value: eur(tot / 100), detail: `${(data ?? []).length} fatture non pagate.`, go: { label: "Fatture passive", href: "/fatture-passive" } };
     }
     return { title: "Non ho capito", value: "🤔", detail: "Prova con: chi arriva oggi, partenze, check-in, ricavo del mese, da incassare — oppure dimmi il nome di un ospite." };
-  }, [answers, active, dueCents, firstName, getGuest, narrate, subOf]);
+  }, [answers, active, dueCents, firstName, getGuest, narrate, subOf, units, t]);
 
   const ask = useCallback(async (text: string) => {
     if (!text.trim()) return;

@@ -230,7 +230,6 @@ export default function StrutturaSchedaPage() {
 
 
   const nCamere = units.filter((u) => u.structureId === params.id).length;
-  const nTipologie = roomTypes.filter((rt) => rt.structureId === params.id).length;
 
   const errs: string[] = [];
   if (!f.name.trim()) errs.push(t("Nome"));

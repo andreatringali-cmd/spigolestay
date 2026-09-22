@@ -26,8 +26,10 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 208, on
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const inputsRef = useRef(inputs);
-  useEffect(() => { inputsRef.current = inputs; }, [inputs]);
+  // Stato letto via ref nel loop di disegno: evita di ricostruire l'effetto canvas (e resettare i
+  // flussi) a ogni transizione idle↔listen↔speak.
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
   // Versione CHIARA e premium in tema chiaro, CONSOLE SCURA in tema scuro.
   const { theme } = useTheme();
   const light = theme !== "dark";
@@ -123,7 +125,8 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 208, on
       }
 
       // Alone del core (assorbimento)
-      const glow = 0.6 + 0.4 * Math.sin(tk * (state === "listen" ? 3.4 : state === "speak" ? 2.6 : 1.4));
+      const st = stateRef.current;
+      const glow = 0.6 + 0.4 * Math.sin(tk * (st === "listen" ? 3.4 : st === "speak" ? 2.6 : 1.4));
       const g = ctx.createRadialGradient(C.x, C.y, 0, C.x, C.y, coreSize * 0.8);
       g.addColorStop(0, rgba(glowCol, (light ? 0.10 : 0.15) * glow)); g.addColorStop(1, rgba(glowCol, 0));
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(C.x, C.y, coreSize * 0.8, 0, Math.PI * 2); ctx.fill();
@@ -132,7 +135,7 @@ export default function NeuralShell({ inputs, state = "idle", coreSize = 208, on
     };
     draw();
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
-  }, [state, coreSize, light]);
+  }, [coreSize, light]);
 
   const mono = "font-mono";
   const tile = (it: ShellInput, align: "left" | "right") => (

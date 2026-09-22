@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseISO, toISO } from "@/lib/dates";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
@@ -130,8 +130,11 @@ export default function RecensioniPage() {
   };
   const pickCandidate = (id: string) => { setPlaceIdInput(id); setPlaceId(id); try { if (selStructureId) localStorage.setItem(PLACEID_KEY(selStructureId), id); } catch {} if (selStructureId) updateStructure(selStructureId, { googlePlaceId: id, updatedAt: Date.now() }); setCandidates(null); };
 
-  // Carica le recensioni Google reali dalla route API.
+  // Carica le recensioni Google reali dalla route API. Guardia "ultima richiesta vince":
+  // se cambio struttura rapidamente, la risposta vecchia non sovrascrive quella nuova.
+  const reqRef = useRef(0);
   const loadGoogle = useCallback(async (pid: string, sid: string) => {
+    const myReq = ++reqRef.current;
     setGoogle((g) => ({ ...g, loading: true, error: undefined }));
     try {
       const token = supabase ? (await supabase.auth.getSession())?.data.session?.access_token : undefined;
@@ -143,6 +146,7 @@ export default function RecensioniPage() {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       const j = await r.json().catch(() => ({}));
+      if (myReq !== reqRef.current) return; // arrivata una richiesta più recente: ignora questa
       setGoogle({
         loading: false,
         configured: typeof j.configured === "boolean" ? j.configured : null,
@@ -154,6 +158,7 @@ export default function RecensioniPage() {
         error: j.error,
       });
     } catch {
+      if (myReq !== reqRef.current) return;
       setGoogle({ loading: false, configured: null, reviews: [], error: "network" });
     }
   }, []);
@@ -188,11 +193,12 @@ export default function RecensioniPage() {
   const shown = reviews
     .filter((r) => filter === "all" || r.source === filter)
     .filter((r) => ratingFilter === "all" || r.bucket === ratingFilter);
-  const avg = reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : (google.rating ?? 0);
+  // Media: con Google collegato usa la media REALE su tutte le recensioni (google.rating), non il campione di ~5.
+  const avg = (googleConnected && typeof google.rating === "number") ? google.rating : (reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : 0);
   const totalCount = google.total && googleConnected ? google.total : reviews.length;
   const unanswered = reviews.filter((r) => !replies[r.id]).length;
   const bySource = connectedSources.map((c) => { const rs = reviews.filter((r) => r.source === c); return { c, n: rs.length, avg: rs.length ? rs.reduce((a, r) => a + r.rating, 0) / rs.length : 0 }; }).filter((x) => x.n);
-  const dist = [10, 9, 8, 7, 6, 5, 4, 3, 2].map((v) => ({ v, n: reviews.filter((r) => r.rating === v).length })).filter((d) => d.v >= 5 || d.n > 0);
+  const dist = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map((v) => ({ v, n: reviews.filter((r) => r.rating === v).length })).filter((d) => d.v >= 5 || d.n > 0);
 
   const addManual = () => {
     const guest = mForm.guest.trim() || "Ospite";
