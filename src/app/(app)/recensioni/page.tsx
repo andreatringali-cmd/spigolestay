@@ -362,17 +362,18 @@ export default function RecensioniPage() {
           const on = connectedSources.includes(s.k);
           const isGoogle = s.k === "google";
           return (
-            <button key={s.k} onClick={() => (isGoogle ? setCfgOpen(true) : setSrcCfg(s.k))} className="flex items-center gap-3 rounded-xl border p-3 text-left shadow-sm transition hover:shadow-md hover:border-[color:var(--focus)]" style={{ borderColor: on ? s.color : "var(--line)" }} title="Apri impostazioni">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: s.color }}>{s.label[0]}</span>
+            <button key={s.k} onClick={() => (isGoogle ? setCfgOpen(true) : setSrcCfg(s.k))} className="group relative flex items-center gap-3 rounded-xl border p-3 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[color:var(--focus)] hover:bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus)] active:translate-y-0" style={{ borderColor: on ? s.color : "var(--line)" }} title="Apri impostazioni">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white transition-transform duration-200 group-hover:scale-110" style={{ backgroundColor: s.color }}>{s.label[0]}</span>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-txt">{s.label}</div>
                 <div className="truncate text-[11px] text-faint">{s.note}</div>
               </div>
               {isGoogle ? (
-                <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold" style={on ? { backgroundColor: "var(--ok)", color: "#fff" } : { border: "1px solid var(--line)", color: "var(--dim)" }}>{on ? "Collegato" : "Configura"}</span>
+                <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition group-hover:opacity-0" style={on ? { backgroundColor: "var(--ok)", color: "#fff" } : { border: "1px solid var(--line)", color: "var(--dim)" }}>{on ? "Collegato" : "Configura"}</span>
               ) : (
-                <span className="shrink-0 rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-faint">Impostazioni</span>
+                <span className="shrink-0 rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-faint transition group-hover:opacity-0">Impostazioni</span>
               )}
+              <span className="pointer-events-none absolute right-3 shrink-0 rounded-full bg-focus px-2.5 py-1 text-[11px] font-semibold text-white opacity-0 transition group-hover:opacity-100">Apri →</span>
             </button>
           );
         })}
