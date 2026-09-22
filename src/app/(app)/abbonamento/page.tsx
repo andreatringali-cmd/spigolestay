@@ -333,7 +333,7 @@ export default function AbbonamentoPage() {
       {/* Riepilogo + Invita un amico su 2 colonne */}
       <div className="mt-4 grid gap-4 lg:grid-cols-2 lg:items-stretch">
       {/* Invita un amico · reward-hero */}
-      <div className="overflow-hidden rounded-2xl border p-5 lg:order-2" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", background: "linear-gradient(135deg, color-mix(in srgb, var(--focus) 10%, var(--surface)), var(--surface))" }}>
+      <div className="h-full overflow-hidden rounded-2xl border p-5 lg:order-2" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, var(--line))", background: "linear-gradient(135deg, color-mix(in srgb, var(--focus) 10%, var(--surface)), var(--surface))" }}>
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           {/* Messaggio + azioni */}
           <div className="min-w-0">
@@ -371,8 +371,8 @@ export default function AbbonamentoPage() {
       </div>
 
       {/* Riepilogo abbonamento */}
-      <div className="lg:order-1">
-        <Card>
+      <div className="h-full lg:order-1">
+        <Card className="h-full">
           <SectionTitle>{t("Il tuo abbonamento")}</SectionTitle>
           <div className="mb-3 rounded-lg border border-line bg-wash p-3">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Piano attivo")}</div>
