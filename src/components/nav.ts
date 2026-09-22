@@ -13,13 +13,13 @@ export const NAV: NavItem[] = [
   { label: "Adempimenti oggi", href: "/adempimenti", group: "", icon: "clipboard", perm: "prenotazioni", module: "pms" },
 
   // PMS: la gestione quotidiana della struttura (il cuore del gestionale).
-  { label: "Assistente", href: "/assistente", group: "PMS", icon: "sparkles", perm: "prenotazioni", module: "pms" },
   { label: "Prenotazioni", href: "/prenotazioni", group: "PMS", icon: "clipboard", perm: "prenotazioni", module: "pms" },
   { label: "Calendario", href: "/calendario", group: "PMS", icon: "calendar", perm: "calendario", module: "pms" },
   { label: "Camere", href: "/camere", group: "PMS", icon: "bed", perm: "camere", module: "pms" },
   { label: "Pulizie", href: "/pulizie", group: "PMS", icon: "sparkles", perm: "pulizie", module: "housekeeping" },
   { label: "Ospiti", href: "/ospiti", group: "PMS", icon: "users", perm: "prenotazioni", module: "pms" },
   { label: "Messaggi", href: "/messaggi", group: "PMS", icon: "chat", perm: "webconcierge", module: "messaging" },
+  { label: "Assistente", href: "/assistente", group: "PMS", icon: "sparkles", perm: "prenotazioni", module: "pms" },
 
   // Channel Manager: distribuzione sui portali + catena del prezzo (tariffe).
   { label: "Channel Manager", href: "/canali", group: "Channel Manager", icon: "share", perm: "canali", module: "cm" },
