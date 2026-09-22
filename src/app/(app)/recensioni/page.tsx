@@ -244,55 +244,6 @@ export default function RecensioniPage() {
         <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Positive</div><div className="font-mono text-lg font-bold text-[color:var(--ok)]">{reviews.length ? Math.round(reviews.filter((r) => r.bucket === "pos").length / reviews.length * 100) : 0}%</div></div>
       </div>
 
-      {/* Configurazione Google Place ID */}
-      <Card className="mb-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <SectionTitle>Recensioni Google</SectionTitle>
-          <div className="flex items-center gap-2">
-            {/* Il menu struttura serve solo quando in alto è selezionato "Tutte". */}
-            {structures.length > 1 && activeStructureId === "all" && (
-              <select value={selStructureId} onChange={(e) => setSelStructureId(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1 text-xs font-semibold text-txt outline-none focus:border-focus">
-                {structures.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
-              </select>
-            )}
-            <button onClick={() => { setCandidates(null); setCfgOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">
-              <Icon name="settings" size={14} /> {placeId ? "Modifica" : "Collega Google"}
-            </button>
-          </div>
-        </div>
-
-        {keyMissing ? (
-          <div className="rounded-lg border p-3 text-sm" style={{ borderColor: "var(--warn)", background: "color-mix(in srgb, var(--warn) 8%, transparent)" }}>
-            <div className="flex items-start gap-2">
-              <Icon name="alertTriangle" size={16} style={{ color: "var(--warn)", flexShrink: 0, marginTop: 2 }} />
-              <div>
-                <div className="font-semibold text-txt">Import Google non ancora attivo</div>
-                <p className="mt-0.5 text-dim">Per importare le recensioni Google serve configurare <code className="rounded bg-wash px-1 py-0.5 font-mono text-[11px]">GOOGLE_PLACES_API_KEY</code> lato server (variabile d&apos;ambiente). Una volta impostata, incolla qui sotto il Place ID della struttura.</p>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {/* Stato collegamento Google */}
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-          {google.loading ? (
-            <span className="text-faint">Caricamento recensioni Google…</span>
-          ) : googleConnected ? (
-            <>
-              <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-white" style={{ backgroundColor: "var(--ok)" }}><span className="h-1.5 w-1.5 rounded-full bg-white" /> Google collegato</span>
-              {google.name ? <span className="text-dim">{google.name}</span> : null}
-              {typeof google.rating === "number" ? <span className="font-mono font-semibold text-txt">{google.rating.toFixed(1)}/10</span> : null}
-              {typeof google.total === "number" ? <span className="text-faint">· {google.total} recensioni totali</span> : null}
-            </>
-          ) : placeId && google.error ? (
-            <span className="text-[color:var(--err)]">Impossibile caricare da Google ({google.error}). Verifica il Place ID e la chiave.</span>
-          ) : placeId && google.configured === false ? (
-            <span className="text-faint">Place ID salvato. Attivo appena la chiave server sarà configurata.</span>
-          ) : !placeId && google.configured === true ? (
-            <span className="text-faint">Chiave server pronta. Incolla il Place ID per importare le recensioni.</span>
-          ) : null}
-        </div>
-      </Card>
 
       {/* Finestra di configurazione Google: ricerca struttura + Place ID */}
       {cfgOpen && (
