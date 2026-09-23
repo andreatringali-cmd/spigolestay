@@ -307,13 +307,14 @@ export default function Dashboard() {
   const alCheckin = arrToday.filter((b) => !b.webCheckin && !b.signature);
   const alBalance = realToday.filter((b) => b.checkIn <= todayISO && b.checkOut >= todayISO && balanceOf(b) > 0);
   const alOos = scopedUnitsAll.filter((u) => u.outOfService);
+  // NB: check-in/schedina, saldo aperto e tassa sono ora gestiti in "Adempimenti oggi" (niente doppione):
+  // qui restano solo gli alert operativi NON coperti dagli adempimenti.
   const alerts = [
     { n: alUnassigned.length, label: "arrivi senza camera assegnata", color: "var(--err)", href: "/prenotazioni" },
-    { n: alBalance.length, label: "prenotazioni con saldo aperto", color: "var(--warn)", href: "/pagamenti" },
-    { n: alTax.length, label: "partenze senza tassa di soggiorno registrata", color: "var(--warn)", href: "/tassa-soggiorno" },
-    { n: alCheckin.length, label: "arrivi senza check-in online / schedina", color: "var(--focus)", href: "/alloggiati" },
     { n: alOos.length, label: "camere fuori servizio", color: "var(--dim)", href: "/camere" },
   ].filter((a) => a.n > 0);
+  // Riepilogo adempimenti del giorno (rimanda alla pagina dedicata): proxy lato client.
+  const adempimentiCount = alCheckin.length + alBalance.length + alTax.length;
 
   // Pulizie di oggi — stessa logica della pagina Pulizie: per camera, in base ai movimenti di oggi.
   const np = (b?: { adults: number; children: number }) => (b ? b.adults + b.children : 0);
@@ -488,20 +489,22 @@ export default function Dashboard() {
         <SectionTitle>{t("Panoramica operativa")}</SectionTitle>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {/* Da controllare */}
-          <OpsCard title={t("Da controllare")} icon="eye" color={alerts.length ? "var(--warn)" : "var(--ok)"} right={<span className="text-[11px] text-faint">{alerts.length ? `${alerts.length} ${t("avvisi")}` : t("ok")}</span>}>
-            {alerts.length === 0 ? (
-              <div className="flex items-center gap-2 py-1 text-sm text-dim"><span className="font-bold text-[color:var(--ok)]">✓</span> {t("Tutto in ordine per oggi.")}</div>
-            ) : (
-              <div className="flex flex-col gap-1.5">
-                {alerts.map((a, i) => (
-                  <Link key={i} href={a.href} className="flex items-center gap-2.5 rounded-lg border border-line px-2.5 py-2 hover:bg-wash">
-                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-xs font-bold text-white" style={{ backgroundColor: a.color }}>{a.n}</span>
-                    <span className="min-w-0 flex-1 text-sm text-txt">{t(a.label)}</span>
-                    <Icon name="chevron" size={14} />
-                  </Link>
-                ))}
-              </div>
-            )}
+          <OpsCard title={t("Da controllare")} icon="eye" color={(alerts.length || adempimentiCount) ? "var(--warn)" : "var(--ok)"} right={<span className="text-[11px] text-faint">{(alerts.length || adempimentiCount) ? `${alerts.length + (adempimentiCount ? 1 : 0)} ${t("avvisi")}` : t("ok")}</span>}>
+            <div className="flex flex-col gap-1.5">
+              {/* Riepilogo adempimenti PA/fiscali → pagina dedicata (evita doppioni sulla dashboard) */}
+              <Link href="/adempimenti" className="flex items-center gap-2.5 rounded-lg border px-2.5 py-2 hover:bg-wash" style={{ borderColor: adempimentiCount ? "color-mix(in srgb, var(--focus) 45%, var(--line))" : "var(--line)" }}>
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-xs font-bold text-white" style={{ backgroundColor: adempimentiCount ? "var(--focus)" : "var(--ok)" }}>{adempimentiCount || "✓"}</span>
+                <span className="min-w-0 flex-1 text-sm font-medium text-txt">{t("Adempimenti oggi")}{adempimentiCount ? ` · ${t("da gestire")}` : ` · ${t("tutto in ordine")}`}</span>
+                <Icon name="chevron" size={14} />
+              </Link>
+              {alerts.map((a, i) => (
+                <Link key={i} href={a.href} className="flex items-center gap-2.5 rounded-lg border border-line px-2.5 py-2 hover:bg-wash">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-xs font-bold text-white" style={{ backgroundColor: a.color }}>{a.n}</span>
+                  <span className="min-w-0 flex-1 text-sm text-txt">{t(a.label)}</span>
+                  <Icon name="chevron" size={14} />
+                </Link>
+              ))}
+            </div>
           </OpsCard>
 
           {/* Pulizie di oggi */}
