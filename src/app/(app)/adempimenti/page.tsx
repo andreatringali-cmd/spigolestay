@@ -23,8 +23,8 @@ const declaredPaxOf = (b: Booking) => (primaryDoneOf(b) ? 1 : 0) + (b.extraGuest
 
 // Scheda di uno step in ordine cronologico: badge numerato (la sequenza è informativa),
 // numero grande, pill di stato, mini-lista opzionale e azione a piena larghezza in fondo.
-function StepCard({ n, tone, label, sub, count, action, onAction, children }: {
-  n: number; tone: string; label: string; sub: string; count: number; action: string; onAction: () => void; children?: React.ReactNode;
+function StepCard({ n, tone, label, sub, count, badge, action, onAction, children }: {
+  n: number; tone: string; label: string; sub: string; count: number; badge?: React.ReactNode; action: string; onAction: () => void; children?: React.ReactNode;
 }) {
   const active = count > 0;
   return (
@@ -32,7 +32,7 @@ function StepCard({ n, tone, label, sub, count, action, onAction, children }: {
       <div className="h-1 w-full" style={{ background: active ? tone : "var(--line)" }} />
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start gap-3">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl font-mono text-xl font-bold" style={{ background: active ? soft(tone) : "var(--wash)", color: active ? tone : "var(--faint)" }}>{count}</span>
+          <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl font-mono font-bold ${badge ? "text-[15px]" : "text-xl"}`} style={{ background: active ? soft(tone) : "var(--wash)", color: active ? tone : "var(--faint)" }}>{badge ?? count}</span>
           <div className="min-w-0 flex-1 pt-0.5">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Passo {n}</div>
             <h3 className="mt-0.5 text-[13.5px] font-semibold leading-snug text-txt">{label}</h3>
@@ -190,6 +190,8 @@ export default function AdempimentiPage() {
   };
 
   const t = today();
+  // Badge "fatti/totali" (X/Y) per le card: undefined se non c'è nulla (così resta "In ordine").
+  const frac = (done: number, todo: number) => (done + todo > 0 ? `${done}/${done + todo}` : undefined);
   // Completezza del check-in PER PERSONA: quanti ospiti dichiarati vs attesi (helper a livello modulo).
   const isComplete = (b: Booking) => declaredPaxOf(b) > 0 && declaredPaxOf(b) >= expectedPaxOf(b);
   const isActiveArrival = (b: Booking) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked";
@@ -253,9 +255,10 @@ export default function AdempimentiPage() {
   const passivePaid = passive.filter((p) => p.paid);
   const passiveOverdue = passiveUnpaid.filter((p) => p.due_date && p.due_date <= t);
 
-  const allClear = arrivalsNoCheckin.length === 0 && schedToSend.length === 0 && istatPend.length === 0 && docsRejected.length === 0 && docsUnpaid.length === 0 && passiveOverdue.length === 0;
-  const totalTasks = arrivalsNoCheckin.length + schedToSend.length + istatPend.length + docsUnpaid.length + docsRejected.length + passiveOverdue.length;
-  const urgent = schedToSend.length + docsRejected.length + passiveOverdue.length; // scadenze/rifiuti = priorità alta
+  // Il totale in alto usa gli STESSI conteggi delle card (schedine raggruppate per prenotazione).
+  const allClear = arrivalsNoCheckin.length === 0 && schedToSendG.length === 0 && istatPend.length === 0 && docsRejected.length === 0 && docsUnpaid.length === 0 && passiveOverdue.length === 0;
+  const totalTasks = arrivalsNoCheckin.length + schedToSendG.length + istatPend.length + docsUnpaid.length + docsRejected.length + passiveOverdue.length;
+  const urgent = schedToSendG.length + docsRejected.length + passiveOverdue.length; // scadenze/rifiuti = priorità alta
   const toDo = totalTasks - urgent;
   const headTone = allClear ? "var(--ok)" : urgent > 0 ? "var(--err)" : "var(--focus)";
   const dateStr = new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
@@ -287,7 +290,7 @@ export default function AdempimentiPage() {
       {/* Ordine CRONOLOGICO: 1) check-in → 2) schedine Questura → 3) ISTAT → 4) incasso → 5) fattura/SdI → 6) fornitori */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* 1 · Check-in online → poi "passaggio di palla" alle schedine */}
-        <StepCard n={1} tone="var(--warn)" label="Check-in online da completare" sub="Da completare" count={arrivalsNoCheckin.length} action={syncing ? "Trasferisco…" : "↪ Trasferisci alle schedine"} onAction={transferToSchedine}>
+        <StepCard n={1} tone="var(--warn)" label="Check-in online da completare" sub="Da completare" count={arrivalsNoCheckin.length} badge={frac(arrivalsCheckedIn.length, arrivalsNoCheckin.length)} action={syncing ? "Trasferisco…" : "↪ Trasferisci alle schedine"} onAction={transferToSchedine}>
           {(arrivalsNoCheckin.length > 0 || arrivalsCheckedIn.length > 0 || syncMsg) ? (
             <>
               {arrivalsNoCheckin.length > 0 && (
@@ -313,7 +316,7 @@ export default function AdempimentiPage() {
         </StepCard>
 
         {/* 2 · Schedine alla Questura */}
-        <StepCard n={2} tone="var(--err)" label="Schedine alla Questura (Alloggiati Web)" sub="Pronte da inviare" count={schedToSendG.length} action="Invia alla Questura" onAction={() => router.push("/alloggiati-web")}>
+        <StepCard n={2} tone="var(--err)" label="Schedine alla Questura (Alloggiati Web)" sub="Pronte da inviare" count={schedToSendG.length} badge={frac(schedSentG.length, schedToSendG.length)} action="Invia alla Questura" onAction={() => router.push("/alloggiati-web")}>
           {(schedToSendG.length > 0 || schedSentG.length > 0) ? (
             <>
               {schedToSendG.length > 0 && (<>
@@ -335,7 +338,7 @@ export default function AdempimentiPage() {
         </StepCard>
 
         {/* 3 · ISTAT — passaggio di palla: genera dai arrivi, poi invia */}
-        <StepCard n={3} tone="var(--warn)" label="Movimenti ISTAT" sub="Da inviare" count={istatPend.length} action={syncingIstat ? "Genero…" : "↪ Genera da arrivi"} onAction={transferToIstat}>
+        <StepCard n={3} tone="var(--warn)" label="Movimenti ISTAT" sub="Da inviare" count={istatPend.length} badge={frac(istatSent.length, istatPend.length)} action={syncingIstat ? "Genero…" : "↪ Genera da arrivi"} onAction={transferToIstat}>
           {(istatPend.length > 0 || istatSent.length > 0 || istatMsg) ? (
             <>
               {istatPend.length > 0 && (<>
@@ -352,7 +355,7 @@ export default function AdempimentiPage() {
         </StepCard>
 
         {/* 4 · Incassi */}
-        <StepCard n={4} tone="var(--focus)" label="Fatture/ricevute da incassare" sub="Da incassare" count={docsUnpaid.length} action="Registra incassi" onAction={() => router.push("/scadenzario-incassi")}>
+        <StepCard n={4} tone="var(--focus)" label="Fatture/ricevute da incassare" sub="Da incassare" count={docsUnpaid.length} badge={frac(docsPaid.length, docsUnpaid.length)} action="Registra incassi" onAction={() => router.push("/scadenzario-incassi")}>
           {(docsUnpaid.length > 0 || docsPaid.length > 0) ? (
             <>
               {docsUnpaid.length > 0 && (<>
@@ -368,7 +371,7 @@ export default function AdempimentiPage() {
         </StepCard>
 
         {/* 5 · Fatture scartate SdI */}
-        <StepCard n={5} tone="var(--err)" label="Fatture elettroniche (SdI)" sub="Da correggere" count={docsRejected.length} action="Correggi e reinvia" onAction={() => router.push("/documenti")}>
+        <StepCard n={5} tone="var(--err)" label="Fatture elettroniche (SdI)" sub="Da correggere" count={docsRejected.length} badge={frac(docsSdiOk.length, docsRejected.length)} action="Correggi e reinvia" onAction={() => router.push("/documenti")}>
           {(docsRejected.length > 0 || docsSdiOk.length > 0) ? (
             <>
               {docsRejected.length > 0 && (<>
@@ -384,7 +387,7 @@ export default function AdempimentiPage() {
         </StepCard>
 
         {/* 6 · Fatture fornitori */}
-        <StepCard n={6} tone="var(--err)" label="Fatture fornitori scadute" sub="Scadute" count={passiveOverdue.length} action="Paga / registra" onAction={() => router.push("/fatture-passive")}>
+        <StepCard n={6} tone="var(--err)" label="Fatture fornitori scadute" sub="Scadute" count={passiveOverdue.length} badge={frac(passivePaid.length, passiveUnpaid.length)} action="Paga / registra" onAction={() => router.push("/fatture-passive")}>
           {(passiveOverdue.length > 0 || passivePaid.length > 0) ? (
             <>
               {passiveOverdue.length > 0 && (<>
