@@ -113,7 +113,7 @@ export async function loadCodeMaps(admin: SupabaseClient): Promise<CodeMaps> {
 // Sinonimi cittadinanza (aggettivo) → nome Stato ufficiale della tabella Luoghi.
 // La "Cittadinanza" del tracciato usa il codice Stato: gli ospiti spesso scrivono l'aggettivo.
 const NAT_ALIAS: Record<string, string> = {
-  ITALIANA: "ITALIA", ITALIANO: "ITALIA",
+  ITALIANA: "ITALIA", ITALIANO: "ITALIA", "REPUBBLICA ITALIANA": "ITALIA", "ITALIA REPUBBLICA": "ITALIA",
   FRANCESE: "FRANCIA", TEDESCA: "GERMANIA", TEDESCO: "GERMANIA",
   SPAGNOLA: "SPAGNA", SPAGNOLO: "SPAGNA",
   INGLESE: "REGNO UNITO", BRITANNICA: "REGNO UNITO", BRITANNICO: "REGNO UNITO",
