@@ -105,7 +105,7 @@ export default function AlloggiatiWebPage() {
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           ["Ospiti in struttura", String(inHouse), "var(--ok)"],
-          ["Schedine pronte", `${readyCount}/${totSched}`, "var(--focus)"],
+          ["Schedine pronte", `${readyCount}/${totSched}`, "var(--ok)"],
           ["Da validare", `${toValidate}/${totSched}`, "var(--warn)"],
           ["Inviate", `${sentCount}/${totSched}`, "var(--dim)"],
         ].map(([lab, val, col]) => (
@@ -202,7 +202,7 @@ export default function AlloggiatiWebPage() {
                   </div>
                   {opened && (
                     <div className="pb-2 pl-6">
-                      {rows.map((x, ri) => { const st = STA(effStato(x)); const g = x.guest ?? {};
+                      {rows.map((x, ri) => { const g = x.guest ?? {};
                         const isCapo = ["16", "17", "18"].includes(x.ruolo);
                         const dob = g.dataNascita ? new Date(g.dataNascita).toLocaleDateString("it-IT") : "";
                         const luogoNascita = [g.comuneNascita, g.provinciaNascita && `(${g.provinciaNascita})`].filter(Boolean).join(" ") || g.statoNascita || "";
@@ -210,7 +210,6 @@ export default function AlloggiatiWebPage() {
                         <div key={x.id} className={`py-2 ${ri > 0 ? "border-t border-[color:color-mix(in_srgb,var(--line)_60%,transparent)]" : ""}`}>
                           <div className="mb-1.5 flex items-center justify-between gap-2">
                             <div className="truncate text-[13px] font-semibold text-txt">{(x.guest?.cognome ?? "") + " " + (x.guest?.nome ?? "") || "—"} <span className="font-normal text-faint">· {RUOLO[x.ruolo] ?? x.ruolo}</span></div>
-                            <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.c} 16%, transparent)`, color: st.c }}>{st.l}</span>
                           </div>
                           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                             <RF label="Sesso" v={g.sesso === "F" ? "F" : g.sesso === "M" ? "M" : ""} />
@@ -258,7 +257,7 @@ export default function AlloggiatiWebPage() {
   );
 }
 
-function STA(k: string) { return ({ da_validare: { l: "Da validare", c: "var(--warn)" }, pronta: { l: "Pronta", c: "var(--focus)" }, inviata: { l: "Inviata", c: "var(--ok)" }, errore: { l: "Errore", c: "var(--err)" } } as Record<string, { l: string; c: string }>)[k] ?? { l: k, c: "var(--dim)" }; }
+function STA(k: string) { return ({ da_validare: { l: "Da validare", c: "var(--warn)" }, pronta: { l: "Pronta", c: "var(--ok)" }, inviata: { l: "Inviata", c: "var(--dim)" }, errore: { l: "Errore", c: "var(--err)" } } as Record<string, { l: string; c: string }>)[k] ?? { l: k, c: "var(--dim)" }; }
 
 // Campo in sola lettura (etichetta sopra, valore in riquadro) — dati ospite ben visibili, come nella vecchia pagina.
 function RF({ label, v }: { label: string; v: string }) {
