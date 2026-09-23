@@ -92,6 +92,34 @@ export default function AlloggiatiWebPage() {
   const totSched = readyCount + toValidate + sentCount;
   const fieldCls = "rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus";
 
+  // Pill di stato (connessione portale + invio automatico 23:00) da mostrare in linea col titolo Schedine.
+  const statusPills = (
+    <div className="flex flex-wrap items-center gap-2">
+      {conn.status === "attivata" ? (
+        <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold" style={{ borderColor: "color-mix(in srgb, var(--ok) 35%, transparent)", backgroundColor: "color-mix(in srgb, var(--ok) 12%, transparent)", color: "var(--ok)" }}>
+          <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ backgroundColor: "var(--ok)" }} /><span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "var(--ok)" }} /></span>
+          Connesso al Portale Alloggiati
+        </span>
+      ) : (
+        <button onClick={() => setSettingsOpen(true)} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold hover:opacity-90" style={{ borderColor: "color-mix(in srgb, var(--warn) 35%, transparent)", backgroundColor: "color-mix(in srgb, var(--warn) 12%, transparent)", color: "var(--warn)" }} title="Apri le impostazioni per connettere il portale">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "var(--warn)" }} />
+          Portale non connesso · configura ⚙
+        </button>
+      )}
+      {conn.auto ? (
+        <span className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, transparent)", backgroundColor: "color-mix(in srgb, var(--focus) 12%, transparent)", color: "var(--focus)" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+          Invio automatico ogni giorno alle 23:00
+        </span>
+      ) : (
+        <button onClick={() => setSettingsOpen(true)} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash" title="Attiva l'invio automatico dalle impostazioni">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+          Invio automatico spento · attiva
+        </button>
+      )}
+    </div>
+  );
+
   // Dati aggiuntivi per arricchire l'anteprima della schedina (presi dalla prenotazione collegata).
   const bookingById = new Map(bookings.map((b) => [b.id, b]));
   const roomName = (rtId?: string) => roomTypes.find((rt) => rt.id === rtId)?.name ?? "";
@@ -102,32 +130,6 @@ export default function AlloggiatiWebPage() {
     <div>
       <PageHeader title="Alloggiati Web" subtitle="Schedine ospiti alla Questura (Portale Alloggiati)"
         actions={structures.length > 1 && activeStructureId === "all" ? <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt">{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select> : undefined} />
-
-      {/* Stato: connessione al portale + invio automatico 23:00 */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        {conn.status === "attivata" ? (
-          <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold" style={{ borderColor: "color-mix(in srgb, var(--ok) 35%, transparent)", backgroundColor: "color-mix(in srgb, var(--ok) 12%, transparent)", color: "var(--ok)" }}>
-            <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ backgroundColor: "var(--ok)" }} /><span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "var(--ok)" }} /></span>
-            Connesso al Portale Alloggiati
-          </span>
-        ) : (
-          <button onClick={() => setSettingsOpen(true)} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold hover:opacity-90" style={{ borderColor: "color-mix(in srgb, var(--warn) 35%, transparent)", backgroundColor: "color-mix(in srgb, var(--warn) 12%, transparent)", color: "var(--warn)" }} title="Apri le impostazioni per connettere il portale">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "var(--warn)" }} />
-            Portale non connesso · configura ⚙
-          </button>
-        )}
-        {conn.auto ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, transparent)", backgroundColor: "color-mix(in srgb, var(--focus) 12%, transparent)", color: "var(--focus)" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-            Invio automatico ogni giorno alle 23:00
-          </span>
-        ) : (
-          <button onClick={() => setSettingsOpen(true)} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash" title="Attiva l'invio automatico dalle impostazioni">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-            Invio automatico spento · attiva
-          </button>
-        )}
-      </div>
 
       {/* Card riepilogo in alto */}
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -159,8 +161,9 @@ export default function AlloggiatiWebPage() {
 
       {/* Schedine a tutta larghezza */}
       <Card>
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <SectionTitle>Schedine</SectionTitle>
+          {statusPills}
         </div>
         <div className="max-h-[60vh] overflow-y-auto">
           {autoBusy && sched.length === 0 ? (
@@ -195,12 +198,13 @@ export default function AlloggiatiWebPage() {
               const capo = rows.find((r) => ["16", "17", "18"].includes(r.ruolo)) ?? rows[0];
               const name = `${capo?.guest?.cognome ?? ""} ${capo?.guest?.nome ?? ""}`.trim() || "Ospite";
               const arrival = rows[0]?.arrival;
+              const bk = bookingById.get(key);
               const allSent = rows.every((r) => r.stato === "inviata");
-              const anyInvalid = rows.some((r) => effStato(r) === "da_validare");
-              const gStato = allSent ? "inviata" : anyInvalid ? "da_validare" : "pronta";
+              const bkComplete = bk ? completeBookingIds.has(bk.id) : true;
+              const anyErr = rows.some((r) => (r.errors ?? []).some((e) => !/incompl/i.test(e)));
+              const gStato = allSent ? "inviata" : !bkComplete ? "da_completare" : anyErr ? "da_validare" : "pronta";
               const gst = STA(gStato);
               const opened = openG[key] ?? false;
-              const bk = bookingById.get(key);
               const nights = bk ? nightsBetween(bk.checkIn, bk.checkOut) : 0;
               const pax = bk ? (bk.adults ?? 1) + (bk.children ?? 0) : rows.length;
               const rNm = bk ? roomName(bk.roomTypeId) : "";
@@ -282,7 +286,7 @@ export default function AlloggiatiWebPage() {
   );
 }
 
-function STA(k: string) { return ({ da_validare: { l: "Da validare", c: "var(--warn)" }, pronta: { l: "Pronta", c: "var(--ok)" }, inviata: { l: "Inviata", c: "var(--dim)" }, errore: { l: "Errore", c: "var(--err)" } } as Record<string, { l: string; c: string }>)[k] ?? { l: k, c: "var(--dim)" }; }
+function STA(k: string) { return ({ da_completare: { l: "Da completare", c: "var(--warn)" }, da_validare: { l: "Da correggere", c: "var(--err)" }, pronta: { l: "Pronta", c: "var(--ok)" }, inviata: { l: "Inviata", c: "var(--dim)" }, errore: { l: "Errore", c: "var(--err)" } } as Record<string, { l: string; c: string }>)[k] ?? { l: k, c: "var(--dim)" }; }
 
 // Campo in sola lettura (etichetta sopra, valore in riquadro) — dati ospite ben visibili, come nella vecchia pagina.
 function RF({ label, v }: { label: string; v: string }) {
