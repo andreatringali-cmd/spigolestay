@@ -17,7 +17,7 @@ const lbl = "block text-xs font-medium text-dim";
 const fmtD = (iso: string) => { try { return new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; } };
 
 interface DocData { firstName: string; lastName: string; sex: string; birthDate: string; birthPlace: string; citizenship: string; docType: string; docNumber: string; docPlace: string }
-const emptyExtra = () => ({ firstName: "", lastName: "", sex: "", birthDate: "", birthPlace: "", citizenship: "", docType: DOC_TYPES[0], docNumber: "", docPlace: "", photoFront: "", photoBack: "" });
+const emptyExtra = () => ({ firstName: "", lastName: "", sex: "", birthDate: "", birthPlace: "", citizenship: "", docType: DOC_TYPES[0], docNumber: "", docPlace: "", photoFront: "", photoBack: "", room: "" });
 
 // Controllo di upload di UNA faccia del documento (fronte o retro), riusato per
 // l'ospite principale e per ogni co-ospite. Se `onReread` è passato, mostra il
@@ -55,6 +55,7 @@ function DocFace({ label, photo, onPick, onRemove, onReread, extracting, aiOff }
 interface Info {
   aiEnabled?: boolean;
   returning?: boolean;
+  group?: { b: string; code: string; roomType: string; unit: string; adults: number; children: number; webCheckin: boolean }[];
   booking: { id: string; code: string; status: string; checkIn: string; checkOut: string; adults: number; children: number; total: number; paid: number; cleaningFee: number; cityTax: number; cityTaxExempt: boolean; webCheckin: boolean; arrivalTime: string; guestRequests: string; extras: { name: string; price: number }[]; extraGuests: (DocData & { docPhotoFront?: string; docPhotoBack?: string })[]; docPhotoFront: string | null; docPhotoBack: string | null; signature: string | null; invoiceRequest: Record<string, unknown> | null };
   guest: { firstName: string; lastName: string; email: string; phone: string; sex: string; birthDate: string; birthPlace: string; citizenship: string; docType: string; docNumber: string; docPlace: string; docPhotoFront?: string | null; docPhotoBack?: string | null };
   roomType: { name: string };

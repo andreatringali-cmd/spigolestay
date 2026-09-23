@@ -3,7 +3,7 @@
 // Provenienza viaggiatori: arrivi e presenze per provenienza (nazione/provincia).
 import { useMemo, useState } from "react";
 import { useData } from "@/lib/store";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { nights } from "@/lib/dates";
 
@@ -54,8 +54,8 @@ export default function ProvenienzaPage() {
         actions={<select value={year} onChange={(e) => setYear(Number(e.target.value))} className={sel}>{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>} />
 
       <div className="mb-4 grid grid-cols-2 gap-3">
-        <Card className="!p-4"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Arrivi {year}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{totals.arrivi}</div></Card>
-        <Card className="!p-4"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Presenze {year}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{totals.presenze}</div></Card>
+        <StatCard label={`Arrivi ${year}`} value={totals.arrivi} />
+        <StatCard label={`Presenze ${year}`} value={totals.presenze} />
       </div>
 
       {totals.arrivi === 0 ? <Card><EmptyState title="Nessun arrivo per quest'anno" sub="Registra le prenotazioni per vedere la provenienza." /></Card> : (

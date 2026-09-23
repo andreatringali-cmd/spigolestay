@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { toISO, shiftISO, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import Icon from "@/components/Icon";
 
 const isWeekend = (iso: string) => { const d = new Date(iso).getDay(); return d === 5 || d === 6 || d === 0; };
@@ -63,10 +63,7 @@ export default function AssistenteRicaviPage() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {([["Tariffa base media", eur(baseRate)], ["Camere in scope", String(scopeUnits.length)], ["Opportunità", String(opportunities.length)], ["Ricavo potenziale", `+${eur(upside)}`]] as [string, string][]).map(([lab, val]) => (
-          <div key={lab} className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{lab}</div>
-            <div className="mt-1 font-mono text-2xl font-bold text-txt">{val}</div>
-          </div>
+          <StatCard key={lab} label={lab} value={val} />
         ))}
       </div>
 

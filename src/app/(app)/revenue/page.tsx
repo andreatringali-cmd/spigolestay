@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 
@@ -71,9 +71,9 @@ export default function RevenuePage() {
       <PageHeader title={t("Revenue · prezzi dinamici")} subtitle={t("Suggerimenti di prezzo in base a occupazione ed eventi")} />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Occupazione media")} {days} {t("gg")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{Math.round(avgOcc * 100)}%</div></Card>
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Camere attive")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{totalUnits}</div></Card>
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Ricavo extra potenziale")}</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: "var(--ok)" }}>{eur(Math.max(0, upside))}</div><div className="mt-0.5 text-[11px] text-faint">{t("applicando i suggerimenti")}</div></Card>
+        <StatCard label={`${t("Occupazione media")} ${days} ${t("gg")}`} value={`${Math.round(avgOcc * 100)}%`} />
+        <StatCard label={t("Camere attive")} value={totalUnits} />
+        <StatCard label={t("Ricavo extra potenziale")} value={eur(Math.max(0, upside))} color="var(--ok)" hint={t("applicando i suggerimenti")} />
       </div>
 
       {/* Parità canali & vantaggio diretto */}

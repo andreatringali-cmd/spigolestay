@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useData } from "@/lib/store";
 import { effectiveBase } from "@/lib/pricing";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { slugify } from "@/lib/publicdata";
@@ -188,13 +188,13 @@ export default function MetaSearchPage() {
 
       {/* KPI */}
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Comparatori collegati")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{connected}<span className="text-sm font-normal text-faint">/{META.length}</span></div></Card>
+        <StatCard label={t("Comparatori collegati")} value={<>{connected}<span className="text-sm font-normal text-faint">/{META.length}</span></>} />
         <Card className="!p-4">
           <div className="text-xs text-dim">{t("Commissione media OTA")}</div>
           <div className="mt-1 flex items-center gap-1"><input type="number" min={0} max={40} value={avgComm} onChange={(e) => saveComm(Number(e.target.value))} className="w-16 rounded-lg border border-line bg-surface px-2 py-1 font-mono text-lg font-bold text-txt outline-none focus:border-focus" /><span className="text-dim">%</span></div>
           <div className="mt-0.5 text-[11px] text-faint">{t("quanto risparmi vendendo diretto")}</div>
         </Card>
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Guadagno extra medio")}</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: "var(--ok)" }}>{eur(avgExtra)}</div><div className="mt-0.5 text-[11px] text-faint">{t("a notte, per prenotazione diretta")}</div></Card>
+        <StatCard label={t("Guadagno extra medio")} value={eur(avgExtra)} color="var(--ok)" hint={t("a notte, per prenotazione diretta")} />
       </div>
 
       {/* Prerequisito: booking engine */}

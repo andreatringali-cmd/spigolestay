@@ -5,7 +5,7 @@ import { useData } from "@/lib/store";
 import { toISO, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { DEFAULT_EXTRAS, CHANNELS, type ExtraService } from "@/lib/types";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import Icon from "@/components/Icon";
 import { useToast } from "@/components/ToastProvider";
@@ -94,7 +94,7 @@ export default function UpsellingPage() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {([["Extra attivi", String(activeCat.length)], ["Arrivi in arrivo", String(arrivals.length)], ["Prezzo medio", eur(Math.round(avgExtra))], ["Ricavo potenziale", `+${eur(potential)}`]] as [string, string][]).map(([lab, val]) => (
-          <div key={lab} className="rounded-xl border border-line bg-surface p-4 shadow-sm"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{lab}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{val}</div></div>
+          <StatCard key={lab} label={lab} value={val} />
         ))}
       </div>
 

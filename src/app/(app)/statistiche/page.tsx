@@ -5,7 +5,7 @@ import { useData } from "@/lib/store";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { toISO, addDays, nights, parseISO } from "@/lib/dates";
 import { eur, num } from "@/lib/format";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, StatCard } from "@/components/ui";
 import Donut from "@/components/Donut";
 import Bars from "@/components/Bars";
 import ColumnChart from "@/components/ColumnChart";
@@ -424,16 +424,11 @@ function RepCols() {
 function KpiD({ label, value, d, cmp }: { label: string; value: string; d: number | null; cmp: string }) {
   const up = (d ?? 0) >= 0;
   const color = d == null ? "var(--faint)" : up ? "var(--ok)" : "var(--err)";
-  return (
-    <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-      <div className="text-xs font-medium uppercase tracking-wide text-dim">{label}</div>
-      <div className="mt-1 font-mono text-xl font-bold tabular-nums text-txt">{value}</div>
-      {d != null && (
-        <div className="mt-1 flex items-center gap-1 text-[11px]" style={{ color }}>
-          <span>{up ? "▲" : "▼"}</span><span className="font-semibold">{Math.abs(d)}%</span><span className="text-faint">vs {cmp}</span>
-        </div>
-      )}
-    </div>
-  );
+  const hint = d != null ? (
+    <span className="flex items-center gap-1" style={{ color }}>
+      <span>{up ? "▲" : "▼"}</span><span className="font-semibold">{Math.abs(d)}%</span><span className="text-faint">vs {cmp}</span>
+    </span>
+  ) : undefined;
+  return <StatCard label={label} value={value} hint={hint} />;
 }
 

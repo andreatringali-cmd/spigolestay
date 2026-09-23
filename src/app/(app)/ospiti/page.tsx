@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { AV_COLORS, initials } from "@/lib/users";
 import { useLang } from "@/lib/i18n";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { nights, parseISO } from "@/lib/dates";
@@ -244,10 +244,7 @@ export default function OspitiPage() {
       {/* Card statistiche */}
       <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {([[t("Ospiti"), String(totGuests)], [t("Ricavi totali"), eur(totRevenue)], [t("Prezzo medio/notte"), eur(avgAll)], [t("Ospiti abituali"), `${repeat}`]] as [string, string][]).map(([lab, val]) => (
-          <div key={lab} className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{lab}</div>
-            <div className="mt-1 font-mono text-2xl font-bold text-txt">{val}</div>
-          </div>
+          <StatCard key={lab} label={lab} value={val} />
         ))}
       </div>
 

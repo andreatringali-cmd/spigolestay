@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import ExportMenu from "@/components/ExportMenu";
 import { exportExcel, exportPdf } from "@/lib/export";
@@ -242,10 +242,10 @@ export default function CassaPage() {
 
       {/* Riepilogo */}
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="!p-4"><div className="text-xs font-medium text-dim">{t("Saldo cassa")}</div><div className={`mt-1 font-mono text-2xl font-bold ${saldoTot >= 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{eur(saldoTot)}</div><div className="mt-1 text-[11px] text-faint">{t("tutti i conti · storico")}</div></Card>
-        <Card className="!p-4"><div className="text-xs font-medium text-dim">{t("Entrate")} {month === "all" ? t("totali") : t("del mese")}</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: "var(--ok)" }}>{eur(entrate)}</div><div className="mt-1 text-[11px] text-faint">{rows.filter((m) => m.kind === "in").length} {t("movimenti")}</div></Card>
-        <Card className="!p-4"><div className="text-xs font-medium text-dim">{t("Uscite")} {month === "all" ? t("totali") : t("del mese")}</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: "var(--err)" }}>{eur(uscite)}</div><div className="mt-1 text-[11px] text-faint">{rows.filter((m) => m.kind === "out").length} {t("movimenti")}</div></Card>
-        <Card className="!p-4"><div className="text-xs font-medium text-dim">{t("Saldo")} {month === "all" ? t("totale") : t("del mese")}</div><div className={`mt-1 font-mono text-2xl font-bold ${saldo >= 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{eur(saldo)}</div><div className="mt-1 text-[11px] text-faint">{t("entrate − uscite")}</div></Card>
+        <StatCard label={t("Saldo cassa")} value={eur(saldoTot)} color={saldoTot >= 0 ? undefined : "var(--err)"} hint={t("tutti i conti · storico")} />
+        <StatCard label={`${t("Entrate")} ${month === "all" ? t("totali") : t("del mese")}`} value={eur(entrate)} color="var(--ok)" hint={`${rows.filter((m) => m.kind === "in").length} ${t("movimenti")}`} />
+        <StatCard label={`${t("Uscite")} ${month === "all" ? t("totali") : t("del mese")}`} value={eur(uscite)} color="var(--err)" hint={`${rows.filter((m) => m.kind === "out").length} ${t("movimenti")}`} />
+        <StatCard label={`${t("Saldo")} ${month === "all" ? t("totale") : t("del mese")}`} value={eur(saldo)} color={saldo >= 0 ? undefined : "var(--err)"} hint={t("entrate − uscite")} />
       </div>
 
       {chartsOn && (

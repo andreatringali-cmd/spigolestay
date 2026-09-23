@@ -9,7 +9,7 @@ import { VIEW_OPTIONS, ROOM_AMENITIES, BED_CONFIGS } from "@/lib/types";
 import { downscaleImage } from "@/lib/images";
 import { AV_COLORS } from "@/lib/users";
 import { eur } from "@/lib/format";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
@@ -212,9 +212,9 @@ export default function CamerePage() {
               </div>
 
               {/* Statistiche */}
-              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {[["Camere", sUnits.length], ["Tipologie", types.filter((rt) => !rt.deriveFrom).length], ["Posti letto", beds], ["Fuori servizio", oos]].map(([k, v]) => (
-                  <div key={k} className="rounded-xl border border-line bg-surface p-3"><div className="text-xs text-dim">{t(k as string)}</div><div className="mt-0.5 font-mono text-xl font-bold text-txt">{v}</div></div>
+              <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {([["Camere", sUnits.length], ["Tipologie", types.filter((rt) => !rt.deriveFrom).length], ["Posti letto", beds], ["Fuori servizio", oos]] as [string, number][]).map(([k, v]) => (
+                  <StatCard key={k} label={t(k)} value={v} />
                 ))}
               </div>
 

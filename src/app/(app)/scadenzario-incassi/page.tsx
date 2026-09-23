@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, StatCard } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 
@@ -49,8 +49,8 @@ export default function ScadenzarioIncassiPage() {
         actions={<select value={scope} onChange={(e) => setScope(e.target.value)} className={sel}><option value="all">Tutti da incassare</option><option value="overdue">Solo scaduti</option><option value="open">Non ancora scaduti</option></select>} />
 
       <div className="mb-4 grid grid-cols-2 gap-3">
-        <Card className="!p-4"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Totale da incassare</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{eur(cents(totalOpen))}</div></Card>
-        <Card className="!p-4"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Di cui scaduto</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: overdueTot > 0 ? "var(--err)" : "var(--ok)" }}>{eur(cents(overdueTot))}</div></Card>
+        <StatCard label="Totale da incassare" value={eur(cents(totalOpen))} />
+        <StatCard label="Di cui scaduto" value={eur(cents(overdueTot))} color={overdueTot > 0 ? "var(--err)" : "var(--ok)"} />
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
