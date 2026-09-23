@@ -84,6 +84,13 @@ export default function AlloggiatiWebPage() {
   // Mostra/nascondi le credenziali salvate (decifrate lato server, solo proprietario).
   const toggleShow = () => setShown((v) => !v); // la password è già caricata (mascherata): l'occhio mostra/nasconde
 
+  // Traduce i codici d'errore della ricevuta in un messaggio chiaro.
+  const ricevutaMsg = (m?: string) => {
+    const raw = (m || "").toUpperCase();
+    if (raw.includes("RICEVUTA") || raw.includes("RECUPERO") || raw.includes("NON TROV"))
+      return "Nessuna ricevuta per quella data: la ricevuta esiste solo DOPO aver inviato le schedine di quel giorno (una per giornata di invio). Invia prima le schedine, poi scarica la ricevuta.";
+    return m || "Ricevuta non disponibile.";
+  };
   // Scarica la ricevuta PDF di una data (integrazione reale attiva).
   const getRicevuta = async () => {
     if (!ricDate) { setMsg("Scegli una data per la ricevuta."); return; }
@@ -96,8 +103,8 @@ export default function AlloggiatiWebPage() {
         a.download = `ricevuta-alloggiati-${ricDate}.pdf`;
         document.body.appendChild(a); a.click(); a.remove();
         setMsg("Ricevuta scaricata ✓");
-      } else setMsg(r.message || "Ricevuta non disponibile.");
-    } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
+      } else setMsg(ricevutaMsg(r.message));
+    } catch (e) { setMsg(ricevutaMsg(e instanceof Error ? e.message : "")); } finally { setBusy(""); }
   };
 
   // Registro sempre allineato alle prenotazioni: le schedine non ancora inviate di prenotazioni
@@ -190,6 +197,15 @@ export default function AlloggiatiWebPage() {
             <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-faint">Opzioni</div>
             <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa ospiti (capofamiglia + membri)</span><input type="checkbox" checked={s.group_guests} onChange={(e) => set({ group_guests: e.target.checked })} className="mr-2 h-4 w-4 accent-[color:var(--focus)]" /></label>
             <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa per camera</span><input type="checkbox" checked={s.group_by_room} onChange={(e) => set({ group_by_room: e.target.checked })} className="mr-2 h-4 w-4 accent-[color:var(--focus)]" /></label>
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-sm text-txt">Invio automatico alla Questura</span>
+              <button type="button" role="switch" aria-checked={s.auto_daily} onClick={() => setAuto(!s.auto_daily)} disabled={!!busy}
+                className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-50"
+                style={{ backgroundColor: s.auto_daily ? "var(--ok)" : "var(--line)" }} title={s.auto_daily ? "Disattiva" : "Attiva"}>
+                <span className="inline-block h-5 w-5 transform rounded-full bg-white shadow transition" style={{ transform: s.auto_daily ? "translateX(22px)" : "translateX(2px)" }} />
+              </button>
+            </div>
+            <span className="block text-[11px] text-faint">{s.auto_daily ? "Attivo: le schedine pronte partono da sole dopo l'arrivo (entro 24h di legge)." : "Spento: le invii tu manualmente con «Invia le pronte»."}</span>
           </div>
           <p className="mt-2 text-[11px] text-faint">L&apos;invio automatico si attiva con l&apos;interruttore nel riquadro «Schedine». Puoi comunque forzare l&apos;invio manuale in qualsiasi momento.</p>
           </div>
@@ -208,19 +224,6 @@ export default function AlloggiatiWebPage() {
           <div className="mb-2 flex items-center justify-between">
             <SectionTitle>Schedine</SectionTitle>
             <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">Pronte da inviare: {readyCount}{upcomingCount ? ` · in preparazione: ${upcomingCount}` : ""}</span>
-          </div>
-          {/* Interruttore INVIO AUTOMATICO: quando attivo, il cron invia da solo le schedine
-              degli ospiti già arrivati (entro 24h). Quando spento, invii tu con «Invia le pronte». */}
-          <div className="mb-2 flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5" style={{ borderColor: s.auto_daily ? "var(--ok)" : "var(--line)", background: s.auto_daily ? "color-mix(in srgb, var(--ok) 7%, transparent)" : "var(--paper)" }}>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-txt">Invio automatico alla Questura</div>
-              <div className="text-[11px] text-faint">{s.auto_daily ? "Attivo: le schedine partono da sole dopo l'arrivo (entro 24h di legge)." : "Spento: le invii tu manualmente con «Invia le pronte»."}</div>
-            </div>
-            <button type="button" role="switch" aria-checked={s.auto_daily} onClick={() => setAuto(!s.auto_daily)} disabled={!!busy}
-              className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-50"
-              style={{ backgroundColor: s.auto_daily ? "var(--ok)" : "var(--line)" }} title={s.auto_daily ? "Disattiva" : "Attiva"}>
-              <span className="inline-block h-5 w-5 transform rounded-full bg-white shadow transition" style={{ transform: s.auto_daily ? "translateX(22px)" : "translateX(2px)" }} />
-            </button>
           </div>
           <div className="mb-2 flex flex-wrap gap-2">
             <button onClick={() => call("sync", "sync")} disabled={!!busy} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "sync" ? "Sincronizzo…" : "Sincronizza dagli arrivi"}</button>
