@@ -222,7 +222,7 @@ export default function AlloggiatiPage() {
                   {declared > 1 && (
                     <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={!!groupMode[b.id]} onChange={(e) => setGroupMode((m) => ({ ...m, [b.id]: e.target.checked }))} className="h-3.5 w-3.5 accent-[color:var(--focus)]" /> {t("Gruppo (non famiglia)")}</label>
                   )}
-                  <DocBtn id={b.id} withDoc apply={(p) => setPrimaryOf(b, p)} />
+                  <div className="ml-auto"><DocBtn id={b.id} withDoc apply={(p) => setPrimaryOf(b, p)} /></div>
                 </div>
                 {extractInfo?.id === b.id && <div className={`mb-2 text-[11px] font-medium ${extractInfo.err ? "text-[color:var(--warn)]" : "text-[color:var(--focus)]"}`}>✨ {extractInfo.text}</div>}
 
