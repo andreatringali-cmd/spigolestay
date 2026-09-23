@@ -145,9 +145,14 @@ export async function syncSchedine(admin: SupabaseClient, tenantId: string, opts
     const people: SchedinaGuest[] = [toG(primary as Record<string, unknown>), ...((b.extraGuests ?? []).map((e) => toG(e as Record<string, unknown>)))];
     const group = groupBy.get(b.structureId) ?? true;
     const perm = nights(b.checkIn, b.checkOut);
+    // Check-in COMPLETO solo se le persone dichiarate coprono gli ospiti attesi: se ne mancano,
+    // la prenotazione è "da completare" e NESSUNA sua schedina è "pronta" (resta "da_validare").
+    const expectedPax = Math.max(1, (b.adults ?? 1) + (b.children ?? 0));
+    const incomplete = people.length < expectedPax;
     const rows = people.map((g, i) => {
       const ruolo = roleFor(i, people.length, group);
-      const errors = validateSchedina(g, ruolo);
+      const errors = [...validateSchedina(g, ruolo)];
+      if (incomplete) errors.push(`Ospiti incompleti: ${people.length}/${expectedPax}`);
       return {
         tenant_id: tenantId, structure_id: b.structureId, booking_id: b.id,
         guest_ref: i === 0 ? "primary" : `extra:${i - 1}`, arrival: b.checkIn, guest: { ...g, perm },

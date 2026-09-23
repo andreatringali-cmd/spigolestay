@@ -103,13 +103,20 @@ export default function AlloggiatiWebPage() {
   // annullate/no-show/sparite non compaiono (le inviate restano come storico). La pulizia DB
   // avviene alla prossima "Sincronizza dagli arrivi"; qui il filtro è immediato.
   const activeBookingIds = new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked").map((b) => b.id));
+  // Prenotazione col check-in COMPLETO (tutti gli ospiti dichiarati): solo queste possono essere "pronte".
+  const declaredOf = (b: typeof bookings[number]) => ((b.webCheckin || !!(b.primaryGuest?.docNumber && b.primaryGuest?.lastName)) ? 1 : 0) + (b.extraGuests?.length ?? 0);
+  const expectedOf = (b: typeof bookings[number]) => Math.max(1, (b.adults ?? 1) + (b.children ?? 0));
+  const completeBookingIds = new Set(bookings.filter((b) => activeBookingIds.has(b.id) && declaredOf(b) >= expectedOf(b)).map((b) => b.id));
+  const bookingComplete = (id: string | null) => !id || completeBookingIds.has(id);
   const visibleSched = sched.filter((x) => x.stato === "inviata" || !x.booking_id || activeBookingIds.has(x.booking_id));
   const todayLocal = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
   const isFuture = (arrivalISO?: string) => (arrivalISO || "") > todayLocal;
-  // "Pronte da inviare" = solo arrivi già avvenuti: la schedina si invia DOPO l'arrivo.
-  const readyCount = visibleSched.filter((x) => x.stato === "pronta" && !isFuture(x.arrival)).length;
+  // "Pronte da inviare" = schedina pronta + arrivo già avvenuto + prenotazione col check-in completo.
+  const readyCount = visibleSched.filter((x) => x.stato === "pronta" && !isFuture(x.arrival) && bookingComplete(x.booking_id)).length;
   const upcomingCount = visibleSched.filter((x) => x.stato !== "inviata" && isFuture(x.arrival)).length;
-  const toValidate = visibleSched.filter((x) => x.stato === "da_validare" && !isFuture(x.arrival)).length;
+  // "Da validare" = tutto ciò che è arrivato ma non è (pronta + prenotazione completa) né inviata.
+  const toValidate = visibleSched.filter((x) => !isFuture(x.arrival) && x.stato !== "inviata" && !(x.stato === "pronta" && bookingComplete(x.booking_id))).length;
+  const effStato = (x: { stato: string; booking_id: string | null }) => (x.stato === "pronta" && !bookingComplete(x.booking_id) ? "da_validare" : x.stato);
   const sentCount = visibleSched.filter((x) => x.stato === "inviata").length;
   // Lista schedine: mostra solo arrivi già avvenuti (+ inviate come storico). Gli arrivi futuri
   // NON compaiono finché l'ospite non arriva (allineato ad Adempimenti).
@@ -233,7 +240,7 @@ export default function AlloggiatiWebPage() {
           </div>
           <div className="max-h-[52vh] overflow-y-auto">
             {listSched.map((x) => {
-              const st = STA(x.stato);
+              const st = STA(effStato(x));
               return (
                 <div key={x.id} className="flex items-center justify-between gap-2 border-b border-line py-2 last:border-0">
                   <div className="min-w-0">
