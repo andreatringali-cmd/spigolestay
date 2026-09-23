@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { nights, parseISO, toISO } from "@/lib/dates";
 import { DOC_TYPES } from "@/lib/types";
@@ -8,6 +8,7 @@ import { useLang } from "@/lib/i18n";
 import { PageHeader, Card } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { downscaleImage } from "@/lib/images";
+import { apiPost } from "@/lib/invoicing/client";
 
 type Co = NonNullable<import("@/lib/types").Booking["extraGuests"]>[number];
 
@@ -28,6 +29,21 @@ export default function AlloggiatiPage() {
   const [groupMode, setGroupMode] = useState<Record<string, boolean>>({}); // true = gruppo (non famiglia)
   const [open, setOpen] = useState<Record<string, boolean>>({}); // schede a tendina: apri/chiudi per prenotazione
   const toggleOpen = (id: string, def: boolean) => setOpen((m) => ({ ...m, [id]: !(m[id] ?? def) }));
+  // Auto-rigenerazione schedine dopo una modifica: niente più "Sincronizza" manuale.
+  // Debounce lungo così la modifica ha già raggiunto il server (sync ~4s) prima di rigenerare.
+  const [dirty, setDirty] = useState(0);
+  const [autoMsg, setAutoMsg] = useState("");
+  const bump = () => setDirty((n) => n + 1);
+  useEffect(() => {
+    if (!dirty) return;
+    const id = setTimeout(async () => {
+      setAutoMsg("Aggiorno le schedine…");
+      try { await apiPost("alloggiati/sync", {}); setAutoMsg("Schedine aggiornate ✓"); }
+      catch { setAutoMsg(""); }
+      setTimeout(() => setAutoMsg(""), 2500);
+    }, 6000);
+    return () => clearTimeout(id);
+  }, [dirty]);
   // Lettura AI del documento: pre-riempie i campi (come nel check-in online).
   const [extractingId, setExtractingId] = useState<string | null>(null);
   const [extractInfo, setExtractInfo] = useState<{ id: string; text: string; err?: boolean } | null>(null);
@@ -128,10 +144,11 @@ export default function AlloggiatiPage() {
   const setPrimaryOf = (b: { id: string; guestId: string; primaryGuest?: PG }, patch: Record<string, unknown>) => {
     if (guest(b.guestId)) setPrimary(b.guestId, patch);
     else updateBooking(b.id, { primaryGuest: { ...(b.primaryGuest ?? {}), ...patch } });
+    bump();
   };
-  const setCo = (b: { id: string; extraGuests?: Co[] }, i: number, patch: Partial<Co>) => updateBooking(b.id, { extraGuests: cosOf(b).map((c, j) => (j === i ? { ...c, ...patch } : c)) });
-  const addCo = (b: { id: string; extraGuests?: Co[] }) => updateBooking(b.id, { extraGuests: [...cosOf(b), { firstName: "", lastName: "" } as Co] });
-  const delCo = (b: { id: string; extraGuests?: Co[] }, i: number) => updateBooking(b.id, { extraGuests: cosOf(b).filter((_, j) => j !== i) });
+  const setCo = (b: { id: string; extraGuests?: Co[] }, i: number, patch: Partial<Co>) => { updateBooking(b.id, { extraGuests: cosOf(b).map((c, j) => (j === i ? { ...c, ...patch } : c)) }); bump(); };
+  const addCo = (b: { id: string; extraGuests?: Co[] }) => { updateBooking(b.id, { extraGuests: [...cosOf(b), { firstName: "", lastName: "" } as Co] }); bump(); };
+  const delCo = (b: { id: string; extraGuests?: Co[] }, i: number) => { updateBooking(b.id, { extraGuests: cosOf(b).filter((_, j) => j !== i) }); bump(); };
 
   const record = (role: string, checkIn: string, nn: number, p: { lastName?: string; firstName?: string; sex?: string; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string }) => {
     const hasDoc = ["16", "17", "18"].includes(role);
@@ -165,7 +182,7 @@ export default function AlloggiatiPage() {
       <PageHeader
         title={t("Alloggiati · Tracciato Questura")}
         subtitle={t("Comunicazione ospiti alla Questura (entro 24h dal check-in) · un record per persona")}
-        actions={<button onClick={genera} disabled={readyCount === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{t("Genera tracciato")} ({readyCount})</button>}
+        actions={<div className="flex items-center gap-3">{autoMsg && <span className="text-[11px] font-medium text-[color:var(--ok)]">{autoMsg}</span>}<button onClick={genera} disabled={readyCount === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">{t("Genera tracciato")} ({readyCount})</button></div>}
       />
 
       {/* Come inviare */}
