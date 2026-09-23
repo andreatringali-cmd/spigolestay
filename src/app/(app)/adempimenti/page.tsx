@@ -220,6 +220,11 @@ export default function AdempimentiPage() {
   const schedBookingIds = new Set(sched.map((s) => s.booking_id).filter(Boolean) as string[]);
   const weekAgo = (() => { const d = new Date(t + "T00:00:00"); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); })();
   const needsTransfer = bookings.filter((b) => isActiveArrival(b) && isComplete(b) && (b.checkIn || "") >= weekAgo && !schedBookingIds.has(b.id));
+  // Stato per gli arrivi con check-in fatto: da trasferire (nessuna schedina) / da correggere
+  // (schedine generate ma con dati non validi) / pronte (schedine tutte pronta).
+  const toTransfer = arrivalsCheckedIn.filter((b) => !schedBookingIds.has(b.id));
+  const toFix = arrivalsCheckedIn.filter((b) => schedBookingIds.has(b.id) && bookingsWithInvalid.has(b.id));
+  const rowStatus = (b: Booking) => (!schedBookingIds.has(b.id) ? "da trasferire" : bookingsWithInvalid.has(b.id) ? "da correggere" : "");
   // Raggruppa le schedine per PRENOTAZIONE: una riga per prenotazione, con quante schedine ha
   // (una a persona). Così con più prenotazioni si capisce a colpo d'occhio a chi si riferiscono.
   type SchedRow = typeof sched[number];
@@ -313,12 +318,12 @@ export default function AdempimentiPage() {
                   <SubHead mt={arrivalsNoCheckin.length > 0}>Check-in fatti ({arrivalsCheckedIn.length}) · pronti per le schedine</SubHead>
                   {arrivalsCheckedIn.slice(0, 6).map((b) => {
                     const g = getGuest(b.guestId); const st = getStructure(b.structureId);
-                    const transferred = schedBookingIds.has(b.id);
-                    return <DoneRow key={b.id} left={`${g?.fullName || "Ospite"} · ${st?.name ?? ""}`} right={transferred ? `${fmtDay(b.checkIn)}→${fmtDay(b.checkOut)} · ${expectedPaxOf(b)}p` : "↪ da trasferire"} />;
+                    const stt = rowStatus(b);
+                    return <DoneRow key={b.id} left={`${g?.fullName || "Ospite"} · ${st?.name ?? ""}`} right={stt === "da trasferire" ? "↪ da trasferire" : stt === "da correggere" ? "⚠ da correggere" : `${fmtDay(b.checkIn)}→${fmtDay(b.checkOut)} · ${expectedPaxOf(b)}p`} />;
                   })}
-                  {needsTransfer.length > 0
-                    ? <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold" style={{ background: soft("var(--warn)"), color: "var(--warn)" }}>↪ {needsTransfer.length} con check-in fatto {needsTransfer.length === 1 ? "non è" : "non sono"} ancora {needsTransfer.length === 1 ? "trasferita" : "trasferite"} alle schedine — premi «Trasferisci».</div>
-                    : <div className="text-[11px] font-medium" style={{ color: "var(--ok)" }}>✓ Tutte trasferite alle schedine.</div>}
+                  {toTransfer.length > 0 && <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold" style={{ background: soft("var(--warn)"), color: "var(--warn)" }}>↪ {toTransfer.length} da trasferire alle schedine — premi «Trasferisci».</div>}
+                  {toFix.length > 0 && <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold" style={{ background: soft("var(--err)"), color: "var(--err)" }}>⚠ {toFix.length} con dati da correggere (ospiti incompleti) — apri <button onClick={() => router.push("/alloggiati-web")} className="underline">Schedine</button>.</div>}
+                  {toTransfer.length === 0 && toFix.length === 0 && <div className="text-[11px] font-medium" style={{ color: "var(--ok)" }}>✓ Tutte pronte alle schedine.</div>}
                 </>
               )}
               {syncMsg && <div className="text-[11px] font-medium" style={{ color: syncMsg.startsWith("✓") ? "var(--ok)" : "var(--err)" }}>{syncMsg}</div>}
