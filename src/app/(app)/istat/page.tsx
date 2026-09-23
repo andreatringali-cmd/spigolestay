@@ -9,6 +9,7 @@ import EmptyState from "@/components/EmptyState";
 import { apiPost } from "@/lib/invoicing/client";
 import IstatSettingsModal from "./SettingsModal";
 import EditBookingModal from "../alloggiati-web/EditBookingModal";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface Row { id: string; arrival: string; departure: string; provenance: string; guests: number; stato: string; booking_id: string | null }
 const STA = (k: string) => ({ pending: { l: "Da inviare", c: "var(--warn)" }, sent: { l: "Inviato", c: "var(--dim)" }, error: { l: "Errore", c: "var(--err)" } } as Record<string, { l: string; c: string }>)[k] ?? { l: k, c: "var(--dim)" };
@@ -23,6 +24,7 @@ export default function IstatPage() {
   const [openG, setOpenG] = useState<Record<string, boolean>>({});
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editBooking, setEditBooking] = useState<string | null>(null);
+  const [confirmClose, setConfirmClose] = useState(false); // conferma chiusura/invio definitivo
   const [conn, setConn] = useState<{ configured?: boolean; auto?: boolean; partner?: string }>({});
 
   useEffect(() => {
@@ -168,7 +170,7 @@ export default function IstatPage() {
         <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
         <Link href="/istat/archivio" className={`${fieldCls} font-semibold hover:bg-wash`} title="Archivio invii: storico delle chiusure giornaliere">📁 Archivio</Link>
         <button onClick={exportCsv} disabled={rowsVisible.length === 0} className={`${fieldCls} font-semibold hover:bg-wash disabled:opacity-50`} title="Scarica il movimento in CSV (dettaglio per ospite)">⬇ Scarica CSV</button>
-        <button onClick={chiudiGiornata} disabled={!!busy || dayPending === 0} className="ml-auto rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Chiudi e invia il movimento del giorno al portale regionale">{busy === "close" ? "Invio…" : `Chiudi giornata (${dayPending})`}</button>
+        <button onClick={() => setConfirmClose(true)} disabled={!!busy || dayPending === 0} className="ml-auto rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Chiudi e invia il movimento del giorno al portale regionale">{busy === "close" ? "Invio…" : `Chiudi giornata (${dayPending})`}</button>
         <button type="button" onClick={() => setSettingsOpen(true)} title="Impostazioni ISTAT" aria-label="Impostazioni ISTAT" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
         </button>
@@ -202,7 +204,8 @@ export default function IstatPage() {
               const listShown = filterDate ? rowsVisible.filter((r) => r.arrival === filterDate || r.departure === filterDate || ((r.arrival || "") < filterDate && filterDate < (r.departure || ""))) : rowsVisible;
               if (!listShown.length && filterDate) return (
                 <div className="flex flex-col items-center gap-2 py-8 text-center">
-                  <p className="text-sm text-faint">Nessun movimento in questa giornata.</p>
+                  <p className="text-sm text-faint">Il {new Date(filterDate).toLocaleDateString("it-IT")} non ci sono ospiti in movimento (nessun arrivo, partenza o presenza).</p>
+                  <p className="text-[11px] text-faint">Cambia giorno con ‹ › in alto, oppure vedi l&apos;intero periodo.</p>
                   <button onClick={() => setFilterDate("")} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-focus hover:bg-wash">Mostra tutto il movimento</button>
                 </div>
               );
@@ -271,6 +274,17 @@ export default function IstatPage() {
 
       {settingsOpen && <IstatSettingsModal sid={sid} onClose={() => { setSettingsOpen(false); void runAuto(); }} />}
       {editBooking && <EditBookingModal bookingId={editBooking} onClose={() => { setEditBooking(null); setTimeout(() => void runAuto(), 6500); }} />}
+      {confirmClose && (
+        <ConfirmDialog
+          title="Chiusura giornaliera"
+          message={<>Stai per chiudere e inviare all&apos;Osservatorio il movimento di <b className="text-txt">{new Date(filterDate || todayIso).toLocaleDateString("it-IT")}</b> ({dayPending} {dayPending === 1 ? "movimento" : "movimenti"}).</>}
+          warning={<>La chiusura è <b>definitiva</b>: una volta inviata non è possibile tornare indietro. Verifica arrivi, presenze e camere prima di confermare.</>}
+          confirmLabel="Chiudi e invia la giornata"
+          busy={busy === "close"}
+          onConfirm={async () => { await chiudiGiornata(); setConfirmClose(false); }}
+          onClose={() => setConfirmClose(false)}
+        />
+      )}
     </div>
   );
 }

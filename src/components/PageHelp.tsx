@@ -251,6 +251,19 @@ const HELP: Record<string, Guide> = {
     intro: "L'anagrafica di tutti gli ospiti.",
     sections: [{ h: "Cosa puoi fare", items: ["Consulta i dati di contatto e lo storico soggiorni.", "I dati documento servono per Alloggiati Web."] }],
   },
+  "/adempimenti": {
+    title: "Adempimenti oggi",
+    intro: "Un cruscotto unico con tutto ciò che va gestito o inviato oggi, in ordine cronologico. Ogni card è un «passo»: il numero in alto è quanto resta da fare (o X/Y fatti/totali), sotto trovi il dettaglio e in basso l'azione.",
+    sections: [
+      { h: "Come leggerla", items: ["Le card in colore hanno qualcosa da fare; quelle spente (numero 0) sono in ordine.", "Il numero grande in alto a sinistra è il conteggio da gestire (o X/Y = fatti su totali).", "Il pulsante blu in fondo porta alla pagina giusta per completare quel passo."] },
+      { h: "1 · Check-in online da completare", items: ["Elenca gli arrivi i cui ospiti non hanno ancora fatto (o completato) il check-in online.", "Da ogni riga puoi sollecitare l'ospite via 💬 WhatsApp o ✉️ Email, oppure «Compila tu» i dati al posto suo.", "«Trasferisci alle schedine» genera/aggiorna le schedine dai check-in fatti."] },
+      { h: "2 · Schedine alla Questura", items: ["Le schedine pronte da inviare al Portale Alloggiati (entro 24h dall'arrivo).", "«Invia alla Questura» apre Alloggiati Web per l'invio (con conferma; l'invio è definitivo).", "Le schedine con errori o incomplete non partono: vanno prima corrette."] },
+      { h: "3 · Movimenti ISTAT", items: ["Il movimento turistico da comunicare all'Osservatorio (arrivi/presenze, anonimo).", "«Genera da arrivi» crea i movimenti dalle prenotazioni; l'invio avviene con la «Chiusura giornaliera» in ISTAT · Turist@t."] },
+      { h: "4 · Fatture/ricevute da incassare", items: ["Documenti emessi ancora da incassare: «Registra incassi» apre lo scadenzario."] },
+      { h: "5 · Fatture elettroniche (SdI)", items: ["Fatture elettroniche scartate dal Sistema di Interscambio: «Correggi e reinvia» apre i documenti."] },
+      { h: "6 · Fatture fornitori scadute", items: ["Fatture passive (acquisti) scadute da pagare/registrare: «Paga / registra» apre le fatture fornitori."] },
+    ],
+  },
   "/alloggiati-web": {
     title: "Alloggiati Web",
     intro: "Comunicazione degli ospiti alla Questura (Portale Alloggiati della Polizia di Stato), obbligatoria entro 24h dall'arrivo. Tutto in una pagina: controllo, correzione, invio e ricevute.",

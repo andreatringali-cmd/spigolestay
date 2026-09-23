@@ -458,7 +458,6 @@ export default function AdempimentiPage() {
         </StepCard>
       </div>
 
-      <p className="mt-4 text-center text-[11px] text-faint">In ordine cronologico: check-in ospite → schedine Questura → ISTAT → incassi → fatture SdI → fornitori.</p>
     </div>
   );
 }
