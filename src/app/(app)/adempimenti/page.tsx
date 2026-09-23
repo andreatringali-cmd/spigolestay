@@ -122,8 +122,8 @@ export default function AdempimentiPage() {
   const router = useRouter();
   const { bookings, getGuest, getStructure } = useData();
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const [sched, setSched] = useState<{ id: string; arrival: string; stato: string; booking_id: string | null }[]>([]);
-  const [istat, setIstat] = useState<{ id: string; arrival: string; stato: string; booking_id: string | null }[]>([]);
+  const [sched, setSched] = useState<{ id: string; arrival: string; stato: string; booking_id: string | null; guest: { cognome?: string; nome?: string } | null; structure_id: string | null }[]>([]);
+  const [istat, setIstat] = useState<{ id: string; arrival: string; stato: string; booking_id: string | null; structure_id: string | null }[]>([]);
   const [docs, setDocs] = useState<{ id: string; number_label: string | null; stato: string; total_cents: number; counterpart: { name?: string } | null }[]>([]);
   const [pays, setPays] = useState<{ document_id: string; amount_cents: number }[]>([]);
   const [passive, setPassive] = useState<{ id: string; supplier_name: string | null; due_date: string | null; total_cents: number; paid: boolean }[]>([]);
@@ -132,8 +132,8 @@ export default function AdempimentiPage() {
   const loadData = useCallback(async () => {
     if (!supabase) return;
     const [a, i, d, p, pv] = await Promise.all([
-      supabase.from("alloggiati_schedine").select("id, arrival, stato, booking_id"),
-      supabase.from("istat_rows").select("id, arrival, stato, booking_id").in("stato", ["pending", "sent"]),
+      supabase.from("alloggiati_schedine").select("id, arrival, stato, booking_id, guest, structure_id"),
+      supabase.from("istat_rows").select("id, arrival, stato, booking_id, structure_id").in("stato", ["pending", "sent"]),
       supabase.from("documents").select("id, number_label, stato, total_cents, counterpart").in("stato", ["scartata", "emessa", "inviata_intermediario", "consegnata"]),
       supabase.from("document_payments").select("document_id, amount_cents"),
       supabase.from("purchase_documents").select("id, supplier_name, due_date, total_cents, paid"),
@@ -189,6 +189,26 @@ export default function AdempimentiPage() {
   const schedToSend = schedPending.filter((s) => (s.arrival || "") <= t);   // arrivate/in arrivo oggi → inviabili
   const schedUpcoming = schedPending.filter((s) => (s.arrival || "") > t);  // arrivi futuri → in preparazione
   const schedSent = sched.filter((s) => s.stato === "inviata");
+  // Raggruppa le schedine per PRENOTAZIONE: una riga per prenotazione, con quante schedine ha
+  // (una a persona). Così con più prenotazioni si capisce a colpo d'occhio a chi si riferiscono.
+  type SchedRow = typeof sched[number];
+  const groupSched = (list: SchedRow[]) => {
+    const m = new Map<string, { key: string; bookingId: string | null; arrival: string; structureId: string | null; count: number }>();
+    for (const s of list) {
+      const key = s.booking_id || s.id;
+      const cur = m.get(key) ?? { key, bookingId: s.booking_id, arrival: s.arrival, structureId: s.structure_id, count: 0 };
+      cur.count += 1;
+      if (s.arrival && (!cur.arrival || s.arrival < cur.arrival)) cur.arrival = s.arrival;
+      m.set(key, cur);
+    }
+    return [...m.values()].sort((a, b) => (a.arrival < b.arrival ? -1 : 1));
+  };
+  const schedToSendG = groupSched(schedToSend);
+  const schedUpcomingG = groupSched(schedUpcoming);
+  const schedSentG = groupSched(schedSent);
+  const bookingName = (bookingId: string | null) => { const b = bookingId ? bookings.find((x) => x.id === bookingId) : null; return b ? (getGuest(b.guestId)?.fullName || "Ospite") : "Prenotazione"; };
+  const structName = (structureId: string | null, bookingId: string | null) => { const b = bookingId ? bookings.find((x) => x.id === bookingId) : null; return getStructure(structureId || b?.structureId || "")?.name || ""; };
+  const schedLabel = (n: number) => (n === 1 ? "1 schedina" : `${n} schedine`);
   // 3 · ISTAT — pending (solo prenotazioni vive) vs inviati.
   const istatPend = istat.filter((s) => s.stato === "pending" && isActive(s.booking_id));
   const istatSent = istat.filter((s) => s.stato === "sent");
@@ -263,24 +283,30 @@ export default function AdempimentiPage() {
         </StepCard>
 
         {/* 2 · Schedine alla Questura */}
-        <StepCard n={2} tone="var(--err)" label="Schedine alla Questura (Alloggiati Web)" sub="Da inviare" count={schedToSend.length} action="Invia alla Questura" onAction={() => router.push("/alloggiati-web")}>
-          {(schedToSend.length > 0 || schedUpcoming.length > 0 || schedSent.length > 0) ? (
+        <StepCard n={2} tone="var(--err)" label="Schedine alla Questura (Alloggiati Web)" sub="Da inviare" count={schedToSendG.length} action="Invia alla Questura" onAction={() => router.push("/alloggiati-web")}>
+          {(schedToSendG.length > 0 || schedUpcomingG.length > 0 || schedSentG.length > 0) ? (
             <>
-              {schedToSend.length > 0 && (<>
-                <SubHead>Da inviare ({schedToSend.length}) · entro 24h dall&apos;arrivo</SubHead>
-                {schedToSend.slice(0, 4).map((sc) => (
-                  <MiniRow key={sc.id} left={`Arrivo ${fmtDay(sc.arrival)}`} right={schedOverdue(sc.arrival) ? `⚠ scaduta ${schedDeadline(sc.arrival)}` : `entro ${schedDeadline(sc.arrival)}`} />
+              {schedToSendG.length > 0 && (<>
+                <SubHead>Da inviare ({schedToSendG.length}) · una riga per prenotazione</SubHead>
+                {schedToSendG.slice(0, 4).map((gr) => (
+                  <MiniRow key={gr.key}
+                    left={`${bookingName(gr.bookingId)} · ${structName(gr.structureId, gr.bookingId)} · arrivo ${fmtDay(gr.arrival)}`}
+                    right={`${schedLabel(gr.count)} · ${schedOverdue(gr.arrival) ? "⚠ scaduta" : `entro ${schedDeadline(gr.arrival)}`}`} />
                 ))}
               </>)}
-              {schedUpcoming.length > 0 && (<>
-                <SubHead mt={schedToSend.length > 0}>Prossimi arrivi ({schedUpcoming.length}) · in preparazione, si inviano dopo l&apos;arrivo</SubHead>
-                {schedUpcoming.slice(0, 3).map((sc) => (
-                  <MiniRow key={sc.id} left={`Arrivo ${fmtDay(sc.arrival)}`} right={`dal ${fmtDay(sc.arrival)}`} />
+              {schedUpcomingG.length > 0 && (<>
+                <SubHead mt={schedToSendG.length > 0}>Prossimi arrivi ({schedUpcomingG.length}) · in preparazione, si inviano dopo l&apos;arrivo</SubHead>
+                {schedUpcomingG.slice(0, 3).map((gr) => (
+                  <MiniRow key={gr.key}
+                    left={`${bookingName(gr.bookingId)} · ${structName(gr.structureId, gr.bookingId)} · arrivo ${fmtDay(gr.arrival)}`}
+                    right={`${schedLabel(gr.count)} · dal ${fmtDay(gr.arrival)}`} />
                 ))}
               </>)}
-              {schedSent.length > 0 && (<>
-                <SubHead mt={schedToSend.length > 0}>Inviate ({schedSent.length})</SubHead>
-                {schedSent.slice(0, 3).map((sc) => <DoneRow key={sc.id} left={`Arrivo ${sc.arrival ? new Date(sc.arrival).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—"}`} />)}
+              {schedSentG.length > 0 && (<>
+                <SubHead mt={schedToSendG.length > 0}>Inviate ({schedSentG.length})</SubHead>
+                {schedSentG.slice(0, 3).map((gr) => (
+                  <DoneRow key={gr.key} left={`${bookingName(gr.bookingId)} · arrivo ${fmtDay(gr.arrival)}`} right={schedLabel(gr.count)} />
+                ))}
               </>)}
             </>
           ) : undefined}
@@ -292,11 +318,11 @@ export default function AdempimentiPage() {
             <>
               {istatPend.length > 0 && (<>
                 <SubHead>Da inviare ({istatPend.length})</SubHead>
-                {istatPend.slice(0, 4).map((r) => <MiniRow key={r.id} left={`Arrivo ${r.arrival ? new Date(r.arrival).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—"}`} />)}
+                {istatPend.slice(0, 4).map((r) => <MiniRow key={r.id} left={`${bookingName(r.booking_id)} · ${structName(r.structure_id, r.booking_id)}`} right={`arrivo ${fmtDay(r.arrival)}`} />)}
               </>)}
               {istatSent.length > 0 && (<>
                 <SubHead mt={istatPend.length > 0}>Inviati ({istatSent.length})</SubHead>
-                {istatSent.slice(0, 3).map((r) => <DoneRow key={r.id} left={`Arrivo ${r.arrival ? new Date(r.arrival).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—"}`} />)}
+                {istatSent.slice(0, 3).map((r) => <DoneRow key={r.id} left={`${bookingName(r.booking_id)} · arrivo ${fmtDay(r.arrival)}`} />)}
               </>)}
               {istatMsg && <div className="text-[11px] font-medium" style={{ color: istatMsg.startsWith("✓") ? "var(--ok)" : "var(--err)" }}>{istatMsg} <button onClick={() => router.push("/istat")} className="underline">apri ISTAT →</button></div>}
             </>
