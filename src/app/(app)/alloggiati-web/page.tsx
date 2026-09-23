@@ -144,6 +144,8 @@ export default function AlloggiatiWebPage() {
   // Lista schedine: mostra solo arrivi già avvenuti (+ inviate come storico). Gli arrivi futuri
   // NON compaiono finché l'ospite non arriva (allineato ad Adempimenti).
   const listSched = visibleSched.filter((x) => x.stato === "inviata" || !isFuture(x.arrival));
+  // Schedine (non inviate) con errori/da validare → riepilogo sotto la lista.
+  const errCount = listSched.filter((x) => x.stato !== "inviata" && ((x.errors?.length ?? 0) > 0 || (x.stato === "pronta" && !bookingComplete(x.booking_id)) || x.stato === "da_validare")).length;
   // Scadenza legale (art. 109 TULPS): la schedina va inviata alla Questura ENTRO 24h dall'arrivo
   // (entro 6h per soggiorni sotto le 24h). Non avendo l'orario esatto d'arrivo usiamo il giorno
   // successivo all'arrivo come termine mostrato.
@@ -158,9 +160,6 @@ export default function AlloggiatiWebPage() {
   };
   const cdTone = (arrivalISO: string): "over" | "soon" | "ok" => { const ms = deadlineDT(arrivalISO).getTime() - now; return ms < 0 ? "over" : ms < 6 * 3600000 ? "soon" : "ok"; };
   const urgColor = (u: string) => (u === "over" ? "var(--err)" : u === "soon" ? "var(--warn)" : "var(--faint)");
-  const toSend = visibleSched.filter((x) => x.stato !== "inviata" && x.arrival && !isFuture(x.arrival));
-  const nextArrival = toSend.length ? toSend.map((x) => x.arrival).sort()[0] : null;
-  const overdueCount = toSend.filter((x) => cdTone(x.arrival) === "over").length;
   // Ospiti attualmente in struttura (arrivati e non ancora ripartiti).
   const inHouse = bookings
     .filter((b) => b.structureId === sid && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && b.checkIn <= todayLocal && todayLocal < b.checkOut)
@@ -212,17 +211,9 @@ export default function AlloggiatiWebPage() {
             <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-faint">Opzioni</div>
             <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa ospiti (capofamiglia + membri)</span><input type="checkbox" checked={s.group_guests} onChange={(e) => set({ group_guests: e.target.checked })} className="mr-2 h-4 w-4 accent-[color:var(--focus)]" /></label>
             <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa per camera</span><input type="checkbox" checked={s.group_by_room} onChange={(e) => set({ group_by_room: e.target.checked })} className="mr-2 h-4 w-4 accent-[color:var(--focus)]" /></label>
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-sm text-txt">Invio automatico alla Questura</span>
-              <button type="button" role="switch" aria-checked={s.auto_daily} onClick={() => setAuto(!s.auto_daily)} disabled={!!busy}
-                className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-50"
-                style={{ backgroundColor: s.auto_daily ? "var(--ok)" : "var(--line)" }} title={s.auto_daily ? "Disattiva" : "Attiva"}>
-                <span className="inline-block h-5 w-5 transform rounded-full bg-white shadow transition" style={{ transform: s.auto_daily ? "translateX(22px)" : "translateX(2px)" }} />
-              </button>
-            </div>
-            <span className="block text-[11px] text-faint">{s.auto_daily ? "Attivo: le schedine pronte partono da sole dopo l'arrivo (entro 24h di legge)." : "Spento: le invii tu manualmente con «Invia le pronte»."}</span>
+            <label className="flex items-center justify-between"><span className="text-sm text-txt">Invio automatico alla Questura</span><input type="checkbox" checked={s.auto_daily} onChange={(e) => setAuto(e.target.checked)} disabled={!!busy} className="mr-2 h-4 w-4 accent-[color:var(--focus)]" /></label>
+            <span className="block text-[11px] text-faint">{s.auto_daily ? "Attivo: le schedine pronte partono da sole alle 23:00 (entro 24h di legge)." : "Spento: le invii tu con «Invia le pronte»."}</span>
           </div>
-          <p className="mt-2 text-[11px] text-faint">L&apos;invio automatico si attiva con l&apos;interruttore nel riquadro «Schedine». Puoi comunque forzare l&apos;invio manuale in qualsiasi momento.</p>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button onClick={save} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "save" ? "Salvataggio…" : "Salva"}</button>
@@ -246,19 +237,7 @@ export default function AlloggiatiWebPage() {
               : <button onClick={runAuto} disabled={!!busy} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash disabled:opacity-50" title="Rigenera e ricontrolla adesso">↻ Ricontrolla</button>}
             <button onClick={() => call("send", "send")} disabled={!!busy || readyCount === 0} className="ml-auto rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Invia subito alla Questura, senza aspettare l'orario automatico">{busy === "send" ? "Invio…" : `Invia le pronte (${readyCount})`}</button>
           </div>
-          <p className="mb-2 text-[11px] text-faint">
-            All&apos;apertura la pagina <b>aggiorna e verifica</b> le schedine da sola: eventuali errori compaiono qui sotto e su ogni schedina.{" "}
-            {s.auto_daily
-              ? "L'invio parte in automatico alle 23:00; con «Invia le pronte» puoi inviare subito."
-              : "Poi invia con «Invia le pronte», oppure attiva l'invio automatico nelle impostazioni."}
-          </p>
           {msg && <p className="mb-2 rounded-lg px-3 py-2 text-sm font-medium" style={{ background: "var(--wash)", color: "var(--dim)" }}>{msg}</p>}
-          {nextArrival && (
-            <div className="mb-2 flex items-start gap-2 rounded-lg border px-3 py-2 text-[12px]" style={{ borderColor: overdueCount ? "var(--err)" : "var(--warn)", background: `color-mix(in srgb, ${overdueCount ? "var(--err)" : "var(--warn)"} 8%, transparent)` }}>
-              <span aria-hidden>⏱</span>
-              <span className="text-dim">Invio alla Questura <b className="text-txt">entro 24h dall&apos;arrivo</b> (art. 109 TULPS). Prossima scadenza: <b style={{ color: overdueCount ? "var(--err)" : "var(--warn)" }}>{cdText(nextArrival)}</b>{overdueCount ? ` · ${overdueCount} in ritardo` : ""}.</span>
-            </div>
-          )}
           <div className="mb-2 flex flex-wrap items-center gap-2 border-t border-line pt-2">
             <span className="text-[11px] font-medium text-dim">Filtra per arrivo:</span>
             <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
@@ -269,6 +248,7 @@ export default function AlloggiatiWebPage() {
             <button onClick={getRicevuta} disabled={!!busy} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "ricevuta" ? "Scarico…" : "Scarica ricevuta"}</button>
           </div>
           <div className="max-h-[52vh] overflow-y-auto">
+            {autoBusy ? <div className="py-10 text-center text-sm text-faint">Aggiorno e verifico le schedine…</div> : <>
             {(() => {
               // Raggruppa le schedine per PRENOTAZIONE (una riga a tendina; dentro, una per persona).
               const map = new Map<string, Sched[]>();
@@ -314,8 +294,10 @@ export default function AlloggiatiWebPage() {
                 );
               });
             })()}
-            {listSched.length === 0 && <EmptyState title="Nessuna schedina" sub="Premi «Sincronizza dagli arrivi»." />}
+            {listSched.length === 0 && <EmptyState title="Nessuna schedina" sub="Le schedine appaiono qui dopo il check-in." />}
+            </>}
           </div>
+          {!autoBusy && errCount > 0 && <p className="mt-2 rounded-lg px-3 py-2 text-[12px] font-medium" style={{ background: "color-mix(in srgb, var(--warn) 10%, transparent)", color: "var(--warn)" }}>⚠ {errCount} {errCount === 1 ? "schedina" : "schedine"} con errori — apri la prenotazione per correggere.</p>}
         </Card>
       </div>
     </div>
