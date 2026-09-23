@@ -255,6 +255,30 @@ export async function fetchRicevuta(admin: SupabaseClient, tenantId: string, str
   } catch (e) { return { ok: false, message: (e as Error)?.message ?? "Errore scaricamento ricevuta." }; }
 }
 
+// Archivio invii: elenco degli invii effettuati (per riscaricare/stampare la ricevuta in qualsiasi momento).
+export async function listSubmissions(admin: SupabaseClient, tenantId: string, structureId: string): Promise<{ ok: boolean; items: { id: string; date: string | null; created_at: string; count: number; stato: string; esito: string | null; ricevuta: string | null; hasPdf: boolean }[] }> {
+  const { data } = await admin.from("alloggiati_submissions")
+    .select("id, arrival, created_at, count, stato, esito, ricevuta, ricevuta_pdf")
+    .eq("tenant_id", tenantId).eq("structure_id", structureId)
+    .order("created_at", { ascending: false }).limit(200);
+  const items = (data ?? []).map((s) => ({ id: s.id as string, date: (s.arrival as string) ?? null, created_at: s.created_at as string, count: (s.count as number) ?? 0, stato: (s.stato as string) ?? "", esito: (s.esito as string) ?? null, ricevuta: (s.ricevuta as string) ?? null, hasPdf: !!s.ricevuta_pdf }));
+  return { ok: true, items };
+}
+
+// Ricevuta di uno specifico invio: usa quella memorizzata; se manca, la scarica dal portale (per data) e la conserva.
+export async function getSubmissionRicevuta(admin: SupabaseClient, tenantId: string, structureId: string, submissionId: string): Promise<{ ok: boolean; message: string; pdfBase64?: string }> {
+  const { data: sub } = await admin.from("alloggiati_submissions").select("id, created_at, ricevuta_pdf").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("id", submissionId).maybeSingle();
+  if (!sub) return { ok: false, message: "Invio non trovato." };
+  if (sub.ricevuta_pdf) return { ok: true, message: "Ricevuta dall'archivio.", pdfBase64: sub.ricevuta_pdf as string };
+  const day = String(sub.created_at).slice(0, 10);
+  const r = await fetchRicevuta(admin, tenantId, structureId, day);
+  if (r.ok && r.pdfBase64) { try { await admin.from("alloggiati_submissions").update({ ricevuta_pdf: r.pdfBase64 }).eq("id", submissionId); } catch {} return r; }
+  // La ricevuta è disponibile sul portale dal giorno DOPO l'invio ed entro ~30 giorni.
+  const today = new Date().toISOString().slice(0, 10);
+  if (day >= today) return { ok: false, message: "La ricevuta sarà disponibile dal giorno successivo all'invio: riprova domani." };
+  return r;
+}
+
 // Invia le schedine PRONTE (arrivo indicato o tutte) → submission + ricevuta.
 export async function sendReady(admin: SupabaseClient, tenantId: string, structureId: string, arrival?: string): Promise<{ ok: boolean; message: string; sent: number }> {
   let q = admin.from("alloggiati_schedine").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pronta");

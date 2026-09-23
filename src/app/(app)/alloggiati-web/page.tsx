@@ -7,8 +7,10 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { apiPost } from "@/lib/invoicing/client";
 import AlloggiatiSettingsModal from "./SettingsModal";
+import AlloggiatiArchiveModal from "./ArchiveModal";
 
-interface Sched { id: string; booking_id: string; arrival: string; guest: { cognome?: string; nome?: string }; ruolo: string; stato: string; errors: string[] | null; ricevuta: string | null }
+interface SchedGuest { cognome?: string; nome?: string; sesso?: "M" | "F" | string; dataNascita?: string; comuneNascita?: string; provinciaNascita?: string; statoNascita?: string; cittadinanza?: string; tipoDoc?: string; numeroDoc?: string; luogoRilascio?: string; perm?: number }
+interface Sched { id: string; booking_id: string; arrival: string; guest: SchedGuest; ruolo: string; stato: string; errors: string[] | null; ricevuta: string | null }
 const RUOLO: Record<string, string> = { "16": "Singolo", "17": "Capofamiglia", "18": "Capogruppo", "19": "Familiare", "20": "Membro" };
 
 export default function AlloggiatiWebPage() {
@@ -17,12 +19,12 @@ export default function AlloggiatiWebPage() {
   const [sched, setSched] = useState<Sched[]>([]);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
-  const [ricDate, setRicDate] = useState("");
   const [filterDate, setFilterDate] = useState(""); // filtro lista schedine per data di arrivo
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []); // countdown vivo (ogni minuto)
   const [openG, setOpenG] = useState<Record<string, boolean>>({}); // schedine a tendina per prenotazione
   const [settingsOpen, setSettingsOpen] = useState(false); // finestra centrale impostazioni
+  const [archiveOpen, setArchiveOpen] = useState(false); // archivio invii/ricevute
 
   useEffect(() => {
     const target = activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId) ? activeStructureId : structures[0]?.id ?? "";
@@ -53,28 +55,6 @@ export default function AlloggiatiWebPage() {
     setBusy(label); setMsg("");
     try { const r = await apiPost<{ message?: string; count?: number; sent?: number }>(`alloggiati/${path}`, { structureId: sid, ...body }); setMsg(r.message || `OK${r.count != null ? ` (${r.count})` : ""}${r.sent != null ? ` — inviate ${r.sent}` : ""}`); await load(); }
     catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
-  };
-
-  // Traduce i codici d'errore della ricevuta in un messaggio chiaro.
-  const ricevutaMsg = (m?: string) => {
-    const raw = (m || "").toUpperCase();
-    if (raw.includes("RICEVUTA") || raw.includes("RECUPERO") || raw.includes("NON TROV"))
-      return "Nessuna ricevuta per quella data: la ricevuta esiste solo DOPO aver inviato le schedine di quel giorno (una per giornata di invio). Invia prima le schedine, poi scarica la ricevuta.";
-    return m || "Ricevuta non disponibile.";
-  };
-  const getRicevuta = async () => {
-    if (!ricDate) { setMsg("Scegli una data per la ricevuta."); return; }
-    setBusy("ricevuta"); setMsg("");
-    try {
-      const r = await apiPost<{ ok: boolean; message?: string; pdfBase64?: string }>("alloggiati/ricevuta", { structureId: sid, date: ricDate });
-      if (r.pdfBase64) {
-        const a = document.createElement("a");
-        a.href = `data:application/pdf;base64,${r.pdfBase64}`;
-        a.download = `ricevuta-alloggiati-${ricDate}.pdf`;
-        document.body.appendChild(a); a.click(); a.remove();
-        setMsg("Ricevuta scaricata ✓");
-      } else setMsg(ricevutaMsg(r.message));
-    } catch (e) { setMsg(ricevutaMsg(e instanceof Error ? e.message : "")); } finally { setBusy(""); }
   };
 
   // Registro sempre allineato alle prenotazioni: annullate/no-show/sparite non compaiono.
@@ -140,9 +120,7 @@ export default function AlloggiatiWebPage() {
         <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className={fieldCls} />
         {filterDate && <button onClick={() => setFilterDate("")} className={`${fieldCls} text-dim hover:bg-wash`} title="Rimuovi filtro">✕</button>}
         <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
-        <span className="text-[11px] font-medium text-dim">Ricevuta:</span>
-        <input type="date" value={ricDate} onChange={(e) => setRicDate(e.target.value)} className={fieldCls} />
-        <button onClick={getRicevuta} disabled={!!busy} className={`${fieldCls} font-semibold hover:bg-wash disabled:opacity-50`}>{busy === "ricevuta" ? "Scarico…" : "Scarica ricevuta"}</button>
+        <button onClick={() => setArchiveOpen(true)} className={`${fieldCls} font-semibold hover:bg-wash`} title="Archivio invii: riscarica o stampa le ricevute quando vuoi">📁 Archivio ricevute</button>
         <button onClick={() => call("send", "send")} disabled={!!busy || readyCount === 0} className="ml-auto rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Invia subito alla Questura, senza aspettare l'orario automatico">{busy === "send" ? "Invio…" : `Invia le pronte (${readyCount})`}</button>
         <button type="button" onClick={() => setSettingsOpen(true)} title="Impostazioni account" aria-label="Impostazioni account" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
@@ -206,20 +184,24 @@ export default function AlloggiatiWebPage() {
                   </button>
                   {opened && (
                     <div className="pb-2 pl-6">
-                      {rows.map((x) => { const st = STA(effStato(x));
-                        const people = bk ? [bk.primaryGuest, ...(bk.extraGuests ?? [])].filter(Boolean) : [];
-                        const norm = (v?: string) => (v ?? "").trim().toLowerCase();
-                        const g = people.find((p) => norm(p?.lastName) === norm(x.guest?.cognome) && norm(p?.firstName) === norm(x.guest?.nome)) ?? people.find((p) => norm(p?.lastName) === norm(x.guest?.cognome));
-                        const docLine = g ? [g.docType, g.docNumber].filter(Boolean).join(" ") : "";
+                      {rows.map((x) => { const st = STA(effStato(x)); const g = x.guest ?? {};
+                        const isCapo = ["16", "17", "18"].includes(x.ruolo);
+                        const dob = g.dataNascita ? new Date(g.dataNascita).toLocaleDateString("it-IT") : "—";
+                        const luogoNascita = [g.comuneNascita, g.provinciaNascita && `(${g.provinciaNascita})`].filter(Boolean).join(" ") || g.statoNascita || "—";
+                        const docLine = isCapo ? ([g.tipoDoc, g.numeroDoc].filter(Boolean).join(" ") || "—") : "non richiesto";
                         return (
-                        <div key={x.id} className="flex items-start justify-between gap-2 border-t border-[color:color-mix(in_srgb,var(--line)_60%,transparent)] py-1.5">
-                          <div className="min-w-0">
-                            <div className="truncate text-[13px] text-txt">{(x.guest?.cognome ?? "") + " " + (x.guest?.nome ?? "") || "—"} <span className="text-faint">· {RUOLO[x.ruolo] ?? x.ruolo}</span></div>
-                            {(docLine || g?.citizenship || g?.birthDate) && <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] text-faint">{docLine && <span>🪪 {docLine}</span>}{g?.citizenship && <span>· {g.citizenship}</span>}{g?.birthDate && <span>· nato/a {new Date(g.birthDate).toLocaleDateString("it-IT")}</span>}</div>}
-                            {x.errors?.length ? <div className="text-[11px] font-medium" style={{ color: "var(--warn)" }}>⚠ {x.errors.join(" · ")}</div> : null}
-                            {x.ricevuta ? <div className="text-[11px] text-faint">ric. {x.ricevuta}</div> : null}
+                        <div key={x.id} className="border-t border-[color:color-mix(in_srgb,var(--line)_60%,transparent)] py-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="truncate text-[13px] font-medium text-txt">{(x.guest?.cognome ?? "") + " " + (x.guest?.nome ?? "") || "—"} <span className="font-normal text-faint">· {RUOLO[x.ruolo] ?? x.ruolo}{g.sesso ? ` · ${g.sesso === "F" ? "F" : "M"}` : ""}</span></div>
+                            <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.c} 16%, transparent)`, color: st.c }}>{st.l}</span>
                           </div>
-                          <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.c} 16%, transparent)`, color: st.c }}>{st.l}</span>
+                          <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
+                            <dt className="text-faint">Nascita</dt><dd className="text-dim">{dob} · {luogoNascita}</dd>
+                            <dt className="text-faint">Cittadinanza</dt><dd className="text-dim">{g.cittadinanza || "—"}</dd>
+                            <dt className="text-faint">Documento</dt><dd className="text-dim">{docLine}{isCapo && g.luogoRilascio ? ` · rilasciato a ${g.luogoRilascio}` : ""}</dd>
+                          </dl>
+                          {x.errors?.length ? <div className="mt-1 text-[11px] font-medium" style={{ color: "var(--warn)" }}>⚠ {x.errors.join(" · ")}</div> : null}
+                          {x.ricevuta ? <div className="text-[11px] text-faint">ric. {x.ricevuta}</div> : null}
                         </div>
                       ); })}
                     </div>
@@ -246,6 +228,7 @@ export default function AlloggiatiWebPage() {
       </Card>
 
       {settingsOpen && <AlloggiatiSettingsModal sid={sid} onClose={() => { setSettingsOpen(false); void runAuto(); }} />}
+      {archiveOpen && <AlloggiatiArchiveModal sid={sid} onClose={() => setArchiveOpen(false)} />}
     </div>
   );
 }
