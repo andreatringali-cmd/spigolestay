@@ -60,16 +60,6 @@ export default function AlloggiatiSettingsModal({ sid, onClose }: { sid: string;
     catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
   };
   const toggleShow = () => setShown((v) => !v);
-  // Fallback: scarica il tracciato .txt delle schedine pronte, da caricare a mano sul portale.
-  const genera = async () => {
-    if (!msid) return;
-    setBusy("tracciato"); setMsg("");
-    try {
-      const r = await apiPost<{ ok: boolean; message?: string; text?: string }>("alloggiati/tracciato", { structureId: msid });
-      if (r.text) { const blob = new Blob([r.text], { type: "text/plain" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `alloggiati_${new Date().toISOString().slice(0, 10)}.txt`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); setMsg(r.message || "Tracciato scaricato ✓"); }
-      else setMsg(r.message || "Nessuna schedina pronta.");
-    } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
-  };
 
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
@@ -116,7 +106,6 @@ export default function AlloggiatiSettingsModal({ sid, onClose }: { sid: string;
           <button onClick={save} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "save" ? "Salvataggio…" : "Salva"}</button>
           <button onClick={() => call("test", "test")} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "test" ? "Test…" : "Test connessione"}</button>
           <button onClick={() => call("tabelle", "tabelle")} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Scarica dal portale i codici ufficiali di comuni, stati e documenti">{busy === "tabelle" ? "Aggiorno…" : "Aggiorna tabelle codici"}</button>
-          <button onClick={genera} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Scarica il tracciato .txt da caricare a mano sul portale (fallback se il web service non è attivo)">{busy === "tracciato" ? "Genero…" : "Genera tracciato .txt"}</button>
         </div>
         {msg && <p className="mt-3 text-sm font-medium text-dim">{msg}</p>}
         <div className="mt-3 border-t border-line pt-3 text-sm">
