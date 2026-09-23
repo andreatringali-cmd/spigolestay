@@ -12,7 +12,7 @@ interface Row { id: string; arrival: string; departure: string; provenance: stri
 const STA = (k: string) => ({ pending: { l: "Da inviare", c: "var(--warn)" }, sent: { l: "Inviato", c: "var(--dim)" }, error: { l: "Errore", c: "var(--err)" } } as Record<string, { l: string; c: string }>)[k] ?? { l: k, c: "var(--dim)" };
 
 export default function IstatPage() {
-  const { structures, activeStructureId, bookings, roomTypes, units } = useData();
+  const { structures, activeStructureId, bookings, roomTypes, units, guests } = useData();
   const [sid, setSid] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState("");
@@ -47,12 +47,6 @@ export default function IstatPage() {
   const autoDone = useRef("");
   useEffect(() => { if (sid && autoDone.current !== sid) { autoDone.current = sid; void runAuto(); } }, [sid, runAuto]);
 
-  const call = async (label: string, path: string) => {
-    setBusy(label); setMsg("");
-    try { const r = await apiPost<{ message?: string; count?: number; sent?: number }>(`istat/${path}`, { structureId: sid }); setMsg(r.message || `OK${r.count != null ? ` (${r.count})` : ""}${r.sent != null ? ` — inviati ${r.sent}` : ""}`); await load(); }
-    catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
-  };
-
   // Movimento sempre allineato alle prenotazioni; gli arrivi futuri non sono "da inviare".
   const activeBookingIds = new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked").map((b) => b.id));
   const todayIso = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
@@ -72,18 +66,52 @@ export default function IstatPage() {
   const totCamere = units.filter((u) => u.structureId === sid).length;
 
   const bookingById = new Map(bookings.map((b) => [b.id, b]));
+  const guestById = new Map(guests.map((g) => [g.id, g]));
   const roomName = (rtId?: string) => roomTypes.find((rt) => rt.id === rtId)?.name ?? "";
+  const unitName = (uid?: string | null) => units.find((u) => u.id === uid)?.name ?? "";
   const CH: Record<string, string> = { direct: "Diretta", booking: "Booking", airbnb: "Airbnb", expedia: "Expedia", ical: "iCal", other: "Altro/OTA", blocked: "Bloccata" };
+  const ageOn = (birth?: string, on?: string) => { if (!birth) return ""; const d = new Date(birth); const t = new Date((on || todayIso) + "T00:00"); let a = t.getFullYear() - d.getFullYear(); if (t.getMonth() < d.getMonth() || (t.getMonth() === d.getMonth() && t.getDate() < d.getDate())) a--; return a >= 0 && a < 130 ? String(a) : ""; };
 
+  // Navigazione "Data corrente soggiorni" (come Turist@t): giorno per giorno.
+  const shiftDay = (n: number) => { const d = new Date((filterDate || todayIso) + "T00:00"); d.setDate(d.getDate() + n); setFilterDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`); };
+  const dayPending = rowsVisible.filter((r) => r.stato === "pending" && (!filterDate || r.arrival === filterDate)).length;
+
+  // Chiudi giornata: invia il movimento del giorno selezionato, poi avanza al giorno dopo (come il portale).
+  const chiudiGiornata = async () => {
+    setBusy("close"); setMsg("");
+    try { const r = await apiPost<{ message?: string; sent?: number }>("istat/close", { structureId: sid, day: filterDate || todayIso }); setMsg(r.message || "Giornata chiusa."); await load(); if (r.sent) shiftDay(1); }
+    catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
+  };
+
+  // Genera il file per la Polizia di Stato (tracciato Alloggiati .txt), come sul portale Turist@t.
+  const generaPS = async () => {
+    setBusy("ps"); setMsg("");
+    try {
+      const r = await apiPost<{ ok: boolean; message?: string; text?: string }>("alloggiati/tracciato", { structureId: sid });
+      if (r.text) { const blob = new Blob([r.text], { type: "text/plain" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `polizia_${new Date().toISOString().slice(0, 10)}.txt`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); setMsg("File per la Polizia generato ✓ (carica su alloggiatiweb.poliziadistato.it)"); }
+      else setMsg(r.message || "Nessuna schedina pronta per il file PS.");
+    } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
+  };
+
+  // CSV per-ospite (stile check-in Turist@t): permanenza, camera, età, sesso, cittadinanza, nascita, residenza.
   const exportCsv = () => {
-    const head = ["Arrivo", "Partenza", "Notti", "Ospiti", "Provenienza", "Stato"];
     const esc = (v: unknown) => { const s = String(v ?? ""); return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const head = ["Data arrivo", "Tipo", "Permanenza (notti)", "Camera", "Età", "Sesso", "Cittadinanza", "Luogo di nascita", "Luogo di residenza"];
     const src = filterDate ? rowsVisible.filter((r) => (r.arrival || "") === filterDate) : rowsVisible;
-    const lines = [head.join(";"), ...src.map((r) => [r.arrival, r.departure, nightsBetween(r.arrival, r.departure), r.guests, r.provenance, STA(r.stato).l].map(esc).join(";"))];
+    const out: string[][] = [];
+    for (const r of src) {
+      const b = r.booking_id ? bookingById.get(r.booking_id) : undefined;
+      const nn = nightsBetween(r.arrival, r.departure);
+      const cam = b ? unitName(b.unitId) || roomName(b.roomTypeId) : "";
+      const g = b ? guestById.get(b.guestId) : undefined; const pg = b?.primaryGuest ?? {};
+      out.push([r.arrival, "Principale", String(nn), cam, ageOn(g?.birthDate ?? pg.birthDate, r.arrival), (g?.sex ?? pg.sex) ?? "", g?.citizenship ?? pg.citizenship ?? r.provenance, g?.birthPlace ?? pg.birthPlace ?? "", g?.province ?? g?.country ?? ""]);
+      for (const c of b?.extraGuests ?? []) out.push([r.arrival, "Ospite", String(nn), cam, ageOn(c.birthDate, r.arrival), c.sex ?? "", c.citizenship ?? "", c.birthPlace ?? "", ""]);
+    }
+    const lines = [head.join(";"), ...out.map((row) => row.map(esc).join(";"))];
     const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
     const st = structures.find((x) => x.id === sid);
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-    a.download = `movimento-istat-${(st?.name || "struttura").replace(/[^A-Za-z0-9_-]/g, "_")}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `movimento-istat-${(st?.name || "struttura").replace(/[^A-Za-z0-9_-]/g, "_")}-${filterDate || "tutto"}.csv`;
     a.click(); URL.revokeObjectURL(a.href);
   };
 
@@ -141,14 +169,20 @@ export default function IstatPage() {
         ))}
       </div>
 
-      {/* Riga filtri */}
+      {/* Barra "Data corrente soggiorni" (come Turist@t): navigazione giornata + azioni */}
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        <span className="text-[11px] font-medium text-dim">Filtra per arrivo:</span>
-        <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className={fieldCls} />
-        {filterDate && <button onClick={() => setFilterDate("")} className={`${fieldCls} text-dim hover:bg-wash`} title="Rimuovi filtro">✕</button>}
+        <span className="text-[11px] font-medium text-dim">Data corrente soggiorni:</span>
+        <div className="inline-flex items-center overflow-hidden rounded-lg border border-line">
+          <button onClick={() => shiftDay(-1)} className="px-2 py-1.5 text-dim hover:bg-wash" title="Giorno precedente">‹</button>
+          <input type="date" value={filterDate || todayIso} onChange={(e) => setFilterDate(e.target.value)} className="border-x border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none" />
+          <button onClick={() => shiftDay(1)} className="px-2 py-1.5 text-dim hover:bg-wash" title="Giorno successivo">›</button>
+        </div>
+        <button onClick={() => setFilterDate(todayIso)} className={`${fieldCls} font-semibold hover:bg-wash`}>Oggi</button>
+        <button onClick={() => setFilterDate("")} className={`${fieldCls} hover:bg-wash ${filterDate ? "" : "opacity-40"}`} title="Mostra tutto il movimento">Tutte</button>
         <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
-        <button onClick={exportCsv} disabled={rowsVisible.length === 0} className={`${fieldCls} font-semibold hover:bg-wash disabled:opacity-50`} title="Scarica il movimento in CSV">⬇ Scarica CSV</button>
-        <button onClick={() => call("close", "close")} disabled={!!busy || pending === 0} className="ml-auto rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Chiudi e invia il movimento al portale regionale">{busy === "close" ? "Invio…" : `Invia / chiudi (${pending})`}</button>
+        <button onClick={generaPS} disabled={!!busy} className={`${fieldCls} font-semibold hover:bg-wash disabled:opacity-50`} title="Genera il file per la Polizia di Stato (Alloggiati) da caricare sul portale">{busy === "ps" ? "Genero…" : "🛡 Genera file per la PS"}</button>
+        <button onClick={exportCsv} disabled={rowsVisible.length === 0} className={`${fieldCls} font-semibold hover:bg-wash disabled:opacity-50`} title="Scarica il movimento in CSV (dettaglio per ospite)">⬇ Scarica CSV</button>
+        <button onClick={chiudiGiornata} disabled={!!busy || dayPending === 0} className="ml-auto rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Chiudi e invia il movimento del giorno al portale regionale">{busy === "close" ? "Invio…" : `Chiudi giornata (${dayPending})`}</button>
         <button type="button" onClick={() => setSettingsOpen(true)} title="Impostazioni ISTAT" aria-label="Impostazioni ISTAT" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
         </button>
@@ -178,16 +212,19 @@ export default function IstatPage() {
               </div>
             )}
             {(() => {
-              const listShown = filterDate ? rowsVisible.filter((r) => (r.arrival || "") === filterDate) : rowsVisible;
+              // Vista giornaliera (come Turist@t): mostra arrivi, partenze e presenti del giorno.
+              const listShown = filterDate ? rowsVisible.filter((r) => r.arrival === filterDate || r.departure === filterDate || ((r.arrival || "") < filterDate && filterDate < (r.departure || ""))) : rowsVisible;
               if (!listShown.length && filterDate) return (
                 <div className="flex flex-col items-center gap-2 py-8 text-center">
-                  <p className="text-sm text-faint">Nessun movimento con arrivo in questa data.</p>
+                  <p className="text-sm text-faint">Nessun movimento in questa giornata.</p>
                   <button onClick={() => setFilterDate("")} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-focus hover:bg-wash">Mostra tutto il movimento</button>
                 </div>
               );
               const structName = structures.find((z) => z.id === sid)?.name ?? "";
+              const ROLE = (r: Row): { l: string; c: string } | null => !filterDate ? null : r.arrival === filterDate ? { l: "Arrivo", c: "var(--ok)" } : r.departure === filterDate ? { l: "Partenza", c: "var(--dim)" } : { l: "Presente", c: "var(--focus)" };
               return listShown.map((r) => {
                 const st = STA(r.stato);
+                const role = ROLE(r);
                 const bk = r.booking_id ? bookingById.get(r.booking_id) : undefined;
                 const nn = nightsBetween(r.arrival, r.departure);
                 const opened = openG[r.id] ?? false;
@@ -198,6 +235,7 @@ export default function IstatPage() {
                     <button type="button" onClick={() => setOpenG((m) => ({ ...m, [r.id]: !(m[r.id] ?? false) }))} className="flex w-full items-center gap-2 py-2 text-left">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
+                          {role && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${role.c} 16%, transparent)`, color: role.c }}>{role.l}</span>}
                           <span className="truncate text-sm font-medium text-txt">{r.arrival ? new Date(r.arrival).toLocaleDateString("it-IT") : "—"} → {r.departure ? new Date(r.departure).toLocaleDateString("it-IT") : "—"}</span>
                           {bk?.code && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 font-mono text-[10px] text-dim">{bk.code}</span>}
                         </div>
