@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
@@ -55,6 +55,20 @@ export default function AlloggiatiWebPage() {
     setSched((sc.data ?? []) as Sched[]);
   }, [sid]);
   useEffect(() => { load(); }, [load]);
+
+  // AUTO all'apertura: rigenera le schedine dagli arrivi e le verifica col portale, poi ricarica.
+  // Così aprendo la pagina vedi subito se ci sono errori, senza premere nulla.
+  const [autoBusy, setAutoBusy] = useState(false);
+  const runAuto = useCallback(async () => {
+    if (!sid) return;
+    setAutoBusy(true); setMsg("");
+    try { await apiPost("alloggiati/sync", { structureId: sid }); } catch {}
+    try { const r = await apiPost<{ message?: string }>("alloggiati/check", { structureId: sid }); if (r?.message) setMsg(r.message); } catch {}
+    try { await load(); } catch {}
+    setAutoBusy(false);
+  }, [sid, load]);
+  const autoDone = useRef("");
+  useEffect(() => { if (sid && autoDone.current !== sid) { autoDone.current = sid; void runAuto(); } }, [sid, runAuto]);
 
   const set = (p: Partial<Sett>) => setS((x) => ({ ...x, ...p }));
   const save = async () => {
@@ -226,15 +240,17 @@ export default function AlloggiatiWebPage() {
             <SectionTitle>Schedine</SectionTitle>
             <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">Pronte da inviare: {readyCount}{upcomingCount ? ` · in preparazione: ${upcomingCount}` : ""}</span>
           </div>
-          <div className="mb-1.5 flex flex-wrap gap-2">
-            <button onClick={() => call("sync", "sync")} disabled={!!busy} title="Rigenera ora le schedine dagli arrivi (avviene comunque in automatico)" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "sync" ? "Sincronizzo…" : "Sincronizza dagli arrivi"}</button>
-            <button onClick={() => call("check", "check")} disabled={!!busy || readyCount === 0} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Controllo preliminare presso il portale, senza inviare">{busy === "check" ? "Controllo…" : "Controlla"}</button>
-            <button onClick={() => call("send", "send")} disabled={!!busy || readyCount === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Invia subito alla Questura, senza aspettare l'orario automatico">{busy === "send" ? "Invio…" : `Invia le pronte (${readyCount})`}</button>
+          <div className="mb-1.5 flex flex-wrap items-center gap-2">
+            {autoBusy
+              ? <span className="text-[11px] font-medium text-dim">Aggiorno e verifico le schedine…</span>
+              : <button onClick={runAuto} disabled={!!busy} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash disabled:opacity-50" title="Rigenera e ricontrolla adesso">↻ Ricontrolla</button>}
+            <button onClick={() => call("send", "send")} disabled={!!busy || readyCount === 0} className="ml-auto rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Invia subito alla Questura, senza aspettare l'orario automatico">{busy === "send" ? "Invio…" : `Invia le pronte (${readyCount})`}</button>
           </div>
           <p className="mb-2 text-[11px] text-faint">
+            All&apos;apertura la pagina <b>aggiorna e verifica</b> le schedine da sola: eventuali errori compaiono qui sotto e su ogni schedina.{" "}
             {s.auto_daily
-              ? "Invio automatico attivo: le schedine partono da sole alle 23:00. I pulsanti sopra sono manuali (facoltativi): Sincronizza = aggiorna ora · Controlla = verifica errori senza inviare · Invia le pronte = invia subito."
-              : "Invio manuale: Sincronizza (aggiorna dagli arrivi) → Controlla (verifica errori) → Invia le pronte. Oppure attiva l'invio automatico nelle impostazioni."}
+              ? "L'invio parte in automatico alle 23:00; con «Invia le pronte» puoi inviare subito."
+              : "Poi invia con «Invia le pronte», oppure attiva l'invio automatico nelle impostazioni."}
           </p>
           {msg && <p className="mb-2 rounded-lg px-3 py-2 text-sm font-medium" style={{ background: "var(--wash)", color: "var(--dim)" }}>{msg}</p>}
           {nextArrival && (
