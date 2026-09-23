@@ -75,7 +75,7 @@ function SubHead({ children, mt }: { children: React.ReactNode; mt?: boolean }) 
 }
 
 // Riga arrivo senza check-in: WhatsApp (link), Email diretta (server) e "Compila tu" (apri il form).
-function ArrivalRow({ b, g, st, origin, waOn, showStruct }: { b: Booking; g?: Guest; st?: Structure; origin: string; waOn?: boolean; showStruct?: boolean }) {
+function ArrivalRow({ b, g, st, origin, waOn, showStruct, rooms, expected: expectedProp, declared: declaredProp }: { b: Booking; g?: Guest; st?: Structure; origin: string; waOn?: boolean; showStruct?: boolean; rooms?: number; expected?: number; declared?: number }) {
   const [mail, setMail] = useState<"idle" | "sending" | "sent" | "err">("idle");
   const [ws, setWs] = useState<"idle" | "sending" | "sent" | "err">("idle");
   const fullLink = `${origin}/checkin?b=${b.id}`;
@@ -109,13 +109,13 @@ function ArrivalRow({ b, g, st, origin, waOn, showStruct }: { b: Booking; g?: Gu
       if (r?.ok !== false) setWs("sent"); else { setWs("err"); window.open(wa, "_blank", "noopener"); }
     } catch { setWs("err"); window.open(wa, "_blank", "noopener"); }
   };
-  const expected = expectedPaxOf(b);
-  const declared = declaredPaxOf(b);
+  const expected = expectedProp ?? expectedPaxOf(b);
+  const declared = declaredProp ?? declaredPaxOf(b);
   const partial = declared > 0 && declared < expected; // qualcuno ha fatto il check-in, ma non tutti
   return (
     <div className="rounded-lg border border-line bg-paper px-2.5 py-1.5">
       <div className="flex items-center justify-between gap-2">
-        <div className="truncate text-[13px] font-medium text-txt"><span className="font-mono text-faint">{b.code || b.id.slice(0, 6).toUpperCase()}</span> · {g?.fullName || "Ospite"}{b.groupId && <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo</span>}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</div>
+        <div className="truncate text-[13px] font-medium text-txt"><span className="font-mono text-faint">{b.code || b.id.slice(0, 6).toUpperCase()}</span> · {g?.fullName || "Ospite"}{rooms && rooms > 1 ? <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo · {rooms} camere</span> : b.groupId ? <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo</span> : null}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</div>
         <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={partial ? { background: soft("var(--warn)"), color: "var(--warn)" } : { background: soft("var(--err)"), color: "var(--err)" }}>
           {partial ? `Incompleto ${declared}/${expected}` : "Da fare"}
         </span>
@@ -221,9 +221,36 @@ export default function AdempimentiPage() {
   // Arrivi di oggi divisi in 3: DA COMPLETARE (dati mancanti), DA CORREGGERE (dati ospite non validi),
   // CHECK-IN FATTI (completi e validi). Lo stato dipende dai DATI della prenotazione, non dalla schedina.
   const arrivalsToday = useMemo(() => bookings.filter((b) => b.checkIn === t && isActiveArrival(b)), [bookings, t]);
-  const arrivalsNoCheckin = arrivalsToday.filter((b) => !isComplete(b));
-  const arrivalsToFix = arrivalsToday.filter((b) => isComplete(b) && !bookingDataValid(b));
   const arrivalsCheckedIn = arrivalsToday.filter((b) => isComplete(b) && bookingDataValid(b));
+  // COLLASSO PER GRUPPO (solo visualizzazione PASSO 1): le prenotazioni con lo stesso groupId
+  // diventano UNA voce (rappresentante = codice più basso, poi arrivo). Quelle senza groupId
+  // restano individuali. Lo stato del gruppo è aggregato su TUTTE le sue prenotazioni.
+  type ArrivalGroup = { key: string; rep: Booking; members: Booking[]; rooms: number; expected: number; declared: number; cat: "todo" | "fix" | "done" };
+  const buildArrivalGroups = (list: Booking[]): ArrivalGroup[] => {
+    const solo: Booking[] = [];
+    const byGroup = new Map<string, Booking[]>();
+    for (const b of list) {
+      if (b.groupId) { const arr = byGroup.get(b.groupId) ?? []; arr.push(b); byGroup.set(b.groupId, arr); }
+      else solo.push(b);
+    }
+    const mk = (members: Booking[], key: string): ArrivalGroup => {
+      const rep = [...members].sort((a, c) => { const ka = bkNo(a), kc = bkNo(c); if (ka !== kc) return ka < kc ? -1 : 1; return (a.checkIn || "") < (c.checkIn || "") ? -1 : 1; })[0];
+      const expected = members.reduce((s, m) => s + expectedPaxOf(m), 0);
+      const declared = members.reduce((s, m) => s + declaredPaxOf(m), 0);
+      const allDone = members.every((m) => isComplete(m) && bookingDataValid(m));
+      const someFix = members.some((m) => isComplete(m) && !bookingDataValid(m));
+      const cat: ArrivalGroup["cat"] = allDone ? "done" : someFix ? "fix" : "todo";
+      return { key, rep, members, rooms: members.length, expected, declared, cat };
+    };
+    const groups: ArrivalGroup[] = [];
+    for (const b of solo) groups.push(mk([b], b.id));
+    for (const [gid, members] of byGroup) groups.push(mk(members, gid));
+    return groups.sort((a, b) => ((a.rep.checkIn || "") < (b.rep.checkIn || "") ? -1 : 1));
+  };
+  const arrivalGroups = buildArrivalGroups(arrivalsToday);
+  const groupsNoCheckin = arrivalGroups.filter((gr) => gr.cat === "todo");
+  const groupsToFix = arrivalGroups.filter((gr) => gr.cat === "fix");
+  const groupsCheckedIn = arrivalGroups.filter((gr) => gr.cat === "done");
   const paidByDoc = useMemo(() => { const m = new Map<string, number>(); for (const p of pays) m.set(p.document_id, (m.get(p.document_id) ?? 0) + p.amount_cents); return m; }, [pays]);
   const balanceOf = (d: { id: string; total_cents: number }) => d.total_cents - (paidByDoc.get(d.id) ?? 0);
   // Solo prenotazioni ancora attive: schedine/ISTAT di annullate o no-show spariscono subito,
@@ -293,7 +320,7 @@ export default function AdempimentiPage() {
   const passiveOverdue = passiveUnpaid.filter((p) => p.due_date && p.due_date <= t);
 
   // Il totale in alto usa gli STESSI conteggi delle card (schedine raggruppate per prenotazione).
-  const checkinTodo = arrivalsNoCheckin.length + arrivalsToFix.length; // da completare + da correggere
+  const checkinTodo = groupsNoCheckin.length + groupsToFix.length; // da completare + da correggere (per GRUPPO)
   const allClear = checkinTodo === 0 && schedToSendG.length === 0 && istatPend.length === 0 && docsRejected.length === 0 && docsUnpaid.length === 0 && passiveOverdue.length === 0;
   const totalTasks = checkinTodo + schedToSendG.length + istatPend.length + docsUnpaid.length + docsRejected.length + passiveOverdue.length;
   const urgent = schedToSendG.length + docsRejected.length + passiveOverdue.length; // scadenze/rifiuti = priorità alta
@@ -328,38 +355,40 @@ export default function AdempimentiPage() {
       {/* Ordine CRONOLOGICO: 1) check-in → 2) schedine Questura → 3) ISTAT → 4) incasso → 5) fattura/SdI → 6) fornitori */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* 1 · Check-in online → poi "passaggio di palla" alle schedine */}
-        <StepCard n={1} tone="var(--warn)" label="Check-in online da completare" sub="Da completare" count={arrivalsNoCheckin.length + arrivalsToFix.length} badge={frac(arrivalsCheckedIn.length, arrivalsNoCheckin.length + arrivalsToFix.length)} action={syncing ? "Trasferisco…" : `↪ Trasferisci alle schedine${needsTransfer.length ? ` (${needsTransfer.length})` : ""}`} onAction={transferToSchedine}>
-          {(arrivalsNoCheckin.length > 0 || arrivalsToFix.length > 0 || arrivalsCheckedIn.length > 0 || syncMsg) ? (
+        <StepCard n={1} tone="var(--warn)" label="Check-in online da completare" sub="Da completare" count={groupsNoCheckin.length + groupsToFix.length} badge={frac(groupsCheckedIn.length, groupsNoCheckin.length + groupsToFix.length)} action={syncing ? "Trasferisco…" : `↪ Trasferisci alle schedine${needsTransfer.length ? ` (${needsTransfer.length})` : ""}`} onAction={transferToSchedine}>
+          {(groupsNoCheckin.length > 0 || groupsToFix.length > 0 || groupsCheckedIn.length > 0 || syncMsg) ? (
             <>
-              {arrivalsNoCheckin.length > 0 && (
+              {groupsNoCheckin.length > 0 && (
                 <>
-                  <SubHead>Da completare ({arrivalsNoCheckin.length})</SubHead>
-                  {arrivalsNoCheckin.slice(0, 5).map((b) => (
-                    <ArrivalRow key={b.id} b={b} g={getGuest(b.guestId)} st={getStructure(b.structureId)} origin={origin} waOn={waOn} showStruct={showStruct} />
+                  <SubHead>Da completare ({groupsNoCheckin.length})</SubHead>
+                  {groupsNoCheckin.slice(0, 5).map((gr) => (
+                    <ArrivalRow key={gr.key} b={gr.rep} g={getGuest(gr.rep.guestId)} st={getStructure(gr.rep.structureId)} origin={origin} waOn={waOn} showStruct={showStruct} rooms={gr.rooms} expected={gr.expected} declared={gr.declared} />
                   ))}
                 </>
               )}
-              {arrivalsToFix.length > 0 && (
+              {groupsToFix.length > 0 && (
                 <>
-                  <SubHead mt={arrivalsNoCheckin.length > 0}>Da correggere ({arrivalsToFix.length}) · dati ospite incompleti</SubHead>
-                  {arrivalsToFix.slice(0, 5).map((b) => {
-                    const g = getGuest(b.guestId); const st = getStructure(b.structureId);
+                  <SubHead mt={groupsNoCheckin.length > 0}>Da correggere ({groupsToFix.length}) · dati ospite incompleti</SubHead>
+                  {groupsToFix.slice(0, 5).map((gr) => {
+                    const b = gr.rep; const g = getGuest(b.guestId); const st = getStructure(b.structureId);
                     const openCheckin = () => { const u = `${origin}/checkin?b=${b.id}`; const w = window.open(u, "_blank"); if (!w) window.location.href = u; };
                     return (
-                      <button key={b.id} onClick={openCheckin} title="Apri il check-in online per completare/correggere i dati" className="flex w-full items-center justify-between gap-2 rounded-lg border bg-paper px-2.5 py-1.5 text-left text-[12.5px] transition hover:bg-wash" style={{ borderColor: "color-mix(in srgb, var(--err) 45%, var(--line))" }}>
-                        <span className="truncate text-dim"><span className="font-mono text-faint">{bkNo(b)}</span> · {g?.fullName || "Ospite"}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</span>
+                      <button key={gr.key} onClick={openCheckin} title="Apri il check-in online per completare/correggere i dati" className="flex w-full items-center justify-between gap-2 rounded-lg border bg-paper px-2.5 py-1.5 text-left text-[12.5px] transition hover:bg-wash" style={{ borderColor: "color-mix(in srgb, var(--err) 45%, var(--line))" }}>
+                        <span className="truncate text-dim"><span className="font-mono text-faint">{bkNo(b)}</span> · {g?.fullName || "Ospite"}{gr.rooms > 1 && <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo · {gr.rooms} camere</span>}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</span>
                         <span className="shrink-0 font-semibold" style={{ color: "var(--err)" }}>⚠ correggi →</span>
                       </button>
                     );
                   })}
                 </>
               )}
-              {arrivalsCheckedIn.length > 0 && (
+              {groupsCheckedIn.length > 0 && (
                 <>
-                  <SubHead mt={arrivalsNoCheckin.length > 0 || arrivalsToFix.length > 0}>Check-in fatti ({arrivalsCheckedIn.length}) · pronti per le schedine</SubHead>
-                  {arrivalsCheckedIn.slice(0, 6).map((b) => {
-                    const g = getGuest(b.guestId);
-                    return <DoneRow key={b.id} left={`${bkNo(b)} · ${g?.fullName || "Ospite"}${structPart(b.structureId)}`} right={schedBookingIds.has(b.id) ? `${fmtDay(b.checkIn)}→${fmtDay(b.checkOut)} · ${omini(expectedPaxOf(b))}` : "↪ da trasferire"} />;
+                  <SubHead mt={groupsNoCheckin.length > 0 || groupsToFix.length > 0}>Check-in fatti ({groupsCheckedIn.length}) · pronti per le schedine</SubHead>
+                  {groupsCheckedIn.slice(0, 6).map((gr) => {
+                    const b = gr.rep; const g = getGuest(b.guestId);
+                    const allTransferred = gr.members.every((m) => schedBookingIds.has(m.id));
+                    const roomsLabel = gr.rooms > 1 ? ` · ${gr.rooms} cam.` : "";
+                    return <DoneRow key={gr.key} left={`${bkNo(b)} · ${g?.fullName || "Ospite"}${roomsLabel}${structPart(b.structureId)}`} right={allTransferred ? `${fmtDay(b.checkIn)}→${fmtDay(b.checkOut)} · ${omini(gr.expected)}` : "↪ da trasferire"} />;
                   })}
                   {toTransfer.length > 0
                     ? <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold" style={{ background: soft("var(--warn)"), color: "var(--warn)" }}>↪ {toTransfer.length} da trasferire alle schedine — premi «Trasferisci».</div>
