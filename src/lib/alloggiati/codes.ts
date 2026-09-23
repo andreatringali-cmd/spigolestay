@@ -122,15 +122,46 @@ const NAT_ALIAS: Record<string, string> = {
   POLACCA: "POLONIA", POLACCO: "POLONIA", RUMENA: "ROMANIA", RUMENO: "ROMANIA",
 };
 
+// Sigla provincia → comune capoluogo. Gli utenti (o l'AI dal documento) scrivono spesso
+// la SIGLA (es. "SR") nel "Luogo di rilascio", ma il tracciato vuole il COMUNE: qui la
+// sigla viene tradotta nel capoluogo (es. SR → SIRACUSA) prima della ricerca per nome.
+const PROVINCE_CAPITAL: Record<string, string> = {
+  AG: "AGRIGENTO", AL: "ALESSANDRIA", AN: "ANCONA", AO: "AOSTA", AP: "ASCOLI PICENO", AQ: "L AQUILA", AR: "AREZZO", AT: "ASTI", AV: "AVELLINO",
+  BA: "BARI", BG: "BERGAMO", BI: "BIELLA", BL: "BELLUNO", BN: "BENEVENTO", BO: "BOLOGNA", BR: "BRINDISI", BS: "BRESCIA", BT: "BARLETTA", BZ: "BOLZANO",
+  CA: "CAGLIARI", CB: "CAMPOBASSO", CE: "CASERTA", CH: "CHIETI", CL: "CALTANISSETTA", CN: "CUNEO", CO: "COMO", CR: "CREMONA", CS: "COSENZA", CT: "CATANIA", CZ: "CATANZARO",
+  EN: "ENNA", FC: "FORLI", FE: "FERRARA", FG: "FOGGIA", FI: "FIRENZE", FM: "FERMO", FR: "FROSINONE",
+  GE: "GENOVA", GO: "GORIZIA", GR: "GROSSETO", IM: "IMPERIA", IS: "ISERNIA", KR: "CROTONE",
+  LC: "LECCO", LE: "LECCE", LI: "LIVORNO", LO: "LODI", LT: "LATINA", LU: "LUCCA",
+  MB: "MONZA", MC: "MACERATA", ME: "MESSINA", MI: "MILANO", MN: "MANTOVA", MO: "MODENA", MS: "MASSA", MT: "MATERA",
+  NA: "NAPOLI", NO: "NOVARA", NU: "NUORO", OR: "ORISTANO", PA: "PALERMO", PC: "PIACENZA", PD: "PADOVA", PE: "PESCARA", PG: "PERUGIA", PI: "PISA",
+  PN: "PORDENONE", PO: "PRATO", PR: "PARMA", PT: "PISTOIA", PU: "PESARO", PV: "PAVIA", PZ: "POTENZA",
+  RA: "RAVENNA", RC: "REGGIO DI CALABRIA", RE: "REGGIO NELL EMILIA", RG: "RAGUSA", RI: "RIETI", RM: "ROMA", RN: "RIMINI", RO: "ROVIGO",
+  SA: "SALERNO", SI: "SIENA", SO: "SONDRIO", SP: "LA SPEZIA", SR: "SIRACUSA", SS: "SASSARI", SU: "CARBONIA", SV: "SAVONA",
+  TA: "TARANTO", TE: "TERAMO", TN: "TRENTO", TO: "TORINO", TP: "TRAPANI", TR: "TERNI", TS: "TRIESTE", TV: "TREVISO",
+  UD: "UDINE", VA: "VARESE", VB: "VERBANIA", VC: "VERCELLI", VE: "VENEZIA", VI: "VICENZA", VR: "VERONA", VT: "VITERBO", VV: "VIBO VALENTIA",
+};
+
+// Se il valore è una sigla di provincia (es. "SR"), ritorna il codice del comune capoluogo.
+function fromSigla(maps: CodeMaps, nv: string): { code: string; provincia: string | null } | null {
+  if (nv.length !== 2 || !PROVINCE_CAPITAL[nv]) return null;
+  const cap = maps.byName.get(norm(PROVINCE_CAPITAL[nv]));
+  if (!cap || !cap.length) return null;
+  const c = cap.find((h) => h.is_comune && norm(h.provincia) === nv) ?? cap.find((h) => h.is_comune) ?? cap[0];
+  return { code: c.code, provincia: c.provincia };
+}
+
 // Risolve un luogo (comune o stato) in codice. Se `value` è già un codice valido lo
 // mantiene; altrimenti cerca per nome (eventualmente disambiguando per provincia),
-// e come ultima spiaggia prova un sinonimo di cittadinanza (es. "Italiana" → "Italia").
+// prova la sigla provincia → capoluogo (es. "SR" → SIRACUSA), e come ultima spiaggia
+// un sinonimo di cittadinanza (es. "Italiana" → "Italia").
 export function resolveLuogo(maps: CodeMaps, value: string | undefined, provincia?: string): string | null {
   const v = (value ?? "").trim();
   if (!v) return null;
   if (maps.codeSet.has(v)) return v;
-  let hits = maps.byName.get(norm(v));
-  if ((!hits || !hits.length) && NAT_ALIAS[norm(v)]) hits = maps.byName.get(norm(NAT_ALIAS[norm(v)]));
+  const nv = norm(v);
+  let hits = maps.byName.get(nv);
+  if ((!hits || !hits.length)) { const s = fromSigla(maps, nv); if (s) return s.code; }
+  if ((!hits || !hits.length) && NAT_ALIAS[nv]) hits = maps.byName.get(norm(NAT_ALIAS[nv]));
   if (!hits || !hits.length) return null;
   if (hits.length === 1) return hits[0].code;
   const p = norm(provincia);
@@ -144,7 +175,7 @@ export function resolveComuneFull(maps: CodeMaps, value: string | undefined, pro
   if (!v) return null;
   if (maps.codeSet.has(v)) return { code: v, provincia: provincia?.trim() || null };
   const hits = maps.byName.get(norm(v));
-  if (!hits || !hits.length) return null;
+  if (!hits || !hits.length) { const s = fromSigla(maps, norm(v)); if (s) return s; return null; }
   const comuni = hits.filter((h) => h.is_comune);
   const pool = comuni.length ? comuni : hits;
   if (pool.length === 1) return { code: pool[0].code, provincia: pool[0].provincia };
