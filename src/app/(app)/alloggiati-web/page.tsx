@@ -20,7 +20,7 @@ export default function AlloggiatiWebPage() {
   const [sched, setSched] = useState<Sched[]>([]);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
-  const [filterDate, setFilterDate] = useState(""); // filtro lista schedine per data di arrivo
+  const [filterDate, setFilterDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }); // filtro lista schedine: default = oggi
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []); // countdown vivo (ogni minuto)
   const [openG, setOpenG] = useState<Record<string, boolean>>({}); // schedine a tendina per prenotazione
