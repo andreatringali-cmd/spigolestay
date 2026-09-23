@@ -251,11 +251,11 @@ const HELP: Record<string, Guide> = {
     intro: "L'anagrafica di tutti gli ospiti.",
     sections: [{ h: "Cosa puoi fare", items: ["Consulta i dati di contatto e lo storico soggiorni.", "I dati documento servono per Alloggiati Web."] }],
   },
-  "/alloggiati": {
+  "/alloggiati-web": {
     title: "Alloggiati Web",
-    intro: "Comunicazione degli arrivi alla Questura (entro 24h dal check-in).",
+    intro: "Comunicazione degli ospiti alla Questura (entro 24h dal check-in), tutta in una pagina.",
     sections: [
-      { h: "Come funziona", items: ["Scegli il periodo (di default oggi): vedi gli arrivi da comunicare.", "Compila per ogni ospite i dati documento (le camere con dati completi sono verdi).", "\"Genera tracciato\" scarica il file da caricare sul Portale Alloggiati."] },
+      { h: "Come funziona", items: ["All'apertura la pagina aggiorna e verifica le schedine da sola (ti segnala eventuali errori).", "Ogni prenotazione è una riga a tendina: la matita ✏️ apre la modifica dati ospite con «Compila dal documento».", "«Invia le pronte» manda subito alla Questura; con l'invio automatico partono da sole alle 23:00.", "Dopo l'invio la ricevuta va in 📁 Archivio: scaricabile o stampabile in qualsiasi momento.", "L'ingranaggio ⚙ apre le impostazioni (credenziali, opzioni, tracciato .txt di riserva)."] },
     ],
   },
   "/tassa-soggiorno": {

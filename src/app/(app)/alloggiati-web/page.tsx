@@ -8,6 +8,7 @@ import EmptyState from "@/components/EmptyState";
 import { apiPost } from "@/lib/invoicing/client";
 import AlloggiatiSettingsModal from "./SettingsModal";
 import AlloggiatiArchiveModal from "./ArchiveModal";
+import EditBookingModal from "./EditBookingModal";
 
 interface SchedGuest { cognome?: string; nome?: string; sesso?: "M" | "F" | string; dataNascita?: string; comuneNascita?: string; provinciaNascita?: string; statoNascita?: string; cittadinanza?: string; tipoDoc?: string; numeroDoc?: string; luogoRilascio?: string; perm?: number }
 interface Sched { id: string; booking_id: string; arrival: string; guest: SchedGuest; ruolo: string; stato: string; errors: string[] | null; ricevuta: string | null }
@@ -25,6 +26,7 @@ export default function AlloggiatiWebPage() {
   const [openG, setOpenG] = useState<Record<string, boolean>>({}); // schedine a tendina per prenotazione
   const [settingsOpen, setSettingsOpen] = useState(false); // finestra centrale impostazioni
   const [archiveOpen, setArchiveOpen] = useState(false); // archivio invii/ricevute
+  const [editBooking, setEditBooking] = useState<string | null>(null); // modale modifica/compilazione dati ospite
 
   useEffect(() => {
     const target = activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId) ? activeStructureId : structures[0]?.id ?? "";
@@ -164,7 +166,8 @@ export default function AlloggiatiWebPage() {
               const chLab = bk ? (CH[bk.channel] ?? bk.channel) : "";
               return (
                 <div key={key} className="border-b border-line last:border-0">
-                  <button type="button" onClick={() => setOpenG((m) => ({ ...m, [key]: !(m[key] ?? false) }))} className="flex w-full items-center gap-2 py-2 text-left">
+                  <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => setOpenG((m) => ({ ...m, [key]: !(m[key] ?? false) }))} className="flex flex-1 items-center gap-2 py-2 text-left">
                     <span className="shrink-0 text-faint">{opened ? "▾" : "▸"}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -182,6 +185,8 @@ export default function AlloggiatiWebPage() {
                     </div>
                     <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${gst.c} 16%, transparent)`, color: gst.c }}>{gst.l}</span>
                   </button>
+                  {bk && <button type="button" onClick={() => setEditBooking(bk.id)} title="Completa / modifica dati ospite" aria-label="Modifica" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg></button>}
+                  </div>
                   {opened && (
                     <div className="pb-2 pl-6">
                       {rows.map((x) => { const st = STA(effStato(x)); const g = x.guest ?? {};
@@ -229,6 +234,7 @@ export default function AlloggiatiWebPage() {
 
       {settingsOpen && <AlloggiatiSettingsModal sid={sid} onClose={() => { setSettingsOpen(false); void runAuto(); }} />}
       {archiveOpen && <AlloggiatiArchiveModal sid={sid} onClose={() => setArchiveOpen(false)} />}
+      {editBooking && <EditBookingModal bookingId={editBooking} onClose={() => { setEditBooking(null); setTimeout(() => void runAuto(), 6500); }} />}
     </div>
   );
 }

@@ -124,7 +124,7 @@ export function answer(raw: string, ctx: AssistantCtx): Answer {
     const arrivals = active.filter((b) => b.checkIn >= todayISO).sort((a, b) => a.checkIn.localeCompare(b.checkIn));
     const missing = arrivals.filter((b) => !complete(b.guestId));
     if (!missing.length) return { kind: "empty", icon: "id", title: "Tutte le schedine dei prossimi arrivi sono complete ✓" };
-    return { kind: "answer", icon: "id", title: "Schedina alloggiati da completare", metric: String(missing.length), detail: "Prossimi arrivi senza dati documento", items: missing.slice(0, 10).map((b) => bItem(b, `arrivo ${fmtD(b.checkIn)}`)), href: "/alloggiati", hrefLabel: "Apri Alloggiati" };
+    return { kind: "answer", icon: "id", title: "Schedina alloggiati da completare", metric: String(missing.length), detail: "Prossimi arrivi senza dati documento", items: missing.slice(0, 10).map((b) => bItem(b, `arrivo ${fmtD(b.checkIn)}`)), href: "/alloggiati-web", hrefLabel: "Apri Alloggiati Web" };
   }
 
   // ── Pulizie / turnover ──

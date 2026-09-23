@@ -77,7 +77,7 @@ export default function Dashboard() {
   const chartMenuRef = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (chartMenuRef.current && !chartMenuRef.current.contains(e.target as Node)) setChartMenuOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
 
-  // Stato "schedina alloggiati": pronta quando l'ospite ha tutti i dati documento (stessa logica di /alloggiati).
+  // Stato "schedina alloggiati": pronta quando l'ospite ha tutti i dati documento (stessa logica di /alloggiati-web).
   const alloggiatiOk = (b: { guestId: string }) => {
     const g = guests.find((x) => x.id === b.guestId);
     return !!(g && (g.lastName || g.fullName) && g.sex && g.birthDate && g.birthPlace && g.citizenship && g.docType && g.docNumber);

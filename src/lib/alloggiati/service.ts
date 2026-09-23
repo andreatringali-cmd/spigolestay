@@ -255,6 +255,20 @@ export async function fetchRicevuta(admin: SupabaseClient, tenantId: string, str
   } catch (e) { return { ok: false, message: (e as Error)?.message ?? "Errore scaricamento ricevuta." }; }
 }
 
+// Genera il tracciato .txt (168 char/riga) delle schedine PRONTE — fallback per l'invio manuale sul portale.
+export async function buildTracciato(admin: SupabaseClient, tenantId: string, structureId: string): Promise<{ ok: boolean; message: string; text?: string; count?: number }> {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data } = await admin.from("alloggiati_schedine").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pronta").lte("arrival", today);
+  const list = data ?? [];
+  if (!list.length) return { ok: false, message: "Nessuna schedina pronta (gli arrivi futuri si inviano dopo l'arrivo)." };
+  const { live } = await creds(admin, tenantId, structureId);
+  const maps: CodeMaps | null = live ? await loadCodeMaps(admin) : null;
+  const lines = list.map((s) => (maps
+    ? buildRecordResolved(s.guest as SchedinaGuest, s.ruolo, s.arrival, (s.guest as { perm?: number })?.perm ?? 1, maps)
+    : buildRecord(s.guest as SchedinaGuest, s.ruolo, s.arrival, (s.guest as { perm?: number })?.perm ?? 1)));
+  return { ok: true, message: `Tracciato con ${lines.length} schedine.`, text: lines.join("\r\n"), count: lines.length };
+}
+
 // Archivio invii: elenco degli invii effettuati (per riscaricare/stampare la ricevuta in qualsiasi momento).
 export async function listSubmissions(admin: SupabaseClient, tenantId: string, structureId: string): Promise<{ ok: boolean; items: { id: string; date: string | null; created_at: string; count: number; stato: string; esito: string | null; ricevuta: string | null; hasPdf: boolean }[] }> {
   const { data } = await admin.from("alloggiati_submissions")
