@@ -19,7 +19,9 @@ const fmtDay = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("it-IT"
 // Completezza del check-in PER PERSONA (usata da card e righe).
 const expectedPaxOf = (b: Booking) => Math.max(1, (b.adults ?? 1) + (b.children ?? 0));
 const primaryDoneOf = (b: Booking) => b.webCheckin === true || !!(b.primaryGuest?.lastName && b.primaryGuest?.docNumber);
-const declaredPaxOf = (b: Booking) => (primaryDoneOf(b) ? 1 : 0) + (b.extraGuests?.length ?? 0);
+// Un ospite conta come "dichiarato" solo se ha davvero dei dati (nome/cognome): un ospite
+// vuoto aggiunto come segnaposto NON conta (altrimenti risulterebbe "2/2" con 1 solo compilato).
+const declaredPaxOf = (b: Booking) => (primaryDoneOf(b) ? 1 : 0) + (b.extraGuests?.filter((e) => !!(e.lastName || e.firstName)).length ?? 0);
 
 // Scheda di uno step in ordine cronologico: badge numerato (la sequenza è informativa),
 // numero grande, pill di stato, mini-lista opzionale e azione a piena larghezza in fondo.
@@ -195,10 +197,14 @@ export default function AdempimentiPage() {
   // Completezza del check-in PER PERSONA: quanti ospiti dichiarati vs attesi (helper a livello modulo).
   const isComplete = (b: Booking) => declaredPaxOf(b) > 0 && declaredPaxOf(b) >= expectedPaxOf(b);
   const isActiveArrival = (b: Booking) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked";
-  // Arrivi di oggi con check-in mancante o INCOMPLETO (non tutte le persone dichiarate).
-  const arrivalsNoCheckin = useMemo(() => bookings.filter((b) => b.checkIn === t && isActiveArrival(b) && !isComplete(b)), [bookings, t]);
-  // Arrivi di oggi con check-in COMPLETO per tutte le persone.
-  const arrivalsCheckedIn = useMemo(() => bookings.filter((b) => b.checkIn === t && isActiveArrival(b) && isComplete(b)), [bookings, t]);
+  // Prenotazioni con almeno una schedina "da validare" (dati di un ospite incompleti/errati).
+  const bookingsWithInvalid = useMemo(() => new Set(sched.filter((s) => s.stato === "da_validare" && s.booking_id).map((s) => s.booking_id as string)), [sched]);
+  // Arrivi di oggi divisi in 3: DA COMPLETARE (dati mancanti), DA CORREGGERE (dichiarati ma schedina
+  // non valida), CHECK-IN FATTI (completi e validi). Un "da correggere" NON è tra i fatti.
+  const arrivalsToday = useMemo(() => bookings.filter((b) => b.checkIn === t && isActiveArrival(b)), [bookings, t]);
+  const arrivalsNoCheckin = arrivalsToday.filter((b) => !isComplete(b));
+  const arrivalsToFix = arrivalsToday.filter((b) => isComplete(b) && bookingsWithInvalid.has(b.id));
+  const arrivalsCheckedIn = arrivalsToday.filter((b) => isComplete(b) && !bookingsWithInvalid.has(b.id));
   const paidByDoc = useMemo(() => { const m = new Map<string, number>(); for (const p of pays) m.set(p.document_id, (m.get(p.document_id) ?? 0) + p.amount_cents); return m; }, [pays]);
   const balanceOf = (d: { id: string; total_cents: number }) => d.total_cents - (paidByDoc.get(d.id) ?? 0);
   // Solo prenotazioni ancora attive: schedine/ISTAT di annullate o no-show spariscono subito,
@@ -208,9 +214,6 @@ export default function AdempimentiPage() {
   // Prenotazioni col check-in COMPLETO per tutte le persone: solo queste possono avere schedine
   // "da inviare". Se una prenotazione è "da completare" (es. 0/2), NON deve comparire nel PASSO 2.
   const completeBookingIds = useMemo(() => new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && declaredPaxOf(b) > 0 && declaredPaxOf(b) >= expectedPaxOf(b)).map((b) => b.id)), [bookings]);
-  // Prenotazioni con almeno una schedina ANCORA da validare (dati di un ospite incompleti/errati):
-  // finché non sono tutte pronte, la prenotazione NON è "pronta da inviare".
-  const bookingsWithInvalid = new Set(sched.filter((s) => s.stato === "da_validare" && s.booking_id).map((s) => s.booking_id));
   // 2 · Schedine Questura — "da inviare" SOLO se: schedina PRONTA + prenotazione COMPLETA + nessuna
   // schedina della stessa prenotazione ancora da validare. Gli arrivi futuri sono esclusi (sotto).
   const schedPending = sched.filter((s) => s.stato === "pronta" && isActive(s.booking_id) && !!s.booking_id && completeBookingIds.has(s.booking_id) && !bookingsWithInvalid.has(s.booking_id));
@@ -220,11 +223,8 @@ export default function AdempimentiPage() {
   const schedBookingIds = new Set(sched.map((s) => s.booking_id).filter(Boolean) as string[]);
   const weekAgo = (() => { const d = new Date(t + "T00:00:00"); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); })();
   const needsTransfer = bookings.filter((b) => isActiveArrival(b) && isComplete(b) && (b.checkIn || "") >= weekAgo && !schedBookingIds.has(b.id));
-  // Stato per gli arrivi con check-in fatto: da trasferire (nessuna schedina) / da correggere
-  // (schedine generate ma con dati non validi) / pronte (schedine tutte pronta).
+  // Tra i "check-in fatti" (completi e validi), quali non hanno ancora la schedina generata → da trasferire.
   const toTransfer = arrivalsCheckedIn.filter((b) => !schedBookingIds.has(b.id));
-  const toFix = arrivalsCheckedIn.filter((b) => schedBookingIds.has(b.id) && bookingsWithInvalid.has(b.id));
-  const rowStatus = (b: Booking) => (!schedBookingIds.has(b.id) ? "da trasferire" : bookingsWithInvalid.has(b.id) ? "da correggere" : "");
   // Raggruppa le schedine per PRENOTAZIONE: una riga per prenotazione, con quante schedine ha
   // (una a persona). Così con più prenotazioni si capisce a colpo d'occhio a chi si riferiscono.
   type SchedRow = typeof sched[number];
@@ -268,8 +268,9 @@ export default function AdempimentiPage() {
   const passiveOverdue = passiveUnpaid.filter((p) => p.due_date && p.due_date <= t);
 
   // Il totale in alto usa gli STESSI conteggi delle card (schedine raggruppate per prenotazione).
-  const allClear = arrivalsNoCheckin.length === 0 && schedToSendG.length === 0 && istatPend.length === 0 && docsRejected.length === 0 && docsUnpaid.length === 0 && passiveOverdue.length === 0;
-  const totalTasks = arrivalsNoCheckin.length + schedToSendG.length + istatPend.length + docsUnpaid.length + docsRejected.length + passiveOverdue.length;
+  const checkinTodo = arrivalsNoCheckin.length + arrivalsToFix.length; // da completare + da correggere
+  const allClear = checkinTodo === 0 && schedToSendG.length === 0 && istatPend.length === 0 && docsRejected.length === 0 && docsUnpaid.length === 0 && passiveOverdue.length === 0;
+  const totalTasks = checkinTodo + schedToSendG.length + istatPend.length + docsUnpaid.length + docsRejected.length + passiveOverdue.length;
   const urgent = schedToSendG.length + docsRejected.length + passiveOverdue.length; // scadenze/rifiuti = priorità alta
   const toDo = totalTasks - urgent;
   const headTone = allClear ? "var(--ok)" : urgent > 0 ? "var(--err)" : "var(--focus)";
@@ -302,8 +303,8 @@ export default function AdempimentiPage() {
       {/* Ordine CRONOLOGICO: 1) check-in → 2) schedine Questura → 3) ISTAT → 4) incasso → 5) fattura/SdI → 6) fornitori */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* 1 · Check-in online → poi "passaggio di palla" alle schedine */}
-        <StepCard n={1} tone="var(--warn)" label="Check-in online da completare" sub="Da completare" count={arrivalsNoCheckin.length} badge={frac(arrivalsCheckedIn.length, arrivalsNoCheckin.length)} action={syncing ? "Trasferisco…" : `↪ Trasferisci alle schedine${needsTransfer.length ? ` (${needsTransfer.length})` : ""}`} onAction={transferToSchedine}>
-          {(arrivalsNoCheckin.length > 0 || arrivalsCheckedIn.length > 0 || syncMsg) ? (
+        <StepCard n={1} tone="var(--warn)" label="Check-in online da completare" sub="Da completare" count={arrivalsNoCheckin.length + arrivalsToFix.length} badge={frac(arrivalsCheckedIn.length, arrivalsNoCheckin.length + arrivalsToFix.length)} action={syncing ? "Trasferisco…" : `↪ Trasferisci alle schedine${needsTransfer.length ? ` (${needsTransfer.length})` : ""}`} onAction={transferToSchedine}>
+          {(arrivalsNoCheckin.length > 0 || arrivalsToFix.length > 0 || arrivalsCheckedIn.length > 0 || syncMsg) ? (
             <>
               {arrivalsNoCheckin.length > 0 && (
                 <>
@@ -313,17 +314,31 @@ export default function AdempimentiPage() {
                   ))}
                 </>
               )}
+              {arrivalsToFix.length > 0 && (
+                <>
+                  <SubHead mt={arrivalsNoCheckin.length > 0}>Da correggere ({arrivalsToFix.length}) · dati ospite incompleti</SubHead>
+                  {arrivalsToFix.slice(0, 5).map((b) => {
+                    const g = getGuest(b.guestId); const st = getStructure(b.structureId);
+                    const openCheckin = () => { const u = `${origin}/checkin?b=${b.id}`; const w = window.open(u, "_blank"); if (!w) window.location.href = u; };
+                    return (
+                      <button key={b.id} onClick={openCheckin} title="Apri il check-in online per completare/correggere i dati" className="flex w-full items-center justify-between gap-2 rounded-lg border bg-paper px-2.5 py-1.5 text-left text-[12.5px] transition hover:bg-wash" style={{ borderColor: "color-mix(in srgb, var(--err) 45%, var(--line))" }}>
+                        <span className="truncate text-dim">{g?.fullName || "Ospite"} <span className="text-faint">· {st?.name ?? ""}</span></span>
+                        <span className="shrink-0 font-semibold" style={{ color: "var(--err)" }}>⚠ correggi →</span>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
               {arrivalsCheckedIn.length > 0 && (
                 <>
-                  <SubHead mt={arrivalsNoCheckin.length > 0}>Check-in fatti ({arrivalsCheckedIn.length}) · pronti per le schedine</SubHead>
+                  <SubHead mt={arrivalsNoCheckin.length > 0 || arrivalsToFix.length > 0}>Check-in fatti ({arrivalsCheckedIn.length}) · pronti per le schedine</SubHead>
                   {arrivalsCheckedIn.slice(0, 6).map((b) => {
                     const g = getGuest(b.guestId); const st = getStructure(b.structureId);
-                    const stt = rowStatus(b);
-                    return <DoneRow key={b.id} left={`${g?.fullName || "Ospite"} · ${st?.name ?? ""}`} right={stt === "da trasferire" ? "↪ da trasferire" : stt === "da correggere" ? "⚠ da correggere" : `${fmtDay(b.checkIn)}→${fmtDay(b.checkOut)} · ${expectedPaxOf(b)}p`} />;
+                    return <DoneRow key={b.id} left={`${g?.fullName || "Ospite"} · ${st?.name ?? ""}`} right={schedBookingIds.has(b.id) ? `${fmtDay(b.checkIn)}→${fmtDay(b.checkOut)} · ${expectedPaxOf(b)}p` : "↪ da trasferire"} />;
                   })}
-                  {toTransfer.length > 0 && <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold" style={{ background: soft("var(--warn)"), color: "var(--warn)" }}>↪ {toTransfer.length} da trasferire alle schedine — premi «Trasferisci».</div>}
-                  {toFix.length > 0 && <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold" style={{ background: soft("var(--err)"), color: "var(--err)" }}>⚠ {toFix.length} con dati da correggere (ospiti incompleti) — apri <button onClick={() => router.push("/alloggiati-web")} className="underline">Schedine</button>.</div>}
-                  {toTransfer.length === 0 && toFix.length === 0 && <div className="text-[11px] font-medium" style={{ color: "var(--ok)" }}>✓ Tutte pronte alle schedine.</div>}
+                  {toTransfer.length > 0
+                    ? <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold" style={{ background: soft("var(--warn)"), color: "var(--warn)" }}>↪ {toTransfer.length} da trasferire alle schedine — premi «Trasferisci».</div>
+                    : <div className="text-[11px] font-medium" style={{ color: "var(--ok)" }}>✓ Tutte trasferite alle schedine.</div>}
                 </>
               )}
               {syncMsg && <div className="text-[11px] font-medium" style={{ color: syncMsg.startsWith("✓") ? "var(--ok)" : "var(--err)" }}>{syncMsg}</div>}

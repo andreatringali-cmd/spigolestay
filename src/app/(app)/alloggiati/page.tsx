@@ -201,7 +201,8 @@ export default function AlloggiatiPage() {
           {arrivals.map((b) => {
             const g = primaryOf(b);
             const complete = bookingOk(b);
-            const declared = totalPeople(b);
+            // "Dichiarati" = ospiti con dati reali (nome/cognome): un ospite vuoto NON conta.
+            const declared = ((g?.lastName || g?.fullName) ? 1 : 0) + cosOf(b).filter((c) => !!(c.lastName || c.firstName)).length;
             const pax = b.adults + b.children;
             const opened = open[b.id] ?? false; // default: SEMPRE chiusa all'apertura pagina
             return (

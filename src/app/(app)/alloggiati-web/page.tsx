@@ -28,6 +28,7 @@ export default function AlloggiatiWebPage() {
   const [hasWs, setHasWs] = useState(false);
   const [shown, setShown] = useState(false); // "Mostra credenziali": recupera i valori in chiaro (solo per il proprietario)
   const [ricDate, setRicDate] = useState("");
+  const [filterDate, setFilterDate] = useState(""); // filtro lista schedine per data di arrivo
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []); // countdown vivo (ogni minuto)
   const [openG, setOpenG] = useState<Record<string, boolean>>({}); // schedine a tendina per prenotazione
@@ -238,6 +239,10 @@ export default function AlloggiatiWebPage() {
             </div>
           )}
           <div className="mb-2 flex flex-wrap items-center gap-2 border-t border-line pt-2">
+            <span className="text-[11px] font-medium text-dim">Filtra per arrivo:</span>
+            <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+            {filterDate && <button onClick={() => setFilterDate("")} className="rounded-lg border border-line px-2 py-1.5 text-sm text-dim hover:bg-wash" title="Rimuovi filtro">✕</button>}
+            <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
             <span className="text-[11px] font-medium text-dim">Ricevuta:</span>
             <input type="date" value={ricDate} onChange={(e) => setRicDate(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
             <button onClick={getRicevuta} disabled={!!busy} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "ricevuta" ? "Scarico…" : "Scarica ricevuta"}</button>
@@ -246,9 +251,11 @@ export default function AlloggiatiWebPage() {
             {(() => {
               // Raggruppa le schedine per PRENOTAZIONE (una riga a tendina; dentro, una per persona).
               const map = new Map<string, Sched[]>();
-              for (const x of listSched) { const k = x.booking_id || x.id; const a = map.get(k); if (a) a.push(x); else map.set(k, [x]); }
+              const listShown = filterDate ? listSched.filter((x) => (x.arrival || "") === filterDate) : listSched;
+              for (const x of listShown) { const k = x.booking_id || x.id; const a = map.get(k); if (a) a.push(x); else map.set(k, [x]); }
               const structName = structures.find((z) => z.id === sid)?.name ?? "";
               const groups = [...map.entries()].sort((a, b) => ((a[1][0]?.arrival || "") < (b[1][0]?.arrival || "") ? -1 : 1));
+              if (!groups.length && filterDate) return <p className="py-4 text-sm text-faint">Nessuna schedina per la data selezionata.</p>;
               return groups.map(([key, rows]) => {
                 const capo = rows.find((r) => ["16", "17", "18"].includes(r.ruolo)) ?? rows[0];
                 const name = `${capo?.guest?.cognome ?? ""} ${capo?.guest?.nome ?? ""}`.trim() || "Ospite";
