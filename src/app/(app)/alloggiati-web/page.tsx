@@ -226,11 +226,16 @@ export default function AlloggiatiWebPage() {
             <SectionTitle>Schedine</SectionTitle>
             <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">Pronte da inviare: {readyCount}{upcomingCount ? ` · in preparazione: ${upcomingCount}` : ""}</span>
           </div>
-          <div className="mb-2 flex flex-wrap gap-2">
-            <button onClick={() => call("sync", "sync")} disabled={!!busy} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "sync" ? "Sincronizzo…" : "Sincronizza dagli arrivi"}</button>
+          <div className="mb-1.5 flex flex-wrap gap-2">
+            <button onClick={() => call("sync", "sync")} disabled={!!busy} title="Rigenera ora le schedine dagli arrivi (avviene comunque in automatico)" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "sync" ? "Sincronizzo…" : "Sincronizza dagli arrivi"}</button>
             <button onClick={() => call("check", "check")} disabled={!!busy || readyCount === 0} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Controllo preliminare presso il portale, senza inviare">{busy === "check" ? "Controllo…" : "Controlla"}</button>
-            <button onClick={() => call("send", "send")} disabled={!!busy || readyCount === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "send" ? "Invio…" : `Invia le pronte (${readyCount})`}</button>
+            <button onClick={() => call("send", "send")} disabled={!!busy || readyCount === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Invia subito alla Questura, senza aspettare l'orario automatico">{busy === "send" ? "Invio…" : `Invia le pronte (${readyCount})`}</button>
           </div>
+          <p className="mb-2 text-[11px] text-faint">
+            {s.auto_daily
+              ? "Invio automatico attivo: le schedine partono da sole alle 23:00. I pulsanti sopra sono manuali (facoltativi): Sincronizza = aggiorna ora · Controlla = verifica errori senza inviare · Invia le pronte = invia subito."
+              : "Invio manuale: Sincronizza (aggiorna dagli arrivi) → Controlla (verifica errori) → Invia le pronte. Oppure attiva l'invio automatico nelle impostazioni."}
+          </p>
           {msg && <p className="mb-2 rounded-lg px-3 py-2 text-sm font-medium" style={{ background: "var(--wash)", color: "var(--dim)" }}>{msg}</p>}
           {nextArrival && (
             <div className="mb-2 flex items-start gap-2 rounded-lg border px-3 py-2 text-[12px]" style={{ borderColor: overdueCount ? "var(--err)" : "var(--warn)", background: `color-mix(in srgb, ${overdueCount ? "var(--err)" : "var(--warn)"} 8%, transparent)` }}>
