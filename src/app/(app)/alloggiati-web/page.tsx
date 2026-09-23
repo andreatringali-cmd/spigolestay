@@ -237,7 +237,6 @@ export default function AlloggiatiWebPage() {
               : <button onClick={runAuto} disabled={!!busy} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash disabled:opacity-50" title="Rigenera e ricontrolla adesso">↻ Ricontrolla</button>}
             <button onClick={() => call("send", "send")} disabled={!!busy || readyCount === 0} className="ml-auto rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Invia subito alla Questura, senza aspettare l'orario automatico">{busy === "send" ? "Invio…" : `Invia le pronte (${readyCount})`}</button>
           </div>
-          {msg && <p className="mb-2 rounded-lg px-3 py-2 text-sm font-medium" style={{ background: "var(--wash)", color: "var(--dim)" }}>{msg}</p>}
           <div className="mb-2 flex flex-wrap items-center gap-2 border-t border-line pt-2">
             <span className="text-[11px] font-medium text-dim">Filtra per arrivo:</span>
             <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
@@ -248,7 +247,7 @@ export default function AlloggiatiWebPage() {
             <button onClick={getRicevuta} disabled={!!busy} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "ricevuta" ? "Scarico…" : "Scarica ricevuta"}</button>
           </div>
           <div className="max-h-[52vh] overflow-y-auto">
-            {autoBusy ? <div className="py-10 text-center text-sm text-faint">Aggiorno e verifico le schedine…</div> : <>
+            {autoBusy ? <EmptyState title="Nessuna schedina" sub="Aggiorno e verifico le schedine…" /> : <>
             {(() => {
               // Raggruppa le schedine per PRENOTAZIONE (una riga a tendina; dentro, una per persona).
               const map = new Map<string, Sched[]>();
@@ -297,7 +296,15 @@ export default function AlloggiatiWebPage() {
             {listSched.length === 0 && <EmptyState title="Nessuna schedina" sub="Le schedine appaiono qui dopo il check-in." />}
             </>}
           </div>
-          {!autoBusy && errCount > 0 && <p className="mt-2 rounded-lg px-3 py-2 text-[12px] font-medium" style={{ background: "color-mix(in srgb, var(--warn) 10%, transparent)", color: "var(--warn)" }}>⚠ {errCount} {errCount === 1 ? "schedina" : "schedine"} con errori — apri la prenotazione per correggere.</p>}
+          {!autoBusy && (
+            <div className="mt-3 border-t border-line pt-3 text-sm">
+              {msg
+                ? <span className="font-medium text-dim">{msg}</span>
+                : errCount > 0
+                  ? <span className="font-medium text-[color:var(--warn)]">⚠ {errCount} {errCount === 1 ? "schedina" : "schedine"} con errori — apri la prenotazione per correggere.</span>
+                  : <span className="text-faint">Nessun errore rilevato.</span>}
+            </div>
+          )}
         </Card>
       </div>
     </div>
