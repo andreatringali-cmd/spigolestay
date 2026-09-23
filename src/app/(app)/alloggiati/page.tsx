@@ -26,6 +26,8 @@ export default function AlloggiatiPage() {
   const [from, setFrom] = useState(todayISO);
   const [to, setTo] = useState(todayISO);
   const [groupMode, setGroupMode] = useState<Record<string, boolean>>({}); // true = gruppo (non famiglia)
+  const [open, setOpen] = useState<Record<string, boolean>>({}); // schede a tendina: apri/chiudi per prenotazione
+  const toggleOpen = (id: string, def: boolean) => setOpen((m) => ({ ...m, [id]: !(m[id] ?? def) }));
   // Lettura AI del documento: pre-riempie i campi (come nel check-in online).
   const [extractingId, setExtractingId] = useState<string | null>(null);
   const [extractInfo, setExtractInfo] = useState<{ id: string; text: string; err?: boolean } | null>(null);
@@ -198,20 +200,26 @@ export default function AlloggiatiPage() {
             const complete = bookingOk(b);
             const declared = totalPeople(b);
             const pax = b.adults + b.children;
+            const opened = open[b.id] ?? !complete; // default: aperta se incompleta, chiusa se completa
             return (
               <Card key={b.id} className={complete ? "" : "border-[color:color-mix(in_srgb,var(--warn)_45%,var(--line))]"}>
-                <div className="mb-3 flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => toggleOpen(b.id, !complete)} className={`flex w-full flex-wrap items-center gap-2 text-left ${opened ? "mb-3" : ""}`}>
+                  <span className="text-faint">{opened ? "▾" : "▸"}</span>
                   <span className={`h-2.5 w-2.5 rounded-full ${complete ? "bg-[color:var(--ok)]" : "bg-[color:var(--warn)]"}`} />
                   <span className="font-display text-base font-bold text-txt">{g?.fullName || t("Ospite")}</span>
                   <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-dim">{roleLabel(roleFor(b, 0))}</span>
                   <span className="text-xs text-dim">{getStructure(b.structureId)?.name} · {t("arrivo")} {fmt(b.checkIn)} · {nights(b.checkIn, b.checkOut)} {t("notti")}</span>
                   <span className={`text-xs ${declared < pax ? "text-[color:var(--warn)]" : "text-faint"}`}>· {declared}/{pax} {t("ospiti dichiarati")}</span>
-                  <div className="ml-auto flex items-center gap-2">
-                    {declared > 1 && (
-                      <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={!!groupMode[b.id]} onChange={(e) => setGroupMode((m) => ({ ...m, [b.id]: e.target.checked }))} className="h-3.5 w-3.5 accent-[color:var(--focus)]" /> {t("Gruppo (non famiglia)")}</label>
-                    )}
-                    <DocBtn id={b.id} withDoc apply={(p) => setPrimaryOf(b, p)} />
-                  </div>
+                  {complete
+                    ? <span className="ml-auto text-sm font-semibold text-[color:var(--ok)]">✓ {t("Pronta")}</span>
+                    : <span className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("Da completare")}</span>}
+                </button>
+                {opened && (<>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  {declared > 1 && (
+                    <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={!!groupMode[b.id]} onChange={(e) => setGroupMode((m) => ({ ...m, [b.id]: e.target.checked }))} className="h-3.5 w-3.5 accent-[color:var(--focus)]" /> {t("Gruppo (non famiglia)")}</label>
+                  )}
+                  <DocBtn id={b.id} withDoc apply={(p) => setPrimaryOf(b, p)} />
                 </div>
                 {extractInfo?.id === b.id && <div className={`mb-2 text-[11px] font-medium ${extractInfo.err ? "text-[color:var(--warn)]" : "text-[color:var(--focus)]"}`}>✨ {extractInfo.text}</div>}
 
@@ -252,6 +260,7 @@ export default function AlloggiatiPage() {
                 ))}
 
                 <button onClick={() => addCo(b)} className="mt-3 rounded-lg border border-dashed border-line px-3 py-1.5 text-xs font-semibold text-focus hover:bg-wash">+ {t("Aggiungi ospite")}</button>
+                </>)}
               </Card>
             );
           })}
