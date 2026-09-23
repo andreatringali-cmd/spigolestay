@@ -135,7 +135,7 @@ export default function AlloggiatiWebPage() {
           <SectionTitle>Schedine</SectionTitle>
         </div>
         <div className="max-h-[60vh] overflow-y-auto">
-          {autoBusy ? (
+          {autoBusy && sched.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-sm text-faint">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/xenora-mark.png" alt="" width={48} height={48} style={{ width: 48, height: 48, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
@@ -143,6 +143,14 @@ export default function AlloggiatiWebPage() {
               <style>{`@keyframes xpulse{0%,100%{opacity:.5;transform:scale(.92)}50%{opacity:1;transform:scale(1)}}`}</style>
             </div>
           ) : <>
+          {autoBusy && sched.length > 0 && (
+            <div className="mb-1 flex items-center gap-2 rounded-lg bg-wash px-2.5 py-1.5 text-[11px] text-dim">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/xenora-mark.png" alt="" width={16} height={16} style={{ width: 16, height: 16, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
+              <span>Verifico le schedine…</span>
+              <style>{`@keyframes xpulse{0%,100%{opacity:.5;transform:scale(.92)}50%{opacity:1;transform:scale(1)}}`}</style>
+            </div>
+          )}
           {(() => {
             const map = new Map<string, Sched[]>();
             const listShown = filterDate ? listSched.filter((x) => (x.arrival || "") === filterDate) : listSched;
@@ -194,26 +202,32 @@ export default function AlloggiatiWebPage() {
                   </div>
                   {opened && (
                     <div className="pb-2 pl-6">
-                      {rows.map((x) => { const st = STA(effStato(x)); const g = x.guest ?? {};
+                      {rows.map((x, ri) => { const st = STA(effStato(x)); const g = x.guest ?? {};
                         const isCapo = ["16", "17", "18"].includes(x.ruolo);
-                        const dob = g.dataNascita ? new Date(g.dataNascita).toLocaleDateString("it-IT") : "—";
-                        const luogoNascita = [g.comuneNascita, g.provinciaNascita && `(${g.provinciaNascita})`].filter(Boolean).join(" ") || g.statoNascita || "—";
-                        const docLine = isCapo ? ([g.tipoDoc, g.numeroDoc].filter(Boolean).join(" ") || "—") : "non richiesto";
+                        const dob = g.dataNascita ? new Date(g.dataNascita).toLocaleDateString("it-IT") : "";
+                        const luogoNascita = [g.comuneNascita, g.provinciaNascita && `(${g.provinciaNascita})`].filter(Boolean).join(" ") || g.statoNascita || "";
                         return (
-                        <div key={x.id} className="border-t border-[color:color-mix(in_srgb,var(--line)_60%,transparent)] py-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="truncate text-[13px] font-medium text-txt">{(x.guest?.cognome ?? "") + " " + (x.guest?.nome ?? "") || "—"} <span className="font-normal text-faint">· {RUOLO[x.ruolo] ?? x.ruolo}{g.sesso ? ` · ${g.sesso === "F" ? "F" : "M"}` : ""}</span></div>
+                        <div key={x.id} className={`py-2 ${ri > 0 ? "border-t border-[color:color-mix(in_srgb,var(--line)_60%,transparent)]" : ""}`}>
+                          <div className="mb-1.5 flex items-center justify-between gap-2">
+                            <div className="truncate text-[13px] font-semibold text-txt">{(x.guest?.cognome ?? "") + " " + (x.guest?.nome ?? "") || "—"} <span className="font-normal text-faint">· {RUOLO[x.ruolo] ?? x.ruolo}</span></div>
                             <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.c} 16%, transparent)`, color: st.c }}>{st.l}</span>
                           </div>
-                          <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
-                            <dt className="text-faint">Nascita</dt><dd className="text-dim">{dob} · {luogoNascita}</dd>
-                            <dt className="text-faint">Cittadinanza</dt><dd className="text-dim">{g.cittadinanza || "—"}</dd>
-                            <dt className="text-faint">Documento</dt><dd className="text-dim">{docLine}{isCapo && g.luogoRilascio ? ` · rilasciato a ${g.luogoRilascio}` : ""}</dd>
-                          </dl>
-                          {x.errors?.length ? <div className="mt-1 text-[11px] font-medium" style={{ color: "var(--warn)" }}>⚠ {x.errors.join(" · ")}</div> : null}
-                          {x.ricevuta ? <div className="text-[11px] text-faint">ric. {x.ricevuta}</div> : null}
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                            <RF label="Sesso" v={g.sesso === "F" ? "F" : g.sesso === "M" ? "M" : ""} />
+                            <RF label="Data di nascita" v={dob} />
+                            <RF label="Luogo di nascita" v={luogoNascita} />
+                            <RF label="Cittadinanza" v={g.cittadinanza ?? ""} />
+                            {isCapo ? <>
+                              <RF label="Tipo documento" v={g.tipoDoc ?? ""} />
+                              <RF label="Numero documento" v={g.numeroDoc ?? ""} />
+                              {g.luogoRilascio ? <RF label="Rilasciato a" v={g.luogoRilascio} /> : null}
+                            </> : <RF label="Documento" v="non richiesto (familiare/membro)" />}
+                          </div>
+                          {x.errors?.length ? <div className="mt-1.5 text-[11px] font-medium" style={{ color: "var(--warn)" }}>⚠ {x.errors.join(" · ")}</div> : null}
+                          {x.ricevuta ? <div className="mt-1 text-[11px] text-faint">ric. {x.ricevuta}</div> : null}
                         </div>
                       ); })}
+                      <div className="mt-1 flex justify-end"><button type="button" onClick={() => bk && setEditBooking(bk.id)} disabled={!bk} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-50"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg> Modifica dati</button></div>
                     </div>
                   )}
                 </div>
@@ -245,3 +259,13 @@ export default function AlloggiatiWebPage() {
 }
 
 function STA(k: string) { return ({ da_validare: { l: "Da validare", c: "var(--warn)" }, pronta: { l: "Pronta", c: "var(--focus)" }, inviata: { l: "Inviata", c: "var(--ok)" }, errore: { l: "Errore", c: "var(--err)" } } as Record<string, { l: string; c: string }>)[k] ?? { l: k, c: "var(--dim)" }; }
+
+// Campo in sola lettura (etichetta sopra, valore in riquadro) — dati ospite ben visibili, come nella vecchia pagina.
+function RF({ label, v }: { label: string; v: string }) {
+  return (
+    <div>
+      <div className="mb-0.5 text-[11px] font-medium text-dim">{label}</div>
+      <div className={`truncate rounded-md border border-line bg-paper px-2 py-1 text-sm ${v ? "text-txt" : "text-faint"}`} title={v || "—"}>{v || "—"}</div>
+    </div>
+  );
+}
