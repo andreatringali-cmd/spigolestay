@@ -251,10 +251,12 @@ export async function fetchRicevuta(admin: SupabaseClient, tenantId: string, str
 // Invia le schedine PRONTE (arrivo indicato o tutte) → submission + ricevuta.
 export async function sendReady(admin: SupabaseClient, tenantId: string, structureId: string, arrival?: string): Promise<{ ok: boolean; message: string; sent: number }> {
   let q = admin.from("alloggiati_schedine").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pronta");
+  // La schedina si invia DOPO l'arrivo: nell'invio massivo escludiamo gli arrivi futuri.
   if (arrival) q = q.eq("arrival", arrival);
+  else q = q.lte("arrival", new Date().toISOString().slice(0, 10));
   const { data: sched } = await q;
   const list = sched ?? [];
-  if (!list.length) return { ok: false, message: "Nessuna schedina pronta da inviare.", sent: 0 };
+  if (!list.length) return { ok: false, message: "Nessuna schedina pronta da inviare (gli arrivi futuri si inviano dopo l'arrivo).", sent: 0 };
 
   const { c, live } = await creds(admin, tenantId, structureId);
 

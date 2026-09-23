@@ -91,8 +91,12 @@ export default function AlloggiatiWebPage() {
   // avviene alla prossima "Sincronizza dagli arrivi"; qui il filtro è immediato.
   const activeBookingIds = new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked").map((b) => b.id));
   const visibleSched = sched.filter((x) => x.stato === "inviata" || !x.booking_id || activeBookingIds.has(x.booking_id));
-  const readyCount = visibleSched.filter((x) => x.stato === "pronta").length;
-  const toValidate = visibleSched.filter((x) => x.stato === "da_validare").length;
+  const todayLocal = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  const isFuture = (arrivalISO?: string) => (arrivalISO || "") > todayLocal;
+  // "Pronte da inviare" = solo arrivi già avvenuti: la schedina si invia DOPO l'arrivo.
+  const readyCount = visibleSched.filter((x) => x.stato === "pronta" && !isFuture(x.arrival)).length;
+  const upcomingCount = visibleSched.filter((x) => x.stato !== "inviata" && isFuture(x.arrival)).length;
+  const toValidate = visibleSched.filter((x) => x.stato === "da_validare" && !isFuture(x.arrival)).length;
   const sentCount = visibleSched.filter((x) => x.stato === "inviata").length;
   // Scadenza legale (art. 109 TULPS): la schedina va inviata alla Questura ENTRO 24h dall'arrivo
   // (entro 6h per soggiorni sotto le 24h). Non avendo l'orario esatto d'arrivo usiamo il giorno
@@ -105,7 +109,6 @@ export default function AlloggiatiWebPage() {
   const nextDl = toSend.length ? deadlineOf(toSend.map((x) => x.arrival).sort()[0]) : null;
   const overdueCount = toSend.filter((x) => urgencyOf(x.arrival) === "over").length;
   // Ospiti attualmente in struttura (arrivati e non ancora ripartiti).
-  const todayLocal = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
   const inHouse = bookings
     .filter((b) => b.structureId === sid && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && b.checkIn <= todayLocal && todayLocal < b.checkOut)
     .reduce((a, b) => a + (b.adults ?? 1) + (b.children ?? 0), 0);
@@ -174,7 +177,7 @@ export default function AlloggiatiWebPage() {
         <Card>
           <div className="mb-2 flex items-center justify-between">
             <SectionTitle>Schedine</SectionTitle>
-            <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">Pronte da inviare: {readyCount}</span>
+            <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">Pronte da inviare: {readyCount}{upcomingCount ? ` · in preparazione: ${upcomingCount}` : ""}</span>
           </div>
           <div className="mb-2 flex flex-wrap gap-2">
             <button onClick={() => call("sync", "sync")} disabled={!!busy} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "sync" ? "Sincronizzo…" : "Sincronizza dagli arrivi"}</button>
@@ -199,7 +202,9 @@ export default function AlloggiatiWebPage() {
                 <div key={x.id} className="flex items-center justify-between gap-2 border-b border-line py-2 last:border-0">
                   <div className="min-w-0">
                     <div className="truncate text-sm text-txt">{(x.guest?.cognome ?? "") + " " + (x.guest?.nome ?? "") || "—"} <span className="text-faint">· {RUOLO[x.ruolo] ?? x.ruolo}</span></div>
-                    <div className="text-[11px] text-faint">Arrivo {x.arrival ? new Date(x.arrival).toLocaleDateString("it-IT") : "—"}{x.errors?.length ? ` · ${x.errors.join(", ")}` : ""}{x.ricevuta ? ` · ric. ${x.ricevuta}` : ""}{x.stato !== "inviata" && x.arrival ? <> · <span style={{ color: urgColor(urgencyOf(x.arrival)), fontWeight: 600 }}>{urgencyOf(x.arrival) === "over" ? "⚠ scaduta " : "entro "}{fmtDeadline(deadlineOf(x.arrival))}</span></> : ""}</div>
+                    <div className="text-[11px] text-faint">Arrivo {x.arrival ? new Date(x.arrival).toLocaleDateString("it-IT") : "—"}{x.errors?.length ? ` · ${x.errors.join(", ")}` : ""}{x.ricevuta ? ` · ric. ${x.ricevuta}` : ""}{x.stato !== "inviata" && x.arrival ? (isFuture(x.arrival)
+  ? <> · <span className="text-faint">in preparazione (si invia dopo l&apos;arrivo)</span></>
+  : <> · <span style={{ color: urgColor(urgencyOf(x.arrival)), fontWeight: 600 }}>{urgencyOf(x.arrival) === "over" ? "⚠ scaduta " : "entro "}{fmtDeadline(deadlineOf(x.arrival))}</span></>) : ""}</div>
                   </div>
                   <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.c} 16%, transparent)`, color: st.c }}>{st.l}</span>
                 </div>

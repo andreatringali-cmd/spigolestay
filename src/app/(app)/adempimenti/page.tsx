@@ -184,7 +184,10 @@ export default function AdempimentiPage() {
   const activeBookingIds = useMemo(() => new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked").map((b) => b.id)), [bookings]);
   const isActive = (bookingId: string | null) => !bookingId || activeBookingIds.has(bookingId);
   // 2 · Schedine Questura — da inviare (non "inviata") vs inviate. Le "da inviare" solo se la prenotazione è viva.
-  const schedToSend = sched.filter((s) => s.stato !== "inviata" && isActive(s.booking_id));
+  // La schedina si invia DOPO l'arrivo: quelle di arrivi futuri sono "in preparazione", non inviabili ora.
+  const schedPending = sched.filter((s) => s.stato !== "inviata" && isActive(s.booking_id));
+  const schedToSend = schedPending.filter((s) => (s.arrival || "") <= t);   // arrivate/in arrivo oggi → inviabili
+  const schedUpcoming = schedPending.filter((s) => (s.arrival || "") > t);  // arrivi futuri → in preparazione
   const schedSent = sched.filter((s) => s.stato === "inviata");
   // 3 · ISTAT — pending (solo prenotazioni vive) vs inviati.
   const istatPend = istat.filter((s) => s.stato === "pending" && isActive(s.booking_id));
@@ -261,12 +264,18 @@ export default function AdempimentiPage() {
 
         {/* 2 · Schedine alla Questura */}
         <StepCard n={2} tone="var(--err)" label="Schedine alla Questura (Alloggiati Web)" sub="Da inviare" count={schedToSend.length} action="Invia alla Questura" onAction={() => router.push("/alloggiati-web")}>
-          {(schedToSend.length > 0 || schedSent.length > 0) ? (
+          {(schedToSend.length > 0 || schedUpcoming.length > 0 || schedSent.length > 0) ? (
             <>
               {schedToSend.length > 0 && (<>
                 <SubHead>Da inviare ({schedToSend.length}) · entro 24h dall&apos;arrivo</SubHead>
                 {schedToSend.slice(0, 4).map((sc) => (
                   <MiniRow key={sc.id} left={`Arrivo ${fmtDay(sc.arrival)}`} right={schedOverdue(sc.arrival) ? `⚠ scaduta ${schedDeadline(sc.arrival)}` : `entro ${schedDeadline(sc.arrival)}`} />
+                ))}
+              </>)}
+              {schedUpcoming.length > 0 && (<>
+                <SubHead mt={schedToSend.length > 0}>Prossimi arrivi ({schedUpcoming.length}) · in preparazione, si inviano dopo l&apos;arrivo</SubHead>
+                {schedUpcoming.slice(0, 3).map((sc) => (
+                  <MiniRow key={sc.id} left={`Arrivo ${fmtDay(sc.arrival)}`} right={`dal ${fmtDay(sc.arrival)}`} />
                 ))}
               </>)}
               {schedSent.length > 0 && (<>
