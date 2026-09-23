@@ -221,10 +221,12 @@ export async function testReady(admin: SupabaseClient, tenantId: string, structu
   const { c, live } = await creds(admin, tenantId, structureId);
   if (!live) return { ok: false, message: "Integrazione reale non attiva: usa mock (nessun controllo dal portale)." };
   let q = admin.from("alloggiati_schedine").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pronta");
+  // Si controllano solo gli arrivi GIÀ avvenuti: gli arrivi futuri (in preparazione) non si verificano.
   if (arrival) q = q.eq("arrival", arrival);
+  else q = q.lte("arrival", new Date().toISOString().slice(0, 10));
   const { data: sched } = await q;
   const list = sched ?? [];
-  if (!list.length) return { ok: false, message: "Nessuna schedina pronta da controllare." };
+  if (!list.length) return { ok: true, message: "Nessuna schedina da controllare." };
   try {
     const token = await getToken(c);
     const maps = await loadCodeMaps(admin);

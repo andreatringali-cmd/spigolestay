@@ -136,7 +136,6 @@ export default function AlloggiatiWebPage() {
   const isFuture = (arrivalISO?: string) => (arrivalISO || "") > todayLocal;
   // "Pronte da inviare" = schedina pronta + arrivo già avvenuto + prenotazione col check-in completo.
   const readyCount = visibleSched.filter((x) => x.stato === "pronta" && !isFuture(x.arrival) && bookingComplete(x.booking_id)).length;
-  const upcomingCount = visibleSched.filter((x) => x.stato !== "inviata" && isFuture(x.arrival)).length;
   // "Da validare" = tutto ciò che è arrivato ma non è (pronta + prenotazione completa) né inviata.
   const toValidate = visibleSched.filter((x) => !isFuture(x.arrival) && x.stato !== "inviata" && !(x.stato === "pronta" && bookingComplete(x.booking_id))).length;
   const effStato = (x: { stato: string; booking_id: string | null }) => (x.stato === "pronta" && !bookingComplete(x.booking_id) ? "da_validare" : x.stato);
@@ -189,7 +188,7 @@ export default function AlloggiatiWebPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="order-2 flex flex-col">
+        <Card className="order-2">
           <SectionTitle>Impostazioni account</SectionTitle>
           <div className="mt-2">
           <div className="space-y-2">
@@ -220,16 +219,15 @@ export default function AlloggiatiWebPage() {
             <button onClick={() => call("test", "test")} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "test" ? "Test…" : "Test connessione"}</button>
             <button onClick={() => call("tabelle", "tabelle")} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Scarica dal portale i codici ufficiali di comuni, stati e documenti">{busy === "tabelle" ? "Aggiorno…" : "Aggiorna tabelle codici"}</button>
           </div>
-          <div className="mt-auto border-t border-line pt-3 text-sm">
+          <div className="mt-3 border-t border-line pt-3 text-sm">
             <span className="text-dim">Stato connessione al portale Alloggiati: </span>
             {s.status === "attivata" ? <span className="font-semibold text-[color:var(--ok)]">✔ Attivata</span> : s.status === "errore" ? <span className="font-semibold text-[color:var(--err)]">✕ Errore</span> : <span className="text-faint">non verificata</span>}
           </div>
         </Card>
 
-        <Card className="order-1 flex flex-col">
+        <Card className="order-1">
           <div className="mb-2 flex items-center justify-between">
             <SectionTitle>Schedine</SectionTitle>
-            <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">Pronte da inviare: {readyCount}{upcomingCount ? ` · in preparazione: ${upcomingCount}` : ""}</span>
           </div>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <span className="text-[11px] font-medium text-dim">Filtra per arrivo:</span>
@@ -298,7 +296,7 @@ export default function AlloggiatiWebPage() {
             {listSched.length === 0 && <EmptyState title="Nessuna schedina" sub="Le schedine appaiono qui dopo il check-in." />}
             </>}
           </div>
-          <div className="mt-auto flex items-center justify-between gap-2 border-t border-line pt-3 text-sm">
+          <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3 text-sm">
             <span className="min-w-0 flex-1">
               {autoBusy
                 ? <span className="text-faint">Verifica in corso…</span>
