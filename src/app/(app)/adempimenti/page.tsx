@@ -203,9 +203,10 @@ export default function AdempimentiPage() {
   // anche prima della prossima sincronizzazione che ripulisce gli orfani lato server.
   const activeBookingIds = useMemo(() => new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked").map((b) => b.id)), [bookings]);
   const isActive = (bookingId: string | null) => !bookingId || activeBookingIds.has(bookingId);
-  // 2 · Schedine Questura — da inviare (non "inviata") vs inviate. Le "da inviare" solo se la prenotazione è viva.
-  // La schedina si invia DOPO l'arrivo: quelle di arrivi futuri sono "in preparazione", non inviabili ora.
-  const schedPending = sched.filter((s) => s.stato !== "inviata" && isActive(s.booking_id));
+  // 2 · Schedine Questura — "da inviare" SOLO quelle PRONTE (check-in completato, dati validi):
+  // le incomplete ("da_validare") restano nel PASSO 1 finché non completi i dati (passaggio di palla).
+  // La schedina si invia DOPO l'arrivo: gli arrivi futuri sono esclusi.
+  const schedPending = sched.filter((s) => s.stato === "pronta" && isActive(s.booking_id));
   const schedToSend = schedPending.filter((s) => (s.arrival || "") <= t);   // arrivate/in arrivo oggi → inviabili
   const schedSent = sched.filter((s) => s.stato === "inviata");
   // Raggruppa le schedine per PRENOTAZIONE: una riga per prenotazione, con quante schedine ha
@@ -310,11 +311,11 @@ export default function AdempimentiPage() {
         </StepCard>
 
         {/* 2 · Schedine alla Questura */}
-        <StepCard n={2} tone="var(--err)" label="Schedine alla Questura (Alloggiati Web)" sub="Da inviare" count={schedToSendG.length} action="Invia alla Questura" onAction={() => router.push("/alloggiati-web")}>
+        <StepCard n={2} tone="var(--err)" label="Schedine alla Questura (Alloggiati Web)" sub="Pronte da inviare" count={schedToSendG.length} action="Invia alla Questura" onAction={() => router.push("/alloggiati-web")}>
           {(schedToSendG.length > 0 || schedSentG.length > 0) ? (
             <>
               {schedToSendG.length > 0 && (<>
-                <SubHead>Da inviare ({schedToSendG.length}) · una riga per prenotazione</SubHead>
+                <SubHead>Pronte da inviare ({schedToSendG.length}) · una riga per prenotazione</SubHead>
                 {schedToSendG.slice(0, 4).map((gr) => (
                   <MiniRow key={gr.key}
                     left={`${bookingName(gr.bookingId)} · ${structName(gr.structureId, gr.bookingId)} · arrivo ${fmtDay(gr.arrival)}`}

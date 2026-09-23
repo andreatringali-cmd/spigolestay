@@ -111,6 +111,9 @@ export default function AlloggiatiWebPage() {
   const upcomingCount = visibleSched.filter((x) => x.stato !== "inviata" && isFuture(x.arrival)).length;
   const toValidate = visibleSched.filter((x) => x.stato === "da_validare" && !isFuture(x.arrival)).length;
   const sentCount = visibleSched.filter((x) => x.stato === "inviata").length;
+  // Lista schedine: mostra solo arrivi già avvenuti (+ inviate come storico). Gli arrivi futuri
+  // NON compaiono finché l'ospite non arriva (allineato ad Adempimenti).
+  const listSched = visibleSched.filter((x) => x.stato === "inviata" || !isFuture(x.arrival));
   // Scadenza legale (art. 109 TULPS): la schedina va inviata alla Questura ENTRO 24h dall'arrivo
   // (entro 6h per soggiorni sotto le 24h). Non avendo l'orario esatto d'arrivo usiamo il giorno
   // successivo all'arrivo come termine mostrato.
@@ -229,7 +232,7 @@ export default function AlloggiatiWebPage() {
             <button onClick={getRicevuta} disabled={!!busy} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "ricevuta" ? "Scarico…" : "Scarica ricevuta"}</button>
           </div>
           <div className="max-h-[52vh] overflow-y-auto">
-            {visibleSched.map((x) => {
+            {listSched.map((x) => {
               const st = STA(x.stato);
               return (
                 <div key={x.id} className="flex items-center justify-between gap-2 border-b border-line py-2 last:border-0">
@@ -243,7 +246,7 @@ export default function AlloggiatiWebPage() {
                 </div>
               );
             })}
-            {visibleSched.length === 0 && <EmptyState title="Nessuna schedina" sub="Premi «Sincronizza dagli arrivi»." />}
+            {listSched.length === 0 && <EmptyState title="Nessuna schedina" sub="Premi «Sincronizza dagli arrivi»." />}
           </div>
         </Card>
       </div>
