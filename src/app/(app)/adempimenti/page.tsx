@@ -115,7 +115,7 @@ function ArrivalRow({ b, g, st, origin, waOn, showStruct }: { b: Booking; g?: Gu
   return (
     <div className="rounded-lg border border-line bg-paper px-2.5 py-1.5">
       <div className="flex items-center justify-between gap-2">
-        <div className="truncate text-[13px] font-medium text-txt"><span className="font-mono text-faint">{b.code || b.id.slice(0, 6).toUpperCase()}</span> · {g?.fullName || "Ospite"}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</div>
+        <div className="truncate text-[13px] font-medium text-txt"><span className="font-mono text-faint">{b.code || b.id.slice(0, 6).toUpperCase()}</span> · {g?.fullName || "Ospite"}{b.groupId && <span className="ml-1 rounded-full bg-[color:color-mix(in_srgb,var(--focus)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[color:var(--focus)]" title="Prenotazione di gruppo: un solo link completa il check-in di tutte le camere">Gruppo</span>}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</div>
         <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={partial ? { background: soft("var(--warn)"), color: "var(--warn)" } : { background: soft("var(--err)"), color: "var(--err)" }}>
           {partial ? `Incompleto ${declared}/${expected}` : "Da fare"}
         </span>
