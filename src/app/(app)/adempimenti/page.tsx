@@ -317,7 +317,7 @@ export default function AdempimentiPage() {
           {(schedToSendG.length > 0 || schedSentG.length > 0) ? (
             <>
               {schedToSendG.length > 0 && (<>
-                <SubHead>Pronte da inviare ({schedToSendG.length}) · una riga per prenotazione</SubHead>
+                <SubHead>Pronte da inviare ({schedToSendG.length})</SubHead>
                 {schedToSendG.slice(0, 4).map((gr) => (
                   <MiniRow key={gr.key}
                     left={`${bookingName(gr.bookingId)} · ${structName(gr.structureId, gr.bookingId)} · arrivo ${fmtDay(gr.arrival)}`}
