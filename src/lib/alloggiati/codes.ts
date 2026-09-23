@@ -110,13 +110,27 @@ export async function loadCodeMaps(admin: SupabaseClient): Promise<CodeMaps> {
   return { hasData: codeSet.size > 0, codeSet, byName, docByName };
 }
 
+// Sinonimi cittadinanza (aggettivo) → nome Stato ufficiale della tabella Luoghi.
+// La "Cittadinanza" del tracciato usa il codice Stato: gli ospiti spesso scrivono l'aggettivo.
+const NAT_ALIAS: Record<string, string> = {
+  ITALIANA: "ITALIA", ITALIANO: "ITALIA",
+  FRANCESE: "FRANCIA", TEDESCA: "GERMANIA", TEDESCO: "GERMANIA",
+  SPAGNOLA: "SPAGNA", SPAGNOLO: "SPAGNA",
+  INGLESE: "REGNO UNITO", BRITANNICA: "REGNO UNITO", BRITANNICO: "REGNO UNITO",
+  SVIZZERA: "SVIZZERA", SVIZZERO: "SVIZZERA", AUSTRIACA: "AUSTRIA", AUSTRIACO: "AUSTRIA",
+  OLANDESE: "PAESI BASSI", BELGA: "BELGIO", PORTOGHESE: "PORTOGALLO",
+  POLACCA: "POLONIA", POLACCO: "POLONIA", RUMENA: "ROMANIA", RUMENO: "ROMANIA",
+};
+
 // Risolve un luogo (comune o stato) in codice. Se `value` è già un codice valido lo
-// mantiene; altrimenti cerca per nome (eventualmente disambiguando per provincia).
+// mantiene; altrimenti cerca per nome (eventualmente disambiguando per provincia),
+// e come ultima spiaggia prova un sinonimo di cittadinanza (es. "Italiana" → "Italia").
 export function resolveLuogo(maps: CodeMaps, value: string | undefined, provincia?: string): string | null {
   const v = (value ?? "").trim();
   if (!v) return null;
   if (maps.codeSet.has(v)) return v;
-  const hits = maps.byName.get(norm(v));
+  let hits = maps.byName.get(norm(v));
+  if ((!hits || !hits.length) && NAT_ALIAS[norm(v)]) hits = maps.byName.get(norm(NAT_ALIAS[norm(v)]));
   if (!hits || !hits.length) return null;
   if (hits.length === 1) return hits[0].code;
   const p = norm(provincia);
@@ -144,9 +158,24 @@ export function italyCode(maps: CodeMaps): string | null {
   return resolveLuogo(maps, "ITALIA");
 }
 
+// Alias tipo documento: le diciture dell'app → codice ufficiale (la tabella scrive es.
+// "CARTA DI IDENTITA", mentre l'app usa "Carta d'identità" → norm "CARTA D IDENTITA").
+const DOC_ALIAS: Record<string, string> = {
+  "CARTA D IDENTITA": "IDENT", "CARTA DI IDENTITA": "IDENT", "CARTA IDENTITA": "IDENT",
+  CIE: "IDELE", "CARTA D IDENTITA ELETTRONICA": "IDELE", "CARTA IDENTITA ELETTRONICA": "IDELE",
+  PASSAPORTO: "PASOR", "PASSAPORTO ORDINARIO": "PASOR",
+  PATENTE: "PATEN", "PATENTE DI GUIDA": "PATEN",
+};
+
 export function resolveDocumento(maps: CodeMaps, value: string | undefined): string | null {
   const v = (value ?? "").trim();
   if (!v) return null;
   if (maps.codeSet.has(v)) return v;
-  return maps.docByName.get(norm(v)) ?? null;
+  const n = norm(v);
+  const byName = maps.docByName.get(n);
+  if (byName) return byName;
+  // Alias diretto → codice, ma solo se quel codice esiste davvero nelle tabelle scaricate.
+  const alias = DOC_ALIAS[n];
+  if (alias && maps.codeSet.has(alias)) return alias;
+  return null;
 }
