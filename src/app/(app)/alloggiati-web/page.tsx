@@ -227,6 +227,7 @@ export default function AlloggiatiWebPage() {
             <button onClick={() => call("check", "check")} disabled={!!busy || readyCount === 0} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Controllo preliminare presso il portale, senza inviare">{busy === "check" ? "Controllo…" : "Controlla"}</button>
             <button onClick={() => call("send", "send")} disabled={!!busy || readyCount === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "send" ? "Invio…" : `Invia le pronte (${readyCount})`}</button>
           </div>
+          {msg && <p className="mb-2 rounded-lg px-3 py-2 text-sm font-medium" style={{ background: "var(--wash)", color: "var(--dim)" }}>{msg}</p>}
           {nextArrival && (
             <div className="mb-2 flex items-start gap-2 rounded-lg border px-3 py-2 text-[12px]" style={{ borderColor: overdueCount ? "var(--err)" : "var(--warn)", background: `color-mix(in srgb, ${overdueCount ? "var(--err)" : "var(--warn)"} 8%, transparent)` }}>
               <span aria-hidden>⏱</span>
@@ -253,10 +254,10 @@ export default function AlloggiatiWebPage() {
                 const anyInvalid = rows.some((r) => effStato(r) === "da_validare");
                 const gStato = allSent ? "inviata" : anyInvalid ? "da_validare" : "pronta";
                 const gst = STA(gStato);
-                const opened = openG[key] ?? (gStato === "da_validare");
+                const opened = openG[key] ?? false; // default: SEMPRE chiusa all'apertura pagina
                 return (
                   <div key={key} className="border-b border-line last:border-0">
-                    <button type="button" onClick={() => setOpenG((m) => ({ ...m, [key]: !(m[key] ?? (gStato === "da_validare")) }))} className="flex w-full items-center gap-2 py-2 text-left">
+                    <button type="button" onClick={() => setOpenG((m) => ({ ...m, [key]: !(m[key] ?? false) }))} className="flex w-full items-center gap-2 py-2 text-left">
                       <span className="shrink-0 text-faint">{opened ? "▾" : "▸"}</span>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm text-txt">{name} <span className="text-faint">· {structName}</span></div>
@@ -286,7 +287,6 @@ export default function AlloggiatiWebPage() {
           </div>
         </Card>
       </div>
-      {msg && <p className="mt-3 text-sm font-medium text-dim">{msg}</p>}
     </div>
   );
 }

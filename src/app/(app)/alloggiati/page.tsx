@@ -203,10 +203,10 @@ export default function AlloggiatiPage() {
             const complete = bookingOk(b);
             const declared = totalPeople(b);
             const pax = b.adults + b.children;
-            const opened = open[b.id] ?? !complete; // default: aperta se incompleta, chiusa se completa
+            const opened = open[b.id] ?? false; // default: SEMPRE chiusa all'apertura pagina
             return (
               <Card key={b.id} className={complete ? "" : "border-[color:color-mix(in_srgb,var(--warn)_45%,var(--line))]"}>
-                <button type="button" onClick={() => toggleOpen(b.id, !complete)} className={`flex w-full flex-wrap items-center gap-2 text-left ${opened ? "mb-3" : ""}`}>
+                <button type="button" onClick={() => toggleOpen(b.id, false)} className={`flex w-full flex-wrap items-center gap-2 text-left ${opened ? "mb-3" : ""}`}>
                   <span className="text-faint">{opened ? "▾" : "▸"}</span>
                   <span className={`h-2.5 w-2.5 rounded-full ${complete ? "bg-[color:var(--ok)]" : "bg-[color:var(--warn)]"}`} />
                   <span className="font-display text-base font-bold text-txt">{g?.fullName || t("Ospite")}</span>
