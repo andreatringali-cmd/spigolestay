@@ -112,9 +112,12 @@ export default function AlloggiatiPage() {
   };
   const primaryOk = (b: { guestId: string; primaryGuest?: PG }) => { const p = primaryOf(b); return !!((p.lastName || p.fullName) && p.sex && p.birthDate && p.birthPlace && p.citizenship && p.docType && p.docNumber); };
   const coOk = (c: Co) => !!(c.lastName && c.firstName && c.sex && c.birthDate && c.birthPlace && c.citizenship);
-  const bookingOk = (b: { id: string; guestId: string; primaryGuest?: PG; extraGuests?: Co[] }) => primaryOk(b) && cosOf(b).every(coOk);
-  const readyCount = arrivals.filter(bookingOk).length;
   const totalPeople = (b: { extraGuests?: Co[] }) => 1 + cosOf(b).length;
+  // "Pronta" solo se i dati dei dichiarati sono validi E le persone dichiarate coprono gli ospiti
+  // attesi (adults+children): se ne manca qualcuno la prenotazione è INCOMPLETA, non pronta.
+  const bookingOk = (b: { id: string; guestId: string; primaryGuest?: PG; extraGuests?: Co[]; adults?: number; children?: number }) =>
+    primaryOk(b) && cosOf(b).every(coOk) && totalPeople(b) >= ((b.adults ?? 0) + (b.children ?? 0));
+  const readyCount = arrivals.filter(bookingOk).length;
 
   const setPrimary = (id: string, patch: Record<string, unknown>) => {
     const g = guest(id); const next = { ...g, ...patch } as Record<string, unknown>;
