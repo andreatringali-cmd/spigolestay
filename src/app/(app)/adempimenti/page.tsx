@@ -74,8 +74,9 @@ function SubHead({ children, mt }: { children: React.ReactNode; mt?: boolean }) 
 }
 
 // Riga arrivo senza check-in: WhatsApp (link), Email diretta (server) e "Compila tu" (apri il form).
-function ArrivalRow({ b, g, st, origin }: { b: Booking; g?: Guest; st?: Structure; origin: string }) {
+function ArrivalRow({ b, g, st, origin, waOn }: { b: Booking; g?: Guest; st?: Structure; origin: string; waOn?: boolean }) {
   const [mail, setMail] = useState<"idle" | "sending" | "sent" | "err">("idle");
+  const [ws, setWs] = useState<"idle" | "sending" | "sent" | "err">("idle");
   const fullLink = `${origin}/checkin?b=${b.id}`;
   // Link ACCORCIATO (xenora.it/g/xxxxxx): più pulito e senza anteprima marketing.
   const [link, setLink] = useState(fullLink);
@@ -96,6 +97,17 @@ function ArrivalRow({ b, g, st, origin }: { b: Booking; g?: Guest; st?: Structur
     } catch { setMail("err"); }
   };
   const compila = () => { const w = window.open(fullLink, "_blank"); if (!w) window.location.href = fullLink; };
+  // WhatsApp: se collegato (Cloud API) invia DIRETTO; altrimenti apre wa.me con il testo pronto.
+  const sendWa = async () => {
+    const dg = (g?.phone ?? "").replace(/\D/g, "");
+    if (!dg) return;
+    if (!waOn) { window.open(wa, "_blank", "noopener"); return; }
+    setWs("sending");
+    try {
+      const r = await apiPost<{ ok?: boolean }>("whatsapp/send", { to: dg, text: msg });
+      if (r?.ok !== false) setWs("sent"); else { setWs("err"); window.open(wa, "_blank", "noopener"); }
+    } catch { setWs("err"); window.open(wa, "_blank", "noopener"); }
+  };
   const expected = expectedPaxOf(b);
   const declared = declaredPaxOf(b);
   const partial = declared > 0 && declared < expected; // qualcuno ha fatto il check-in, ma non tutti
@@ -113,7 +125,7 @@ function ArrivalRow({ b, g, st, origin }: { b: Booking; g?: Guest; st?: Structur
         <span className={partial ? "font-semibold text-[color:var(--warn)]" : ""}>✓ check-in {declared}/{expected}</span>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-        {wa && <a href={wa} target="_blank" rel="noreferrer" className="rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</a>}
+        {wa && <button onClick={sendWa} disabled={ws === "sending" || ws === "sent"} className="rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-70" style={{ backgroundColor: ws === "sent" ? "var(--ok)" : ws === "err" ? "var(--err)" : "#25D366" }} title={waOn ? "Invia su WhatsApp" : "Apri WhatsApp col messaggio pronto"}>{ws === "sent" ? "✓ Inviato" : ws === "sending" ? "Invio…" : ws === "err" ? "Riprova" : "💬 WhatsApp"}</button>}
         {g?.email && <button onClick={sendMail} disabled={mail === "sending" || mail === "sent"} className={`rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-70 ${mail === "sent" ? "bg-[color:var(--ok)]" : mail === "err" ? "bg-[color:var(--err)]" : "bg-focus"}`}>{mail === "sent" ? "✓ Inviata" : mail === "sending" ? "Invio…" : mail === "err" ? "Riprova" : "✉ Email"}</button>}
         <button onClick={compila} className="rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--warn)" }}>Compila tu</button>
       </div>
@@ -132,6 +144,9 @@ export default function AdempimentiPage() {
   const [passive, setPassive] = useState<{ id: string; supplier_name: string | null; due_date: string | null; total_cents: number; paid: boolean }[]>([]);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []); // countdown vivo
+  // WhatsApp Cloud API collegato? Se sì, il pulsante invia DIRETTO; altrimenti apre wa.me.
+  const [waOn, setWaOn] = useState(false);
+  useEffect(() => { apiPost<{ connected: boolean }>("whatsapp/settings", { action: "status" }).then((r) => setWaOn(!!r.connected)).catch(() => {}); }, []);
 
   // Carica tutti i dati (anche il lato "fatti") in modo da poter aggiornare le schede dopo un'azione.
   const loadData = useCallback(async () => {
@@ -276,7 +291,7 @@ export default function AdempimentiPage() {
                 <>
                   <SubHead>Da completare ({arrivalsNoCheckin.length})</SubHead>
                   {arrivalsNoCheckin.slice(0, 5).map((b) => (
-                    <ArrivalRow key={b.id} b={b} g={getGuest(b.guestId)} st={getStructure(b.structureId)} origin={origin} />
+                    <ArrivalRow key={b.id} b={b} g={getGuest(b.guestId)} st={getStructure(b.structureId)} origin={origin} waOn={waOn} />
                   ))}
                 </>
               )}
