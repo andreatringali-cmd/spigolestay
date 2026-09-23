@@ -63,7 +63,9 @@ export async function closeDay(admin: SupabaseClient, tenantId: string, structur
   const { data: sett } = await admin.from("istat_settings").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).maybeSingle();
   const provider = "mock"; // TODO(istat): connettore regionale reale (Ross1000/Turist@t) via credenziali sett
   let q = admin.from("istat_rows").select("id, booking_id").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pending");
+  // Si invia per gli arrivi già avvenuti: senza un giorno specifico, escludi gli arrivi futuri.
   if (day) q = q.eq("arrival", day);
+  else q = q.lte("arrival", new Date().toISOString().slice(0, 10));
   const { data: rows } = await q;
   const list = (rows ?? []) as { id: string; booking_id: string | null }[];
   const ids = list.map((r) => r.id);

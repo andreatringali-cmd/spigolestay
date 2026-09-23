@@ -14,8 +14,6 @@ const today = () => { const t = new Date(); return `${t.getFullYear()}-${String(
 const soft = (tone: string, pct = 14) => `color-mix(in srgb, ${tone} ${pct}%, transparent)`;
 const fmtDay = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—");
 // Scadenza schedina Questura: entro 24h dall'arrivo (mostrata come giorno successivo all'arrivo).
-const schedDeadline = (iso?: string) => { if (!iso) return "—"; const d = new Date(iso); d.setDate(d.getDate() + 1); return d.toLocaleDateString("it-IT", { day: "2-digit", month: "short" }); };
-const schedOverdue = (iso?: string) => { if (!iso) return false; const d = new Date(iso); d.setDate(d.getDate() + 1); return d.getTime() < Date.now(); };
 
 // Completezza del check-in PER PERSONA (usata da card e righe).
 const expectedPaxOf = (b: Booking) => Math.max(1, (b.adults ?? 1) + (b.children ?? 0));
@@ -127,6 +125,8 @@ export default function AdempimentiPage() {
   const [docs, setDocs] = useState<{ id: string; number_label: string | null; stato: string; total_cents: number; counterpart: { name?: string } | null }[]>([]);
   const [pays, setPays] = useState<{ document_id: string; amount_cents: number }[]>([]);
   const [passive, setPassive] = useState<{ id: string; supplier_name: string | null; due_date: string | null; total_cents: number; paid: boolean }[]>([]);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []); // countdown vivo
 
   // Carica tutti i dati (anche il lato "fatti") in modo da poter aggiornare le schede dopo un'azione.
   const loadData = useCallback(async () => {
@@ -207,8 +207,17 @@ export default function AdempimentiPage() {
   const bookingName = (bookingId: string | null) => { const b = bookingId ? bookings.find((x) => x.id === bookingId) : null; return b ? (getGuest(b.guestId)?.fullName || "Ospite") : "Prenotazione"; };
   const structName = (structureId: string | null, bookingId: string | null) => { const b = bookingId ? bookings.find((x) => x.id === bookingId) : null; return getStructure(structureId || b?.structureId || "")?.name || ""; };
   const schedLabel = (n: number) => (n === 1 ? "1 schedina" : `${n} schedine`);
+  // Countdown vivo alla scadenza (≈ arrivo + 24h, assunto arrivo alle 14:00).
+  const schedCd = (iso?: string) => {
+    if (!iso) return "";
+    const d = new Date(iso + "T14:00:00"); d.setDate(d.getDate() + 1);
+    const ms = d.getTime() - now; const over = ms < 0; const a = Math.abs(ms);
+    const days = Math.floor(a / 86400000), h = Math.floor((a % 86400000) / 3600000), m = Math.floor((a % 3600000) / 60000);
+    const lbl = days >= 1 ? `${days}g ${h}h` : h >= 1 ? `${h}h ${m}m` : `${m}m`;
+    return over ? `⚠ scaduta da ${lbl}` : `⏱ tra ${lbl}`;
+  };
   // 3 · ISTAT — pending (solo prenotazioni vive) vs inviati.
-  const istatPend = istat.filter((s) => s.stato === "pending" && isActive(s.booking_id));
+  const istatPend = istat.filter((s) => s.stato === "pending" && isActive(s.booking_id) && (s.arrival || "") <= t);
   const istatSent = istat.filter((s) => s.stato === "sent");
   // 4 · Incassi — documenti non saldati vs saldati.
   const docsUnpaid = docs.filter((d) => d.stato !== "scartata" && balanceOf(d) > 0);
@@ -289,7 +298,7 @@ export default function AdempimentiPage() {
                 {schedToSendG.slice(0, 4).map((gr) => (
                   <MiniRow key={gr.key}
                     left={`${bookingName(gr.bookingId)} · ${structName(gr.structureId, gr.bookingId)} · arrivo ${fmtDay(gr.arrival)}`}
-                    right={`${schedLabel(gr.count)} · ${schedOverdue(gr.arrival) ? "⚠ scaduta" : `entro ${schedDeadline(gr.arrival)}`}`} />
+                    right={`${schedLabel(gr.count)} · ${schedCd(gr.arrival)}`} />
                 ))}
               </>)}
               {schedSentG.length > 0 && (<>

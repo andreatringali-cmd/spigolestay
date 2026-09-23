@@ -60,7 +60,9 @@ export default function IstatPage() {
   // Movimento sempre allineato alle prenotazioni: righe pending di prenotazioni annullate/no-show
   // non compaiono (le inviate restano come storico).
   const activeBookingIds = new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked").map((b) => b.id));
-  const rowsVisible = rows.filter((r) => r.stato === "sent" || !r.booking_id || activeBookingIds.has(r.booking_id));
+  // Il movimento si invia per gli arrivi GIÀ avvenuti: gli arrivi futuri non compaiono tra i "da inviare".
+  const todayIso = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  const rowsVisible = rows.filter((r) => (r.stato === "sent" || !r.booking_id || activeBookingIds.has(r.booking_id)) && (r.stato === "sent" || (r.arrival || "") <= todayIso));
   const pending = rowsVisible.filter((r) => r.stato === "pending").length;
   // Export CSV del movimento (utilizzabile subito: riconciliazione/caricamento manuale sul portale regionale).
   const exportCsv = () => {
