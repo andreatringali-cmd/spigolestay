@@ -83,16 +83,6 @@ export default function IstatPage() {
     catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
   };
 
-  // Genera il file per la Polizia di Stato (tracciato Alloggiati .txt), come sul portale Turist@t.
-  const generaPS = async () => {
-    setBusy("ps"); setMsg("");
-    try {
-      const r = await apiPost<{ ok: boolean; message?: string; text?: string }>("alloggiati/tracciato", { structureId: sid });
-      if (r.text) { const blob = new Blob([r.text], { type: "text/plain" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `polizia_${new Date().toISOString().slice(0, 10)}.txt`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); setMsg("File per la Polizia generato ✓ (carica su alloggiatiweb.poliziadistato.it)"); }
-      else setMsg(r.message || "Nessuna schedina pronta per il file PS.");
-    } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
-  };
-
   // CSV per-ospite (stile check-in Turist@t): permanenza, camera, età, sesso, cittadinanza, nascita, residenza.
   const exportCsv = () => {
     const esc = (v: unknown) => { const s = String(v ?? ""); return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
@@ -180,7 +170,6 @@ export default function IstatPage() {
         <button onClick={() => setFilterDate(todayIso)} className={`${fieldCls} font-semibold hover:bg-wash`}>Oggi</button>
         <button onClick={() => setFilterDate("")} className={`${fieldCls} hover:bg-wash ${filterDate ? "" : "opacity-40"}`} title="Mostra tutto il movimento">Tutte</button>
         <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
-        <button onClick={generaPS} disabled={!!busy} className={`${fieldCls} font-semibold hover:bg-wash disabled:opacity-50`} title="Genera il file per la Polizia di Stato (Alloggiati) da caricare sul portale">{busy === "ps" ? "Genero…" : "🛡 Genera file per la PS"}</button>
         <button onClick={exportCsv} disabled={rowsVisible.length === 0} className={`${fieldCls} font-semibold hover:bg-wash disabled:opacity-50`} title="Scarica il movimento in CSV (dettaglio per ospite)">⬇ Scarica CSV</button>
         <button onClick={chiudiGiornata} disabled={!!busy || dayPending === 0} className="ml-auto rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Chiudi e invia il movimento del giorno al portale regionale">{busy === "close" ? "Invio…" : `Chiudi giornata (${dayPending})`}</button>
         <button type="button" onClick={() => setSettingsOpen(true)} title="Impostazioni ISTAT" aria-label="Impostazioni ISTAT" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">
