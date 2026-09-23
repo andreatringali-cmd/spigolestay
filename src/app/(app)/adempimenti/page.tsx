@@ -187,7 +187,6 @@ export default function AdempimentiPage() {
   // La schedina si invia DOPO l'arrivo: quelle di arrivi futuri sono "in preparazione", non inviabili ora.
   const schedPending = sched.filter((s) => s.stato !== "inviata" && isActive(s.booking_id));
   const schedToSend = schedPending.filter((s) => (s.arrival || "") <= t);   // arrivate/in arrivo oggi → inviabili
-  const schedUpcoming = schedPending.filter((s) => (s.arrival || "") > t);  // arrivi futuri → in preparazione
   const schedSent = sched.filter((s) => s.stato === "inviata");
   // Raggruppa le schedine per PRENOTAZIONE: una riga per prenotazione, con quante schedine ha
   // (una a persona). Così con più prenotazioni si capisce a colpo d'occhio a chi si riferiscono.
@@ -204,7 +203,6 @@ export default function AdempimentiPage() {
     return [...m.values()].sort((a, b) => (a.arrival < b.arrival ? -1 : 1));
   };
   const schedToSendG = groupSched(schedToSend);
-  const schedUpcomingG = groupSched(schedUpcoming);
   const schedSentG = groupSched(schedSent);
   const bookingName = (bookingId: string | null) => { const b = bookingId ? bookings.find((x) => x.id === bookingId) : null; return b ? (getGuest(b.guestId)?.fullName || "Ospite") : "Prenotazione"; };
   const structName = (structureId: string | null, bookingId: string | null) => { const b = bookingId ? bookings.find((x) => x.id === bookingId) : null; return getStructure(structureId || b?.structureId || "")?.name || ""; };
@@ -284,7 +282,7 @@ export default function AdempimentiPage() {
 
         {/* 2 · Schedine alla Questura */}
         <StepCard n={2} tone="var(--err)" label="Schedine alla Questura (Alloggiati Web)" sub="Da inviare" count={schedToSendG.length} action="Invia alla Questura" onAction={() => router.push("/alloggiati-web")}>
-          {(schedToSendG.length > 0 || schedUpcomingG.length > 0 || schedSentG.length > 0) ? (
+          {(schedToSendG.length > 0 || schedSentG.length > 0) ? (
             <>
               {schedToSendG.length > 0 && (<>
                 <SubHead>Da inviare ({schedToSendG.length}) · una riga per prenotazione</SubHead>
@@ -292,14 +290,6 @@ export default function AdempimentiPage() {
                   <MiniRow key={gr.key}
                     left={`${bookingName(gr.bookingId)} · ${structName(gr.structureId, gr.bookingId)} · arrivo ${fmtDay(gr.arrival)}`}
                     right={`${schedLabel(gr.count)} · ${schedOverdue(gr.arrival) ? "⚠ scaduta" : `entro ${schedDeadline(gr.arrival)}`}`} />
-                ))}
-              </>)}
-              {schedUpcomingG.length > 0 && (<>
-                <SubHead mt={schedToSendG.length > 0}>Prossimi arrivi ({schedUpcomingG.length}) · in preparazione, si inviano dopo l&apos;arrivo</SubHead>
-                {schedUpcomingG.slice(0, 3).map((gr) => (
-                  <MiniRow key={gr.key}
-                    left={`${bookingName(gr.bookingId)} · ${structName(gr.structureId, gr.bookingId)} · arrivo ${fmtDay(gr.arrival)}`}
-                    right={`${schedLabel(gr.count)} · dal ${fmtDay(gr.arrival)}`} />
                 ))}
               </>)}
               {schedSentG.length > 0 && (<>
