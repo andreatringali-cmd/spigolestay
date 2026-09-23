@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { PageHeader } from "@/components/ui";
+import WeatherWidget from "@/components/WeatherWidget";
 import { eur } from "@/lib/format";
 import { centsEur, apiPost } from "@/lib/invoicing/client";
 import { shortenLink } from "@/lib/guestlink";
@@ -302,7 +303,7 @@ export default function AdempimentiPage() {
 
   return (
     <div>
-      <PageHeader title="Adempimenti oggi" subtitle="Tutto ciò che va gestito o inviato, in ordine cronologico" />
+      <PageHeader title="Adempimenti oggi" subtitle="Tutto ciò che va gestito o inviato, in ordine cronologico" actions={<WeatherWidget compact />} />
 
       {/* Riepilogo d'impatto: quante cose da gestire e con che priorità */}
       <section className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-line bg-surface p-4 shadow-sm sm:p-5">
