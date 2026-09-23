@@ -48,7 +48,11 @@ export async function syncIstat(admin: SupabaseClient, tenantId: string, opts: {
   for (const b of bookings) {
     const sf = startFrom.get(b.structureId);
     if (sf && b.checkIn < sf) continue; // non inviare movimenti prima della data indicata
+    // Ripulisci eventuali righe non inviate della prenotazione (evita duplicati)…
     await admin.from("istat_rows").delete().eq("tenant_id", tenantId).eq("booking_id", b.id).neq("stato", "sent");
+    // …e se la prenotazione è già stata INVIATA, non ricreare una riga pending (niente doppioni sent+pending).
+    const { data: alreadySent } = await admin.from("istat_rows").select("id").eq("tenant_id", tenantId).eq("booking_id", b.id).eq("stato", "sent").limit(1);
+    if (alreadySent && alreadySent.length) continue;
     const g = guestsById.get(b.guestId);
     const provenance = g?.province || g?.country || (g?.citizenship ?? "");
     const { error } = await admin.from("istat_rows").insert({
@@ -124,5 +128,17 @@ export async function closeDay(admin: SupabaseClient, tenantId: string, structur
   for (const bid of Array.from(new Set(list.map((r) => r.booking_id).filter(Boolean))) as string[]) {
     await logBookingEvent(admin, tenantId, bid, "istat", "Movimento ISTAT inviato");
   }
+  // Storico: registra la chiusura giornaliera (archivio invii ISTAT).
+  try { await admin.from("istat_submissions").insert({ tenant_id: tenantId, structure_id: structureId, day: day ?? today, count: ids.length, stato: "sent", esito }); } catch {}
   return { ok: true, message: live ? `Movimento inviato al portale: ${ids.length} righe.` : `Movimento inviato: ${ids.length} righe (demo).`, sent: ids.length };
+}
+
+// Archivio invii ISTAT: elenco delle chiusure giornaliere (storico).
+export async function listIstatSubmissions(admin: SupabaseClient, tenantId: string, structureId: string): Promise<{ ok: boolean; items: { id: string; day: string | null; created_at: string; count: number; stato: string; esito: string | null }[] }> {
+  const { data } = await admin.from("istat_submissions")
+    .select("id, day, created_at, count, stato, esito")
+    .eq("tenant_id", tenantId).eq("structure_id", structureId)
+    .order("created_at", { ascending: false }).limit(200);
+  const items = (data ?? []).map((s) => ({ id: s.id as string, day: (s.day as string) ?? null, created_at: s.created_at as string, count: (s.count as number) ?? 0, stato: (s.stato as string) ?? "", esito: (s.esito as string) ?? null }));
+  return { ok: true, items };
 }

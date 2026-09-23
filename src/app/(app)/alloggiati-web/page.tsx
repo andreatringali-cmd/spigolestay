@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { apiPost } from "@/lib/invoicing/client";
 import AlloggiatiSettingsModal from "./SettingsModal";
-import AlloggiatiArchiveModal from "./ArchiveModal";
 import EditBookingModal from "./EditBookingModal";
 
 interface SchedGuest { cognome?: string; nome?: string; sesso?: "M" | "F" | string; dataNascita?: string; comuneNascita?: string; provinciaNascita?: string; statoNascita?: string; cittadinanza?: string; tipoDoc?: string; numeroDoc?: string; luogoRilascio?: string; perm?: number }
@@ -25,7 +25,6 @@ export default function AlloggiatiWebPage() {
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []); // countdown vivo (ogni minuto)
   const [openG, setOpenG] = useState<Record<string, boolean>>({}); // schedine a tendina per prenotazione
   const [settingsOpen, setSettingsOpen] = useState(false); // finestra centrale impostazioni
-  const [archiveOpen, setArchiveOpen] = useState(false); // archivio invii/ricevute
   const [editBooking, setEditBooking] = useState<string | null>(null); // modale modifica/compilazione dati ospite
   const [conn, setConn] = useState<{ status?: string; auto?: boolean }>({}); // stato connessione portale + invio automatico
 
@@ -163,7 +162,7 @@ export default function AlloggiatiWebPage() {
         <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className={fieldCls} />
         {filterDate && <button onClick={() => setFilterDate("")} className={`${fieldCls} text-dim hover:bg-wash`} title="Rimuovi filtro">✕</button>}
         <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
-        <button onClick={() => setArchiveOpen(true)} className={`${fieldCls} font-semibold hover:bg-wash`} title="Archivio invii: riscarica o stampa le ricevute quando vuoi">📁 Archivio ricevute</button>
+        <Link href="/alloggiati-web/archivio" className={`${fieldCls} font-semibold hover:bg-wash`} title="Archivio invii: riscarica o stampa le ricevute quando vuoi">📁 Archivio ricevute</Link>
         <button onClick={generaTracciato} disabled={!!busy || readyCount === 0} className={`${fieldCls} ml-auto font-semibold hover:bg-wash disabled:opacity-50`} title="Scarica il tracciato .txt da caricare a mano sul portale (se il web service non è attivo)">{busy === "tracciato" ? "Genero…" : "⬇ Genera tracciato .txt"}</button>
         <button onClick={() => call("send", "send")} disabled={!!busy || readyCount === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Invia subito alla Questura, senza aspettare l'orario automatico">{busy === "send" ? "Invio…" : `Invia le pronte (${readyCount})`}</button>
         <button type="button" onClick={() => setSettingsOpen(true)} title="Impostazioni account" aria-label="Impostazioni account" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">
@@ -292,7 +291,6 @@ export default function AlloggiatiWebPage() {
       </Card>
 
       {settingsOpen && <AlloggiatiSettingsModal sid={sid} onClose={() => { setSettingsOpen(false); void runAuto(); }} />}
-      {archiveOpen && <AlloggiatiArchiveModal sid={sid} onClose={() => setArchiveOpen(false)} />}
       {editBooking && <EditBookingModal bookingId={editBooking} onClose={() => { setEditBooking(null); setTimeout(() => void runAuto(), 6500); }} />}
     </div>
   );

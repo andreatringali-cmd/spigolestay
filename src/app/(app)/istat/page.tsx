@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
+import Link from "next/link";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { apiPost } from "@/lib/invoicing/client";
 import IstatSettingsModal from "./SettingsModal";
+import EditBookingModal from "../alloggiati-web/EditBookingModal";
 
 interface Row { id: string; arrival: string; departure: string; provenance: string; guests: number; stato: string; booking_id: string | null }
 const STA = (k: string) => ({ pending: { l: "Da inviare", c: "var(--warn)" }, sent: { l: "Inviato", c: "var(--dim)" }, error: { l: "Errore", c: "var(--err)" } } as Record<string, { l: string; c: string }>)[k] ?? { l: k, c: "var(--dim)" };
@@ -20,6 +22,7 @@ export default function IstatPage() {
   const [filterDate, setFilterDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; });
   const [openG, setOpenG] = useState<Record<string, boolean>>({});
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [editBooking, setEditBooking] = useState<string | null>(null);
   const [conn, setConn] = useState<{ configured?: boolean; auto?: boolean; partner?: string }>({});
 
   useEffect(() => {
@@ -170,6 +173,7 @@ export default function IstatPage() {
         <button onClick={() => setFilterDate(todayIso)} className={`${fieldCls} font-semibold hover:bg-wash`}>Oggi</button>
         <button onClick={() => setFilterDate("")} className={`${fieldCls} hover:bg-wash ${filterDate ? "" : "opacity-40"}`} title="Mostra tutto il movimento">Tutte</button>
         <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
+        <Link href="/istat/archivio" className={`${fieldCls} font-semibold hover:bg-wash`} title="Archivio invii: storico delle chiusure giornaliere">📁 Archivio</Link>
         <button onClick={exportCsv} disabled={rowsVisible.length === 0} className={`${fieldCls} font-semibold hover:bg-wash disabled:opacity-50`} title="Scarica il movimento in CSV (dettaglio per ospite)">⬇ Scarica CSV</button>
         <button onClick={chiudiGiornata} disabled={!!busy || dayPending === 0} className="ml-auto rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Chiudi e invia il movimento del giorno al portale regionale">{busy === "close" ? "Invio…" : `Chiudi giornata (${dayPending})`}</button>
         <button type="button" onClick={() => setSettingsOpen(true)} title="Impostazioni ISTAT" aria-label="Impostazioni ISTAT" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">
@@ -251,6 +255,7 @@ export default function IstatPage() {
                           {rNm ? <RF label="Camera" v={rNm} /> : null}
                           {chLab ? <RF label="Canale" v={chLab} /> : null}
                         </div>
+                        <div className="mt-2 flex justify-end"><button type="button" onClick={() => bk && setEditBooking(bk.id)} disabled={!bk} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-50"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg> Modifica dati</button></div>
                       </div>
                     )}
                   </div>
@@ -272,6 +277,7 @@ export default function IstatPage() {
       </Card>
 
       {settingsOpen && <IstatSettingsModal sid={sid} onClose={() => { setSettingsOpen(false); void runAuto(); }} />}
+      {editBooking && <EditBookingModal bookingId={editBooking} onClose={() => { setEditBooking(null); setTimeout(() => void runAuto(), 6500); }} />}
     </div>
   );
 }
