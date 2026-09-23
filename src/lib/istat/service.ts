@@ -6,7 +6,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Structure, Booking, Guest } from "@/lib/types";
 import { logBookingEvent } from "@/lib/booking-events";
 import { decryptCred } from "@/lib/crypto-creds";
+import { sendDaily, type DailyMovement } from "@/lib/istat/turistat";
 
+// Invio reale al portale regionale (Turist@t) attivo solo con ISTAT_LIVE=1 e credenziali complete.
+const ISTAT_LIVE = process.env.ISTAT_LIVE === "1";
 const DATA_KEY = "spigolestay:data:v1";
 type Blob = { structures?: Structure[]; bookings?: Booking[]; guests?: Guest[] };
 
@@ -58,26 +61,68 @@ export async function syncIstat(admin: SupabaseClient, tenantId: string, opts: {
   return { count };
 }
 
-// Chiusura/invio giornaliero (mock): segna come inviate le righe pending del giorno.
+// Costruisce la chiusura giornaliera (stile Turist@t) dai dati prenotazione per un giorno.
+function buildDailyMovement(blob: Blob, structureId: string, day: string): DailyMovement {
+  const units = 0; // le camere totali stanno nel client; qui non servono al calcolo movimento
+  const guestsById = new Map((blob.guests ?? []).map((g) => [g.id, g]));
+  const isInactive = (b: { status?: string; channel?: string }) => b.status === "cancelled" || b.status === "no_show" || b.channel === "blocked";
+  const act = (blob.bookings ?? []).filter((b) => b.structureId === structureId && !isInactive(b));
+  const pax = (b: Booking) => (b.adults ?? 1) + (b.children ?? 0);
+  const nights = (ci?: string, co?: string) => { if (!ci || !co) return 0; return Math.max(0, Math.round((new Date(co + "T00:00").getTime() - new Date(ci + "T00:00").getTime()) / 86400000)); };
+  const arrivati = act.filter((b) => b.checkIn === day).reduce((a, b) => a + pax(b), 0);
+  const partiti = act.filter((b) => b.checkOut === day).reduce((a, b) => a + pax(b), 0);
+  const present = act.filter((b) => b.checkIn <= day && day < b.checkOut);
+  const presenti = present.reduce((a, b) => a + pax(b), 0);
+  const camereOccupate = present.length;
+  const ageFrom = (iso?: string) => { if (!iso) return undefined; const d = new Date(iso); const t = new Date(day); let a = t.getFullYear() - d.getFullYear(); if (t.getMonth() < d.getMonth() || (t.getMonth() === d.getMonth() && t.getDate() < d.getDate())) a--; return a >= 0 && a < 130 ? a : undefined; };
+  // Dettaglio movimento (anonimo) degli arrivi del giorno.
+  const ospiti = act.filter((b) => b.checkIn === day).flatMap((b) => {
+    const g = guestsById.get(b.guestId);
+    const pg = b.primaryGuest ?? {};
+    const main = {
+      permanenza: nights(b.checkIn, b.checkOut), camera: b.unitId ?? undefined,
+      eta: ageFrom(g?.birthDate ?? pg.birthDate), sesso: (g?.sex ?? pg.sex) as "M" | "F" | undefined,
+      cittadinanza: g?.citizenship ?? pg.citizenship, luogoNascita: g?.birthPlace ?? pg.birthPlace,
+      luogoResidenza: g?.province ?? g?.country ?? undefined,
+    };
+    const extra = (b.extraGuests ?? []).map((c) => ({ permanenza: nights(b.checkIn, b.checkOut), camera: b.unitId ?? undefined, eta: ageFrom(c.birthDate), sesso: c.sex as "M" | "F" | undefined, cittadinanza: c.citizenship, luogoNascita: c.birthPlace, luogoResidenza: undefined }));
+    return [main, ...extra];
+  });
+  return { day, arrivati, partiti, presenti, camereOccupate, camereTotali: units, ospiti };
+}
+
+// Chiusura/invio giornaliero. Con ISTAT_LIVE + credenziali → invio reale al portale (Turist@t);
+// altrimenti mock. Marca come inviate le righe pending del giorno.
 export async function closeDay(admin: SupabaseClient, tenantId: string, structureId: string, day?: string): Promise<{ ok: boolean; message: string; sent: number }> {
   const { data: sett } = await admin.from("istat_settings").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).maybeSingle();
-  const provider = "mock"; // TODO(istat): connettore regionale reale (Ross1000/Turist@t) via credenziali sett
+  const today = new Date().toISOString().slice(0, 10);
   let q = admin.from("istat_rows").select("id, booking_id").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pending");
   // Si invia per gli arrivi già avvenuti: senza un giorno specifico, escludi gli arrivi futuri.
   if (day) q = q.eq("arrival", day);
-  else q = q.lte("arrival", new Date().toISOString().slice(0, 10));
+  else q = q.lte("arrival", today);
   const { data: rows } = await q;
   const list = (rows ?? []) as { id: string; booking_id: string | null }[];
   const ids = list.map((r) => r.id);
   if (!ids.length) return { ok: false, message: "Nessuna riga da inviare.", sent: 0 };
+
   const istatPassword = decryptCred(sett?.password_enc);
-  if (provider === "mock") {
-    if (!sett?.username || !istatPassword) return { ok: false, message: "Credenziali ISTAT mancanti.", sent: 0 };
-    await admin.from("istat_rows").update({ stato: "sent", esito: "Inviato (mock)" }).in("id", ids);
-    for (const bid of Array.from(new Set(list.map((r) => r.booking_id).filter(Boolean))) as string[]) {
-      await logBookingEvent(admin, tenantId, bid, "istat", "Movimento ISTAT inviato");
-    }
-    return { ok: true, message: `Movimento inviato: ${ids.length} righe (mock).`, sent: ids.length };
+  if (!sett?.username || !istatPassword) return { ok: false, message: "Credenziali ISTAT mancanti: aprile impostazioni e inserisci username e password.", sent: 0 };
+
+  const live = ISTAT_LIVE && !!sett.username && !!istatPassword;
+  let esito = "Inviato (mock)";
+  if (live) {
+    try {
+      const blob = await readBlob(admin, tenantId);
+      const movement = buildDailyMovement(blob, structureId, day ?? today);
+      const r = await sendDaily({ username: sett.username, password: istatPassword }, movement);
+      if (!r.ok) return { ok: false, message: r.message, sent: 0 };
+      esito = r.ricevuta ? `Inviato · ric. ${r.ricevuta}` : "Inviato al portale Turist@t";
+    } catch (e) { return { ok: false, message: (e as Error)?.message ?? "Errore invio al portale Turist@t.", sent: 0 }; }
   }
-  throw new Error("istat_provider_not_configured");
+
+  await admin.from("istat_rows").update({ stato: "sent", esito }).in("id", ids);
+  for (const bid of Array.from(new Set(list.map((r) => r.booking_id).filter(Boolean))) as string[]) {
+    await logBookingEvent(admin, tenantId, bid, "istat", "Movimento ISTAT inviato");
+  }
+  return { ok: true, message: live ? `Movimento inviato al portale: ${ids.length} righe.` : `Movimento inviato: ${ids.length} righe (demo).`, sent: ids.length };
 }
