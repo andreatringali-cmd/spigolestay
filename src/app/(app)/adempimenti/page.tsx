@@ -216,6 +216,10 @@ export default function AdempimentiPage() {
   const schedPending = sched.filter((s) => s.stato === "pronta" && isActive(s.booking_id) && !!s.booking_id && completeBookingIds.has(s.booking_id) && !bookingsWithInvalid.has(s.booking_id));
   const schedToSend = schedPending.filter((s) => (s.arrival || "") <= t);   // arrivate/in arrivo oggi → inviabili
   const schedSent = sched.filter((s) => s.stato === "inviata");
+  // Prenotazioni con check-in COMPLETO ma SENZA schedine ancora generate → "da trasferire alle schedine".
+  const schedBookingIds = new Set(sched.map((s) => s.booking_id).filter(Boolean) as string[]);
+  const weekAgo = (() => { const d = new Date(t + "T00:00:00"); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); })();
+  const needsTransfer = bookings.filter((b) => isActiveArrival(b) && isComplete(b) && (b.checkIn || "") >= weekAgo && !schedBookingIds.has(b.id));
   // Raggruppa le schedine per PRENOTAZIONE: una riga per prenotazione, con quante schedine ha
   // (una a persona). Così con più prenotazioni si capisce a colpo d'occhio a chi si riferiscono.
   type SchedRow = typeof sched[number];
@@ -293,7 +297,7 @@ export default function AdempimentiPage() {
       {/* Ordine CRONOLOGICO: 1) check-in → 2) schedine Questura → 3) ISTAT → 4) incasso → 5) fattura/SdI → 6) fornitori */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* 1 · Check-in online → poi "passaggio di palla" alle schedine */}
-        <StepCard n={1} tone="var(--warn)" label="Check-in online da completare" sub="Da completare" count={arrivalsNoCheckin.length} badge={frac(arrivalsCheckedIn.length, arrivalsNoCheckin.length)} action={syncing ? "Trasferisco…" : "↪ Trasferisci alle schedine"} onAction={transferToSchedine}>
+        <StepCard n={1} tone="var(--warn)" label="Check-in online da completare" sub="Da completare" count={arrivalsNoCheckin.length} badge={frac(arrivalsCheckedIn.length, arrivalsNoCheckin.length)} action={syncing ? "Trasferisco…" : `↪ Trasferisci alle schedine${needsTransfer.length ? ` (${needsTransfer.length})` : ""}`} onAction={transferToSchedine}>
           {(arrivalsNoCheckin.length > 0 || arrivalsCheckedIn.length > 0 || syncMsg) ? (
             <>
               {arrivalsNoCheckin.length > 0 && (
@@ -309,8 +313,12 @@ export default function AdempimentiPage() {
                   <SubHead mt={arrivalsNoCheckin.length > 0}>Check-in fatti ({arrivalsCheckedIn.length}) · pronti per le schedine</SubHead>
                   {arrivalsCheckedIn.slice(0, 6).map((b) => {
                     const g = getGuest(b.guestId); const st = getStructure(b.structureId);
-                    return <DoneRow key={b.id} left={`${g?.fullName || "Ospite"} · ${st?.name ?? ""}`} right={`${fmtDay(b.checkIn)}→${fmtDay(b.checkOut)} · ${expectedPaxOf(b)}p`} />;
+                    const transferred = schedBookingIds.has(b.id);
+                    return <DoneRow key={b.id} left={`${g?.fullName || "Ospite"} · ${st?.name ?? ""}`} right={transferred ? `${fmtDay(b.checkIn)}→${fmtDay(b.checkOut)} · ${expectedPaxOf(b)}p` : "↪ da trasferire"} />;
                   })}
+                  {needsTransfer.length > 0
+                    ? <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold" style={{ background: soft("var(--warn)"), color: "var(--warn)" }}>↪ {needsTransfer.length} con check-in fatto {needsTransfer.length === 1 ? "non è" : "non sono"} ancora {needsTransfer.length === 1 ? "trasferita" : "trasferite"} alle schedine — premi «Trasferisci».</div>
+                    : <div className="text-[11px] font-medium" style={{ color: "var(--ok)" }}>✓ Tutte trasferite alle schedine.</div>}
                 </>
               )}
               {syncMsg && <div className="text-[11px] font-medium" style={{ color: syncMsg.startsWith("✓") ? "var(--ok)" : "var(--err)" }}>{syncMsg}</div>}
