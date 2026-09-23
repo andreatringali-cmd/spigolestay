@@ -62,8 +62,8 @@ export const NAV: NavItem[] = [
   { label: "Forniture", href: "/forniture", group: "Amministrazione", icon: "box", perm: "cassa", module: "pms" },
 
   // Adempimenti PA: cosa mandi agli enti (Questura, ISTAT, Comune).
-  { label: "Alloggiati Web", href: "/alloggiati-web", group: "Adempimenti PA", icon: "id", perm: "alloggiati", module: "pms" },
   { label: "ISTAT · Turist@t", href: "/istat", group: "Adempimenti PA", icon: "chart", perm: "alloggiati", module: "pms" },
+  { label: "Alloggiati Web", href: "/alloggiati-web", group: "Adempimenti PA", icon: "id", perm: "alloggiati", module: "pms" },
   { label: "Tassa soggiorno", href: "/tassa-soggiorno", group: "Adempimenti PA", icon: "receipt", perm: "tassa", module: "pms" },
 
   // Configurazione: impostazioni della struttura e dell'account.
