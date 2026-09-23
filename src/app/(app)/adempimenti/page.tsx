@@ -7,6 +7,7 @@ import { useData } from "@/lib/store";
 import { PageHeader } from "@/components/ui";
 import { eur } from "@/lib/format";
 import { centsEur, apiPost } from "@/lib/invoicing/client";
+import { shortenLink } from "@/lib/guestlink";
 import type { Booking, Guest, Structure } from "@/lib/types";
 
 // Data locale (NON UTC): altrimenti vicino a mezzanotte "oggi" sfasa di un giorno.
@@ -75,8 +76,12 @@ function SubHead({ children, mt }: { children: React.ReactNode; mt?: boolean }) 
 // Riga arrivo senza check-in: WhatsApp (link), Email diretta (server) e "Compila tu" (apri il form).
 function ArrivalRow({ b, g, st, origin }: { b: Booking; g?: Guest; st?: Structure; origin: string }) {
   const [mail, setMail] = useState<"idle" | "sending" | "sent" | "err">("idle");
-  const link = `${origin}/checkin?b=${b.id}`;
-  const msg = `Ciao ${g?.firstName || ""}, completa il check-in online per il tuo soggiorno${st ? ` a ${st.name}` : ""}: ${link}`;
+  const fullLink = `${origin}/checkin?b=${b.id}`;
+  // Link ACCORCIATO (xenora.it/g/xxxxxx): più pulito e senza anteprima marketing.
+  const [link, setLink] = useState(fullLink);
+  useEffect(() => { let on = true; shortenLink(fullLink).then((s) => { if (on) setLink(s); }).catch(() => {}); return () => { on = false; }; }, [fullLink]);
+  // Messaggio breve e chiaramente DA PARTE DELLA STRUTTURA (firma inclusa).
+  const msg = `Gentile ${g?.firstName || "ospite"}, le scriviamo da ${st?.name || "la struttura"}. Per velocizzare il suo arrivo la invitiamo a completare il check-in online (dati e documento, bastano 2 minuti): ${link} . Grazie e a presto!${st?.name ? `\n— ${st.name}` : ""}`;
   const wa = g?.phone ? `https://wa.me/${g.phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}` : "";
   const sendMail = async () => {
     if (!g?.email) return;
@@ -90,7 +95,7 @@ function ArrivalRow({ b, g, st, origin }: { b: Booking; g?: Guest; st?: Structur
       setMail(r.ok && j?.ok ? "sent" : "err");
     } catch { setMail("err"); }
   };
-  const compila = () => { const w = window.open(link, "_blank"); if (!w) window.location.href = link; };
+  const compila = () => { const w = window.open(fullLink, "_blank"); if (!w) window.location.href = fullLink; };
   const expected = expectedPaxOf(b);
   const declared = declaredPaxOf(b);
   const partial = declared > 0 && declared < expected; // qualcuno ha fatto il check-in, ma non tutti
@@ -108,9 +113,9 @@ function ArrivalRow({ b, g, st, origin }: { b: Booking; g?: Guest; st?: Structur
         <span className={partial ? "font-semibold text-[color:var(--warn)]" : ""}>✓ check-in {declared}/{expected}</span>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-        {wa && <a href={wa} target="_blank" rel="noreferrer" className="rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>💬 Sollecita</a>}
+        {wa && <a href={wa} target="_blank" rel="noreferrer" className="rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</a>}
         {g?.email && <button onClick={sendMail} disabled={mail === "sending" || mail === "sent"} className={`rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-70 ${mail === "sent" ? "bg-[color:var(--ok)]" : mail === "err" ? "bg-[color:var(--err)]" : "bg-focus"}`}>{mail === "sent" ? "✓ Inviata" : mail === "sending" ? "Invio…" : mail === "err" ? "Riprova" : "✉ Email"}</button>}
-        <button onClick={compila} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-txt hover:bg-wash">Compila tu</button>
+        <button onClick={compila} className="rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--warn)" }}>Compila tu</button>
       </div>
     </div>
   );
