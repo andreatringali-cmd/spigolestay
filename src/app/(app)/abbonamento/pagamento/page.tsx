@@ -3,11 +3,12 @@
 // Informazioni di pagamento (dimostrativo). In produzione i dati della carta sono gestiti da
 // Stripe e NON passano dall'app: qui si mostra solo lo stato e i dati di fatturazione.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
+import { supabase } from "@/lib/supabase";
 
 interface Billing { businessName: string; vat: string; taxCode: string; address: string; streetNumber: string; city: string; province: string; sdi: string; pec: string; email: string }
 const KEY = "spigolestay:billing";
@@ -21,7 +22,20 @@ export default function PagamentoPage() {
   const [customer, setCustomer] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  useEffect(() => { try { const r = localStorage.getItem(KEY); if (r) setB({ ...empty, ...JSON.parse(r) }); } catch {} }, []);
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    // Cache locale immediata (per non mostrare vuoto), poi il SERVER è autorevole per i dati fiscali.
+    try { const r = localStorage.getItem(KEY); if (r) setB({ ...empty, ...JSON.parse(r) }); } catch {}
+    if (!supabase || !user) return;
+    supabase.from("tenant_invoice_settings").select("denominazione, vat, tax_code, pec, sdi, address, city, province").eq("tenant_id", user.id).maybeSingle().then(({ data }) => {
+      if (!data) return;
+      // Preferisco il valore presente (server o locale) per non azzerare mai un campo compilato.
+      setB((p) => ({ ...p,
+        businessName: data.denominazione || p.businessName, vat: data.vat || p.vat, taxCode: data.tax_code || p.taxCode,
+        pec: data.pec || p.pec, sdi: data.sdi || p.sdi, address: data.address || p.address, city: data.city || p.city, province: data.province || p.province,
+      }));
+    });
+  }, [user]);
   // Cliente Stripe dell'ABBONAMENTO XENORA, autorevole dal server: evita di aprire per errore
   // un tuo cliente omonimo (stessa email ma non Xenora). Se non c'è abbonamento, customer = null.
   useEffect(() => {
@@ -37,8 +51,23 @@ export default function PagamentoPage() {
       .catch(() => {});
     return () => { cancel = true; };
   }, [user?.email, user?.id]);
-  const set = (k: keyof Billing, v: string) => setB((p) => ({ ...p, [k]: v }));
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(b)); } catch {} setSaved(true); window.setTimeout(() => setSaved(false), 2000); };
+  const set = (k: keyof Billing, v: string) => { loadedRef.current = true; setB((p) => ({ ...p, [k]: v })); };
+  // Salvataggio: localStorage (cache) + SERVER (tenant_invoice_settings) → i dati fiscali NON si perdono più.
+  const persist = async (data: Billing) => {
+    try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {}
+    if (supabase && user) {
+      try {
+        await supabase.from("tenant_invoice_settings").upsert({
+          tenant_id: user.id, denominazione: data.businessName, vat: data.vat, tax_code: data.taxCode,
+          pec: data.pec, sdi: data.sdi, address: data.address, city: data.city, province: data.province,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "tenant_id" });
+      } catch {}
+    }
+  };
+  const save = () => { void persist(b); setSaved(true); window.setTimeout(() => setSaved(false), 2000); };
+  // Auto-salvataggio dopo una modifica (niente più "ho dimenticato di premere Salva").
+  useEffect(() => { if (!loadedRef.current) return; const id = setTimeout(() => { void persist(b); }, 1000); return () => clearTimeout(id); }, [b]);
 
   // Aggiungi/gestisci carta: la carta è gestita da Stripe (non passa dall'app).
   const openPortal = async (cid: string) => {

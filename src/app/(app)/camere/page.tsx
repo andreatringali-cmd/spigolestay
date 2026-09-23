@@ -54,12 +54,9 @@ export default function CamerePage() {
   const typeMatchQ = (rt: { name: string }) => !q || rt.name.toLowerCase().includes(q);
   const unitMatchQ = (u: Unit) => !q || (u.name || "").toLowerCase().includes(q) || (u.code || "").toLowerCase().includes(q);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  // Tendine delle camere: di default CHIUSE. Salviamo le tipologie APERTE, cosi un elenco
-  // vuoto (primo accesso o nuova tipologia) significa chiusa.
-  const OPEN_KEY = "spigolestay:camere:aperte:v2";
+  // Tendine delle camere: SEMPRE chiuse all'apertura della pagina (non si ricordano più aperte).
   const [opened, setOpened] = useState<Set<string>>(new Set());
-  useEffect(() => { try { const r = localStorage.getItem(OPEN_KEY); if (r) setOpened(new Set(JSON.parse(r))); } catch {} }, []);
-  const toggleOpen = (id: string) => setOpened((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); try { localStorage.setItem(OPEN_KEY, JSON.stringify([...n])); } catch {} return n; });
+  const toggleOpen = (id: string) => setOpened((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   // Selezione multipla camere (modifica in blocco)
   const [sel, setSel] = useState<Set<string>>(new Set());
   const toggleSel = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
