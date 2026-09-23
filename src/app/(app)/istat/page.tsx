@@ -12,7 +12,7 @@ interface Row { id: string; arrival: string; departure: string; provenance: stri
 const STA = (k: string) => ({ pending: { l: "Da inviare", c: "var(--warn)" }, sent: { l: "Inviato", c: "var(--dim)" }, error: { l: "Errore", c: "var(--err)" } } as Record<string, { l: string; c: string }>)[k] ?? { l: k, c: "var(--dim)" };
 
 export default function IstatPage() {
-  const { structures, activeStructureId, bookings, roomTypes } = useData();
+  const { structures, activeStructureId, bookings, roomTypes, units } = useData();
   const [sid, setSid] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState("");
@@ -61,7 +61,15 @@ export default function IstatPage() {
   const sent = rowsVisible.filter((r) => r.stato === "sent").length;
   const nightsBetween = (ci?: string, co?: string) => { if (!ci || !co) return 0; const a = new Date(ci + "T00:00"), b = new Date(co + "T00:00"); return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86400000)); };
   const presenze = rowsVisible.reduce((acc, r) => acc + nightsBetween(r.arrival, r.departure) * (r.guests || 1), 0);
-  const inHouse = bookings.filter((b) => b.structureId === sid && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && b.checkIn <= todayIso && todayIso < b.checkOut).reduce((a, b) => a + (b.adults ?? 1) + (b.children ?? 0), 0);
+  // Chiusura giornaliera (stile Turist@t): situazione del giorno selezionato (default oggi).
+  const dayISO = filterDate || todayIso;
+  const actB = bookings.filter((b) => b.structureId === sid && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked");
+  const paxOf = (b: typeof bookings[number]) => (b.adults ?? 1) + (b.children ?? 0);
+  const arrivati = actB.filter((b) => b.checkIn === dayISO).reduce((a, b) => a + paxOf(b), 0);
+  const partiti = actB.filter((b) => b.checkOut === dayISO).reduce((a, b) => a + paxOf(b), 0);
+  const presenti = actB.filter((b) => b.checkIn <= dayISO && dayISO < b.checkOut).reduce((a, b) => a + paxOf(b), 0);
+  const camereOcc = actB.filter((b) => b.checkIn <= dayISO && dayISO < b.checkOut).length;
+  const totCamere = units.filter((u) => u.structureId === sid).length;
 
   const bookingById = new Map(bookings.map((b) => [b.id, b]));
   const roomName = (rtId?: string) => roomTypes.find((rt) => rt.id === rtId)?.name ?? "";
@@ -114,13 +122,17 @@ export default function IstatPage() {
       <PageHeader title="ISTAT · Turist@t" subtitle="Movimento turistico verso il portale regionale"
         actions={structures.length > 1 && activeStructureId === "all" ? <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt">{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select> : undefined} />
 
-      {/* Card riepilogo in alto */}
+      {/* Chiusura giornaliera: situazione del giorno selezionato (come Turist@t) */}
+      <div className="mb-1 flex items-center gap-2 text-xs text-faint">
+        <span>Situazione del <b className="text-dim">{new Date(dayISO).toLocaleDateString("it-IT")}</b></span>
+        <span>· presenze totali periodo: <b className="text-dim">{presenze}</b> notti · {pending > 0 ? <span className="text-[color:var(--warn)]">{pending} da inviare</span> : <span>{sent} inviati</span>}</span>
+      </div>
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          ["Ospiti in struttura", String(inHouse), "var(--ok)"],
-          ["Da inviare", `${pending}/${tot}`, "var(--warn)"],
-          ["Inviati", `${sent}/${tot}`, "var(--dim)"],
-          ["Presenze (notti)", String(presenze), "var(--focus)"],
+          ["Ospiti arrivati", String(arrivati), "var(--ok)"],
+          ["Ospiti partiti", String(partiti), "var(--dim)"],
+          ["Ospiti presenti", String(presenti), "var(--focus)"],
+          ["Camere occupate", `${camereOcc}/${totCamere}`, camereOcc > 0 ? "var(--warn)" : "var(--dim)"],
         ].map(([lab, val, col]) => (
           <div key={lab} className="rounded-xl border border-line bg-surface p-4 shadow-sm">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{lab}</div>
