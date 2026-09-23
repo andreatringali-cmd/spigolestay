@@ -100,8 +100,8 @@ export default function AdempimentiPage() {
   const router = useRouter();
   const { bookings, getGuest, getStructure } = useData();
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const [sched, setSched] = useState<{ id: string; arrival: string; stato: string }[]>([]);
-  const [istat, setIstat] = useState<{ id: string; arrival: string; stato: string }[]>([]);
+  const [sched, setSched] = useState<{ id: string; arrival: string; stato: string; booking_id: string | null }[]>([]);
+  const [istat, setIstat] = useState<{ id: string; arrival: string; stato: string; booking_id: string | null }[]>([]);
   const [docs, setDocs] = useState<{ id: string; number_label: string | null; stato: string; total_cents: number; counterpart: { name?: string } | null }[]>([]);
   const [pays, setPays] = useState<{ document_id: string; amount_cents: number }[]>([]);
   const [passive, setPassive] = useState<{ id: string; supplier_name: string | null; due_date: string | null; total_cents: number; paid: boolean }[]>([]);
@@ -110,8 +110,8 @@ export default function AdempimentiPage() {
   const loadData = useCallback(async () => {
     if (!supabase) return;
     const [a, i, d, p, pv] = await Promise.all([
-      supabase.from("alloggiati_schedine").select("id, arrival, stato"),
-      supabase.from("istat_rows").select("id, arrival, stato").in("stato", ["pending", "sent"]),
+      supabase.from("alloggiati_schedine").select("id, arrival, stato, booking_id"),
+      supabase.from("istat_rows").select("id, arrival, stato, booking_id").in("stato", ["pending", "sent"]),
       supabase.from("documents").select("id, number_label, stato, total_cents, counterpart").in("stato", ["scartata", "emessa", "inviata_intermediario", "consegnata"]),
       supabase.from("document_payments").select("document_id, amount_cents"),
       supabase.from("purchase_documents").select("id, supplier_name, due_date, total_cents, paid"),
@@ -154,12 +154,16 @@ export default function AdempimentiPage() {
   const arrivalsCheckedIn = useMemo(() => bookings.filter((b) => b.checkIn === t && b.status !== "cancelled" && b.channel !== "blocked" && b.webCheckin), [bookings, t]);
   const paidByDoc = useMemo(() => { const m = new Map<string, number>(); for (const p of pays) m.set(p.document_id, (m.get(p.document_id) ?? 0) + p.amount_cents); return m; }, [pays]);
   const balanceOf = (d: { id: string; total_cents: number }) => d.total_cents - (paidByDoc.get(d.id) ?? 0);
-  // 2 · Schedine Questura — da inviare (non "inviata") vs inviate.
-  const schedToSend = sched.filter((s) => s.stato !== "inviata");
+  // Solo prenotazioni ancora attive: schedine/ISTAT di annullate o no-show spariscono subito,
+  // anche prima della prossima sincronizzazione che ripulisce gli orfani lato server.
+  const activeBookingIds = useMemo(() => new Set(bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked").map((b) => b.id)), [bookings]);
+  const isActive = (bookingId: string | null) => !bookingId || activeBookingIds.has(bookingId);
+  // 2 · Schedine Questura — da inviare (non "inviata") vs inviate. Le "da inviare" solo se la prenotazione è viva.
+  const schedToSend = sched.filter((s) => s.stato !== "inviata" && isActive(s.booking_id));
   const schedSent = sched.filter((s) => s.stato === "inviata");
   const schedToday = schedToSend.filter((s) => s.arrival === t);
-  // 3 · ISTAT — pending vs inviati.
-  const istatPend = istat.filter((s) => s.stato === "pending");
+  // 3 · ISTAT — pending (solo prenotazioni vive) vs inviati.
+  const istatPend = istat.filter((s) => s.stato === "pending" && isActive(s.booking_id));
   const istatSent = istat.filter((s) => s.stato === "sent");
   // 4 · Incassi — documenti non saldati vs saldati.
   const docsUnpaid = docs.filter((d) => d.stato !== "scartata" && balanceOf(d) > 0);

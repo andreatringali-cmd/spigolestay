@@ -241,9 +241,18 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     const l = sendLinkFor(x.tpl, x.b, x.g); if (!l) return;
     const body = fillFor(x.tpl.texts[langOf(x.g)] || x.tpl.texts.it || "", x.b, x.g);
     const dg = (x.g.phone ?? "").replace(/\D/g, "");
-    // Se WhatsApp è collegato e c'è un numero: invio reale dall'app; altrimenti wa.me/mailto.
-    const sentReal = l.kind === "wa" && waOn && dg && await waSendReal(dg, body);
-    if (!sentReal) window.open(l.href, "_blank", "noopener");
+    // WhatsApp collegato + numero → invio reale; email → invio reale via server (Resend), non bozza mailto.
+    let sentReal = false;
+    if (l.kind === "wa") {
+      sentReal = !!(waOn && dg && await waSendReal(dg, body));
+    } else if (l.kind === "email" && x.g.email) {
+      const st = getStructure(x.b.structureId);
+      try {
+        const r = await apiPost<{ ok?: boolean }>("email", { kind: "guest_message", to: x.g.email, subject: x.tpl.name, text: body, booking: { structureName: st?.name, structureEmail: st?.email } });
+        sentReal = r?.ok !== false;
+      } catch { sentReal = false; }
+    }
+    if (!sentReal) window.open(l.href, "_blank", "noopener"); // fallback: apre wa.me/mailto se l'invio reale non è possibile
     addTo(x.g.id, "out", body, l.kind === "wa" ? "WhatsApp" : "Email");
     saveSent([{ key: sentKey(x), guest: x.g.fullName, tpl: x.tpl.name, via: l.kind === "wa" ? "WhatsApp" : "Email", ts: Date.now() }, ...sent.filter((s) => s.key !== sentKey(x))].slice(0, 200));
   };

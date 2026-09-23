@@ -124,6 +124,18 @@ export async function syncSchedine(admin: SupabaseClient, tenantId: string, opts
     b.status !== "cancelled" && b.channel !== "blocked" &&
     (b.checkIn || "") >= startISO && (!opts.structureId || b.structureId === opts.structureId));
 
+  // Pulizia ORFANI: elimina le schedine NON inviate le cui prenotazioni sono state annullate/no-show
+  // o non esistono più (es. camera rivenduta). Così un no-show non lascia schedine "da mandare".
+  const activeIds = new Set((blob.bookings ?? []).filter((b) => b.status !== "cancelled" && b.channel !== "blocked").map((b) => b.id));
+  {
+    let q = admin.from("alloggiati_schedine").select("id, booking_id").eq("tenant_id", tenantId).neq("stato", "inviata");
+    if (opts.structureId) q = q.eq("structure_id", opts.structureId);
+    const { data: existing } = await q;
+    const orphanIds = ((existing ?? []) as { id: string; booking_id: string | null }[])
+      .filter((r) => !r.booking_id || !activeIds.has(r.booking_id)).map((r) => r.id);
+    if (orphanIds.length) await admin.from("alloggiati_schedine").delete().in("id", orphanIds);
+  }
+
   let count = 0;
   for (const b of bookings) {
     // Non toccare le schedine già inviate per questa prenotazione.

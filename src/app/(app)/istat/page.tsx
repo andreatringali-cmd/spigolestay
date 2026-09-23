@@ -9,12 +9,12 @@ import { apiPost } from "@/lib/invoicing/client";
 
 interface Sett { region: string; partner: string; username: string; password_enc: string; auto_daily: boolean; start_from: string; status: string; status_msg: string }
 const DEF: Sett = { region: "Sicilia", partner: "Turist@t", username: "", password_enc: "", auto_daily: false, start_from: "", status: "", status_msg: "" };
-interface Row { id: string; arrival: string; departure: string; provenance: string; guests: number; stato: string }
+interface Row { id: string; arrival: string; departure: string; provenance: string; guests: number; stato: string; booking_id: string | null }
 const REGIONS = ["Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna", "Friuli-Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche", "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana", "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto"];
 const STA = (k: string) => ({ pending: { l: "Da inviare", c: "var(--warn)" }, sent: { l: "Inviato", c: "var(--ok)" }, error: { l: "Errore", c: "var(--err)" } } as Record<string, { l: string; c: string }>)[k] ?? { l: k, c: "var(--dim)" };
 
 export default function IstatPage() {
-  const { structures, activeStructureId } = useData();
+  const { structures, activeStructureId, bookings } = useData();
   const [sid, setSid] = useState("");
   const [s, setS] = useState<Sett>(DEF);
   const [rows, setRows] = useState<Row[]>([]);
@@ -33,7 +33,7 @@ export default function IstatPage() {
     if (!supabase || !sid) return;
     const [st, rw] = await Promise.all([
       supabase.from("istat_settings").select("*").eq("structure_id", sid).maybeSingle(),
-      supabase.from("istat_rows").select("id, arrival, departure, provenance, guests, stato").eq("structure_id", sid).order("arrival", { ascending: false }),
+      supabase.from("istat_rows").select("id, arrival, departure, provenance, guests, stato, booking_id").eq("structure_id", sid).order("arrival", { ascending: false }),
     ]);
     setS(st.data ? { ...DEF, ...Object.fromEntries(Object.entries(st.data).filter(([, v]) => v !== null)) as Partial<Sett> } : DEF);
     setHasPw(!!st.data?.password_enc); setPw("");
@@ -57,12 +57,16 @@ export default function IstatPage() {
     catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
   };
 
-  const pending = rows.filter((r) => r.stato === "pending").length;
+  // Movimento sempre allineato alle prenotazioni: righe pending di prenotazioni annullate/no-show
+  // non compaiono (le inviate restano come storico).
+  const activeBookingIds = new Set(bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked").map((b) => b.id));
+  const rowsVisible = rows.filter((r) => r.stato === "sent" || !r.booking_id || activeBookingIds.has(r.booking_id));
+  const pending = rowsVisible.filter((r) => r.stato === "pending").length;
   // Export CSV del movimento (utilizzabile subito: riconciliazione/caricamento manuale sul portale regionale).
   const exportCsv = () => {
     const head = ["Arrivo", "Partenza", "Provenienza", "Ospiti", "Stato"];
     const esc = (v: unknown) => { const s = String(v ?? ""); return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-    const lines = [head.join(";"), ...rows.map((r) => [r.arrival, r.departure, r.provenance, r.guests, STA(r.stato).l].map(esc).join(";"))];
+    const lines = [head.join(";"), ...rowsVisible.map((r) => [r.arrival, r.departure, r.provenance, r.guests, STA(r.stato).l].map(esc).join(";"))];
     const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
     const st = structures.find((x) => x.id === sid);
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -99,15 +103,15 @@ export default function IstatPage() {
           <div className="mb-2 flex flex-wrap gap-2">
             <button onClick={() => call("sync", "sync")} disabled={!!busy} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "sync" ? "Sincronizzo…" : "Sincronizza dagli arrivi"}</button>
             <button onClick={() => call("close", "close")} disabled={!!busy || pending === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "close" ? "Invio…" : `Invia / chiudi (${pending})`}</button>
-            <button onClick={exportCsv} disabled={rows.length === 0} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Scarica il movimento in CSV per caricarlo/riconciliarlo sul portale regionale">↓ Scarica CSV</button>
+            <button onClick={exportCsv} disabled={rowsVisible.length === 0} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Scarica il movimento in CSV per caricarlo/riconciliarlo sul portale regionale">↓ Scarica CSV</button>
           </div>
           <div className="max-h-[52vh] overflow-y-auto">
-            {rows.map((r) => { const st = STA(r.stato); return (
+            {rowsVisible.map((r) => { const st = STA(r.stato); return (
               <div key={r.id} className="flex items-center justify-between gap-2 border-b border-line py-2 last:border-0">
                 <div className="min-w-0"><div className="truncate text-sm text-txt">{r.arrival ? new Date(r.arrival).toLocaleDateString("it-IT") : "—"} → {r.departure ? new Date(r.departure).toLocaleDateString("it-IT") : "—"}</div><div className="text-[11px] text-faint">{r.guests} ospiti · provenienza {r.provenance || "—"}</div></div>
                 <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.c} 16%, transparent)`, color: st.c }}>{st.l}</span>
               </div>); })}
-            {rows.length === 0 && <EmptyState title="Nessun movimento" sub="Premi «Sincronizza dagli arrivi»." />}
+            {rowsVisible.length === 0 && <EmptyState title="Nessun movimento" sub="Premi «Sincronizza dagli arrivi»." />}
           </div>
         </Card>
       </div>

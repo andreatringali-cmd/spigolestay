@@ -194,6 +194,16 @@ export async function POST(req: Request) {
       const data = await send(b.guestEmail, subject, reminderHtml(b, body.checkinUrl || ""), b.structureEmail);
       return NextResponse.json({ ok: true, id: data?.id });
     }
+    if (body.kind === "guest_message") {
+      // Messaggio libero all'ospite (modelli/automazioni): invio reale via Resend, non una bozza mailto.
+      if (!body.to) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
+      const subject = body.subject || (b.structureName ? `Messaggio da ${b.structureName}` : "Messaggio");
+      const accent = body.accent || b.color || "#285f92";
+      const title = body.subject || b.structureName || "Messaggio";
+      const html = shell(title, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>`);
+      const data = await send(body.to, subject, html, body.replyTo || b.structureEmail);
+      return NextResponse.json({ ok: true, id: data?.id });
+    }
     if (body.kind === "quote") {
       if (!body.to) return NextResponse.json({ ok: false, error: "Email destinatario mancante" }, { status: 400 });
       const subject = body.subject || "Preventivo";

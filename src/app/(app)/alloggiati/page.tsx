@@ -7,6 +7,7 @@ import { DOC_TYPES } from "@/lib/types";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
+import { downscaleImage } from "@/lib/images";
 
 type Co = NonNullable<import("@/lib/types").Booking["extraGuests"]>[number];
 
@@ -25,6 +26,62 @@ export default function AlloggiatiPage() {
   const [from, setFrom] = useState(todayISO);
   const [to, setTo] = useState(todayISO);
   const [groupMode, setGroupMode] = useState<Record<string, boolean>>({}); // true = gruppo (non famiglia)
+  // Lettura AI del documento: pre-riempie i campi (come nel check-in online).
+  const [extractingId, setExtractingId] = useState<string | null>(null);
+  const [extractInfo, setExtractInfo] = useState<{ id: string; text: string; err?: boolean } | null>(null);
+
+  // Normalizza il tipo documento restituito dall'AI verso i valori del menu.
+  const normDoc = (d?: string): string | undefined => {
+    if (!d) return undefined;
+    if (DOC_TYPES.includes(d)) return d;
+    if (/patente/i.test(d)) return "Patente di guida";
+    if (/passa/i.test(d)) return "Passaporto";
+    if (/identit|carta/i.test(d)) return "Carta d'identità";
+    return undefined;
+  };
+  // Costruisce un patch solo con i campi effettivamente letti (non sovrascrive con vuoti).
+  const patchFrom = (f: Record<string, string>, withDoc: boolean): Record<string, unknown> => {
+    const p: Record<string, unknown> = {};
+    if (f.firstName) p.firstName = f.firstName;
+    if (f.lastName) p.lastName = f.lastName;
+    if (f.sex === "M" || f.sex === "F") p.sex = f.sex;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(f.birthDate || "")) p.birthDate = f.birthDate;
+    if (f.birthPlace) p.birthPlace = f.birthPlace;
+    if (f.citizenship) p.citizenship = f.citizenship;
+    if (withDoc) { const dt = normDoc(f.docType); if (dt) p.docType = dt; if (f.docNumber) p.docNumber = f.docNumber; }
+    return p;
+  };
+  // Apre il selettore file, legge il documento e pre-riempie i campi della persona.
+  const fillFromDoc = (id: string, withDoc: boolean, apply: (patch: Record<string, unknown>) => void) => {
+    const input = document.createElement("input");
+    input.type = "file"; input.accept = "image/*";
+    input.onchange = async () => {
+      const file = input.files?.[0]; if (!file) return;
+      setExtractingId(id); setExtractInfo(null);
+      try {
+        const dl = await downscaleImage(file, 900, 0.72);
+        const r = await fetch("/api/checkin/extract", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ image: dl }) });
+        const j = await r.json().catch(() => ({}));
+        if (j?.ok && j.fields) {
+          const patch = patchFrom(j.fields, withDoc);
+          if (Object.keys(patch).length) { apply(patch); setExtractInfo({ id, text: t("Campi compilati dal documento — controlla e correggi se serve.") }); }
+          else setExtractInfo({ id, text: t("Documento letto ma nessun campo riconosciuto."), err: true });
+        } else if (j?.error === "ai_not_configured") {
+          setExtractInfo({ id, text: t("Lettura automatica non disponibile: compila i campi a mano."), err: true });
+        } else {
+          setExtractInfo({ id, text: t("Non sono riuscito a leggere il documento. Riprova con una foto più nitida."), err: true });
+        }
+      } catch { setExtractInfo({ id, text: t("Errore nella lettura del documento."), err: true }); }
+      finally { setExtractingId(null); }
+    };
+    input.click();
+  };
+  const DocBtn = ({ id, withDoc, apply }: { id: string; withDoc: boolean; apply: (p: Record<string, unknown>) => void }) => (
+    <button type="button" onClick={() => fillFromDoc(id, withDoc, apply)} disabled={extractingId === id}
+      className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-50">
+      {extractingId === id ? t("Leggo…") : `✨ ${t("Compila dal documento")}`}
+    </button>
+  );
 
   const guest = (id: string) => guests.find((g) => g.id === id);
   const arrivals = useMemo(
@@ -149,10 +206,14 @@ export default function AlloggiatiPage() {
                   <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-dim">{roleLabel(roleFor(b, 0))}</span>
                   <span className="text-xs text-dim">{getStructure(b.structureId)?.name} · {t("arrivo")} {fmt(b.checkIn)} · {nights(b.checkIn, b.checkOut)} {t("notti")}</span>
                   <span className={`text-xs ${declared < pax ? "text-[color:var(--warn)]" : "text-faint"}`}>· {declared}/{pax} {t("ospiti dichiarati")}</span>
-                  {declared > 1 && (
-                    <label className="ml-auto flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={!!groupMode[b.id]} onChange={(e) => setGroupMode((m) => ({ ...m, [b.id]: e.target.checked }))} className="h-3.5 w-3.5 accent-[color:var(--focus)]" /> {t("Gruppo (non famiglia)")}</label>
-                  )}
+                  <div className="ml-auto flex items-center gap-2">
+                    {declared > 1 && (
+                      <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={!!groupMode[b.id]} onChange={(e) => setGroupMode((m) => ({ ...m, [b.id]: e.target.checked }))} className="h-3.5 w-3.5 accent-[color:var(--focus)]" /> {t("Gruppo (non famiglia)")}</label>
+                    )}
+                    <DocBtn id={b.id} withDoc apply={(p) => setPrimaryOf(b, p)} />
+                  </div>
                 </div>
+                {extractInfo?.id === b.id && <div className={`mb-2 text-[11px] font-medium ${extractInfo.err ? "text-[color:var(--warn)]" : "text-[color:var(--focus)]"}`}>✨ {extractInfo.text}</div>}
 
                 {/* Ospite principale */}
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -173,8 +234,12 @@ export default function AlloggiatiPage() {
                       <span className="text-xs font-semibold text-dim">{t("Ospite")} {i + 2}</span>
                       <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-dim">{roleLabel(roleFor(b, i + 1))}</span>
                       <span className="text-[10px] text-faint">{t("(familiare/membro: documento non obbligatorio)")}</span>
-                      <button onClick={() => delCo(b, i)} className="ml-auto text-faint hover:text-[color:var(--err)]" title={t("Rimuovi")}>✕</button>
+                      <div className="ml-auto flex items-center gap-2">
+                        <DocBtn id={`${b.id}-${i}`} withDoc={false} apply={(p) => setCo(b, i, p as Partial<Co>)} />
+                        <button onClick={() => delCo(b, i)} className="text-faint hover:text-[color:var(--err)]" title={t("Rimuovi")}>✕</button>
+                      </div>
                     </div>
+                    {extractInfo?.id === `${b.id}-${i}` && <div className={`mb-2 text-[11px] font-medium ${extractInfo.err ? "text-[color:var(--warn)]" : "text-[color:var(--focus)]"}`}>✨ {extractInfo.text}</div>}
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                       <F label={t("Cognome")}><input className={inp} value={c.lastName} onChange={(e) => setCo(b, i, { lastName: e.target.value })} /></F>
                       <F label={t("Nome")}><input className={inp} value={c.firstName} onChange={(e) => setCo(b, i, { firstName: e.target.value })} /></F>

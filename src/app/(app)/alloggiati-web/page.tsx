@@ -86,9 +86,14 @@ export default function AlloggiatiWebPage() {
     } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); }
   };
 
-  const readyCount = sched.filter((x) => x.stato === "pronta").length;
-  const toValidate = sched.filter((x) => x.stato === "da_validare").length;
-  const sentCount = sched.filter((x) => x.stato === "inviata").length;
+  // Registro sempre allineato alle prenotazioni: le schedine non ancora inviate di prenotazioni
+  // annullate/no-show/sparite non compaiono (le inviate restano come storico). La pulizia DB
+  // avviene alla prossima "Sincronizza dagli arrivi"; qui il filtro è immediato.
+  const activeBookingIds = new Set(bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked").map((b) => b.id));
+  const visibleSched = sched.filter((x) => x.stato === "inviata" || !x.booking_id || activeBookingIds.has(x.booking_id));
+  const readyCount = visibleSched.filter((x) => x.stato === "pronta").length;
+  const toValidate = visibleSched.filter((x) => x.stato === "da_validare").length;
+  const sentCount = visibleSched.filter((x) => x.stato === "inviata").length;
   // Ospiti attualmente in struttura (arrivati e non ancora ripartiti).
   const todayLocal = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
   const inHouse = bookings
@@ -172,7 +177,7 @@ export default function AlloggiatiWebPage() {
             <button onClick={getRicevuta} disabled={!!busy} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "ricevuta" ? "Scarico…" : "Scarica ricevuta"}</button>
           </div>
           <div className="max-h-[52vh] overflow-y-auto">
-            {sched.map((x) => {
+            {visibleSched.map((x) => {
               const st = STA(x.stato);
               return (
                 <div key={x.id} className="flex items-center justify-between gap-2 border-b border-line py-2 last:border-0">
@@ -184,7 +189,7 @@ export default function AlloggiatiWebPage() {
                 </div>
               );
             })}
-            {sched.length === 0 && <EmptyState title="Nessuna schedina" sub="Premi «Sincronizza dagli arrivi»." />}
+            {visibleSched.length === 0 && <EmptyState title="Nessuna schedina" sub="Premi «Sincronizza dagli arrivi»." />}
           </div>
         </Card>
       </div>
