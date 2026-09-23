@@ -1,6 +1,6 @@
 {
   "crons": [
     { "path": "/api/cron/checkin-reminders", "schedule": "0 7 * * *" },
-    { "path": "/api/cron/alloggiati-auto", "schedule": "0 19 * * *" }
+    { "path": "/api/cron/alloggiati-auto", "schedule": "0 21 * * *" }
   ]
 }
