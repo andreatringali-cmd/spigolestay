@@ -677,7 +677,7 @@ export default function CalendarGrid() {
             const tentative = !blocked && b.status === "tentative";
             const sotto = barStyle === "sotto";
             const barColor = blocked
-              ? { backgroundColor: "#242424", color: "#f5c000", boxShadow: "inset 3px 0 0 #f5c000, 0 1px 1px rgba(0,0,0,.2)" }
+              ? { backgroundColor: "color-mix(in srgb, var(--dim) 12%, var(--surface))", backgroundImage: "repeating-linear-gradient(45deg, color-mix(in srgb, var(--dim) 26%, transparent) 0 5px, transparent 5px 11px)", color: "var(--dim)", boxShadow: "inset 3px 0 0 color-mix(in srgb, var(--dim) 55%, transparent)" }
               : { backgroundColor: `var(${meta.cssVar})`, color: meta.text, boxShadow: "inset 3px 0 0 rgba(0,0,0,.28), 0 1px 1px rgba(0,0,0,.14)" };
             const label = blocked ? "Fuori servizio" : guestName(b.guestId);
             const pay = payStatusOf(b);

@@ -97,6 +97,9 @@ export default function PrenotazioniPage() {
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return bookings.filter((b) => {
+      // Le camere "fuori servizio"/blocchi calendario (channel = "blocked") NON sono prenotazioni:
+      // non compaiono nell'elenco.
+      if (b.channel === "blocked") return false;
       // Nessun filtro = tutte le prenotazioni (anche lo storico). Il "dal" è preimpostato a oggi:
       // azzerando i filtri si vede tutto.
       // Filtro globale struttura (selettore in alto a destra)

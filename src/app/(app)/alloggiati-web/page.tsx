@@ -30,6 +30,7 @@ export default function AlloggiatiWebPage() {
   const [ricDate, setRicDate] = useState("");
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []); // countdown vivo (ogni minuto)
+  const [openG, setOpenG] = useState<Record<string, boolean>>({}); // schedine a tendina per prenotazione
 
   useEffect(() => {
     const target = activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId) ? activeStructureId : structures[0]?.id ?? "";
@@ -155,9 +156,9 @@ export default function AlloggiatiWebPage() {
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           ["Ospiti in struttura", String(inHouse), "var(--ok)"],
-          ["Schedine pronte", String(readyCount), "var(--focus)"],
-          ["Da validare", String(toValidate), "var(--warn)"],
-          ["Inviate", String(sentCount), "var(--dim)"],
+          ["Schedine pronte", `${readyCount}/${readyCount + toValidate + sentCount}`, "var(--focus)"],
+          ["Da validare", `${toValidate}/${readyCount + toValidate + sentCount}`, "var(--warn)"],
+          ["Inviate", `${sentCount}/${readyCount + toValidate + sentCount}`, "var(--dim)"],
         ].map(([lab, val, col]) => (
           <div key={lab} className="rounded-xl border border-line bg-surface p-4 shadow-sm">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{lab}</div>
@@ -167,7 +168,7 @@ export default function AlloggiatiWebPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
+        <Card className="order-2">
           <SectionTitle>Impostazioni account</SectionTitle>
           <div className="mt-2">
           <div className="space-y-2">
@@ -189,9 +190,8 @@ export default function AlloggiatiWebPage() {
             <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-faint">Opzioni</div>
             <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa ospiti (capofamiglia + membri)</span><input type="checkbox" checked={s.group_guests} onChange={(e) => set({ group_guests: e.target.checked })} className="mr-2 h-4 w-4 accent-[color:var(--focus)]" /></label>
             <label className="flex items-center justify-between"><span className="text-sm text-txt">Raggruppa per camera</span><input type="checkbox" checked={s.group_by_room} onChange={(e) => set({ group_by_room: e.target.checked })} className="mr-2 h-4 w-4 accent-[color:var(--focus)]" /></label>
-            <label className="flex items-center justify-between"><span className="text-sm text-txt">Invio automatico giornaliero</span><input type="checkbox" checked={s.auto_daily} onChange={(e) => set({ auto_daily: e.target.checked })} className="mr-2 h-4 w-4 accent-[color:var(--focus)]" /></label>
           </div>
-          <p className="mt-2 text-[11px] text-faint">L'invio automatico avviene dopo la mezzanotte. Per rientrare nelle 24h di legge puoi forzare l'invio manualmente in qualsiasi momento.</p>
+          <p className="mt-2 text-[11px] text-faint">L&apos;invio automatico si attiva con l&apos;interruttore nel riquadro «Schedine». Puoi comunque forzare l&apos;invio manuale in qualsiasi momento.</p>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button onClick={save} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "save" ? "Salvataggio…" : "Salva"}</button>
@@ -204,7 +204,7 @@ export default function AlloggiatiWebPage() {
           </div>
         </Card>
 
-        <Card>
+        <Card className="order-1">
           <div className="mb-2 flex items-center justify-between">
             <SectionTitle>Schedine</SectionTitle>
             <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">Pronte da inviare: {readyCount}{upcomingCount ? ` · in preparazione: ${upcomingCount}` : ""}</span>
@@ -239,20 +239,49 @@ export default function AlloggiatiWebPage() {
             <button onClick={getRicevuta} disabled={!!busy} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "ricevuta" ? "Scarico…" : "Scarica ricevuta"}</button>
           </div>
           <div className="max-h-[52vh] overflow-y-auto">
-            {listSched.map((x) => {
-              const st = STA(effStato(x));
-              return (
-                <div key={x.id} className="flex items-center justify-between gap-2 border-b border-line py-2 last:border-0">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm text-txt">{(x.guest?.cognome ?? "") + " " + (x.guest?.nome ?? "") || "—"} <span className="text-faint">· {RUOLO[x.ruolo] ?? x.ruolo}</span></div>
-                    <div className="text-[11px] text-faint">Arrivo {x.arrival ? new Date(x.arrival).toLocaleDateString("it-IT") : "—"}{x.errors?.length ? ` · ${x.errors.join(", ")}` : ""}{x.ricevuta ? ` · ric. ${x.ricevuta}` : ""}{x.stato !== "inviata" && x.arrival ? (isFuture(x.arrival)
-  ? <> · <span className="text-faint">in preparazione (si invia dopo l&apos;arrivo)</span></>
-  : <> · <span style={{ color: urgColor(cdTone(x.arrival)), fontWeight: 600 }}>{cdTone(x.arrival) === "over" ? "⚠ " : "⏱ "}{cdText(x.arrival)}</span></>) : ""}</div>
+            {(() => {
+              // Raggruppa le schedine per PRENOTAZIONE (una riga a tendina; dentro, una per persona).
+              const map = new Map<string, Sched[]>();
+              for (const x of listSched) { const k = x.booking_id || x.id; const a = map.get(k); if (a) a.push(x); else map.set(k, [x]); }
+              const structName = structures.find((z) => z.id === sid)?.name ?? "";
+              const groups = [...map.entries()].sort((a, b) => ((a[1][0]?.arrival || "") < (b[1][0]?.arrival || "") ? -1 : 1));
+              return groups.map(([key, rows]) => {
+                const capo = rows.find((r) => ["16", "17", "18"].includes(r.ruolo)) ?? rows[0];
+                const name = `${capo?.guest?.cognome ?? ""} ${capo?.guest?.nome ?? ""}`.trim() || "Ospite";
+                const arrival = rows[0]?.arrival;
+                const allSent = rows.every((r) => r.stato === "inviata");
+                const anyInvalid = rows.some((r) => effStato(r) === "da_validare");
+                const gStato = allSent ? "inviata" : anyInvalid ? "da_validare" : "pronta";
+                const gst = STA(gStato);
+                const opened = openG[key] ?? (gStato === "da_validare");
+                return (
+                  <div key={key} className="border-b border-line last:border-0">
+                    <button type="button" onClick={() => setOpenG((m) => ({ ...m, [key]: !(m[key] ?? (gStato === "da_validare")) }))} className="flex w-full items-center gap-2 py-2 text-left">
+                      <span className="shrink-0 text-faint">{opened ? "▾" : "▸"}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm text-txt">{name} <span className="text-faint">· {structName}</span></div>
+                        <div className="text-[11px] text-faint">Arrivo {arrival ? new Date(arrival).toLocaleDateString("it-IT") : "—"} · {rows.length === 1 ? "1 schedina" : `${rows.length} schedine`}{gStato !== "inviata" && arrival ? (isFuture(arrival) ? " · in preparazione" : <> · <span style={{ color: urgColor(cdTone(arrival)), fontWeight: 600 }}>{cdTone(arrival) === "over" ? "⚠ " : "⏱ "}{cdText(arrival)}</span></>) : ""}</div>
+                      </div>
+                      <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${gst.c} 16%, transparent)`, color: gst.c }}>{gst.l}</span>
+                    </button>
+                    {opened && (
+                      <div className="pb-2 pl-6">
+                        {rows.map((x) => { const st = STA(effStato(x)); return (
+                          <div key={x.id} className="flex items-start justify-between gap-2 border-t border-[color:color-mix(in_srgb,var(--line)_60%,transparent)] py-1.5">
+                            <div className="min-w-0">
+                              <div className="truncate text-[13px] text-txt">{(x.guest?.cognome ?? "") + " " + (x.guest?.nome ?? "") || "—"} <span className="text-faint">· {RUOLO[x.ruolo] ?? x.ruolo}</span></div>
+                              {x.errors?.length ? <div className="text-[11px] font-medium" style={{ color: "var(--warn)" }}>⚠ {x.errors.join(" · ")}</div> : null}
+                              {x.ricevuta ? <div className="text-[11px] text-faint">ric. {x.ricevuta}</div> : null}
+                            </div>
+                            <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.c} 16%, transparent)`, color: st.c }}>{st.l}</span>
+                          </div>
+                        ); })}
+                      </div>
+                    )}
                   </div>
-                  <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.c} 16%, transparent)`, color: st.c }}>{st.l}</span>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
             {listSched.length === 0 && <EmptyState title="Nessuna schedina" sub="Premi «Sincronizza dagli arrivi»." />}
           </div>
         </Card>
