@@ -149,7 +149,12 @@ export default function AlloggiatiWebPage() {
             for (const x of listShown) { const k = x.booking_id || x.id; const a = map.get(k); if (a) a.push(x); else map.set(k, [x]); }
             const structName = structures.find((z) => z.id === sid)?.name ?? "";
             const groups = [...map.entries()].sort((a, b) => ((a[1][0]?.arrival || "") < (b[1][0]?.arrival || "") ? -1 : 1));
-            if (!groups.length && filterDate) return <p className="py-4 text-sm text-faint">Nessuna schedina per la data selezionata.</p>;
+            if (!groups.length && filterDate) return (
+              <div className="flex flex-col items-center gap-2 py-8 text-center">
+                <p className="text-sm text-faint">Nessuna schedina con arrivo in questa data.</p>
+                <button onClick={() => setFilterDate("")} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-focus hover:bg-wash">Mostra tutte le schedine</button>
+              </div>
+            );
             return groups.map(([key, rows]) => {
               const capo = rows.find((r) => ["16", "17", "18"].includes(r.ruolo)) ?? rows[0];
               const name = `${capo?.guest?.cognome ?? ""} ${capo?.guest?.nome ?? ""}`.trim() || "Ospite";
