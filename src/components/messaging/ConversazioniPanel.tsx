@@ -218,15 +218,21 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     .map((b) => ({ b, g: guests.find((x) => x.id === b.guestId)! })).filter((x) => x.g), [bookings, guests, activeStructureId]);
   const addDaysISO = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
   const todayISO = new Date().toISOString().slice(0, 10);
-  const queue = useMemo(() => templates.filter((tp) => tp.active && tp.trigger !== "manual").flatMap((tp) =>
-    bookingsWithGuest.map(({ b, g }) => {
-      const anchor = tp.trigger === "before_arrival" ? addDaysISO(b.checkIn, -tp.days)
-        : tp.trigger === "on_arrival" ? b.checkIn
-        : tp.trigger === "after_arrival" ? addDaysISO(b.checkIn, tp.days)
-        : tp.trigger === "on_checkout" ? b.checkOut : addDaysISO(b.checkOut, tp.days);
-      return { key: `${tp.id}-${b.id}`, date: anchor, time: tp.time, tpl: tp, g, b };
-    })
-  ).filter((x) => x.date >= todayISO).sort((a, b) => (a.date + a.time < b.date + b.time ? -1 : 1)).slice(0, 40), [templates, bookingsWithGuest, todayISO]);
+  // Finestra di RECUPERO: includiamo anche gli invii "scaduti" degli ultimi giorni, così un
+  // last-minute (prenotazione creata DOPO l'orario del modello, o lo stesso giorno) non viene
+  // perso: compare come "In ritardo · da inviare subito" invece di sparire.
+  const queue = useMemo(() => {
+    const catchupFrom = addDaysISO(todayISO, -3);
+    return templates.filter((tp) => tp.active && tp.trigger !== "manual").flatMap((tp) =>
+      bookingsWithGuest.map(({ b, g }) => {
+        const anchor = tp.trigger === "before_arrival" ? addDaysISO(b.checkIn, -tp.days)
+          : tp.trigger === "on_arrival" ? b.checkIn
+          : tp.trigger === "after_arrival" ? addDaysISO(b.checkIn, tp.days)
+          : tp.trigger === "on_checkout" ? b.checkOut : addDaysISO(b.checkOut, tp.days);
+        return { key: `${tp.id}-${b.id}`, date: anchor, time: tp.time, tpl: tp, g, b, late: anchor < todayISO };
+      })
+    ).filter((x) => x.date >= catchupFrom).sort((a, b) => (a.date + a.time < b.date + b.time ? -1 : 1)).slice(0, 40);
+  }, [templates, bookingsWithGuest, todayISO]);
 
   const sendLinkFor = (tpl: MsgTemplate, b: Booking, g: Guest): { href: string; kind: "wa" | "email" } | null => {
     const body = fillFor(tpl.texts[langOf(g)] || tpl.texts.it || "", b, g);
@@ -256,7 +262,8 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     addTo(x.g.id, "out", body, l.kind === "wa" ? "WhatsApp" : "Email");
     saveSent([{ key: sentKey(x), guest: x.g.fullName, tpl: x.tpl.name, via: l.kind === "wa" ? "WhatsApp" : "Email", ts: Date.now() }, ...sent.filter((s) => s.key !== sentKey(x))].slice(0, 200));
   };
-  const todayQueue = queue.filter((x) => x.date === todayISO && !isSent(x));
+  // "Invia oggi" copre oggi + gli arretrati non ancora inviati (finestra di recupero).
+  const todayQueue = queue.filter((x) => x.date <= todayISO && !isSent(x));
   const guestQueue = sel ? queue.filter((x) => x.g.id === sel && !isSent(x)) : [];
 
   const chipBase = "inline-flex items-center gap-1 rounded-full border border-line bg-paper px-2 py-0.5 text-[11px] text-dim";
@@ -344,7 +351,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {queue.map((x) => (
                   <div key={x.key} className="flex items-center gap-3 py-2">
-                    <div className="w-14 shrink-0 text-center"><div className="font-mono text-sm font-bold text-txt">{new Date(x.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</div><div className="text-[10px] text-faint">{x.time}</div></div>
+                    <div className="w-16 shrink-0 text-center"><div className="font-mono text-sm font-bold" style={{ color: x.late && !isSent(x) ? "var(--warn)" : "var(--txt)" }}>{new Date(x.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</div><div className="text-[10px] font-semibold" style={{ color: x.late && !isSent(x) ? "var(--warn)" : "var(--faint)" }}>{x.late && !isSent(x) ? `⏱ ${t("in ritardo")}` : x.time}</div></div>
                     <button onClick={() => setSel(x.g.id)} className="min-w-0 flex-1 text-left hover:underline"><div className="truncate text-sm text-txt"><b>{x.tpl.name}</b> → {x.g.fullName}</div><div className="text-[11px] text-faint">{getStructure(x.b.structureId)?.name} · {x.g.phone ? "WhatsApp" : x.g.email ? t("Email") : t("nessun contatto")}</div></button>
                     {isSent(x) ? (
                       <span className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{t("Inviato")} ✓</span>
