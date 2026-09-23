@@ -178,7 +178,7 @@ function Engine() {
   const setD = <K extends keyof DocData>(k: K, v: string) => setDoc((p) => (p ? { ...p, [k]: v } : p));
   const setExtra = (i: number, k: string, v: string) => setExtras((p) => p.map((e, j) => (j === i ? { ...e, [k]: v } : e)));
 
-  const valid = !!doc && doc.firstName.trim() && doc.lastName.trim() && doc.birthDate && doc.docNumber.trim() && consent;
+  const valid = !!doc && doc.firstName.trim() && doc.lastName.trim() && doc.birthDate && doc.docNumber.trim() && consent && !!signature;
 
   // ── Upsell + riepilogo pagamento ──
   const b = info?.booking;
@@ -200,7 +200,7 @@ function Engine() {
   const submit = async (opts?: { assumeConsent?: boolean }) => {
     const consented = opts?.assumeConsent || consent;
     const reqOk = !!doc && !!doc.firstName.trim() && !!doc.lastName.trim() && !!doc.birthDate && !!doc.docNumber.trim();
-    if (!info || !doc || !reqOk || !consented || submitting) return;
+    if (!info || !doc || !reqOk || !consented || !signature || submitting) return;
     setSubmitting(true); setSubmitErr("");
     try {
       const r = await fetch("/api/checkin", {
@@ -303,8 +303,8 @@ function Engine() {
           <div className={`${box} mb-4 p-4`} style={{ borderColor: "var(--ok)" }}>
             <div className="flex items-center gap-2"><span className="text-lg">👋</span><h2 className="font-display text-base font-bold text-txt">Bentornato, {info.guest.firstName || doc?.firstName}!</h2></div>
             <p className="mt-1 text-xs text-dim">Abbiamo già i tuoi dati e il documento del soggiorno precedente. Controlla che sia tutto corretto qui sotto e conferma — oppure invia subito.</p>
-            <button onClick={() => submit({ assumeConsent: true })} disabled={submitting} className="mt-3 w-full rounded-lg py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--ok)" }}>{submitting ? "Invio…" : "Confermo: i dati sono corretti → invia check-in"}</button>
-            <p className="mt-2 text-center text-[10px] text-faint">Confermando dichiari che i dati sono corretti e acconsenti al trattamento per la registrazione alla Questura.</p>
+            <button onClick={() => submit({ assumeConsent: true })} disabled={submitting || !signature} className="mt-3 w-full rounded-lg py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--ok)" }}>{submitting ? "Invio…" : "Confermo: i dati sono corretti → invia check-in"}</button>
+            <p className="mt-2 text-center text-[10px] text-faint">{signature ? "Confermando dichiari che i dati sono corretti e acconsenti al trattamento per la registrazione alla Questura." : "Per inviare, apponi la firma in fondo alla pagina."}</p>
           </div>
         )}
 
@@ -422,13 +422,6 @@ function Engine() {
           </div>
         )}
 
-        {/* Firma */}
-        <div className={`${box} mb-4 p-4`}>
-          <h2 className="mb-1 font-display text-lg font-bold text-txt">Firma</h2>
-          <p className="mb-3 text-xs text-dim">Firma per confermare la correttezza dei dati e l&apos;accettazione delle condizioni.</p>
-          <SignaturePad value={signature} onChange={setSignature} />
-        </div>
-
         {/* Richiedi fattura (facoltativo) */}
         <div className={`${box} p-4`}>
           <label className="flex items-center justify-between">
@@ -464,9 +457,15 @@ function Engine() {
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[color:var(--focus)]" />
             <span>Confermo che i dati sono corretti e acconsento al trattamento dei dati personali e del documento ai fini della registrazione degli alloggiati (Questura) e degli adempimenti di legge.</span>
           </label>
+          {/* Firma OBBLIGATORIA, subito prima dell'invio */}
+          <div className="mt-4 border-t border-line pt-4">
+            <h2 className="mb-1 font-display text-base font-bold text-txt">Firma <span style={{ color: "var(--err)" }}>*</span></h2>
+            <p className="mb-3 text-xs text-dim">Firma per confermare la correttezza dei dati e l&apos;accettazione delle condizioni.</p>
+            <SignaturePad value={signature} onChange={setSignature} />
+          </div>
           {submitErr && <div className="mt-3 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)", color: "var(--err)" }}>{submitErr}</div>}
           <button onClick={() => submit()} disabled={!valid || submitting} className="mt-4 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{submitting ? "Invio…" : "Invia il check-in"}</button>
-          {!valid && <div className="mt-2 text-center text-[11px] text-faint">Compila nome, cognome, data di nascita, numero documento e spunta il consenso.</div>}
+          {!valid && <div className="mt-2 text-center text-[11px] text-faint">Per inviare: compila nome, cognome, data di nascita, numero documento, spunta il consenso e <b>firma</b>.</div>}
         </div>
       </div>
     </div>
