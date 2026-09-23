@@ -149,14 +149,14 @@ export default function AdempimentiPage() {
 
   const t = today();
   // Arrivi di oggi senza check-in online.
-  const arrivalsNoCheckin = useMemo(() => bookings.filter((b) => b.checkIn === t && b.status !== "cancelled" && b.channel !== "blocked" && !b.webCheckin), [bookings, t]);
+  const arrivalsNoCheckin = useMemo(() => bookings.filter((b) => b.checkIn === t && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && !b.webCheckin), [bookings, t]);
   // Check-in di oggi GIÀ completati + ospiti attualmente in casa (per il messaggio positivo).
-  const arrivalsCheckedIn = useMemo(() => bookings.filter((b) => b.checkIn === t && b.status !== "cancelled" && b.channel !== "blocked" && b.webCheckin), [bookings, t]);
+  const arrivalsCheckedIn = useMemo(() => bookings.filter((b) => b.checkIn === t && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && b.webCheckin), [bookings, t]);
   const paidByDoc = useMemo(() => { const m = new Map<string, number>(); for (const p of pays) m.set(p.document_id, (m.get(p.document_id) ?? 0) + p.amount_cents); return m; }, [pays]);
   const balanceOf = (d: { id: string; total_cents: number }) => d.total_cents - (paidByDoc.get(d.id) ?? 0);
   // Solo prenotazioni ancora attive: schedine/ISTAT di annullate o no-show spariscono subito,
   // anche prima della prossima sincronizzazione che ripulisce gli orfani lato server.
-  const activeBookingIds = useMemo(() => new Set(bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked").map((b) => b.id)), [bookings]);
+  const activeBookingIds = useMemo(() => new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked").map((b) => b.id)), [bookings]);
   const isActive = (bookingId: string | null) => !bookingId || activeBookingIds.has(bookingId);
   // 2 · Schedine Questura — da inviare (non "inviata") vs inviate. Le "da inviare" solo se la prenotazione è viva.
   const schedToSend = sched.filter((s) => s.stato !== "inviata" && isActive(s.booking_id));

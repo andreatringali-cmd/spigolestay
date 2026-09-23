@@ -59,7 +59,7 @@ export default function IstatPage() {
 
   // Movimento sempre allineato alle prenotazioni: righe pending di prenotazioni annullate/no-show
   // non compaiono (le inviate restano come storico).
-  const activeBookingIds = new Set(bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked").map((b) => b.id));
+  const activeBookingIds = new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked").map((b) => b.id));
   const rowsVisible = rows.filter((r) => r.stato === "sent" || !r.booking_id || activeBookingIds.has(r.booking_id));
   const pending = rowsVisible.filter((r) => r.stato === "pending").length;
   // Export CSV del movimento (utilizzabile subito: riconciliazione/caricamento manuale sul portale regionale).

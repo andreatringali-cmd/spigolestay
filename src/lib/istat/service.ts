@@ -24,13 +24,14 @@ export async function syncIstat(admin: SupabaseClient, tenantId: string, opts: {
   const startISO = start.toISOString().slice(0, 10);
   const guestsById = new Map((blob.guests ?? []).map((g) => [g.id, g]));
 
+  const isInactive = (b: { status?: string; channel?: string }) => b.status === "cancelled" || b.status === "no_show" || b.channel === "blocked";
   const bookings = (blob.bookings ?? []).filter((b) =>
-    b.status !== "cancelled" && b.channel !== "blocked" &&
+    !isInactive(b) &&
     (b.checkIn || "") >= startISO && (!opts.structureId || b.structureId === opts.structureId));
 
   // Pulizia ORFANI: elimina le righe NON inviate di prenotazioni annullate/no-show
   // o non più esistenti, così il movimento turistico rispecchia sempre le prenotazioni attive.
-  const activeIds = new Set((blob.bookings ?? []).filter((b) => b.status !== "cancelled" && b.channel !== "blocked").map((b) => b.id));
+  const activeIds = new Set((blob.bookings ?? []).filter((b) => !isInactive(b)).map((b) => b.id));
   {
     let q = admin.from("istat_rows").select("id, booking_id").eq("tenant_id", tenantId).neq("stato", "sent");
     if (opts.structureId) q = q.eq("structure_id", opts.structureId);

@@ -120,13 +120,14 @@ export async function syncSchedine(admin: SupabaseClient, tenantId: string, opts
   const start = new Date(); start.setDate(start.getDate() - (opts.fromDays ?? 7));
   const startISO = start.toISOString().slice(0, 10);
 
+  const isInactive = (b: { status?: string; channel?: string }) => b.status === "cancelled" || b.status === "no_show" || b.channel === "blocked";
   const bookings = (blob.bookings ?? []).filter((b) =>
-    b.status !== "cancelled" && b.channel !== "blocked" &&
+    !isInactive(b) &&
     (b.checkIn || "") >= startISO && (!opts.structureId || b.structureId === opts.structureId));
 
   // Pulizia ORFANI: elimina le schedine NON inviate le cui prenotazioni sono state annullate/no-show
   // o non esistono più (es. camera rivenduta). Così un no-show non lascia schedine "da mandare".
-  const activeIds = new Set((blob.bookings ?? []).filter((b) => b.status !== "cancelled" && b.channel !== "blocked").map((b) => b.id));
+  const activeIds = new Set((blob.bookings ?? []).filter((b) => !isInactive(b)).map((b) => b.id));
   {
     let q = admin.from("alloggiati_schedine").select("id, booking_id").eq("tenant_id", tenantId).neq("stato", "inviata");
     if (opts.structureId) q = q.eq("structure_id", opts.structureId);

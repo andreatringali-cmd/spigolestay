@@ -89,7 +89,7 @@ export default function AlloggiatiWebPage() {
   // Registro sempre allineato alle prenotazioni: le schedine non ancora inviate di prenotazioni
   // annullate/no-show/sparite non compaiono (le inviate restano come storico). La pulizia DB
   // avviene alla prossima "Sincronizza dagli arrivi"; qui il filtro è immediato.
-  const activeBookingIds = new Set(bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked").map((b) => b.id));
+  const activeBookingIds = new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked").map((b) => b.id));
   const visibleSched = sched.filter((x) => x.stato === "inviata" || !x.booking_id || activeBookingIds.has(x.booking_id));
   const readyCount = visibleSched.filter((x) => x.stato === "pronta").length;
   const toValidate = visibleSched.filter((x) => x.stato === "da_validare").length;
@@ -97,7 +97,7 @@ export default function AlloggiatiWebPage() {
   // Ospiti attualmente in struttura (arrivati e non ancora ripartiti).
   const todayLocal = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
   const inHouse = bookings
-    .filter((b) => b.structureId === sid && b.status !== "cancelled" && b.channel !== "blocked" && b.checkIn <= todayLocal && todayLocal < b.checkOut)
+    .filter((b) => b.structureId === sid && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && b.checkIn <= todayLocal && todayLocal < b.checkOut)
     .reduce((a, b) => a + (b.adults ?? 1) + (b.children ?? 0), 0);
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";

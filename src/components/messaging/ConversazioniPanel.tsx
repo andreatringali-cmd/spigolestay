@@ -214,7 +214,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
 
   // ── Coda invii automatici (calcolata sulle prenotazioni reali) ──
   const bookingsWithGuest = useMemo(() => bookings
-    .filter((b) => (activeStructureId === "all" || b.structureId === activeStructureId) && b.status !== "cancelled" && b.channel !== "blocked")
+    .filter((b) => (activeStructureId === "all" || b.structureId === activeStructureId) && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked")
     .map((b) => ({ b, g: guests.find((x) => x.id === b.guestId)! })).filter((x) => x.g), [bookings, guests, activeStructureId]);
   const addDaysISO = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
   const todayISO = new Date().toISOString().slice(0, 10);

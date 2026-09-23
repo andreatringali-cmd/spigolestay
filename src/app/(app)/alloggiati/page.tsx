@@ -86,7 +86,7 @@ export default function AlloggiatiPage() {
   const guest = (id: string) => guests.find((g) => g.id === id);
   const arrivals = useMemo(
     () => bookings
-      .filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId))
+      .filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId))
       .filter((b) => b.checkIn >= from && b.checkIn <= to)
       .sort((a, b) => a.checkIn.localeCompare(b.checkIn)),
     [bookings, from, to, activeStructureId]
