@@ -14,6 +14,7 @@ import type { Booking, Guest, Structure } from "@/lib/types";
 const today = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; };
 const soft = (tone: string, pct = 14) => `color-mix(in srgb, ${tone} ${pct}%, transparent)`;
 const fmtDay = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—");
+const omini = (n: number) => (n <= 5 ? "👤".repeat(Math.max(1, n)) : `👤 ${n}`); // ospiti come icone
 // Scadenza schedina Questura: entro 24h dall'arrivo (mostrata come giorno successivo all'arrivo).
 
 // Completezza del check-in PER PERSONA (usata da card e righe).
@@ -76,7 +77,7 @@ function SubHead({ children, mt }: { children: React.ReactNode; mt?: boolean }) 
 }
 
 // Riga arrivo senza check-in: WhatsApp (link), Email diretta (server) e "Compila tu" (apri il form).
-function ArrivalRow({ b, g, st, origin, waOn }: { b: Booking; g?: Guest; st?: Structure; origin: string; waOn?: boolean }) {
+function ArrivalRow({ b, g, st, origin, waOn, showStruct }: { b: Booking; g?: Guest; st?: Structure; origin: string; waOn?: boolean; showStruct?: boolean }) {
   const [mail, setMail] = useState<"idle" | "sending" | "sent" | "err">("idle");
   const [ws, setWs] = useState<"idle" | "sending" | "sent" | "err">("idle");
   const fullLink = `${origin}/checkin?b=${b.id}`;
@@ -116,14 +117,14 @@ function ArrivalRow({ b, g, st, origin, waOn }: { b: Booking; g?: Guest; st?: St
   return (
     <div className="rounded-lg border border-line bg-paper px-2.5 py-1.5">
       <div className="flex items-center justify-between gap-2">
-        <div className="truncate text-[13px] font-medium text-txt">{g?.fullName || "Ospite"} <span className="text-faint">· {st?.name ?? ""}</span></div>
+        <div className="truncate text-[13px] font-medium text-txt"><span className="font-mono text-faint">{b.code || b.id.slice(0, 6).toUpperCase()}</span> · {g?.fullName || "Ospite"}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</div>
         <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={partial ? { background: soft("var(--warn)"), color: "var(--warn)" } : { background: soft("var(--err)"), color: "var(--err)" }}>
           {partial ? `Incompleto ${declared}/${expected}` : "Da fare"}
         </span>
       </div>
       <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-faint">
         <span>🗓 {fmtDay(b.checkIn)} → {fmtDay(b.checkOut)}</span>
-        <span>👤 {expected} {expected === 1 ? "persona" : "persone"}</span>
+        <span title={`${expected} ospiti`}>{omini(expected)}</span>
         <span className={partial ? "font-semibold text-[color:var(--warn)]" : ""}>✓ check-in {declared}/{expected}</span>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -137,8 +138,11 @@ function ArrivalRow({ b, g, st, origin, waOn }: { b: Booking; g?: Guest; st?: St
 
 export default function AdempimentiPage() {
   const router = useRouter();
-  const { bookings, getGuest, getStructure } = useData();
+  const { bookings, getGuest, getStructure, activeStructureId } = useData();
   const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const showStruct = activeStructureId === "all"; // se una struttura è già selezionata in alto, non ripeto il nome
+  const bkNo = (b: Booking) => b.code || b.id.slice(0, 6).toUpperCase();       // numero prenotazione
+  const structPart = (structureId: string) => (showStruct ? ` · ${getStructure(structureId)?.name ?? ""}` : "");
   const [sched, setSched] = useState<{ id: string; arrival: string; stato: string; booking_id: string | null; guest: { cognome?: string; nome?: string } | null; structure_id: string | null }[]>([]);
   const [istat, setIstat] = useState<{ id: string; arrival: string; stato: string; booking_id: string | null; structure_id: string | null }[]>([]);
   const [docs, setDocs] = useState<{ id: string; number_label: string | null; stato: string; total_cents: number; counterpart: { name?: string } | null }[]>([]);
@@ -165,6 +169,14 @@ export default function AdempimentiPage() {
     setPassive((pv.data ?? []) as typeof passive);
   }, []);
   useEffect(() => { loadData(); }, [loadData]);
+  // Ricarica schedine/documenti al rientro sulla pagina o dopo una sincronizzazione dati,
+  // così lo stato non resta indietro rispetto alle modifiche fatte altrove.
+  useEffect(() => {
+    const h = () => loadData();
+    window.addEventListener("focus", h);
+    window.addEventListener("spigolestay:datasync", h);
+    return () => { window.removeEventListener("focus", h); window.removeEventListener("spigolestay:datasync", h); };
+  }, [loadData]);
 
   // "Passaggio di palla" passo 1 → 2: genera/aggiorna le schedine dagli arrivi con check-in fatto.
   const [syncing, setSyncing] = useState(false);
@@ -197,14 +209,23 @@ export default function AdempimentiPage() {
   // Completezza del check-in PER PERSONA: quanti ospiti dichiarati vs attesi (helper a livello modulo).
   const isComplete = (b: Booking) => declaredPaxOf(b) > 0 && declaredPaxOf(b) >= expectedPaxOf(b);
   const isActiveArrival = (b: Booking) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked";
-  // Prenotazioni con almeno una schedina "da validare" (dati di un ospite incompleti/errati).
+  // Prenotazioni con almeno una schedina "da validare" (usata per il PASSO 2, a livello schedina).
   const bookingsWithInvalid = useMemo(() => new Set(sched.filter((s) => s.stato === "da_validare" && s.booking_id).map((s) => s.booking_id as string)), [sched]);
-  // Arrivi di oggi divisi in 3: DA COMPLETARE (dati mancanti), DA CORREGGERE (dichiarati ma schedina
-  // non valida), CHECK-IN FATTI (completi e validi). Un "da correggere" NON è tra i fatti.
+  // Validità calcolata sui DATI VERI della prenotazione (non sulla schedina, che è una copia).
+  const guestFieldsOk = (g?: { lastName?: string; firstName?: string; sex?: string; birthDate?: string; birthPlace?: string; citizenship?: string; country?: string }) =>
+    !!(g?.lastName && g?.firstName && g?.sex && g?.birthDate && g?.birthPlace && (g?.citizenship || g?.country));
+  const bookingDataValid = (b: Booking) => {
+    const p = getGuest(b.guestId) ?? b.primaryGuest;
+    if (!guestFieldsOk(p) || !(p?.docType && p?.docNumber)) return false;
+    for (const e of (b.extraGuests ?? [])) if (!guestFieldsOk(e)) return false;
+    return true;
+  };
+  // Arrivi di oggi divisi in 3: DA COMPLETARE (dati mancanti), DA CORREGGERE (dati ospite non validi),
+  // CHECK-IN FATTI (completi e validi). Lo stato dipende dai DATI della prenotazione, non dalla schedina.
   const arrivalsToday = useMemo(() => bookings.filter((b) => b.checkIn === t && isActiveArrival(b)), [bookings, t]);
   const arrivalsNoCheckin = arrivalsToday.filter((b) => !isComplete(b));
-  const arrivalsToFix = arrivalsToday.filter((b) => isComplete(b) && bookingsWithInvalid.has(b.id));
-  const arrivalsCheckedIn = arrivalsToday.filter((b) => isComplete(b) && !bookingsWithInvalid.has(b.id));
+  const arrivalsToFix = arrivalsToday.filter((b) => isComplete(b) && !bookingDataValid(b));
+  const arrivalsCheckedIn = arrivalsToday.filter((b) => isComplete(b) && bookingDataValid(b));
   const paidByDoc = useMemo(() => { const m = new Map<string, number>(); for (const p of pays) m.set(p.document_id, (m.get(p.document_id) ?? 0) + p.amount_cents); return m; }, [pays]);
   const balanceOf = (d: { id: string; total_cents: number }) => d.total_cents - (paidByDoc.get(d.id) ?? 0);
   // Solo prenotazioni ancora attive: schedine/ISTAT di annullate o no-show spariscono subito,
@@ -241,8 +262,14 @@ export default function AdempimentiPage() {
   };
   const schedToSendG = groupSched(schedToSend);
   const schedSentG = groupSched(schedSent);
-  const bookingName = (bookingId: string | null) => { const b = bookingId ? bookings.find((x) => x.id === bookingId) : null; return b ? (getGuest(b.guestId)?.fullName || "Ospite") : "Prenotazione"; };
-  const structName = (structureId: string | null, bookingId: string | null) => { const b = bookingId ? bookings.find((x) => x.id === bookingId) : null; return getStructure(structureId || b?.structureId || "")?.name || ""; };
+  // Etichetta prenotazione: numero · ospite (· struttura solo se non già selezionata in alto).
+  const bookingLabel = (bookingId: string | null, structureId: string | null) => {
+    const b = bookingId ? bookings.find((x) => x.id === bookingId) : null;
+    const nm = b ? (getGuest(b.guestId)?.fullName || "Ospite") : "Prenotazione";
+    const code = b ? bkNo(b) : "";
+    const stn = showStruct ? (getStructure(structureId || b?.structureId || "")?.name || "") : "";
+    return `${code ? code + " · " : ""}${nm}${stn ? " · " + stn : ""}`;
+  };
   const schedLabel = (n: number) => (n === 1 ? "1 schedina" : `${n} schedine`);
   // Countdown vivo alla scadenza (≈ arrivo + 24h, assunto arrivo alle 14:00).
   const schedCd = (iso?: string) => {
@@ -310,7 +337,7 @@ export default function AdempimentiPage() {
                 <>
                   <SubHead>Da completare ({arrivalsNoCheckin.length})</SubHead>
                   {arrivalsNoCheckin.slice(0, 5).map((b) => (
-                    <ArrivalRow key={b.id} b={b} g={getGuest(b.guestId)} st={getStructure(b.structureId)} origin={origin} waOn={waOn} />
+                    <ArrivalRow key={b.id} b={b} g={getGuest(b.guestId)} st={getStructure(b.structureId)} origin={origin} waOn={waOn} showStruct={showStruct} />
                   ))}
                 </>
               )}
@@ -322,7 +349,7 @@ export default function AdempimentiPage() {
                     const openCheckin = () => { const u = `${origin}/checkin?b=${b.id}`; const w = window.open(u, "_blank"); if (!w) window.location.href = u; };
                     return (
                       <button key={b.id} onClick={openCheckin} title="Apri il check-in online per completare/correggere i dati" className="flex w-full items-center justify-between gap-2 rounded-lg border bg-paper px-2.5 py-1.5 text-left text-[12.5px] transition hover:bg-wash" style={{ borderColor: "color-mix(in srgb, var(--err) 45%, var(--line))" }}>
-                        <span className="truncate text-dim">{g?.fullName || "Ospite"} <span className="text-faint">· {st?.name ?? ""}</span></span>
+                        <span className="truncate text-dim"><span className="font-mono text-faint">{bkNo(b)}</span> · {g?.fullName || "Ospite"}{showStruct && <span className="text-faint"> · {st?.name ?? ""}</span>}</span>
                         <span className="shrink-0 font-semibold" style={{ color: "var(--err)" }}>⚠ correggi →</span>
                       </button>
                     );
@@ -333,8 +360,8 @@ export default function AdempimentiPage() {
                 <>
                   <SubHead mt={arrivalsNoCheckin.length > 0 || arrivalsToFix.length > 0}>Check-in fatti ({arrivalsCheckedIn.length}) · pronti per le schedine</SubHead>
                   {arrivalsCheckedIn.slice(0, 6).map((b) => {
-                    const g = getGuest(b.guestId); const st = getStructure(b.structureId);
-                    return <DoneRow key={b.id} left={`${g?.fullName || "Ospite"} · ${st?.name ?? ""}`} right={schedBookingIds.has(b.id) ? `${fmtDay(b.checkIn)}→${fmtDay(b.checkOut)} · ${expectedPaxOf(b)}p` : "↪ da trasferire"} />;
+                    const g = getGuest(b.guestId);
+                    return <DoneRow key={b.id} left={`${bkNo(b)} · ${g?.fullName || "Ospite"}${structPart(b.structureId)}`} right={schedBookingIds.has(b.id) ? `${fmtDay(b.checkIn)}→${fmtDay(b.checkOut)} · ${omini(expectedPaxOf(b))}` : "↪ da trasferire"} />;
                   })}
                   {toTransfer.length > 0
                     ? <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold" style={{ background: soft("var(--warn)"), color: "var(--warn)" }}>↪ {toTransfer.length} da trasferire alle schedine — premi «Trasferisci».</div>
@@ -354,14 +381,14 @@ export default function AdempimentiPage() {
                 <SubHead>Pronte da inviare ({schedToSendG.length})</SubHead>
                 {schedToSendG.slice(0, 4).map((gr) => (
                   <MiniRow key={gr.key}
-                    left={`${bookingName(gr.bookingId)} · ${structName(gr.structureId, gr.bookingId)} · arrivo ${fmtDay(gr.arrival)}`}
+                    left={`${bookingLabel(gr.bookingId, gr.structureId)} · arrivo ${fmtDay(gr.arrival)}`}
                     right={`${schedLabel(gr.count)} · ${schedCd(gr.arrival)}`} />
                 ))}
               </>)}
               {schedSentG.length > 0 && (<>
                 <SubHead mt={schedToSendG.length > 0}>Inviate ({schedSentG.length})</SubHead>
                 {schedSentG.slice(0, 3).map((gr) => (
-                  <DoneRow key={gr.key} left={`${bookingName(gr.bookingId)} · arrivo ${fmtDay(gr.arrival)}`} right={schedLabel(gr.count)} />
+                  <DoneRow key={gr.key} left={`${bookingLabel(gr.bookingId, gr.structureId)} · arrivo ${fmtDay(gr.arrival)}`} right={schedLabel(gr.count)} />
                 ))}
               </>)}
             </>
@@ -374,11 +401,11 @@ export default function AdempimentiPage() {
             <>
               {istatPend.length > 0 && (<>
                 <SubHead>Da inviare ({istatPend.length})</SubHead>
-                {istatPend.slice(0, 4).map((r) => <MiniRow key={r.id} left={`${bookingName(r.booking_id)} · ${structName(r.structure_id, r.booking_id)}`} right={`arrivo ${fmtDay(r.arrival)}`} />)}
+                {istatPend.slice(0, 4).map((r) => <MiniRow key={r.id} left={bookingLabel(r.booking_id, r.structure_id)} right={`arrivo ${fmtDay(r.arrival)}`} />)}
               </>)}
               {istatSent.length > 0 && (<>
                 <SubHead mt={istatPend.length > 0}>Inviati ({istatSent.length})</SubHead>
-                {istatSent.slice(0, 3).map((r) => <DoneRow key={r.id} left={`${bookingName(r.booking_id)} · arrivo ${fmtDay(r.arrival)}`} />)}
+                {istatSent.slice(0, 3).map((r) => <DoneRow key={r.id} left={`${bookingLabel(r.booking_id, r.structure_id)} · arrivo ${fmtDay(r.arrival)}`} />)}
               </>)}
               {istatMsg && <div className="text-[11px] font-medium" style={{ color: istatMsg.startsWith("✓") ? "var(--ok)" : "var(--err)" }}>{istatMsg} <button onClick={() => router.push("/istat")} className="underline">apri ISTAT →</button></div>}
             </>
