@@ -38,8 +38,20 @@ export async function GET(req: Request) {
     const nightsTot = (() => { try { return Math.max(1, Math.round((Date.parse(s(b.checkOut)) - Date.parse(s(b.checkIn))) / 86400000)); } catch { return 1; } })();
     const cityTax = cityTaxOf(st as unknown as Structure, n(b.adults) || 1, nightsTot, n(b.total), b.cityTaxExempt === true);
 
+    // Prenotazione di GRUPPO: se questa prenotazione ha un groupId, restituisci tutte le camere
+    // del gruppo (stessa struttura/store) per un check-in unico che compila tutti gli ospiti.
+    const groupId = s(b.groupId);
+    let group: { b: string; code: string; roomType: string; unit: string; adults: number; children: number; webCheckin: boolean }[] = [];
+    if (groupId) {
+      const rts = arr(store.data.roomTypes); const uns = arr(store.data.units);
+      group = arr(store.data.bookings)
+        .filter((x) => s((x as Json).groupId) === groupId && s((x as Json).status) !== "cancelled" && s((x as Json).status) !== "no_show" && s((x as Json).channel) !== "blocked")
+        .map((x) => { const xb = x as Json; const rt = rts.find((r) => (r as Json).id === xb.roomTypeId) as Json | undefined; const un = uns.find((u) => (u as Json).id === xb.unitId) as Json | undefined; return { b: s(xb.id), code: s(xb.code) || s(xb.id).slice(0, 8).toUpperCase(), roomType: s(rt?.name), unit: un ? s(un.name) : "", adults: n(xb.adults) || 1, children: n(xb.children), webCheckin: xb.webCheckin === true }; });
+    }
+
     return NextResponse.json({
       ok: true,
+      group: group.length > 1 ? group : undefined,
       aiEnabled: !!process.env.ANTHROPIC_API_KEY, // l'auto-compilazione dal documento è attiva?
       booking: {
         id: s(b.id), code: s(b.code) || s(b.id).slice(0, 8).toUpperCase(), status: s(b.status),

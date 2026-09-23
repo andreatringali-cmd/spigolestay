@@ -26,8 +26,8 @@ const declaredPaxOf = (b: Booking) => (primaryDoneOf(b) ? 1 : 0) + (b.extraGuest
 
 // Scheda di uno step in ordine cronologico: badge numerato (la sequenza è informativa),
 // numero grande, pill di stato, mini-lista opzionale e azione a piena larghezza in fondo.
-function StepCard({ n, tone, label, sub, count, badge, action, onAction, children }: {
-  n: number; tone: string; label: string; sub: string; count: number; badge?: React.ReactNode; action: string; onAction: () => void; children?: React.ReactNode;
+function StepCard({ n, tone, label, count, badge, action, onAction, children }: {
+  n: number; tone: string; label: string; sub?: string; count: number; badge?: React.ReactNode; action: string; onAction: () => void; children?: React.ReactNode;
 }) {
   const active = count > 0;
   return (
@@ -41,11 +41,8 @@ function StepCard({ n, tone, label, sub, count, badge, action, onAction, childre
             <h3 className="mt-0.5 text-[13.5px] font-semibold leading-snug text-txt">{label}</h3>
           </div>
         </div>
-        <div className="mt-2.5">
-          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={active ? { background: soft(tone), color: tone } : { background: soft("var(--ok)"), color: "var(--ok)" }}>{active ? sub : "✓ In ordine"}</span>
-        </div>
         {children ? <div className="mt-3 flex-1 space-y-1.5">{children}</div> : <div className="flex-1" />}
-        <button onClick={onAction} className="mt-3.5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-paper px-3 py-2 text-xs font-semibold text-txt transition hover:border-[color:var(--focus)] hover:bg-wash">{action}<span aria-hidden>→</span></button>
+        <button onClick={onAction} className="mt-3.5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-focus px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90">{action}<span aria-hidden>→</span></button>
       </div>
     </article>
   );

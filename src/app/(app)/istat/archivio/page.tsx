@@ -48,7 +48,7 @@ export default function IstatArchivioPage() {
         actions={<Link href="/istat" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← Torna al movimento</Link>} />
 
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        {structures.length > 1 && <select value={sid} onChange={(e) => setSid(e.target.value)} className={fieldCls}>{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>}
+        {structures.length > 1 && activeStructureId === "all" && <select value={sid} onChange={(e) => setSid(e.target.value)} className={fieldCls}>{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>}
         <span className="text-[11px] font-medium text-dim">Dal</span>
         <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={fieldCls} />
         <span className="text-[11px] font-medium text-dim">Al</span>

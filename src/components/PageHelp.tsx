@@ -253,9 +253,26 @@ const HELP: Record<string, Guide> = {
   },
   "/alloggiati-web": {
     title: "Alloggiati Web",
-    intro: "Comunicazione degli ospiti alla Questura (entro 24h dal check-in), tutta in una pagina.",
+    intro: "Comunicazione degli ospiti alla Questura (Portale Alloggiati della Polizia di Stato), obbligatoria entro 24h dall'arrivo. Tutto in una pagina: controllo, correzione, invio e ricevute.",
     sections: [
-      { h: "Come funziona", items: ["All'apertura la pagina aggiorna e verifica le schedine da sola (ti segnala eventuali errori).", "Ogni prenotazione è una riga a tendina: la matita ✏️ apre la modifica dati ospite con «Compila dal documento».", "«Invia le pronte» manda subito alla Questura; con l'invio automatico partono da sole alle 23:00.", "Dopo l'invio la ricevuta va in 📁 Archivio: scaricabile o stampabile in qualsiasi momento.", "L'ingranaggio ⚙ apre le impostazioni (credenziali, opzioni, tracciato .txt di riserva)."] },
+      { h: "A cosa serve", items: ["Per ogni ospite che dorme in struttura va inviata una «schedina» nominativa alla Questura (art. 109 TULPS), entro 24 ore dall'arrivo (o all'arrivo per soggiorni di 1 notte).", "Xenora genera le schedine dai dati del check-in online e le invia al portale al posto tuo.", "Le schedine sono sempre allineate alle prenotazioni: se annulli o segni no-show, spariscono da sole."] },
+      { h: "Come funziona ogni giorno", items: ["Apri la pagina: si aggiorna e verifica le schedine da sola (farfalla che pulsa), poi ti dice se ci sono errori.", "Ogni prenotazione è una riga a tendina: cliccala per vedere i dati inviati (sesso, nascita, cittadinanza, documento).", "Se manca qualcosa, apri la tendina e premi «Modifica dati» ✏️: compili a mano o con «✨ Compila dal documento» (foto → campi automatici).", "Quando è «Pronta», premi «Invia le pronte» (in alto a destra) per mandarla subito alla Questura."] },
+      { h: "Gli stati della schedina", items: ["🟠 Da completare — manca un ospite o un dato obbligatorio: aprila e completala.", "🔴 Da correggere — c'è un errore (es. documento o codice non valido): correggi dai dettagli.", "🟢 Pronta — tutto ok, si può inviare.", "⚫ Inviata — già comunicata alla Questura (con ricevuta)."] },
+      { h: "Invio automatico", items: ["Nelle impostazioni ⚙ puoi attivare l'invio automatico: le schedine pronte partono da sole ogni sera alle 23:00 (entro le 24h di legge).", "Se è spento, invii tu con «Invia le pronte».", "Lo stato in alto nel box mostra «Connesso al Portale» e se l'invio automatico è attivo."] },
+      { h: "Archivio ricevute", items: ["Dopo ogni invio la ricevuta della Questura viene salvata: apri «📁 Archivio ricevute».", "È una pagina con elenco e filtri (data, stato): puoi riscaricare o stampare ogni ricevuta in qualsiasi momento.", "La ricevuta resta disponibile per sempre (viene memorizzata al primo scaricamento)."] },
+      { h: "Impostazioni (⚙)", items: ["Credenziali del Portale Alloggiati: Username, Password e Webservice Code (il codice si genera sul portale della Polizia e ha una scadenza).", "Opzioni: raggruppa ospiti (capofamiglia + familiari) o per camera; invio automatico.", "«Genera tracciato .txt»: file di riserva da caricare a mano sul portale, se il collegamento automatico non fosse attivo."] },
+    ],
+  },
+  "/istat": {
+    title: "ISTAT · Turist@t",
+    intro: "Movimento turistico verso l'Osservatorio Turistico Regionale (Turist@t in Sicilia): arrivi, presenze e camere occupate, dichiarati giorno per giorno. Sono dati anonimi (niente nome/documento).",
+    sections: [
+      { h: "A cosa serve", items: ["Ogni struttura deve comunicare all'Osservatorio quanti ospiti arrivano, quante notti restano e da dove vengono — per le statistiche del turismo (ISTAT/Regione).", "Non è nominativo: contano età, sesso, cittadinanza, provenienza, camere e notti. I nomi e i documenti riguardano solo la Questura (Alloggiati).", "Xenora calcola tutto dalle tue prenotazioni: non devi reinserire nulla."] },
+      { h: "Data corrente soggiorni", items: ["Il portale lavora un giorno alla volta: in alto scegli la giornata con ‹ › (o «Oggi»), oppure «Tutte» per vedere l'intero movimento.", "Le card mostrano la situazione di quel giorno: Ospiti arrivati, partiti, presenti e Camere occupate su totale."] },
+      { h: "Il movimento del giorno", items: ["Sotto trovi l'elenco con l'etichetta del giorno: 🟢 Arrivo, Partenza, 🔵 Presente.", "Apri una riga per il dettaglio (notti, camera, provenienza, canale) e «Modifica dati» se serve correggere (è collegato alle prenotazioni e ad Alloggiati).", "Gli arrivi futuri non sono «da inviare»: si comunicano dopo l'arrivo."] },
+      { h: "Chiudi giornata", items: ["«Chiudi giornata» trasmette il movimento di quel giorno all'Osservatorio e passa al giorno dopo (come la «Chiusura Giornaliera» del portale).", "Con l'invio automatico attivo (impostazioni ⚙) la chiusura può partire da sola ogni giorno.", "Ogni chiusura finisce nell'«📁 Archivio» (pagina con elenco e filtri per data)."] },
+      { h: "Archivio e CSV", items: ["«📁 Archivio»: storico di tutte le chiusure giornaliere inviate.", "«⬇ Scarica CSV»: esporta il movimento (dettaglio per ospite: permanenza, camera, età, sesso, cittadinanza, nascita, residenza), utile per inserimento o riconciliazione manuale."] },
+      { h: "Collegamento automatico", items: ["Per l'invio automatico reale serve un account «USER PMS» del portale regionale (uno per struttura), da richiedere una volta al Servizio Osservatorio Turistico.", "Finché non è collegato, la pagina funziona in modalità dimostrativa e puoi comunque usare il CSV per l'inserimento manuale.", "Le credenziali si inseriscono nelle impostazioni ⚙ (regione, portale, username, password)."] },
     ],
   },
   "/tassa-soggiorno": {
