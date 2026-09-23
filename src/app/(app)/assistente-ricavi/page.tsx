@@ -61,11 +61,11 @@ export default function AssistenteRicaviPage() {
     <div>
       <PageHeader title="Assistente ricavi" subtitle="Prezzi consigliati giorno per giorno in base a occupazione, weekend ed eventi locali" actions={<button onClick={applyAll} disabled={!opportunities.length} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">Applica tutti i consigli ({opportunities.length})</button>} />
 
-      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {([["Tariffa base media", eur(baseRate)], ["Camere in scope", String(scopeUnits.length)], ["Opportunità", String(opportunities.length)], ["Ricavo potenziale", `+${eur(upside)}`]] as [string, string][]).map(([lab, val]) => (
-          <div key={lab} className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-faint">{lab}</div>
-            <div className="font-mono text-lg font-bold leading-tight text-txt">{val}</div>
+          <div key={lab} className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{lab}</div>
+            <div className="mt-1 font-mono text-2xl font-bold text-txt">{val}</div>
           </div>
         ))}
       </div>

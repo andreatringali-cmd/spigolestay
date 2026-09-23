@@ -49,8 +49,8 @@ export default function ScadenzarioIncassiPage() {
         actions={<select value={scope} onChange={(e) => setScope(e.target.value)} className={sel}><option value="all">Tutti da incassare</option><option value="overdue">Solo scaduti</option><option value="open">Non ancora scaduti</option></select>} />
 
       <div className="mb-4 grid grid-cols-2 gap-3">
-        <Card><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Totale da incassare</div><div className="font-mono text-lg font-bold text-txt">{eur(cents(totalOpen))}</div></Card>
-        <Card><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Di cui scaduto</div><div className="font-mono text-lg font-bold" style={{ color: overdueTot > 0 ? "var(--err)" : "var(--ok)" }}>{eur(cents(overdueTot))}</div></Card>
+        <Card className="!p-4"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Totale da incassare</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{eur(cents(totalOpen))}</div></Card>
+        <Card className="!p-4"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Di cui scaduto</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: overdueTot > 0 ? "var(--err)" : "var(--ok)" }}>{eur(cents(overdueTot))}</div></Card>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">

@@ -109,6 +109,32 @@ export default function PuliziePage() {
   }, [structures]);
   const persistStock = (next: Prod[]) => { setStock(next); try { localStorage.setItem("spigolestay:pulizie:stock", JSON.stringify(next)); } catch {} };
   const persistOrders = (next: Order[]) => { setOrders(next); try { localStorage.setItem("spigolestay:pulizie:orders", JSON.stringify(next)); } catch {} };
+  // Ri-lettura IN-PLACE quando la sincronizzazione col server aggiorna il localStorage
+  // (evento spigolestay:datasync) o al ritorno sulla scheda. Senza, lo stato React di questa
+  // pagina resterebbe "vecchio" e il salvataggio successivo (persistStock/persistOrders/…)
+  // riscriverebbe i dati appena sincronizzati con valori obsoleti: è la causa per cui le
+  // modifiche a "Scorte & spesa" tornavano indietro. Le chiavi pulizie:* sono flat (non nel
+  // blob dati) e la fusione le tiene "local-wins", quindi rileggerle è sempre sicuro.
+  useEffect(() => {
+    const rehydrate = () => {
+      try {
+        const s = localStorage.getItem("spigolestay:pulizie:stock"); if (s) setStock(JSON.parse(s));
+        const o = localStorage.getItem("spigolestay:pulizie:orders"); if (o) setOrders(JSON.parse(o));
+        const iss = localStorage.getItem("spigolestay:pulizie:issues"); if (iss) setIssues(JSON.parse(iss));
+        const dn = localStorage.getItem("spigolestay:pulizie:done"); if (dn) setDone(JSON.parse(dn));
+        const nt = localStorage.getItem("spigolestay:pulizie:notes"); if (nt) setNotes(JSON.parse(nt));
+      } catch {}
+    };
+    const onVis = () => { if (document.visibilityState === "visible") rehydrate(); };
+    window.addEventListener("spigolestay:datasync", rehydrate);
+    window.addEventListener("focus", rehydrate);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("spigolestay:datasync", rehydrate);
+      window.removeEventListener("focus", rehydrate);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, []);
   const setQty = (id: string, qty: number) => persistStock(stock.map((p) => (p.id === id ? { ...p, qty: Math.max(0, qty) } : p)));
   // Pulsanti rapidi (per la signora): impostano la giacenza in base allo stato scelto.
   const setStatusQuick = (p: Prod, s: StockStatus) => setQty(p.id, s === "out" ? 0 : s === "low" ? Math.max(1, p.min) : p.qty > p.min ? p.qty : p.min + 1);

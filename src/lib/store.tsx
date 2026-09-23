@@ -322,9 +322,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addUnit: (u) => { const id = uid(); setUnits((prev) => [...prev, { id, ...u, updatedAt: Date.now() }]); logAct("config", `Camera aggiunta — ${u.name}`); return id; },
       updateUnit: (id, patch) => setUnits((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch, updatedAt: Date.now() } : x))),
       setUnitRoomType: (unitId, roomTypeId) =>
-        setUnits((prev) => prev.map((u) => (u.id === unitId ? { ...u, roomTypeId } : u))),
+        setUnits((prev) => prev.map((u) => (u.id === unitId ? { ...u, roomTypeId, updatedAt: Date.now() } : u))),
       toggleOutOfService: (unitId) =>
-        setUnits((prev) => prev.map((u) => (u.id === unitId ? { ...u, outOfService: !u.outOfService } : u))),
+        setUnits((prev) => prev.map((u) => (u.id === unitId ? { ...u, outOfService: !u.outOfService, updatedAt: Date.now() } : u))),
 
       deleteStructure: (id) => {
         const nm = structures.find((s) => s.id === id)?.name;
@@ -419,7 +419,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const crossed = !!(target && cur && target.structureId !== cur.structureId);
         setBookings((prev) => prev.map((b) => {
           if (b.id !== id) return b;
-          const next: Booking = { ...b, unitId: to.unitId, checkIn: to.checkIn, checkOut: to.checkOut };
+          const next: Booking = { ...b, unitId: to.unitId, checkIn: to.checkIn, checkOut: to.checkOut, updatedAt: Date.now() };
           if (target && target.structureId !== b.structureId) {
             // Cambio struttura: la prenotazione passa alla nuova struttura (e alla tipologia della camera di arrivo)
             // e porta con sé l'avviso "spostata da…". Se torna alla struttura d'origine l'avviso sparisce.
@@ -452,9 +452,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         logAct("cancel", `Cancellazione gruppo (${members.length} camere)${gName ? " — " + gName : ""}`);
       },
 
-      addEvent: (e) => { setEvents((prev) => [...prev, { id: uid(), ...e }]); logAct("event", `Evento: ${e.name}`); },
-      updateEvent: (id, patch) => setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e))),
-      deleteEvent: (id) => setEvents((prev) => prev.filter((e) => e.id !== id)),
+      addEvent: (e) => { setEvents((prev) => [...prev, { id: uid(), ...e, updatedAt: Date.now() }]); logAct("event", `Evento: ${e.name}`); },
+      updateEvent: (id, patch) => setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch, updatedAt: Date.now() } : e))),
+      deleteEvent: (id) => { tomb("events", id); setEvents((prev) => prev.filter((e) => e.id !== id)); },
 
       setDayRates: (map) => { setRateOverrides((prev) => ({ ...prev, ...map })); logAct("rate", `Tariffe aggiornate · ${Object.keys(map).length} giorni`); },
       clearDayRates: (isos) => setRateOverrides((prev) => { const c = { ...prev }; isos.forEach((i) => delete c[i]); return c; }),

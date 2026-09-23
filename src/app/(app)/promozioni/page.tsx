@@ -159,11 +159,11 @@ export default function PromozioniPage() {
     <div>
       <PageHeader title="Promozioni" subtitle="Crea le tue promo, salvale e inviale quando vuoi · max 4 invii l'anno" />
 
-      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {([["Commissioni OTA (storico)", `€ ${Math.round(otaCommission).toLocaleString("it-IT")}`], ["Promo salvate", String(promos.length)], ["Invii quest'anno", `${usedThisYear}/4`], ["Destinatari 'da ricontattare'", String(guests.filter((g) => { if (!g.email) return false; const list = bookings.filter((b) => b.guestId === g.id && b.status !== "cancelled"); const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), ""); return !!last && daysAgo(last) > 300; }).length)], ["Ospiti con email", String(guests.filter((g) => g.email).length)]] as [string, string][]).map(([lab, val]) => (
-          <div key={lab} className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-faint">{lab}</div>
-            <div className="font-mono text-lg font-bold leading-tight text-txt">{val}</div>
+          <div key={lab} className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{lab}</div>
+            <div className="mt-1 font-mono text-2xl font-bold text-txt">{val}</div>
           </div>
         ))}
       </div>

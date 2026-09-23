@@ -92,9 +92,9 @@ export default function UpsellingPage() {
     <div>
       <PageHeader title="Upselling & extra" subtitle="Servizi ed esperienze da proporre prima dell'arrivo per aumentare il ricavo per prenotazione" />
 
-      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {([["Extra attivi", String(activeCat.length)], ["Arrivi in arrivo", String(arrivals.length)], ["Prezzo medio", eur(Math.round(avgExtra))], ["Ricavo potenziale", `+${eur(potential)}`]] as [string, string][]).map(([lab, val]) => (
-          <div key={lab} className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">{lab}</div><div className="font-mono text-lg font-bold leading-tight text-txt">{val}</div></div>
+          <div key={lab} className="rounded-xl border border-line bg-surface p-4 shadow-sm"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{lab}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{val}</div></div>
         ))}
       </div>
 

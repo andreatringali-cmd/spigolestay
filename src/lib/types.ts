@@ -268,6 +268,7 @@ export interface CalEvent {
   from: string; // ISO incluso
   to: string;   // ISO escluso (giorno dopo l'ultimo)
   color: string; // colore esadecimale
+  updatedAt?: number; // epoch ms ultima modifica (sync last-write-wins)
 }
 
 export const EVENT_COLORS = ["#E0552B", "#E0A21C", "#7C3AED", "#0E9F6E", "#2563EB", "#DB2777", "#0891B2", "#6B7280"];

@@ -209,7 +209,7 @@ export default function FatturePassivePage() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[["Imponibile", totals.imp, "var(--dim)"], ["IVA", totals.iva, "var(--dim)"], ["Totale", totals.tot, "var(--txt)"], ["Da pagare", totals.unpaid, totals.unpaid > 0 ? "var(--warn)" : "var(--ok)"]].map(([l, v, c]) => (
-          <Card key={l as string}><div className="text-[10px] font-medium uppercase tracking-wide text-faint">{l as string}</div><div className="font-mono text-lg font-bold" style={{ color: c as string }}>{eur(cents(v as number))}</div></Card>
+          <Card key={l as string} className="!p-4"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{l as string}</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: c as string }}>{eur(cents(v as number))}</div></Card>
         ))}
       </div>
 

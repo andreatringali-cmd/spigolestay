@@ -39,8 +39,8 @@ export default function RegistroBolloPage() {
         actions={<select value={year} onChange={(e) => setYear(Number(e.target.value))} className={sel}>{[...new Set([String(year), ...years])].map((y) => <option key={y} value={y}>{y}</option>)}</select>} />
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {quarters.map((q) => <Card key={q.q}><div className="text-[10px] font-medium uppercase tracking-wide text-faint">{q.q}º trimestre</div><div className="font-mono text-lg font-bold text-txt">{eur(cents(q.cents))}</div><div className="text-[11px] text-faint">{q.count} doc.</div></Card>)}
-        <Card><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Totale {year}</div><div className="font-mono text-lg font-bold text-focus">{eur(cents(totalYear))}</div><div className="text-[11px] text-faint">{ofYear.length} doc.</div></Card>
+        {quarters.map((q) => <Card key={q.q} className="!p-4"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{q.q}º trimestre</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{eur(cents(q.cents))}</div><div className="text-[11px] text-faint">{q.count} doc.</div></Card>)}
+        <Card className="!p-4"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Totale {year}</div><div className="mt-1 font-mono text-2xl font-bold text-focus">{eur(cents(totalYear))}</div><div className="text-[11px] text-faint">{ofYear.length} doc.</div></Card>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">

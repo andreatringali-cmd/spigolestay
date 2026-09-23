@@ -10,6 +10,7 @@ import { downscaleImage } from "@/lib/images";
 import { AV_COLORS } from "@/lib/users";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import WeatherWidget from "@/components/WeatherWidget";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -154,12 +155,17 @@ export default function CamerePage() {
       <PageHeader
         title={t("Camere")}
         subtitle={t("Tipologie e singole camere di ogni struttura")}
-        actions={activeStructureId === "all" ? (
-          <select value={localS} onChange={(e) => setLocalS(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
-            <option value="all">{t("Tutte le strutture")}</option>
-            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        ) : null}
+        actions={
+          <div className="flex items-center gap-2">
+            {activeStructureId === "all" && (
+              <select value={localS} onChange={(e) => setLocalS(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+                <option value="all">{t("Tutte le strutture")}</option>
+                {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            )}
+            <WeatherWidget compact />
+          </div>
+        }
       />
 
       {scoped.length === 0 && <Card><div className="py-8 text-center text-sm text-faint">{t("Nessuna struttura. Creane una in")} <Link href="/strutture" className="text-focus underline">{t("Strutture")}</Link>.</div></Card>}
@@ -199,7 +205,7 @@ export default function CamerePage() {
           return (
             <div key={s.id}>
               <div className="mb-2 flex items-center justify-between">
-                <div className="font-display text-lg font-bold text-txt">{s.name}</div>
+                {activeStructureId === "all" ? <div className="font-display text-lg font-bold text-txt">{s.name}</div> : <div />}
                 <div className="flex gap-2">
                   {sUnits.some((u) => u.order != null) && <button onClick={() => sUnits.forEach((u) => updateUnit(u.id, { order: undefined }))} title={t("Riporta le camere all'ordine numerico crescente")} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash">↕ {t("Ordine numerico")}</button>}
                 </div>

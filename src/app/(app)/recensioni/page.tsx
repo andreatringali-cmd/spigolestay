@@ -325,11 +325,11 @@ export default function RecensioniPage() {
     <div>
       <PageHeader title="Recensioni & reputazione" subtitle="Recensioni Google reali e OTA in un posto, con risposte suggerite dall'AI" />
 
-      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Media</div><div className="font-mono text-lg font-bold text-txt">{avg.toFixed(1)}<span className="text-xs text-faint">/10</span></div></div>
-        <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Recensioni</div><div className="font-mono text-lg font-bold text-txt">{totalCount}{googleConnected && google.total && google.total > reviews.length ? <span className="text-xs text-faint"> ({reviews.length} qui)</span> : null}</div></div>
-        <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Da rispondere</div><div className="font-mono text-lg font-bold" style={{ color: unanswered ? "var(--warn)" : "var(--ok)" }}>{unanswered}</div></div>
-        <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-sm"><div className="text-[10px] font-medium uppercase tracking-wide text-faint">Positive</div><div className="font-mono text-lg font-bold text-[color:var(--ok)]">{reviews.length ? Math.round(reviews.filter((r) => r.bucket === "pos").length / reviews.length * 100) : 0}%</div></div>
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Media</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{avg.toFixed(1)}<span className="text-xs text-faint">/10</span></div></div>
+        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Recensioni</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{totalCount}{googleConnected && google.total && google.total > reviews.length ? <span className="text-xs text-faint"> ({reviews.length} qui)</span> : null}</div></div>
+        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Da rispondere</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: unanswered ? "var(--warn)" : "var(--ok)" }}>{unanswered}</div></div>
+        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm"><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Positive</div><div className="mt-1 font-mono text-2xl font-bold text-[color:var(--ok)]">{reviews.length ? Math.round(reviews.filter((r) => r.bucket === "pos").length / reviews.length * 100) : 0}%</div></div>
       </div>
 
 
