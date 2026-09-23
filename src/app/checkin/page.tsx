@@ -77,6 +77,7 @@ function Engine() {
   const [arrival, setArrival] = useState("Non lo so");
   const [guestReq, setGuestReq] = useState("");
   const [extras, setExtras] = useState<ReturnType<typeof emptyExtra>[]>([]);
+  const [primaryRoom, setPrimaryRoom] = useState(""); // camera assegnata all'ospite principale (prenotazioni di gruppo)
   const [photoFront, setPhotoFront] = useState<string | undefined>();
   const [photoBack, setPhotoBack] = useState<string | undefined>();
   const [signature, setSignature] = useState<string | undefined>();
@@ -152,8 +153,17 @@ function Engine() {
         // Ospite di ritorno: se questa prenotazione non ha ancora foto, riusa quelle dell'anagrafica.
         setPhotoFront(b.docPhotoFront || g.docPhotoFront || undefined); setPhotoBack(b.docPhotoBack || g.docPhotoBack || undefined); setSignature(b.signature || undefined);
         setAiOff(d.aiEnabled === false);
-        const need = Math.max(0, (b.adults || 1) - 1);
-        setExtras(b.extraGuests?.length ? b.extraGuests.map((e) => ({ ...emptyExtra(), ...e, photoFront: e.docPhotoFront || "", photoBack: e.docPhotoBack || "" })) : Array.from({ length: need }, emptyExtra));
+        if (d.group && d.group.length > 1) {
+          // Prenotazione di GRUPPO: un unico check-in per tutte le camere. Prepara un posto per
+          // ogni ospite atteso e assegna le camere di default (riempiendo ogni camera per capienza).
+          const slots = d.group.flatMap((r) => Array.from({ length: Math.max(1, (r.adults || 1) + (r.children || 0)) }, () => r.b));
+          setPrimaryRoom(slots[0] || d.group[0].b);
+          const need = Math.max(0, slots.length - 1);
+          setExtras(Array.from({ length: need }, (_, i) => ({ ...emptyExtra(), room: slots[i + 1] || d.group![0].b })));
+        } else {
+          const need = Math.max(0, (b.adults || 1) - 1);
+          setExtras(b.extraGuests?.length ? b.extraGuests.map((e) => ({ ...emptyExtra(), ...e, photoFront: e.docPhotoFront || "", photoBack: e.docPhotoBack || "" })) : Array.from({ length: need }, emptyExtra));
+        }
         if (b.invoiceRequest) setInv((p) => ({ ...p, ...Object.fromEntries(Object.entries(b.invoiceRequest!).filter(([, v]) => v != null).map(([k, v]) => [k, v as string | boolean])) }));
       }
     } catch { setLoadErr("Errore di rete."); }
@@ -198,6 +208,48 @@ function Engine() {
   const balance = Math.max(0, grand - paid);
   const canPay = !!st?.stripeChargesEnabled && !!st?.stripeAccount && balance > 0;
 
+  // Prenotazione di gruppo: un unico check-in per più camere.
+  const groupRooms = info?.group ?? [];
+  const isGroup = groupRooms.length > 1;
+  const roomLabel = (r: { roomType: string; unit: string; code: string }) => [r.roomType, r.unit].filter(Boolean).join(" · ") || r.code;
+  const invoicePayload = inv.wants ? { wants: true, kind: inv.kind, name: inv.name.trim() || undefined, vat: inv.vat.trim() || undefined, taxCode: inv.taxCode.trim() || undefined, address: inv.address.trim() || undefined, city: inv.city.trim() || undefined, cap: inv.cap.trim() || undefined, province: inv.province.trim() || undefined, sdiCode: inv.sdiCode.trim() || undefined, country: "IT" } : { wants: false };
+
+  // Invio di GRUPPO: distribuisce gli ospiti per camera e salva ogni camera.
+  const submitGroup = async () => {
+    const reqOk = !!doc && !!doc.firstName.trim() && !!doc.lastName.trim() && !!doc.birthDate && !!doc.docNumber.trim();
+    if (!info || !doc || !reqOk || !consent || !signature || submitting) return;
+    type Person = { room: string; d: DocData; pf?: string; pb?: string };
+    const people: Person[] = [{ room: primaryRoom || groupRooms[0].b, d: doc, pf: photoFront, pb: photoBack }];
+    extras.filter((e) => e.firstName.trim() && e.lastName.trim()).forEach((e) => people.push({ room: e.room || groupRooms[0].b, d: e as unknown as DocData, pf: e.photoFront || undefined, pb: e.photoBack || undefined }));
+    const missing = groupRooms.filter((r) => !people.some((p) => p.room === r.b));
+    if (missing.length) { setSubmitErr(`Assegna almeno un ospite a ogni camera: ${missing.map((m) => m.roomType || m.code).join(", ")}.`); window.scrollTo(0, 0); return; }
+    setSubmitting(true); setSubmitErr("");
+    try {
+      for (const r of groupRooms) {
+        const inRoom = people.filter((p) => p.room === r.b);
+        const primary = inRoom[0];
+        const others = inRoom.slice(1);
+        const isMain = r.b === params.b;
+        const resp = await fetch("/api/checkin", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            slug: params.slug, b: r.b,
+            doc: { firstName: primary.d.firstName.trim(), lastName: primary.d.lastName.trim(), sex: primary.d.sex || undefined, birthDate: primary.d.birthDate, birthPlace: primary.d.birthPlace, citizenship: primary.d.citizenship, docType: primary.d.docType, docNumber: (primary.d.docNumber || "").trim(), docPlace: primary.d.docPlace },
+            arrival, guestRequests: isMain ? (guestReq.trim() || undefined) : undefined,
+            extraGuests: others.map((o) => ({ firstName: o.d.firstName, lastName: o.d.lastName, sex: o.d.sex, birthDate: o.d.birthDate, birthPlace: o.d.birthPlace, citizenship: o.d.citizenship, docType: o.d.docType, docNumber: o.d.docNumber, docPlace: o.d.docPlace, docPhotoFront: o.pf, docPhotoBack: o.pb })),
+            docPhotoFront: primary.pf, docPhotoBack: primary.pb, signature,
+            invoiceRequest: isMain ? invoicePayload : undefined,
+            chosenExtras: isMain ? upsellItems : [],
+          }),
+        });
+        const j = await resp.json().catch(() => ({}));
+        if (!resp.ok || !j?.ok) throw new Error(j?.error || "fail");
+      }
+      setDone(true); window.scrollTo(0, 0);
+    } catch { setSubmitErr("Invio non riuscito. Riprova."); }
+    setSubmitting(false);
+  };
+
   const submit = async (opts?: { assumeConsent?: boolean }) => {
     const consented = opts?.assumeConsent || consent;
     const reqOk = !!doc && !!doc.firstName.trim() && !!doc.lastName.trim() && !!doc.birthDate && !!doc.docNumber.trim();
@@ -212,7 +264,7 @@ function Engine() {
           arrival, guestRequests: guestReq.trim() || undefined,
           extraGuests: extras.filter((e) => e.firstName.trim() && e.lastName.trim()),
           docPhotoFront: photoFront, docPhotoBack: photoBack, signature,
-          invoiceRequest: inv.wants ? { wants: true, kind: inv.kind, name: inv.name.trim() || undefined, vat: inv.vat.trim() || undefined, taxCode: inv.taxCode.trim() || undefined, address: inv.address.trim() || undefined, city: inv.city.trim() || undefined, cap: inv.cap.trim() || undefined, province: inv.province.trim() || undefined, sdiCode: inv.sdiCode.trim() || undefined, country: "IT" } : { wants: false },
+          invoiceRequest: invoicePayload,
           chosenExtras: upsellItems,
         }),
       });
@@ -299,8 +351,17 @@ function Engine() {
           {info.booking.webCheckin && <div className="mt-2 rounded-lg bg-[color:color-mix(in_srgb,var(--ok)_12%,transparent)] px-3 py-1.5 text-xs font-medium text-[color:var(--ok)]">Check-in già inviato — puoi aggiornare i dati e reinviare.</div>}
         </div>
 
+        {/* Prenotazione di gruppo: un solo check-in per tutte le camere */}
+        {isGroup && (
+          <div className={`${box} mb-4 p-4`} style={{ borderColor: "var(--focus)" }}>
+            <div className="flex items-center gap-2"><span className="text-lg">👥</span><h2 className="font-display text-base font-bold text-txt">Prenotazione di gruppo · {groupRooms.length} camere</h2></div>
+            <p className="mt-1 text-xs text-dim">Compila qui gli ospiti di <b>tutte</b> le camere: per ogni persona scegli la <b>camera</b>. Al termine invii tutto in una volta.</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">{groupRooms.map((r) => <span key={r.b} className="rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] text-dim">{roomLabel(r)} · {(r.adults || 1) + (r.children || 0)} {(r.adults || 1) + (r.children || 0) === 1 ? "ospite" : "ospiti"}</span>)}</div>
+          </div>
+        )}
+
         {/* Bentornato: check-in veloce per ospiti di ritorno */}
-        {info.returning && !info.booking.webCheckin && (
+        {info.returning && !info.booking.webCheckin && !isGroup && (
           <div className={`${box} mb-4 p-4`} style={{ borderColor: "var(--ok)" }}>
             <div className="flex items-center gap-2"><span className="text-lg">👋</span><h2 className="font-display text-base font-bold text-txt">Bentornato, {info.guest.firstName || doc?.firstName}!</h2></div>
             <p className="mt-1 text-xs text-dim">Abbiamo già i tuoi dati e il documento del soggiorno precedente. Controlla che sia tutto corretto qui sotto e conferma — oppure invia subito.</p>
@@ -315,6 +376,7 @@ function Engine() {
           <p className="mb-3 text-xs text-dim">Richiesti per legge per la comunicazione degli alloggiati alla Questura. I documenti restano riservati.</p>
           {doc && (
             <div className="grid gap-3 sm:grid-cols-2">
+              {isGroup && <label className={`${lbl} sm:col-span-2`}>Camera *<select value={primaryRoom} onChange={(e) => setPrimaryRoom(e.target.value)} className={`${field} mt-1`}>{groupRooms.map((r) => <option key={r.b} value={r.b}>{roomLabel(r)}</option>)}</select></label>}
               <label className={lbl}>Nome *<input value={doc.firstName} onChange={(e) => setD("firstName", e.target.value)} className={`${field} mt-1`} /></label>
               <label className={lbl}>Cognome *<input value={doc.lastName} onChange={(e) => setD("lastName", e.target.value)} className={`${field} mt-1`} /></label>
               <label className={lbl}>Sesso<select value={doc.sex} onChange={(e) => setD("sex", e.target.value)} className={`${field} mt-1`}><option value="">—</option><option value="M">Maschile</option><option value="F">Femminile</option></select></label>
@@ -339,7 +401,7 @@ function Engine() {
 
         {/* Co-ospiti (sezione sempre visibile: si può sempre aggiungere un ospite) */}
         <div className={`${box} mb-4 p-4`}>
-            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">Altri ospiti</h2><button onClick={() => setExtras((p) => [...p, emptyExtra()])} className="rounded-md border border-line px-2 py-1 text-xs font-medium text-focus hover:bg-wash">＋ Aggiungi</button></div>
+            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">Altri ospiti</h2><button onClick={() => setExtras((p) => [...p, { ...emptyExtra(), room: isGroup ? (primaryRoom || groupRooms[0].b) : "" }])} className="rounded-md border border-line px-2 py-1 text-xs font-medium text-focus hover:bg-wash">＋ Aggiungi</button></div>
             {extras.length === 0 ? (
               <p className="text-xs text-faint">Se con te soggiornano altre persone, aggiungile con &ldquo;＋ Aggiungi&rdquo;.</p>
             ) : (
@@ -351,6 +413,7 @@ function Engine() {
                     <button onClick={() => setExtras((p) => p.filter((_, j) => j !== i))} className="text-faint hover:text-[color:var(--err)]">✕</button>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
+                    {isGroup && <select value={e.room} onChange={(ev) => setExtra(i, "room", ev.target.value)} className={`${field} sm:col-span-2`}>{groupRooms.map((r) => <option key={r.b} value={r.b}>Camera: {roomLabel(r)}</option>)}</select>}
                     <input value={e.firstName} onChange={(ev) => setExtra(i, "firstName", ev.target.value)} placeholder="Nome" className={field} />
                     <input value={e.lastName} onChange={(ev) => setExtra(i, "lastName", ev.target.value)} placeholder="Cognome" className={field} />
                     <select value={e.sex ?? ""} onChange={(ev) => setExtra(i, "sex", ev.target.value)} className={field}><option value="">Sesso</option><option value="M">Maschile</option><option value="F">Femminile</option></select>
@@ -465,7 +528,7 @@ function Engine() {
             <SignaturePad value={signature} onChange={setSignature} />
           </div>
           {submitErr && <div className="mt-3 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)", color: "var(--err)" }}>{submitErr}</div>}
-          <button onClick={() => submit()} disabled={!valid || submitting} className="mt-4 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{submitting ? "Invio…" : "Invia il check-in"}</button>
+          <button onClick={() => (isGroup ? submitGroup() : submit())} disabled={!valid || submitting} className="mt-4 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{submitting ? "Invio…" : isGroup ? "Invia il check-in del gruppo" : "Invia il check-in"}</button>
           {!valid && <div className="mt-2 text-center text-[11px] text-faint">Per inviare: compila nome, cognome, data di nascita, numero documento, spunta il consenso e <b>firma</b>.</div>}
         </div>
       </div>
