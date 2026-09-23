@@ -12,6 +12,12 @@ import type { Booking, Guest, Structure } from "@/lib/types";
 // Data locale (NON UTC): altrimenti vicino a mezzanotte "oggi" sfasa di un giorno.
 const today = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; };
 const soft = (tone: string, pct = 14) => `color-mix(in srgb, ${tone} ${pct}%, transparent)`;
+const fmtDay = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—");
+
+// Completezza del check-in PER PERSONA (usata da card e righe).
+const expectedPaxOf = (b: Booking) => Math.max(1, (b.adults ?? 1) + (b.children ?? 0));
+const primaryDoneOf = (b: Booking) => b.webCheckin === true || !!(b.primaryGuest?.lastName && b.primaryGuest?.docNumber);
+const declaredPaxOf = (b: Booking) => (primaryDoneOf(b) ? 1 : 0) + (b.extraGuests?.length ?? 0);
 
 // Scheda di uno step in ordine cronologico: badge numerato (la sequenza è informativa),
 // numero grande, pill di stato, mini-lista opzionale e azione a piena larghezza in fondo.
@@ -84,9 +90,22 @@ function ArrivalRow({ b, g, st, origin }: { b: Booking; g?: Guest; st?: Structur
     } catch { setMail("err"); }
   };
   const compila = () => { const w = window.open(link, "_blank"); if (!w) window.location.href = link; };
+  const expected = expectedPaxOf(b);
+  const declared = declaredPaxOf(b);
+  const partial = declared > 0 && declared < expected; // qualcuno ha fatto il check-in, ma non tutti
   return (
     <div className="rounded-lg border border-line bg-paper px-2.5 py-1.5">
-      <div className="truncate text-[13px] font-medium text-txt">{g?.fullName || "Ospite"} <span className="text-faint">· {st?.name ?? ""}</span></div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="truncate text-[13px] font-medium text-txt">{g?.fullName || "Ospite"} <span className="text-faint">· {st?.name ?? ""}</span></div>
+        <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={partial ? { background: soft("var(--warn)"), color: "var(--warn)" } : { background: soft("var(--err)"), color: "var(--err)" }}>
+          {partial ? `Incompleto ${declared}/${expected}` : "Da fare"}
+        </span>
+      </div>
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-faint">
+        <span>🗓 {fmtDay(b.checkIn)} → {fmtDay(b.checkOut)}</span>
+        <span>👤 {expected} {expected === 1 ? "persona" : "persone"}</span>
+        <span className={partial ? "font-semibold text-[color:var(--warn)]" : ""}>✓ check-in {declared}/{expected}</span>
+      </div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
         {wa && <a href={wa} target="_blank" rel="noreferrer" className="rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: "#25D366" }}>💬 Sollecita</a>}
         {g?.email && <button onClick={sendMail} disabled={mail === "sending" || mail === "sent"} className={`rounded-md px-2 py-1 text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-70 ${mail === "sent" ? "bg-[color:var(--ok)]" : mail === "err" ? "bg-[color:var(--err)]" : "bg-focus"}`}>{mail === "sent" ? "✓ Inviata" : mail === "sending" ? "Invio…" : mail === "err" ? "Riprova" : "✉ Email"}</button>}
@@ -148,10 +167,13 @@ export default function AdempimentiPage() {
   };
 
   const t = today();
-  // Arrivi di oggi senza check-in online.
-  const arrivalsNoCheckin = useMemo(() => bookings.filter((b) => b.checkIn === t && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && !b.webCheckin), [bookings, t]);
-  // Check-in di oggi GIÀ completati + ospiti attualmente in casa (per il messaggio positivo).
-  const arrivalsCheckedIn = useMemo(() => bookings.filter((b) => b.checkIn === t && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" && b.webCheckin), [bookings, t]);
+  // Completezza del check-in PER PERSONA: quanti ospiti dichiarati vs attesi (helper a livello modulo).
+  const isComplete = (b: Booking) => declaredPaxOf(b) > 0 && declaredPaxOf(b) >= expectedPaxOf(b);
+  const isActiveArrival = (b: Booking) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked";
+  // Arrivi di oggi con check-in mancante o INCOMPLETO (non tutte le persone dichiarate).
+  const arrivalsNoCheckin = useMemo(() => bookings.filter((b) => b.checkIn === t && isActiveArrival(b) && !isComplete(b)), [bookings, t]);
+  // Arrivi di oggi con check-in COMPLETO per tutte le persone.
+  const arrivalsCheckedIn = useMemo(() => bookings.filter((b) => b.checkIn === t && isActiveArrival(b) && isComplete(b)), [bookings, t]);
   const paidByDoc = useMemo(() => { const m = new Map<string, number>(); for (const p of pays) m.set(p.document_id, (m.get(p.document_id) ?? 0) + p.amount_cents); return m; }, [pays]);
   const balanceOf = (d: { id: string; total_cents: number }) => d.total_cents - (paidByDoc.get(d.id) ?? 0);
   // Solo prenotazioni ancora attive: schedine/ISTAT di annullate o no-show spariscono subito,
@@ -210,7 +232,7 @@ export default function AdempimentiPage() {
       {/* Ordine CRONOLOGICO: 1) check-in → 2) schedine Questura → 3) ISTAT → 4) incasso → 5) fattura/SdI → 6) fornitori */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* 1 · Check-in online → poi "passaggio di palla" alle schedine */}
-        <StepCard n={1} tone="var(--warn)" label="Arrivi senza check-in online" sub="Da sollecitare" count={arrivalsNoCheckin.length} action={syncing ? "Trasferisco…" : "↪ Trasferisci alle schedine"} onAction={transferToSchedine}>
+        <StepCard n={1} tone="var(--warn)" label="Check-in online da completare" sub="Da completare" count={arrivalsNoCheckin.length} action={syncing ? "Trasferisco…" : "↪ Trasferisci alle schedine"} onAction={transferToSchedine}>
           {(arrivalsNoCheckin.length > 0 || arrivalsCheckedIn.length > 0 || syncMsg) ? (
             <>
               {arrivalsNoCheckin.length > 0 && (
@@ -226,7 +248,7 @@ export default function AdempimentiPage() {
                   <SubHead mt={arrivalsNoCheckin.length > 0}>Check-in fatti ({arrivalsCheckedIn.length}) · pronti per le schedine</SubHead>
                   {arrivalsCheckedIn.slice(0, 6).map((b) => {
                     const g = getGuest(b.guestId); const st = getStructure(b.structureId);
-                    return <DoneRow key={b.id} left={`${g?.fullName || "Ospite"} · ${st?.name ?? ""}`} />;
+                    return <DoneRow key={b.id} left={`${g?.fullName || "Ospite"} · ${st?.name ?? ""}`} right={`${fmtDay(b.checkIn)}→${fmtDay(b.checkOut)} · ${expectedPaxOf(b)}p`} />;
                   })}
                 </>
               )}
