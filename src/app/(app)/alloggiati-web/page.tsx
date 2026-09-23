@@ -247,7 +247,14 @@ export default function AlloggiatiWebPage() {
             <button onClick={getRicevuta} disabled={!!busy} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "ricevuta" ? "Scarico…" : "Scarica ricevuta"}</button>
           </div>
           <div className="max-h-[52vh] overflow-y-auto">
-            {autoBusy ? <EmptyState title="Nessuna schedina" sub="Aggiorno e verifico le schedine…" /> : <>
+            {autoBusy ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-14 text-sm text-faint">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/xenora-mark.png" alt="" width={48} height={48} style={{ width: 48, height: 48, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
+                <span>Aggiorno e verifico le schedine…</span>
+                <style>{`@keyframes xpulse{0%,100%{opacity:.5;transform:scale(.92)}50%{opacity:1;transform:scale(1)}}`}</style>
+              </div>
+            ) : <>
             {(() => {
               // Raggruppa le schedine per PRENOTAZIONE (una riga a tendina; dentro, una per persona).
               const map = new Map<string, Sched[]>();
