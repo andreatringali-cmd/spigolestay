@@ -27,6 +27,7 @@ export default function AlloggiatiWebPage() {
   const [settingsOpen, setSettingsOpen] = useState(false); // finestra centrale impostazioni
   const [archiveOpen, setArchiveOpen] = useState(false); // archivio invii/ricevute
   const [editBooking, setEditBooking] = useState<string | null>(null); // modale modifica/compilazione dati ospite
+  const [conn, setConn] = useState<{ status?: string; auto?: boolean }>({}); // stato connessione portale + invio automatico
 
   useEffect(() => {
     const target = activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId) ? activeStructureId : structures[0]?.id ?? "";
@@ -37,6 +38,7 @@ export default function AlloggiatiWebPage() {
     if (!supabase || !sid) return;
     const { data } = await supabase.from("alloggiati_schedine").select("id, booking_id, arrival, guest, ruolo, stato, errors, ricevuta").eq("structure_id", sid).order("arrival", { ascending: false });
     setSched((data ?? []) as Sched[]);
+    try { const { data: st } = await supabase.from("alloggiati_settings").select("status, auto_daily").eq("structure_id", sid).maybeSingle(); setConn({ status: st?.status ?? undefined, auto: !!st?.auto_daily }); } catch { setConn({}); }
   }, [sid]);
   useEffect(() => { load(); }, [load]);
 
@@ -100,6 +102,32 @@ export default function AlloggiatiWebPage() {
     <div>
       <PageHeader title="Alloggiati Web" subtitle="Schedine ospiti alla Questura (Portale Alloggiati)"
         actions={structures.length > 1 && activeStructureId === "all" ? <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt">{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select> : undefined} />
+
+      {/* Stato: connessione al portale + invio automatico 23:00 */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {conn.status === "attivata" ? (
+          <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold" style={{ borderColor: "color-mix(in srgb, var(--ok) 35%, transparent)", backgroundColor: "color-mix(in srgb, var(--ok) 12%, transparent)", color: "var(--ok)" }}>
+            <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ backgroundColor: "var(--ok)" }} /><span className="relative inline-flex h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "var(--ok)" }} /></span>
+            Connesso al Portale Alloggiati
+          </span>
+        ) : (
+          <button onClick={() => setSettingsOpen(true)} className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold hover:opacity-90" style={{ borderColor: "color-mix(in srgb, var(--warn) 35%, transparent)", backgroundColor: "color-mix(in srgb, var(--warn) 12%, transparent)", color: "var(--warn)" }} title="Apri le impostazioni per connettere il portale">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "var(--warn)" }} />
+            Portale non connesso · configura ⚙
+          </button>
+        )}
+        {conn.auto ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold" style={{ borderColor: "color-mix(in srgb, var(--focus) 35%, transparent)", backgroundColor: "color-mix(in srgb, var(--focus) 12%, transparent)", color: "var(--focus)" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+            Invio automatico ogni giorno alle 23:00
+          </span>
+        ) : (
+          <button onClick={() => setSettingsOpen(true)} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-dim hover:bg-wash" title="Attiva l'invio automatico dalle impostazioni">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+            Invio automatico spento · attiva
+          </button>
+        )}
+      </div>
 
       {/* Card riepilogo in alto */}
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -179,9 +207,7 @@ export default function AlloggiatiWebPage() {
               const chLab = bk ? (CH[bk.channel] ?? bk.channel) : "";
               return (
                 <div key={key} className="border-b border-line last:border-0">
-                  <div className="flex items-center gap-1">
-                  <button type="button" onClick={() => setOpenG((m) => ({ ...m, [key]: !(m[key] ?? false) }))} className="flex flex-1 items-center gap-2 py-2 text-left">
-                    <span className="shrink-0 text-faint">{opened ? "▾" : "▸"}</span>
+                  <button type="button" onClick={() => setOpenG((m) => ({ ...m, [key]: !(m[key] ?? false) }))} className="flex w-full items-center gap-2 py-2 text-left">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="truncate text-sm font-medium text-txt">{name}</span>
@@ -197,9 +223,8 @@ export default function AlloggiatiWebPage() {
                       <div className="text-[11px] text-faint">📅 {arrival ? new Date(arrival).toLocaleDateString("it-IT") : "—"}{bk?.checkOut ? ` → ${new Date(bk.checkOut).toLocaleDateString("it-IT")}` : ""}{nights ? ` · ${nights} ${nights === 1 ? "notte" : "notti"}` : ""}{bk?.arrivalTime ? ` · arrivo h ${bk.arrivalTime}` : ""}{gStato !== "inviata" && arrival ? (isFuture(arrival) ? " · in preparazione" : <> · <span style={{ color: urgColor(cdTone(arrival)), fontWeight: 600 }}>{cdTone(arrival) === "over" ? "⚠ " : "⏱ "}{cdText(arrival)}</span></>) : ""}</div>
                     </div>
                     <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${gst.c} 16%, transparent)`, color: gst.c }}>{gst.l}</span>
+                    <span className="shrink-0 text-faint">{opened ? "▾" : "▸"}</span>
                   </button>
-                  {bk && <button type="button" onClick={() => setEditBooking(bk.id)} title="Completa / modifica dati ospite" aria-label="Modifica" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg></button>}
-                  </div>
                   {opened && (
                     <div className="pb-2 pl-6">
                       {rows.map((x, ri) => { const g = x.guest ?? {};
