@@ -94,6 +94,16 @@ export default function AlloggiatiWebPage() {
   const readyCount = visibleSched.filter((x) => x.stato === "pronta").length;
   const toValidate = visibleSched.filter((x) => x.stato === "da_validare").length;
   const sentCount = visibleSched.filter((x) => x.stato === "inviata").length;
+  // Scadenza legale (art. 109 TULPS): la schedina va inviata alla Questura ENTRO 24h dall'arrivo
+  // (entro 6h per soggiorni sotto le 24h). Non avendo l'orario esatto d'arrivo usiamo il giorno
+  // successivo all'arrivo come termine mostrato.
+  const deadlineOf = (arrivalISO: string) => { const d = new Date(arrivalISO + "T00:00:00"); d.setDate(d.getDate() + 1); return d; };
+  const fmtDeadline = (d: Date) => d.toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
+  const urgencyOf = (arrivalISO: string): "over" | "soon" | "ok" => { const h = (deadlineOf(arrivalISO).getTime() - Date.now()) / 3600000; return h < 0 ? "over" : h <= 24 ? "soon" : "ok"; };
+  const urgColor = (u: string) => (u === "over" ? "var(--err)" : u === "soon" ? "var(--warn)" : "var(--faint)");
+  const toSend = visibleSched.filter((x) => x.stato !== "inviata" && x.arrival);
+  const nextDl = toSend.length ? deadlineOf(toSend.map((x) => x.arrival).sort()[0]) : null;
+  const overdueCount = toSend.filter((x) => urgencyOf(x.arrival) === "over").length;
   // Ospiti attualmente in struttura (arrivati e non ancora ripartiti).
   const todayLocal = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
   const inHouse = bookings
@@ -171,6 +181,12 @@ export default function AlloggiatiWebPage() {
             <button onClick={() => call("check", "check")} disabled={!!busy || readyCount === 0} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50" title="Controllo preliminare presso il portale, senza inviare">{busy === "check" ? "Controllo…" : "Controlla"}</button>
             <button onClick={() => call("send", "send")} disabled={!!busy || readyCount === 0} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "send" ? "Invio…" : `Invia le pronte (${readyCount})`}</button>
           </div>
+          {nextDl && (
+            <div className="mb-2 flex items-start gap-2 rounded-lg border px-3 py-2 text-[12px]" style={{ borderColor: overdueCount ? "var(--err)" : "var(--warn)", background: `color-mix(in srgb, ${overdueCount ? "var(--err)" : "var(--warn)"} 8%, transparent)` }}>
+              <span aria-hidden>⏱</span>
+              <span className="text-dim">Invio alla Questura <b className="text-txt">entro 24h dall&apos;arrivo</b> (art. 109 TULPS). Prossima scadenza: <b style={{ color: overdueCount ? "var(--err)" : "var(--warn)" }}>{fmtDeadline(nextDl)}</b>{overdueCount ? ` · ${overdueCount} in ritardo` : ""}.</span>
+            </div>
+          )}
           <div className="mb-2 flex flex-wrap items-center gap-2 border-t border-line pt-2">
             <span className="text-[11px] font-medium text-dim">Ricevuta:</span>
             <input type="date" value={ricDate} onChange={(e) => setRicDate(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
@@ -183,7 +199,7 @@ export default function AlloggiatiWebPage() {
                 <div key={x.id} className="flex items-center justify-between gap-2 border-b border-line py-2 last:border-0">
                   <div className="min-w-0">
                     <div className="truncate text-sm text-txt">{(x.guest?.cognome ?? "") + " " + (x.guest?.nome ?? "") || "—"} <span className="text-faint">· {RUOLO[x.ruolo] ?? x.ruolo}</span></div>
-                    <div className="text-[11px] text-faint">Arrivo {x.arrival ? new Date(x.arrival).toLocaleDateString("it-IT") : "—"}{x.errors?.length ? ` · ${x.errors.join(", ")}` : ""}{x.ricevuta ? ` · ric. ${x.ricevuta}` : ""}</div>
+                    <div className="text-[11px] text-faint">Arrivo {x.arrival ? new Date(x.arrival).toLocaleDateString("it-IT") : "—"}{x.errors?.length ? ` · ${x.errors.join(", ")}` : ""}{x.ricevuta ? ` · ric. ${x.ricevuta}` : ""}{x.stato !== "inviata" && x.arrival ? <> · <span style={{ color: urgColor(urgencyOf(x.arrival)), fontWeight: 600 }}>{urgencyOf(x.arrival) === "over" ? "⚠ scaduta " : "entro "}{fmtDeadline(deadlineOf(x.arrival))}</span></> : ""}</div>
                   </div>
                   <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.c} 16%, transparent)`, color: st.c }}>{st.l}</span>
                 </div>

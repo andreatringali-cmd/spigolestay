@@ -13,6 +13,9 @@ import type { Booking, Guest, Structure } from "@/lib/types";
 const today = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; };
 const soft = (tone: string, pct = 14) => `color-mix(in srgb, ${tone} ${pct}%, transparent)`;
 const fmtDay = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—");
+// Scadenza schedina Questura: entro 24h dall'arrivo (mostrata come giorno successivo all'arrivo).
+const schedDeadline = (iso?: string) => { if (!iso) return "—"; const d = new Date(iso); d.setDate(d.getDate() + 1); return d.toLocaleDateString("it-IT", { day: "2-digit", month: "short" }); };
+const schedOverdue = (iso?: string) => { if (!iso) return false; const d = new Date(iso); d.setDate(d.getDate() + 1); return d.getTime() < Date.now(); };
 
 // Completezza del check-in PER PERSONA (usata da card e righe).
 const expectedPaxOf = (b: Booking) => Math.max(1, (b.adults ?? 1) + (b.children ?? 0));
@@ -183,7 +186,6 @@ export default function AdempimentiPage() {
   // 2 · Schedine Questura — da inviare (non "inviata") vs inviate. Le "da inviare" solo se la prenotazione è viva.
   const schedToSend = sched.filter((s) => s.stato !== "inviata" && isActive(s.booking_id));
   const schedSent = sched.filter((s) => s.stato === "inviata");
-  const schedToday = schedToSend.filter((s) => s.arrival === t);
   // 3 · ISTAT — pending (solo prenotazioni vive) vs inviati.
   const istatPend = istat.filter((s) => s.stato === "pending" && isActive(s.booking_id));
   const istatSent = istat.filter((s) => s.stato === "sent");
@@ -262,8 +264,10 @@ export default function AdempimentiPage() {
           {(schedToSend.length > 0 || schedSent.length > 0) ? (
             <>
               {schedToSend.length > 0 && (<>
-                <SubHead>Da inviare ({schedToSend.length}) · in arrivo oggi: {schedToday.length}</SubHead>
-                {schedToSend.slice(0, 4).map((sc) => <MiniRow key={sc.id} left={`Arrivo ${sc.arrival ? new Date(sc.arrival).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—"}`} />)}
+                <SubHead>Da inviare ({schedToSend.length}) · entro 24h dall&apos;arrivo</SubHead>
+                {schedToSend.slice(0, 4).map((sc) => (
+                  <MiniRow key={sc.id} left={`Arrivo ${fmtDay(sc.arrival)}`} right={schedOverdue(sc.arrival) ? `⚠ scaduta ${schedDeadline(sc.arrival)}` : `entro ${schedDeadline(sc.arrival)}`} />
+                ))}
               </>)}
               {schedSent.length > 0 && (<>
                 <SubHead mt={schedToSend.length > 0}>Inviate ({schedSent.length})</SubHead>
