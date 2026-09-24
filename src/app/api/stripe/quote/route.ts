@@ -46,19 +46,25 @@ export async function POST(req: Request) {
       mode: "payment",
       line_items: [{ price_data: { currency: "eur", unit_amount: amount * 100, product_data: { name: label } }, quantity: 1 }],
       metadata: { kind: "quote", source, ...meta },
-      payment_intent_data: {
-        metadata: { kind: "quote", source, ...meta },
-        // La fee ha senso solo con un account collegato (direct charge).
-        ...(acct && fee.applies ? { application_fee_amount: fee.totalCents } : {}),
-      },
+      payment_intent_data: { metadata: { kind: "quote", source, ...meta } },
       customer_email: email,
       success_url: success.includes("{CHECKOUT_SESSION_ID}") ? success : `${success}${success.includes("?") ? "&" : "?"}paid=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancel,
     };
-    // Stripe Connect: se la struttura ha un account collegato, l'incasso va DIRETTAMENTE su quell'account.
-    const session = acct
-      ? await stripe.checkout.sessions.create(params, { stripeAccount: acct })
-      : await stripe.checkout.sessions.create(params);
+    // Stripe Connect — DESTINATION CHARGE: l'addebito avviene sulla PIATTAFORMA e i fondi
+    // vengono trasferiti all'account della struttura (transfer_data.destination). È il pattern
+    // richiesto da Stripe per le piattaforme nuove con account Express/Custom (i "direct charges"
+    // non sono più supportati). La commissione resta alla piattaforma con application_fee_amount.
+    if (acct) {
+      params.payment_intent_data = {
+        ...params.payment_intent_data,
+        transfer_data: { destination: acct },
+        on_behalf_of: acct,
+        ...(fee.applies ? { application_fee_amount: fee.totalCents } : {}),
+      };
+    }
+    // Sempre creata sull'account PIATTAFORMA (niente stripeAccount header).
+    const session = await stripe.checkout.sessions.create(params);
     return NextResponse.json({ url: session.url });
   } catch (e) {
     return NextResponse.json({ error: "stripe_error", message: (e as Error)?.message ?? "errore" }, { status: 500 });

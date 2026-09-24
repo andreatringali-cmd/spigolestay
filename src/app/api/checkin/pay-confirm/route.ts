@@ -30,12 +30,9 @@ export async function POST(req: Request) {
     let store = slug ? await findBookingStore(admin, slug, bid) : null;
     if (!store) store = await findBookingStoreById(admin, bid);
     if (!store) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
-    const st = (store.structure ?? {}) as Json;
-    const acct = s(st.stripeAccount);
-    if (!acct) return NextResponse.json({ ok: false, error: "no_account" }, { status: 400 });
-
     const stripe = new Stripe(key);
-    const session = await stripe.checkout.sessions.retrieve(sessionId, undefined, { stripeAccount: acct });
+    // Destination charge: la sessione è sull'account PIATTAFORMA (niente stripeAccount header).
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
     if (session.payment_status !== "paid") return NextResponse.json({ ok: false, error: "not_paid" }, { status: 402 });
     const amount = Math.round((session.amount_total ?? 0) / 100);
     // Idempotenza: non risommare se questa sessione è già stata registrata.
