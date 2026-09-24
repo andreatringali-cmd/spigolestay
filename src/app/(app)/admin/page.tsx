@@ -74,6 +74,7 @@ export default function AdminPage() {
   const [statusF, setStatusF] = useState<"all" | "paganti" | "trialing" | "recupero" | "none">("all");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [pay, setPay] = useState<Record<string, { loading: boolean; invoices: Invoice[]; error?: string }>>({});
+  const [notes, setNotes] = useState<Record<string, { loading?: boolean; text: string; saved?: boolean; saving?: boolean }>>({});
 
   const authToken = async () => (await (supabase?.auth.getSession() ?? Promise.resolve({ data: { session: null } }))).data.session?.access_token || "";
 
@@ -103,11 +104,30 @@ export default function AdminPage() {
       setPay((p) => ({ ...p, [cid]: { loading: false, invoices: d.invoices || [], error: d.error } }));
     } catch { setPay((p) => ({ ...p, [cid]: { loading: false, invoices: [], error: "network" } })); }
   };
+  const loadNote = async (uid: string) => {
+    if (notes[uid]) return;
+    setNotes((n) => ({ ...n, [uid]: { loading: true, text: "" } }));
+    try {
+      const token = await authToken();
+      const res = await fetch("/api/admin/notes", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ action: "get", userId: uid }) });
+      const d = await res.json();
+      setNotes((n) => ({ ...n, [uid]: { loading: false, text: d.note || "" } }));
+    } catch { setNotes((n) => ({ ...n, [uid]: { loading: false, text: "" } })); }
+  };
+  const saveNote = async (uid: string) => {
+    setNotes((n) => ({ ...n, [uid]: { ...(n[uid] || { text: "" }), saving: true, saved: false } }));
+    try {
+      const token = await authToken();
+      await fetch("/api/admin/notes", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ action: "save", userId: uid, note: notes[uid]?.text || "" }) });
+      setNotes((n) => ({ ...n, [uid]: { ...(n[uid] || { text: "" }), saving: false, saved: true } }));
+    } catch { setNotes((n) => ({ ...n, [uid]: { ...(n[uid] || { text: "" }), saving: false } })); }
+  };
   const toggle = (acc: Account) => {
     const id = acc.owner.id;
     const nowOpen = !expanded[id];
     setExpanded((e) => ({ ...e, [id]: nowOpen }));
     if (nowOpen && acc.owner.stripeCustomerId) loadPayments(acc.owner.stripeCustomerId);
+    if (nowOpen) loadNote(id);
   };
 
   const kpi = useMemo(() => {
@@ -390,6 +410,21 @@ export default function AdminPage() {
                             ) : (
                               <div className="text-[12px] text-faint">{p?.error ? `Errore: ${p.error}` : "Nessun pagamento registrato."}</div>
                             )}
+
+                            <div className="mt-4">
+                              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Note interne (private)</div>
+                              <textarea
+                                value={notes[r.id]?.text ?? ""}
+                                onChange={(e) => setNotes((n) => ({ ...n, [r.id]: { ...(n[r.id] || {}), text: e.target.value, saved: false } }))}
+                                placeholder={notes[r.id]?.loading ? "Carico…" : "Appunti su questo cliente: contatti, accordi, promemoria…"}
+                                rows={2}
+                                className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus"
+                              />
+                              <div className="mt-1.5 flex items-center gap-2">
+                                <button onClick={() => saveNote(r.id)} disabled={notes[r.id]?.saving} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{notes[r.id]?.saving ? "Salvo…" : "Salva nota"}</button>
+                                {notes[r.id]?.saved && <span className="text-[12px] font-medium text-[color:var(--ok)]">Salvato ✓</span>}
+                              </div>
+                            </div>
                           </td>
                         </tr>
                       )}
