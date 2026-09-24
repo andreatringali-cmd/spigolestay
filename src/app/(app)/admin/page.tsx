@@ -181,11 +181,7 @@ export default function AdminPage() {
 
   return (
     <div>
-      <PageHeader title="Back-office" subtitle="Chi paga, abbonati, scadenze, piani e storico fatture di Xenora" hideHelp
-        actions={<div className="flex items-center gap-2">
-          <button onClick={exportCsv} disabled={loading || !accounts?.length} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">⤓ CSV</button>
-          <button onClick={load} disabled={loading} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-60">{loading ? "Aggiorno…" : "↻ Aggiorna"}</button>
-        </div>} />
+      <PageHeader title="Back-office" subtitle="Chi paga, abbonati, scadenze, piani e storico fatture di Xenora" hideHelp />
 
       {!stripeOn && !err && (
         <div className="mb-4 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 12%, transparent)", color: "var(--dim)" }}>
@@ -207,16 +203,6 @@ export default function AdminPage() {
           <button onClick={() => setView("accounts")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "accounts" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Account paganti</button>
           <button onClick={() => setView("all")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "all" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Tutti i registrati</button>
         </div>
-        {view !== "overview" && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca email, nome, telefono, struttura…" className="min-w-[200px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />}
-        {view === "accounts" && (
-          <select value={statusF} onChange={(e) => setStatusF(e.target.value as typeof statusF)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
-            <option value="all">Tutti</option>
-            <option value="paganti">Solo paganti</option>
-            <option value="trialing">In prova</option>
-            <option value="recupero">Da recuperare / in scadenza</option>
-            <option value="none">Senza abbonamento</option>
-          </select>
-        )}
       </div>
 
       {loading ? (
@@ -225,11 +211,10 @@ export default function AdminPage() {
         <Card><div className="py-10 text-center text-sm text-dim">Impossibile caricare i dati ({err}). <button onClick={load} className="underline">Riprova</button></div></Card>
       ) : view === "overview" ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <StatCard label="Incasso totale finora" value={stripeOn ? `€ ${dash.lifetime.toFixed(0)}` : "—"} color="var(--ok)" hint="tutte le fatture pagate" />
             <StatCard label="Da incassare" value={stripeOn ? `€ ${dash.dueTotal.toFixed(0)}` : "—"} color={dash.dueTotal > 0 ? "var(--bad,#dc2626)" : undefined} hint="fatture aperte" />
             <StatCard label="ARPU" value={stripeOn ? `€ ${dash.arpu.toFixed(0)}` : "—"} hint="ricavo medio per abbonato" />
-            <StatCard label="Da recuperare" value={dash.recover.length} color={dash.recover.length > 0 ? "var(--warn)" : undefined} hint="scaduti / in scadenza" onClick={() => { setView("accounts"); setStatusF("recupero"); }} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -420,6 +405,22 @@ export default function AdminPage() {
           )}
         </Card>
       )}
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+        {view !== "overview" && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca email, nome, telefono, struttura…" className="min-w-[200px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />}
+        {view === "accounts" && (
+          <select value={statusF} onChange={(e) => setStatusF(e.target.value as typeof statusF)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+            <option value="all">Tutti</option>
+            <option value="paganti">Solo paganti</option>
+            <option value="trialing">In prova</option>
+            <option value="recupero">Da recuperare / in scadenza</option>
+            <option value="none">Senza abbonamento</option>
+          </select>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <button onClick={exportCsv} disabled={loading || !accounts?.length} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">⤓ CSV</button>
+          <button onClick={load} disabled={loading} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-60">{loading ? "Aggiorno…" : "↻ Aggiorna"}</button>
+        </div>
+      </div>
       <div className="mt-3 text-[11px] text-faint">Piano/strutture/camere si aggiornano quando l&apos;utente apre l&apos;app. Pagamenti, scadenze e storico fatture arrivano da Stripe in tempo reale.</div>
     </div>
   );
