@@ -197,13 +197,6 @@ export default function AdminPage() {
         <StatCard label="Iscritti totali" value={kpi.total} hint="account registrati" />
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-lg border border-line p-0.5">
-          <button onClick={() => setView("overview")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "overview" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Panoramica</button>
-          <button onClick={() => setView("accounts")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "accounts" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Account paganti</button>
-          <button onClick={() => setView("all")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "all" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Tutti i registrati</button>
-        </div>
-      </div>
 
       {loading ? (
         <Card><div className="py-10 text-center text-sm text-faint">Carico i dati…</div></Card>
@@ -406,6 +399,11 @@ export default function AdminPage() {
         </Card>
       )}
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+        <div className="inline-flex rounded-lg border border-line p-0.5">
+          <button onClick={() => setView("overview")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "overview" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Panoramica</button>
+          <button onClick={() => setView("accounts")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "accounts" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Account paganti</button>
+          <button onClick={() => setView("all")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "all" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Tutti i registrati</button>
+        </div>
         {view !== "overview" && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca email, nome, telefono, struttura…" className="min-w-[200px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />}
         {view === "accounts" && (
           <select value={statusF} onChange={(e) => setStatusF(e.target.value as typeof statusF)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
