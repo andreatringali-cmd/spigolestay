@@ -20,7 +20,11 @@ interface Row {
   stripeCustomerId: string | null; subStatus: string | null; periodEnd: string | null;
   cancelAtPeriodEnd: boolean; monthlyAmount: number | null; currency: string | null;
   invitedCount: number; referredByCode: string | null;
+  // Ruolo nell'organizzazione: chi PAGA (owner/solo con abbonamento) vs collaboratori (member).
+  ownsOrg: boolean; memberOfOrgIds: string[]; isPayer: boolean;
 }
+// Account "pagante" (titolare) con i collaboratori annidati (a tendina).
+interface Account { owner: Row; members: Row[] }
 
 export async function GET(req: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -60,6 +64,20 @@ export async function GET(req: Request) {
   (referrals || []).forEach((r) => {
     invitedByInviter.set(r.inviter_id as string, (invitedByInviter.get(r.inviter_id as string) || 0) + 1);
     referredBy.set(r.invited_id as string, r.code as string);
+  });
+
+  // 3b) Membership: chi è TITOLARE (owner) di un'organizzazione e chi è COLLABORATORE (member).
+  // La signora delle pulizie / soci non pagano: rientrano nel piano del titolare della loro org.
+  const { data: memberships } = await admin.from("memberships").select("org_id,user_id,role,active");
+  const orgOwnerId = new Map<string, string>();          // org_id → user_id del titolare
+  const orgMemberIds = new Map<string, string[]>();      // org_id → [user_id collaboratori]
+  const ownsOrgIds = new Map<string, string[]>();        // user_id → [org_id posseduti]
+  const memberOfOrgIds = new Map<string, string[]>();    // user_id → [org_id di cui è collaboratore]
+  (memberships || []).forEach((m) => {
+    if (m.active === false) return;
+    const oid = m.org_id as string, uid = m.user_id as string;
+    if (m.role === "owner") { orgOwnerId.set(oid, uid); ownsOrgIds.set(uid, [...(ownsOrgIds.get(uid) || []), oid]); }
+    else { orgMemberIds.set(oid, [...(orgMemberIds.get(oid) || []), uid]); memberOfOrgIds.set(uid, [...(memberOfOrgIds.get(uid) || []), oid]); }
   });
 
   // 4) Stripe (best-effort): stato abbonamento + prossimo rinnovo per cliente
@@ -118,14 +136,34 @@ export async function GET(req: Request) {
       currency: si?.currency ?? null,
       invitedCount: invitedByInviter.get(u.id) || 0,
       referredByCode: referredBy.get(u.id) || null,
+      ownsOrg: (ownsOrgIds.get(u.id) || []).length > 0,
+      memberOfOrgIds: memberOfOrgIds.get(u.id) || [],
+      isPayer: !!(si && ["active", "trialing", "past_due", "unpaid", "incomplete"].includes((si.status || "").toLowerCase())) || (!!cid && !(memberOfOrgIds.get(u.id) || []).length),
     };
   });
 
   // Ordina per data registrazione (più recenti prima)
   rows.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
 
+  // Raggruppamento per ACCOUNT PAGANTE: i collaboratori (member) finiscono annidati sotto il titolare.
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+  const isPureCollaborator = (r: Row) => r.memberOfOrgIds.length > 0 && !r.ownsOrg && !r.isPayer;
+  const accounts: Account[] = [];
+  for (const r of rows) {
+    if (isPureCollaborator(r)) continue; // apparirà annidato sotto il titolare
+    // Collaboratori = member delle org possedute da questo utente.
+    const myOrgIds = (ownsOrgIds.get(r.id) || []);
+    const memberIds = new Set<string>();
+    for (const oid of myOrgIds) for (const uid of (orgMemberIds.get(oid) || [])) if (uid !== r.id) memberIds.add(uid);
+    const members = Array.from(memberIds).map((id) => rowById.get(id)).filter((x): x is Row => !!x);
+    accounts.push({ owner: r, members });
+  }
+  // Titolari paganti prima, poi il resto; per data registrazione.
+  accounts.sort((a, b) => (Number(b.owner.isPayer) - Number(a.owner.isPayer)) || (b.owner.createdAt || "").localeCompare(a.owner.createdAt || ""));
+
   return NextResponse.json({
     rows,
+    accounts,
     stripeConfigured: !!stripe,
     generatedAt: new Date().toISOString(),
   });
