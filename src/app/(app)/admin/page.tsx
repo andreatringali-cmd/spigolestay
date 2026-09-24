@@ -63,6 +63,26 @@ function alertsFor(r: Row): Alert[] {
 }
 const needsAttention = (r: Row) => isPastDue(r) || (() => { const du = daysUntil(r.periodEnd); return !r.cancelAtPeriodEnd && (isActive(r) || isTrial(r)) && du != null && du >= 0 && du <= 7; })() || r.cancelAtPeriodEnd;
 
+function Pager({ total, page, pageSize, onPage, onPageSize }: { total: number; page: number; pageSize: number; onPage: (p: number) => void; onPageSize: (s: number) => void }) {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const cur = Math.min(page, pages - 1);
+  const from = total === 0 ? 0 : cur * pageSize + 1;
+  const to = Math.min(total, (cur + 1) * pageSize);
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-t border-line px-3 py-2 text-[13px]">
+      <span className="text-dim">{from}–{to} di {total}</span>
+      <div className="ml-auto flex items-center gap-2">
+        <select value={pageSize} onChange={(e) => { onPageSize(Number(e.target.value)); onPage(0); }} className="rounded-md border border-line bg-paper px-2 py-1 text-[13px] text-txt outline-none">
+          <option value={25}>25 / pag.</option><option value={50}>50 / pag.</option><option value={100}>100 / pag.</option>
+        </select>
+        <button disabled={cur <= 0} onClick={() => onPage(cur - 1)} className="rounded-md border border-line px-2.5 py-1 font-semibold text-dim hover:bg-wash disabled:opacity-40">←</button>
+        <span className="text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{cur + 1}/{pages}</span>
+        <button disabled={cur >= pages - 1} onClick={() => onPage(cur + 1)} className="rounded-md border border-line px-2.5 py-1 font-semibold text-dim hover:bg-wash disabled:opacity-40">→</button>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -75,6 +95,8 @@ export default function AdminPage() {
   const [q, setQ] = useState("");
   const [statusF, setStatusF] = useState<"all" | "paganti" | "trialing" | "recupero" | "none">("all");
   const [payF, setPayF] = useState<"all" | "paid" | "due">("all");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
   const [allPay, setAllPay] = useState<{ loading: boolean; loaded: boolean; invoices: (Invoice & { customerId: string | null; customerEmail: string | null; customerName: string })[]; error?: string }>({ loading: false, loaded: false, invoices: [] });
 
   const authToken = async () => (await (supabase?.auth.getSession() ?? Promise.resolve({ data: { session: null } }))).data.session?.access_token || "";
@@ -106,6 +128,7 @@ export default function AdminPage() {
     } catch { setAllPay({ loading: false, loaded: true, invoices: [], error: "network" }); }
   };
   useEffect(() => { if (view === "pagamenti" || view === "overview") loadAllPay(); /* eslint-disable-next-line */ }, [view]);
+  useEffect(() => { setPage(0); }, [q, statusF, payF, view]);
 
   const openDetail = (acc: Account) => router.push(`/admin/${acc.owner.id}`);
 
@@ -337,7 +360,7 @@ export default function AdminPage() {
                   <th className="px-3 py-2 font-semibold">Fattura</th>
                 </tr></thead>
                 <tbody>
-                  {filteredPay.inv.map((inv) => (
+                  {filteredPay.inv.slice(page * pageSize, (page + 1) * pageSize).map((inv) => (
                     <tr key={inv.id} className="border-b border-line/60 hover:bg-wash/50">
                       <td className="px-3 py-2.5 whitespace-nowrap text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{dmy(inv.date)}</td>
                       <td className="px-3 py-2.5"><div className="font-medium text-txt">{inv.customerName || inv.customerEmail || "—"}</div>{inv.customerName && inv.customerEmail && <div className="text-[12px] text-dim">{inv.customerEmail}</div>}</td>
@@ -350,6 +373,7 @@ export default function AdminPage() {
                 </tbody>
               </table>
             )}
+            {filteredPay.inv.length > 0 && <Pager total={filteredPay.inv.length} page={page} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />}
           </Card>
         </div>
       ) : (
@@ -368,7 +392,7 @@ export default function AdminPage() {
                 <th className="px-3 py-2 font-semibold">Azioni</th>
               </tr></thead>
               <tbody>
-                {filteredAccounts.map((acc) => {
+                {filteredAccounts.slice(page * pageSize, (page + 1) * pageSize).map((acc) => {
                   const r = acc.owner; const al = alertsFor(r);
                   const topAlert = al.find((a) => a.tone === "red") || al.find((a) => a.tone === "amber");
                   return (
@@ -407,6 +431,7 @@ export default function AdminPage() {
               </tbody>
             </table>
           )}
+          {filteredAccounts.length > 0 && <Pager total={filteredAccounts.length} page={page} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />}
         </Card>
       )}
       {view === "overview" && <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface p-2.5 shadow-sm">{filtersInner}</div>}
