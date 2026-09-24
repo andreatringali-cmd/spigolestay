@@ -809,7 +809,7 @@ function MoveList({ items, empty, groupByStructure, structures, guestName, getUn
               <div className="flex items-center gap-1 truncate text-xs text-dim">{getUnit(b.unitId)?.name ?? t("Da assegnare")} · <span className="font-mono text-faint">{fmt(b.checkIn)} → {fmt(b.checkOut)}</span> · <span className="inline-flex items-center gap-0.5"><Icon name="users" size={12} />{b.adults + b.children}</span> · <span className="font-mono">{b.total ? eur(b.total) : "—"}</span></div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
-              <StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--faint)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} />
+              <StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--err)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} />
               <StatusIcon icon="card" color={PAY[pay][0]} title={PAY[pay][1]} />
               {b.channel !== "blocked" && <ChannelLogo channel={b.channel} size={18} title={ch.label} />}
             </div>
