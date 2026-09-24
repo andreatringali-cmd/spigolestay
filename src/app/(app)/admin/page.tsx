@@ -5,7 +5,7 @@
 // a tendina. In più: vista "tutti i registrati", contatti rapidi, filtri scadenze, export CSV.
 // I dati arrivano da /api/admin/overview e /api/admin/payments (service_role lato server).
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { PageHeader, Card, StatCard } from "@/components/ui";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
@@ -69,12 +69,14 @@ export default function AdminPage() {
   const [err, setErr] = useState("");
   const [stripeOn, setStripeOn] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"overview" | "accounts">("overview");
+  const [view, setView] = useState<"overview" | "accounts" | "pagamenti">("overview");
   const [q, setQ] = useState("");
   const [statusF, setStatusF] = useState<"all" | "paganti" | "trialing" | "recupero" | "none">("all");
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [selected, setSelected] = useState<Account | null>(null);
   const [pay, setPay] = useState<Record<string, { loading: boolean; invoices: Invoice[]; error?: string }>>({});
   const [notes, setNotes] = useState<Record<string, { loading?: boolean; text: string; saved?: boolean; saving?: boolean }>>({});
+  const [payF, setPayF] = useState<"all" | "paid" | "due">("all");
+  const [allPay, setAllPay] = useState<{ loading: boolean; loaded: boolean; invoices: (Invoice & { customerId: string | null; customerEmail: string | null; customerName: string })[]; error?: string }>({ loading: false, loaded: false, invoices: [] });
 
   const authToken = async () => (await (supabase?.auth.getSession() ?? Promise.resolve({ data: { session: null } }))).data.session?.access_token || "";
 
@@ -104,6 +106,18 @@ export default function AdminPage() {
       setPay((p) => ({ ...p, [cid]: { loading: false, invoices: d.invoices || [], error: d.error } }));
     } catch { setPay((p) => ({ ...p, [cid]: { loading: false, invoices: [], error: "network" } })); }
   };
+  const loadAllPay = async () => {
+    if (allPay.loaded || allPay.loading) return;
+    setAllPay((s) => ({ ...s, loading: true }));
+    try {
+      const token = await authToken();
+      const res = await fetch("/api/admin/all-payments", { headers: { Authorization: `Bearer ${token}` } });
+      const d = await res.json();
+      setAllPay({ loading: false, loaded: true, invoices: d.invoices || [], error: d.error });
+    } catch { setAllPay({ loading: false, loaded: true, invoices: [], error: "network" }); }
+  };
+  useEffect(() => { if (view === "pagamenti") loadAllPay(); /* eslint-disable-next-line */ }, [view]);
+
   const loadNote = async (uid: string) => {
     if (notes[uid]) return;
     setNotes((n) => ({ ...n, [uid]: { loading: true, text: "" } }));
@@ -122,12 +136,10 @@ export default function AdminPage() {
       setNotes((n) => ({ ...n, [uid]: { ...(n[uid] || { text: "" }), saving: false, saved: true } }));
     } catch { setNotes((n) => ({ ...n, [uid]: { ...(n[uid] || { text: "" }), saving: false } })); }
   };
-  const toggle = (acc: Account) => {
-    const id = acc.owner.id;
-    const nowOpen = !expanded[id];
-    setExpanded((e) => ({ ...e, [id]: nowOpen }));
-    if (nowOpen && acc.owner.stripeCustomerId) loadPayments(acc.owner.stripeCustomerId);
-    if (nowOpen) loadNote(id);
+  const openDetail = (acc: Account) => {
+    setSelected(acc);
+    if (acc.owner.stripeCustomerId) loadPayments(acc.owner.stripeCustomerId);
+    loadNote(acc.owner.id);
   };
 
   const kpi = useMemo(() => {
@@ -158,6 +170,17 @@ export default function AdminPage() {
     for (const r of rs) { if (!r.createdAt) continue; const k = r.createdAt.slice(0, 7); const i = mIdx.get(k); if (i != null) months[i].count++; }
     return { byPlan, lifetime, dueTotal, arpu, renewals, recover, months, maxMonth: Math.max(1, ...months.map((m) => m.count)) };
   }, [rows, accounts, kpi.mrr]);
+
+  const filteredPay = useMemo(() => {
+    let inv = allPay.invoices;
+    if (payF === "paid") inv = inv.filter((i) => i.paid);
+    else if (payF === "due") inv = inv.filter((i) => i.status === "open" || i.status === "uncollectible" || i.status === "past_due");
+    const t = q.trim().toLowerCase();
+    if (t) inv = inv.filter((i) => (i.customerEmail || "").toLowerCase().includes(t) || (i.customerName || "").toLowerCase().includes(t) || (i.description || "").toLowerCase().includes(t));
+    const incassato = allPay.invoices.filter((i) => i.paid).reduce((s, i) => s + i.amount, 0);
+    const daRecuperare = allPay.invoices.filter((i) => i.status === "open" || i.status === "uncollectible" || i.status === "past_due").reduce((s, i) => s + i.amount, 0);
+    return { inv, incassato, daRecuperare };
+  }, [allPay.invoices, payF, q]);
 
   const filteredAccounts = useMemo(() => {
     let as = accounts || [];
@@ -206,6 +229,7 @@ export default function AdminPage() {
       <div className="inline-flex rounded-lg border border-line p-0.5">
         <button onClick={() => setView("overview")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "overview" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Panoramica</button>
         <button onClick={() => setView("accounts")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "accounts" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Account paganti</button>
+        <button onClick={() => setView("pagamenti")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "pagamenti" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Pagamenti</button>
       </div>
       {view !== "overview" && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca email, nome, telefono, struttura…" className="min-w-[200px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />}
       {view === "accounts" && (
@@ -215,6 +239,13 @@ export default function AdminPage() {
           <option value="trialing">In prova</option>
           <option value="recupero">Da recuperare / in scadenza</option>
           <option value="none">Senza abbonamento</option>
+        </select>
+      )}
+      {view === "pagamenti" && (
+        <select value={payF} onChange={(e) => setPayF(e.target.value as typeof payF)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+          <option value="all">Tutte le fatture</option>
+          <option value="paid">Pagate</option>
+          <option value="due">Da recuperare</option>
         </select>
       )}
       <div className="ml-auto flex items-center gap-2">
@@ -317,6 +348,43 @@ export default function AdminPage() {
             </Card>
           </div>
         </div>
+      ) : view === "pagamenti" ? (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Incassato (ultime 100 fatture)" value={stripeOn ? `€ ${filteredPay.incassato.toFixed(0)}` : "—"} color="var(--ok)" hint="fatture pagate" />
+            <StatCard label="Da recuperare" value={stripeOn ? `€ ${filteredPay.daRecuperare.toFixed(0)}` : "—"} color={filteredPay.daRecuperare > 0 ? "var(--bad,#dc2626)" : undefined} hint="fatture aperte / non pagate" onClick={() => setPayF("due")} />
+          </div>
+          <Card className="overflow-x-auto p-0">
+            {allPay.loading ? (
+              <div className="py-10 text-center text-sm text-faint">Carico i pagamenti…</div>
+            ) : filteredPay.inv.length === 0 ? (
+              <div className="py-10 text-center text-sm text-faint">{allPay.error ? `Errore: ${allPay.error}` : "Nessuna fattura."}</div>
+            ) : (
+              <table className="w-full min-w-[840px] text-sm">
+                <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+                  <th className="px-3 py-2 font-semibold">Data</th>
+                  <th className="px-3 py-2 font-semibold">Cliente</th>
+                  <th className="px-3 py-2 font-semibold">Descrizione</th>
+                  <th className="px-3 py-2 font-semibold text-right">Importo</th>
+                  <th className="px-3 py-2 font-semibold">Stato</th>
+                  <th className="px-3 py-2 font-semibold">Fattura</th>
+                </tr></thead>
+                <tbody>
+                  {filteredPay.inv.map((inv) => (
+                    <tr key={inv.id} className="border-b border-line/60 hover:bg-wash/50">
+                      <td className="px-3 py-2.5 whitespace-nowrap text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{dmy(inv.date)}</td>
+                      <td className="px-3 py-2.5"><div className="font-medium text-txt">{inv.customerName || inv.customerEmail || "—"}</div>{inv.customerName && inv.customerEmail && <div className="text-[12px] text-dim">{inv.customerEmail}</div>}</td>
+                      <td className="px-3 py-2.5 text-dim">{inv.description || "Abbonamento"}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-right font-semibold text-txt" style={{ fontVariantNumeric: "tabular-nums" }}>{eur(inv.amount, inv.currency)}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap"><span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={inv.paid ? { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } : { backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{inv.paid ? "pagata" : (inv.status || "—")}</span></td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">{inv.pdf ? <a href={inv.pdf} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">PDF</a> : inv.hostedUrl ? <a href={inv.hostedUrl} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">Apri</a> : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Card>
+        </div>
       ) : (
         <Card className="overflow-x-auto p-0">
           {filteredAccounts.length === 0 ? <div className="py-10 text-center text-sm text-faint">Nessun account trovato.</div> : (
@@ -336,15 +404,14 @@ export default function AdminPage() {
               </tr></thead>
               <tbody>
                 {filteredAccounts.map((acc) => {
-                  const r = acc.owner; const al = alertsFor(r); const open = !!expanded[r.id];
-                  const p = r.stripeCustomerId ? pay[r.stripeCustomerId] : undefined;
+                  const r = acc.owner; const al = alertsFor(r);
                   const topAlert = al.find((a) => a.tone === "red") || al.find((a) => a.tone === "amber");
                   return (
                     <Fragment key={r.id}>
-                      <tr className="cursor-pointer border-b border-line/60 hover:bg-wash/40" onClick={() => toggle(acc)}>
+                      <tr className="cursor-pointer border-b border-line/60 hover:bg-wash/40" onClick={() => openDetail(acc)} title="Apri scheda">
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-2">
-                            <span className="shrink-0 text-dim transition-transform" style={{ transform: open ? "rotate(90deg)" : "none" }}>›</span>
+                            <span className="shrink-0 text-faint">›</span>
                             <div className="min-w-0">
                               <div className="truncate font-semibold text-txt">{r.name || r.email || "—"}{acc.members.length > 0 && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-medium text-dim">👥 {acc.members.length}</span>}</div>
                               <div className="truncate text-[12px] text-dim">{r.email}{r.phone ? ` · ${r.phone}` : ""}</div>
@@ -382,52 +449,6 @@ export default function AdminPage() {
                         </tr>
                       ))}
 
-                      {open && (
-                        <tr className="border-b border-line/60 bg-wash/30">
-                          <td colSpan={11} className="px-4 py-3">
-                            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Storico pagamenti / fatture{r.totalPaid != null ? ` · totale pagato ${eur(r.totalPaid, r.currency || "EUR")}` : ""}</div>
-                            {!r.stripeCustomerId ? (
-                              <div className="text-[12px] text-faint">Nessun cliente Stripe collegato (account non pagante).</div>
-                            ) : p?.loading ? (
-                              <div className="text-[12px] text-faint">Carico lo storico…</div>
-                            ) : p?.invoices?.length ? (
-                              <div className="overflow-x-auto">
-                                <table className="w-full min-w-[520px] text-sm">
-                                  <thead><tr className="text-left text-[11px] uppercase tracking-wide text-faint"><th className="py-1 pr-3 font-semibold">Data</th><th className="py-1 pr-3 font-semibold">Descrizione</th><th className="py-1 pr-3 font-semibold text-right">Importo</th><th className="py-1 pr-3 font-semibold">Stato</th><th className="py-1 font-semibold">Fattura</th></tr></thead>
-                                  <tbody>
-                                    {p.invoices.map((inv) => (
-                                      <tr key={inv.id} className="border-t border-line/60">
-                                        <td className="py-1.5 pr-3 whitespace-nowrap text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{dmy(inv.date)}</td>
-                                        <td className="py-1.5 pr-3 text-dim">{inv.description || inv.number || "Abbonamento"}</td>
-                                        <td className="py-1.5 pr-3 whitespace-nowrap text-right font-semibold text-txt" style={{ fontVariantNumeric: "tabular-nums" }}>{eur(inv.amount, inv.currency)}</td>
-                                        <td className="py-1.5 pr-3 whitespace-nowrap"><span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={inv.paid ? { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } : { backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{inv.paid ? "pagata" : (inv.status || "—")}</span></td>
-                                        <td className="py-1.5 whitespace-nowrap">{inv.pdf ? <a href={inv.pdf} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">PDF</a> : inv.hostedUrl ? <a href={inv.hostedUrl} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">Apri</a> : "—"}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <div className="text-[12px] text-faint">{p?.error ? `Errore: ${p.error}` : "Nessun pagamento registrato."}</div>
-                            )}
-
-                            <div className="mt-4">
-                              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Note interne (private)</div>
-                              <textarea
-                                value={notes[r.id]?.text ?? ""}
-                                onChange={(e) => setNotes((n) => ({ ...n, [r.id]: { ...(n[r.id] || {}), text: e.target.value, saved: false } }))}
-                                placeholder={notes[r.id]?.loading ? "Carico…" : "Appunti su questo cliente: contatti, accordi, promemoria…"}
-                                rows={2}
-                                className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus"
-                              />
-                              <div className="mt-1.5 flex items-center gap-2">
-                                <button onClick={() => saveNote(r.id)} disabled={notes[r.id]?.saving} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{notes[r.id]?.saving ? "Salvo…" : "Salva nota"}</button>
-                                {notes[r.id]?.saved && <span className="text-[12px] font-medium text-[color:var(--ok)]">Salvato ✓</span>}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
                     </Fragment>
                   );
                 })}
@@ -438,6 +459,99 @@ export default function AdminPage() {
       )}
       {view === "overview" && <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface p-2.5 shadow-sm">{filtersInner}</div>}
       <div className="mt-3 text-[11px] text-faint">Piano/strutture/camere si aggiornano quando l&apos;utente apre l&apos;app. Pagamenti, scadenze e storico fatture arrivano da Stripe in tempo reale.</div>
+
+      {selected && (() => {
+        const r = selected.owner; const mp = r.stripeCustomerId ? pay[r.stripeCustomerId] : undefined; const al = alertsFor(r);
+        const info = (label: string, value: ReactNode) => (<div><div className="text-[11px] uppercase tracking-wide text-faint">{label}</div><div className="text-sm font-medium text-txt">{value}</div></div>);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setSelected(null)}>
+            <div className="absolute inset-0 bg-black/40" />
+            <div className="relative z-10 flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              {/* Header */}
+              <div className="flex items-start gap-3 border-b border-line px-5 py-4">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold text-white" style={{ backgroundColor: r.isPayer ? "var(--ok)" : "var(--faint)" }}>{(r.name || r.email || "?").slice(0, 2).toUpperCase()}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2"><h2 className="truncate font-display text-xl font-bold text-txt">{r.name || r.email || "—"}</h2><PlanBadge plan={r.plan} /></div>
+                  <div className="truncate text-[12px] text-dim">{r.email}{r.phone ? ` · ${r.phone}` : ""}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2"><ContactBtns r={r} /><button onClick={() => setSelected(null)} className="grid h-8 w-8 place-items-center rounded-lg text-dim hover:bg-wash hover:text-txt">✕</button></div>
+              </div>
+
+              <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+                {al.length > 0 && <div className="flex flex-wrap gap-1.5">{al.map((a, i) => <span key={i} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={toneStyle(a.tone)}>{a.label}</span>)}</div>}
+
+                {/* Abbonamento */}
+                <div className="grid grid-cols-2 gap-3 rounded-xl border border-line bg-wash/40 p-3 sm:grid-cols-3">
+                  {info("Ruolo", r.ownsOrg ? "Titolare" : r.isPayer ? "Pagante" : "Registrato")}
+                  {info("Stato", r.subStatus || "—")}
+                  {info("Scadenza", dmy(r.periodEnd))}
+                  {info("Canone", r.monthlyAmount != null ? `${eur(r.monthlyAmount, r.currency || "EUR")}/mese` : "—")}
+                  {info("Dovuto", r.amountDue != null && r.amountDue > 0 ? <span style={{ color: "var(--bad,#dc2626)" }}>{eur(r.amountDue, r.currency || "EUR")}</span> : "—")}
+                  {info("Pagato finora", r.totalPaid != null ? eur(r.totalPaid, r.currency || "EUR") : "—")}
+                  {info("Strutture", String(r.structures || 0))}
+                  {info("Camere", String(r.rooms || 0))}
+                  {info("Registrato", dmy(r.createdAt))}
+                </div>
+                {r.structureNames && <div className="text-[13px] text-dim">🏠 {r.structureNames}</div>}
+
+                {/* Collaboratori */}
+                {selected.members.length > 0 && (
+                  <div>
+                    <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Collaboratori (nel piano)</div>
+                    <div className="space-y-1.5">
+                      {selected.members.map((m) => (
+                        <div key={m.id} className="flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2">
+                          <span className="min-w-0 flex-1 truncate"><span className="font-medium text-txt">{m.name || m.email}</span> <span className="text-[12px] text-dim">{m.email}</span></span>
+                          <ContactBtns r={m} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Storico pagamenti */}
+                <div>
+                  <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Storico pagamenti / fatture</div>
+                  {!r.stripeCustomerId ? (
+                    <div className="text-[12px] text-faint">Nessun cliente Stripe collegato (account non pagante).</div>
+                  ) : mp?.loading ? (
+                    <div className="text-[12px] text-faint">Carico lo storico…</div>
+                  ) : mp?.invoices?.length ? (
+                    <div className="overflow-x-auto rounded-lg border border-line">
+                      <table className="w-full min-w-[480px] text-sm">
+                        <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="px-3 py-1.5 font-semibold">Data</th><th className="px-3 py-1.5 font-semibold">Descrizione</th><th className="px-3 py-1.5 font-semibold text-right">Importo</th><th className="px-3 py-1.5 font-semibold">Stato</th><th className="px-3 py-1.5 font-semibold">Fattura</th></tr></thead>
+                        <tbody>
+                          {mp.invoices.map((inv) => (
+                            <tr key={inv.id} className="border-b border-line/60">
+                              <td className="px-3 py-1.5 whitespace-nowrap text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{dmy(inv.date)}</td>
+                              <td className="px-3 py-1.5 text-dim">{inv.description || inv.number || "Abbonamento"}</td>
+                              <td className="px-3 py-1.5 whitespace-nowrap text-right font-semibold text-txt" style={{ fontVariantNumeric: "tabular-nums" }}>{eur(inv.amount, inv.currency)}</td>
+                              <td className="px-3 py-1.5 whitespace-nowrap"><span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={inv.paid ? { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } : { backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{inv.paid ? "pagata" : (inv.status || "—")}</span></td>
+                              <td className="px-3 py-1.5 whitespace-nowrap">{inv.pdf ? <a href={inv.pdf} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">PDF</a> : inv.hostedUrl ? <a href={inv.hostedUrl} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">Apri</a> : "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-[12px] text-faint">{mp?.error ? `Errore: ${mp.error}` : "Nessun pagamento registrato."}</div>
+                  )}
+                </div>
+
+                {/* Note interne */}
+                <div>
+                  <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Note interne (private)</div>
+                  <textarea value={notes[r.id]?.text ?? ""} onChange={(e) => setNotes((n) => ({ ...n, [r.id]: { ...(n[r.id] || {}), text: e.target.value, saved: false } }))} placeholder={notes[r.id]?.loading ? "Carico…" : "Appunti su questo cliente: contatti, accordi, promemoria…"} rows={3} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <button onClick={() => saveNote(r.id)} disabled={notes[r.id]?.saving} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{notes[r.id]?.saving ? "Salvo…" : "Salva nota"}</button>
+                    {notes[r.id]?.saved && <span className="text-[12px] font-medium text-[color:var(--ok)]">Salvato ✓</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
