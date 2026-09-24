@@ -86,6 +86,7 @@ function Engine() {
   const setI = (k: string, v: string | boolean) => setInv((p) => ({ ...p, [k]: v }));
   const [ups, setUps] = useState<Record<string, number>>({});
   const [paying, setPaying] = useState(false);
+  const [payErr, setPayErr] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitErr, setSubmitErr] = useState("");
   const [done, setDone] = useState(false);
@@ -277,7 +278,7 @@ function Engine() {
 
   const payNow = async () => {
     if (!info || balance <= 0 || !st) return;
-    setPaying(true);
+    setPaying(true); setPayErr("");
     try {
       const origin = window.location.origin;
       const r = await fetch("/api/stripe/quote", {
@@ -285,8 +286,10 @@ function Engine() {
         body: JSON.stringify({ amount: balance, label: `Soggiorno ${st.name}`, email: info.guest.email, acct: st.stripeAccount || "", metadata: { bookingId: params.b }, successUrl: `${origin}/checkin?site=${encodeURIComponent(params.slug)}&b=${encodeURIComponent(params.b)}`, cancelUrl: `${origin}/checkin?site=${encodeURIComponent(params.slug)}&b=${encodeURIComponent(params.b)}` }),
       });
       const j = await r.json().catch(() => ({}));
-      if (j.url) window.location.href = j.url; else setPaying(false);
-    } catch { setPaying(false); }
+      if (j.url) { window.location.href = j.url; return; }
+      setPaying(false);
+      setPayErr(j?.message || j?.error || `Pagamento non disponibile (HTTP ${r.status}).`);
+    } catch (e) { setPaying(false); setPayErr(e instanceof Error ? e.message : "Errore di rete."); }
   };
 
   const accent = st?.color || "#4F46E5";
@@ -482,6 +485,7 @@ function Engine() {
             ) : (
               <p className="mt-3 text-center text-xs text-faint">{balance > 0 ? "Il saldo si paga all'arrivo in struttura." : "Soggiorno già saldato."}</p>
             )}
+            {payErr && <div className="mt-2 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)", color: "var(--err)" }}>{payErr}</div>}
             <p className="mt-2 text-center text-[11px] text-faint">Il pagamento online arriva direttamente alla struttura (Stripe).</p>
           </div>
         )}
