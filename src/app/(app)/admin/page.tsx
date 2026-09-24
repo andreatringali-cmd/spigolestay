@@ -179,6 +179,32 @@ export default function AdminPage() {
     </div>
   );
 
+  // Riga unica: schede + ricerca/filtro + CSV/Aggiorna. In Panoramica va in fondo,
+  // nelle altre due schede va SOPRA il registro.
+  const filtersInner = (
+    <>
+      <div className="inline-flex rounded-lg border border-line p-0.5">
+        <button onClick={() => setView("overview")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "overview" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Panoramica</button>
+        <button onClick={() => setView("accounts")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "accounts" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Account paganti</button>
+        <button onClick={() => setView("all")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "all" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Tutti i registrati</button>
+      </div>
+      {view !== "overview" && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca email, nome, telefono, struttura…" className="min-w-[200px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />}
+      {view === "accounts" && (
+        <select value={statusF} onChange={(e) => setStatusF(e.target.value as typeof statusF)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+          <option value="all">Tutti</option>
+          <option value="paganti">Solo paganti</option>
+          <option value="trialing">In prova</option>
+          <option value="recupero">Da recuperare / in scadenza</option>
+          <option value="none">Senza abbonamento</option>
+        </select>
+      )}
+      <div className="ml-auto flex items-center gap-2">
+        <button onClick={exportCsv} disabled={loading || !accounts?.length} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">⤓ CSV</button>
+        <button onClick={load} disabled={loading} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-60">{loading ? "Aggiorno…" : "↻ Aggiorna"}</button>
+      </div>
+    </>
+  );
+
   return (
     <div>
       <PageHeader title="Back-office" subtitle="Chi paga, abbonati, scadenze, piani e storico fatture di Xenora" hideHelp />
@@ -197,6 +223,7 @@ export default function AdminPage() {
         <StatCard label="Iscritti totali" value={kpi.total} hint="account registrati" />
       </div>
 
+      {view !== "overview" && <div className="mb-3 flex flex-wrap items-center gap-2">{filtersInner}</div>}
 
       {loading ? (
         <Card><div className="py-10 text-center text-sm text-faint">Carico i dati…</div></Card>
@@ -398,27 +425,7 @@ export default function AdminPage() {
           )}
         </Card>
       )}
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
-        <div className="inline-flex rounded-lg border border-line p-0.5">
-          <button onClick={() => setView("overview")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "overview" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Panoramica</button>
-          <button onClick={() => setView("accounts")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "accounts" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Account paganti</button>
-          <button onClick={() => setView("all")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "all" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Tutti i registrati</button>
-        </div>
-        {view !== "overview" && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca email, nome, telefono, struttura…" className="min-w-[200px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />}
-        {view === "accounts" && (
-          <select value={statusF} onChange={(e) => setStatusF(e.target.value as typeof statusF)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
-            <option value="all">Tutti</option>
-            <option value="paganti">Solo paganti</option>
-            <option value="trialing">In prova</option>
-            <option value="recupero">Da recuperare / in scadenza</option>
-            <option value="none">Senza abbonamento</option>
-          </select>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          <button onClick={exportCsv} disabled={loading || !accounts?.length} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">⤓ CSV</button>
-          <button onClick={load} disabled={loading} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-60">{loading ? "Aggiorno…" : "↻ Aggiorna"}</button>
-        </div>
-      </div>
+      {view === "overview" && <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">{filtersInner}</div>}
       <div className="mt-3 text-[11px] text-faint">Piano/strutture/camere si aggiornano quando l&apos;utente apre l&apos;app. Pagamenti, scadenze e storico fatture arrivano da Stripe in tempo reale.</div>
     </div>
   );
