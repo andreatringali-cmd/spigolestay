@@ -28,7 +28,11 @@ export async function GET(req: Request) {
   const stripe = new Stripe(stripeKey);
   try {
     const inv = await stripe.invoices.list({ limit: 100, expand: ["data.customer"] });
-    const invoices = inv.data.map((i) => {
+    // Solo ABBONAMENTI Xenora: escludi eventuali fatture non legate a una subscription
+    // (i pagamenti degli OSPITI alle strutture passano da Stripe Connect come charge, non come
+    // fatture di abbonamento, quindi NON devono comparire nel back-office).
+    const subInvoices = inv.data.filter((i) => (i.billing_reason || "").startsWith("subscription"));
+    const invoices = subInvoices.map((i) => {
       // Il customer può essere: string (id), Stripe.Customer (espanso) o Stripe.DeletedCustomer.
       const cust = i.customer;
       const isExpanded = typeof cust === "object" && cust !== null && !("deleted" in cust && cust.deleted);

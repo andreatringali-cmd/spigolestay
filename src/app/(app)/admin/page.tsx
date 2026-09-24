@@ -105,7 +105,7 @@ export default function AdminPage() {
       setAllPay({ loading: false, loaded: true, invoices: d.invoices || [], error: d.error });
     } catch { setAllPay({ loading: false, loaded: true, invoices: [], error: "network" }); }
   };
-  useEffect(() => { if (view === "pagamenti") loadAllPay(); /* eslint-disable-next-line */ }, [view]);
+  useEffect(() => { if (view === "pagamenti" || view === "overview") loadAllPay(); /* eslint-disable-next-line */ }, [view]);
 
   const openDetail = (acc: Account) => router.push(`/admin/${acc.owner.id}`);
 
@@ -125,8 +125,8 @@ export default function AdminPage() {
     const payers = acc.filter((a) => a.owner.isPayer);
     const byPlan: Record<string, { count: number; mrr: number }> = {};
     for (const a of payers) { const k = (a.owner.plan || "—").toLowerCase(); (byPlan[k] ||= { count: 0, mrr: 0 }); byPlan[k].count++; byPlan[k].mrr += a.owner.monthlyAmount || 0; }
-    const lifetime = rs.reduce((s, r) => s + (r.totalPaid || 0), 0);
-    const dueTotal = rs.reduce((s, r) => s + (r.amountDue || 0), 0);
+    const lifetime = allPay.invoices.filter((i) => i.paid).reduce((s, i) => s + i.amount, 0);
+    const dueTotal = allPay.invoices.filter((i) => i.status === "open" || i.status === "uncollectible" || i.status === "past_due").reduce((s, i) => s + i.amount, 0);
     const arpu = payers.length ? kpi.mrr / payers.length : 0;
     const renewals = acc.filter((a) => { const d = daysUntil(a.owner.periodEnd); return d != null && d >= 0 && d <= 30 && (isActive(a.owner) || isTrial(a.owner)); }).sort((a, b) => (a.owner.periodEnd || "").localeCompare(b.owner.periodEnd || ""));
     const recover = acc.filter((a) => needsAttention(a.owner));
@@ -136,7 +136,7 @@ export default function AdminPage() {
     const mIdx = new Map(months.map((m, i) => [m.key, i]));
     for (const r of rs) { if (!r.createdAt) continue; const k = r.createdAt.slice(0, 7); const i = mIdx.get(k); if (i != null) months[i].count++; }
     return { byPlan, lifetime, dueTotal, arpu, renewals, recover, months, maxMonth: Math.max(1, ...months.map((m) => m.count)) };
-  }, [rows, accounts, kpi.mrr]);
+  }, [rows, accounts, kpi.mrr, allPay.invoices]);
 
   const filteredPay = useMemo(() => {
     let inv = allPay.invoices;
@@ -355,7 +355,7 @@ export default function AdminPage() {
       ) : (
         <Card className="overflow-x-auto p-0">
           {filteredAccounts.length === 0 ? <div className="py-10 text-center text-sm text-faint">Nessun account trovato.</div> : (
-            <table className="w-full min-w-[1240px] text-sm">
+            <table className="w-full min-w-[1000px] text-sm">
               <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
                 <th className="px-3 py-2 font-semibold">Titolare / collaboratore</th>
                 <th className="px-3 py-2 font-semibold">Piano</th>
@@ -365,8 +365,6 @@ export default function AdminPage() {
                 <th className="px-3 py-2 font-semibold">Pagamento</th>
                 <th className="px-3 py-2 font-semibold">Scadenza</th>
                 <th className="px-3 py-2 font-semibold text-right">Canone</th>
-                <th className="px-3 py-2 font-semibold text-right">Dovuto</th>
-                <th className="px-3 py-2 font-semibold text-right">Pagato finora</th>
                 <th className="px-3 py-2 font-semibold">Azioni</th>
               </tr></thead>
               <tbody>
@@ -395,9 +393,12 @@ export default function AdminPage() {
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{dmy(r.periodEnd)}</td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-right text-txt" style={{ fontVariantNumeric: "tabular-nums" }}>{r.monthlyAmount != null ? `${eur(r.monthlyAmount, r.currency || "EUR")}` : "—"}</td>
-                        <td className="px-3 py-2.5 whitespace-nowrap text-right" style={{ fontVariantNumeric: "tabular-nums" }}>{r.amountDue != null && r.amountDue > 0 ? <span className="font-semibold" style={{ color: "var(--bad,#dc2626)" }}>{eur(r.amountDue, r.currency || "EUR")}</span> : <span className="text-faint">—</span>}</td>
-                        <td className="px-3 py-2.5 whitespace-nowrap text-right font-semibold text-txt" style={{ fontVariantNumeric: "tabular-nums" }}>{r.totalPaid != null ? eur(r.totalPaid, r.currency || "EUR") : "—"}</td>
-                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}><ContactBtns r={r} /></td>
+                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-1.5">
+                            <ContactBtns r={r} />
+                            {r.stripeCustomerId && <a href={`https://dashboard.stripe.com/customers/${r.stripeCustomerId}`} target="_blank" rel="noreferrer" title="Apri su Stripe" className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">Stripe ↗</a>}
+                          </div>
+                        </td>
                       </tr>
 
                     </Fragment>

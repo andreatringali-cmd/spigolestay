@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "bad_signature", message: (e as Error)?.message }, { status: 400 });
   }
 
-  const origin = new URL(req.url).origin;
+  const origin = req.headers.get("origin") || new URL(req.url).origin;
   try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
@@ -73,6 +73,71 @@ export async function POST(req: Request) {
       const ch = event.data.object as Stripe.Charge;
       const pi = typeof ch.payment_intent === "string" ? ch.payment_intent : (ch.payment_intent?.id || "");
       if (pi) await reconcileRefund(pi, event.account || "", event.type === "charge.dispute.created");
+    }
+
+    // Avvisi al TITOLARE per eventi importanti di abbonamento/fatturazione della PIATTAFORMA (!event.account).
+    // Best-effort: mai far fallire il webhook. Riguarda solo gli abbonati Xenora (conto piattaforma).
+    if (!event.account) {
+      try {
+        // 1) Nuovo abbonato Xenora.
+        if (event.type === "customer.subscription.created") {
+          const sub = event.data.object as Stripe.Subscription;
+          const email = await customerEmail(stripe, sub.customer);
+          const item0 = sub.items?.data?.[0];
+          const price = item0?.price;
+          const importo = typeof price?.unit_amount === "number"
+            ? `${(price.unit_amount / 100).toLocaleString("it-IT", { minimumFractionDigits: 2 })} ${(price.currency || "eur").toUpperCase()}${price.recurring?.interval ? `/${price.recurring.interval}` : ""}`
+            : "";
+          const piano = sub.metadata?.plan || price?.nickname || price?.id || "";
+          const text = [
+            "Nuovo abbonamento Xenora attivato.",
+            email ? `Cliente: ${email}` : "",
+            piano ? `Piano: ${piano}` : "",
+            importo ? `Importo: ${importo}` : "",
+            `Stato: ${sub.status}`,
+          ].filter(Boolean).join("\n");
+          await notifyAdmins(origin, "Nuovo abbonato Xenora", text);
+        }
+
+        // 2) Pagamento fallito.
+        if (event.type === "invoice.payment_failed") {
+          const inv = event.data.object as Stripe.Invoice;
+          const a = inv as unknown as { customer?: string | { id?: string } | null; customer_email?: string | null; amount_due?: number | null; number?: string | null; hosted_invoice_url?: string | null; currency?: string | null };
+          const email = a.customer_email || await customerEmail(stripe, a.customer ?? null);
+          const importo = typeof a.amount_due === "number" ? `${(a.amount_due / 100).toLocaleString("it-IT", { minimumFractionDigits: 2 })} ${(a.currency || "eur").toUpperCase()}` : "";
+          const text = [
+            "Il pagamento di un abbonamento Xenora è FALLITO.",
+            email ? `Cliente: ${email}` : "",
+            importo ? `Importo dovuto: ${importo}` : "",
+            a.number ? `Fattura: ${a.number}` : "",
+            a.hosted_invoice_url ? `Link fattura: ${a.hosted_invoice_url}` : "",
+          ].filter(Boolean).join("\n");
+          await notifyAdmins(origin, "⚠ Pagamento fallito", text);
+        }
+
+        // 3) Disdetta abbonamento: cancellazione immediata oppure impostata a fine periodo.
+        const isCancelNow = event.type === "customer.subscription.deleted";
+        const isCancelScheduled = event.type === "customer.subscription.updated"
+          && (() => {
+            const sub = event.data.object as Stripe.Subscription;
+            const prev = (event.data as unknown as { previous_attributes?: { cancel_at_period_end?: boolean } }).previous_attributes;
+            return sub.cancel_at_period_end === true && prev?.cancel_at_period_end === false;
+          })();
+        if (isCancelNow || isCancelScheduled) {
+          const sub = event.data.object as Stripe.Subscription;
+          const email = await customerEmail(stripe, sub.customer);
+          const fineUnix = (sub as unknown as { current_period_end?: number | null; cancel_at?: number | null }).cancel_at
+            ?? (sub as unknown as { current_period_end?: number | null }).current_period_end
+            ?? null;
+          const fine = fineUnix ? (() => { try { return new Date(fineUnix * 1000).toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" }); } catch { return ""; } })() : "";
+          const text = [
+            isCancelNow ? "Un abbonamento Xenora è stato disdetto (cancellato)." : "Un abbonamento Xenora è stato impostato per la disdetta a fine periodo.",
+            email ? `Cliente: ${email}` : "",
+            fine ? `Fine periodo/servizio: ${fine}` : "",
+          ].filter(Boolean).join("\n");
+          await notifyAdmins(origin, "Disdetta abbonamento", text);
+        }
+      } catch { /* avvisi best-effort: non bloccare mai il webhook */ }
     }
 
     return NextResponse.json({ ok: true, received: event.type });
@@ -130,6 +195,33 @@ async function subscriptionInputFromInvoice(stripe: Stripe, inv: Stripe.Invoice)
     taxCents: a.tax ?? null,
     currency: a.currency ?? "eur",
   };
+}
+
+// Recupera l'email del cliente Stripe gestendo il caso di customer cancellato (DeletedCustomer).
+async function customerEmail(stripe: Stripe, customer: string | { id?: string } | null | undefined): Promise<string> {
+  const id = typeof customer === "string" ? customer : (customer?.id || "");
+  if (!id) return "";
+  try {
+    const c = await stripe.customers.retrieve(id);
+    if ((c as { deleted?: boolean }).deleted) return "";
+    return (c as Stripe.Customer).email || "";
+  } catch { return ""; }
+}
+
+// Avvisa il TITOLARE (tutti gli indirizzi in ADMIN_EMAILS) inviando un'email semplice via /api/email.
+// Best-effort: se RESEND non è configurato fallisce silenziosamente. Non deve mai propagare errori.
+async function notifyAdmins(origin: string, subject: string, text: string) {
+  const admins = (process.env.ADMIN_EMAILS || "spigolehouse@gmail.com,andreatringali.spi@gmail.com")
+    .split(",").map((s) => s.trim()).filter(Boolean);
+  for (const to of admins) {
+    try {
+      await fetch(`${origin}/api/email`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "quote", to, subject, text, accent: "#285f92" }),
+      });
+    } catch { /* invio best-effort: ignora */ }
+  }
 }
 
 // Trova la prenotazione col dato payment_intent (in app_state o org_state) e annota rimborso/dispute.

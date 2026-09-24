@@ -91,18 +91,11 @@ export async function GET(req: Request) {
     // Recupero per cliente PARALLELO (con limite di concorrenza) per non impilare le chiamate Stripe.
     const fetchOne = async (cid: string) => {
       try {
-        const [subs, invs] = await Promise.all([
-          stripe.subscriptions.list({ customer: cid, status: "all", limit: 1 }),
-          stripe.invoices.list({ customer: cid, limit: 100 }).catch(() => ({ data: [] as Stripe.Invoice[] })),
-        ]);
-        let totalPaid = 0, amountDue = 0, invCur: string | null = null;
-        for (const i of invs.data) {
-          invCur = invCur || (i.currency ? i.currency.toUpperCase() : null);
-          totalPaid += (i.amount_paid ?? 0) / 100;
-          if (i.status === "open" || i.status === "uncollectible") amountDue += (i.amount_remaining ?? i.amount_due ?? 0) / 100;
-        }
+        // Lista LEGGERA: solo l'abbonamento (1 chiamata). Il pagato/dovuto per cliente si
+        // calcola nella scheda dettaglio (/api/admin/account), non qui, per non rallentare l'elenco.
+        const subs = await stripe.subscriptions.list({ customer: cid, status: "all", limit: 1 });
         const s = subs.data[0];
-        if (!s) { stripeInfo.set(cid, { status: null, periodEnd: null, cancel: false, monthly: null, currency: invCur, totalPaid, amountDue }); return; }
+        if (!s) { stripeInfo.set(cid, { status: null, periodEnd: null, cancel: false, monthly: null, currency: null, totalPaid: null, amountDue: null }); return; }
         const item = s.items.data[0];
         const amt = item?.price?.unit_amount ?? null;
         const interval = item?.price?.recurring?.interval;
@@ -115,9 +108,9 @@ export async function GET(req: Request) {
           periodEnd: periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null,
           cancel: !!s.cancel_at_period_end,
           monthly,
-          currency: item?.price?.currency ?? invCur,
-          totalPaid,
-          amountDue,
+          currency: item?.price?.currency ?? null,
+          totalPaid: null,
+          amountDue: null,
         });
       } catch { /* salta questo cliente */ }
     };

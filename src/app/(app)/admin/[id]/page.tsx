@@ -82,7 +82,7 @@ export default function AccountDetailPage() {
     <div>
       <button onClick={() => router.push("/admin")} className="mb-2 text-sm font-semibold text-focus hover:underline">← Registro</button>
       <PageHeader title={a.name || a.email || "Account"} subtitle={a.email || ""} hideHelp
-        actions={<Contacts email={a.email} phone={a.phone} />} />
+        actions={<div className="flex items-center gap-1.5"><Contacts email={a.email} phone={a.phone} />{a.stripeCustomerId && <a href={`https://dashboard.stripe.com/customers/${a.stripeCustomerId}`} target="_blank" rel="noreferrer" className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">Stripe ↗</a>}</div>} />
 
       {/* Abbonamento */}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
