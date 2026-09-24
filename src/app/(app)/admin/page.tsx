@@ -69,7 +69,7 @@ export default function AdminPage() {
   const [err, setErr] = useState("");
   const [stripeOn, setStripeOn] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"overview" | "accounts" | "all">("overview");
+  const [view, setView] = useState<"overview" | "accounts">("overview");
   const [q, setQ] = useState("");
   const [statusF, setStatusF] = useState<"all" | "paganti" | "trialing" | "recupero" | "none">("all");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -186,7 +186,6 @@ export default function AdminPage() {
       <div className="inline-flex rounded-lg border border-line p-0.5">
         <button onClick={() => setView("overview")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "overview" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Panoramica</button>
         <button onClick={() => setView("accounts")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "accounts" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Account paganti</button>
-        <button onClick={() => setView("all")} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${view === "all" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>Tutti i registrati</button>
       </div>
       {view !== "overview" && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca email, nome, telefono, struttura…" className="min-w-[200px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />}
       {view === "accounts" && (
@@ -223,7 +222,7 @@ export default function AdminPage() {
         <StatCard label="Iscritti totali" value={kpi.total} hint="account registrati" />
       </div>
 
-      {view !== "overview" && <div className="mb-3 flex flex-wrap items-center gap-2">{filtersInner}</div>}
+      {view !== "overview" && <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface p-2.5 shadow-sm">{filtersInner}</div>}
 
       {loading ? (
         <Card><div className="py-10 text-center text-sm text-faint">Carico i dati…</div></Card>
@@ -298,7 +297,7 @@ export default function AdminPage() {
             </Card>
           </div>
         </div>
-      ) : view === "accounts" ? (
+      ) : (
         <Card className="overflow-x-auto p-0">
           {filteredAccounts.length === 0 ? <div className="py-10 text-center text-sm text-faint">Nessun account trovato.</div> : (
             <table className="w-full min-w-[1240px] text-sm">
@@ -401,31 +400,8 @@ export default function AdminPage() {
             </table>
           )}
         </Card>
-      ) : (
-        <Card className="overflow-x-auto p-0">
-          {(rows || []).length === 0 ? <div className="py-10 text-center text-sm text-faint">Nessun utente.</div> : (
-            <table className="w-full min-w-[900px] text-sm">
-              <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
-                <th className="px-3 py-2 font-semibold">Utente</th><th className="px-3 py-2 font-semibold">Registrato</th><th className="px-3 py-2 font-semibold">Ultimo accesso</th><th className="px-3 py-2 font-semibold">Piano</th><th className="px-3 py-2 font-semibold">Ruolo</th><th className="px-3 py-2 font-semibold">Pagamento</th><th className="px-3 py-2 font-semibold">Contatti</th>
-              </tr></thead>
-              <tbody>
-                {(rows || []).filter((r) => { const t = q.trim().toLowerCase(); return !t || (r.email || "").toLowerCase().includes(t) || (r.name || "").toLowerCase().includes(t) || (r.phone || "").toLowerCase().includes(t); }).map((r) => (
-                  <tr key={r.id} className="border-b border-line/60 hover:bg-wash/50">
-                    <td className="px-3 py-2.5"><div className="font-semibold text-txt">{r.name || "—"}</div><div className="text-[12px] text-dim">{r.email}</div></td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{dmy(r.createdAt)}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{dmy(r.lastActive)}</td>
-                    <td className="px-3 py-2.5"><PlanBadge plan={r.plan} /></td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-[12px] text-dim">{r.isPayer ? "pagante" : r.memberOfOrgIds.length ? "collaboratore" : r.ownsOrg ? "titolare" : "—"}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-dim">{r.subStatus || "—"}</td>
-                    <td className="px-3 py-2.5"><ContactBtns r={r} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Card>
       )}
-      {view === "overview" && <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">{filtersInner}</div>}
+      {view === "overview" && <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface p-2.5 shadow-sm">{filtersInner}</div>}
       <div className="mt-3 text-[11px] text-faint">Piano/strutture/camere si aggiornano quando l&apos;utente apre l&apos;app. Pagamenti, scadenze e storico fatture arrivano da Stripe in tempo reale.</div>
     </div>
   );
