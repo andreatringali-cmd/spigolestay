@@ -12,7 +12,7 @@ import UserSwitcher from "./UserSwitcher";
 
 // Email del titolare Xenora che vede il link al back-office (l'accesso vero è comunque
 // verificato lato server dalla variabile ADMIN_EMAILS).
-const OWNER_EMAILS = ["spigolehouse@gmail.com"];
+const OWNER_EMAILS = ["spigolehouse@gmail.com", "andreatringali.spi@gmail.com"];
 
 const isActive = (href: string, pathname: string) => (href === "/" ? pathname === "/" : (pathname === href || pathname.startsWith(href + "/")));
 

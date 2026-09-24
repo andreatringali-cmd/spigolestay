@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 // Usa la SUPABASE_SERVICE_ROLE_KEY lato server (mai esposta al browser) per leggere auth.users +
 // profiles + referrals, e Stripe (se configurato) per stato abbonamento e prossimo rinnovo.
 
-const OWNER_EMAILS = (process.env.ADMIN_EMAILS || "spigolehouse@gmail.com")
+const OWNER_EMAILS = (process.env.ADMIN_EMAILS || "spigolehouse@gmail.com,andreatringali.spi@gmail.com")
   .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
 
 interface Row {
