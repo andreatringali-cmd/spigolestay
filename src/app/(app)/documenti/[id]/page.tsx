@@ -249,14 +249,15 @@ export default function DocumentoPage() {
       <style>*{box-sizing:border-box}body{font-family:Georgia,serif;color:#1a2131;margin:0;padding:44px 52px;font-size:13px;line-height:1.5}
       .head{display:flex;justify-content:space-between;border-bottom:3px solid #285f92;padding-bottom:14px;margin-bottom:18px}.doc{font-size:22px;font-weight:700;color:#285f92}
       .p{display:flex;justify-content:space-between;gap:24px;margin:16px 0}.p h4{margin:0 0 4px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#5c6479}
-      table{width:100%;border-collapse:collapse;margin-top:10px}th,td{padding:8px 6px;border-bottom:1px solid #e3e6ef}th{text-align:left;font-size:11px;text-transform:uppercase;color:#5c6479}
+      table{width:100%;border-collapse:collapse;margin-top:10px}th,td{padding:8px 6px;border-bottom:1px solid #e3e6ef}th{text-align:left;font-size:11px;text-transform:uppercase;color:#5c6479}td[style*="right"],.tot div span:last-child{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
       .tot{margin:14px 0 0;margin-left:auto;width:280px}.tot div{display:flex;justify-content:space-between;padding:4px 0}.tot .g{border-top:2px solid #285f92;font-weight:700;font-size:15px;margin-top:6px;padding-top:8px}
       .note{margin-top:26px;font-size:11px;color:#7a8194;border-top:1px solid #e3e6ef;padding-top:12px}@media print{body{padding:24px 30px}}</style></head><body>
       <div class="head"><div>${emit || '<div>Emittente da configurare</div>'}</div><div style="text-align:right"><div class="doc">${DOC_KIND_LABEL[doc.doc_kind]}</div><div>n. ${doc.number_label ?? "(bozza)"}</div><div>${f.issue_date ? new Date(f.issue_date).toLocaleDateString("it-IT") : ""}</div></div></div>
       <div class="p"><div><h4>Cliente</h4>${cli}</div>${doc.booking_code ? `<div style="text-align:right"><h4>Prenotazione</h4><div>${esc(doc.booking_code)}</div></div>` : ""}</div>
       <table><thead><tr><th>Descrizione</th><th style="text-align:right">Q.tà</th><th style="text-align:right">IVA</th><th style="text-align:right">Totale</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="tot"><div><span>Imponibile</span><span>${e(totals.taxable)}</span></div><div><span>IVA</span><span>${e(totals.vat)}</span></div>${totals.out ? `<div><span>Fuori campo IVA (art.15)</span><span>${e(totals.out)}</span></div>` : ""}${totals.bolloCents ? `<div><span>Bollo</span><span>${e(totals.bolloCents)}</span></div>` : ""}<div class="g"><span>Totale</span><span>${e(totals.total)}</span></div></div>
-      <div class="note">${se?.regime_note ? esc(se.regime_note) + "<br>" : ""}${esc(se?.footer_note ?? "")}<br>Documento di cortesia.</div></body></html>`);
+      ${f.notes ? `<div class="note"><h4 style="margin:0 0 4px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#5c6479">Causale / Note</h4>${esc(f.notes)}</div>` : ""}
+      <div class="note">${se?.regime_note ? esc(se.regime_note) + "<br>" : ""}${esc(se?.footer_note ?? "")}<br>Documento di cortesia — non valido ai fini fiscali.</div></body></html>`);
     w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
   };
 
