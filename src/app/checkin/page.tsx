@@ -208,6 +208,9 @@ function Engine() {
   const paid = b?.paid ?? 0;
   const balance = Math.max(0, grand - paid);
   const canPay = !!st?.stripeChargesEnabled && !!st?.stripeAccount && balance > 0;
+  // Descrizione mostrata nel Checkout Stripe (colonna sinistra).
+  const shortD = (iso?: string) => { try { return new Date(iso!).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }); } catch { return ""; } };
+  const payLabel = `${st?.name ?? "Soggiorno"} · soggiorno ${shortD(b?.checkIn)}–${shortD(b?.checkOut)}${b?.code ? ` · ${b.code}` : ""}`;
 
   // Prenotazione di gruppo: un unico check-in per più camere.
   const groupRooms = info?.group ?? [];
@@ -283,7 +286,7 @@ function Engine() {
       const origin = window.location.origin;
       const r = await fetch("/api/stripe/quote", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: balance, label: `Soggiorno ${st.name}`, email: info.guest.email, acct: st.stripeAccount || "", metadata: { bookingId: params.b }, successUrl: `${origin}/checkin?site=${encodeURIComponent(params.slug)}&b=${encodeURIComponent(params.b)}`, cancelUrl: `${origin}/checkin?site=${encodeURIComponent(params.slug)}&b=${encodeURIComponent(params.b)}` }),
+        body: JSON.stringify({ amount: balance, label: payLabel, email: info.guest.email, acct: st.stripeAccount || "", metadata: { bookingId: params.b }, successUrl: `${origin}/checkin?site=${encodeURIComponent(params.slug)}&b=${encodeURIComponent(params.b)}`, cancelUrl: `${origin}/checkin?site=${encodeURIComponent(params.slug)}&b=${encodeURIComponent(params.b)}` }),
       });
       const j = await r.json().catch(() => ({}));
       if (j.url) { window.location.href = j.url; return; }
