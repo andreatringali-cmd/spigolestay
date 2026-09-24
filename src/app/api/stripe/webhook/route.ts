@@ -1,6 +1,8 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { handleSubscriptionPaid, type SubscriptionPaidInput } from "@/lib/invoicing/subscription-billing";
+import { planByKey } from "@/lib/stripe-plans";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +49,23 @@ export async function POST(req: Request) {
       }
       // I saldi pagati al check-in (kind "quote") vengono registrati dal ritorno pagina
       // (pay-confirm). Qui li lasciamo passare: la creazione prenotazione non serve.
+
+      // ABBONAMENTO Xenora (piattaforma): il checkout con trial NON incassa subito → nessuna
+      // fattura qui. Loggo solo l'attivazione; la fatturazione parte da invoice.paid.
+      if (!event.account && session.mode === "subscription") {
+        console.log("[sub-invoicing] subscription checkout completata (attivazione/trial):", {
+          userId: m.userId || session.client_reference_id || "", plan: m.plan || "",
+          customer: typeof session.customer === "string" ? session.customer : session.customer?.id || "",
+          email: session.customer_details?.email || session.customer_email || "",
+        });
+      }
+    }
+
+    // Pagamento di un abbonamento Xenora (rinnovo o primo addebito a fine trial).
+    // Solo eventi della PIATTAFORMA (!event.account): gli abbonati stanno sul conto piattaforma.
+    if (!event.account && (event.type === "invoice.paid" || event.type === "invoice.payment_succeeded")) {
+      const input = await subscriptionInputFromInvoice(stripe, event.data.object as Stripe.Invoice);
+      if (input) await handleSubscriptionPaid(input, { origin });
     }
 
     if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
@@ -61,6 +80,56 @@ export async function POST(req: Request) {
     // Non far ritentare all'infinito Stripe per errori nostri non critici: rispondi 200.
     return NextResponse.json({ ok: true, warning: (e as Error)?.message ?? "handler_error" });
   }
+}
+
+// Normalizza una Invoice Stripe di ABBONAMENTO nell'input per la fatturazione.
+// Ritorna null se non è una fattura di subscription (così non tocchiamo altre fatture).
+async function subscriptionInputFromInvoice(stripe: Stripe, inv: Stripe.Invoice): Promise<SubscriptionPaidInput | null> {
+  // Alcuni campi variano per versione API: accesso difensivo.
+  const a = inv as unknown as {
+    id?: string; subscription?: string | { id?: string } | null; customer?: string | { id?: string } | null;
+    customer_email?: string | null; total?: number | null; subtotal?: number | null; tax?: number | null;
+    amount_paid?: number | null; currency?: string | null; billing_reason?: string | null;
+    period_start?: number | null; period_end?: number | null;
+    lines?: { data?: { period?: { start?: number; end?: number } | null; price?: { metadata?: Record<string, string> } | null }[] };
+    parent?: { subscription_details?: { subscription?: string | { id?: string } | null } | null } | null;
+  };
+
+  const subRef = a.subscription ?? a.parent?.subscription_details?.subscription ?? null;
+  const subId = typeof subRef === "string" ? subRef : (subRef?.id ?? null);
+  const isSub = !!subId || (a.billing_reason || "").startsWith("subscription");
+  if (!isSub) return null; // non è una fattura di abbonamento: ignora
+
+  const custId = typeof a.customer === "string" ? a.customer : (a.customer?.id ?? null);
+  const line0 = a.lines?.data?.[0];
+  const periodStart = line0?.period?.start ?? a.period_start ?? null;
+  const periodEnd = line0?.period?.end ?? a.period_end ?? null;
+
+  // Metadata (userId/plan): dalla subscription se disponibile, altrimenti dal price della riga.
+  let plan: string | null = line0?.price?.metadata?.plan ?? null;
+  let userId: string | null = null;
+  if (subId) {
+    try {
+      const sub = await stripe.subscriptions.retrieve(subId);
+      userId = sub.metadata?.userId || null;
+      plan = sub.metadata?.plan || plan;
+    } catch { /* metadata non disponibili: si salterà con motivo lato lib */ }
+  }
+  const planName = plan ? (planByKey(plan)?.name ?? null) : null;
+
+  return {
+    stripeInvoiceId: a.id || "",
+    stripeSubscriptionId: subId,
+    stripeCustomerId: custId,
+    subscriberUserId: userId,
+    subscriberEmail: a.customer_email ?? null,
+    plan, planName,
+    periodStart, periodEnd,
+    totalCents: (a.total ?? a.amount_paid ?? 0) || 0,
+    subtotalCents: a.subtotal ?? null,
+    taxCents: a.tax ?? null,
+    currency: a.currency ?? "eur",
+  };
 }
 
 // Trova la prenotazione col dato payment_intent (in app_state o org_state) e annota rimborso/dispute.

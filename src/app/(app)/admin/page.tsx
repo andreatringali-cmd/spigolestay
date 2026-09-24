@@ -5,19 +5,30 @@
 // I dati arrivano da /api/admin/overview (service_role lato server): il browser non vede mai le chiavi.
 
 import { useEffect, useMemo, useState } from "react";
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, StatCard } from "@/components/ui";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { TIERS, ROOMS_PER_STRUCT } from "@/lib/plans";
 
 interface Row {
-  id: string; email: string | null; name: string; createdAt: string | null; lastSignIn: string | null;
+  id: string; email: string | null; name: string; phone: string | null; createdAt: string | null;
+  lastSignIn: string | null; lastActive: string | null;
   emailConfirmed: boolean; plan: string | null; structures: number; rooms: number; structureNames: string;
   stripeCustomerId: string | null; subStatus: string | null; periodEnd: string | null;
   cancelAtPeriodEnd: boolean; monthlyAmount: number | null; currency: string | null;
   invitedCount: number; referredByCode: string | null;
 }
 interface Alert { label: string; tone: "red" | "amber" | "info" }
+
+// Raggruppa gli stati Stripe in categorie usate da riepilogo e filtro.
+const ACTIVE = ["active"];
+const TRIALING = ["trialing"];
+const PAST_DUE = ["past_due", "unpaid", "incomplete", "incomplete_expired", "canceled"];
+const statusOf = (r: Row) => (r.subStatus || "").toLowerCase();
+const isActive = (r: Row) => ACTIVE.includes(statusOf(r));
+const isTrial = (r: Row) => TRIALING.includes(statusOf(r));
+const isPastDue = (r: Row) => PAST_DUE.includes(statusOf(r));
+const isNone = (r: Row) => !statusOf(r);
 
 const dmy = (iso: string | null) => {
   if (!iso) return "—";
@@ -52,6 +63,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [onlyAlerts, setOnlyAlerts] = useState(false);
+  const [statusF, setStatusF] = useState<"all" | "active" | "trialing" | "past_due" | "none">("all");
+  const [sortBy, setSortBy] = useState<"created" | "expiry">("created");
 
   const load = async () => {
     setLoading(true); setErr("");
@@ -72,21 +85,34 @@ export default function AdminPage() {
 
   const kpi = useMemo(() => {
     const rs = rows || [];
-    const active = rs.filter((r) => ["active", "trialing"].includes((r.subStatus || "").toLowerCase())).length;
-    const mrr = rs.reduce((a, r) => a + (["active", "trialing"].includes((r.subStatus || "").toLowerCase()) ? (r.monthlyAmount || 0) : 0), 0);
+    const active = rs.filter(isActive).length;
+    const trialing = rs.filter(isTrial).length;
+    const pastDue = rs.filter(isPastDue).length;
+    // MRR = importi mensili delle sole subscription attive o in prova
+    const mrr = rs.reduce((a, r) => a + ((isActive(r) || isTrial(r)) ? (r.monthlyAmount || 0) : 0), 0);
     const attention = rs.filter((r) => alertsFor(r).some((a) => a.tone === "red")).length;
-    const structures = rs.reduce((a, r) => a + (r.structures || 0), 0);
-    const invited = rs.reduce((a, r) => a + (r.invitedCount || 0), 0);
-    return { total: rs.length, active, mrr, attention, structures, invited };
+    return { total: rs.length, active, trialing, pastDue, mrr, attention };
   }, [rows]);
 
   const filtered = useMemo(() => {
     let rs = rows || [];
     const term = q.trim().toLowerCase();
-    if (term) rs = rs.filter((r) => (r.email || "").toLowerCase().includes(term) || (r.name || "").toLowerCase().includes(term) || (r.structureNames || "").toLowerCase().includes(term));
+    if (term) rs = rs.filter((r) => (r.email || "").toLowerCase().includes(term) || (r.name || "").toLowerCase().includes(term) || (r.phone || "").toLowerCase().includes(term) || (r.structureNames || "").toLowerCase().includes(term));
+    if (statusF !== "all") rs = rs.filter((r) => statusF === "active" ? isActive(r) : statusF === "trialing" ? isTrial(r) : statusF === "past_due" ? isPastDue(r) : isNone(r));
     if (onlyAlerts) rs = rs.filter((r) => alertsFor(r).some((a) => a.tone === "red"));
+    rs = [...rs];
+    if (sortBy === "expiry") {
+      // Scadenze più vicine prima; chi non ha rinnovo va in fondo.
+      rs.sort((a, b) => {
+        const av = a.periodEnd ? +new Date(a.periodEnd) : Infinity;
+        const bv = b.periodEnd ? +new Date(b.periodEnd) : Infinity;
+        return av - bv;
+      });
+    } else {
+      rs.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    }
     return rs;
-  }, [rows, q, onlyAlerts]);
+  }, [rows, q, statusF, onlyAlerts, sortBy]);
 
   const toneStyle = (tone: Alert["tone"]) => tone === "red"
     ? { backgroundColor: "color-mix(in srgb, var(--bad,#dc2626) 14%, transparent)", color: "var(--bad,#dc2626)" }
@@ -106,15 +132,6 @@ export default function AdminPage() {
     </div>
   );
 
-  const kpis = [
-    { label: "Utenti registrati", value: kpi.total, hint: "Account totali" },
-    { label: "Abbonati attivi", value: kpi.active, hint: stripeOn ? "active + in prova" : "Stripe non collegato" },
-    { label: "MRR stimato", value: stripeOn ? `€ ${kpi.mrr.toFixed(0)}` : "—", hint: "Ricavo mensile ricorrente" },
-    { label: "Da controllare", value: kpi.attention, hint: "Con avvisi critici", danger: kpi.attention > 0 },
-    { label: "Strutture totali", value: kpi.structures, hint: "Su tutti gli account" },
-    { label: "Inviti convertiti", value: kpi.invited, hint: "Referral collegati" },
-  ] as { label: string; value: string | number; hint: string; danger?: boolean }[];
-
   return (
     <div>
       <PageHeader title="Back-office" subtitle="Monitoraggio utenti, piani, incassi e scadenze di Xenora" hideHelp
@@ -127,18 +144,27 @@ export default function AdminPage() {
         </div>
       )}
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {kpis.map((k) => (
-          <div key={k.label} className="rounded-xl border border-line bg-surface p-3 shadow-sm">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-faint">{k.label}</div>
-            <div className="mt-1 text-2xl font-bold tracking-tight" style={{ color: k.danger ? "var(--bad,#dc2626)" : "var(--txt)" }}>{k.value}</div>
-            <div className="mt-0.5 text-[11px] text-faint">{k.hint}</div>
-          </div>
-        ))}
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <StatCard label="Iscritti totali" value={kpi.total} hint="Account registrati" />
+        <StatCard label="Abbonati attivi" value={stripeOn ? kpi.active : "—"} color="var(--ok)" hint={stripeOn ? "subscription active" : "Stripe non collegato"} />
+        <StatCard label="In prova" value={stripeOn ? kpi.trialing : "—"} color="var(--warn)" hint={stripeOn ? "trialing" : "Stripe non collegato"} />
+        <StatCard label="Scaduti / Past due" value={stripeOn ? kpi.pastDue : "—"} color={kpi.pastDue > 0 ? "var(--bad,#dc2626)" : undefined} hint={stripeOn ? "past_due / non pagati" : "Stripe non collegato"} />
+        <StatCard label="MRR stimato" value={stripeOn ? `€ ${kpi.mrr.toFixed(0)}` : "—"} hint="Ricavo mensile ricorrente" />
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca per email, nome o struttura…" className="min-w-[200px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca per email, nome, telefono o struttura…" className="min-w-[200px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+        <select value={statusF} onChange={(e) => setStatusF(e.target.value as typeof statusF)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+          <option value="all">Tutti gli stati</option>
+          <option value="active">Attivi</option>
+          <option value="trialing">In prova</option>
+          <option value="past_due">Scaduti / Past due</option>
+          <option value="none">Nessun abbonamento</option>
+        </select>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+          <option value="created">Ordina: registrazione</option>
+          <option value="expiry">Ordina: scadenza</option>
+        </select>
         <label className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-dim">
           <input type="checkbox" checked={onlyAlerts} onChange={(e) => setOnlyAlerts(e.target.checked)} /> Solo da controllare
         </label>
@@ -152,11 +178,12 @@ export default function AdminPage() {
         ) : filtered.length === 0 ? (
           <div className="py-10 text-center text-sm text-faint">Nessun utente trovato.</div>
         ) : (
-          <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[960px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
                 <th className="px-3 py-2 font-semibold">Utente</th>
                 <th className="px-3 py-2 font-semibold">Registrato</th>
+                <th className="px-3 py-2 font-semibold">Ultimo accesso</th>
                 <th className="px-3 py-2 font-semibold">Piano</th>
                 <th className="px-3 py-2 font-semibold">Strutture / Camere</th>
                 <th className="px-3 py-2 font-semibold">Pagamento</th>
@@ -174,8 +201,10 @@ export default function AdminPage() {
                     <td className="px-3 py-2.5">
                       <div className="font-semibold text-txt">{r.name || "—"}</div>
                       <div className="text-[12px] text-dim">{r.email}</div>
+                      {r.phone && <div className="text-[12px] text-faint">{r.phone}</div>}
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{dmy(r.createdAt)}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{dmy(r.lastActive)}</td>
                     <td className="px-3 py-2.5">
                       <span className="rounded-full border border-line bg-paper px-2 py-0.5 text-[12px] font-medium text-txt">{tierName(r.plan)}</span>
                     </td>

@@ -359,7 +359,7 @@ export default function PreventiviPage() {
     setMailState({ sending: true });
     try {
       const payLink = await getPayLink();
-      const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: email.trim(), subject: `Preventivo ${structureName}`, text: outMsg, ctaUrl: payLink, ctaLabel: "Conferma e paga online →", accent: structure?.photoColor, replyTo: structure?.email }) });
+      const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: email.trim(), subject: `Preventivo ${structureName}`, text: outMsg, ctaUrl: payLink, ctaLabel: "Conferma e paga online →", accent: structure?.photoColor, replyTo: structure?.email, brand: { name: structure?.name, logo: structure?.logo, address: [structure?.address, structure?.streetNumber, structure?.city].filter(Boolean).join(" "), phone: structure?.phone, email: structure?.email, website: structure?.website, accent: structure?.photoColor, cin: structure?.cin, vat: structure?.vat } }) });
       const j = await r.json().catch(() => ({}));
       setMailState({ sending: false, ok: r.ok && j?.ok, msg: (r.ok && j?.ok) ? `Inviato a ${email.trim()}` : (j?.error || `Errore ${r.status}`) });
     } catch (e) { setMailState({ sending: false, ok: false, msg: e instanceof Error ? e.message : "Rete non disponibile" }); }

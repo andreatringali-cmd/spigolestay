@@ -194,6 +194,7 @@ export async function POST(req: Request) {
               checkInFrom: g("checkInFrom"), checkOutBy: g("checkOutBy"),
               address: [g("address"), g("streetNumber"), g("city")].filter(Boolean).join(" "), phone: g("phone"),
               ratePlan: planName || undefined, cancelPolicy,
+              logo: g("logo"), website: g("website"), cin: g("cin"), vat: g("vat"),
             },
           }),
         });

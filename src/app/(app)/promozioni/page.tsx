@@ -144,7 +144,7 @@ export default function PromozioniPage() {
       if (!g.email) continue;
       const body = applyPromo(sending.body, { nome: g.firstName || g.fullName?.split(" ")[0] || "", sconto: sending.discountPct, codice: sending.code, scadenza: scad, struttura: st?.name, contatti });
       try {
-        const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: g.email, subject, text: body, accent: st?.photoColor, replyTo: st?.email }) });
+        const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: g.email, subject, text: body, accent: st?.photoColor, replyTo: st?.email, brand: { name: st?.name, logo: st?.logo, address: [st?.address, st?.streetNumber, st?.city].filter(Boolean).join(" "), phone: st?.phone, email: st?.email, website: st?.website, accent: st?.photoColor, cin: st?.cin, vat: st?.vat } }) });
         const j = await r.json().catch(() => ({}));
         if (r.ok && j?.ok) ok++; else fail++;
       } catch { fail++; }

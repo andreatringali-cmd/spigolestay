@@ -91,7 +91,7 @@ function ArrivalRow({ b, g, st, origin, waOn, showStruct, rooms, expected: expec
     try {
       const r = await fetch("/api/email", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "checkin_reminder", checkinUrl: link, booking: { code: b.code, structureName: st?.name, structureEmail: st?.email, guestName: g?.fullName, guestEmail: g?.email, checkIn: b.checkIn, checkInFrom: st?.checkInFrom, color: st?.photoColor, address: st?.address, phone: st?.phone } }),
+        body: JSON.stringify({ kind: "checkin_reminder", checkinUrl: link, booking: { code: b.code, structureName: st?.name, structureEmail: st?.email, guestName: g?.fullName, guestEmail: g?.email, checkIn: b.checkIn, checkInFrom: st?.checkInFrom, color: st?.photoColor, address: [st?.address, st?.streetNumber, st?.city].filter(Boolean).join(" "), phone: st?.phone, logo: st?.logo, website: st?.website, cin: st?.cin, vat: st?.vat } }),
       });
       const j = await r.json().catch(() => ({}));
       setMail(r.ok && j?.ok ? "sent" : "err");

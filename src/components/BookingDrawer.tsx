@@ -515,7 +515,7 @@ export default function BookingDrawer() {
             const short = await shortenGuideLink(gLink);
             const msg = guideMsgWith(short);
             try {
-              const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to, subject: guideSubject, text: msg, accent: structure?.photoColor, replyTo: structure?.email }) });
+              const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to, subject: guideSubject, text: msg, accent: structure?.photoColor, replyTo: structure?.email, brand: { name: structure?.name, logo: structure?.logo, address: [structure?.address, structure?.streetNumber, structure?.city].filter(Boolean).join(" "), phone: structure?.phone, email: structure?.email, website: structure?.website, accent: structure?.photoColor, cin: structure?.cin, vat: structure?.vat } }) });
               const j = await r.json().catch(() => ({}));
               if (r.ok && j?.ok) window.alert(`${t("Guida inviata a")} ${to}`);
               else window.open(gmailGuide(msg), "_blank");
@@ -742,7 +742,12 @@ export default function BookingDrawer() {
               </span>
             ) : null; })()}
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-2">
+            {structure?.logo
+              ? <img src={structure.logo} alt={structure?.name ?? ""} title={structure?.name} className="h-9 w-9 rounded-lg border border-line bg-white object-contain p-0.5" />
+              : structure?.name
+                ? <div className="grid h-9 w-9 place-items-center rounded-lg text-xs font-bold text-white" title={structure?.name} style={{ backgroundColor: structure?.photoColor || "#285f92" }}>{structure.name.slice(0, 2).toUpperCase()}</div>
+                : null}
             <button onClick={closeBooking} aria-label={t("Chiudi")} className="grid h-8 w-8 place-items-center rounded-lg text-dim hover:bg-wash hover:text-txt">✕</button>
           </div>
         </div>

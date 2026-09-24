@@ -6,7 +6,7 @@ import { useData } from "@/lib/store";
 import { CHANNELS, type Channel, type RoomType, type Booking, type Guest } from "@/lib/types";
 import { sendVoucher } from "@/lib/mailer";
 import { shortenLink } from "@/lib/guestlink";
-import { effBase } from "@/lib/pricing";
+import { rateForDay } from "@/lib/pricing";
 import { shiftISO, toISO, nights } from "@/lib/dates";
 import { cityTaxOf } from "@/lib/booking";
 import { eur } from "@/lib/format";
@@ -15,7 +15,6 @@ import Icon from "@/components/Icon";
 import QRCode from "qrcode";
 
 const CHANNEL_OPTS: Channel[] = ["direct", "booking", "airbnb", "expedia"];
-const isWeekend = (iso: string) => { const d = new Date(iso).getDay(); return d === 5 || d === 6 || d === 0; };
 // Normalizza il telefono in formato internazionale (default +39) così WhatsApp funziona sempre.
 const normPhone = (p: string): string | undefined => { const s = (p ?? "").trim(); if (!s) return undefined; if (s.startsWith("+")) return s; if (s.startsWith("00")) return "+" + s.slice(2); return `+39 ${s}`; };
 const fmtDay = (iso: string) => { try { return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; } };
@@ -94,7 +93,8 @@ export default function NuovaPrenotazionePage() {
   const availUnits = (rt: RoomType) => { const root = poolRootId(rt); return units.filter((u) => u.roomTypeId === root && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn)); };
   // Totale camere reali del pool (fuori servizio permanenti escluse): serve a mostrare "libere su totale".
   const unitsOfType = (rt: RoomType) => { const root = poolRootId(rt); return units.filter((u) => u.roomTypeId === root && !u.outOfService).length; };
-  const dayPrice = (rt: RoomType, iso: string) => { const base = effBase(rt, roomTypes); const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(base * (isWeekend(iso) ? 1 + weekendPct / 100 : 1)); return Math.max(0, Math.round(raw)); };
+  // Motore prezzi UNICO: le derivate seguono l'override giornaliero della madre (cascata).
+  const dayPrice = (rt: RoomType, iso: string) => rateForDay(rt.id, iso, roomTypes, rateOverrides, weekendPct);
   const stayPrice = (rt: RoomType) => { let s = 0; for (let i = 0; i < nightsN; i++) s += dayPrice(rt, shiftISO(checkIn, i)); return s; };
   const cap = (rt: RoomType) => rt.maxOccupancy ?? rt.beds ?? 2;
   const linePrice = (rt: RoomType) => priceOv[rt.id] ?? stayPrice(rt);
@@ -606,16 +606,20 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
         const subj = `Conferma prenotazione${created.code ? ` ${created.code}` : ""} · ${structName}`;
         const gmailHref = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(g?.email ?? "")}&su=${encodeURIComponent(subj)}&body=${encodeURIComponent(msg)}`;
         return (
-          <Card className="mx-auto mb-10 max-w-xl text-center">
-            <div className="mx-auto mb-2 grid h-12 w-12 place-items-center rounded-full" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}><Icon name="check" size={24} /></div>
-            <h3 className="font-display text-lg font-bold text-txt">{mode === "preventivo" ? "Opzione creata" : "Prenotazione creata"}</h3>
-            <p className="mt-1 text-sm text-dim">{sendConfirm && g?.email ? <>La <b className="text-txt">conferma via email</b> è stata inviata all'ospite. Puoi anche condividere il link o il voucher.</> : <>Invia all'ospite la conferma con il <b className="text-txt">link per gestire la prenotazione</b>: documenti, self check-in e note. Il link è anche nel QR del voucher PDF.</>}</p>
+          <Card className="mx-auto mb-10 mt-8 max-w-xl overflow-hidden !p-0 text-center shadow-lg sm:mt-12">
+            <div className="flex flex-col items-center px-6 pb-6 pt-9">
+              <div className="relative mb-4 grid h-16 w-16 place-items-center rounded-full" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }}>
+                <span className="absolute inset-0 rounded-full" style={{ boxShadow: "0 0 0 8px color-mix(in srgb, var(--ok) 7%, transparent)" }} />
+                <Icon name="check" size={30} />
+              </div>
+              <h3 className="font-display text-2xl font-bold tracking-tight text-txt">{mode === "preventivo" ? "Opzione creata" : "Prenotazione creata"}</h3>
+              <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-dim">{sendConfirm && g?.email ? <>La <b className="text-txt">conferma via email</b> è stata inviata all'ospite. Puoi anche condividere il link o il voucher.</> : <>Invia all'ospite la conferma con il <b className="text-txt">link per gestire la prenotazione</b>: documenti, self check-in e note. Il link è anche nel QR del voucher PDF.</>}</p>
 
-            {sendConfirm && g?.email && (
-              <div className="mx-auto mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }}><Icon name="mail" size={14} /> Email di conferma inviata a {g.email}</div>
-            )}
+              {sendConfirm && g?.email && (
+                <div className="mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }}><Icon name="mail" size={14} /> Email di conferma inviata a {g.email}</div>
+              )}
 
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <div className="mt-5 flex flex-wrap justify-center gap-2">
               <a href={wa || undefined} target="_blank" rel="noreferrer" className={`flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 ${wa ? "" : "pointer-events-none opacity-40"}`} style={{ backgroundColor: "#25D366" }}><Icon name="chat" size={15} /> WhatsApp</a>
               {!(sendConfirm && g?.email) && <button onClick={() => printVoucher(url)} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="fileText" size={15} /> Voucher PDF (QR)</button>}
               <button onClick={async () => { try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} }} className="flex items-center gap-1.5 rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="copy" size={15} /> {copied ? "Link copiato ✓" : "Copia link"}</button>
@@ -624,14 +628,15 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
               )}
             </div>
 
-            {emailState.msg && (
-              <div className={`mt-2 text-xs ${emailState.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>
-                {emailState.ok ? "✓ " : "⚠ "}{emailState.msg}
-                {!emailState.ok && <> · <a href={gmailHref} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">apri Gmail</a></>}
-              </div>
-            )}
+              {emailState.msg && (
+                <div className={`mt-3 text-xs ${emailState.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>
+                  {emailState.ok ? "✓ " : "⚠ "}{emailState.msg}
+                  {!emailState.ok && <> · <a href={gmailHref} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">apri Gmail</a></>}
+                </div>
+              )}
+            </div>
 
-            <div className="mt-4 border-t border-line pt-3">
+            <div className="border-t border-line bg-wash/40 px-6 py-3.5">
               <button onClick={() => router.push("/prenotazioni")} className="text-sm font-semibold text-focus hover:underline">Vai alle prenotazioni →</button>
             </div>
           </Card>

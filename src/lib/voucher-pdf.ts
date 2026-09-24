@@ -9,6 +9,7 @@ export interface VoucherData {
   checkIn?: string; checkOut?: string; nights?: number; adults?: number; children?: number;
   total?: number; currency?: string; checkInFrom?: string; checkOutBy?: string;
   color?: string; ratePlan?: string; cancelPolicy?: string; manageUrl?: string;
+  logo?: string; website?: string; cin?: string; vat?: string;
 }
 
 function hexRgb(hex?: string) {
@@ -35,10 +36,26 @@ export async function buildVoucherPdf(b: VoucherData): Promise<Uint8Array> {
   const M = 48; // margine
   const cur = b.currency || "€";
 
-  // Intestazione colorata
+  // Intestazione colorata (carta intestata)
   page.drawRectangle({ x: 0, y: 841.89 - 96, width: W, height: 96, color: accent });
-  page.drawText(b.structureName || "Xenora", { x: M, y: 841.89 - 52, size: 22, font: bold, color: rgb(1, 1, 1) });
-  page.drawText("Conferma di prenotazione", { x: M, y: 841.89 - 74, size: 12, font, color: rgb(1, 1, 1) });
+  // Logo della struttura (se presente): riquadro bianco a sinistra, testo spostato a destra.
+  let textX = M;
+  if (b.logo && /^data:image\//i.test(b.logo)) {
+    try {
+      const isPng = /^data:image\/png/i.test(b.logo);
+      const bytes = Buffer.from(b.logo.split(",")[1] || "", "base64");
+      const img = isPng ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
+      const box = 56; // riquadro bianco quadrato
+      const scale = Math.min(box / img.width, box / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      const boxY = 841.89 - 96 + (96 - box) / 2;
+      page.drawRectangle({ x: M, y: boxY, width: box, height: box, color: rgb(1, 1, 1) });
+      page.drawImage(img, { x: M + (box - w) / 2, y: boxY + (box - h) / 2, width: w, height: h });
+      textX = M + box + 14;
+    } catch { /* logo non valido: si continua col solo testo */ }
+  }
+  page.drawText(b.structureName || "Xenora", { x: textX, y: 841.89 - 52, size: 22, font: bold, color: rgb(1, 1, 1) });
+  page.drawText("Conferma di prenotazione", { x: textX, y: 841.89 - 74, size: 12, font, color: rgb(1, 1, 1) });
   if (b.code) {
     const codeText = b.code;
     const tw = bold.widthOfTextAtSize(codeText, 16);
@@ -92,9 +109,11 @@ export async function buildVoucherPdf(b: VoucherData): Promise<Uint8Array> {
   const foot = (page as PDFPage);
   const footY = 60;
   page.drawLine({ start: { x: M, y: footY + 24 }, end: { x: W - M, y: footY + 24 }, thickness: 0.6, color: line });
-  const contacts = [b.address, b.phone, b.structureEmail].filter(Boolean).join("  ·  ");
+  const contacts = [b.address, b.phone, b.structureEmail, b.website].filter(Boolean).join("  ·  ");
+  const legal = [b.cin ? `CIN ${b.cin}` : "", b.vat ? `P.IVA ${b.vat}` : ""].filter(Boolean).join("  ·  ");
   if (contacts) drawCentered(foot, contacts, footY + 8, 9, font, dim, W);
-  drawCentered(foot, "Documento non fiscale · Generato con Xenora · Digital Solution", footY - 6, 8, font, rgb(0.6, 0.64, 0.7), W);
+  if (legal) drawCentered(foot, legal, footY - 4, 8, font, dim, W);
+  drawCentered(foot, "Documento non fiscale · Generato con Xenora", legal ? footY - 16 : footY - 6, 8, font, rgb(0.6, 0.64, 0.7), W);
 
   return doc.save();
 }

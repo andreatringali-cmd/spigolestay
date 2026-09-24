@@ -36,6 +36,10 @@ function payload(b: Booking, d: Deps) {
     address: s ? [s.address, s.streetNumber, s.city].filter(Boolean).join(" ") : undefined,
     phone: s?.phone,
     color: s?.photoColor,
+    logo: s?.logo,
+    website: s?.website,
+    cin: s?.cin,
+    vat: s?.vat,
   };
 }
 

@@ -49,6 +49,24 @@ export async function POST(req: Request) {
       data.bookings = bookings;
       return true;
     });
+    // Notifica al GESTORE: pagamento ricevuto (best-effort, come per check-in/modifica/cancellazione).
+    if (wrote) {
+      try {
+        const st = (store.structure ?? {}) as Json;
+        const b = store.booking as Json;
+        const g = (store.guest ?? {}) as Json;
+        const hostEmail = s(st.email);
+        if (hostEmail) {
+          const origin = req.headers.get("origin") || new URL(req.url).origin;
+          const code = s(b.code) || s(b.id).slice(0, 8).toUpperCase();
+          const guestName = s(g.fullName) || `${s(g.firstName)} ${s(g.lastName)}`.trim();
+          await fetch(`${origin}/api/email`, {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ kind: "quote", to: hostEmail, subject: `Pagamento ricevuto ${code} · ${s(st.name)}`, text: `Hai ricevuto un pagamento di € ${amount.toLocaleString("it-IT")} per la prenotazione ${code}${guestName ? ` di ${guestName}` : ""} (${s(b.checkIn)} → ${s(b.checkOut)}).`, booking: { structureName: s(st.name), structureEmail: hostEmail, color: s(st.photoColor) } }),
+          });
+        }
+      } catch { /* notifica non critica */ }
+    }
     return NextResponse.json({ ok: wrote, amount });
   } catch (e) {
     return NextResponse.json({ ok: false, error: "server_error", message: (e as Error)?.message ?? "errore" }, { status: 500 });

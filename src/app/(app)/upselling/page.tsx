@@ -76,7 +76,7 @@ export default function UpsellingPage() {
       if (!g?.email) { toast("L'ospite non ha un'email.", "error"); return; }
       // Invio automatico dal server (Resend), come conferma e preventivi.
       try {
-        const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: g.email, subject: "Servizi extra per il tuo soggiorno", text: msg, accent: st?.photoColor, replyTo: st?.email }) });
+        const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: g.email, subject: "Servizi extra per il tuo soggiorno", text: msg, accent: st?.photoColor, replyTo: st?.email, brand: { name: st?.name, logo: st?.logo, address: [st?.address, st?.streetNumber, st?.city].filter(Boolean).join(" "), phone: st?.phone, email: st?.email, website: st?.website, accent: st?.photoColor, cin: st?.cin, vat: st?.vat } }) });
         const j = await r.json().catch(() => ({}));
         if (!(r.ok && j?.ok)) { window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(g.email)}&su=${encodeURIComponent("Servizi extra per il tuo soggiorno")}&body=${encodeURIComponent(msg)}`, "_blank"); }
       } catch { window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(g.email)}&su=${encodeURIComponent("Servizi extra per il tuo soggiorno")}&body=${encodeURIComponent(msg)}`, "_blank"); }

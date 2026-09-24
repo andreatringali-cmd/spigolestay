@@ -143,7 +143,7 @@ export async function GET(req: Request) {
           try {
             const r = await fetch(`${origin}/api/email`, {
               method: "POST", headers: { "content-type": "application/json" },
-              body: JSON.stringify({ kind: "guest_message", to: email, subject: tp.name || s(st.name) || "Messaggio", text, booking: { structureName: s(st.name), structureEmail: s(st.email), color: s(st.photoColor) }, replyTo: s(st.email) || undefined }),
+              body: JSON.stringify({ kind: "guest_message", to: email, subject: tp.name || s(st.name) || "Messaggio", text, booking: { structureName: s(st.name), structureEmail: s(st.email), color: s(st.photoColor), logo: s(st.logo), website: s(st.website), address: [s(st.address), s(st.streetNumber), s(st.city)].filter(Boolean).join(" "), phone: s(st.phone), cin: s(st.cin), vat: s(st.vat) }, replyTo: s(st.email) || undefined }),
             });
             const j = await r.json().catch(() => ({}));
             if (r.ok && j?.ok) { okAny = true; sent++; }

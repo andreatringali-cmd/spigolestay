@@ -14,7 +14,8 @@ const OWNER_EMAILS = (process.env.ADMIN_EMAILS || "spigolehouse@gmail.com")
   .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
 
 interface Row {
-  id: string; email: string | null; name: string; createdAt: string | null; lastSignIn: string | null;
+  id: string; email: string | null; name: string; phone: string | null; createdAt: string | null;
+  lastSignIn: string | null; lastActive: string | null;
   emailConfirmed: boolean; plan: string | null; structures: number; rooms: number; structureNames: string;
   stripeCustomerId: string | null; subStatus: string | null; periodEnd: string | null;
   cancelAtPeriodEnd: boolean; monthlyAmount: number | null; currency: string | null;
@@ -100,8 +101,10 @@ export async function GET(req: Request) {
       id: u.id,
       email: u.email ?? (p.email as string) ?? null,
       name: (p.full_name as string) || (u.user_metadata?.full_name as string) || "",
+      phone: (p.phone as string) || (u.user_metadata?.phone as string) || null,
       createdAt: u.created_at ?? null,
       lastSignIn: u.last_sign_in_at ?? null,
+      lastActive: (p.last_active as string) || u.last_sign_in_at || null,
       emailConfirmed: !!u.email_confirmed_at,
       plan: (p.plan as string) || null,
       structures: (p.structures_count as number) ?? 0,

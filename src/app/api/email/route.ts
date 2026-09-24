@@ -19,18 +19,59 @@ interface BookingPayload {
   adults?: number; children?: number; total?: number; currency?: string;
   checkInFrom?: string; checkOutBy?: string; address?: string; phone?: string; color?: string;
   ratePlan?: string; cancelPolicy?: string; refunded?: number;
+  logo?: string; website?: string; cin?: string; vat?: string;
 }
 
-function shell(title: string, accent: string, inner: string) {
+// Identità della struttura da mostrare come carta intestata (header + footer).
+interface Brand { name?: string; logo?: string; address?: string; phone?: string; email?: string; website?: string; accent?: string; cin?: string; vat?: string }
+function brandFrom(b: BookingPayload): Brand {
+  return { name: b.structureName, logo: b.logo, address: b.address, phone: b.phone, email: b.structureEmail, website: b.website, accent: b.color, cin: b.cin, vat: b.vat };
+}
+
+// Blocco logo (immagine se presente, altrimenti pastiglia con l'iniziale nel colore struttura).
+function logoBlock(brand: Brand, accent: string) {
+  if (brand.logo && /^data:image\//i.test(brand.logo)) {
+    return `<img src="${brand.logo}" alt="${esc(brand.name || "")}" width="52" height="52" style="display:block;width:52px;height:52px;border-radius:12px;object-fit:contain;background:#fff;border:1px solid #eceef1;" />`;
+  }
+  const initials = esc((brand.name || "XN").replace(/[^\p{L}\p{N} ]/gu, "").split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "XN");
+  return `<div style="width:52px;height:52px;border-radius:12px;background:${accent};color:#fff;text-align:center;line-height:52px;font-weight:800;font-size:20px;font-family:Arial,sans-serif;">${initials}</div>`;
+}
+
+// Carta intestata: barra colore struttura + header con logo/nome/contatti + corpo + footer con recapiti.
+function shell(title: string, accent: string, inner: string, brand?: Brand) {
+  const bd = brand || {};
+  const name = esc(bd.name || "");
+  const contacts = [bd.phone, bd.email, bd.website].filter(Boolean).map(esc).join(" · ");
+  const legal = [bd.cin ? `CIN ${esc(bd.cin)}` : "", bd.vat ? `P.IVA ${esc(bd.vat)}` : ""].filter(Boolean).join(" · ");
+  const header = bd.name
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+        <tr>
+          <td width="52" valign="top" style="padding-right:14px;">${logoBlock(bd, accent)}</td>
+          <td valign="middle">
+            <div style="font-size:19px;font-weight:800;color:#1f2430;letter-spacing:-.2px;">${name}</div>
+            ${bd.address ? `<div style="font-size:12px;color:#8a919c;margin-top:2px;">${esc(bd.address)}</div>` : ""}
+            <div style="font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:${accent};font-weight:700;margin-top:4px;">${esc(title)}</div>
+          </td>
+        </tr>
+      </table>`
+    : `<div style="font-size:13px;letter-spacing:.5px;text-transform:uppercase;color:${accent};font-weight:700;">${esc(title)}</div>`;
+  const footer = bd.name
+    ? `<div style="margin-top:14px;background:#fff;border:1px solid #e6e8ec;border-radius:14px;padding:16px 20px;color:#8a919c;font-size:11px;line-height:1.6;">
+         <div style="font-weight:700;color:#5b616c;">${name}</div>
+         ${bd.address ? `<div>${esc(bd.address)}</div>` : ""}
+         ${contacts ? `<div>${contacts}</div>` : ""}
+         ${legal ? `<div>${legal}</div>` : ""}
+       </div>
+       <div style="text-align:center;color:#b9bfc9;font-size:10px;margin-top:8px;">Inviato con Xenora</div>`
+    : `<div style="text-align:center;color:#9aa1ac;font-size:11px;margin-top:14px;">Inviato con Xenora · Digital Solution</div>`;
   return `<!doctype html><html lang="it"><body style="margin:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2430;">
-  <div style="max-width:560px;margin:0 auto;padding:24px 16px;">
+  <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
     <div style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e6e8ec;">
-      <div style="background:${accent};padding:22px 24px;color:#fff;">
-        <div style="font-size:13px;opacity:.85;letter-spacing:.5px;text-transform:uppercase;">${esc(title)}</div>
-      </div>
-      <div style="padding:24px;">${inner}</div>
+      <div style="height:5px;background:${accent};"></div>
+      <div style="padding:22px 24px 18px;border-bottom:1px solid #f0f1f4;">${header}</div>
+      <div style="padding:22px 24px 26px;">${inner}</div>
     </div>
-    <div style="text-align:center;color:#9aa1ac;font-size:11px;margin-top:14px;">Inviato con Xenora · Digital Solution</div>
+    ${footer}
   </div></body></html>`;
 }
 
@@ -66,10 +107,8 @@ function voucherHtml(b: BookingPayload, checkinUrl: string, manageUrl?: string) 
     ${manageUrl ? `<div style="margin:12px 0 6px;">
       <a href="${esc(manageUrl)}" style="display:block;text-align:center;background:#fff;border:1px solid ${accent};color:${accent};text-decoration:none;font-weight:700;font-size:14px;padding:12px;border-radius:10px;">Gestisci la prenotazione (modifica o annulla)</a>
     </div>` : ""}
-    ${b.address ? `<p style="margin:18px 0 0;font-size:13px;color:#4b5563;">📍 ${esc(b.address)}</p>` : ""}
-    ${b.phone ? `<p style="margin:4px 0 0;font-size:13px;color:#4b5563;">📞 ${esc(b.phone)}</p>` : ""}
   `;
-  return shell(`${b.structureName || "Conferma prenotazione"}`, accent, inner);
+  return shell("Conferma prenotazione", accent, inner, brandFrom(b));
 }
 
 // Email di annullamento (all'ospite): conferma la cancellazione ed eventuale rimborso.
@@ -94,7 +133,7 @@ function cancelHtml(b: BookingPayload) {
     </div>
     <p style="margin:18px 0 0;font-size:13px;color:#4b5563;">Ci dispiace vederti annullare. Sarai sempre il benvenuto in futuro.</p>
   `;
-  return shell("Prenotazione annullata", accent, inner);
+  return shell("Prenotazione annullata", accent, inner, brandFrom(b));
 }
 
 interface CheckinGuest { role?: string; firstName?: string; lastName?: string; sex?: string; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string; docPlace?: string }
@@ -123,7 +162,7 @@ function checkinHtml(b: BookingPayload, guests: CheckinGuest[], arrival?: string
     ${list}
     <p style="margin:14px 0 0;font-size:12px;color:#9aa1ac;">Apri il gestionale → Alloggiati Web per generare il tracciato e inviarlo alla Questura.</p>
   `;
-  return shell("Check-in ricevuto", accent, inner);
+  return shell("Check-in ricevuto", accent, inner, brandFrom(b));
 }
 
 // Sollecito check-in all'OSPITE: email diretta con il link per compilare il check-in online.
@@ -140,10 +179,34 @@ function reminderHtml(b: BookingPayload, checkinUrl: string) {
       <a href="${esc(checkinUrl)}" style="display:block;text-align:center;background:${accent};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:10px;">Fai il check-in online →</a>
     </div>
     <p style="margin:8px 0 0;font-size:12px;color:#9aa1ac;text-align:center;">Compila i dati prima dell'arrivo: risparmi tempo al check-in.</p>
-    ${b.address ? `<p style="margin:18px 0 0;font-size:13px;color:#4b5563;">📍 ${esc(b.address)}</p>` : ""}
-    ${b.phone ? `<p style="margin:4px 0 0;font-size:13px;color:#4b5563;">📞 ${esc(b.phone)}</p>` : ""}
   `;
-  return shell(`${b.structureName || "Completa il check-in"}`, accent, inner);
+  return shell("Completa il check-in", accent, inner, brandFrom(b));
+}
+
+// Ricevuta di pagamento dell'ABBONAMENTO Xenora (email sobria all'abbonato).
+interface SubReceiptPayload { plan?: string | null; planName?: string | null; totalCents?: number; currency?: string; periodStart?: number | null; periodEnd?: number | null; invoiceId?: string }
+function subReceiptHtml(s: SubReceiptPayload) {
+  const accent = "#285f92";
+  const cur = (s.currency || "EUR").toUpperCase() === "EUR" ? "€" : (s.currency || "EUR");
+  const amount = typeof s.totalCents === "number" ? `${cur} ${(s.totalCents / 100).toLocaleString("it-IT", { minimumFractionDigits: 2 })}` : "";
+  const plan = s.planName || (s.plan ? s.plan.charAt(0).toUpperCase() + s.plan.slice(1) : "");
+  const fmt = (u?: number | null) => { if (!u) return ""; try { return new Date(u * 1000).toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" }); } catch { return ""; } };
+  const periodo = s.periodStart && s.periodEnd ? `${fmt(s.periodStart)} → ${fmt(s.periodEnd)}` : "";
+  const inner = `
+    <p style="margin:0 0 4px;font-size:16px;">Grazie,</p>
+    <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">abbiamo ricevuto il pagamento del tuo abbonamento <b>Xenora</b>. Ecco il riepilogo.</p>
+    <table style="width:100%;border-collapse:collapse;">
+      ${plan ? row("Piano", esc(plan)) : ""}
+      ${periodo ? row("Periodo", esc(periodo)) : ""}
+      ${amount ? row("Importo", esc(amount)) : ""}
+      ${s.invoiceId ? row("Riferimento", `<span style="font-family:monospace;">${esc(s.invoiceId)}</span>`) : ""}
+    </table>
+    <div style="margin:18px 0 0;background:#f8f9fb;border:1px solid #eceef1;border-radius:10px;padding:12px 14px;font-size:12px;color:#4b5563;">
+      Il <b>documento fiscale</b> relativo a questo pagamento ti sarà recapitato a seguire.
+    </div>
+    <p style="margin:18px 0 0;font-size:13px;color:#4b5563;">Grazie per aver scelto Xenora.</p>
+  `;
+  return shell("Ricevuta abbonamento", accent, inner);
 }
 
 async function send(to: string, subject: string, html: string, replyTo?: string, attachments?: { filename: string; content: string }[]) {
@@ -159,7 +222,7 @@ async function send(to: string, subject: string, html: string, replyTo?: string,
 
 export async function POST(req: Request) {
   if (!KEY) return NextResponse.json({ ok: false, error: "RESEND_API_KEY non configurata" }, { status: 500 });
-  let body: { kind?: string; booking?: BookingPayload; checkinUrl?: string; manageUrl?: string; guests?: CheckinGuest[]; arrival?: string; operatorEmail?: string; to?: string; subject?: string; text?: string; accent?: string; replyTo?: string; ctaUrl?: string; ctaLabel?: string };
+  let body: { kind?: string; booking?: BookingPayload; brand?: Brand; checkinUrl?: string; manageUrl?: string; guests?: CheckinGuest[]; arrival?: string; operatorEmail?: string; to?: string; subject?: string; text?: string; accent?: string; replyTo?: string; ctaUrl?: string; ctaLabel?: string; subscription?: SubReceiptPayload };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "JSON non valido" }, { status: 400 }); }
   const b = body.booking || {};
   try {
@@ -199,15 +262,17 @@ export async function POST(req: Request) {
       if (!body.to) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
       const subject = body.subject || (b.structureName ? `Messaggio da ${b.structureName}` : "Messaggio");
       const accent = body.accent || b.color || "#285f92";
-      const title = body.subject || b.structureName || "Messaggio";
-      const html = shell(title, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>`);
+      const brand = body.brand || (b.structureName ? { ...brandFrom(b), accent } : undefined);
+      const title = body.subject || "Messaggio";
+      const html = shell(title, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>`, brand);
       const data = await send(body.to, subject, html, body.replyTo || b.structureEmail);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "quote") {
       if (!body.to) return NextResponse.json({ ok: false, error: "Email destinatario mancante" }, { status: 400 });
       const subject = body.subject || "Preventivo";
-      const accent = body.accent || "#285f92";
+      const accent = body.accent || body.brand?.accent || "#285f92";
+      const brand = body.brand ? { ...body.brand, accent } : (b.structureName ? { ...brandFrom(b), accent } : undefined);
       // Pulsante di azione (Conferma e paga): l'URL viaggia dentro il bottone, non come testo lungo.
       const cta = body.ctaUrl
         ? `<div style="margin:22px 0 6px;">
@@ -215,8 +280,17 @@ export async function POST(req: Request) {
            </div>
            <p style="margin:8px 0 0;font-size:12px;color:#9aa1ac;text-align:center;">Pagamento sicuro con Stripe · carta, PayPal, Klarna e altri metodi.</p>`
         : "";
-      const html = shell(subject, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>${cta}`);
+      const html = shell(subject, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>${cta}`, brand);
       const data = await send(body.to, subject, html, body.replyTo);
+      return NextResponse.json({ ok: true, id: data?.id });
+    }
+    if (body.kind === "sub_receipt") {
+      // Ricevuta pagamento abbonamento all'ABBONATO. Il webbook la invoca SOLO con SUB_INVOICING_LIVE attivo.
+      const to = body.to;
+      if (!to) return NextResponse.json({ ok: false, error: "Email destinatario mancante" }, { status: 400 });
+      const s = body.subscription || {};
+      const subject = `Ricevuta abbonamento Xenora${s.planName || s.plan ? ` · ${s.planName || s.plan}` : ""}`.trim();
+      const data = await send(to, subject, subReceiptHtml(s), body.replyTo);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     return NextResponse.json({ ok: false, error: "kind sconosciuto" }, { status: 400 });

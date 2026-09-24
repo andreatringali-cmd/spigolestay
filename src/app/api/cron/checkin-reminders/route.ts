@@ -120,8 +120,12 @@ export async function GET(req: Request) {
             checkIn: b.checkIn,
             checkInFrom: st?.checkInFrom,
             color: st?.photoColor,
-            address: st?.address,
+            address: [st?.address, st?.streetNumber, st?.city].filter(Boolean).join(" "),
             phone: st?.phone,
+            logo: st?.logo,
+            website: st?.website,
+            cin: st?.cin,
+            vat: st?.vat,
           },
         };
 
