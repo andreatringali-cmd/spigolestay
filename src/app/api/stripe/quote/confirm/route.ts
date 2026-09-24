@@ -37,11 +37,10 @@ export async function POST(req: Request) {
     const acct = typeof body?.acct === "string" && body.acct.trim() ? body.acct.trim() : "";
     if (!sessionId) return NextResponse.json({ error: "missing_session" }, { status: 400 });
 
-    // 1) Verifica pagamento su Stripe (sull'account Connect se presente).
+    // 1) Verifica pagamento su Stripe. Con i destination charge la sessione è sull'account
+    //    PIATTAFORMA, quindi si recupera sempre senza stripeAccount header.
     const stripe = new Stripe(key);
-    const session = acct
-      ? await stripe.checkout.sessions.retrieve(sessionId, undefined, { stripeAccount: acct })
-      : await stripe.checkout.sessions.retrieve(sessionId);
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
     if (session.payment_status !== "paid") return NextResponse.json({ error: "not_paid", status: session.payment_status }, { status: 402 });
 
     const m = (session.metadata ?? {}) as Record<string, string>;

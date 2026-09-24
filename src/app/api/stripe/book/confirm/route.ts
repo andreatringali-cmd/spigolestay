@@ -48,7 +48,8 @@ export async function POST(req: Request) {
     if (!resolved?.acct) return NextResponse.json({ ok: false, error: "no_stripe_account" }, { status: 400 });
 
     const stripe = new Stripe(key);
-    const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["payment_intent"] }, { stripeAccount: resolved.acct });
+    // Destination charge: la sessione è sull'account PIATTAFORMA (niente stripeAccount header).
+    const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["payment_intent"] });
     if (session.payment_status !== "paid") return NextResponse.json({ ok: false, error: "not_paid", status: session.payment_status }, { status: 402 });
     const m = (session.metadata ?? {}) as Record<string, string>;
     const pi = session.payment_intent;

@@ -80,14 +80,16 @@ export async function POST(req: Request) {
     const label = `${st?.name || "Prenotazione"} · ${ci} → ${co}${isPartial ? " (caparra)" : ""}`;
     const success = `${origin}/prenota?site=${encodeURIComponent(slug)}&s=${encodeURIComponent(sid)}&paid=1&session_id={CHECKOUT_SESSION_ID}`;
     const cancel = `${origin}/prenota?site=${encodeURIComponent(slug)}&s=${encodeURIComponent(sid)}&canceled=1`;
+    // DESTINATION CHARGE: addebito sulla piattaforma, fondi trasferiti alla struttura
+    // (i direct charges non sono più supportati per piattaforme nuove con account Express).
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [{ price_data: { currency: "eur", unit_amount: amount * 100, product_data: { name: label } }, quantity: 1 }],
       customer_email: g.email || undefined,
       metadata: meta,
-      payment_intent_data: { metadata: meta },
+      payment_intent_data: { metadata: meta, transfer_data: { destination: acct }, on_behalf_of: acct },
       success_url: success, cancel_url: cancel,
-    }, { stripeAccount: acct });
+    });
     return NextResponse.json({ ok: true, payment: true, url: session.url, token });
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "stripe_error" }, { status: 500 });
