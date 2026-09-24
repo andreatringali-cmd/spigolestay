@@ -9,7 +9,7 @@ import { nights, parseISO, toISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { bookingGrandTotal } from "@/lib/booking";
 import { exportExcel, exportPdf } from "@/lib/export";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import ScrollStrip from "@/components/ScrollStrip";
@@ -285,10 +285,10 @@ export default function PrenotazioniPage() {
 
       {/* Card riepilogo */}
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <MiniCard label={t("Prenotazioni")} value={String(filtered.length)} />
-        <MiniCard label={t("Notti totali")} value={String(nightsTot)} />
-        <MiniCard label={t("ADR (prezzo medio/notte)")} value={eur(avgPrice)} />
-        <MiniCard label={t("Ricavi")} value={eur(revenue)} />
+        <StatCard label={t("Prenotazioni")} value={String(filtered.length)} />
+        <StatCard label={t("Notti totali")} value={String(nightsTot)} />
+        <StatCard label={t("ADR (prezzo medio/notte)")} value={eur(avgPrice)} />
+        <StatCard label={t("Ricavi")} value={eur(revenue)} />
       </div>
 
       {/* Grafici: una riga scorrevole con frecce ‹ › · torte larghe 2 card, barre 1 card */}
@@ -494,14 +494,6 @@ function StatusIcon({ icon, color, title }: { icon: string; color: string; title
   );
 }
 
-function MiniCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-      <div className="text-xs font-medium uppercase tracking-wide text-dim">{label}</div>
-      <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-txt">{value}</div>
-    </div>
-  );
-}
 function Th({ children, k, sort, onSort }: { children: React.ReactNode; k?: string; sort?: { key: string; dir: "asc" | "desc" }; onSort?: (k: string) => void }) {
   if (!k || !sort || !onSort) return <th className="sticky top-0 whitespace-nowrap border-b border-line bg-surface px-3 py-2 font-semibold">{children}</th>;
   const active = sort.key === k;

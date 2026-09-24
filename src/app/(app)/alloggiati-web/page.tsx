@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { apiPost } from "@/lib/invoicing/client";
 import AlloggiatiSettingsModal from "./SettingsModal";
@@ -151,10 +151,7 @@ export default function AlloggiatiWebPage() {
           ["Da validare", `${toValidate}/${totSched}`, "var(--warn)"],
           ["Inviate", `${sentCount}/${totSched}`, "var(--dim)"],
         ].map(([lab, val, col]) => (
-          <div key={lab} className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{lab}</div>
-            <div className="mt-1 font-mono text-2xl font-bold" style={{ color: col }}>{val}</div>
-          </div>
+          <StatCard key={lab} label={lab} value={val} color={col} />
         ))}
       </div>
 
