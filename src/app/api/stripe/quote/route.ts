@@ -15,6 +15,7 @@ export async function POST(req: Request) {
     const amount = Math.round(Number(body?.amount) || 0); // in euro
     if (amount <= 0) return NextResponse.json({ error: "invalid_amount" }, { status: 400 });
     const label = String(body?.label || "Prenotazione").slice(0, 250);
+    const desc = typeof body?.desc === "string" && body.desc.trim() ? body.desc.trim().slice(0, 300) : "";
     const email = typeof body?.email === "string" ? body.email : undefined;
     const meta: Record<string, string> = {};
     if (body?.metadata && typeof body.metadata === "object") {
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
 
     const params: Stripe.Checkout.SessionCreateParams = {
       mode: "payment",
-      line_items: [{ price_data: { currency: "eur", unit_amount: amount * 100, product_data: { name: label } }, quantity: 1 }],
+      line_items: [{ price_data: { currency: "eur", unit_amount: amount * 100, product_data: { name: label, ...(desc ? { description: desc } : {}) } }, quantity: 1 }],
       metadata: { kind: "quote", source, ...meta },
       payment_intent_data: { metadata: { kind: "quote", source, ...meta } },
       customer_email: email,

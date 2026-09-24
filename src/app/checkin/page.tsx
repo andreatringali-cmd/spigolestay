@@ -208,9 +208,15 @@ function Engine() {
   const paid = b?.paid ?? 0;
   const balance = Math.max(0, grand - paid);
   const canPay = !!st?.stripeChargesEnabled && !!st?.stripeAccount && balance > 0;
-  // Descrizione mostrata nel Checkout Stripe (colonna sinistra).
-  const shortD = (iso?: string) => { try { return new Date(iso!).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }); } catch { return ""; } };
-  const payLabel = `${st?.name ?? "Soggiorno"} · soggiorno ${shortD(b?.checkIn)}–${shortD(b?.checkOut)}${b?.code ? ` · ${b.code}` : ""}`;
+  // Testo mostrato nel Checkout Stripe (colonna sinistra): titolo + descrizione professionale.
+  const dLong = (iso?: string) => { try { return new Date(iso!).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" }); } catch { return ""; } };
+  const payLabel = `Soggiorno · ${st?.name ?? "Struttura"}`;
+  const payDesc = [
+    [info?.roomType?.name, info?.unit ? `(${info.unit.name})` : ""].filter(Boolean).join(" "),
+    b ? `${dLong(b.checkIn)} → ${dLong(b.checkOut)}` : "",
+    nightsN ? `${nightsN} ${nightsN === 1 ? "notte" : "notti"}` : "",
+    b?.code ? `Rif. ${b.code}` : "",
+  ].filter(Boolean).join(" · ");
 
   // Prenotazione di gruppo: un unico check-in per più camere.
   const groupRooms = info?.group ?? [];
@@ -286,7 +292,7 @@ function Engine() {
       const origin = window.location.origin;
       const r = await fetch("/api/stripe/quote", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: balance, label: payLabel, email: info.guest.email, acct: st.stripeAccount || "", metadata: { bookingId: params.b }, successUrl: `${origin}/checkin?site=${encodeURIComponent(params.slug)}&b=${encodeURIComponent(params.b)}`, cancelUrl: `${origin}/checkin?site=${encodeURIComponent(params.slug)}&b=${encodeURIComponent(params.b)}` }),
+        body: JSON.stringify({ amount: balance, label: payLabel, desc: payDesc, email: info.guest.email, acct: st.stripeAccount || "", metadata: { bookingId: params.b }, successUrl: `${origin}/checkin?site=${encodeURIComponent(params.slug)}&b=${encodeURIComponent(params.b)}`, cancelUrl: `${origin}/checkin?site=${encodeURIComponent(params.slug)}&b=${encodeURIComponent(params.b)}` }),
       });
       const j = await r.json().catch(() => ({}));
       if (j.url) { window.location.href = j.url; return; }
