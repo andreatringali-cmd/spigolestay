@@ -14,6 +14,7 @@ import {
   buildDocumentDraft, toCents, type FolioLine, type Regime, type DocKind,
 } from "./folio";
 import { getProvider, OpenapiProvider, type EInvoicePayload } from "./provider";
+import { resolveFicSendConfig } from "./fic-oauth";
 import { buildAutofatturaXml, autofatturaFileName } from "./fatturapa";
 import { logBookingEvent } from "@/lib/booking-events";
 import { decryptCred, encryptCred } from "@/lib/crypto-creds";
@@ -317,7 +318,15 @@ async function buildPayload(admin: SupabaseClient, tenantId: string, documentId:
     payment: { method: doc.payment_method, dueDate: doc.due_date, terms: doc.payment_terms },
     notes: doc.notes,
   };
-  return { payload, docKind: doc.doc_kind, providerName: (doc.provider as string) || (settings?.default_provider as string) || "mock", providerCfg: decryptProviderCfg((cred?.config as Record<string, unknown>) ?? {}) };
+  const providerName = (doc.provider as string) || (settings?.default_provider as string) || "mock";
+  // Fatture in Cloud: risolvi un access token fresco (rinnovo via refresh se scaduto).
+  let providerCfg: Record<string, unknown>;
+  if (providerName === "fattureincloud") {
+    providerCfg = await resolveFicSendConfig(admin, tenantId) as unknown as Record<string, unknown>;
+  } else {
+    providerCfg = decryptProviderCfg((cred?.config as Record<string, unknown>) ?? {});
+  }
+  return { payload, docKind: doc.doc_kind, providerName, providerCfg };
 }
 
 export interface SendOutcome { providerRef: string; stato: string; message?: string; skipped?: boolean }
@@ -456,10 +465,12 @@ export async function providerCredStatus(admin: SupabaseClient, tenantId: string
 
 // Verifica le credenziali con una chiamata leggera all'intermediario.
 export async function testProvider(admin: SupabaseClient, tenantId: string, provider: string): Promise<{ ok: boolean; message: string }> {
-  const { data } = await admin.from("provider_credentials").select("config").eq("tenant_id", tenantId).eq("provider", provider).maybeSingle();
-  const cfg = decryptProviderCfg((data?.config as Record<string, unknown>) ?? {});
   try {
+    // Fatture in Cloud: usa un access token fresco (rinnovo automatico) e prova una lettura.
+    const cfg = provider === "fattureincloud"
+      ? await resolveFicSendConfig(admin, tenantId) as unknown as Record<string, unknown>
+      : decryptProviderCfg(((await admin.from("provider_credentials").select("config").eq("tenant_id", tenantId).eq("provider", provider).maybeSingle()).data?.config as Record<string, unknown>) ?? {});
     await getProvider(provider, cfg).listNotifications();
-    return { ok: true, message: "Connessione all'intermediario riuscita." };
+    return { ok: true, message: provider === "fattureincloud" ? "Collegamento a Fatture in Cloud attivo ✓" : "Connessione all'intermediario riuscita." };
   } catch (e) { return { ok: false, message: (e as Error)?.message ?? "Errore di connessione." }; }
 }

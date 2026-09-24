@@ -3,6 +3,7 @@
 // trasmette allo SdI e restituisce esiti/ricevute. Qui: interfaccia + mock
 // (dev/test) + provider REALE Openapi.it + scheletro Fatture in Cloud.
 import { buildFatturaPaXml, fatturaPaFileName } from "./fatturapa";
+import { FIC_API_BASE } from "./fic-oauth";
 
 export type ProviderName = "mock" | "openapi" | "fattureincloud";
 
@@ -200,41 +201,188 @@ export class OpenapiProvider implements EInvoiceProvider {
 // completare col flusso OAuth (token per tenant) e gli endpoint REST.
 // Doc: https://developers.fattureincloud.it
 // ---------------------------------------------------------------------------
-export interface FicConfig { accessToken?: string; companyId?: string }
+export interface FicConfig { accessToken?: string; companyId?: string; dryRun?: boolean }
+
+// Tipo aliquota IVA nel registro FIC (GET /c/{id}/info/vat_types).
+interface FicVatType { id: number; value: number; ei_type?: string | null; is_disabled?: boolean; description?: string }
+
+// Mappa lo stato e-fattura FIC (ei_status) nei nostri stati.
+//  sent/pending/processing → inviata_intermediario
+//  accepted/delivered      → consegnata
+//  error/discarded/rejected → scartata
+function mapEiStatus(raw: string | undefined | null): DocStatus {
+  const s = (raw || "").toString().toLowerCase();
+  if (/error|discard|reject|scart|rifiut/.test(s)) return "scartata";
+  if (/accept|deliver|conseg/.test(s)) return "consegnata";
+  return "inviata_intermediario";
+}
 
 export class FattureInCloudProvider implements EInvoiceProvider {
   readonly name = "fattureincloud" as const;
+  private vatCache: FicVatType[] | null = null;
   constructor(private cfg: FicConfig) {}
 
-  // TODO(fic): base API. Auth = Bearer access_token OAuth del tenant (rinnovabile via refresh_token).
-  private base() { return "https://api-v2.fattureincloud.it"; }
+  private base() { return FIC_API_BASE; }
   private headers() { return { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${this.cfg.accessToken ?? ""}` }; }
   private company() {
-    if (!this.cfg.companyId) throw new Error("fattureincloud_not_connected"); // manca il collegamento OAuth + company_id
+    if (!this.cfg.accessToken) throw new Error("fattureincloud_not_connected");
+    if (!this.cfg.companyId) throw new Error("fattureincloud_no_company");
     return this.cfg.companyId;
   }
 
-  async send(_payload: EInvoicePayload): Promise<SendResult> {
-    void _payload; void this.base; void this.headers; void this.company;
-    // TODO(fic): POST /c/{company_id}/issued_documents con il documento (type=invoice),
-    //   e_invoice=true per l'invio SdI; mappare l'id FIC in providerRef.
-    //   Mappare le nostre righe/aliquote/nature nel formato FIC (vat, not_taxable...).
-    throw new Error("fattureincloud_not_configured");
+  private async req(method: string, path: string, body?: unknown): Promise<{ ok: boolean; status: number; json: Record<string, unknown> }> {
+    const res = await fetch(`${this.base()}${path}`, { method, headers: this.headers(), body: body != null ? JSON.stringify(body) : undefined });
+    const text = await res.text();
+    let json: Record<string, unknown> = {};
+    try { json = text ? JSON.parse(text) : {}; } catch { json = { message: text }; }
+    return { ok: res.ok, status: res.status, json };
+  }
+  private data(json: Record<string, unknown>): Record<string, unknown> {
+    const d = json.data; return (d && typeof d === "object") ? d as Record<string, unknown> : json;
+  }
+  private errMsg(json: Record<string, unknown>): string {
+    const e = json.error as Record<string, unknown> | string | undefined;
+    if (typeof e === "string") return e;
+    if (e && typeof e === "object") return (e.message as string) || JSON.stringify(e);
+    return (json.message as string) || "";
+  }
+
+  // Registro IVA della company (cache per istanza).
+  private async vatTypes(): Promise<FicVatType[]> {
+    if (this.vatCache) return this.vatCache;
+    const r = await this.req("GET", `/c/${this.company()}/info/vat_types`);
+    if (!r.ok) throw new Error(`Fatture in Cloud vat_types ${r.status}: ${this.errMsg(r.json)}`);
+    const arr = (this.data(r.json) as unknown as { vat_types?: FicVatType[] }).vat_types
+      ?? (Array.isArray(this.data(r.json)) ? this.data(r.json) as unknown as FicVatType[] : []);
+    this.vatCache = arr;
+    return arr;
+  }
+  // Trova l'id aliquota per (rate, nature). Nature (N1/N2.2…) → aliquota 0% con ei_type corrispondente.
+  private async vatIdFor(rate: number, nature?: string | null): Promise<number> {
+    const types = (await this.vatTypes()).filter((t) => !t.is_disabled);
+    if (nature) {
+      const nat = nature.toUpperCase();
+      const exact = types.find((t) => (t.ei_type || "").toUpperCase() === nat);
+      if (exact) return exact.id;
+      const byFamily = types.find((t) => Number(t.value) === 0 && (t.ei_type || "").toUpperCase().startsWith(nat.slice(0, 2)));
+      if (byFamily) return byFamily.id;
+      const anyZero = types.find((t) => Number(t.value) === 0 && (t.ei_type || ""));
+      if (anyZero) return anyZero.id;
+    }
+    const byValue = types.find((t) => Number(t.value) === Number(rate) && !(t.ei_type));
+    if (byValue) return byValue.id;
+    const anyValue = types.find((t) => Number(t.value) === Number(rate));
+    if (anyValue) return anyValue.id;
+    throw new Error(`Fatture in Cloud: aliquota IVA ${rate}%${nature ? ` (${nature})` : ""} non trovata nel registro della tua azienda.`);
+  }
+
+  // Numero/numerazione dal nostro number_label (es. "12/2026" → number 12; "A/12/2026" → num "A").
+  private numberOf(label: string): { number?: number; numeration?: string } {
+    const num = (label.match(/(\d+)/) || [])[1];
+    const pre = (label.match(/^([A-Za-z]+)/) || [])[1];
+    return { number: num ? parseInt(num, 10) : undefined, numeration: pre || undefined };
+  }
+
+  private async buildData(payload: EInvoicePayload, type: "invoice" | "credit_note"): Promise<Record<string, unknown>> {
+    const c = payload.cliente;
+    const eInvoice = true; // send() è chiamato solo per documenti da trasmettere allo SdI
+    const items = [];
+    for (const l of payload.lines) {
+      const isOoS = !!l.vatNature && /^N1/i.test(l.vatNature);
+      items.push({
+        name: l.description,
+        qty: l.qty,
+        net_price: l.unitPriceCents / 100,
+        vat: { id: await this.vatIdFor(l.vatRate, l.vatNature) },
+        ...(l.vatNature ? { not_taxable: isOoS } : {}),
+      });
+    }
+    const totalEuro = payload.totals.totalCents / 100;
+    const { number, numeration } = this.numberOf(payload.numberLabel || "");
+    return {
+      type,
+      entity: {
+        name: c.name,
+        vat_number: c.vat || undefined,
+        tax_code: c.taxCode || undefined,
+        address_street: c.address || undefined,
+        address_postal_code: c.cap || undefined,
+        address_city: c.city || undefined,
+        address_province: c.province || undefined,
+        country_iso: c.country || "IT",
+        e_invoice: eInvoice,
+        ei_code: c.sdiCode || "0000000",
+        certified_email: c.pec || undefined,
+      },
+      date: (payload.issueDate || "").slice(0, 10) || undefined,
+      ...(number ? { number } : {}),
+      ...(numeration ? { numeration } : {}),
+      currency: { id: payload.currency || "EUR" },
+      language: { code: "it" },
+      items_list: items,
+      payments_list: [{
+        amount: totalEuro,
+        due_date: (payload.payment?.dueDate || payload.issueDate || "").slice(0, 10) || undefined,
+        status: "not_paid",
+      }],
+      e_invoice: eInvoice,
+      ...(payload.notes ? { notes: payload.notes } : {}),
+    };
+  }
+
+  async send(payload: EInvoicePayload): Promise<SendResult> {
+    const type = payload.docKind === "nota_di_credito" ? "credit_note" : "invoice";
+    const data = await this.buildData(payload, type);
+    const r = await this.req("POST", `/c/${this.company()}/issued_documents`, { data });
+    if (!r.ok) throw new Error(`Fatture in Cloud ${r.status}: ${this.errMsg(r.json) || "creazione documento non riuscita"}`);
+    const docId = (this.data(r.json).id as number | string) ?? "";
+    if (!docId) throw new Error("Fatture in Cloud: risposta senza id documento.");
+    const providerRef = `fic:${docId}`;
+
+    // Modalità prova: il documento è creato in Fatture in Cloud ma NON trasmesso allo SdI.
+    if (this.cfg.dryRun) {
+      return { providerRef, status: "inviata_intermediario", message: "Documento creato in Fatture in Cloud (MODALITÀ PROVA — non inviato allo SdI). Verificalo su Fatture in Cloud, poi disattiva la prova per l'invio reale." };
+    }
+    // Invio reale allo SdI.
+    const s = await this.req("POST", `/c/${this.company()}/issued_documents/${docId}/e_invoice/send`);
+    if (!s.ok) throw new Error(`Fatture in Cloud invio SdI ${s.status}: ${this.errMsg(s.json) || "invio non riuscito"}`);
+    return { providerRef, status: "inviata_intermediario", message: "Fattura creata e trasmessa allo SdI tramite Fatture in Cloud." };
   }
   async sendCreditNote(payload: EInvoicePayload): Promise<SendResult> { return this.send(payload); }
-  async getStatus(_ref: string): Promise<StatusResult> {
-    void _ref;
-    // TODO(fic): GET /c/{company_id}/issued_documents/{id}/e_invoice → stato SdI → nostri stati.
-    throw new Error("fattureincloud_not_configured");
+
+  private idOf(ref: string) { return ref.replace(/^fic:/, ""); }
+
+  async getStatus(providerRef: string): Promise<StatusResult> {
+    const id = this.idOf(providerRef);
+    const r = await this.req("GET", `/c/${this.company()}/issued_documents/${encodeURIComponent(id)}?fieldset=detailed`);
+    if (!r.ok) throw new Error(`Fatture in Cloud ${r.status}: ${this.errMsg(r.json) || "stato non disponibile"}`);
+    const d = this.data(r.json);
+    const ei = (d.ei_status as string) || ((d.e_invoice as boolean) ? "pending" : "");
+    const status = mapEiStatus(ei);
+    let message = ei ? `Stato e-fattura: ${ei}` : "Documento presente su Fatture in Cloud.";
+    if (status === "scartata") {
+      const er = await this.req("GET", `/c/${this.company()}/issued_documents/${encodeURIComponent(id)}/e_invoice/error_reason`).catch(() => null);
+      const reason = er && er.ok ? (this.data(er.json).error_reason as string) : "";
+      if (reason) message = `Scartata dallo SdI: ${reason}`;
+    }
+    return { status, message, xmlAvailable: true, raw: r.json };
   }
-  async getXml(_ref: string): Promise<string | null> {
-    void _ref;
-    // TODO(fic): GET dell'XML e-fattura prodotto da Fatture in Cloud.
-    throw new Error("fattureincloud_not_configured");
+
+  async getXml(providerRef: string): Promise<string | null> {
+    const id = this.idOf(providerRef);
+    const r = await this.req("GET", `/c/${this.company()}/issued_documents/${encodeURIComponent(id)}/e_invoice/xml`);
+    if (!r.ok) return null;
+    const d = this.data(r.json);
+    const raw = (d.xml as string) || (d.data as string) || "";
+    if (!raw) return null;
+    if (raw.trimStart().startsWith("<")) return raw;
+    try { return Buffer.from(raw, "base64").toString("utf8"); } catch { return raw; }
   }
+
+  // Verifica leggera del collegamento (usata da testProvider): elenca le aliquote.
   async listNotifications(): Promise<ProviderNotification[]> {
-    // TODO(fic): sincronizzazione periodica degli esiti SdI dei documenti aperti.
-    throw new Error("fattureincloud_not_configured");
+    await this.vatTypes(); // se il token/company sono validi non solleva
+    return [];
   }
 }
 

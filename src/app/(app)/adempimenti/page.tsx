@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { PageHeader } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
+import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 import { centsEur, apiPost } from "@/lib/invoicing/client";
 import { shortenLink } from "@/lib/guestlink";
@@ -353,6 +354,9 @@ export default function AdempimentiPage() {
       </section>
 
       {/* Ordine CRONOLOGICO: 1) check-in → 2) schedine Questura → 3) ISTAT → 4) incasso → 5) fattura/SdI → 6) fornitori */}
+      {allClear ? (
+        <EmptyState title="Tutto in ordine per oggi" sub="Non c'è niente da inviare o gestire adesso. Comparirà qui appena serve." />
+      ) : (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* 1 · Check-in online → poi "passaggio di palla" alle schedine */}
         <StepCard n={1} tone="var(--warn)" label="Check-in online da completare" sub="Da completare" count={groupsNoCheckin.length + groupsToFix.length} badge={frac(groupsCheckedIn.length, groupsNoCheckin.length + groupsToFix.length)} action={syncing ? "Trasferisco…" : `↪ Trasferisci alle schedine${needsTransfer.length ? ` (${needsTransfer.length})` : ""}`} onAction={transferToSchedine}>
@@ -487,6 +491,7 @@ export default function AdempimentiPage() {
           ) : undefined}
         </StepCard>
       </div>
+      )}
 
     </div>
   );

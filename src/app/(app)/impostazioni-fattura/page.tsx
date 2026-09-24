@@ -31,6 +31,10 @@ export default function ImpostazioniFatturaPage() {
   const [token, setToken] = useState("");
   const [credBusy, setCredBusy] = useState("");
   const [credMsg, setCredMsg] = useState("");
+  // Collegamento Fatture in Cloud (OAuth).
+  const [fic, setFic] = useState({ connected: false, configured: true, companyName: "", dryRun: true });
+  const [ficBusy, setFicBusy] = useState("");
+  const [ficMsg, setFicMsg] = useState("");
 
   useEffect(() => {
     if (!supabase) { setLoading(false); return; }
@@ -50,6 +54,32 @@ export default function ImpostazioniFatturaPage() {
       .then((r) => { setCred({ hasToken: r.hasToken, sandbox: r.sandbox, signature: r.signature, legalStorage: r.legalStorage }); setToken(""); })
       .catch(() => {});
   }, [s.default_provider, provNeedsCreds]);
+
+  // Stato collegamento Fatture in Cloud + messaggi dal callback OAuth (?fic=...).
+  const loadFic = () => apiPost<{ connected: boolean; configured: boolean; companyName: string; dryRun: boolean }>("invoicing/provider", { provider: "fattureincloud", action: "status" })
+    .then((r) => setFic({ connected: r.connected, configured: r.configured, companyName: r.companyName, dryRun: r.dryRun })).catch(() => {});
+  useEffect(() => { if (s.default_provider === "fattureincloud") loadFic(); }, [s.default_provider]);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const f = q.get("fic");
+    if (!f) return;
+    if (f === "connected") setFicMsg(`Fatture in Cloud collegato ✓${q.get("company") ? ` — ${q.get("company")}` : ""}. Modalità prova attiva: verifica un documento su Fatture in Cloud, poi disattiva la prova.`);
+    else if (f === "nocompany") setFicMsg("Collegato, ma nessuna azienda trovata sull'account Fatture in Cloud.");
+    else if (f === "error") setFicMsg(`Collegamento non riuscito: ${q.get("msg") || "errore"}`);
+    setS((p) => ({ ...p, default_provider: "fattureincloud" }));
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+
+  const connectFic = async () => {
+    setFicBusy("connect"); setFicMsg("");
+    try { const r = await apiPost<{ url?: string }>("invoicing/fic/start", {}); if (r.url) window.location.href = r.url; }
+    catch (e) { setFicMsg(e instanceof Error ? e.message : "Errore"); setFicBusy(""); }
+  };
+  const ficAction = async (action: string, extra: Record<string, unknown> = {}) => {
+    setFicBusy(action); setFicMsg("");
+    try { const r = await apiPost<{ message?: string }>("invoicing/provider", { provider: "fattureincloud", action, ...extra }); setFicMsg(r.message || "OK"); await loadFic(); }
+    catch (e) { setFicMsg(e instanceof Error ? e.message : "Errore"); } finally { setFicBusy(""); }
+  };
 
   const saveCred = async () => {
     setCredBusy("save"); setCredMsg("");
@@ -115,13 +145,13 @@ export default function ImpostazioniFatturaPage() {
           <label className="mt-2 block"><span className={lbl}>Provider fatturazione elettronica</span>
             <select value={s.default_provider} onChange={(e) => set({ default_provider: e.target.value })} className={inp}>
               <option value="mock">Test (mock, nessun invio reale)</option>
-              <option value="fattureincloud">Fatture in Cloud (da collegare)</option>
+              <option value="fattureincloud">Fatture in Cloud (consigliato)</option>
               <option value="openapi">Openapi.it (SdI)</option>
             </select>
           </label>
           <p className="mt-2 text-[12px] text-dim">
             {s.default_provider === "mock" && "Modalità di prova: i documenti vengono numerati ed 'emessi' ma non trasmessi davvero allo SdI."}
-            {s.default_provider === "fattureincloud" && "Le fatture verranno spinte nel tuo conto Fatture in Cloud, che gestisce XML e SdI. Serve il collegamento OAuth (in arrivo)."}
+            {s.default_provider === "fattureincloud" && "Le fatture vengono create nel tuo conto Fatture in Cloud, che genera l'XML e le trasmette allo SdI. Collega il tuo account qui sotto."}
             {s.default_provider === "openapi" && "Invio tramite intermediario Openapi.it: Xenora costruisce l'XML FatturaPA e lo trasmette allo SdI. Incolla il token del tuo account Openapi."}
           </p>
 
@@ -142,6 +172,32 @@ export default function ImpostazioniFatturaPage() {
               </div>
               {credMsg && <p className="text-[12px] text-dim">{credMsg}</p>}
               <p className="text-[11px] text-faint">Il token è cifrato sul server (AES-256-GCM) e non viene mai ri-mostrato. Usa prima la sandbox per un invio di prova.</p>
+            </div>
+          )}
+          {s.default_provider === "fattureincloud" && (
+            <div className="mt-3 space-y-3 rounded-lg border border-line bg-wash/50 p-3">
+              {!fic.configured && <p className="text-[12px] text-[color:var(--warn)]">Fatture in Cloud non è ancora abilitato sul server (mancano le chiavi FIC_CLIENT_ID/SECRET). Contatta Xenora.</p>}
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-txt">Collegamento</span>
+                <span className="text-[11px] font-medium" style={{ color: fic.connected ? "var(--ok)" : "var(--faint)" }}>{fic.connected ? `● collegato${fic.companyName ? ` — ${fic.companyName}` : ""}` : "○ non collegato"}</span>
+              </div>
+              {!fic.connected ? (
+                <button onClick={connectFic} disabled={!!ficBusy || !fic.configured} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{ficBusy === "connect" ? "Reindirizzo…" : "Collega Fatture in Cloud"}</button>
+              ) : (
+                <>
+                  <label className="flex items-center justify-between rounded-lg border border-line bg-paper px-3 py-2">
+                    <span className="text-sm text-txt">Modalità prova <span className="text-[11px] text-dim">(crea su Fatture in Cloud senza inviare allo SdI)</span></span>
+                    <input type="checkbox" checked={fic.dryRun} onChange={(e) => ficAction("dryrun", { dryRun: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" />
+                  </label>
+                  {!fic.dryRun && <p className="text-[12px] font-medium text-[color:var(--warn)]">⚠ Invio reale attivo: le fatture emesse saranno trasmesse allo SdI.</p>}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button onClick={() => ficAction("test")} disabled={!!ficBusy} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{ficBusy === "test" ? "Verifico…" : "Verifica collegamento"}</button>
+                    <button onClick={() => ficAction("disconnect")} disabled={!!ficBusy} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-[color:var(--err)] hover:bg-wash disabled:opacity-50">{ficBusy === "disconnect" ? "…" : "Scollega"}</button>
+                  </div>
+                </>
+              )}
+              {ficMsg && <p className="text-[12px] text-dim">{ficMsg}</p>}
+              <p className="text-[11px] text-faint">Le fatture vengono create e inviate allo SdI dal tuo conto Fatture in Cloud. I token sono cifrati sul server. Alla prima connessione la modalità prova è attiva per sicurezza.</p>
             </div>
           )}
           <label className="mt-3 block"><span className={lbl}>Lingua PDF predefinita</span>
