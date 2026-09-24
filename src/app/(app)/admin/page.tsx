@@ -5,7 +5,8 @@
 // a tendina. In più: vista "tutti i registrati", contatti rapidi, filtri scadenze, export CSV.
 // I dati arrivano da /api/admin/overview e /api/admin/payments (service_role lato server).
 
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader, Card, StatCard } from "@/components/ui";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
@@ -64,6 +65,7 @@ const needsAttention = (r: Row) => isPastDue(r) || (() => { const du = daysUntil
 
 export default function AdminPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [err, setErr] = useState("");
@@ -72,9 +74,6 @@ export default function AdminPage() {
   const [view, setView] = useState<"overview" | "accounts" | "pagamenti">("overview");
   const [q, setQ] = useState("");
   const [statusF, setStatusF] = useState<"all" | "paganti" | "trialing" | "recupero" | "none">("all");
-  const [selected, setSelected] = useState<Account | null>(null);
-  const [pay, setPay] = useState<Record<string, { loading: boolean; invoices: Invoice[]; error?: string }>>({});
-  const [notes, setNotes] = useState<Record<string, { loading?: boolean; text: string; saved?: boolean; saving?: boolean }>>({});
   const [payF, setPayF] = useState<"all" | "paid" | "due">("all");
   const [allPay, setAllPay] = useState<{ loading: boolean; loaded: boolean; invoices: (Invoice & { customerId: string | null; customerEmail: string | null; customerName: string })[]; error?: string }>({ loading: false, loaded: false, invoices: [] });
 
@@ -96,16 +95,6 @@ export default function AdminPage() {
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [user?.id]);
 
-  const loadPayments = async (cid: string) => {
-    if (pay[cid]?.invoices || pay[cid]?.loading) return;
-    setPay((p) => ({ ...p, [cid]: { loading: true, invoices: [] } }));
-    try {
-      const token = await authToken();
-      const res = await fetch("/api/admin/payments", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ customerId: cid }) });
-      const d = await res.json();
-      setPay((p) => ({ ...p, [cid]: { loading: false, invoices: d.invoices || [], error: d.error } }));
-    } catch { setPay((p) => ({ ...p, [cid]: { loading: false, invoices: [], error: "network" } })); }
-  };
   const loadAllPay = async () => {
     if (allPay.loaded || allPay.loading) return;
     setAllPay((s) => ({ ...s, loading: true }));
@@ -118,29 +107,7 @@ export default function AdminPage() {
   };
   useEffect(() => { if (view === "pagamenti") loadAllPay(); /* eslint-disable-next-line */ }, [view]);
 
-  const loadNote = async (uid: string) => {
-    if (notes[uid]) return;
-    setNotes((n) => ({ ...n, [uid]: { loading: true, text: "" } }));
-    try {
-      const token = await authToken();
-      const res = await fetch("/api/admin/notes", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ action: "get", userId: uid }) });
-      const d = await res.json();
-      setNotes((n) => ({ ...n, [uid]: { loading: false, text: d.note || "" } }));
-    } catch { setNotes((n) => ({ ...n, [uid]: { loading: false, text: "" } })); }
-  };
-  const saveNote = async (uid: string) => {
-    setNotes((n) => ({ ...n, [uid]: { ...(n[uid] || { text: "" }), saving: true, saved: false } }));
-    try {
-      const token = await authToken();
-      await fetch("/api/admin/notes", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ action: "save", userId: uid, note: notes[uid]?.text || "" }) });
-      setNotes((n) => ({ ...n, [uid]: { ...(n[uid] || { text: "" }), saving: false, saved: true } }));
-    } catch { setNotes((n) => ({ ...n, [uid]: { ...(n[uid] || { text: "" }), saving: false } })); }
-  };
-  const openDetail = (acc: Account) => {
-    setSelected(acc);
-    if (acc.owner.stripeCustomerId) loadPayments(acc.owner.stripeCustomerId);
-    loadNote(acc.owner.id);
-  };
+  const openDetail = (acc: Account) => router.push(`/admin/${acc.owner.id}`);
 
   const kpi = useMemo(() => {
     const rs = rows || [];
@@ -460,98 +427,6 @@ export default function AdminPage() {
       {view === "overview" && <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface p-2.5 shadow-sm">{filtersInner}</div>}
       <div className="mt-3 text-[11px] text-faint">Piano/strutture/camere si aggiornano quando l&apos;utente apre l&apos;app. Pagamenti, scadenze e storico fatture arrivano da Stripe in tempo reale.</div>
 
-      {selected && (() => {
-        const r = selected.owner; const mp = r.stripeCustomerId ? pay[r.stripeCustomerId] : undefined; const al = alertsFor(r);
-        const info = (label: string, value: ReactNode) => (<div><div className="text-[11px] uppercase tracking-wide text-faint">{label}</div><div className="text-sm font-medium text-txt">{value}</div></div>);
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setSelected(null)}>
-            <div className="absolute inset-0 bg-black/40" />
-            <div className="relative z-10 flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              {/* Header */}
-              <div className="flex items-start gap-3 border-b border-line px-5 py-4">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold text-white" style={{ backgroundColor: r.isPayer ? "var(--ok)" : "var(--faint)" }}>{(r.name || r.email || "?").slice(0, 2).toUpperCase()}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2"><h2 className="truncate font-display text-xl font-bold text-txt">{r.name || r.email || "—"}</h2><PlanBadge plan={r.plan} /></div>
-                  <div className="truncate text-[12px] text-dim">{r.email}{r.phone ? ` · ${r.phone}` : ""}</div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2"><ContactBtns r={r} /><button onClick={() => setSelected(null)} className="grid h-8 w-8 place-items-center rounded-lg text-dim hover:bg-wash hover:text-txt">✕</button></div>
-              </div>
-
-              <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
-                {al.length > 0 && <div className="flex flex-wrap gap-1.5">{al.map((a, i) => <span key={i} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={toneStyle(a.tone)}>{a.label}</span>)}</div>}
-
-                {/* Abbonamento */}
-                <div className="grid grid-cols-2 gap-3 rounded-xl border border-line bg-wash/40 p-3 sm:grid-cols-3">
-                  {info("Ruolo", r.ownsOrg ? "Titolare" : r.isPayer ? "Pagante" : "Registrato")}
-                  {info("Stato", r.subStatus || "—")}
-                  {info("Scadenza", dmy(r.periodEnd))}
-                  {info("Canone", r.monthlyAmount != null ? `${eur(r.monthlyAmount, r.currency || "EUR")}/mese` : "—")}
-                  {info("Dovuto", r.amountDue != null && r.amountDue > 0 ? <span style={{ color: "var(--bad,#dc2626)" }}>{eur(r.amountDue, r.currency || "EUR")}</span> : "—")}
-                  {info("Pagato finora", r.totalPaid != null ? eur(r.totalPaid, r.currency || "EUR") : "—")}
-                  {info("Strutture", String(r.structures || 0))}
-                  {info("Camere", String(r.rooms || 0))}
-                  {info("Registrato", dmy(r.createdAt))}
-                </div>
-                {r.structureNames && <div className="text-[13px] text-dim">🏠 {r.structureNames}</div>}
-
-                {/* Collaboratori */}
-                {selected.members.length > 0 && (
-                  <div>
-                    <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Collaboratori (nel piano)</div>
-                    <div className="space-y-1.5">
-                      {selected.members.map((m) => (
-                        <div key={m.id} className="flex items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2">
-                          <span className="min-w-0 flex-1 truncate"><span className="font-medium text-txt">{m.name || m.email}</span> <span className="text-[12px] text-dim">{m.email}</span></span>
-                          <ContactBtns r={m} />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Storico pagamenti */}
-                <div>
-                  <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Storico pagamenti / fatture</div>
-                  {!r.stripeCustomerId ? (
-                    <div className="text-[12px] text-faint">Nessun cliente Stripe collegato (account non pagante).</div>
-                  ) : mp?.loading ? (
-                    <div className="text-[12px] text-faint">Carico lo storico…</div>
-                  ) : mp?.invoices?.length ? (
-                    <div className="overflow-x-auto rounded-lg border border-line">
-                      <table className="w-full min-w-[480px] text-sm">
-                        <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint"><th className="px-3 py-1.5 font-semibold">Data</th><th className="px-3 py-1.5 font-semibold">Descrizione</th><th className="px-3 py-1.5 font-semibold text-right">Importo</th><th className="px-3 py-1.5 font-semibold">Stato</th><th className="px-3 py-1.5 font-semibold">Fattura</th></tr></thead>
-                        <tbody>
-                          {mp.invoices.map((inv) => (
-                            <tr key={inv.id} className="border-b border-line/60">
-                              <td className="px-3 py-1.5 whitespace-nowrap text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{dmy(inv.date)}</td>
-                              <td className="px-3 py-1.5 text-dim">{inv.description || inv.number || "Abbonamento"}</td>
-                              <td className="px-3 py-1.5 whitespace-nowrap text-right font-semibold text-txt" style={{ fontVariantNumeric: "tabular-nums" }}>{eur(inv.amount, inv.currency)}</td>
-                              <td className="px-3 py-1.5 whitespace-nowrap"><span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={inv.paid ? { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } : { backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{inv.paid ? "pagata" : (inv.status || "—")}</span></td>
-                              <td className="px-3 py-1.5 whitespace-nowrap">{inv.pdf ? <a href={inv.pdf} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">PDF</a> : inv.hostedUrl ? <a href={inv.hostedUrl} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">Apri</a> : "—"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="text-[12px] text-faint">{mp?.error ? `Errore: ${mp.error}` : "Nessun pagamento registrato."}</div>
-                  )}
-                </div>
-
-                {/* Note interne */}
-                <div>
-                  <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Note interne (private)</div>
-                  <textarea value={notes[r.id]?.text ?? ""} onChange={(e) => setNotes((n) => ({ ...n, [r.id]: { ...(n[r.id] || {}), text: e.target.value, saved: false } }))} placeholder={notes[r.id]?.loading ? "Carico…" : "Appunti su questo cliente: contatti, accordi, promemoria…"} rows={3} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <button onClick={() => saveNote(r.id)} disabled={notes[r.id]?.saving} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{notes[r.id]?.saving ? "Salvo…" : "Salva nota"}</button>
-                    {notes[r.id]?.saved && <span className="text-[12px] font-medium text-[color:var(--ok)]">Salvato ✓</span>}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }
