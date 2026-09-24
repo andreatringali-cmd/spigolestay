@@ -42,10 +42,26 @@ export function loadWeekendPct(): number {
 // TARIFFA UNICA per (tipologia, giorno): override calendario (per tipo o per giorno),
 // altrimenti base effettiva (con derivazione) + maggiorazione weekend. Usata da
 // calendario, motore prenotazioni, revenue, preventivi, sito/widget.
-export function rateForDay(typeId: string, iso: string, all: RoomType[], overrides: Record<string, number> = {}, weekendPct = 25): number {
+export function rateForDay(typeId: string, iso: string, all: RoomType[], overrides: Record<string, number> = {}, weekendPct = 25, seen: Set<string> = new Set()): number {
+  // 1) Override diretto (per quella tipologia e giorno, o per il giorno) → vince sempre.
   const ov = overrides[`${typeId}|${iso}`] ?? overrides[iso];
   if (ov != null) return Math.max(0, Math.round(ov));
   const rt = all.find((x) => x.id === typeId);
-  const base = rt ? effectiveBase(rt, all) : 0;
+  if (!rt) return 0;
+  // 2) Tipologia DERIVATA: segue il prezzo GIORNALIERO della madre (override del calendario
+  //    inclusi) e applica la propria regola (% o +€). Così una modifica dal calendario sulla
+  //    madre si propaga a tutte le derivate. Guardia anti-ciclo con `seen`.
+  if (rt.deriveFrom && !seen.has(rt.id)) {
+    seen.add(rt.id);
+    const src = all.find((x) => x.id === rt.deriveFrom);
+    if (src) {
+      const motherDay = rateForDay(src.id, iso, all, overrides, weekendPct, seen);
+      const v = rt.deriveValue ?? 0;
+      const raw = rt.deriveMode === "percent" ? motherDay * (1 + v / 100) : motherDay + v;
+      return Math.max(0, rt.deriveRound === false ? raw : Math.round(raw));
+    }
+  }
+  // 3) Tipologia base: prezzo di listino + maggiorazione weekend.
+  const base = effectiveBase(rt, all);
   return Math.max(0, Math.round(base * (isWeekendISO(iso) ? 1 + weekendPct / 100 : 1)));
 }
