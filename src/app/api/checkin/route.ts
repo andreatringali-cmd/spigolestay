@@ -49,6 +49,14 @@ export async function GET(req: Request) {
         .map((x) => { const xb = x as Json; const rt = rts.find((r) => (r as Json).id === xb.roomTypeId) as Json | undefined; const un = uns.find((u) => (u as Json).id === xb.unitId) as Json | undefined; return { b: s(xb.id), code: s(xb.code) || s(xb.id).slice(0, 8).toUpperCase(), roomType: s(rt?.name), unit: un ? s(un.name) : "", adults: n(xb.adults) || 1, children: n(xb.children), webCheckin: xb.webCheckin === true }; });
     }
 
+    // Verifica LIVE che l'account collegato possa incassare, se il flag salvato non è ancora true:
+    // così l'ospite vede "Paga ora" anche se il gestore non ha riaperto la pagina struttura dopo l'onboarding.
+    let chargesEnabled = st.stripeChargesEnabled === true;
+    const stripeAcct = s(st.stripeAccount);
+    if (stripeAcct && !chargesEnabled && process.env.STRIPE_SECRET_KEY) {
+      try { const Stripe = (await import("stripe")).default; const stripe = new Stripe(process.env.STRIPE_SECRET_KEY); const a = await stripe.accounts.retrieve(stripeAcct); chargesEnabled = !!a.charges_enabled; } catch {}
+    }
+
     return NextResponse.json({
       ok: true,
       group: group.length > 1 ? group : undefined,
@@ -73,7 +81,7 @@ export async function GET(req: Request) {
         address: s(st.address), streetNumber: s(st.streetNumber), city: s(st.city),
         checkInFrom: s(st.checkInFrom), checkOutBy: s(st.checkOutBy), accessInfo: s(st.accessInfo),
         currency: s(st.currency) || "€", cityTax: (st.cityTax as Json) || null,
-        stripeAccount: s(st.stripeAccount), stripeChargesEnabled: st.stripeChargesEnabled === true,
+        stripeAccount: s(st.stripeAccount), stripeChargesEnabled: chargesEnabled,
         extras: arr(st.extras).filter((e) => (e as { active?: boolean }).active !== false).map((e) => ({ id: s((e as Json).id), name: s((e as Json).name), desc: s((e as Json).desc), price: n((e as Json).price), per: s((e as Json).per) })),
       },
     });

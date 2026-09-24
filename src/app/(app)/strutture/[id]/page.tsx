@@ -57,7 +57,7 @@ export default function StrutturaSchedaPage() {
   const set = <K extends keyof Structure>(k: K, v: Structure[K]) => setF((p) => ({ ...p, [k]: v }));
   // Stripe Connect: collega il Stripe del proprietario di questa struttura (incassa lui).
   const [stripeSt, setStripeSt] = useState<{ loading?: boolean; enabled?: boolean; msg?: string }>({});
-  const verifyStripe = async (acct: string) => { try { const r = await fetch(`/api/stripe/connect?id=${encodeURIComponent(acct)}`); const j = await r.json(); setStripeSt({ enabled: !!j?.chargesEnabled }); } catch {} };
+  const verifyStripe = async (acct: string) => { try { const r = await fetch(`/api/stripe/connect?id=${encodeURIComponent(acct)}`); const j = await r.json(); const en = !!j?.chargesEnabled; setStripeSt({ enabled: en }); if (!isNew) updateStructure(params.id as string, { stripeChargesEnabled: en }); } catch {} };
   useEffect(() => {
     try {
       const sp = new URLSearchParams(window.location.search);
