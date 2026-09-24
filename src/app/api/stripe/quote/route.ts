@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
-import { computePlatformFee, type PaymentSource } from "@/lib/payments/fee";
+import { computePlatformFee, estimatedStripeFeeCents, type PaymentSource } from "@/lib/payments/fee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,11 +57,15 @@ export async function POST(req: Request) {
     // richiesto da Stripe per le piattaforme nuove con account Express/Custom (i "direct charges"
     // non sono più supportati). La commissione resta alla piattaforma con application_fee_amount.
     if (acct) {
+      // La struttura sostiene la commissione Stripe: le trasferiamo il NETTO (lordo − stima Stripe
+      // − eventuale fee Xenora). La piattaforma trattiene il resto (copre Stripe + fee).
+      const gross = amount * 100;
+      const platformFee = fee.applies ? fee.totalCents : 0;
+      const transferAmount = Math.max(0, gross - estimatedStripeFeeCents(gross) - platformFee);
       params.payment_intent_data = {
         ...params.payment_intent_data,
-        transfer_data: { destination: acct },
+        transfer_data: { destination: acct, amount: transferAmount },
         on_behalf_of: acct,
-        ...(fee.applies ? { application_fee_amount: fee.totalCents } : {}),
       };
     }
     // Sempre creata sull'account PIATTAFORMA (niente stripeAccount header).

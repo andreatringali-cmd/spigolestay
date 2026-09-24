@@ -57,6 +57,15 @@ export function computePlatformFee(grossCents: number, source: PaymentSource, cf
   return { applies: true, baseCents, vatCents, totalCents, bps, vatRate };
 }
 
+// Stima della commissione di elaborazione Stripe (carte SEE/EEA: 1,5% + 0,25€).
+// Usata per i DESTINATION charge: si trasferisce alla struttura il netto (lordo − questa stima),
+// così la commissione Stripe resta a carico della struttura e la piattaforma non ci rimette.
+// Le carte extra-UE costano di più: in quei casi la piccola differenza la assorbe la piattaforma.
+export function estimatedStripeFeeCents(grossCents: number): number {
+  if (grossCents <= 0) return 0;
+  return Math.round(grossCents * 0.015) + 25;
+}
+
 /** Rimborso proporzionale della fee quando si rimborsa parte dell'incasso. */
 export function proratedFeeRefundCents(fee: Pick<FeeResult, "totalCents">, grossCents: number, refundGrossCents: number): number {
   if (grossCents <= 0 || refundGrossCents <= 0) return 0;

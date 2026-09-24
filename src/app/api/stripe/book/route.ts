@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { estimatedStripeFeeCents } from "@/lib/payments/fee";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
       line_items: [{ price_data: { currency: "eur", unit_amount: amount * 100, product_data: { name: label } }, quantity: 1 }],
       customer_email: g.email || undefined,
       metadata: meta,
-      payment_intent_data: { metadata: meta, transfer_data: { destination: acct }, on_behalf_of: acct },
+      payment_intent_data: { metadata: meta, transfer_data: { destination: acct, amount: Math.max(0, amount * 100 - estimatedStripeFeeCents(amount * 100)) }, on_behalf_of: acct },
       success_url: success, cancel_url: cancel,
     });
     return NextResponse.json({ ok: true, payment: true, url: session.url, token });
