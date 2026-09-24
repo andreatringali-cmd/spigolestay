@@ -88,21 +88,21 @@ export async function GET(req: Request) {
   const stripeInfo = new Map<string, SInfo>();
   if (stripe) {
     const custIds = Array.from(new Set((profiles || []).map((p) => p.stripe_customer_id).filter(Boolean))) as string[];
-    for (const cid of custIds.slice(0, 300)) {
+    // Recupero per cliente PARALLELO (con limite di concorrenza) per non impilare le chiamate Stripe.
+    const fetchOne = async (cid: string) => {
       try {
-        const subs = await stripe.subscriptions.list({ customer: cid, status: "all", limit: 1 });
-        const s = subs.data[0];
-        // Storico fatture del cliente: pagato finora (somma pagate) e dovuto (somma non pagate).
+        const [subs, invs] = await Promise.all([
+          stripe.subscriptions.list({ customer: cid, status: "all", limit: 1 }),
+          stripe.invoices.list({ customer: cid, limit: 100 }).catch(() => ({ data: [] as Stripe.Invoice[] })),
+        ]);
         let totalPaid = 0, amountDue = 0, invCur: string | null = null;
-        try {
-          const invs = await stripe.invoices.list({ customer: cid, limit: 100 });
-          for (const i of invs.data) {
-            invCur = invCur || (i.currency ? i.currency.toUpperCase() : null);
-            totalPaid += (i.amount_paid ?? 0) / 100;
-            if (i.status === "open" || i.status === "uncollectible") amountDue += (i.amount_remaining ?? i.amount_due ?? 0) / 100;
-          }
-        } catch { /* niente fatture */ }
-        if (!s) { stripeInfo.set(cid, { status: null, periodEnd: null, cancel: false, monthly: null, currency: invCur, totalPaid, amountDue }); continue; }
+        for (const i of invs.data) {
+          invCur = invCur || (i.currency ? i.currency.toUpperCase() : null);
+          totalPaid += (i.amount_paid ?? 0) / 100;
+          if (i.status === "open" || i.status === "uncollectible") amountDue += (i.amount_remaining ?? i.amount_due ?? 0) / 100;
+        }
+        const s = subs.data[0];
+        if (!s) { stripeInfo.set(cid, { status: null, periodEnd: null, cancel: false, monthly: null, currency: invCur, totalPaid, amountDue }); return; }
         const item = s.items.data[0];
         const amt = item?.price?.unit_amount ?? null;
         const interval = item?.price?.recurring?.interval;
@@ -120,7 +120,13 @@ export async function GET(req: Request) {
           amountDue,
         });
       } catch { /* salta questo cliente */ }
-    }
+    };
+    // Pool di concorrenza (8 richieste in volo).
+    const queue = custIds.slice(0, 300);
+    const CONC = 8;
+    await Promise.all(Array.from({ length: Math.min(CONC, queue.length) }, async () => {
+      while (queue.length) { const cid = queue.shift(); if (cid) await fetchOne(cid); }
+    }));
   }
 
   const rows: Row[] = users.map((u) => {

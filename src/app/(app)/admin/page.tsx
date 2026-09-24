@@ -400,22 +400,6 @@ export default function AdminPage() {
                         <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}><ContactBtns r={r} /></td>
                       </tr>
 
-                      {acc.members.map((m) => (
-                        <tr key={m.id} className="border-b border-line/40 bg-surface/40">
-                          <td className="px-3 py-2 pl-9"><span className="text-dim">↳ </span><span className="font-medium text-txt">{m.name || m.email}</span> <span className="text-[12px] text-dim">{m.email}{m.phone ? ` · ${m.phone}` : ""}</span></td>
-                          <td className="px-3 py-2"><span className="text-[11px] text-faint">nel piano</span></td>
-                          <td className="px-3 py-2 whitespace-nowrap text-[12px] text-dim">Collaboratore</td>
-                          <td className="px-3 py-2 text-right text-faint">—</td>
-                          <td className="px-3 py-2 text-right text-faint">—</td>
-                          <td className="px-3 py-2 text-faint">—</td>
-                          <td className="px-3 py-2 text-faint">—</td>
-                          <td className="px-3 py-2 text-right text-faint">—</td>
-                          <td className="px-3 py-2 text-right text-faint">—</td>
-                          <td className="px-3 py-2 text-right text-faint">—</td>
-                          <td className="px-3 py-2"><ContactBtns r={m} /></td>
-                        </tr>
-                      ))}
-
                     </Fragment>
                   );
                 })}
