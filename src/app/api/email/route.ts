@@ -60,9 +60,9 @@ function voucherHtml(b: BookingPayload, checkinUrl: string, manageUrl?: string) 
     </table>
     ${b.cancelPolicy ? `<div style="margin:14px 0 0;background:#f8f9fb;border:1px solid #eceef1;border-radius:10px;padding:12px 14px;font-size:12px;color:#4b5563;"><b style="color:#1f2430;">Condizioni di cancellazione</b><br>${esc(b.cancelPolicy)}</div>` : ""}
     <div style="margin:22px 0 6px;">
-      <a href="${esc(checkinUrl)}" style="display:block;text-align:center;background:${accent};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:10px;">Fai il check-in online →</a>
+      <a href="${esc(checkinUrl)}" style="display:block;text-align:center;background:${accent};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:10px;">Gestisci la tua prenotazione →</a>
     </div>
-    <p style="margin:8px 0 0;font-size:12px;color:#9aa1ac;text-align:center;">Compila i dati prima dell'arrivo: risparmi tempo al tuo check-in.</p>
+    <p style="margin:8px 0 0;font-size:12px;color:#9aa1ac;text-align:center;">Completa i dati mancanti, fai il <b>check-in online</b>, <b>paga</b> il saldo e invia le tue <b>richieste</b> — tutto da qui.</p>
     ${manageUrl ? `<div style="margin:12px 0 6px;">
       <a href="${esc(manageUrl)}" style="display:block;text-align:center;background:#fff;border:1px solid ${accent};color:${accent};text-decoration:none;font-weight:700;font-size:14px;padding:12px;border-radius:10px;">Gestisci la prenotazione (modifica o annulla)</a>
     </div>` : ""}

@@ -294,7 +294,7 @@ function Engine() {
     <div className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-3">
         <div className="grid h-9 w-9 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: accent }}>{(st?.name ?? "SS").slice(0, 2).toUpperCase()}</div>
-        <div className="leading-tight"><div className="text-sm font-bold text-txt">{st?.name ?? "Xenora"}</div><div className="text-[11px] text-faint">Check-in online</div></div>
+        <div className="leading-tight"><div className="text-sm font-bold text-txt">{st?.name ?? "Xenora"}</div><div className="text-[11px] text-faint">Gestisci la tua prenotazione</div></div>
       </div>
     </div>
   );
