@@ -53,8 +53,6 @@ function slotDate(tpl: Tpl, checkIn: string, checkOut: string): string | null {
     default: return null; // manual
   }
 }
-const tplMinutes = (time: string) => { const [h, m] = (time || "10:00").split(":"); return (parseInt(h, 10) || 0) * 60 + (parseInt(m, 10) || 0); };
-
 // Sostituzione segnaposto {ospite} {struttura} {camera} {checkin} {checkout} {notti} {saldo} {codice_accesso} {link_checkin} {link_guida}.
 function fillTokens(text: string, ctx: Record<string, string>): string {
   return text.replace(/\{([a-z_]+)\}/gi, (m, k: string) => (k in ctx ? ctx[k] : m));
@@ -77,7 +75,9 @@ export async function GET(req: Request) {
 
   const live = process.env.AUTO_MESSAGES_LIVE === "1";
   const origin = url.origin;
-  const { ymd: todayRome, minutes: nowMin } = romeNow();
+  // Su piano Hobby il cron gira UNA volta al giorno: inviamo tutti i messaggi previsti per
+  // oggi al run giornaliero (l'orario del modello è indicativo). Dedup per giorno.
+  const { ymd: todayRome } = romeNow();
 
   let accounts = 0, candidates = 0, sent = 0;
   const errors: string[] = [];
@@ -125,7 +125,6 @@ export async function GET(req: Request) {
       for (const tp of tpls) {
         const slot = slotDate(tp, checkIn, checkOut);
         if (!slot || slot !== todayRome) continue;
-        if (nowMin < tplMinutes(tp.time)) continue; // non ancora l'orario previsto (oggi)
         candidates++;
         if (!live) continue; // dry-run: non inviare
         if (sent >= CAP) { errors.push("cap_reached"); return; }
