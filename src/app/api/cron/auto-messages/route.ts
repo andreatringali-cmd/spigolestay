@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { sendWhatsapp } from "@/lib/whatsapp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ const s = (v: unknown) => (typeof v === "string" ? v : "");
 const num = (v: unknown) => (typeof v === "number" ? v : 0);
 
 type Trigger = "manual" | "before_arrival" | "on_arrival" | "after_arrival" | "on_checkout" | "after_checkout";
-interface Tpl { id: string; name: string; texts: Record<string, string>; trigger: Trigger; days: number; time: string; active: boolean }
+interface Tpl { id: string; name: string; texts: Record<string, string>; trigger: Trigger; days: number; time: string; active: boolean; waTemplate?: string }
 
 // Data (Y-M-D) e minuti-del-giorno "adesso" nel fuso Europe/Rome.
 function romeNow(): { ymd: string; minutes: number } {
@@ -79,7 +80,7 @@ export async function GET(req: Request) {
   // oggi al run giornaliero (l'orario del modello è indicativo). Dedup per giorno.
   const { ymd: todayRome } = romeNow();
 
-  let accounts = 0, candidates = 0, sent = 0;
+  let accounts = 0, candidates = 0, sent = 0, waSent = 0;
   const errors: string[] = [];
   const CAP = 300; // tetto di sicurezza per esecuzione
 
@@ -103,7 +104,7 @@ export async function GET(req: Request) {
       if (!checkIn || !checkOut) continue;
       const g = guests.get(s(b.guestId)) || (b.primaryGuest as Json) || {};
       const email = s(g.email);
-      if (!email) continue;
+      if (!email && !s(g.phone)) continue; // niente email né telefono → nessun canale
       const st = structures.get(s(b.structureId)) || {};
       const unit = units.get(s(b.unitId)) || {};
       const rt = roomTypes.get(s(b.roomTypeId)) || {};
@@ -136,15 +137,32 @@ export async function GET(req: Request) {
         if (!claim.data || claim.data.length === 0) continue; // già inviato in precedenza
         const text = fillTokens(tp.texts?.[lang] || tp.texts?.it || "", ctx).trim();
         if (!text) { continue; }
-        try {
-          const r = await fetch(`${origin}/api/email`, {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ kind: "guest_message", to: email, subject: tp.name || s(st.name) || "Messaggio", text, booking: { structureName: s(st.name), structureEmail: s(st.email), color: s(st.photoColor) }, replyTo: s(st.email) || undefined }),
-          });
-          const j = await r.json().catch(() => ({}));
-          if (r.ok && j?.ok) { sent++; }
-          else { errors.push(`send ${s(b.id)}/${tp.id}: ${j?.error || r.status}`); await admin.from("auto_message_log").delete().eq("tenant_id", tenantId).eq("booking_id", s(b.id)).eq("template_id", tp.id).eq("slot_date", slot); }
-        } catch (e) { errors.push(`send ${s(b.id)}: ${e instanceof Error ? e.message : "err"}`); await admin.from("auto_message_log").delete().eq("tenant_id", tenantId).eq("booking_id", s(b.id)).eq("template_id", tp.id).eq("slot_date", slot); }
+        let okAny = false;
+        // Canale 1: EMAIL (se l'ospite ha email).
+        if (email) {
+          try {
+            const r = await fetch(`${origin}/api/email`, {
+              method: "POST", headers: { "content-type": "application/json" },
+              body: JSON.stringify({ kind: "guest_message", to: email, subject: tp.name || s(st.name) || "Messaggio", text, booking: { structureName: s(st.name), structureEmail: s(st.email), color: s(st.photoColor) }, replyTo: s(st.email) || undefined }),
+            });
+            const j = await r.json().catch(() => ({}));
+            if (r.ok && j?.ok) { okAny = true; sent++; }
+            else errors.push(`mail ${s(b.id)}/${tp.id}: ${j?.error || r.status}`);
+          } catch (e) { errors.push(`mail ${s(b.id)}: ${e instanceof Error ? e.message : "err"}`); }
+        }
+        // Canale 2: WHATSAPP (se WA collegato per il tenant e l'ospite ha numero). Per i messaggi
+        // "a freddo" (proattivi) Meta richiede un template approvato: se il modello ha waTemplate lo
+        // usa, altrimenti invia testo libero (recapitato solo entro 24h dall'ultimo msg dell'ospite).
+        const phone = s(g.phone);
+        if (phone) {
+          try {
+            const w = await sendWhatsapp(admin, tenantId, { to: phone, text, templateName: tp.waTemplate || undefined, lang });
+            if (w.ok) { okAny = true; waSent++; }
+            else if (w.message && !/non collegato/i.test(w.message)) errors.push(`wa ${s(b.id)}/${tp.id}: ${w.message}`);
+          } catch (e) { errors.push(`wa ${s(b.id)}: ${e instanceof Error ? e.message : "err"}`); }
+        }
+        // Se nessun canale è andato a buon fine, libera il claim così si riprova al prossimo giro.
+        if (!okAny) await admin.from("auto_message_log").delete().eq("tenant_id", tenantId).eq("booking_id", s(b.id)).eq("template_id", tp.id).eq("slot_date", slot);
       }
     }
   };
@@ -165,5 +183,5 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "scan_failed", accounts, candidates, sent }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, live, today: todayRome, accounts, candidates, sent, ...(errors.length ? { errors: errors.slice(0, 50) } : {}) });
+  return NextResponse.json({ ok: true, live, today: todayRome, accounts, candidates, sent, waSent, ...(errors.length ? { errors: errors.slice(0, 50) } : {}) });
 }

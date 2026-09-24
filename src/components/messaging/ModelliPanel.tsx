@@ -22,7 +22,7 @@ const PHASE_LABEL: Record<Trigger, string> = { before_arrival: "Prima dell'arriv
 // Ordine cronologico interno alla fase: "giorni prima" più alti = più presto; "giorni dopo" più alti = più tardi.
 const chronoKey = (tp: MsgTemplate) => (tp.trigger === "before_arrival" ? -tp.days : tp.trigger === "after_arrival" || tp.trigger === "after_checkout" ? tp.days : 0);
 
-interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; trigger: Trigger; days: number; time: string; active: boolean; srcId?: string; order?: number }
+interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; trigger: Trigger; days: number; time: string; active: boolean; srcId?: string; order?: number; waTemplate?: string }
 const emptyTpl = (): MsgTemplate => ({ id: (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random())), name: "", texts: { it: "", en: "", fr: "", de: "", es: "" }, trigger: "manual", days: 1, time: "10:00", active: true });
 const triggerDesc = (tpl: MsgTemplate, tr: (s: string) => string) => {
   if (tpl.trigger === "manual") return tr("Invio manuale");
@@ -166,6 +166,11 @@ export default function ModelliPanel() {
                   <select value={editing.srcId ?? ""} onChange={(e) => setEditing({ ...editing, srcId: e.target.value || undefined })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">
                     {LINKABLE.map(([v, n]) => <option key={v} value={v}>{t(n)}</option>)}
                   </select>
+                </label>
+              )}
+              {editing.trigger !== "manual" && (
+                <label className="mt-2 block text-xs font-medium text-dim">{t("Template WhatsApp approvato")} <span className="font-normal text-faint">{t("(facoltativo · nome del template Meta per l'invio automatico WhatsApp; senza, WhatsApp parte solo entro 24h)")}</span>
+                  <input value={editing.waTemplate ?? ""} onChange={(e) => setEditing({ ...editing, waTemplate: e.target.value || undefined })} placeholder={t("es. benvenuto_prearrivo")} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" />
                 </label>
               )}
             </div>
