@@ -13,6 +13,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { italianHolidays, italianBridges } from "@/lib/holidays";
 import { DEFAULT_STRAT, RISK_PRESET, MONTHS, cellKey, runNettare, applyMod, hasMod, normalizeStrategy, type Cell, type Mod, type Period, type Risk, type Strategy, type Step } from "@/lib/nettare";
 import { effBase } from "@/lib/pricing";
+import { fetchCityPulse, computeMarketSignal, type MarketPulse } from "@/lib/market";
 
 const WINDOW = 90;
 const FUTURE = 30;
@@ -20,8 +21,6 @@ const GRID_DAYS = 30;
 const PREVIEW = 90;
 const STRAT_KEY = "spigolestay:nettare:strategy";
 const MODS_KEY = "spigolestay:nettare:mods";
-
-type Pulse = { n_structures: number; occupancy: number | null; adr: number | null };
 
 const money2 = (n: number) => `${n >= 0 ? "+" : "−"} ${Math.abs(n).toFixed(2).replace(".", ",")} €`;
 
@@ -40,7 +39,7 @@ export default function NettarePage() {
 
   const [strat, setStrat] = useState<Strategy>(DEFAULT_STRAT);
   const [mods, setMods] = useState<Record<string, Mod>>({});
-  const [pulse, setPulse] = useState<Pulse | null>(null);
+  const [pulse, setPulse] = useState<MarketPulse | null>(null);
   const [applied, setApplied] = useState(false);
   const [start, setStart] = useState(today);
   const [openStrat, setOpenStrat] = useState(true);
@@ -77,19 +76,13 @@ export default function NettarePage() {
   }, [struct, sRooms, sBookings, today]);
 
   const basePrice = useMemo(() => (my.adr > 0 ? Math.round(my.adr) : (mainType?.basePrice ?? 0) || 90), [my.adr, mainType]);
-  const market = useMemo(() => ({
-    cityHot: pulse?.occupancy != null && pulse.occupancy > my.occ + 0.05,
-    adrGap: pulse?.adr != null && my.adr > 0 ? (pulse.adr - my.adr) / my.adr : 0,
-  }), [pulse, my]);
+  // Segnale di mercato dalla fonte unica condivisa (dati tuoi reali + Rete città quando disponibile).
+  const market = useMemo(() => computeMarketSignal(my.occ, my.adr, pulse), [pulse, my.occ, my.adr]);
 
   const refresh = useCallback(async () => {
-    if (!supabase || !user?.id || !city) return;
-    try {
-      const { data } = await supabase.rpc("market_pulse", { p_city: city, p_from: shiftISO(toISO(new Date()), -WINDOW), p_to: toISO(new Date()) });
-      setPulse((Array.isArray(data) ? data[0] : data) as Pulse ?? null);
-    } catch {}
-  }, [user?.id, city]);
-  useEffect(() => { void refresh(); }, [refresh]);
+    setPulse(await fetchCityPulse(supabase, city, WINDOW));
+  }, [city]);
+  useEffect(() => { void refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [city, user?.id]);
 
   const holidays = useMemo(() => { const y = new Date().getFullYear(); return italianHolidays([y, y + 1, y + 2], city); }, [city]);
   const bridges = useMemo(() => italianBridges(holidays), [holidays]);
@@ -196,8 +189,12 @@ export default function NettarePage() {
             <button onClick={applyPrices} className="rounded-full px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 active:scale-95" style={{ background: "var(--focus)" }}>{applied ? `✓ ${t("Prezzi applicati")}` : `${t("Applica ai prossimi")} ${FUTURE} ${t("giorni")}`}</button>
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px]">
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px]">
           <span className="text-faint">{t("Nèttare consiglia, tu applichi. I prezzi applicati vanno nel calendario di Xenora.")}</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2 py-0.5 text-[11px] font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--ok) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--ok)" }} />{t("Dati tuoi · occupazione reale")}</span>
+          {market.hasZoneData
+            ? <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2 py-0.5 text-[11px] font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--focus) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--focus)" }} />{t("Media di zona attiva")}</span>
+            : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2 py-0.5 text-[11px] font-medium text-faint">{t("Media di zona (Rete città): in arrivo")}</span>}
           {city && <Link href="/mercato" className="font-medium" style={{ color: "var(--focus)" }}>{t("Vedi i dati della Rete città")} →</Link>}
         </div>
       </div>

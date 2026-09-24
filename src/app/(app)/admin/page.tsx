@@ -98,6 +98,10 @@ export default function AdminPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [allPay, setAllPay] = useState<{ loading: boolean; loaded: boolean; invoices: (Invoice & { customerId: string | null; customerEmail: string | null; customerName: string })[]; error?: string }>({ loading: false, loaded: false, invoices: [] });
+  // Account paganti: paginazione/ricerca LATO SERVER (scalabile a migliaia di utenti).
+  const [pagedAccounts, setPagedAccounts] = useState<Account[]>([]);
+  const [pagedTotal, setPagedTotal] = useState(0);
+  const [accLoading, setAccLoading] = useState(false);
 
   const authToken = async () => (await (supabase?.auth.getSession() ?? Promise.resolve({ data: { session: null } }))).data.session?.access_token || "";
 
@@ -129,6 +133,27 @@ export default function AdminPage() {
   };
   useEffect(() => { if (view === "pagamenti" || view === "overview") loadAllPay(); /* eslint-disable-next-line */ }, [view]);
   useEffect(() => { setPage(0); }, [q, statusF, payF, view]);
+
+  // Lista "Account paganti" dal DB con paginazione/ricerca lato server (nessuna chiamata Stripe per riga).
+  const loadAccounts = async () => {
+    setAccLoading(true);
+    try {
+      const token = await authToken();
+      if (!token) { setAccLoading(false); return; }
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize), q: q.trim(), status: statusF });
+      const res = await fetch(`/api/admin/overview?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await res.json();
+      if (res.ok) { setPagedAccounts(d.accounts || []); setPagedTotal(d.total || 0); setStripeOn(!!d.stripeConfigured); }
+    } catch { /* rete: mantieni i dati precedenti */ }
+    setAccLoading(false);
+  };
+  // Ricarica con debounce quando cambia ricerca/filtro/pagina (solo nella scheda Account paganti).
+  useEffect(() => {
+    if (view !== "accounts") return;
+    const t = setTimeout(() => { loadAccounts(); }, 300);
+    return () => clearTimeout(t);
+    /* eslint-disable-next-line */
+  }, [view, q, statusF, page, pageSize, user?.id]);
 
   const openDetail = (acc: Account) => router.push(`/admin/${acc.owner.id}`);
 
@@ -171,17 +196,6 @@ export default function AdminPage() {
     const daRecuperare = allPay.invoices.filter((i) => i.status === "open" || i.status === "uncollectible" || i.status === "past_due").reduce((s, i) => s + i.amount, 0);
     return { inv, incassato, daRecuperare };
   }, [allPay.invoices, payF, q]);
-
-  const filteredAccounts = useMemo(() => {
-    let as = accounts || [];
-    const term = q.trim().toLowerCase();
-    if (term) as = as.filter((a) => [a.owner, ...a.members].some((r) => (r.email || "").toLowerCase().includes(term) || (r.name || "").toLowerCase().includes(term) || (r.phone || "").toLowerCase().includes(term) || (r.structureNames || "").toLowerCase().includes(term)));
-    if (statusF === "paganti") as = as.filter((a) => a.owner.isPayer && (isActive(a.owner) || isTrial(a.owner) || !!a.owner.stripeCustomerId));
-    else if (statusF === "trialing") as = as.filter((a) => isTrial(a.owner));
-    else if (statusF === "recupero") as = as.filter((a) => needsAttention(a.owner));
-    else if (statusF === "none") as = as.filter((a) => !a.owner.isPayer);
-    return as;
-  }, [accounts, q, statusF]);
 
   const toneStyle = (tone: Alert["tone"]) => tone === "red"
     ? { backgroundColor: "color-mix(in srgb, var(--bad,#dc2626) 14%, transparent)", color: "var(--bad,#dc2626)" }
@@ -378,7 +392,7 @@ export default function AdminPage() {
         </div>
       ) : (
         <Card className="overflow-x-auto p-0">
-          {filteredAccounts.length === 0 ? <div className="py-10 text-center text-sm text-faint">Nessun account trovato.</div> : (
+          {accLoading && pagedAccounts.length === 0 ? <div className="py-10 text-center text-sm text-faint">Carico gli account…</div> : pagedAccounts.length === 0 ? <div className="py-10 text-center text-sm text-faint">Nessun account trovato.</div> : (
             <table className="w-full min-w-[1000px] text-sm">
               <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
                 <th className="px-3 py-2 font-semibold">Titolare / collaboratore</th>
@@ -392,7 +406,7 @@ export default function AdminPage() {
                 <th className="px-3 py-2 font-semibold">Azioni</th>
               </tr></thead>
               <tbody>
-                {filteredAccounts.slice(page * pageSize, (page + 1) * pageSize).map((acc) => {
+                {pagedAccounts.map((acc) => {
                   const r = acc.owner; const al = alertsFor(r);
                   const topAlert = al.find((a) => a.tone === "red") || al.find((a) => a.tone === "amber");
                   return (
@@ -431,7 +445,7 @@ export default function AdminPage() {
               </tbody>
             </table>
           )}
-          {filteredAccounts.length > 0 && <Pager total={filteredAccounts.length} page={page} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />}
+          {pagedTotal > 0 && <Pager total={pagedTotal} page={page} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />}
         </Card>
       )}
       {view === "overview" && <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface p-2.5 shadow-sm">{filtersInner}</div>}

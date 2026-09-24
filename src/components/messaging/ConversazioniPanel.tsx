@@ -11,6 +11,7 @@ import ChannelLogo from "@/components/ChannelLogo";
 import { eur } from "@/lib/format";
 import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
 import { apiPost } from "@/lib/invoicing/client";
+import { supabase } from "@/lib/supabase";
 
 
 interface Msg { id: string; dir: "out" | "in"; text: string; ts: number; via?: string }
@@ -90,6 +91,12 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const [showInvii, setShowInvii] = useState(false); // gli invii programmati si aprono su richiesta, non di default
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // ── Bozza assistita dall'AI (Claude) ──
+  // aiUnavailable = la chiave non è configurata sul server → nascondi il pulsante con nota.
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiErr, setAiErr] = useState(false);
+  const [aiUnavailable, setAiUnavailable] = useState(false);
+
   // Ospiti con almeno una prenotazione (nella struttura attiva), ordinati per struttura poi alfabetico.
   const people = useMemo(() => {
     const map = new Map<string, { id: string; name: string; phone?: string; email?: string; struct: string; lastCheckIn: string; b: Booking }>();
@@ -162,6 +169,36 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     } catch { window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(t("Messaggio"))}&body=${encodeURIComponent(text)}`, "_blank"); }
   };
   const logIn = () => { const text = draft.trim() || window.prompt(t("Testo della risposta ricevuta dall'ospite:")) || ""; if (text.trim()) { add("in", text, "manuale"); setDraft(""); } };
+
+  // Chiede a Claude una BOZZA di risposta nella lingua dell'ospite, basata sul thread + prenotazione.
+  // La bozza precompila il campo risposta: l'operatore la modifica e invia col flusso esistente.
+  const draftWithAi = async () => {
+    if (!current || aiBusy) return;
+    setAiBusy(true); setAiErr(false);
+    try {
+      const g = guests.find((x) => x.id === current.id);
+      const b = current.b;
+      const st = b ? getStructure(b.structureId) : undefined;
+      const room = b ? (getUnit(b.unitId)?.name ?? getRoomType(b.roomTypeId)?.name ?? "") : "";
+      const payload = {
+        messages: (threads[current.id] ?? []).map((m) => ({ dir: m.dir, text: m.text })),
+        lang: langOf(g),
+        guestName: current.name,
+        structureName: st?.name ?? current.struct ?? "",
+        room,
+        checkIn: b ? fmtLong(b.checkIn) : "",
+        checkOut: b ? fmtLong(b.checkOut) : "",
+      };
+      // Fetch diretto (non apiPost) per leggere il body anche quando ok:false, distinguendo ai_not_configured.
+      const token = (await supabase?.auth.getSession())?.data.session?.access_token;
+      const res = await fetch("/api/ai/guest-reply", { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(payload) });
+      const r = await res.json().catch(() => ({})) as { ok?: boolean; draft?: string; error?: string };
+      if (r.ok && r.draft) { setDraft(r.draft); }
+      else if (r.error === "ai_not_configured") { setAiUnavailable(true); }
+      else { setAiErr(true); }
+    } catch { setAiErr(true); }
+    finally { setAiBusy(false); }
+  };
 
   // ── Segnaposto e modelli ──
   const langOf = (g?: Guest): Lang => (["it", "en", "fr", "de", "es"].includes(g?.language ?? "") ? (g!.language as Lang) : "it");
@@ -485,6 +522,12 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 </select>
                 <button onClick={insertGuide} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition hover:bg-wash hover:text-txt">📖 {t("Guida ospiti")}</button>
                 {current.b && <button onClick={insertCheckin} title={t("Invia il link per il check-in online (compila la schedina alloggiati)")} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition hover:bg-wash hover:text-txt">📝 {t("Check-in online")}</button>}
+                {aiUnavailable ? (
+                  <span className="rounded-full border border-dashed border-line px-3 py-1 text-xs font-medium text-faint" title={t("La risposta assistita dall'AI sarà attivata a breve")}>✨ {t("Bozza con AI")} · {t("disponibile a breve")}</span>
+                ) : (
+                  <button onClick={draftWithAi} disabled={aiBusy} title={t("Proponi una bozza di risposta nella lingua dell'ospite (da rivedere prima di inviare)")} className="rounded-full border px-3 py-1 text-xs font-semibold transition disabled:opacity-50" style={{ borderColor: "color-mix(in srgb, var(--focus) 40%, transparent)", color: "var(--focus)", backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" }}>{aiBusy ? `✨ ${t("Scrivo…")}` : `✨ ${t("Bozza con AI")}`}</button>
+                )}
+                {aiErr && <span className="text-[11px] text-[color:var(--err)]">{t("Non sono riuscito a generare la bozza. Riprova.")}</span>}
               </div>
               <div className="rounded-2xl border border-line bg-paper p-2 transition focus-within:border-focus focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--focus)_18%,transparent)]">
                 <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder={t("Scrivi un messaggio…")} className="w-full resize-none bg-transparent px-1.5 py-1 text-sm text-txt outline-none placeholder:text-faint" />

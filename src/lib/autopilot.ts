@@ -6,6 +6,7 @@
 import type { Booking, RoomType, Unit } from "./types";
 import { rateForDay, loadWeekendPct } from "./pricing";
 import { shiftISO } from "./dates";
+import { zoneMultiplier, type MarketSignal } from "./market";
 
 export interface AutopilotCfg {
   on: boolean;          // applica automaticamente
@@ -54,6 +55,7 @@ export function computeSuggestions(
   bookings: Booking[], roomTypes: RoomType[], units: Unit[], rateOverrides: Record<string, number>,
   cfg: AutopilotCfg, todayISO: string, structureId: string,
   highDemand?: Map<string, string>, // iso → motivo (festivo/ponte/evento) per prezzi consapevoli
+  signal?: MarketSignal,            // benchmark "Rete città" (usato solo se ha dati reali di zona)
 ): Suggestion[] {
   const weekendPct = loadWeekendPct();
   const out: Suggestion[] = [];
@@ -83,6 +85,9 @@ export function computeSuggestions(
       // Alta richiesta: festivo / ponte / evento locale → alza (se non già scarico)
       const hd = highDemand?.get(iso);
       if (hd && occ >= 25) { mult *= 1.10; reasons.push(hd); }
+      // Benchmark di zona (Rete città): attivo SOLO con dati reali di zona; stessa logica di Revenue/Nèttare.
+      const z = zoneMultiplier(signal, occ / 100);
+      if (z.mult !== 1) { mult *= z.mult; reasons.push(...z.reasons); }
 
       // Guardrail: variazione massima vs base + pavimento/tetto
       let suggested = Math.round(base * mult);

@@ -43,6 +43,134 @@ export async function GET(req: Request) {
   if (whoErr || !caller?.email || !OWNER_EMAILS.includes(caller.email.toLowerCase()))
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
+  // ── Modalità DB (scalabile): paginazione/ricerca LATO SERVER, stato abbonamento letto da `profiles`
+  // (scritto dal webhook). Attiva SOLO se il chiamante passa uno di questi query params; altrimenti
+  // resta il comportamento storico più sotto (retro-compatibile: nulla si rompe).
+  const sp = new URL(req.url).searchParams;
+  const dbMode = ["page", "pageSize", "q", "status", "sort"].some((k) => sp.has(k));
+  if (dbMode) {
+    const page = Math.max(0, parseInt(sp.get("page") || "0", 10) || 0);
+    const pageSize = Math.min(100, Math.max(1, parseInt(sp.get("pageSize") || "25", 10) || 25));
+    // Sanifica il termine per il filtro PostgREST (.or/.ilike): via caratteri che romperebbero la sintassi.
+    const q = (sp.get("q") || "").trim().replace(/[,()%*\\]/g, " ").trim();
+    const status = (sp.get("status") || "all").toLowerCase();
+    const sort = (sp.get("sort") || "created").toLowerCase();
+
+    // Referrals + memberships (tabelle piccole): servono per invitati e ruoli org.
+    const { data: referrals } = await admin.from("referrals").select("*");
+    const invitedByInviter = new Map<string, number>();
+    const referredBy = new Map<string, string>();
+    (referrals || []).forEach((r) => {
+      invitedByInviter.set(r.inviter_id as string, (invitedByInviter.get(r.inviter_id as string) || 0) + 1);
+      referredBy.set(r.invited_id as string, r.code as string);
+    });
+
+    const { data: memberships } = await admin.from("memberships").select("org_id,user_id,role,active");
+    const orgMemberIds = new Map<string, string[]>();   // org_id → [user_id collaboratori]
+    const ownsOrgIds = new Map<string, string[]>();     // user_id → [org_id posseduti]
+    const memberOfOrgIds = new Map<string, string[]>(); // user_id → [org_id di cui è collaboratore]
+    (memberships || []).forEach((m) => {
+      if (m.active === false) return;
+      const oid = m.org_id as string, uid = m.user_id as string;
+      if (m.role === "owner") ownsOrgIds.set(uid, [...(ownsOrgIds.get(uid) || []), oid]);
+      else { orgMemberIds.set(oid, [...(orgMemberIds.get(oid) || []), uid]); memberOfOrgIds.set(uid, [...(memberOfOrgIds.get(uid) || []), oid]); }
+    });
+
+    // Escludi i collaboratori PURI (member di un'org, non titolari e non paganti): appaiono annidati.
+    const candidateColl = Array.from(memberOfOrgIds.keys()).filter((uid) => !(ownsOrgIds.get(uid) || []).length);
+    let excludeIds: string[] = [];
+    if (candidateColl.length) {
+      const { data: cand } = await admin.from("profiles").select("user_id,stripe_customer_id,subscription_status").in("user_id", candidateColl);
+      const payerSet = new Set((cand || []).filter((p) => !!p.stripe_customer_id || ["active", "trialing", "past_due", "unpaid", "incomplete"].includes(((p.subscription_status as string) || "").toLowerCase())).map((p) => p.user_id as string));
+      excludeIds = candidateColl.filter((uid) => !payerSet.has(uid));
+    }
+
+    const rowFromProfile = (p: Record<string, unknown>): Row => {
+      const uid = p.user_id as string;
+      const cid = (p.stripe_customer_id as string) || null;
+      const st = (p.subscription_status as string) || null;
+      const mc = p.monthly_amount_cents as number | null | undefined;
+      return {
+        id: uid,
+        email: (p.email as string) ?? null,
+        name: (p.full_name as string) || "",
+        phone: (p.phone as string) || null,
+        createdAt: (p.created_at as string) ?? null,
+        lastSignIn: (p.last_active as string) ?? null,
+        lastActive: (p.last_active as string) ?? null,
+        emailConfirmed: true, // in modalità DB non interroghiamo auth.users per riga
+        plan: (p.plan as string) || null,
+        structures: (p.structures_count as number) ?? 0,
+        rooms: (p.rooms_count as number) ?? 0,
+        structureNames: (p.structure_names as string) || "",
+        stripeCustomerId: cid,
+        subStatus: st,
+        periodEnd: (p.current_period_end as string) ?? null,
+        cancelAtPeriodEnd: !!p.cancel_at_period_end,
+        monthlyAmount: typeof mc === "number" ? mc / 100 : null,
+        currency: (p.sub_currency as string) || null,
+        totalPaid: null,
+        amountDue: null,
+        invitedCount: invitedByInviter.get(uid) || 0,
+        referredByCode: referredBy.get(uid) || null,
+        ownsOrg: (ownsOrgIds.get(uid) || []).length > 0,
+        memberOfOrgIds: memberOfOrgIds.get(uid) || [],
+        isPayer: ["active", "trialing", "past_due", "unpaid", "incomplete"].includes((st || "").toLowerCase()) || (!!cid && !(memberOfOrgIds.get(uid) || []).length),
+      };
+    };
+
+    let query = admin.from("profiles").select("*", { count: "exact" });
+    if (q) query = query.or(`email.ilike.%${q}%,full_name.ilike.%${q}%,phone.ilike.%${q}%`);
+    if (status === "paganti") query = query.not("stripe_customer_id", "is", null);
+    else if (status === "none") query = query.is("stripe_customer_id", null);
+    else if (status === "trialing") query = query.eq("subscription_status", "trialing");
+    else if (status === "recupero") {
+      const now = new Date().toISOString();
+      const in7 = new Date(Date.now() + 7 * 86400000).toISOString();
+      query = query.or(`subscription_status.in.(past_due,unpaid,incomplete,incomplete_expired,canceled),cancel_at_period_end.eq.true,and(subscription_status.in.(active,trialing),current_period_end.gte.${now},current_period_end.lte.${in7})`);
+    }
+    if (excludeIds.length) query = query.not("user_id", "in", `(${excludeIds.join(",")})`);
+
+    const ordered =
+      sort === "periodend" ? query.order("current_period_end", { ascending: true, nullsFirst: false })
+      : sort === "monthly" ? query.order("monthly_amount_cents", { ascending: false, nullsFirst: false })
+      : sort === "name" ? query.order("full_name", { ascending: true, nullsFirst: false })
+      : query.order("created_at", { ascending: false });
+
+    const from = page * pageSize;
+    const { data: pageProfiles, count } = await ordered.range(from, from + pageSize - 1);
+
+    // Collaboratori annidati sotto i titolari di QUESTA pagina.
+    const owners = (pageProfiles || []) as Record<string, unknown>[];
+    const memberIdSet = new Set<string>();
+    for (const p of owners) for (const oid of (ownsOrgIds.get(p.user_id as string) || [])) for (const uid of (orgMemberIds.get(oid) || [])) if (uid !== (p.user_id as string)) memberIdSet.add(uid);
+    const memberProfById = new Map<string, Record<string, unknown>>();
+    if (memberIdSet.size) {
+      const { data: mp } = await admin.from("profiles").select("*").in("user_id", Array.from(memberIdSet));
+      (mp || []).forEach((p) => memberProfById.set(p.user_id as string, p as Record<string, unknown>));
+    }
+
+    const accounts: Account[] = owners.map((p) => {
+      const owner = rowFromProfile(p);
+      const memberIds = new Set<string>();
+      for (const oid of (ownsOrgIds.get(owner.id) || [])) for (const uid of (orgMemberIds.get(oid) || [])) if (uid !== owner.id) memberIds.add(uid);
+      const members = Array.from(memberIds).map((id) => { const m = memberProfById.get(id); return m ? rowFromProfile(m) : null; }).filter((x): x is Row => !!x);
+      return { owner, members };
+    });
+    const rows = accounts.map((a) => a.owner);
+
+    return NextResponse.json({
+      rows,
+      accounts,
+      total: count ?? 0,
+      page,
+      pageSize,
+      stripeConfigured: !!process.env.STRIPE_SECRET_KEY,
+      dbMode: true,
+      generatedAt: new Date().toISOString(),
+    });
+  }
+
   // 1) Utenti auth (paginati)
   type AuthUser = { id: string; email?: string; created_at?: string; last_sign_in_at?: string | null; email_confirmed_at?: string | null; user_metadata?: Record<string, unknown> };
   const users: AuthUser[] = [];

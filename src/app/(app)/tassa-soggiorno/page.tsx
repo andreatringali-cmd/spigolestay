@@ -6,6 +6,7 @@ import { nights } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { cityTaxForBooking } from "@/lib/citytax";
 
 const MONTHS = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -50,21 +51,8 @@ export default function TassaSoggiornoPage() {
   );
 
   const rows = inPeriod.map((b) => {
-    // Persone paganti: se ho le età dei bambini uso la soglia (es. under 14 esenti); altrimenti il toggle "minori esenti".
-    const payingKids = (b.childAges && b.childAges.length) ? b.childAges.filter((a) => a >= exemptAge).length : (childrenExempt ? 0 : b.children);
-    const persons = b.cityTaxExempt ? 0 : b.adults + payingKids;
-    const nN = nights(b.checkIn, b.checkOut);
-    const taxable = Math.min(nN, maxNights);
-    let tax: number;
-    if (taxMode === "percentuale") {
-      // Siracusa: (prezzo camera a notte ÷ n. ospiti) × 4%, con tetto € a persona/notte, × persone paganti × notti.
-      const guestsTot = Math.max(1, b.adults + b.children);
-      const nightlyRate = nN > 0 ? (b.total ?? 0) / nN : 0;
-      const perPersonTax = Math.min((nightlyRate / guestsTot) * (pct / 100), cap);
-      tax = Math.round(perPersonTax * persons * taxable * 100) / 100;
-    } else {
-      tax = persons * taxable * amount;
-    }
+    // Logica unica in @/lib/citytax (condivisa con "Elabora tutto" degli Adempimenti).
+    const { persons, taxable, tax } = cityTaxForBooking(b, { taxMode, amount, pct, cap, maxNights, childrenExempt, exemptAge });
     return { b, persons, taxable, tax };
   });
   const total = rows.reduce((a, r) => a + r.tax, 0);

@@ -5,21 +5,51 @@
 // click o lasci fare all'autopilot. Scrive gli override del calendario (motore unico).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/lib/store";
-import { toISO } from "@/lib/dates";
+import { useAuth } from "@/lib/authsync";
+import { supabase } from "@/lib/supabase";
+import { toISO, shiftISO, nights } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useToast } from "@/components/ToastProvider";
 import { italianHolidays, italianBridges } from "@/lib/holidays";
 import { computeSuggestions, loadAutopilot, saveAutopilot, toOverrideMap, highDemandMap, type AutopilotCfg, type Suggestion } from "@/lib/autopilot";
+import { fetchCityPulse, computeMarketSignal, MARKET_WINDOW, type MarketPulse } from "@/lib/market";
 
 const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
 
 export default function RevenueAutopilotPage() {
   const { bookings, roomTypes, units, events, rateOverrides, setDayRates, structures, activeStructureId, getStructure } = useData();
+  const { user } = useAuth();
   const toast = useToast();
   const todayISO = toISO(new Date());
   const [cfg, setCfg] = useState<AutopilotCfg>(loadAutopilot());
   const scope = activeStructureId;
+
+  // Struttura di riferimento per il benchmark di zona (attiva con città, altrimenti la prima con città).
+  const struct = useMemo(() => {
+    const active = structures.find((s) => s.id === scope && (s.city || "").trim());
+    return active || structures.find((s) => (s.city || "").trim()) || structures[0];
+  }, [structures, scope]);
+  const city = (struct?.city || "").trim();
+
+  // I MIEI dati reali (occupazione + ADR ultimi 90 gg) dalle prenotazioni nel blob.
+  const my = useMemo(() => {
+    const sRooms = units.filter((u) => u.structureId === struct?.id && !u.outOfService).length;
+    if (!struct || sRooms === 0) return { occ: 0, adr: 0 };
+    const mine = bookings.filter((b) => b.structureId === struct.id && b.status !== "cancelled" && b.channel !== "blocked");
+    let rt = 0, rs = 0, rev = 0;
+    for (let i = 0; i < MARKET_WINDOW; i++) {
+      const D = shiftISO(todayISO, -i);
+      const a = mine.filter((b) => b.checkIn <= D && b.checkOut > D);
+      rt += sRooms; rs += a.length; rev += a.reduce((s, b) => s + (b.total || 0) / Math.max(1, nights(b.checkIn, b.checkOut)), 0);
+    }
+    return { occ: rt ? rs / rt : 0, adr: rs ? rev / rs : 0 };
+  }, [struct, units, bookings, todayISO]);
+
+  // Benchmark di zona "Rete città" (onesto: usato solo se ci sono abbastanza strutture reali).
+  const [pulse, setPulse] = useState<MarketPulse | null>(null);
+  useEffect(() => { let off = false; (async () => { const p = await fetchCityPulse(supabase, city); if (!off) setPulse(p); })(); return () => { off = true; }; }, [user?.id, city]);
+  const signal = useMemo(() => computeMarketSignal(my.occ, my.adr, pulse), [my.occ, my.adr, pulse]);
 
   // Giorni ad alta richiesta (festivi/ponti/eventi) per prezzi consapevoli.
   const highDemand = useMemo(() => {
@@ -31,8 +61,8 @@ export default function RevenueAutopilotPage() {
   }, [events, scope, structures, cfg.horizonDays, todayISO]);
 
   const suggestions = useMemo(
-    () => computeSuggestions(bookings, roomTypes, units, rateOverrides, cfg, todayISO, scope, highDemand),
-    [bookings, roomTypes, units, rateOverrides, cfg, todayISO, scope, highDemand],
+    () => computeSuggestions(bookings, roomTypes, units, rateOverrides, cfg, todayISO, scope, highDemand, signal),
+    [bookings, roomTypes, units, rateOverrides, cfg, todayISO, scope, highDemand, signal],
   );
 
   const setCfgPersist = (patch: Partial<AutopilotCfg>) => { const next = { ...cfg, ...patch }; setCfg(next); saveAutopilot(next); };
@@ -60,6 +90,14 @@ export default function RevenueAutopilotPage() {
   return (
     <div>
       <PageHeader title="Revenue Autopilot" subtitle="Il pilota prezzi: suggerisce e applica tariffe ottimali giorno per giorno" />
+
+      {/* Fonti dati: onesto su cosa è reale ora e cosa arriva */}
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px]">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--ok) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--ok)" }} />Dati tuoi · occupazione reale dalle prenotazioni</span>
+        {signal.hasZoneData
+          ? <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--focus) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--focus)" }} />Media di zona attiva{city ? ` · ${city}` : ""}</span>
+          : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 font-medium text-faint">Media di zona (Rete città): in arrivo</span>}
+      </div>
 
       {/* Riepilogo + interruttore autopilot */}
       <div className="mb-4 grid gap-3 lg:grid-cols-4">

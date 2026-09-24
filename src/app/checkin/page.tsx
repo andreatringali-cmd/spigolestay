@@ -105,7 +105,7 @@ function Engine() {
     if (!img || extracting) return;
     setExtracting(true); setExtractMsg("");
     try {
-      const r = await fetch("/api/checkin/extract", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ image: img }) });
+      const r = await fetch("/api/ai/checkin-extract", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ image: img }) });
       const j = await r.json().catch(() => ({}));
       if (r.status === 503 && j?.error === "ai_not_configured") { setAiOff(true); setExtracting(false); return; }
       if (r.ok && j?.ok && j.fields) { apply(j.fields as Record<string, string>); setExtractMsg("Dati compilati dal documento — controllali prima di inviare."); }

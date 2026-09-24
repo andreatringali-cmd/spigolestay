@@ -140,6 +140,21 @@ export async function POST(req: Request) {
       } catch { /* avvisi best-effort: non bloccare mai il webhook */ }
     }
 
+    // Sincronizza lo stato abbonamento nella riga `profiles` del cliente (match su stripe_customer_id)
+    // così il back-office legge l'elenco dal DB senza interrogare Stripe per ogni utente.
+    // Best-effort: non deve MAI far fallire il webhook (né toccare la logica esistente sopra).
+    if (!event.account) {
+      try {
+        if (event.type === "customer.subscription.created"
+          || event.type === "customer.subscription.updated"
+          || event.type === "customer.subscription.deleted") {
+          await syncProfileFromSubscription(event.data.object as Stripe.Subscription, event.type === "customer.subscription.deleted");
+        } else if (event.type === "invoice.paid" || event.type === "invoice.payment_succeeded") {
+          await syncProfileFromInvoice(stripe, event.data.object as Stripe.Invoice);
+        }
+      } catch { /* sync profilo best-effort: non bloccare il webhook */ }
+    }
+
     return NextResponse.json({ ok: true, received: event.type });
   } catch (e) {
     // Non far ritentare all'infinito Stripe per errori nostri non critici: rispondi 200.
@@ -262,4 +277,53 @@ async function reconcileRefund(paymentIntent: string, account: string, isDispute
   const { data: users } = await admin.from("app_state").select("user_id").limit(5000);
   for (const u of arr(users)) { if (await patchInRow("app_state", "user_id", String((u as { user_id?: string }).user_id))) return; }
   void account;
+}
+
+// Aggiorna la riga `profiles` del cliente con lo stato dell'abbonamento (per il back-office scalabile:
+// l'elenco si legge dal DB, senza chiamare Stripe per ogni riga). Best-effort.
+async function syncProfileFromSubscription(sub: Stripe.Subscription, deleted: boolean) {
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!sbUrl || !service) return;
+  const custId = typeof sub.customer === "string" ? sub.customer : (sub.customer?.id || "");
+  if (!custId) return;
+
+  const item0 = sub.items?.data?.[0];
+  const price = item0?.price;
+  const amt = typeof price?.unit_amount === "number" ? price.unit_amount : null;
+  const interval = price?.recurring?.interval;
+  const monthlyCents = amt == null ? null : (interval === "year" ? Math.round(amt / 12) : amt);
+  const periodEndUnix = (item0 as unknown as { current_period_end?: number })?.current_period_end
+    ?? (sub as unknown as { current_period_end?: number })?.current_period_end
+    ?? null;
+  const planKey = sub.metadata?.plan
+    || (price?.metadata as Record<string, string> | undefined)?.plan
+    || null;
+
+  const patch: Record<string, unknown> = {
+    subscription_status: deleted ? "canceled" : sub.status,
+    current_period_end: periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null,
+    monthly_amount_cents: monthlyCents,
+    cancel_at_period_end: !!sub.cancel_at_period_end,
+    sub_currency: price?.currency ?? null,
+    sub_updated_at: new Date().toISOString(),
+  };
+  if (planKey) patch.plan = planKey; // se il piano non è ricavabile, lascia invariato
+
+  const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
+  await admin.from("profiles").update(patch).eq("stripe_customer_id", custId);
+}
+
+// invoice.paid / invoice.payment_succeeded: recupera la subscription (se presente) e riusa
+// syncProfileFromSubscription per riflettere il nuovo periodo/importo nella riga `profiles`.
+async function syncProfileFromInvoice(stripe: Stripe, inv: Stripe.Invoice) {
+  const a = inv as unknown as {
+    subscription?: string | { id?: string } | null;
+    parent?: { subscription_details?: { subscription?: string | { id?: string } | null } | null } | null;
+  };
+  const subRef = a.subscription ?? a.parent?.subscription_details?.subscription ?? null;
+  const subId = typeof subRef === "string" ? subRef : (subRef?.id ?? null);
+  if (!subId) return; // fattura non di abbonamento: niente da sincronizzare
+  const sub = await stripe.subscriptions.retrieve(subId);
+  await syncProfileFromSubscription(sub, false);
 }

@@ -7,6 +7,7 @@ import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { CHANNELS } from "@/lib/types";
 import { parseICS, importIcsEvents, toChannel, toISO, toNum, normName, type IcsEvent } from "@/lib/ics";
+import { buildTemplateCsv, bookingDedupeKey } from "@/lib/import/template";
 
 // ── Parsing CSV robusto (virgolette, delimitatore auto ; , o tab) ──
 function parseCSV(text: string): string[][] {
@@ -35,16 +36,18 @@ const FIELDS: { key: string; label: string; req?: boolean; kw: RegExp }[] = [
   { key: "room", label: "Camera / tipologia", kw: /camera|room|tipolog|unit|alloggio|appartamento|systemato/i },
   { key: "channel", label: "Canale", kw: /canale|channel|portale|source|origine|\bota\b|provenienza/i },
   { key: "adults", label: "Ospiti / adulti", kw: /adult|ospiti|pax|persone|guests?/i },
+  { key: "children", label: "Bambini", kw: /bambin|child|kids|minor/i },
   { key: "total", label: "Importo totale", kw: /totale|total|importo|amount|prezzo|price|revenue|incasso|ricavo/i },
   { key: "email", label: "Email", kw: /email|mail/i },
   { key: "phone", label: "Telefono", kw: /telefono|phone|tel\b|cell|mobile/i },
   { key: "bookedOn", label: "Data prenotazione", kw: /prenotat|booked|creat|created|data.?pren/i },
+  { key: "note", label: "Note", kw: /note|nota|remark|comment|richiest/i },
 ];
 
 export default function ImportaPage() {
   const router = useRouter();
   const { t } = useLang();
-  const { structures, roomTypes, units, bookings, activeStructureId, addGuest, addBooking, updateBooking, deleteBooking, addRoomType, addUnit } = useData();
+  const { structures, roomTypes, units, bookings, guests, activeStructureId, addGuest, addBooking, updateBooking, deleteBooking, addRoomType, addUnit } = useData();
   const [rows, setRows] = useState<string[][]>([]);
   const [mode, setMode] = useState<"csv" | "ics">("csv");
   const [events, setEvents] = useState<IcsEvent[]>([]);
@@ -57,6 +60,8 @@ export default function ImportaPage() {
   const [roomMap, setRoomMap] = useState<Record<string, string>>({}); // nome camera ICS -> id tipologia (o "__new__")
   const [done, setDone] = useState<number | null>(null);
   const [err, setErr] = useState("");
+  const [icsUrl, setIcsUrl] = useState("");
+  const [fetching, setFetching] = useState(false);
 
   const icsRooms = useMemo(() => { const set = new Set<string>(); events.forEach((e) => { if (e.room) set.add(e.room.trim()); }); return [...set]; }, [events]);
   // Auto-mappatura camere ICS → tipologie esistenti (riempie solo le mancanti, così non fa loop).
@@ -84,16 +89,18 @@ export default function ImportaPage() {
   const headers = rows[0] ?? [];
   const dataRows = useMemo(() => rows.slice(1).filter((r) => r.some((c) => (c || "").trim())), [rows]);
 
+  // Carica testo iCal (da file o da URL) → anteprima eventi.
+  const loadIcsText = (text: string, label: string) => {
+    const ev = parseICS(text);
+    setMode("ics"); setEvents(ev); setRows([]); setMap({}); setFileName(label);
+    if (!ev.length) setErr(t("Nessuna prenotazione trovata nel calendario iCal."));
+  };
+
   const onFile = async (f: File | undefined) => {
     if (!f) return;
     setErr(""); setDone(null); setFileName(f.name);
     const text = await f.text();
-    if (/BEGIN:VCALENDAR/i.test(text) || /\.ics$/i.test(f.name)) {
-      const ev = parseICS(text);
-      setMode("ics"); setEvents(ev); setRows([]); setMap({});
-      if (!ev.length) setErr(t("Nessuna prenotazione trovata nel file ICS."));
-      return;
-    }
+    if (/BEGIN:VCALENDAR/i.test(text) || /\.ics$/i.test(f.name)) { loadIcsText(text, f.name); return; }
     setMode("csv"); setEvents([]);
     const parsed = parseCSV(text);
     if (parsed.length < 2) { setErr(t("Il file sembra vuoto o non valido.")); setRows([]); return; }
@@ -101,6 +108,33 @@ export default function ImportaPage() {
     const auto: Record<string, number> = {};
     parsed[0].forEach((h, i) => { FIELDS.forEach((f2) => { if (auto[f2.key] === undefined && f2.kw.test(h)) auto[f2.key] = i; }); });
     setMap(auto);
+  };
+
+  // Scarica il template CSV da compilare (con colonne attese + 2 righe d'esempio).
+  const downloadTemplate = () => {
+    try {
+      const blob = new Blob([buildTemplateCsv()], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "xenora-template-prenotazioni.csv";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch { setErr(t("Impossibile generare il template.")); }
+  };
+
+  // Scarica un calendario da un URL .ics (via proxy /api/ical, che aggira il CORS).
+  const fetchIcalUrl = async () => {
+    const url = icsUrl.trim();
+    if (!/^https?:\/\//i.test(url)) { setErr(t("Inserisci un URL iCal valido (https://…).")); return; }
+    setErr(""); setDone(null); setFetching(true);
+    try {
+      const res = await fetch(`/api/ical?url=${encodeURIComponent(url)}`, { cache: "no-store" });
+      if (!res.ok) { const msg = await res.text().catch(() => ""); setErr(msg || `${t("Download fallito")} (HTTP ${res.status})`); return; }
+      const text = await res.text();
+      loadIcsText(text, url);
+    } catch {
+      setErr(t("Impossibile scaricare il calendario (verifica l'URL)."));
+    } finally { setFetching(false); }
   };
 
   const runImportICS = () => {
@@ -129,26 +163,39 @@ export default function ImportaPage() {
     let rtFallback = sRooms[0]?.id ?? "";
     if (!rtFallback) rtFallback = addRoomType({ structureId, name: t("Camere importate"), beds: 2, basePrice: 0 });
 
-    let n = 0, skipped = 0;
+    // Anti-duplicato: chiavi (struttura+ospite+date) delle prenotazioni GIÀ presenti,
+    // più quelle create in questa stessa passata (evita doppioni anche interni al file).
+    const guestNameOf = (id: string) => guests.find((g) => g.id === id)?.fullName ?? "";
+    const seen = new Set(bookings.filter((b) => b.structureId === structureId).map((b) => bookingDedupeKey(b.structureId, guestNameOf(b.guestId), b.checkIn, b.checkOut)));
+
+    let n = 0, skipped = 0, dup = 0;
     dataRows.forEach((r) => {
       const ci = toISO(val(r, "checkIn")), co = toISO(val(r, "checkOut")), name = val(r, "guest");
-      if (!ci || !co || !name) { skipped++; return; }
+      if (!ci || !co || !name || ci >= co) { skipped++; return; } // campi obbligatori mancanti o date incoerenti
+      const key = bookingDedupeKey(structureId, name, ci, co);
+      if (seen.has(key)) { dup++; return; } // già presente / doppione nel file
+      seen.add(key);
       const guestId = addGuest({ fullName: name, email: val(r, "email") || undefined, phone: val(r, "phone") || undefined });
       const roomTxt = val(r, "room");
       const roomTypeId = (roomTxt && findRoom(roomTxt)) || rtFallback;
       const bookedOn = toISO(val(r, "bookedOn"));
+      const noteTxt = val(r, "note");
       addBooking({
         structureId, roomTypeId, unitId: null, guestId,
         channel: toChannel(val(r, "channel")), status: "confirmed",
         checkIn: ci, checkOut: co, ...(bookedOn ? { bookedOn } : {}),
-        adults: Math.max(1, Math.round(toNum(val(r, "adults")) ?? 2)), children: 0,
+        adults: Math.max(1, Math.round(toNum(val(r, "adults")) ?? 2)),
+        children: Math.max(0, Math.round(toNum(val(r, "children")) ?? 0)),
         ...(toNum(val(r, "total")) !== undefined ? { total: toNum(val(r, "total")) } : {}),
-        note: t("Importato da CSV"),
+        note: (t("Importato da CSV") + (noteTxt ? " · " + noteTxt : "")).slice(0, 280),
       });
       n++;
     });
     setDone(n);
-    if (skipped) setErr(`${skipped} ${t("righe saltate (date o nome mancanti).")}`);
+    const msgs: string[] = [];
+    if (skipped) msgs.push(`${skipped} ${t("righe saltate (date o nome mancanti).")}`);
+    if (dup) msgs.push(`${dup} ${t("doppioni ignorati (già presenti).")}`);
+    setErr(msgs.join(" "));
   };
 
   const sel = "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus";
@@ -175,6 +222,13 @@ export default function ImportaPage() {
         <div className="flex flex-col gap-4">
           <Card>
             <SectionTitle>{t("1. Struttura e file")}</SectionTitle>
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line bg-wash/50 p-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-txt">{t("Non sai da dove partire?")}</div>
+                <div className="text-xs text-dim">{t("Scarica il modello CSV con le colonne giuste, compilalo con il tuo storico e ricaricalo qui.")}</div>
+              </div>
+              <button type="button" onClick={downloadTemplate} className="shrink-0 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Scarica il modello CSV")}</button>
+            </div>
             {structures.length === 0 ? (
               <p className="text-sm text-dim">{t("Prima crea una struttura e le camere, poi torna qui a importare.")}</p>
             ) : (
@@ -186,6 +240,13 @@ export default function ImportaPage() {
                 </label>
                 <label><span className="mb-1 block text-xs font-medium text-dim">{t("File CSV o ICS")}</span>
                   <input type="file" accept=".csv,.ics,text/csv,text/calendar,text/plain" onChange={(e) => onFile(e.target.files?.[0])} className="block w-full text-sm text-dim file:mr-3 file:rounded-lg file:border-0 file:bg-focus file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:opacity-90" />
+                </label>
+                <label className="sm:col-span-2"><span className="mb-1 block text-xs font-medium text-dim">{t("…oppure incolla un URL iCal (.ics)")}</span>
+                  <div className="flex gap-2">
+                    <input value={icsUrl} onChange={(e) => setIcsUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); fetchIcalUrl(); } }} placeholder="https://…/calendar.ics" className={sel} />
+                    <button type="button" onClick={fetchIcalUrl} disabled={fetching || !/^https?:\/\//i.test(icsUrl.trim())} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{fetching ? t("Scarico…") : t("Carica")}</button>
+                  </div>
+                  <span className="mt-1 block text-[11px] text-faint">{t("Utile per importare lo storico da un altro gestionale o da una OTA che espone un calendario iCal.")}</span>
                 </label>
                 <label className="sm:col-span-2"><span className="mb-1 block text-xs font-medium text-dim">{t("Assegna a")}</span>
                   <select value={targetUnit} onChange={(e) => setTargetUnit(e.target.value)} className={sel}>

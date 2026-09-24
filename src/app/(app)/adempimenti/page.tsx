@@ -10,6 +10,8 @@ import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 import { centsEur, apiPost } from "@/lib/invoicing/client";
 import { shortenLink } from "@/lib/guestlink";
+import { cityTaxTotal, DEFAULT_CITY_TAX_RULES } from "@/lib/citytax";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Booking, Guest, Structure } from "@/lib/types";
 
 // Data locale (NON UTC): altrimenti vicino a mezzanotte "oggi" sfasa di un giorno.
@@ -17,6 +19,13 @@ const today = () => { const t = new Date(); return `${t.getFullYear()}-${String(
 const soft = (tone: string, pct = 14) => `color-mix(in srgb, ${tone} ${pct}%, transparent)`;
 const fmtDay = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—");
 const omini = (n: number) => (n <= 5 ? "👤".repeat(Math.max(1, n)) : `👤 ${n}`); // ospiti come icone
+// Meta grafica per l'esito di ogni passo di "Elabora tutto".
+const STEP_META: Record<"fatto" | "prova" | "errore" | "niente", { icon: string; label: string; tone: string }> = {
+  fatto: { icon: "✓", label: "Fatto", tone: "var(--ok)" },
+  prova: { icon: "🧪", label: "In prova", tone: "var(--warn)" },
+  errore: { icon: "⚠", label: "Errore", tone: "var(--err)" },
+  niente: { icon: "–", label: "Niente da fare", tone: "var(--faint)" },
+};
 // Scadenza schedina Questura: entro 24h dall'arrivo (mostrata come giorno successivo all'arrivo).
 
 // Completezza del check-in PER PERSONA (usata da card e righe).
@@ -137,7 +146,7 @@ function ArrivalRow({ b, g, st, origin, waOn, showStruct, rooms, expected: expec
 
 export default function AdempimentiPage() {
   const router = useRouter();
-  const { bookings, getGuest, getStructure, activeStructureId } = useData();
+  const { bookings, structures, getGuest, getStructure, activeStructureId } = useData();
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const showStruct = activeStructureId === "all"; // se una struttura è già selezionata in alto, non ripeto il nome
   const bkNo = (b: Booking) => b.code || b.id.slice(0, 6).toUpperCase();       // numero prenotazione
@@ -200,6 +209,58 @@ export default function AdempimentiPage() {
       setIstatMsg(`✓ Movimenti ISTAT generati${typeof r?.count === "number" ? `: ${r.count}` : ""}.`);
     } catch (e) { setIstatMsg(e instanceof Error ? e.message : "Errore nella generazione."); }
     finally { setSyncingIstat(false); }
+  };
+
+  // ── "Elabora tutto" (adempimenti in un click) ────────────────────────────
+  // Orchestrazione: schedine Alloggiati + movimenti ISTAT via route server (che rispetta i gate
+  // ALLOGGIATI_LIVE/ISTAT_LIVE), tassa di soggiorno calcolata qui (dati già nello store).
+  type RunStep = { key: string; label: string; status: "fatto" | "prova" | "errore" | "niente"; detail: string; count: number };
+  type RunResult = { steps: RunStep[]; live: { alloggiati: boolean; istat: boolean } };
+  const [runBusy, setRunBusy] = useState(false);
+  const [runConfirm, setRunConfirm] = useState(false);
+  const [runSteps, setRunSteps] = useState<RunStep[] | null>(null);
+  const [prepared, setPrepared] = useState<RunResult | null>(null);
+
+  const scopeStructureIds = () => (activeStructureId === "all" ? structures.map((s) => s.id) : [activeStructureId]).filter(Boolean);
+
+  // Tassa di soggiorno del trimestre in corso (stima con regole Siracusa), riuso della logica condivisa.
+  const buildTaxStep = (): RunStep => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const startM = Math.floor(now.getMonth() / 3) * 3;
+    const p2 = (n: number) => String(n).padStart(2, "0");
+    const start = `${y}-${p2(startM + 1)}-01`;
+    const end = startM + 3 >= 12 ? `${y + 1}-01-01` : `${y}-${p2(startM + 4)}-01`;
+    const inScope = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId) && b.checkIn >= start && b.checkIn < end);
+    const { total, count } = cityTaxTotal(inScope, DEFAULT_CITY_TAX_RULES);
+    return {
+      key: "tassa", label: "Tassa di soggiorno", status: count > 0 ? "fatto" : "niente", count,
+      detail: count > 0 ? `Imposta stimata ${eur(total)} su ${count} ${count === 1 ? "soggiorno" : "soggiorni"} (trimestre in corso, regole Siracusa).` : "Nessun soggiorno da tassare nel periodo.",
+    };
+  };
+
+  const runAll = async (mode: "prepare" | "confirm"): Promise<RunResult> =>
+    apiPost<RunResult>("adempimenti/run", { mode, structureIds: scopeStructureIds() });
+
+  // Avvio: prepara (sincronizza senza inviare); se c'è un invio REALE da fare chiedo conferma,
+  // altrimenti (gate OFF / niente da inviare) mostro direttamente l'esito in prova.
+  const startElabora = async () => {
+    setRunBusy(true); setRunSteps(null);
+    try {
+      const r = await runAll("prepare");
+      const cnt = (k: string) => r.steps.find((s) => s.key === k)?.count ?? 0;
+      const willSendReal = (r.live.alloggiati && cnt("schedine") > 0) || (r.live.istat && cnt("istat") > 0);
+      if (willSendReal) { setPrepared(r); setRunConfirm(true); }
+      else { setRunSteps([...r.steps, buildTaxStep()]); await loadData(); }
+    } catch (e) {
+      setRunSteps([{ key: "errore", label: "Elaborazione", status: "errore", count: 0, detail: e instanceof Error ? e.message : "Errore durante l'elaborazione." }]);
+    } finally { setRunBusy(false); }
+  };
+  const confirmElabora = async () => {
+    setRunBusy(true);
+    try { const r = await runAll("confirm"); setRunSteps([...r.steps, buildTaxStep()]); await loadData(); }
+    catch (e) { setRunSteps([{ key: "errore", label: "Elaborazione", status: "errore", count: 0, detail: e instanceof Error ? e.message : "Errore durante l'invio." }]); }
+    finally { setRunBusy(false); setRunConfirm(false); }
   };
 
   const t = today();
@@ -351,7 +412,55 @@ export default function AdempimentiPage() {
             </div>
           </>
         )}
+        {/* Azione "in un click": elabora TUTTI gli adempimenti PA dovuti (schedine, ISTAT, tassa) in sequenza. */}
+        <button onClick={startElabora} disabled={runBusy} className="ml-auto inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60" style={{ background: "linear-gradient(135deg, var(--focus), color-mix(in srgb, var(--focus) 70%, #7c3aed))" }} title="Elabora in sequenza schedine Alloggiati, movimenti ISTAT e tassa di soggiorno">
+          <span aria-hidden>⚡</span>{runBusy ? "Elaboro…" : "Elabora tutto"}
+        </button>
       </section>
+
+      {/* Riepilogo passo-passo dell'ultima elaborazione "in un click". */}
+      {runSteps && (
+        <section className="mb-5 rounded-2xl border border-line bg-surface p-4 shadow-sm">
+          <div className="mb-2.5 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-txt">Esito «Elabora tutto»</h2>
+            <button onClick={() => setRunSteps(null)} className="grid h-7 w-7 place-items-center rounded-lg border border-line text-dim hover:bg-wash" aria-label="Chiudi riepilogo">✕</button>
+          </div>
+          <ul className="space-y-1.5">
+            {runSteps.map((s) => {
+              const m = STEP_META[s.status];
+              return (
+                <li key={s.key} className="flex items-start gap-2.5 rounded-lg border border-line bg-paper px-3 py-2">
+                  <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md text-[13px] font-bold" style={{ background: soft(m.tone), color: m.tone }}>{m.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-semibold text-txt">{s.label}</span>
+                      <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase" style={{ background: soft(m.tone), color: m.tone }}>{m.label}</span>
+                    </div>
+                    <div className="mt-0.5 text-[12px] text-dim">{s.detail}</div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {runConfirm && prepared && (() => {
+        const cnt = (k: string) => prepared.steps.find((s) => s.key === k)?.count ?? 0;
+        const sched = prepared.live.alloggiati ? cnt("schedine") : 0;
+        const istatN = prepared.live.istat ? cnt("istat") : 0;
+        return (
+          <ConfirmDialog
+            title="Elabora tutto — invio agli enti"
+            message={<>Stai per inviare in un colpo solo: {sched > 0 && <><b className="text-txt">{sched}</b> {sched === 1 ? "schedina" : "schedine"} alla Questura</>}{sched > 0 && istatN > 0 && " e "}{istatN > 0 && <><b className="text-txt">{istatN}</b> {istatN === 1 ? "movimento" : "movimenti"} ISTAT</>}. La tassa di soggiorno verrà solo calcolata.</>}
+            warning={<>L&apos;invio agli enti è <b>definitivo</b> e non può essere annullato. Le voci non pronte o con enti non attivi restano in prova.</>}
+            confirmLabel="Invia tutto"
+            busy={runBusy}
+            onConfirm={confirmElabora}
+            onClose={() => { setRunConfirm(false); setPrepared(null); }}
+          />
+        );
+      })()}
 
       {/* Ordine CRONOLOGICO: 1) check-in → 2) schedine Questura → 3) ISTAT → 4) incasso → 5) fattura/SdI → 6) fornitori */}
       {allClear ? (

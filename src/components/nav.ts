@@ -72,6 +72,7 @@ export const NAV: NavItem[] = [
   { label: "Guida ospiti", href: "/guida-ospiti", group: "Booking Engine", icon: "share", perm: "webconcierge", module: "guide" },
   { label: "Impostazioni fattura", href: "/impostazioni-fattura", group: "Configurazione", icon: "receipt", perm: "webconcierge", module: "concierge" },
   { label: "Registro attività", href: "/registro", group: "Configurazione", icon: "clipboard", perm: "impostazioni", module: "pms" },
+  { label: "Importa dati", href: "/importa", group: "Configurazione", icon: "box", perm: "impostazioni", module: "pms" },
   { label: "Impostazioni", href: "/impostazioni", group: "Configurazione", icon: "settings", perm: "impostazioni", module: "pms" },
 
   { label: "Abbonamento", href: "/abbonamento", group: "Il mio abbonamento", icon: "card", perm: "abbonamento", module: "pms" },
