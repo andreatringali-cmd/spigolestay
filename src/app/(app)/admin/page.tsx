@@ -5,7 +5,7 @@
 // a tendina. In più: vista "tutti i registrati", contatti rapidi, filtri scadenze, export CSV.
 // I dati arrivano da /api/admin/overview e /api/admin/payments (service_role lato server).
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { PageHeader, Card, StatCard } from "@/components/ui";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
@@ -17,6 +17,7 @@ interface Row {
   emailConfirmed: boolean; plan: string | null; structures: number; rooms: number; structureNames: string;
   stripeCustomerId: string | null; subStatus: string | null; periodEnd: string | null;
   cancelAtPeriodEnd: boolean; monthlyAmount: number | null; currency: string | null;
+  totalPaid: number | null; amountDue: number | null;
   invitedCount: number; referredByCode: string | null;
   ownsOrg: boolean; memberOfOrgIds: string[]; isPayer: boolean;
 }
@@ -204,82 +205,102 @@ export default function AdminPage() {
       ) : err ? (
         <Card><div className="py-10 text-center text-sm text-dim">Impossibile caricare i dati ({err}). <button onClick={load} className="underline">Riprova</button></div></Card>
       ) : view === "accounts" ? (
-        <div className="space-y-2.5">
-          {filteredAccounts.length === 0 ? <Card><div className="py-10 text-center text-sm text-faint">Nessun account trovato.</div></Card> : filteredAccounts.map((acc) => {
-            const r = acc.owner; const al = alertsFor(r); const open = !!expanded[r.id];
-            const p = r.stripeCustomerId ? pay[r.stripeCustomerId] : undefined;
-            return (
-              <Card key={r.id} className="!p-0 overflow-hidden">
-                <button onClick={() => toggle(acc)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-wash/40">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: r.isPayer ? "var(--ok)" : "var(--faint)" }}>{(r.name || r.email || "?").slice(0, 2).toUpperCase()}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate font-semibold text-txt">{r.name || r.email || "—"}</span>
-                      <PlanBadge plan={r.plan} />
-                      {acc.members.length > 0 && <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">👥 {acc.members.length} collaboratori</span>}
-                    </div>
-                    <div className="truncate text-[12px] text-dim">{r.email}{r.phone ? ` · ${r.phone}` : ""} · {r.structures} strutt. · {r.rooms} camere</div>
-                  </div>
-                  <div className="hidden shrink-0 text-right sm:block">
-                    <div className="text-sm font-semibold text-txt" style={{ fontVariantNumeric: "tabular-nums" }}>{r.monthlyAmount != null ? `${eur(r.monthlyAmount, r.currency || "EUR")}/mese` : (r.isPayer ? "—" : "no abb.")}</div>
-                    <div className="text-[11px] text-dim">{r.subStatus ? `${r.subStatus} · rinnovo ${dmy(r.periodEnd)}` : "nessun abbonamento"}</div>
-                  </div>
-                  <span className="ml-1 shrink-0 text-dim transition-transform" style={{ transform: open ? "rotate(90deg)" : "none" }}>›</span>
-                </button>
-
-                <div className="flex flex-wrap items-center gap-1.5 px-4 pb-2">
-                  {al.map((a, i) => <span key={i} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={toneStyle(a.tone)}>{a.label}</span>)}
-                  <div className="ml-auto"><ContactBtns r={r} /></div>
-                </div>
-
-                {open && (
-                  <div className="border-t border-line bg-wash/30 px-4 py-3">
-                    {acc.members.length > 0 && (
-                      <div className="mb-3">
-                        <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Collaboratori (nel piano del titolare)</div>
-                        <div className="space-y-1.5">
-                          {acc.members.map((m) => (
-                            <div key={m.id} className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2">
-                              <span className="min-w-0 flex-1"><span className="font-medium text-txt">{m.name || m.email}</span> <span className="text-[12px] text-dim">{m.email}{m.phone ? ` · ${m.phone}` : ""}</span></span>
-                              <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">collaboratore</span>
-                              <ContactBtns r={m} />
+        <Card className="overflow-x-auto p-0">
+          {filteredAccounts.length === 0 ? <div className="py-10 text-center text-sm text-faint">Nessun account trovato.</div> : (
+            <table className="w-full min-w-[1080px] text-sm">
+              <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+                <th className="px-3 py-2 font-semibold">Titolare / collaboratore</th>
+                <th className="px-3 py-2 font-semibold">Piano</th>
+                <th className="px-3 py-2 font-semibold">Ruolo</th>
+                <th className="px-3 py-2 font-semibold">Pagamento</th>
+                <th className="px-3 py-2 font-semibold">Scadenza</th>
+                <th className="px-3 py-2 font-semibold text-right">Canone</th>
+                <th className="px-3 py-2 font-semibold text-right">Dovuto</th>
+                <th className="px-3 py-2 font-semibold text-right">Pagato finora</th>
+                <th className="px-3 py-2 font-semibold">Azioni</th>
+              </tr></thead>
+              <tbody>
+                {filteredAccounts.map((acc) => {
+                  const r = acc.owner; const al = alertsFor(r); const open = !!expanded[r.id];
+                  const p = r.stripeCustomerId ? pay[r.stripeCustomerId] : undefined;
+                  const topAlert = al.find((a) => a.tone === "red") || al.find((a) => a.tone === "amber");
+                  return (
+                    <Fragment key={r.id}>
+                      <tr className="cursor-pointer border-b border-line/60 hover:bg-wash/40" onClick={() => toggle(acc)}>
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="shrink-0 text-dim transition-transform" style={{ transform: open ? "rotate(90deg)" : "none" }}>›</span>
+                            <div className="min-w-0">
+                              <div className="truncate font-semibold text-txt">{r.name || r.email || "—"}{acc.members.length > 0 && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-medium text-dim">👥 {acc.members.length}</span>}</div>
+                              <div className="truncate text-[12px] text-dim">{r.email}{r.phone ? ` · ${r.phone}` : ""}</div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5"><PlanBadge plan={r.plan} /></td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-[12px] text-dim">{r.ownsOrg ? "Titolare" : r.isPayer ? "Pagante" : "—"}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">
+                          {r.subStatus ? <span className="text-dim">{r.subStatus}</span> : <span className="text-faint">—</span>}
+                          {topAlert && <span className="ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium" style={toneStyle(topAlert.tone)}>{topAlert.label}</span>}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{dmy(r.periodEnd)}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-right text-txt" style={{ fontVariantNumeric: "tabular-nums" }}>{r.monthlyAmount != null ? `${eur(r.monthlyAmount, r.currency || "EUR")}` : "—"}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-right" style={{ fontVariantNumeric: "tabular-nums" }}>{r.amountDue != null && r.amountDue > 0 ? <span className="font-semibold" style={{ color: "var(--bad,#dc2626)" }}>{eur(r.amountDue, r.currency || "EUR")}</span> : <span className="text-faint">—</span>}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-right font-semibold text-txt" style={{ fontVariantNumeric: "tabular-nums" }}>{r.totalPaid != null ? eur(r.totalPaid, r.currency || "EUR") : "—"}</td>
+                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}><ContactBtns r={r} /></td>
+                      </tr>
 
-                    <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Storico pagamenti / fatture</div>
-                    {!r.stripeCustomerId ? (
-                      <div className="text-[12px] text-faint">Nessun cliente Stripe collegato (account non pagante).</div>
-                    ) : p?.loading ? (
-                      <div className="text-[12px] text-faint">Carico lo storico…</div>
-                    ) : p?.invoices?.length ? (
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[520px] text-sm">
-                          <thead><tr className="text-left text-[11px] uppercase tracking-wide text-faint"><th className="py-1 pr-3 font-semibold">Data</th><th className="py-1 pr-3 font-semibold">Descrizione</th><th className="py-1 pr-3 font-semibold">Importo</th><th className="py-1 pr-3 font-semibold">Stato</th><th className="py-1 font-semibold">Fattura</th></tr></thead>
-                          <tbody>
-                            {p.invoices.map((inv) => (
-                              <tr key={inv.id} className="border-t border-line/60">
-                                <td className="py-1.5 pr-3 whitespace-nowrap text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{dmy(inv.date)}</td>
-                                <td className="py-1.5 pr-3 text-dim">{inv.description || inv.number || "Abbonamento"}</td>
-                                <td className="py-1.5 pr-3 whitespace-nowrap font-semibold text-txt" style={{ fontVariantNumeric: "tabular-nums" }}>{eur(inv.amount, inv.currency)}</td>
-                                <td className="py-1.5 pr-3 whitespace-nowrap"><span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={inv.paid ? { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } : { backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{inv.paid ? "pagata" : (inv.status || "—")}</span></td>
-                                <td className="py-1.5 whitespace-nowrap">{inv.pdf ? <a href={inv.pdf} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">PDF</a> : inv.hostedUrl ? <a href={inv.hostedUrl} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">Apri</a> : "—"}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="text-[12px] text-faint">{p?.error ? `Errore: ${p.error}` : "Nessun pagamento registrato."}</div>
-                    )}
-                  </div>
-                )}
-              </Card>
-            );
-          })}
-        </div>
+                      {acc.members.map((m) => (
+                        <tr key={m.id} className="border-b border-line/40 bg-surface/40">
+                          <td className="px-3 py-2 pl-9"><span className="text-dim">↳ </span><span className="font-medium text-txt">{m.name || m.email}</span> <span className="text-[12px] text-dim">{m.email}{m.phone ? ` · ${m.phone}` : ""}</span></td>
+                          <td className="px-3 py-2"><span className="text-[11px] text-faint">nel piano</span></td>
+                          <td className="px-3 py-2 whitespace-nowrap text-[12px] text-dim">Collaboratore</td>
+                          <td className="px-3 py-2 text-faint">—</td>
+                          <td className="px-3 py-2 text-faint">—</td>
+                          <td className="px-3 py-2 text-right text-faint">—</td>
+                          <td className="px-3 py-2 text-right text-faint">—</td>
+                          <td className="px-3 py-2 text-right text-faint">—</td>
+                          <td className="px-3 py-2"><ContactBtns r={m} /></td>
+                        </tr>
+                      ))}
+
+                      {open && (
+                        <tr className="border-b border-line/60 bg-wash/30">
+                          <td colSpan={9} className="px-4 py-3">
+                            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Storico pagamenti / fatture{r.totalPaid != null ? ` · totale pagato ${eur(r.totalPaid, r.currency || "EUR")}` : ""}</div>
+                            {!r.stripeCustomerId ? (
+                              <div className="text-[12px] text-faint">Nessun cliente Stripe collegato (account non pagante).</div>
+                            ) : p?.loading ? (
+                              <div className="text-[12px] text-faint">Carico lo storico…</div>
+                            ) : p?.invoices?.length ? (
+                              <div className="overflow-x-auto">
+                                <table className="w-full min-w-[520px] text-sm">
+                                  <thead><tr className="text-left text-[11px] uppercase tracking-wide text-faint"><th className="py-1 pr-3 font-semibold">Data</th><th className="py-1 pr-3 font-semibold">Descrizione</th><th className="py-1 pr-3 font-semibold text-right">Importo</th><th className="py-1 pr-3 font-semibold">Stato</th><th className="py-1 font-semibold">Fattura</th></tr></thead>
+                                  <tbody>
+                                    {p.invoices.map((inv) => (
+                                      <tr key={inv.id} className="border-t border-line/60">
+                                        <td className="py-1.5 pr-3 whitespace-nowrap text-dim" style={{ fontVariantNumeric: "tabular-nums" }}>{dmy(inv.date)}</td>
+                                        <td className="py-1.5 pr-3 text-dim">{inv.description || inv.number || "Abbonamento"}</td>
+                                        <td className="py-1.5 pr-3 whitespace-nowrap text-right font-semibold text-txt" style={{ fontVariantNumeric: "tabular-nums" }}>{eur(inv.amount, inv.currency)}</td>
+                                        <td className="py-1.5 pr-3 whitespace-nowrap"><span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={inv.paid ? { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } : { backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{inv.paid ? "pagata" : (inv.status || "—")}</span></td>
+                                        <td className="py-1.5 whitespace-nowrap">{inv.pdf ? <a href={inv.pdf} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">PDF</a> : inv.hostedUrl ? <a href={inv.hostedUrl} target="_blank" rel="noreferrer" className="font-semibold text-focus hover:underline">Apri</a> : "—"}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="text-[12px] text-faint">{p?.error ? `Errore: ${p.error}` : "Nessun pagamento registrato."}</div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </Card>
       ) : (
         <Card className="overflow-x-auto p-0">
           {(rows || []).length === 0 ? <div className="py-10 text-center text-sm text-faint">Nessun utente.</div> : (

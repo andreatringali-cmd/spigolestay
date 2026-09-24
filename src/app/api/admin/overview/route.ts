@@ -19,6 +19,7 @@ interface Row {
   emailConfirmed: boolean; plan: string | null; structures: number; rooms: number; structureNames: string;
   stripeCustomerId: string | null; subStatus: string | null; periodEnd: string | null;
   cancelAtPeriodEnd: boolean; monthlyAmount: number | null; currency: string | null;
+  totalPaid: number | null; amountDue: number | null;
   invitedCount: number; referredByCode: string | null;
   // Ruolo nell'organizzazione: chi PAGA (owner/solo con abbonamento) vs collaboratori (member).
   ownsOrg: boolean; memberOfOrgIds: string[]; isPayer: boolean;
@@ -83,7 +84,7 @@ export async function GET(req: Request) {
   // 4) Stripe (best-effort): stato abbonamento + prossimo rinnovo per cliente
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const stripe = stripeKey ? new Stripe(stripeKey) : null;
-  type SInfo = { status: string | null; periodEnd: string | null; cancel: boolean; monthly: number | null; currency: string | null };
+  type SInfo = { status: string | null; periodEnd: string | null; cancel: boolean; monthly: number | null; currency: string | null; totalPaid: number | null; amountDue: number | null };
   const stripeInfo = new Map<string, SInfo>();
   if (stripe) {
     const custIds = Array.from(new Set((profiles || []).map((p) => p.stripe_customer_id).filter(Boolean))) as string[];
@@ -91,12 +92,21 @@ export async function GET(req: Request) {
       try {
         const subs = await stripe.subscriptions.list({ customer: cid, status: "all", limit: 1 });
         const s = subs.data[0];
-        if (!s) { stripeInfo.set(cid, { status: null, periodEnd: null, cancel: false, monthly: null, currency: null }); continue; }
+        // Storico fatture del cliente: pagato finora (somma pagate) e dovuto (somma non pagate).
+        let totalPaid = 0, amountDue = 0, invCur: string | null = null;
+        try {
+          const invs = await stripe.invoices.list({ customer: cid, limit: 100 });
+          for (const i of invs.data) {
+            invCur = invCur || (i.currency ? i.currency.toUpperCase() : null);
+            totalPaid += (i.amount_paid ?? 0) / 100;
+            if (i.status === "open" || i.status === "uncollectible") amountDue += (i.amount_remaining ?? i.amount_due ?? 0) / 100;
+          }
+        } catch { /* niente fatture */ }
+        if (!s) { stripeInfo.set(cid, { status: null, periodEnd: null, cancel: false, monthly: null, currency: invCur, totalPaid, amountDue }); continue; }
         const item = s.items.data[0];
         const amt = item?.price?.unit_amount ?? null;
         const interval = item?.price?.recurring?.interval;
         const monthly = amt == null ? null : (interval === "year" ? Math.round(amt / 12) : amt) / 100;
-        // In API recenti il periodo è a livello di item; fallback su eventuale campo legacy della subscription.
         const periodEndUnix = (item as unknown as { current_period_end?: number })?.current_period_end
           ?? (s as unknown as { current_period_end?: number })?.current_period_end
           ?? null;
@@ -105,7 +115,9 @@ export async function GET(req: Request) {
           periodEnd: periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null,
           cancel: !!s.cancel_at_period_end,
           monthly,
-          currency: item?.price?.currency ?? null,
+          currency: item?.price?.currency ?? invCur,
+          totalPaid,
+          amountDue,
         });
       } catch { /* salta questo cliente */ }
     }
@@ -134,6 +146,8 @@ export async function GET(req: Request) {
       cancelAtPeriodEnd: si?.cancel ?? false,
       monthlyAmount: si?.monthly ?? null,
       currency: si?.currency ?? null,
+      totalPaid: si?.totalPaid ?? null,
+      amountDue: si?.amountDue ?? null,
       invitedCount: invitedByInviter.get(u.id) || 0,
       referredByCode: referredBy.get(u.id) || null,
       ownsOrg: (ownsOrgIds.get(u.id) || []).length > 0,
