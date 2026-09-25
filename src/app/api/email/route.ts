@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildVoucherPdf } from "@/lib/voucher-pdf";
+import { buildQuotePdf, type QuotePdfRoom, type QuotePdfExtra } from "@/lib/quote-pdf";
 
 export const runtime = "nodejs";
 
@@ -222,7 +223,13 @@ async function send(to: string, subject: string, html: string, replyTo?: string,
 
 export async function POST(req: Request) {
   if (!KEY) return NextResponse.json({ ok: false, error: "RESEND_API_KEY non configurata" }, { status: 500 });
-  let body: { kind?: string; booking?: BookingPayload; brand?: Brand; checkinUrl?: string; manageUrl?: string; guests?: CheckinGuest[]; arrival?: string; operatorEmail?: string; to?: string; subject?: string; text?: string; accent?: string; replyTo?: string; ctaUrl?: string; ctaLabel?: string; subscription?: SubReceiptPayload };
+  let body: {
+    kind?: string; booking?: BookingPayload; brand?: Brand; checkinUrl?: string; manageUrl?: string; guests?: CheckinGuest[]; arrival?: string; operatorEmail?: string;
+    to?: string; subject?: string; text?: string; accent?: string; replyTo?: string; ctaUrl?: string; ctaLabel?: string; subscription?: SubReceiptPayload;
+    // Dati strutturati del preventivo (kind: "quote"), usati per generare il PDF allegato.
+    guestName?: string; checkIn?: string; checkOut?: string; nights?: number; adults?: number; children?: number;
+    rooms?: QuotePdfRoom[]; total?: number; deposit?: number; ref?: string; extras?: QuotePdfExtra[];
+  };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "JSON non valido" }, { status: 400 }); }
   const b = body.booking || {};
   try {
@@ -281,7 +288,21 @@ export async function POST(req: Request) {
            <p style="margin:8px 0 0;font-size:12px;color:#9aa1ac;text-align:center;">Pagamento sicuro con Stripe · carta, PayPal, Klarna e altri metodi.</p>`
         : "";
       const html = shell(subject, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>${cta}`, brand);
-      const data = await send(body.to, subject, html, body.replyTo);
+      // Allega il preventivo in PDF (carta intestata). Se la generazione fallisce, invia comunque l'email.
+      let attachments: { filename: string; content: string }[] | undefined;
+      try {
+        const pdf = await buildQuotePdf({
+          ref: body.ref,
+          structureName: brand?.name, structureEmail: brand?.email, phone: brand?.phone, address: brand?.address,
+          guestName: body.guestName, guestEmail: body.to,
+          checkIn: body.checkIn, checkOut: body.checkOut, nights: body.nights, adults: body.adults, children: body.children,
+          rooms: body.rooms, total: body.total, deposit: body.deposit,
+          color: accent, logo: brand?.logo, website: brand?.website, cin: brand?.cin, vat: brand?.vat,
+          extras: body.extras,
+        });
+        attachments = [{ filename: `preventivo-${(body.ref || "preventivo").replace(/[^A-Za-z0-9_-]/g, "-")}.pdf`, content: Buffer.from(pdf).toString("base64") }];
+      } catch { attachments = undefined; }
+      const data = await send(body.to, subject, html, body.replyTo, attachments);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "sub_receipt") {

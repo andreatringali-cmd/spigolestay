@@ -57,6 +57,15 @@ export async function POST(req: Request) {
     const gn = (m.gn || "").trim();        // nome ospite
     const ge = (m.ge || "").trim();        // email ospite
     const ref = (m.ref || "").trim();      // codice preventivo "n/anno"
+    // Servizi extra scelti dall'ospite sulla pagina pubblica: formato compatto "Nome:12.5|Nome2:8"
+    // (evita di sprecare il limite di 480 caratteri per valore dei metadata Stripe con JSON verboso).
+    const extras: { name: string; price: number }[] = (m.ext || "").split("|").map((seg) => seg.trim()).filter(Boolean).map((seg) => {
+      const idx = seg.lastIndexOf(":");
+      if (idx < 0) return null;
+      const price = Number(seg.slice(idx + 1));
+      const name = seg.slice(0, idx).trim();
+      return name && Number.isFinite(price) ? { name, price } : null;
+    }).filter((x): x is { name: string; price: number } => !!x);
     if (!sid || !ci || !co) return NextResponse.json({ error: "missing_metadata" }, { status: 400 });
 
     const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -117,6 +126,7 @@ export async function POST(req: Request) {
       paid: amountPaid,
       depositPaid: amountPaid > 0,
       extId,
+      extras: extras.length ? extras : undefined,
       note: ref ? `Da preventivo n. ${ref} · pagato online` : "Pagato online",
     };
     bookings.push(booking);
