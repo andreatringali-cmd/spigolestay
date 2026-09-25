@@ -185,7 +185,7 @@ export default function PrenotazioniPage() {
       <td className="px-3 py-2.5 font-mono font-semibold text-txt">{b.total ? eur(grand(b)) : "—"}</td>
       <td className="px-3 py-2.5 font-mono text-dim">{commissionOf(b) ? <>{eur(commissionOf(b))} <span className="text-faint">({commissionPctOf(b)}%)</span></> : "—"}</td>
       <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{b.total ? eur(nettoOf(b)) : "—"}</td>
-      <td className="px-3 py-2.5"><div className="flex items-center gap-1.5"><StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--faint)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} /><StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} /></div></td>
+      <td className="px-3 py-2.5"><div className="flex items-center gap-1.5"><StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--err)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} /><StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} /></div></td>
     </>);
   };
 
@@ -386,7 +386,7 @@ export default function PrenotazioniPage() {
                 <span className="shrink-0 font-mono font-semibold text-txt">{b.total ? eur(b.total) : "—"}</span>
               </div>
               <div className="mt-2 flex items-center gap-1.5">
-                <StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--faint)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} />
+                <StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--err)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} />
                 <StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} />
                 {activeStructureId === "all" && <span className="ml-auto flex items-center gap-1 truncate text-[11px] text-faint"><span className="h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} />{getStructure(b.structureId)?.name}</span>}
               </div>
