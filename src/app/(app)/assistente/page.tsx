@@ -229,19 +229,27 @@ export default function AssistentePage() {
     const occ14 = Array.from({ length: 14 }, (_, i) => { const day = dayISO(i); const occ = active.filter((b) => b.checkIn <= day && day < b.checkOut && b.unitId).length; return totUnits > 0 ? Math.round((occ / totUnits) * 100) : 0; });
     const arrLast14 = Array.from({ length: 14 }, (_, i) => { const day = dayISO(i - 13); return active.filter((b) => b.checkIn === day).length; });
     const revLast6mo = Array.from({ length: 6 }, (_, i) => { const d = new Date(t + "T00:00:00"); d.setMonth(d.getMonth() - (5 - i)); const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; return Math.round(active.filter((b) => monthOf(b.checkIn) === m).reduce((a, b) => a + bookingGrandTotal(b, getStructure(b.structureId)), 0)); });
+    // Toni derivati SOLO dai 4 colori semantici del tema (focus/ok/warn/err) via color-mix:
+    // niente esadecimali fissi → la tavolozza resta coerente con QUALSIASI palette scelta
+    // dall'utente in Impostazioni (comprese quelle più audaci come Terminale o Vino & Oro).
+    const teal = "color-mix(in srgb, var(--focus) 60%, var(--ok) 40%)";
+    const violet = "color-mix(in srgb, var(--focus) 55%, var(--err) 45%)";
+    const lime = "color-mix(in srgb, var(--ok) 70%, var(--warn) 30%)";
+    const amber = "color-mix(in srgb, var(--warn) 60%, var(--err) 40%)";
+    const soft = "color-mix(in srgb, var(--focus) 45%, var(--txt) 55%)";
     return [
       { label: "Arrivi oggi", value: String(answers.arrivalsToday.length), tone: "var(--ok)", q: "arrivi oggi", spark: arrNext7 },
       { label: "Partenze oggi", value: String(answers.departuresToday.length), tone: "var(--warn)", q: "partenze", spark: depNext7 },
-      { label: "In casa ora", value: String(inHouse.length), tone: "#38bdf8", q: "chi è in casa", spark: inHouse7 },
+      { label: "In casa ora", value: String(inHouse.length), tone: teal, q: "chi è in casa", spark: inHouse7 },
       { label: "Check-in mancanti", value: String(answers.noCheckin.length), tone: "var(--focus)", q: "check-in mancanti" },
-      { label: "Camere da pulire", value: String(cleanUnits.size), tone: "#a78bfa", q: "pulizie" },
+      { label: "Camere da pulire", value: String(cleanUnits.size), tone: violet, q: "pulizie" },
       { label: "Occupazione oggi", value: `${occPct}%`, tone: occPct >= 80 ? "var(--ok)" : occPct >= 40 ? "var(--warn)" : "var(--err)", q: "occupazione", spark: occ14 },
-      { label: "Arrivi 7 giorni", value: String(weekArr), tone: "#2dd4bf", q: "prossimi arrivi", spark: arrNext7 },
-      { label: "Prossimo arrivo", value: nextLabel, tone: "#38bdf8", q: "prossimo arrivo" },
+      { label: "Arrivi 7 giorni", value: String(weekArr), tone: lime, q: "prossimi arrivi", spark: arrNext7 },
+      { label: "Prossimo arrivo", value: nextLabel, tone: soft, q: "prossimo arrivo" },
       { label: "Prenotazioni mese", value: String(monthArr.length), tone: "var(--focus)", q: "prenotazioni del mese", spark: arrLast14 },
       { label: "Da incassare", value: dueCents != null ? eur(dueCents / 100) : "—", tone: "var(--err)", q: "da incassare" },
       { label: "Prenotazioni non saldate", value: String(unpaid), tone: "var(--warn)", q: "da incassare" },
-      { label: "Tassa soggiorno da incassare", value: String(cityTaxDue), tone: "#f59e0b", q: "tassa di soggiorno" },
+      { label: "Tassa soggiorno da incassare", value: String(cityTaxDue), tone: amber, q: "tassa di soggiorno" },
       { label: "Incassato mese", value: answers.incassato.value ?? "—", tone: "var(--ok)", q: "incassato" },
       { label: "Ricavo previsto", value: answers.ricavo.value ?? "—", tone: "var(--focus)", q: "ricavo", spark: revLast6mo },
     ];
@@ -411,170 +419,150 @@ export default function AssistentePage() {
 
   const state = listening ? "listen" : speaking ? "speak" : "idle";
 
-  // ── Presentazione: interfaccia chat moderna e sobria, costruita SOLO sui token del tema Xenora
-  //    (var(--surface/paper/wash/line/txt/dim/faint/focus…) → chiaro e scuro automatici). Accento = --focus
-  //    per coerenza col resto dell'app. Niente palette hardcoded, niente HUD: pulito e leggibile ovunque.
-  const statusLabel = state === "listen" ? "In ascolto…" : state === "speak" ? "Sta rispondendo…" : "Online";
+  // ── Presentazione: "command deck" — non una chat, un centro di comando. Un orbe di presenza
+  //    al posto dell'avatar (respira in idle, "sonar" in ascolto, onda quando risponde), una
+  //    sola risposta a fuoco per volta (niente cronologia impilata: più semplice da leggere),
+  //    e i toni delle tessere derivati SOLO da --focus/--ok/--warn/--err → si adattano a
+  //    qualunque palette scelta in Impostazioni. Costruito solo sui token del tema: chiaro/scuro
+  //    automatici, nessun colore fuori dal sistema.
+  const statusLabel = state === "listen" ? "In ascolto…" : state === "speak" ? "Sta rispondendo…" : "Pronto";
   const statusTone = state === "listen" ? "var(--err)" : state === "speak" ? "var(--focus)" : "var(--ok)";
   const focusTint = (pct: number) => `color-mix(in srgb, var(--focus) ${pct}%, transparent)`;
 
-  // Briefing "vivo" del giorno a chip essenziali (stessi dati del testo vocale `briefing`).
-  const todayFacts: { k: string; v: string; tone: string }[] = [
-    { k: "Arrivi oggi", v: String(answers.arrivalsToday.length), tone: "var(--ok)" },
-    { k: "Partenze oggi", v: String(answers.departuresToday.length), tone: "var(--warn)" },
-  ];
-  if (answers.noCheckin.length) todayFacts.push({ k: "Check-in da fare", v: String(answers.noCheckin.length), tone: "var(--focus)" });
-  if (dueCents && dueCents > 0) todayFacts.push({ k: "Da incassare", v: eur(dueCents / 100), tone: "var(--err)" });
-
-  // Avatar leggero dell'assistente (coerente col tema): pallino sfumato sull'accento.
-  const avatar = (dim: string, icon = 16) => (
-    <span className={`grid ${dim} shrink-0 place-items-center rounded-full text-white shadow-sm`} style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }} aria-hidden>
-      <Icon name="chat" size={icon} />
-    </span>
+  // Orbe di presenza: idle respira piano, in ascolto emette un anello "sonar" (tinto err = registrazione),
+  // in risposta mostra un piccolo equalizzatore a barre. Un solo elemento visivo racconta lo stato.
+  const orb = (size: number, clickable = false) => (
+    <button
+      type="button"
+      onClick={clickable ? () => speak(briefing) : undefined}
+      title={clickable ? "Ascolta il briefing del giorno" : undefined}
+      className={`relative grid shrink-0 place-items-center rounded-full ${clickable ? "cursor-pointer" : "cursor-default"}`}
+      style={{ width: size, height: size }}
+      aria-hidden={!clickable}
+    >
+      {state === "listen" && <span className="xn-orb-ring absolute inset-0 rounded-full" style={{ boxShadow: `0 0 0 1.5px ${focusTint(0)}`, border: "1.5px solid var(--err)" }} />}
+      <span
+        className="xn-orb relative grid h-full w-full place-items-center rounded-full text-white shadow-sm"
+        style={{ background: `radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--focus) 55%, #fff) 0%, var(--focus) 62%, color-mix(in srgb, var(--focus) 82%, #000) 100%)` }}
+      >
+        {state === "speak" ? (
+          <span className="flex items-end gap-[3px]" style={{ height: size * 0.34 }}>
+            {[0, 1, 2].map((i) => <span key={i} className="xn-wave-bar w-[3px] rounded-full bg-white/90" style={{ height: "100%", animationDelay: `${i * 0.14}s` }} />)}
+          </span>
+        ) : (
+          <Icon name="sparkles" size={Math.round(size * 0.4)} />
+        )}
+      </span>
+    </button>
   );
 
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <section className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+      <style>{`
+        @keyframes xnOrbBreathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.045); } }
+        @keyframes xnOrbRing { 0% { transform: scale(0.85); opacity: .6; } 100% { transform: scale(1.7); opacity: 0; } }
+        @keyframes xnWave { 0%,100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
+        .xn-orb { animation: xnOrbBreathe 3.6s ease-in-out infinite; }
+        .xn-orb-ring { animation: xnOrbRing 1.4s cubic-bezier(.22,1,.36,1) infinite; }
+        .xn-wave-bar { animation: xnWave .85s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .xn-orb, .xn-orb-ring, .xn-wave-bar { animation: none !important; } }
+      `}</style>
 
-        {/* ─────────── HEADER del pannello ─────────── */}
-        <header className="flex items-center gap-3 border-b border-line px-4 py-3 sm:px-5">
-          <span className="relative">
-            {avatar("h-10 w-10", 18)}
-            {state !== "idle" && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 animate-pulse rounded-full border-2 border-surface" style={{ backgroundColor: statusTone }} />}
-          </span>
-          <div className="min-w-0">
-            <div className="truncate font-display text-[15px] font-bold leading-tight text-txt">Assistente Xenora</div>
-            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-dim">
-              <span className={`inline-block h-1.5 w-1.5 rounded-full ${state === "idle" ? "" : "animate-pulse"}`} style={{ backgroundColor: statusTone }} />
-              {statusLabel}
-            </div>
-          </div>
-          <div className="ml-auto flex items-center gap-1.5">
-            <button onClick={() => speak(briefing)} title="Ascolta il briefing del giorno" className="hidden items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-dim transition hover:bg-wash hover:text-txt sm:inline-flex"><Icon name="chat" size={14} /> Briefing</button>
-            <button onClick={toggleVoice} title={voiceOn ? "Voce attiva — tocca per spegnere" : "Voce spenta — tocca per attivare"} aria-pressed={voiceOn} className="grid h-9 w-9 place-items-center rounded-lg border text-base transition" style={voiceOn ? { borderColor: "transparent", background: focusTint(12) } : { borderColor: "var(--line)" }}>{voiceOn ? "🔊" : "🔇"}</button>
-          </div>
-        </header>
-
-        {/* ─────────── CONVERSAZIONE ─────────── */}
-        <div className="flex flex-col gap-4 px-4 py-5 sm:px-5">
-
-          {/* Bolla di benvenuto: briefing del giorno */}
-          <div className="flex items-start gap-2.5">
-            {avatar("h-8 w-8", 14)}
-            <div className="min-w-0 max-w-[85%]">
-              <div className="rounded-2xl rounded-tl-md border border-line bg-wash px-4 py-3">
-                <h1 className="font-display text-base font-bold leading-tight text-txt">{greet}{firstName ? ` ${firstName}` : ""}<span style={{ color: "var(--focus)" }}>.</span></h1>
-                <p className="mt-1.5 text-sm leading-relaxed text-txt">{briefing}</p>
-              </div>
-              {todayFacts.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {todayFacts.map((f) => (
-                    <span key={f.k} className="inline-flex items-baseline gap-1.5 rounded-full border border-line bg-paper px-2.5 py-1">
-                      <span className="font-mono text-xs font-bold tabular-nums" style={{ color: f.tone }}>{f.v}</span>
-                      <span className="text-[11px] font-medium text-dim">{f.k}</span>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Tessere dati reali (clic = domanda all'assistente) */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-            {tiles.map((it) => (
-              <button
-                key={it.label}
-                type="button"
-                onClick={() => { if (it.q) { setQ(it.q); ask(it.q); } }}
-                className="group flex flex-col items-start rounded-xl border border-line bg-paper px-3 py-2.5 text-left transition hover:-translate-y-px hover:border-focus hover:bg-wash"
-              >
-                <span className="font-mono text-[9px] font-semibold uppercase leading-none tracking-[0.12em] text-faint">{it.label}</span>
-                <span className="mt-1.5 font-mono text-lg font-bold leading-none tabular-nums" style={{ color: it.tone }}>{it.value}</span>
-                {it.spark && it.spark.length > 1 && (() => {
-                  const max = Math.max(1, ...it.spark!); const n = it.spark!.length; const w = n * 4;
-                  return (
-                    <svg viewBox={`0 0 ${w} 16`} preserveAspectRatio="none" className="mt-2 h-3 w-full opacity-70 transition-opacity group-hover:opacity-100" aria-hidden>
-                      {it.spark!.map((v, k) => { const h = Math.max(1.2, (v / max) * 14); return <rect key={k} x={k * 4} y={16 - h} width={2.4} height={h} rx={1.2} fill={it.tone} opacity={0.28 + 0.6 * (v / max)} />; })}
-                    </svg>
-                  );
-                })()}
-              </button>
-            ))}
-          </div>
-
-          {/* Bolla utente (eco della domanda) */}
-          {sent && (
-            <div className="anim-pop flex justify-end">
-              <div className="max-w-[85%] rounded-2xl rounded-tr-md px-4 py-2.5 text-white shadow-sm" style={{ backgroundColor: "var(--focus)" }}>
-                <p className="text-sm leading-relaxed">{sent}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Indicatore "sta scrivendo/rispondendo" */}
-          {state === "speak" && (
-            <div className="flex items-center gap-2.5">
-              {avatar("h-8 w-8", 14)}
-              <div className="inline-flex items-center gap-1 rounded-2xl rounded-tl-md border border-line bg-wash px-4 py-3">
-                {[0, 1, 2].map((i) => (
-                  <span key={i} className="h-1.5 w-1.5 animate-bounce rounded-full" style={{ backgroundColor: "var(--faint)", animationDelay: `${i * 0.15}s` }} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Bolla risposta dell'assistente */}
-          {ans && (
-            <div className="anim-pop flex items-start gap-2.5">
-              {avatar("h-8 w-8", 14)}
-              <div className="min-w-0 max-w-[92%] flex-1 rounded-2xl rounded-tl-md border border-line bg-wash px-4 py-3.5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-txt">{ans.title}</div>
-                    {ans.value && <div className="mt-1 font-mono text-3xl font-bold tabular-nums text-txt">{ans.value}</div>}
-                    {ans.detail && <p className="mt-1.5 text-sm leading-relaxed text-dim">{ans.detail}</p>}
-                  </div>
-                  <button onClick={() => speak(ans.speech ?? [ans.title, ans.value, ans.detail].filter(Boolean).join(". "))} title="Rileggi ad alta voce" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-dim transition hover:bg-paper hover:text-txt"><Icon name="chat" size={14} /></button>
-                </div>
-
-                {ans.list && ans.list.length > 0 && (
-                  <div className="mt-3 flex flex-col gap-1.5">
-                    <button onClick={() => readAllList(ans.list!)} className="mb-0.5 inline-flex items-center justify-center gap-1.5 self-start rounded-full px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 active:scale-95" style={{ backgroundColor: "var(--focus)" }}><Icon name="chat" size={13} /> Leggimi tutti</button>
-                    {ans.list.map((it) => (
-                      <button key={it.id} onClick={() => pickBooking(it.id)} className="group flex items-center justify-between gap-3 rounded-xl border border-line bg-paper px-3.5 py-2.5 text-left transition hover:border-focus hover:bg-surface">
-                        <span className="min-w-0"><span className="block truncate text-sm font-semibold text-txt">{it.label}</span>{it.sub && <span className="block truncate text-[11px] text-faint">{it.sub}</span>}</span>
-                        <span className="shrink-0 text-xs font-semibold text-focus transition-transform group-hover:translate-x-0.5">Dettagli →</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {ans.go && <button onClick={() => router.push(ans.go!.href)} className="mt-3 inline-flex rounded-full border border-line bg-paper px-3.5 py-1.5 text-xs font-semibold text-txt transition hover:border-focus hover:bg-surface">{ans.go.label} →</button>}
-              </div>
-            </div>
-          )}
+      {/* ─────────── Barra di stato, minimale ─────────── */}
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`inline-block h-1.5 w-1.5 rounded-full ${state === "idle" ? "" : "animate-pulse"}`} style={{ backgroundColor: statusTone }} />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">Assistente Xenora · {statusLabel}</span>
         </div>
+        <button onClick={toggleVoice} title={voiceOn ? "Voce attiva — tocca per spegnere" : "Voce spenta — tocca per attivare"} aria-pressed={voiceOn} className="grid h-8 w-8 place-items-center rounded-full border text-sm transition" style={voiceOn ? { borderColor: "transparent", background: focusTint(12) } : { borderColor: "var(--line)" }}>{voiceOn ? "🔊" : "🔇"}</button>
+      </div>
 
-        {/* ─────────── INPUT: chips + barra di richiesta ─────────── */}
-        <div className="border-t border-line bg-paper px-4 py-3 sm:px-5">
-          <div className="mb-2.5 flex flex-wrap gap-1.5">
-            {CHIPS.map((c) => (
-              <button key={c.q} onClick={() => { setQ(c.label); ask(c.q); }} className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-medium text-dim transition hover:border-focus hover:text-focus">{c.label}</button>
-            ))}
-          </div>
-          <form onSubmit={(e) => { e.preventDefault(); ask(q); }} className="flex items-center gap-2 rounded-2xl border bg-surface p-1.5 transition" style={{ borderColor: focused ? "var(--focus)" : "var(--line)", boxShadow: focused ? `0 0 0 3px ${focusTint(16)}` : "none" }}>
-            {micAvailable && (
-              <button type="button" onClick={toggleListening} title={listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare"} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl transition active:scale-95" style={listening ? { backgroundColor: "var(--err)", color: "#fff" } : { color: "var(--focus)", background: focusTint(12) }}><Mic size={18} /></button>
-            )}
-            <input value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} placeholder={listening ? "Sto ascoltando…" : "Chiedimi qualsiasi cosa…"} className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-txt outline-none placeholder:text-faint" />
-            <button type="submit" title="Invia" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }} disabled={!q.trim()}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><line x1="12" y1="19" x2="12" y2="5" /><polyline points="6 11 12 5 18 11" /></svg>
-            </button>
-          </form>
-          {(!micAvailable || micHint) && <p className="mt-2 text-xs font-medium" style={{ color: micHint ? "var(--err)" : "var(--faint)" }}>{micHint || "La voce in entrata si attiva aprendo Xenora in Chrome o Edge."}</p>}
+      {/* ─────────── Hero: orbe + saluto + briefing ─────────── */}
+      <div className="mb-7 flex items-start gap-4">
+        {orb(56, true)}
+        <div className="min-w-0 flex-1 pt-1">
+          <h1 className="font-display text-2xl font-bold leading-tight tracking-tight text-txt sm:text-[28px]">{greet}{firstName ? ` ${firstName}` : ""}<span style={{ color: "var(--focus)" }}>.</span></h1>
+          <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-dim">{briefing}</p>
         </div>
-      </section>
+      </div>
+
+      {/* ─────────── Barra di richiesta: il "centro comandi" ─────────── */}
+      <form onSubmit={(e) => { e.preventDefault(); ask(q); }} className="flex items-center gap-2 rounded-full border bg-surface p-1.5 pl-2 shadow-sm transition" style={{ borderColor: focused ? "var(--focus)" : "var(--line)", boxShadow: focused ? `0 0 0 3px ${focusTint(14)}` : undefined }}>
+        {micAvailable && (
+          <button type="button" onClick={toggleListening} title={listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare"} className="grid h-10 w-10 shrink-0 place-items-center rounded-full transition active:scale-95" style={listening ? { backgroundColor: "var(--err)", color: "#fff" } : { color: "var(--focus)", background: focusTint(12) }}><Mic size={18} /></button>
+        )}
+        <input value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} placeholder={listening ? "Sto ascoltando…" : "Chiedimi qualsiasi cosa…"} className="min-w-0 flex-1 bg-transparent px-2 py-2 text-[15px] text-txt outline-none placeholder:text-faint" />
+        <button type="submit" title="Invia" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }} disabled={!q.trim()}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><line x1="12" y1="19" x2="12" y2="5" /><polyline points="6 11 12 5 18 11" /></svg>
+        </button>
+      </form>
+      {(!micAvailable || micHint) && <p className="mt-2 px-1 text-xs font-medium" style={{ color: micHint ? "var(--err)" : "var(--faint)" }}>{micHint || "La voce in entrata si attiva aprendo Xenora in Chrome o Edge."}</p>}
+
+      {/* Domande rapide */}
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {CHIPS.map((c) => (
+          <button key={c.q} onClick={() => { setQ(c.label); ask(c.q); }} className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-dim transition hover:border-focus hover:text-focus">{c.label}</button>
+        ))}
+      </div>
+
+      {/* ─────────── Risposta a fuoco (una sola alla volta, niente cronologia) ─────────── */}
+      {ans && (
+        <div className="anim-pop relative mt-6 overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-sm">
+          <span className="absolute inset-y-0 left-0 w-[3px]" style={{ backgroundColor: "var(--focus)" }} aria-hidden />
+          {sent && <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">Hai chiesto · «{sent}»</div>}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-txt">{ans.title}</div>
+              {ans.value && <div className="mt-1 font-display text-4xl font-bold tabular-nums leading-none text-txt">{ans.value}</div>}
+              {ans.detail && <p className="mt-2 max-w-xl text-sm leading-relaxed text-dim">{ans.detail}</p>}
+            </div>
+            <button onClick={() => speak(ans.speech ?? [ans.title, ans.value, ans.detail].filter(Boolean).join(". "))} title="Rileggi ad alta voce" className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line text-dim transition hover:bg-wash hover:text-txt"><Icon name="chat" size={14} /></button>
+          </div>
+
+          {ans.list && ans.list.length > 0 && (
+            <div className="mt-4 flex flex-col gap-1.5">
+              <button onClick={() => readAllList(ans.list!)} className="mb-0.5 inline-flex items-center justify-center gap-1.5 self-start rounded-full px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 active:scale-95" style={{ backgroundColor: "var(--focus)" }}><Icon name="chat" size={13} /> Leggimi tutti</button>
+              {ans.list.map((it) => (
+                <button key={it.id} onClick={() => pickBooking(it.id)} className="group flex items-center justify-between gap-3 rounded-xl border border-line bg-paper px-3.5 py-2.5 text-left transition hover:border-focus hover:bg-wash">
+                  <span className="min-w-0"><span className="block truncate text-sm font-semibold text-txt">{it.label}</span>{it.sub && <span className="block truncate text-[11px] text-faint">{it.sub}</span>}</span>
+                  <span className="shrink-0 text-xs font-semibold text-focus transition-transform group-hover:translate-x-0.5">Dettagli →</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {ans.go && <button onClick={() => router.push(ans.go!.href)} className="mt-4 inline-flex rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-txt transition hover:border-focus hover:bg-wash">{ans.go.label} →</button>}
+        </div>
+      )}
+
+      {/* ─────────── Panoramica di oggi: tessere dati reali (clic = domanda) ─────────── */}
+      <div className="mb-2 mt-8 flex items-center gap-2">
+        <div className="h-px flex-1" style={{ backgroundColor: "var(--line)" }} />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-faint">Panoramica di oggi</span>
+        <div className="h-px flex-1" style={{ backgroundColor: "var(--line)" }} />
+      </div>
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+        {tiles.map((it) => (
+          <button
+            key={it.label}
+            type="button"
+            onClick={() => { if (it.q) { setQ(it.q); ask(it.q); } }}
+            className="group relative flex flex-col items-start overflow-hidden rounded-xl border border-line bg-surface px-3.5 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+          >
+            <span className="absolute inset-x-0 top-0 h-[2.5px] opacity-70 transition-opacity group-hover:opacity-100" style={{ backgroundColor: it.tone }} aria-hidden />
+            <span className="font-mono text-[9px] font-semibold uppercase leading-none tracking-[0.12em] text-faint">{it.label}</span>
+            <span className="mt-1.5 font-display text-xl font-bold leading-none tabular-nums" style={{ color: it.tone }}>{it.value}</span>
+            {it.spark && it.spark.length > 1 && (() => {
+              const max = Math.max(1, ...it.spark!); const n = it.spark!.length; const w = n * 4;
+              return (
+                <svg viewBox={`0 0 ${w} 16`} preserveAspectRatio="none" className="mt-2 h-3 w-full opacity-60 transition-opacity group-hover:opacity-100" aria-hidden>
+                  {it.spark!.map((v, k) => { const h = Math.max(1.2, (v / max) * 14); return <rect key={k} x={k * 4} y={16 - h} width={2.4} height={h} rx={1.2} fill={it.tone} opacity={0.28 + 0.6 * (v / max)} />; })}
+                </svg>
+              );
+            })()}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
