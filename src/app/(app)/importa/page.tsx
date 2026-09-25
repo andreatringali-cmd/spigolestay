@@ -59,6 +59,8 @@ export default function ImportaPage() {
   const [replacePrev, setReplacePrev] = useState(true);
   const [targetUnit, setTargetUnit] = useState<string>(""); // "" = auto per tipologia; altrimenti id camera specifica
   const [roomMap, setRoomMap] = useState<Record<string, string>>({}); // nome camera ICS -> id tipologia (o "__new__")
+  const [unitMap, setUnitMap] = useState<Record<string, string>>({}); // nome camera CSV (Octorate) -> id camera Xenora (o "__new__")
+  const [unitMapType, setUnitMapType] = useState<Record<string, string>>({}); // nome camera CSV -> tipologia sotto cui creare la nuova camera
   const [done, setDone] = useState<number | null>(null);
   const [err, setErr] = useState("");
   const [icsUrl, setIcsUrl] = useState("");
@@ -154,34 +156,82 @@ export default function ImportaPage() {
   const val = (r: string[], key: string) => { const i = map[key]; return i === undefined || i < 0 ? "" : (r[i] ?? "").trim(); };
   const ready = structureId && map.guest !== undefined && map.checkIn !== undefined && map.checkOut !== undefined && dataRows.length > 0;
 
+  // Camere distinte trovate nel file (colonna "Camera"), per la mappatura ESPLICITA: per ognuna
+  // decidi tu a quale camera di Xenora agganciarla (o creane una nuova con lo stesso nome).
+  const csvRooms = useMemo(() => {
+    if (map.room === undefined) return [] as string[];
+    const set = new Set<string>();
+    dataRows.forEach((r) => { const v = val(r, "room"); if (v) set.add(v); });
+    return [...set];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataRows, map.room]);
+  const sUnitsHere = useMemo(() => units.filter((u) => u.structureId === structureId), [units, structureId]);
+  const sRoomsHere = useMemo(() => roomTypes.filter((rt) => rt.structureId === structureId), [roomTypes, structureId]);
+
+  // Auto-proposta (riempie solo le mancanti): camera Xenora con nome uguale/simile se esiste,
+  // altrimenti "crea nuova con questo nome" — resta comunque tutto modificabile a mano.
+  useEffect(() => {
+    if (mode !== "csv" || !csvRooms.length) return;
+    setUnitMap((prev) => {
+      const next = { ...prev }; let changed = false;
+      csvRooms.forEach((txt) => {
+        if (next[txt] === undefined) {
+          const s = txt.toLowerCase().trim();
+          const hit = sUnitsHere.find((u) => u.name.toLowerCase().trim() === s) || sUnitsHere.find((u) => s.includes(u.name.toLowerCase().trim()) || u.name.toLowerCase().trim().includes(s));
+          next[txt] = hit ? hit.id : "__new__"; changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+    setUnitMapType((prev) => {
+      const next = { ...prev }; let changed = false;
+      csvRooms.forEach((txt) => {
+        if (next[txt] === undefined) {
+          const s = txt.toLowerCase().trim();
+          const hit = sRoomsHere.find((rt) => s.includes(rt.name.toLowerCase()) || rt.name.toLowerCase().includes(s));
+          next[txt] = hit ? hit.id : (sRoomsHere[0]?.id ?? ""); changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [csvRooms, mode, sUnitsHere, sRoomsHere]);
+
+  const roomResolvedLabel = (txt: string): string => {
+    if (!txt) return "—";
+    const target = unitMap[txt];
+    if (target && target !== "__new__") { const u = sUnitsHere.find((x) => x.id === target); return u ? u.name : "—"; }
+    return `${txt} (${t("nuova")})`;
+  };
+
   const preview = dataRows.slice(0, 5).map((r) => ({
     guest: val(r, "guest"), checkIn: toISO(val(r, "checkIn")), checkOut: toISO(val(r, "checkOut")),
-    room: val(r, "room"), channel: CHANNELS[toChannel(val(r, "channel"))].label, total: toNum(val(r, "total")),
+    room: val(r, "room"), roomResolved: roomResolvedLabel(val(r, "room")), channel: CHANNELS[toChannel(val(r, "channel"))].label, total: toNum(val(r, "total")),
   }));
 
   const runImport = () => {
     if (!ready) return;
-    const sRooms = roomTypes.filter((rt) => rt.structureId === structureId);
-    const sUnits = units.filter((u) => u.structureId === structureId);
-    // Prova PRIMA a far combaciare il testo con la CAMERA FISICA esatta (es. "SH_#1", come su
-    // Octorate): così la prenotazione va nella stessa camera già prevista, non solo nella
-    // tipologia. Se la camera non esiste ancora in Xenora, la CREA al volo con lo stesso nome
-    // esatto (una volta sola per nome, riusata per le righe successive) — così non serve
-    // pre-creare a mano tutte le camere prima di importare, e si azzera il rischio di errori.
-    const unitByName = new Map<string, string>(sUnits.map((u) => [u.name.toLowerCase().trim(), u.id]));
-    const findUnit = (txt: string) => {
-      const s = (txt || "").toLowerCase().trim(); if (!s) return undefined;
-      if (unitByName.has(s)) return unitByName.get(s)!;
-      const hit = sUnits.find((u) => s.includes(u.name.toLowerCase()) || u.name.toLowerCase().includes(s));
-      return hit?.id;
-    };
-    const findRoom = (txt: string) => {
-      const s = (txt || "").toLowerCase().trim();
-      if (s) { const hit = sRooms.find((rt) => rt.name.toLowerCase() === s) || sRooms.find((rt) => s.includes(rt.name.toLowerCase()) || rt.name.toLowerCase().includes(s)); if (hit) return hit.id; }
-      return sRooms[0]?.id ?? "";
-    };
-    let rtFallback = sRooms[0]?.id ?? "";
+    let rtFallback = sRoomsHere[0]?.id ?? "";
     if (!rtFallback) rtFallback = addRoomType({ structureId, name: t("Camere importate"), beds: 2, basePrice: 0 });
+
+    // Risolve la camera per una riga usando la mappatura ESPLICITA scelta dall'utente (unitMap):
+    // camera esistente scelta a mano, oppure "crea nuova con questo nome" (una volta sola per
+    // nome anche se più righe puntano alla stessa camera nuova, grazie alla cache locale).
+    const createdUnits = new Map<string, { id: string; roomTypeId: string }>();
+    const resolveUnit = (roomTxt: string): { unitId: string | null; roomTypeId: string } => {
+      if (!roomTxt) return { unitId: null, roomTypeId: rtFallback };
+      const target = unitMap[roomTxt];
+      if (target && target !== "__new__") {
+        const rtId = sUnitsHere.find((u) => u.id === target)?.roomTypeId ?? rtFallback;
+        return { unitId: target, roomTypeId: rtId };
+      }
+      const key = roomTxt.toLowerCase().trim();
+      const cached = createdUnits.get(key);
+      if (cached) return { unitId: cached.id, roomTypeId: cached.roomTypeId };
+      const rtId = unitMapType[roomTxt] || rtFallback;
+      const newId = addUnit({ structureId, roomTypeId: rtId, name: roomTxt });
+      createdUnits.set(key, { id: newId, roomTypeId: rtId });
+      return { unitId: newId, roomTypeId: rtId };
+    };
 
     // Anti-duplicato: chiavi (struttura+ospite+date) delle prenotazioni GIÀ presenti,
     // più quelle create in questa stessa passata (evita doppioni anche interni al file).
@@ -197,22 +247,7 @@ export default function ImportaPage() {
       seen.add(key);
       const guestId = addGuest({ fullName: name, email: val(r, "email") || undefined, phone: val(r, "phone") || undefined });
       const roomTxt = val(r, "room");
-      let unitId: string | null = null, roomTypeId = rtFallback;
-      if (roomTxt) {
-        const existingId = findUnit(roomTxt);
-        if (existingId) {
-          unitId = existingId;
-          roomTypeId = sUnits.find((u) => u.id === existingId)?.roomTypeId ?? rtFallback;
-        } else {
-          // Camera non ancora presente in Xenora: la creo con lo stesso nome esatto di
-          // Octorate, sotto la tipologia più simile al testo (o la prima disponibile).
-          roomTypeId = findRoom(roomTxt) || rtFallback;
-          const newId = addUnit({ structureId, roomTypeId, name: roomTxt.trim() });
-          sUnits.push({ id: newId, structureId, roomTypeId, name: roomTxt.trim() } as typeof sUnits[number]);
-          unitByName.set(roomTxt.toLowerCase().trim(), newId);
-          unitId = newId;
-        }
-      }
+      const { unitId, roomTypeId } = resolveUnit(roomTxt);
       const bookedOn = toISO(val(r, "bookedOn"));
       const noteTxt = val(r, "note");
       addBooking({
@@ -376,7 +411,7 @@ export default function ImportaPage() {
             <Card>
               <SectionTitle>{t("2. Mappa le colonne")}</SectionTitle>
               <p className="mb-3 text-xs text-dim">{t("Abbina i campi di Xenora alle colonne del tuo file. * obbligatori.")}</p>
-              <p className="mb-3 rounded-lg border border-line bg-wash/50 p-2.5 text-[11px] text-dim">{t("Per rispettare l'assegnazione già fatta su Octorate: se la colonna \"Camera\" riporta il nome esatto della camera (es. SH_#1), la prenotazione va in quella camera specifica — e se in Xenora non esiste ancora, viene CREATA in automatico con lo stesso nome. Se riporta solo la tipologia generica (es. Deluxe), viene assegnata solo alla tipologia.")}</p>
+              <p className="mb-3 rounded-lg border border-line bg-wash/50 p-2.5 text-[11px] text-dim">{t("Mappa qui la colonna \"Camera\" (nome/codice usato su Octorate, es. SH_#1): nel passo successivo scegli TU a mano a quale camera di Xenora agganciare ognuna, o creane una nuova.")}</p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {FIELDS.map((f) => (
                   <label key={f.key}><span className="mb-1 block text-xs font-medium text-dim">{t(f.label)}{f.req && <span className="text-focus"> *</span>}</span>
@@ -390,13 +425,40 @@ export default function ImportaPage() {
             </Card>
           )}
 
+          {mode === "csv" && csvRooms.length > 0 && (
+            <Card>
+              <SectionTitle>{t("2b. Assegna le camere")}</SectionTitle>
+              <p className="mb-3 text-xs text-dim">{t("Per ogni camera trovata nel file (Octorate o il tuo vecchio gestionale), scegli a quale camera di Xenora agganciarla — oppure creala nuova con lo stesso nome, sotto la tipologia giusta.")}</p>
+              <div className="grid gap-2">
+                {csvRooms.map((txt) => {
+                  const chosen = unitMap[txt] ?? "__new__";
+                  return (
+                    <div key={txt} className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash/50 p-2.5">
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-txt" title={txt}>{txt}</span>
+                      <span className="text-faint">→</span>
+                      <select value={chosen} onChange={(e) => setUnitMap((m) => ({ ...m, [txt]: e.target.value }))} className="max-w-[55%] rounded-lg border border-line bg-surface px-2 py-1.5 text-xs text-txt">
+                        {sUnitsHere.map((u) => { const rt = sRoomsHere.find((x) => x.id === u.roomTypeId); return <option key={u.id} value={u.id}>{u.name}{rt ? ` (${rt.name})` : ""}</option>; })}
+                        <option value="__new__">➕ {t("Crea nuova camera con questo nome")}</option>
+                      </select>
+                      {chosen === "__new__" && sRoomsHere.length > 0 && (
+                        <select value={unitMapType[txt] ?? sRoomsHere[0].id} onChange={(e) => setUnitMapType((m) => ({ ...m, [txt]: e.target.value }))} className="rounded-lg border border-line bg-surface px-2 py-1.5 text-xs text-dim">
+                          {sRoomsHere.map((rt) => <option key={rt.id} value={rt.id}>{t("sotto")} {rt.name}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
           {ready && (
             <Card>
               <SectionTitle>{t("3. Anteprima")}</SectionTitle>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[620px] text-sm">
                   <thead><tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
-                    <th className="px-2 py-2">{t("Ospite")}</th><th className="px-2 py-2">Check-in</th><th className="px-2 py-2">Check-out</th><th className="px-2 py-2">{t("Camera")}</th><th className="px-2 py-2">{t("Canale")}</th><th className="px-2 py-2">{t("Importo")}</th>
+                    <th className="px-2 py-2">{t("Ospite")}</th><th className="px-2 py-2">Check-in</th><th className="px-2 py-2">Check-out</th><th className="px-2 py-2">{t("Camera nel file")}</th><th className="px-2 py-2">{t("→ Camera Xenora")}</th><th className="px-2 py-2">{t("Canale")}</th><th className="px-2 py-2">{t("Importo")}</th>
                   </tr></thead>
                   <tbody>
                     {preview.map((p, i) => (
@@ -405,6 +467,7 @@ export default function ImportaPage() {
                         <td className="px-2 py-2 font-mono text-xs" style={{ color: p.checkIn ? "var(--txt)" : "var(--err)" }}>{p.checkIn || t("data?")}</td>
                         <td className="px-2 py-2 font-mono text-xs" style={{ color: p.checkOut ? "var(--txt)" : "var(--err)" }}>{p.checkOut || t("data?")}</td>
                         <td className="px-2 py-2 text-dim">{p.room || "—"}</td>
+                        <td className="px-2 py-2 font-medium text-txt">{p.roomResolved}</td>
                         <td className="px-2 py-2 text-dim">{p.channel}</td>
                         <td className="px-2 py-2 font-mono text-xs text-dim">{p.total !== undefined ? `€${p.total}` : "—"}</td>
                       </tr>
@@ -412,7 +475,7 @@ export default function ImportaPage() {
                   </tbody>
                 </table>
               </div>
-              <p className="mt-3 text-xs text-faint">{t("Mostrate le prime 5 su")} {dataRows.length}. {t("La camera viene abbinata alla tipologia col nome più simile; se non trovata, alla prima tipologia della struttura.")}</p>
+              <p className="mt-3 text-xs text-faint">{t("Mostrate le prime 5 su")} {dataRows.length}. {csvRooms.length > 0 ? t("La camera va dove hai scelto sopra in \"Assegna le camere\".") : t("Nessuna colonna Camera mappata: le prenotazioni entrano senza camera fisica assegnata.")}</p>
               <button onClick={runImport} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90">{t("Importa")} {dataRows.length} {t("prenotazioni")}</button>
             </Card>
           )}
