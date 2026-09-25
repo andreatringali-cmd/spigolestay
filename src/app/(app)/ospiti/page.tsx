@@ -58,6 +58,7 @@ export default function OspitiPage() {
   const [pickPromo, setPickPromo] = useState(false);
   useEffect(() => { setPromos(loadPromos()); }, []);
   const [confirmClearNl, setConfirmClearNl] = useState(false);
+  const [openReg, setOpenReg] = useState({ ospiti: true, nl: true });
 
   const term = q.trim().toLowerCase();
   const rows = guests
@@ -149,7 +150,7 @@ export default function OspitiPage() {
   };
 
   // Registro riutilizzabile: variante "lead" (newsletter) con colonne ridotte.
-  const Register = ({ title, list, empty, lead, onClear }: { title: string; list: typeof sorted; empty: string; lead?: boolean; onClear?: () => void }) => {
+  const Register = ({ title, list, empty, lead, onClear, open, onToggle }: { title: string; list: typeof sorted; empty: string; lead?: boolean; onClear?: () => void; open: boolean; onToggle: () => void }) => {
     const ids = list.map((r) => r.guest.id);
     const clearBtn = onClear && list.length > 0 && (
       <button onClick={onClear} className={`ml-2 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition ${confirmClearNl ? "border-[color:var(--err)] bg-[color:var(--err)] text-white" : "border-line text-dim hover:border-[color:var(--err)] hover:text-[color:var(--err)]"}`}>
@@ -169,8 +170,13 @@ export default function OspitiPage() {
       <div className="mb-6">
         {/* Telefono: schede */}
         <div className="md:hidden">
-          <div className="mb-2 flex items-center px-1 text-sm font-bold uppercase tracking-wide text-txt">{title} <span className="font-normal text-faint">· {list.length}</span>{clearBtn}{confirmClearNl && onClear && <button onClick={() => setConfirmClearNl(false)} className="ml-1.5 text-[10px] font-normal normal-case text-faint hover:text-txt">{t("annulla")}</button>}</div>
-          <div className="flex flex-col gap-2">
+          <div className="mb-2 flex items-center px-1 text-sm font-bold uppercase tracking-wide text-txt">
+            <button onClick={onToggle} className="flex items-center gap-1.5 hover:text-focus">
+              <span className="text-[10px] text-faint">{open ? "▾" : "▸"}</span>{title} <span className="font-normal text-faint">· {list.length}</span>
+            </button>
+            {clearBtn}{confirmClearNl && onClear && <button onClick={() => setConfirmClearNl(false)} className="ml-1.5 text-[10px] font-normal normal-case text-faint hover:text-txt">{t("annulla")}</button>}
+          </div>
+          {open && <div className="flex flex-col gap-2">
             {list.map(({ guest, stays, nightsTot, spent, last, topCh }) => (
               <div key={guest.id} className="flex items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm">
                 <input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: "var(--focus)" }} className="shrink-0" />
@@ -195,13 +201,18 @@ export default function OspitiPage() {
               </div>
             ))}
             {list.length === 0 && <div className="rounded-xl border border-line bg-surface"><EmptyState title={empty} /></div>}
-          </div>
+          </div>}
         </div>
 
         {/* Tablet/desktop: tabella */}
         <div className="hidden rounded-xl border border-line bg-surface shadow-sm md:block">
-          <div className="flex items-center gap-1.5 border-b border-line px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-txt">{title} <span className="font-normal text-faint">· {list.length}</span>{clearBtn}{confirmClearNl && onClear && <button onClick={() => setConfirmClearNl(false)} className="text-[10px] font-normal normal-case text-faint hover:text-txt">{t("annulla")}</button>}</div>
-          <div className="max-h-[62vh] overflow-auto">
+          <div className="flex items-center gap-1.5 border-b border-line px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-txt">
+            <button onClick={onToggle} className="flex items-center gap-1.5 hover:text-focus">
+              <span className="text-[10px] text-faint">{open ? "▾" : "▸"}</span>{title} <span className="font-normal text-faint">· {list.length}</span>
+            </button>
+            {clearBtn}{confirmClearNl && onClear && <button onClick={() => setConfirmClearNl(false)} className="text-[10px] font-normal normal-case text-faint hover:text-txt">{t("annulla")}</button>}
+          </div>
+          {open && <div className="max-h-[62vh] overflow-auto">
           <table className={`w-full ${lead ? "min-w-[560px]" : "min-w-[980px]"} text-sm`}>
             <thead className="sticky top-0 z-10 bg-wash">
               <tr className="border-b border-line text-[11px] uppercase tracking-wide text-faint">
@@ -245,7 +256,7 @@ export default function OspitiPage() {
               {list.length === 0 && <tr><td colSpan={lead ? 6 : 13}><EmptyState title={empty} /></td></tr>}
             </tbody>
           </table>
-          </div>
+          </div>}
         </div>
       </div>
     );
@@ -295,8 +306,8 @@ export default function OspitiPage() {
         </div>
       </div>
 
-      <Register title={t("Registro ospiti")} list={guestSorted} empty={t("Nessun ospite in questo segmento.")} />
-      <Register title={t("Registro newsletter")} list={nlSorted} empty={t("Nessun iscritto alla newsletter.")} lead onClear={clearNewsletter} />
+      <Register title={t("Registro ospiti")} list={guestSorted} empty={t("Nessun ospite in questo segmento.")} open={openReg.ospiti} onToggle={() => setOpenReg((v) => ({ ...v, ospiti: !v.ospiti }))} />
+      <Register title={t("Registro newsletter")} list={nlSorted} empty={t("Nessun iscritto alla newsletter.")} lead onClear={clearNewsletter} open={openReg.nl} onToggle={() => setOpenReg((v) => ({ ...v, nl: !v.nl }))} />
 
       {pickPromo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
