@@ -893,7 +893,7 @@ export default function CalendarGrid() {
                   <button key={String(v)} onClick={() => patchView({ span: v })} className={`rounded-md py-1 text-xs font-semibold transition ${vw.span === v ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>{lab}</button>
                 ))}
               </div>
-              <MenuToggle label="Inizia da ieri" on={vw.fromYesterday} onClick={() => { const nf = !vw.fromYesterday; patchView({ fromYesterday: nf }); if (vw.span !== "month") { const t = new Date(); const base = new Date(t.getFullYear(), t.getMonth(), t.getDate()); setStart(nf ? addDays(base, -1) : base); } }} />
+              <MenuToggle label="Inizia da ieri" on={vw.fromYesterday} disabled={vw.span === "month"} title={vw.span === "month" ? "Disponibile solo nella vista a 7 giorni" : undefined} onClick={() => { const nf = !vw.fromYesterday; patchView({ fromYesterday: nf }); const t = new Date(); const base = new Date(t.getFullYear(), t.getMonth(), t.getDate()); setStart(nf ? addDays(base, -1) : base); }} />
               <div className="my-1 border-t border-line" />
               <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Righe</div>
               <MenuToggle label="Tariffa" on={vw.rate} onClick={() => patchView({ rate: !vw.rate })} />
@@ -1779,11 +1779,11 @@ function destinationLabel(view: DragView, bookings: { id: string; checkIn: strin
   return `${u.name} · ${newIn.slice(8)}→${newOut.slice(8)} (${nights(newIn, newOut)} ntt)`;
 }
 
-function MenuToggle({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+function MenuToggle({ label, on, onClick, disabled, title }: { label: string; on: boolean; onClick: () => void; disabled?: boolean; title?: string }) {
   return (
-    <button onClick={onClick} className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-txt hover:bg-wash">
+    <button onClick={disabled ? undefined : onClick} disabled={disabled} title={title} className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm ${disabled ? "cursor-not-allowed text-faint" : "text-txt hover:bg-wash"}`}>
       <span>{label}</span>
-      <span className={`relative h-4 w-7 shrink-0 rounded-full transition ${on ? "bg-focus" : "bg-line"}`}>
+      <span className={`relative h-4 w-7 shrink-0 rounded-full transition ${disabled ? "bg-line opacity-50" : on ? "bg-focus" : "bg-line"}`}>
         <span className="absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all" style={{ left: on ? "14px" : "2px" }} />
       </span>
     </button>
