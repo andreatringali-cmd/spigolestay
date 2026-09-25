@@ -73,8 +73,6 @@ export default function UtentiPage() {
           </tbody>
         </table>
       </div>
-
-      <p className="mt-3 text-xs text-faint">{t("Clicca una riga per aprire la scheda completa (account, 2FA, strutture, permessi granulari). In produzione l'accesso è applicato lato server e la foto è caricabile.")}</p>
     </div>
   );
 }
