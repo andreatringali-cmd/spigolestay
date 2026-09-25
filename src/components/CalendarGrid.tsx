@@ -1220,10 +1220,6 @@ export default function CalendarGrid() {
       {vw.occ && (
       <div ref={occScrollRef} onScroll={() => syncScroll(occScrollRef.current, gridScrollRef.current)} className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <div className="relative" style={{ width: gridW + LABEL_W }}>
-          {/* Separatore mese evidenziato */}
-          {monthBoundaries.map((b) => (
-            <div key={b} className="pointer-events-none absolute inset-y-0 z-20" style={{ left: LABEL_W + b * cellW, borderLeft: "2px solid color-mix(in srgb, var(--txt) 42%, transparent)" }} />
-          ))}
           {/* Fascia mese con frecce */}
           <div className="relative flex border-b border-line bg-wash">
             <div className="sticky left-0 z-20 shrink-0 border-r border-line bg-wash" style={{ width: LABEL_W }} />
@@ -1232,6 +1228,10 @@ export default function CalendarGrid() {
                 <div key={seg.key} className="flex items-center justify-center overflow-hidden whitespace-nowrap border-r border-line py-1 text-[11px] font-bold uppercase tracking-wide capitalize text-dim" style={{ width: seg.count * cellW }}>{seg.label}</div>
               ))}
             </div>
+            {/* Separatore mese evidenziato: solo su questa fascia, non su tutta l'altezza */}
+            {monthBoundaries.map((b) => (
+              <div key={b} className="pointer-events-none absolute inset-y-0 z-20" style={{ left: LABEL_W + b * cellW, borderLeft: "2px solid color-mix(in srgb, var(--txt) 42%, transparent)" }} />
+            ))}
             <button onClick={goPrev} title={vw.span === "month" ? "Mese precedente" : "Periodo precedente"} className="absolute inset-y-0 z-30 grid w-7 place-items-center text-lg font-bold leading-none text-[color:var(--ok)] transition hover:bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)]" style={{ left: LABEL_W }}>‹</button>
             <button onClick={goNext} title={vw.span === "month" ? "Mese successivo" : "Periodo successivo"} className="absolute inset-y-0 right-0 z-30 grid w-7 place-items-center text-lg font-bold leading-none text-[color:var(--ok)] transition hover:bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)]">›</button>
           </div>
@@ -1303,10 +1303,6 @@ export default function CalendarGrid() {
             setSelHover((h) => (h === iso ? h : iso));
           }}
         >
-          {/* Separatore verticale evidenziato al cambio mese (su tutta l'altezza) */}
-          {monthBoundaries.map((b) => (
-            <div key={b} className="pointer-events-none absolute inset-y-0 z-20" style={{ left: LABEL_W + b * cellW, borderLeft: "2px solid color-mix(in srgb, var(--txt) 42%, transparent)" }} />
-          ))}
           {/* Fascia mese (con frecce di navigazione a sinistra e alla fine) */}
           <div className="relative flex border-b border-line bg-wash">
             <div className="sticky left-0 z-20 shrink-0 border-r border-line bg-wash" style={{ width: LABEL_W }} />
@@ -1317,6 +1313,10 @@ export default function CalendarGrid() {
                 </div>
               ))}
             </div>
+            {/* Separatore mese evidenziato: solo su questa fascia, non su tutta l'altezza della griglia */}
+            {monthBoundaries.map((b) => (
+              <div key={b} className="pointer-events-none absolute inset-y-0 z-20" style={{ left: LABEL_W + b * cellW, borderLeft: "2px solid color-mix(in srgb, var(--txt) 42%, transparent)" }} />
+            ))}
             {/* Frecce dentro il calendario: all'inizio e alla fine delle date */}
             <button onClick={goPrev} title={vw.span === "month" ? "Mese precedente" : "Periodo precedente"} className="absolute inset-y-0 z-30 grid w-7 place-items-center text-lg font-bold leading-none text-[color:var(--ok)] transition hover:bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)]" style={{ left: LABEL_W }}>‹</button>
             <button onClick={goNext} title={vw.span === "month" ? "Mese successivo" : "Periodo successivo"} className="absolute inset-y-0 right-0 z-30 grid w-7 place-items-center text-lg font-bold leading-none text-[color:var(--ok)] transition hover:bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)]">›</button>
