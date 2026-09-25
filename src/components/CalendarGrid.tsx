@@ -656,7 +656,7 @@ export default function CalendarGrid() {
             );
           })}
           {unit.outOfService && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center" style={{ backgroundColor: "#242424", boxShadow: "inset 3px 0 0 #f5c000" }}>
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center" style={{ backgroundColor: "#0d0d0d", backgroundImage: "repeating-linear-gradient(45deg, #3a3a3a 0 8px, #0d0d0d 8px 16px)", boxShadow: "inset 3px 0 0 #f5c000" }}>
               <span className="inline-flex items-center gap-1 text-[10px] font-bold" style={{ color: "#f5c000" }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-6 6a2 2 0 1 0 2.8 2.8l6-6a4 4 0 0 0 5.4-5.4l-2.3 2.3-2.1-2.1z" /></svg>
                 Fuori servizio
@@ -677,7 +677,7 @@ export default function CalendarGrid() {
             const tentative = !blocked && b.status === "tentative";
             const sotto = barStyle === "sotto";
             const barColor = blocked
-              ? { backgroundColor: "color-mix(in srgb, var(--dim) 12%, var(--surface))", backgroundImage: "repeating-linear-gradient(45deg, color-mix(in srgb, var(--dim) 26%, transparent) 0 5px, transparent 5px 11px)", color: "var(--dim)", boxShadow: "inset 3px 0 0 color-mix(in srgb, var(--dim) 55%, transparent)" }
+              ? { backgroundColor: "#1f1f1f", backgroundImage: "repeating-linear-gradient(45deg, #3a3a3a 0 6px, #0d0d0d 6px 12px)", color: "#e8e8e8", boxShadow: "inset 3px 0 0 rgba(0,0,0,.6), 0 1px 1px rgba(0,0,0,.3)" }
               : { backgroundColor: `var(${meta.cssVar})`, color: meta.text, boxShadow: "inset 3px 0 0 rgba(0,0,0,.28), 0 1px 1px rgba(0,0,0,.14)" };
             const label = blocked ? "Fuori servizio" : guestName(b.guestId);
             const pay = payStatusOf(b);
