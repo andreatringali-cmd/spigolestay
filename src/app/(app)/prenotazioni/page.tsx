@@ -275,14 +275,6 @@ export default function PrenotazioniPage() {
     <div>
       <PageHeader title={t("Prenotazioni")} subtitle={t("In anteprima le prenotazioni in corso e future · seleziona un intervallo di date per vedere lo storico")} actions={<WeatherWidget compact />} />
 
-      {pastActive && (
-        <div className="mb-3 flex items-center gap-2 rounded-lg border border-focus bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)] px-3 py-2 text-xs text-dim">
-          <span className="rounded-full bg-focus px-2 py-0.5 text-[10px] font-bold uppercase text-white">{t("Storico")}</span>
-          {t("Stai consultando prenotazioni passate (dal")} {fmt(from)}{to ? ` ${t("al")} ${fmt(to)}` : ""}{t("). Card e grafici si riferiscono a questo periodo.")}
-          <button onClick={clearFilters} className="ml-auto font-semibold text-focus hover:underline">{t("Torna a in corso e futuri")}</button>
-        </div>
-      )}
-
       {/* Card riepilogo */}
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label={t("Prenotazioni")} value={String(filtered.length)} />
@@ -339,6 +331,14 @@ export default function PrenotazioniPage() {
         </div>
         </div>
       </div>
+
+      {pastActive && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-focus bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)] px-3 py-2 text-xs text-dim">
+          <span className="rounded-full bg-focus px-2 py-0.5 text-[10px] font-bold uppercase text-white">{t("Storico")}</span>
+          {t("Stai consultando prenotazioni passate (dal")} {fmt(from)}{to ? ` ${t("al")} ${fmt(to)}` : ""}{t("). Card e grafici si riferiscono a questo periodo.")}
+          <button onClick={clearFilters} className="ml-auto font-semibold text-focus hover:underline">{t("Torna a in corso e futuri")}</button>
+        </div>
+      )}
 
       {/* Telefono: lista a schede (la tabella qui sotto è nascosta) */}
       <div className="flex flex-col gap-2 md:hidden">
