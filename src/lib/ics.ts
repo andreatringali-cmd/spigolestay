@@ -84,20 +84,27 @@ export function parseICS(text: string): IcsEvent[] {
 }
 
 // Assegnatore di camere fisiche con BIN-PACKING per tipologia: dato un elenco di camere/prenotazioni
-// esistenti, riusa una camera libera (checkout ≤ nuovo check-in) e ne crea di nuove solo quando
-// servono, così nessuna prenotazione finisce doppia sulla stessa camera. Condiviso tra import ICS
-// e import CSV (quando la colonna "Camera" del file è la sola TIPOLOGIA, come nell'export Octorate:
-// mappare tutte le righe a UNA camera specifica le sovrapporrebbe tutte lì).
+// esistenti, riusa una camera libera (checkout ≤ nuovo check-in). Ne crea una nuova SOLO se quella
+// tipologia non ha ancora nessuna camera (serve un aggancio); se le camere reali esistono già tutte
+// (es. tipologia già mappata su Octorate) e sono tutte occupate in quelle date, la prenotazione resta
+// SENZA camera ("Da assegnare") invece di inventarne una in più — è un overbooking da controllare a
+// mano, non un errore da nascondere creando una camera fantasma. Condiviso tra import ICS e import
+// CSV (quando la colonna "Camera" del file è la sola TIPOLOGIA, come nell'export Octorate: mappare
+// tutte le righe a UNA camera specifica le sovrapporrebbe tutte lì).
 export function makeUnitAssigner(units: Unit[], bookings: Booking[], structureId: string, excludeIds: Set<string> = new Set()) {
   const slots: Record<string, { unitId: string; last: string }[]> = {};
   units.filter((u) => u.structureId === structureId).forEach((u) => {
     const last = bookings.filter((b) => b.unitId === u.id && !excludeIds.has(b.id)).reduce((mx, b) => (b.checkOut > mx ? b.checkOut : mx), "0000-00-00");
     (slots[u.roomTypeId] ||= []).push({ unitId: u.id, last });
   });
-  return (typeId: string, ci: string, co: string, addUnit: (u: { structureId: string; roomTypeId: string; name: string }) => string, t: (s: string) => string): string => {
+  return (typeId: string, ci: string, co: string, addUnit: (u: { structureId: string; roomTypeId: string; name: string }) => string, t: (s: string) => string): string | null => {
     const arr = (slots[typeId] ||= []);
     let s = arr.find((x) => x.last <= ci);
-    if (!s) { const id = addUnit({ structureId, roomTypeId: typeId, name: `${t("Camera")} ${arr.length + 1}` }); s = { unitId: id, last: "0000-00-00" }; arr.push(s); }
+    if (!s) {
+      if (arr.length > 0) return null; // camere reali già tutte occupate → overbooking, lascia da assegnare
+      const id = addUnit({ structureId, roomTypeId: typeId, name: `${t("Camera")} 1` });
+      s = { unitId: id, last: "0000-00-00" }; arr.push(s);
+    }
     s.last = co; return s.unitId;
   };
 }
@@ -165,8 +172,8 @@ export function importIcsEvents(events: IcsEvent[], opts: IcsImportOpts, ctx: Ic
   };
 
   // Assegnazione camere fisiche con bin-packing (funzione condivisa, vedi makeUnitAssigner):
-  // riusa le esistenti, ne crea quante servono per le sovrapposizioni → nessuna prenotazione
-  // finisce in overbooking sulla stessa camera.
+  // riusa le esistenti; se sono già tutte occupate in quelle date, la prenotazione resta senza
+  // camera (overbooking reale, da assegnare a mano) invece di crearne una fantasma in più.
   const assignUnitRaw = makeUnitAssigner(units, bookings, structureId, delIds);
   const assignUnit = (typeId: string, ci: string, co: string) => assignUnitRaw(typeId, ci, co, addUnit, t);
 

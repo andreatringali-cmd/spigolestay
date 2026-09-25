@@ -344,6 +344,7 @@ export default function CalendarGrid() {
     return out;
   }, [monthSegments]);
   const todayISO = useMemo(() => toISO(new Date()), []);
+  const todayIdx = useMemo(() => days.findIndex((d) => toISO(d) === todayISO), [days, todayISO]);
   const guestName = (id: string) => guests.find((g) => g.id === id)?.fullName ?? "Ospite";
   // Stato prenotazione per le icone sulle barre.
   const payStatusOf = (b: { total?: number; cleaningFee?: number; paid?: number }): "paid" | "partial" | "unpaid" => {
@@ -1220,6 +1221,10 @@ export default function CalendarGrid() {
       {vw.occ && (
       <div ref={occScrollRef} onScroll={() => syncScroll(occScrollRef.current, gridScrollRef.current)} className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <div className="relative" style={{ width: gridW + LABEL_W }}>
+          {/* Linea "oggi", su tutta l'altezza del pannello occupazione */}
+          {todayIdx >= 0 && (
+            <div className="pointer-events-none absolute inset-y-0 z-20" style={{ left: LABEL_W + todayIdx * cellW, borderLeft: "2px solid var(--focus)" }} />
+          )}
           {/* Fascia mese con frecce */}
           <div className="relative flex border-b border-line bg-wash">
             <div className="sticky left-0 z-20 shrink-0 border-r border-line bg-wash" style={{ width: LABEL_W }} />
