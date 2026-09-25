@@ -7,7 +7,7 @@ import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { CHANNELS } from "@/lib/types";
-import { parseICS, importIcsEvents, toChannel, toISO, toNum, normName, type IcsEvent } from "@/lib/ics";
+import { parseICS, importIcsEvents, toChannel, toISO, toNum, normName, makeUnitAssigner, type IcsEvent } from "@/lib/ics";
 import { buildTemplateCsv, bookingDedupeKey } from "@/lib/import/template";
 
 // ── Parsing CSV robusto (virgolette, delimitatore auto ; , o tab) ──
@@ -168,8 +168,13 @@ export default function ImportaPage() {
   const sUnitsHere = useMemo(() => units.filter((u) => u.structureId === structureId), [units, structureId]);
   const sRoomsHere = useMemo(() => roomTypes.filter((rt) => rt.structureId === structureId), [roomTypes, structureId]);
 
-  // Auto-proposta (riempie solo le mancanti): camera Xenora con nome uguale/simile se esiste,
-  // altrimenti "crea nuova con questo nome" — resta comunque tutto modificabile a mano.
+  // Auto-proposta (riempie solo le mancanti):
+  //  1) il testo combacia con una CAMERA esistente (nome esatto, es. "SH_#1")   → quella camera.
+  //  2) il testo combacia con una TIPOLOGIA esistente (es. "Camera ... Deluxe") → assegnazione
+  //     automatica nella tipologia (bin-packing, niente sovrapposizioni): è il caso più comune,
+  //     perché gli export di Octorate riportano di solito la TIPOLOGIA, non la camera specifica.
+  //  3) nessuna corrispondenza                                                 → crea nuova camera.
+  // Resta comunque tutto modificabile a mano.
   useEffect(() => {
     if (mode !== "csv" || !csvRooms.length) return;
     setUnitMap((prev) => {
@@ -177,8 +182,11 @@ export default function ImportaPage() {
       csvRooms.forEach((txt) => {
         if (next[txt] === undefined) {
           const s = txt.toLowerCase().trim();
-          const hit = sUnitsHere.find((u) => u.name.toLowerCase().trim() === s) || sUnitsHere.find((u) => s.includes(u.name.toLowerCase().trim()) || u.name.toLowerCase().trim().includes(s));
-          next[txt] = hit ? hit.id : "__new__"; changed = true;
+          const unitHit = sUnitsHere.find((u) => u.name.toLowerCase().trim() === s) || sUnitsHere.find((u) => s.includes(u.name.toLowerCase().trim()) || u.name.toLowerCase().trim().includes(s));
+          if (unitHit) { next[txt] = unitHit.id; changed = true; return; }
+          const sn = normName(txt);
+          const typeHit = sn ? (sRoomsHere.find((rt) => normName(rt.name) === sn) || sRoomsHere.find((rt) => { const rn = normName(rt.name); return !!rn && (sn.includes(rn) || rn.includes(sn)); })) : undefined;
+          next[txt] = typeHit ? "__type__" : "__new__"; changed = true;
         }
       });
       return changed ? next : prev;
@@ -187,8 +195,8 @@ export default function ImportaPage() {
       const next = { ...prev }; let changed = false;
       csvRooms.forEach((txt) => {
         if (next[txt] === undefined) {
-          const s = txt.toLowerCase().trim();
-          const hit = sRoomsHere.find((rt) => s.includes(rt.name.toLowerCase()) || rt.name.toLowerCase().includes(s));
+          const sn = normName(txt);
+          const hit = sn ? (sRoomsHere.find((rt) => normName(rt.name) === sn) || sRoomsHere.find((rt) => { const rn = normName(rt.name); return !!rn && (sn.includes(rn) || rn.includes(sn)); })) : undefined;
           next[txt] = hit ? hit.id : (sRoomsHere[0]?.id ?? ""); changed = true;
         }
       });
@@ -199,6 +207,7 @@ export default function ImportaPage() {
   const roomResolvedLabel = (txt: string): string => {
     if (!txt) return "—";
     const target = unitMap[txt];
+    if (target === "__type__") { const rt = sRoomsHere.find((x) => x.id === unitMapType[txt]); return `${t("Auto")} · ${rt?.name || "—"}`; }
     if (target && target !== "__new__") { const u = sUnitsHere.find((x) => x.id === target); return u ? u.name : "—"; }
     return `${txt} (${t("nuova")})`;
   };
@@ -218,12 +227,23 @@ export default function ImportaPage() {
     if (!rtFallback) rtFallback = addRoomType({ structureId, name: t("Camere importate"), beds: 2, basePrice: 0 });
 
     // Risolve la camera per una riga usando la mappatura ESPLICITA scelta dall'utente (unitMap):
-    // camera esistente scelta a mano, oppure "crea nuova con questo nome" (una volta sola per
-    // nome anche se più righe puntano alla stessa camera nuova, grazie alla cache locale).
+    //  - id di una camera esistente  → quella, sempre (nessun bin-packing: scelta manuale precisa).
+    //  - "__type__"                  → assegnazione automatica nella tipologia con bin-packing
+    //    (stesso motore dell'import ICS): riusa camere libere, ne crea quante servono, MAI
+    //    sovrapposizioni sulla stessa camera. È il caso giusto quando il file riporta solo la
+    //    tipologia (es. export Octorate "Camera Matrimoniale | Deluxe").
+    //  - "__new__"                   → crea UNA camera nuova con questo nome esatto (riusata per
+    //    le righe successive con lo stesso testo, via cache locale) — per i rari file con codici
+    //    camera specifici (es. "SH_#1") non ancora presenti in Xenora.
+    const assignInType = makeUnitAssigner(sUnitsHere, bookings, structureId);
     const createdUnits = new Map<string, { id: string; roomTypeId: string }>();
-    const resolveUnit = (roomTxt: string): { unitId: string | null; roomTypeId: string } => {
+    const resolveUnit = (roomTxt: string, ci: string, co: string): { unitId: string | null; roomTypeId: string } => {
       if (!roomTxt) return { unitId: null, roomTypeId: rtFallback };
       const target = unitMap[roomTxt];
+      if (target === "__type__") {
+        const rtId = unitMapType[roomTxt] || rtFallback;
+        return { unitId: assignInType(rtId, ci, co, addUnit, t), roomTypeId: rtId };
+      }
       if (target && target !== "__new__") {
         const rtId = sUnitsHere.find((u) => u.id === target)?.roomTypeId ?? rtFallback;
         return { unitId: target, roomTypeId: rtId };
@@ -251,7 +271,7 @@ export default function ImportaPage() {
       seen.add(key);
       const guestId = addGuest({ fullName: name, email: val(r, "email") || undefined, phone: val(r, "phone") || undefined });
       const roomTxt = val(r, "room");
-      const { unitId, roomTypeId } = resolveUnit(roomTxt);
+      const { unitId, roomTypeId } = resolveUnit(roomTxt, ci, co);
       const bookedOn = toISO(val(r, "bookedOn"));
       const noteTxt = val(r, "note");
       addBooking({
@@ -432,21 +452,23 @@ export default function ImportaPage() {
           {mode === "csv" && csvRooms.length > 0 && (
             <Card>
               <SectionTitle>{t("2b. Assegna le camere")}</SectionTitle>
-              <p className="mb-3 text-xs text-dim">{t("Per ogni camera trovata nel file (Octorate o il tuo vecchio gestionale), scegli a quale camera di Xenora agganciarla — oppure creala nuova con lo stesso nome, sotto la tipologia giusta.")}</p>
+              <p className="mb-3 text-xs text-dim">{t("Per ogni valore trovato nel file: se è una CAMERA specifica (es. SH_#1) agganciala o creala; se è solo una TIPOLOGIA (es. \"Camera Matrimoniale | Deluxe\", il caso più comune con Octorate) scegli l'assegnazione automatica — distribuisce le prenotazioni sulle camere di quella tipologia senza mai sovrapporle.")}</p>
               <div className="grid gap-2">
                 {csvRooms.map((txt) => {
-                  const chosen = unitMap[txt] ?? "__new__";
+                  const chosen = unitMap[txt] ?? "__type__";
+                  const needsType = chosen === "__new__" || chosen === "__type__";
                   return (
                     <div key={txt} className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash/50 p-2.5">
                       <span className="min-w-0 flex-1 truncate text-sm font-medium text-txt" title={txt}>{txt}</span>
                       <span className="text-faint">→</span>
                       <select value={chosen} onChange={(e) => setUnitMap((m) => ({ ...m, [txt]: e.target.value }))} className="max-w-[55%] rounded-lg border border-line bg-surface px-2 py-1.5 text-xs text-txt">
+                        <option value="__type__">🎯 {t("Assegna automaticamente nella tipologia (niente sovrapposizioni)")}</option>
                         {sUnitsHere.map((u) => { const rt = sRoomsHere.find((x) => x.id === u.roomTypeId); return <option key={u.id} value={u.id}>{u.name}{rt ? ` (${rt.name})` : ""}</option>; })}
                         <option value="__new__">➕ {t("Crea nuova camera con questo nome")}</option>
                       </select>
-                      {chosen === "__new__" && sRoomsHere.length > 0 && (
+                      {needsType && sRoomsHere.length > 0 && (
                         <select value={unitMapType[txt] ?? sRoomsHere[0].id} onChange={(e) => setUnitMapType((m) => ({ ...m, [txt]: e.target.value }))} className="rounded-lg border border-line bg-surface px-2 py-1.5 text-xs text-dim">
-                          {sRoomsHere.map((rt) => <option key={rt.id} value={rt.id}>{t("sotto")} {rt.name}</option>)}
+                          {sRoomsHere.map((rt) => <option key={rt.id} value={rt.id}>{chosen === "__new__" ? t("sotto") : t("nella tipologia")} {rt.name}</option>)}
                         </select>
                       )}
                     </div>
