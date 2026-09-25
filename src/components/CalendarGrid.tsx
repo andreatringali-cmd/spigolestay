@@ -595,7 +595,7 @@ export default function CalendarGrid() {
   const unitNameOf = (id: string | null) => (id ? units.find((u) => u.id === id)?.name ?? "—" : "da assegnare");
 
   // Mix canali & commissioni sul periodo.
-  const chAgg = (["booking", "airbnb", "expedia", "other", "direct"] as const).map((ch) => { const list = bkPeriod.filter((b) => b.channel === ch); const revenue = list.reduce((a, b) => a + (b.total ?? 0), 0); const commission = list.reduce((a, b) => { const pct = b.commissionPct ?? CHANNELS[ch].commission * 100; return a + (b.total ?? 0) * pct / 100; }, 0); return { ch, meta: CHANNELS[ch], n: list.length, revenue, commission }; }).filter((x) => x.n > 0);
+  const chAgg = (["booking", "airbnb", "expedia", "hotelbeds", "other", "direct"] as const).map((ch) => { const list = bkPeriod.filter((b) => b.channel === ch); const revenue = list.reduce((a, b) => a + (b.total ?? 0), 0); const commission = list.reduce((a, b) => { const pct = b.commissionPct ?? CHANNELS[ch].commission * 100; return a + (b.total ?? 0) * pct / 100; }, 0); return { ch, meta: CHANNELS[ch], n: list.length, revenue, commission }; }).filter((x) => x.n > 0);
   const chTotalN = chAgg.reduce((a, x) => a + x.n, 0);
   const chCommission = Math.round(chAgg.reduce((a, x) => a + x.commission, 0));
   const directShare = chTotalN ? Math.round(((chAgg.find((x) => x.ch === "direct")?.n ?? 0) / chTotalN) * 100) : 0;

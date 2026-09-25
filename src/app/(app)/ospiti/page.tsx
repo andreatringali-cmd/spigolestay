@@ -11,6 +11,7 @@ import EmptyState from "@/components/EmptyState";
 import { nights, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { CHANNELS, type Channel } from "@/lib/types";
+import ChannelLogo from "@/components/ChannelLogo";
 import { type Promo, loadPromos, promoMailto } from "@/lib/promos";
 
 const avColor = (n: string) => AV_COLORS[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
@@ -26,9 +27,10 @@ export default function OspitiPage() {
   // senza contatto NON vengono mai uniti (rischio di fondere persone diverse).
   const dupGroups = useMemo(() => {
     const nrm = (s?: string) => (s ?? "").trim().toLowerCase();
-    const nrmPhone = (s?: string) => (s ?? "").replace(/[\s+()./-]/g, "");
+    // Confronta solo le ultime 9 cifre: ignora differenze di prefisso internazionale (+39/0039) o trunk (0).
+    const nrmPhone = (s?: string) => { const d = (s ?? "").replace(/\D/g, ""); return d.length >= 9 ? d.slice(-9) : ""; };
     const byKey = new Map<string, typeof guests>();
-    guests.forEach((g) => { const key = nrm(g.email) || (nrmPhone(g.phone).length >= 6 ? "tel:" + nrmPhone(g.phone) : ""); if (!key) return; const arr = byKey.get(key) ?? []; arr.push(g); byKey.set(key, arr); });
+    guests.forEach((g) => { const key = nrm(g.email) || (nrmPhone(g.phone) ? "tel:" + nrmPhone(g.phone) : ""); if (!key) return; const arr = byKey.get(key) ?? []; arr.push(g); byKey.set(key, arr); });
     return [...byKey.values()].filter((a) => a.length > 1);
   }, [guests]);
   const dupCount = dupGroups.reduce((a, g) => a + g.length - 1, 0);
@@ -170,7 +172,10 @@ export default function OspitiPage() {
                   ) : (
                     <>
                       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-dim">
-                        {topCh && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `var(${CHANNELS[topCh].cssVar})`, color: CHANNELS[topCh].text }}>{CHANNELS[topCh].label}</span>}
+                        {topCh && (topCh === "direct"
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          ? <img src="/xenora-logo.png" alt="Xenora · Diretta" title="Diretta · Xenora" style={{ height: 14, width: "auto" }} />
+                          : <span className="inline-flex items-center gap-1"><ChannelLogo channel={topCh} size={14} title={CHANNELS[topCh].label} /><span>{CHANNELS[topCh].label}</span></span>)}
                         <span>{stays} {t("pren.")} · {nightsTot} {t("notti")}</span>
                         {guest.country && <><span className="text-faint">·</span><span>{guest.country}</span></>}
                       </div>
@@ -217,7 +222,10 @@ export default function OspitiPage() {
                   <td className="whitespace-nowrap px-3 py-2 text-txt">{guest.email ?? "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-txt">{guest.country ?? "—"}</td>
                   {!lead && <>
-                    <td className="whitespace-nowrap px-3 py-2">{topCh ? <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `var(${CHANNELS[topCh].cssVar})`, color: CHANNELS[topCh].text }}>{CHANNELS[topCh].label}</span> : "—"}</td>
+                    <td className="whitespace-nowrap px-3 py-2">{topCh ? (topCh === "direct"
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      ? <img src="/xenora-logo.png" alt="Xenora · Diretta" title="Diretta · Xenora" style={{ height: 16, width: "auto" }} />
+                      : <span className="inline-flex items-center gap-1.5"><ChannelLogo channel={topCh} size={16} title={CHANNELS[topCh].label} /><span className="text-xs text-dim">{CHANNELS[topCh].label}</span></span>) : "—"}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{stays}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{nightsTot}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{avg > 0 ? eur(avg) : "—"}</td>

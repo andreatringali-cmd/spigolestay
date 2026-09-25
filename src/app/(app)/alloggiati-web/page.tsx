@@ -135,7 +135,7 @@ export default function AlloggiatiWebPage() {
   // Dati aggiuntivi per arricchire l'anteprima della schedina (presi dalla prenotazione collegata).
   const bookingById = new Map(bookings.map((b) => [b.id, b]));
   const roomName = (rtId?: string) => roomTypes.find((rt) => rt.id === rtId)?.name ?? "";
-  const CH: Record<string, string> = { direct: "Diretta", booking: "Booking", airbnb: "Airbnb", expedia: "Expedia", ical: "iCal", other: "Altro/OTA", blocked: "Bloccata" };
+  const CH: Record<string, string> = { direct: "Diretta", booking: "Booking", airbnb: "Airbnb", expedia: "Expedia", hotelbeds: "HotelBeds", ical: "iCal", other: "Altro/OTA", blocked: "Bloccata" };
   const nightsBetween = (ci?: string, co?: string) => { if (!ci || !co) return 0; const a = new Date(ci + "T00:00"), b = new Date(co + "T00:00"); return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86400000)); };
 
   return (

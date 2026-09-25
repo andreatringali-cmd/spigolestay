@@ -72,7 +72,7 @@ export default function IstatPage() {
   const guestById = new Map(guests.map((g) => [g.id, g]));
   const roomName = (rtId?: string) => roomTypes.find((rt) => rt.id === rtId)?.name ?? "";
   const unitName = (uid?: string | null) => units.find((u) => u.id === uid)?.name ?? "";
-  const CH: Record<string, string> = { direct: "Diretta", booking: "Booking", airbnb: "Airbnb", expedia: "Expedia", ical: "iCal", other: "Altro/OTA", blocked: "Bloccata" };
+  const CH: Record<string, string> = { direct: "Diretta", booking: "Booking", airbnb: "Airbnb", expedia: "Expedia", hotelbeds: "HotelBeds", ical: "iCal", other: "Altro/OTA", blocked: "Bloccata" };
   const ageOn = (birth?: string, on?: string) => { if (!birth) return ""; const d = new Date(birth); const t = new Date((on || todayIso) + "T00:00"); let a = t.getFullYear() - d.getFullYear(); if (t.getMonth() < d.getMonth() || (t.getMonth() === d.getMonth() && t.getDate() < d.getDate())) a--; return a >= 0 && a < 130 ? String(a) : ""; };
 
   // Navigazione "Data corrente soggiorni" (come Turist@t): giorno per giorno.

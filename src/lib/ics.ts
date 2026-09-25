@@ -37,13 +37,14 @@ export function toNum(s: string): number | undefined {
   return isNaN(n) ? undefined : n;
 }
 // Riconosce il canale dal testo Octorate (SUMMARY): booking_xml, expedia, octoevo (=diretta),
-// hotelBeds/agoda/hostelworld… (=Altro/OTA). Sconosciuto → diretta.
+// hotelBeds (=canale dedicato), agoda/hostelworld… (=Altro/OTA). Sconosciuto → diretta.
 export function toChannel(s: string): Channel {
   s = (s || "").toLowerCase();
   if (s.includes("booking")) return "booking";                 // booking_xml
   if (s.includes("airbnb")) return "airbnb";
   if (s.includes("expedia") || s.includes("vrbo") || s.includes("homeaway")) return "expedia";
-  if (/hotel\s*beds|hotelbeds|agoda|hostelworld|despegar|hotusa|hrs|roiback|veturis|dingus|jumbotour|restel|welcomebeds|bedsonline/.test(s)) return "other";
+  if (/hotel\s*beds|hotelbeds/.test(s)) return "hotelbeds";
+  if (/agoda|hostelworld|despegar|hotusa|hrs|roiback|veturis|dingus|jumbotour|restel|welcomebeds|bedsonline/.test(s)) return "other";
   if (s.includes("octoevo") || s.includes("octobook") || s.includes("diret") || s.includes("direct") || s.includes("wubook")) return "direct";
   return "direct";
 }

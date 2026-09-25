@@ -272,7 +272,7 @@ export default function FatturePassivePage() {
           <div className="relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">Autofattura OTA — precompila</span><button onClick={() => setOta(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <div className="grid gap-2 sm:grid-cols-2">
-              <label className={lbl}>Canale<select value={otaChannel} onChange={(e) => setOtaChannel(e.target.value as Channel)} className={inp}>{(["booking", "airbnb", "expedia", "other"] as Channel[]).map((c) => <option key={c} value={c}>{CHANNELS[c].label}</option>)}</select></label>
+              <label className={lbl}>Canale<select value={otaChannel} onChange={(e) => setOtaChannel(e.target.value as Channel)} className={inp}>{(["booking", "airbnb", "expedia", "hotelbeds", "other"] as Channel[]).map((c) => <option key={c} value={c}>{CHANNELS[c].label}</option>)}</select></label>
               <label className={lbl}>Mese<input type="month" value={otaMonth} max={monthNow()} onChange={(e) => setOtaMonth(e.target.value)} className={inp} /></label>
             </div>
 
