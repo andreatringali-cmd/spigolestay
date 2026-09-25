@@ -674,8 +674,11 @@ export default function BookingDrawer() {
           <Field label={`${t("Soggiorno")} (€)`}><input type="number" min={0} className={inputCls} value={form.total} onChange={(e) => set({ total: Math.max(0, +e.target.value) })} /></Field>
           <Field label={`${t("Pulizia")} (€)`}><input type="number" min={0} className={inputCls} value={form.cleaningFee} onChange={(e) => set({ cleaningFee: Math.max(0, +e.target.value) })} /></Field>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label={`${t("Commissione")} (%)`}><input type="number" min={0} max={100} step={0.5} className={inputCls} value={form.commissionPct} onChange={(e) => set({ commissionPct: Math.max(0, Math.min(100, +e.target.value)) })} /></Field>
+        <div className="grid grid-cols-3 gap-2">
+          <Field label={`${t("Commissione")} (€)`}>
+            <input type="number" min={0} step={1} className={inputCls} value={Math.round(form.total * form.commissionPct / 100)} onChange={(e) => { const eurVal = Math.max(0, +e.target.value); const pct = form.total > 0 ? (eurVal / form.total) * 100 : 0; set({ commissionPct: Math.round(pct * 10) / 10 }); }} />
+          </Field>
+          <Field label={`${t("Commissione")} (%)`}><input type="number" min={0} max={100} step={0.1} className={inputCls} value={form.commissionPct} onChange={(e) => set({ commissionPct: Math.max(0, Math.min(100, +e.target.value)) })} /></Field>
           <div className="flex flex-col justify-end">
             <span className="mb-1 block text-xs font-medium text-dim">{t("Netto (soggiorno − commissione)")}</span>
             <div className="rounded-lg border border-line bg-wash px-2.5 py-1.5 text-sm font-mono font-semibold text-[color:var(--ok)]">{eur(form.total - Math.round(form.total * form.commissionPct / 100))}</div>
