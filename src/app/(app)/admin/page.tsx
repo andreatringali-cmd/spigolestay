@@ -102,6 +102,7 @@ export default function AdminPage() {
   const [pagedAccounts, setPagedAccounts] = useState<Account[]>([]);
   const [pagedTotal, setPagedTotal] = useState(0);
   const [accLoading, setAccLoading] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
 
   const authToken = async () => (await (supabase?.auth.getSession() ?? Promise.resolve({ data: { session: null } }))).data.session?.access_token || "";
 
@@ -156,6 +157,27 @@ export default function AdminPage() {
   }, [view, q, statusF, page, pageSize, user?.id]);
 
   const openDetail = (acc: Account) => router.push(`/admin/${acc.owner.id}`);
+
+  // Backfill una-tantum: popola i campi abbonamento in `profiles` leggendoli da Stripe (abbonati
+  // esistenti, senza aspettare un evento webhook). Al termine ricarica i dati mostrati.
+  const backfillFromStripe = async () => {
+    if (backfilling) return;
+    setBackfilling(true);
+    try {
+      const token = await authToken();
+      if (!token) { setBackfilling(false); return; }
+      const res = await fetch("/api/admin/backfill-subs", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        alert(`Aggiornamento da Stripe completato.\nControllati: ${d.scanned ?? 0}\nAggiornati: ${d.updated ?? 0}${d.errors?.length ? `\nErrori: ${d.errors.length}` : ""}`);
+        await load();
+        if (view === "accounts") await loadAccounts();
+      } else {
+        alert(`Aggiornamento non riuscito: ${d.error || res.status}`);
+      }
+    } catch { alert("Aggiornamento non riuscito: errore di rete."); }
+    setBackfilling(false);
+  };
 
   const kpi = useMemo(() => {
     const rs = rows || [];
@@ -254,6 +276,7 @@ export default function AdminPage() {
       )}
       <div className="ml-auto flex items-center gap-2">
         <button onClick={exportCsv} disabled={loading || !accounts?.length} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">⤓ CSV</button>
+        {stripeOn && <button onClick={backfillFromStripe} disabled={backfilling} title="Rilegge da Stripe lo stato abbonamento di tutti gli abbonati e aggiorna il database" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-60">{backfilling ? "Sincronizzo…" : "⟳ Aggiorna da Stripe"}</button>}
         <button onClick={load} disabled={loading} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-60">{loading ? "Aggiorno…" : "↻ Aggiorna"}</button>
       </div>
     </>

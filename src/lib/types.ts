@@ -241,6 +241,7 @@ export interface Guest {
   // CRM
   vip?: boolean;
   marketingConsent?: boolean;
+  source?: string;      // provenienza del contatto (es. "sito" per gli iscritti newsletter dal sito pubblico)
   tags?: string[];
   preferences?: string; // richieste ricorrenti, allergie…
   notes?: string;       // note interne
@@ -328,6 +329,9 @@ export interface Booking {
   cancelledBy?: "guest" | "host";
   refundedAmount?: number; // € rimborsati (0 se fuori policy)
   changeRequest?: { at: string; ci?: string; co?: string; adults?: number; children?: number; message?: string }; // richiesta di modifica date inviata al gestore
+  // Richiesta recensione post check-out: tracciamento invio (non la recensione ricevuta, che vive su Google/OTA).
+  reviewRequestedAt?: number; // epoch ms in cui è stata inviata la richiesta di recensione all'ospite
+  reviewRequestChannel?: "whatsapp" | "email"; // canale usato per l'ultima richiesta
 }
 
 // Recensione DIRETTA: lasciata da un ospite sul mini-sito pubblico (Xenosite).

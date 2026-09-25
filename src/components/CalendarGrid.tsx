@@ -1411,7 +1411,7 @@ export default function CalendarGrid() {
         return (
           <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]">
             <button aria-label="Chiudi" onClick={() => setPick(null)} className="absolute inset-0 bg-black/40" />
-            <div className="relative w-full max-w-xs rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="font-display text-lg font-bold text-txt">Cosa vuoi inserire?</div>
               <div className="mb-4 mt-0.5 text-xs text-dim">{u?.name} · <span className="capitalize">{pretty}</span> · {nn} {nn === 1 ? "notte" : "notti"}</div>
               <div className="flex flex-col gap-2">
@@ -1448,7 +1448,7 @@ export default function CalendarGrid() {
                   </span>
                 </button>
               </div>
-              <button onClick={() => setPick(null)} className="mt-4 w-full rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
+              <button onClick={() => setPick(null)} className="mt-4 w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">Annulla</button>
             </div>
           </div>
         );

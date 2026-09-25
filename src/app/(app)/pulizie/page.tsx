@@ -29,7 +29,7 @@ const ACT: Record<ActionKey, { label: string; color: string }> = {
   niente: { label: "Niente", color: "var(--focus)" },
 };
 
-interface Issue { id: string; unitId: string; unitName: string; structureName: string; date: string; type: string; note: string; photo?: string; createdAt: string; resolved?: boolean; resolvedAt?: string }
+interface Issue { id: string; unitId: string; unitName: string; structureName: string; date: string; type: string; note: string; photo?: string; createdAt: string; resolved?: boolean; resolvedAt?: string; updatedAt?: number; _deleted?: boolean }
 const ISSUE_TYPES: { key: string; label: string; icon: string; color: string }[] = [
   { key: "guasto", label: "Guasto / manutenzione", icon: "settings", color: "var(--err)" },
   { key: "danno", label: "Danno / macchia", icon: "logout", color: "var(--warn)" },
@@ -40,8 +40,8 @@ const ISSUE_TYPES: { key: string; label: string; icon: string; color: string }[]
 const issueMeta = (key: string) => ISSUE_TYPES.find((x) => x.key === key) ?? ISSUE_TYPES[ISSUE_TYPES.length - 1];
 
 type StockStatus = "ok" | "low" | "out";
-interface Prod { id: string; name: string; structureId: string; qty: number; min: number; supplier?: string }
-interface Order { id: string; productId: string; productName: string; structureId: string; date: string; qty: number; cost?: number }
+interface Prod { id: string; name: string; structureId: string; qty: number; min: number; supplier?: string; updatedAt?: number; _deleted?: boolean }
+interface Order { id: string; productId: string; productName: string; structureId: string; date: string; qty: number; cost?: number; updatedAt?: number }
 const DEFAULT_PRODUCTS = ["Carta igienica", "Prodotti cortesia (kit bagno)", "Anticalcare", "Detergente vetri", "Sgrassatore cucina", "Detersivo pavimenti", "Sapone mani", "Sacchi spazzatura", "Spugne e panni", "Shampoo / bagnoschiuma"];
 const statusOf = (p: Prod): StockStatus => (p.qty <= 0 ? "out" : p.qty <= p.min ? "low" : "ok");
 const STOCK_STATUS: { key: StockStatus; label: string; short: string; color: string }[] = [
@@ -74,13 +74,15 @@ export default function PuliziePage() {
   const persistIssues = (next: Issue[]) => { setIssues(next); try { localStorage.setItem("spigolestay:pulizie:issues", JSON.stringify(next)); } catch {} };
   const [issueDraft, setIssueDraft] = useState<null | { unitId: string; unitName: string; structureName: string; type: string; note: string; photo?: string }>(null);
   const [showResolved, setShowResolved] = useState(false);
-  const saveIssue = () => { if (!issueDraft || !issueDraft.note.trim()) return; const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()); persistIssues([{ id, unitId: issueDraft.unitId, unitName: issueDraft.unitName, structureName: issueDraft.structureName, date, type: issueDraft.type, note: issueDraft.note.trim(), photo: issueDraft.photo, createdAt: new Date().toISOString(), resolved: false }, ...issues]); playSound("done"); notify(`⚠ Segnalazione · ${issueDraft.unitName}`, `${issueMeta(issueDraft.type).label}: ${issueDraft.note.trim()}`); setIssueDraft(null); };
-  const resolveIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, resolved: true, resolvedAt: new Date().toISOString() } : i)));
-  const reopenIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, resolved: false, resolvedAt: undefined } : i)));
-  const deleteIssue = (id: string) => persistIssues(issues.filter((i) => i.id !== id));
+  const saveIssue = () => { if (!issueDraft || !issueDraft.note.trim()) return; const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()); persistIssues([{ id, unitId: issueDraft.unitId, unitName: issueDraft.unitName, structureName: issueDraft.structureName, date, type: issueDraft.type, note: issueDraft.note.trim(), photo: issueDraft.photo, createdAt: new Date().toISOString(), resolved: false, updatedAt: Date.now() }, ...issues]); playSound("done"); notify(`⚠ Segnalazione · ${issueDraft.unitName}`, `${issueMeta(issueDraft.type).label}: ${issueDraft.note.trim()}`); setIssueDraft(null); };
+  const resolveIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, resolved: true, resolvedAt: new Date().toISOString(), updatedAt: Date.now() } : i)));
+  const reopenIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, resolved: false, resolvedAt: undefined, updatedAt: Date.now() } : i)));
+  // Cancellazione = soft-delete (tombstone _deleted + updatedAt): la fusione LWW per id fa
+  // vincere la cancellazione recente, così una segnalazione eliminata non risorge da un'altra copia.
+  const deleteIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, _deleted: true, updatedAt: Date.now() } : i)));
   const onIssuePhoto = (file: File | undefined) => { if (!file) return; const reader = new FileReader(); reader.onload = () => setIssueDraft((d) => (d ? { ...d, photo: reader.result as string } : d)); reader.readAsDataURL(file); };
-  const openIssues = issues.filter((i) => !i.resolved);
-  const resolvedIssues = issues.filter((i) => i.resolved).sort((a, b) => (b.resolvedAt ?? b.createdAt).localeCompare(a.resolvedAt ?? a.createdAt));
+  const openIssues = issues.filter((i) => !i.resolved && !i._deleted);
+  const resolvedIssues = issues.filter((i) => i.resolved && !i._deleted).sort((a, b) => (b.resolvedAt ?? b.createdAt).localeCompare(a.resolvedAt ?? a.createdAt));
   const roomHasIssue = (unitId: string) => openIssues.some((i) => i.unitId === unitId && i.date === date);
 
   // Scorte / lista della spesa (prodotti ricorrenti).
@@ -135,27 +137,32 @@ export default function PuliziePage() {
       document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
-  const setQty = (id: string, qty: number) => persistStock(stock.map((p) => (p.id === id ? { ...p, qty: Math.max(0, qty) } : p)));
+  const setQty = (id: string, qty: number) => persistStock(stock.map((p) => (p.id === id ? { ...p, qty: Math.max(0, qty), updatedAt: Date.now() } : p)));
   // Pulsanti rapidi (per la signora): impostano la giacenza in base allo stato scelto.
   const setStatusQuick = (p: Prod, s: StockStatus) => setQty(p.id, s === "out" ? 0 : s === "low" ? Math.max(1, p.min) : p.qty > p.min ? p.qty : p.min + 1);
   const newProdId = () => ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2));
   const saveProd = () => {
     const d = prodDraft; if (!d || !d.name.trim()) return;
     const name = d.name.trim(); const supplier = d.supplier.trim() || undefined; const qty = Math.max(0, d.qty); const min = Math.max(0, d.min);
-    if (d.id) persistStock(stock.map((p) => (p.id === d.id ? { ...p, name, structureId: d.structureId || p.structureId, supplier, qty, min } : p)));
-    else if (d.applyAll && activeStructureId === "all") persistStock([...stock, ...structures.map((s) => ({ id: newProdId(), name, structureId: s.id, supplier, qty, min }))]);
-    else { const sid = d.structureId || (activeStructureId !== "all" ? activeStructureId : structures[0]?.id) || ""; if (!sid) return; persistStock([...stock, { id: newProdId(), name, structureId: sid, supplier, qty, min }]); }
+    if (d.id) persistStock(stock.map((p) => (p.id === d.id ? { ...p, name, structureId: d.structureId || p.structureId, supplier, qty, min, updatedAt: Date.now() } : p)));
+    else if (d.applyAll && activeStructureId === "all") persistStock([...stock, ...structures.map((s) => ({ id: newProdId(), name, structureId: s.id, supplier, qty, min, updatedAt: Date.now() }))]);
+    else { const sid = d.structureId || (activeStructureId !== "all" ? activeStructureId : structures[0]?.id) || ""; if (!sid) return; persistStock([...stock, { id: newProdId(), name, structureId: sid, supplier, qty, min, updatedAt: Date.now() }]); }
     setProdDraft(null);
   };
-  const delProd = (id: string) => persistStock(stock.filter((p) => p.id !== id));
+  // Cancellazione = soft-delete (tombstone _deleted + updatedAt): la fusione LWW per id fa vincere
+  // la cancellazione recente, così un prodotto eliminato non "risorge" da una copia stantìa.
+  const delProd = (id: string) => persistStock(stock.map((p) => (p.id === id ? { ...p, _deleted: true, updatedAt: Date.now() } : p)));
   const [confirmDelProd, setConfirmDelProd] = useState<Prod | null>(null);
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [restock, setRestock] = useState<null | { product: Prod; qty: number; cost: string }>(null);
-  const doRestock = () => { const r = restock; if (!r || r.qty <= 0) return; setQty(r.product.id, r.product.qty + r.qty); const c = r.cost.trim() ? Number(r.cost.replace(",", ".")) : undefined; const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()); persistOrders([{ id, productId: r.product.id, productName: r.product.name, structureId: r.product.structureId, date: new Date().toISOString(), qty: r.qty, cost: Number.isFinite(c as number) ? c : undefined }, ...orders]); setRestock(null); };
+  const doRestock = () => { const r = restock; if (!r || r.qty <= 0) return; setQty(r.product.id, r.product.qty + r.qty); const c = r.cost.trim() ? Number(r.cost.replace(",", ".")) : undefined; const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()); persistOrders([{ id, productId: r.product.id, productName: r.product.name, structureId: r.product.structureId, date: new Date().toISOString(), qty: r.qty, cost: Number.isFinite(c as number) ? c : undefined, updatedAt: Date.now() }, ...orders]); setRestock(null); };
   // Ambito: se una struttura è attiva mostro solo le sue scorte; con "tutte" le mostro raggruppate.
+  // I prodotti soft-eliminati (_deleted) restano nell'array (per la fusione anti-resurrezione) ma
+  // non vengono mai mostrati né conteggiati.
   const scopeStructures = activeStructureId === "all" ? structures : structures.filter((s) => s.id === activeStructureId);
   const scopeIds = scopeStructures.map((s) => s.id);
-  const stockScoped = stock.filter((p) => scopeIds.includes(p.structureId));
+  const stockLive = stock.filter((p) => !p._deleted);
+  const stockScoped = stockLive.filter((p) => scopeIds.includes(p.structureId));
   const structNameOf = (id: string) => structures.find((s) => s.id === id)?.name ?? "";
   // Colore della struttura: quello scelto nella scheda struttura (photoColor); in mancanza, palette di riserva.
   const structColorOf = (id: string) => structures.find((s) => s.id === id)?.photoColor || STRUCT_COLORS[Math.max(0, structures.findIndex((s) => s.id === id)) % STRUCT_COLORS.length];
@@ -387,7 +394,7 @@ export default function PuliziePage() {
           {(() => { const empty = shopList.length === 0; return (
             <div className="order-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm lg:order-2">
               <div className="ml-auto flex items-center gap-2">
-                <button disabled={empty} onClick={() => persistStock(stock.map((p) => (scopeIds.includes(p.structureId) && statusOf(p) !== "ok" ? { ...p, qty: p.min + 2 } : p)))} className="whitespace-nowrap rounded-lg border border-line px-3 py-2 text-sm font-semibold text-[color:var(--ok)] hover:bg-wash disabled:opacity-40 disabled:hover:bg-transparent">{t("Tutto riassortito")}</button>
+                <button disabled={empty} onClick={() => persistStock(stock.map((p) => (!p._deleted && scopeIds.includes(p.structureId) && statusOf(p) !== "ok" ? { ...p, qty: p.min + 2, updatedAt: Date.now() } : p)))} className="whitespace-nowrap rounded-lg border border-line px-3 py-2 text-sm font-semibold text-[color:var(--ok)] hover:bg-wash disabled:opacity-40 disabled:hover:bg-transparent">{t("Tutto riassortito")}</button>
                 <div ref={shareRef} className="relative">
                   <button disabled={empty} onClick={() => setShareOpen((v) => !v)} className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
                   {shareOpen && (
@@ -447,7 +454,7 @@ export default function PuliziePage() {
 
           {/* Inventario prodotti — riga 2 col sinistra (order 2 mobile / 3 desktop) */}
           <div className="order-2 rounded-xl border border-line bg-surface p-3 shadow-sm lg:order-3 lg:flex lg:h-[34rem] lg:flex-col">
-            <div className="mb-2 flex items-center gap-2 text-sm font-bold text-txt"><Icon name="grid" size={16} /> {t("Prodotti")} <span className="text-faint">· {stockFiltered.length}/{stock.length}</span></div>
+            <div className="mb-2 flex items-center gap-2 text-sm font-bold text-txt"><Icon name="grid" size={16} /> {t("Prodotti")} <span className="text-faint">· {stockFiltered.length}/{stockLive.length}</span></div>
             <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
               {stockFiltered.length === 0 && <div className="py-4 text-center text-xs text-faint">{t("Nessun prodotto trovato.")}</div>}
               {activeStructureId === "all" ? (

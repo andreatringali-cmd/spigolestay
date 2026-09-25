@@ -48,28 +48,35 @@ export default function AssistantBar() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[10vh]">
+        <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[9vh]">
           <button aria-label="Chiudi" onClick={() => setOpen(false)} className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
-          <div className="relative flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
-            {/* Input */}
-            <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-              <span className="text-focus"><Icon name="chat" size={18} /></span>
+          <div className="anim-pop relative flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
+            {/* Barra di richiesta */}
+            <div className="flex items-center gap-2.5 border-b border-line px-3.5 py-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white shadow-sm" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name="chat" size={16} /></span>
               <input
                 ref={inputRef}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Es. quanto ho incassato a luglio? chi arriva domani?"
+                placeholder="Chiedimi qualsiasi cosa…"
                 className="w-full bg-transparent text-[15px] text-txt outline-none placeholder:text-faint"
               />
-              {q && <button onClick={() => setQ("")} className="rounded px-1.5 text-dim hover:text-txt">✕</button>}
+              {q
+                ? <button onClick={() => setQ("")} title="Cancella" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-dim transition hover:bg-wash hover:text-txt">✕</button>
+                : <kbd className="hidden shrink-0 rounded border border-line bg-paper px-1.5 py-0.5 text-[10px] font-semibold text-dim sm:block">/</kbd>}
             </div>
 
-            {/* Risposta */}
-            <div className="max-h-[62vh] overflow-y-auto p-3">
+            {/* Conversazione / risposta */}
+            <div className="max-h-[62vh] overflow-y-auto p-3.5">
               {(res.kind === "help" || (res.kind === "empty" && res.suggestions)) && (
-                <div className="p-1">
-                  {res.detail && <p className="mb-3 px-1 text-sm text-dim">{res.detail}</p>}
-                  <div className="flex flex-wrap gap-2">
+                <div>
+                  {res.detail && (
+                    <div className="mb-3 flex items-start gap-2.5">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name="chat" size={14} /></span>
+                      <p className="max-w-[85%] rounded-2xl rounded-tl-md border border-line bg-wash px-3.5 py-2.5 text-sm leading-relaxed text-txt">{res.detail}</p>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2 pl-10">
                     {(res.suggestions ?? SUGGESTIONS).map((s) => (
                       <button key={s} onClick={() => setQ(s)} className="rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-medium text-dim transition hover:border-focus hover:text-focus">{s}</button>
                     ))}
@@ -78,47 +85,52 @@ export default function AssistantBar() {
               )}
 
               {res.kind === "empty" && !res.suggestions && (
-                <div className="flex items-center gap-3 rounded-xl bg-wash px-4 py-4">
-                  <span className="grid h-9 w-9 place-items-center rounded-lg text-faint" style={{ backgroundColor: "color-mix(in srgb, var(--faint) 16%, transparent)" }}><Icon name={res.icon} size={18} /></span>
-                  <div><div className="text-sm font-semibold text-txt">{res.title}</div>{res.detail && <div className="text-xs text-dim">{res.detail}</div>}</div>
+                <div className="flex items-start gap-2.5">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name={res.icon} size={14} /></span>
+                  <div className="max-w-[85%] rounded-2xl rounded-tl-md border border-line bg-wash px-4 py-3">
+                    <div className="text-sm font-semibold text-txt">{res.title}</div>
+                    {res.detail && <div className="mt-0.5 text-xs text-dim">{res.detail}</div>}
+                  </div>
                 </div>
               )}
 
               {res.kind === "answer" && (
-                <div>
-                  <div className="flex items-center gap-3 rounded-xl px-3 py-3" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" }}>
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white" style={{ backgroundColor: "var(--focus)" }}><Icon name={res.icon} size={20} /></span>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold text-txt">{res.title}</div>
-                      {res.detail && <div className="text-xs text-dim">{res.detail}</div>}
+                <div className="flex items-start gap-2.5">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name={res.icon} size={14} /></span>
+                  <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-line bg-wash px-4 py-3.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-txt">{res.title}</div>
+                        {res.detail && <div className="mt-0.5 text-xs text-dim">{res.detail}</div>}
+                      </div>
+                      {res.metric && <div className="shrink-0 font-mono text-2xl font-bold tabular-nums text-focus">{res.metric}</div>}
                     </div>
-                    {res.metric && <div className="shrink-0 font-mono text-2xl font-bold text-focus">{res.metric}</div>}
+
+                    {res.items && res.items.length > 0 && (
+                      <div className="mt-3 flex flex-col divide-y divide-[color:var(--line)] overflow-hidden rounded-xl border border-line bg-paper">
+                        {res.items.map((it, i) => {
+                          const clickable = !!(it.bookingId || it.href);
+                          const onClick = it.bookingId ? () => openBk(it.bookingId!) : it.href ? () => go(it.href!) : undefined;
+                          return (
+                            <button key={i} onClick={onClick} disabled={!clickable} className={`flex items-center gap-3 px-3 py-2.5 text-left transition ${clickable ? "hover:bg-wash" : ""}`}>
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-sm font-medium text-txt">{it.label}</div>
+                                {it.sub && <div className="truncate text-xs text-dim">{it.sub}</div>}
+                              </div>
+                              {it.badge && <span className="shrink-0 rounded-full bg-wash px-2 py-0.5 font-mono text-[11px] font-semibold text-dim">{it.badge}</span>}
+                              {clickable && <span className="shrink-0 text-faint">›</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {res.href && (
+                      <button onClick={() => go(res.href!)} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-paper py-2.5 text-sm font-semibold text-focus transition hover:border-focus hover:bg-surface">
+                        {res.hrefLabel ?? "Vedi tutto"} →
+                      </button>
+                    )}
                   </div>
-
-                  {res.items && res.items.length > 0 && (
-                    <div className="mt-2 flex flex-col divide-y divide-[color:var(--line)] overflow-hidden rounded-xl border border-line">
-                      {res.items.map((it, i) => {
-                        const clickable = !!(it.bookingId || it.href);
-                        const onClick = it.bookingId ? () => openBk(it.bookingId!) : it.href ? () => go(it.href!) : undefined;
-                        return (
-                          <button key={i} onClick={onClick} disabled={!clickable} className={`flex items-center gap-3 px-3 py-2.5 text-left ${clickable ? "hover:bg-wash" : ""}`}>
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-sm font-medium text-txt">{it.label}</div>
-                              {it.sub && <div className="truncate text-xs text-dim">{it.sub}</div>}
-                            </div>
-                            {it.badge && <span className="shrink-0 rounded-full bg-wash px-2 py-0.5 font-mono text-[11px] font-semibold text-dim">{it.badge}</span>}
-                            {clickable && <span className="shrink-0 text-faint">›</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {res.href && (
-                    <button onClick={() => go(res.href!)} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-line py-2.5 text-sm font-semibold text-focus transition hover:bg-wash">
-                      {res.hrefLabel ?? "Vedi tutto"} →
-                    </button>
-                  )}
                 </div>
               )}
             </div>

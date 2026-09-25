@@ -4,10 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseISO, toISO } from "@/lib/dates";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import Icon from "@/components/Icon";
+import EmptyState from "@/components/EmptyState";
 import { useData } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
+import { apiPost } from "@/lib/invoicing/client";
 import { DATA_KEY } from "@/lib/publicdata";
 import type { NormalizedReview } from "@/lib/reviews/google";
+import { googleReviewUrl, recentCheckouts, reviewRequestMessage, stayNights } from "@/lib/reviews";
 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" });
 
@@ -45,7 +48,7 @@ interface GoogleState {
 }
 
 export default function RecensioniPage() {
-  const { structures, activeStructureId, updateStructure, directReviews, setDirectReviewReply } = useData();
+  const { structures, bookings, guests, activeStructureId, updateStructure, updateBooking, addActivity, directReviews, setDirectReviewReply } = useData();
 
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -59,6 +62,13 @@ export default function RecensioniPage() {
 
   const [google, setGoogle] = useState<GoogleState>({ loading: false, configured: null, reviews: [] });
   const [manual, setManual] = useState<ManualReview[]>([]);
+
+  // --- Richiesta recensione post check-out -------------------------------------------------
+  const [reqWindow, setReqWindow] = useState<number>(30); // finestra giorni dei check-out recenti
+  const [reqBusy, setReqBusy] = useState<Record<string, "wa" | "email">>({}); // invii in corso per prenotazione
+  const [reqMsg, setReqMsg] = useState<string>(""); // feedback transitorio
+  const [wa, setWa] = useState<{ connected: boolean; phoneId: string }>({ connected: false, phoneId: "" });
+  useEffect(() => { apiPost<{ connected: boolean; phoneId: string }>("whatsapp/settings", { action: "status" }).then((r) => setWa({ connected: !!r.connected, phoneId: r.phoneId || "" })).catch(() => {}); }, []);
 
   // Form inserimento manuale
   const [showManual, setShowManual] = useState(false);
@@ -312,6 +322,77 @@ export default function RecensioniPage() {
     if (r.source === "direct") { setDirectReviewReply(r.id, ""); await pushDirectToSnapshot(r.id, ""); }
   };
 
+  // Check-out recenti (rispetta il selettore struttura globale). La struttura di ogni
+  // prenotazione porta con sé il proprio Google Place ID → link recensione per-struttura.
+  const checkouts = useMemo(
+    () => recentCheckouts(bookings, guests, { days: reqWindow, structureId: activeStructureId }),
+    [bookings, guests, reqWindow, activeStructureId],
+  );
+  const requestedCount = checkouts.filter((c) => c.requested).length;
+  // Structure attive nell'elenco senza Place ID → avviso "imposta Google Place ID".
+  const missingPlaceId = useMemo(() => {
+    const ids = new Set(checkouts.map((c) => c.booking.structureId));
+    return structures.filter((s) => ids.has(s.id) && !(s.googlePlaceId || "").trim());
+  }, [checkouts, structures]);
+
+  const flash = (m: string) => { setReqMsg(m); window.setTimeout(() => setReqMsg((cur) => (cur === m ? "" : cur)), 4000); };
+
+  // Segna la richiesta come inviata sulla prenotazione (persistito nel blob via updateBooking,
+  // che aggiorna updatedAt → la sync last-write-wins la propaga senza rompere nulla).
+  const markRequested = (bookingId: string, channel: "whatsapp" | "email") => {
+    updateBooking(bookingId, { reviewRequestedAt: Date.now(), reviewRequestChannel: channel });
+  };
+
+  // Richiesta via WhatsApp: se la Cloud API è collegata invia davvero; altrimenti apre wa.me.
+  const requestWhatsapp = async (bookingId: string) => {
+    const item = checkouts.find((c) => c.booking.id === bookingId);
+    if (!item) return;
+    const st = structures.find((s) => s.id === item.booking.structureId);
+    const url = googleReviewUrl(st?.googlePlaceId);
+    if (!url) { flash("Imposta prima il Google Place ID di questa struttura."); return; }
+    const phone = (item.guest?.phone ?? "").replace(/\D/g, "");
+    if (!phone) { flash("L'ospite non ha un numero di telefono."); return; }
+    const text = reviewRequestMessage({ guestName: item.guestName, structureName: st?.name, reviewUrl: url });
+    setReqBusy((b) => ({ ...b, [bookingId]: "wa" }));
+    try {
+      let sent = false;
+      if (wa.connected) { try { const r = await apiPost<{ ok: boolean }>("whatsapp/send", { to: phone, text }); sent = !!r.ok; } catch { sent = false; } }
+      if (!sent) window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+      markRequested(bookingId, "whatsapp");
+      addActivity("message", `Richiesta recensione inviata (WhatsApp)${item.guestName ? " — " + item.guestName : ""}`);
+      flash(sent ? "Richiesta inviata via WhatsApp." : "WhatsApp aperto con il messaggio pronto.");
+    } finally { setReqBusy((b) => { const n = { ...b }; delete n[bookingId]; return n; }); }
+  };
+
+  // Richiesta via email (Resend, kind "guest_message"); fallback a Gmail compose se l'invio fallisce.
+  const requestEmail = async (bookingId: string) => {
+    const item = checkouts.find((c) => c.booking.id === bookingId);
+    if (!item) return;
+    const st = structures.find((s) => s.id === item.booking.structureId);
+    const url = googleReviewUrl(st?.googlePlaceId);
+    if (!url) { flash("Imposta prima il Google Place ID di questa struttura."); return; }
+    const email = item.guest?.email?.trim();
+    if (!email) { flash("L'ospite non ha un'email."); return; }
+    const subject = `Com'è andato il soggiorno${st?.name ? ` a ${st.name}` : ""}?`;
+    const text = reviewRequestMessage({ guestName: item.guestName, structureName: st?.name, reviewUrl: url });
+    setReqBusy((b) => ({ ...b, [bookingId]: "email" }));
+    try {
+      let ok = false;
+      try {
+        const brand = { name: st?.name, logo: st?.logo, address: [st?.address, st?.streetNumber, st?.city].filter(Boolean).join(" "), phone: st?.phone, email: st?.email, website: st?.website, accent: st?.photoColor, cin: st?.cin, vat: st?.vat };
+        const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "guest_message", to: email, subject, text, accent: st?.photoColor, replyTo: st?.email, brand }) });
+        const j = await r.json().catch(() => ({}));
+        ok = r.ok && !!j?.ok;
+      } catch { ok = false; }
+      if (!ok) window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`, "_blank", "noopener");
+      markRequested(bookingId, "email");
+      addActivity("message", `Richiesta recensione inviata (email)${item.guestName ? " — " + item.guestName : ""}`);
+      flash(ok ? "Richiesta inviata via email." : "Bozza email aperta con il messaggio pronto.");
+    } finally { setReqBusy((b) => { const n = { ...b }; delete n[bookingId]; return n; }); }
+  };
+
+  const undoRequested = (bookingId: string) => updateBooking(bookingId, { reviewRequestedAt: undefined, reviewRequestChannel: undefined });
+
   const suggest = (r: { guest: string; bucket: string }) => {
     const first = r.guest.split(" ")[0];
     if (r.bucket === "pos") return `Grazie di cuore ${first}! Siamo felicissimi che il soggiorno sia stato all'altezza. Ti aspettiamo di nuovo a Siracusa — alla prossima con una sorpresa riservata a chi torna. 🌊`;
@@ -331,6 +412,73 @@ export default function RecensioniPage() {
         <StatCard label="Da rispondere" value={unanswered} color={unanswered ? "var(--warn)" : "var(--ok)"} />
         <StatCard label="Positive" value={`${reviews.length ? Math.round(reviews.filter((r) => r.bucket === "pos").length / reviews.length * 100) : 0}%`} color="var(--ok)" />
       </div>
+
+      {/* Chiedi la recensione: automazione della richiesta Google post check-out + tracciamento invio */}
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <SectionTitle>Chiedi la recensione</SectionTitle>
+            {checkouts.length > 0 && <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">{requestedCount}/{checkouts.length} già richieste</span>}
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="mr-1 text-[11px] font-semibold text-faint">Check-out ultimi</span>
+            {[7, 14, 30, 60].map((d) => (
+              <button key={d} onClick={() => setReqWindow(d)} className={`rounded-lg px-2 py-1 text-xs font-semibold transition ${reqWindow === d ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{d}g</button>
+            ))}
+          </div>
+        </div>
+        <p className="mt-1 text-xs text-dim">Invia all&apos;ospite il link diretto alla recensione Google della struttura, via WhatsApp o email. Segna chi ha già ricevuto la richiesta.</p>
+
+        {reqMsg && <div className="mt-2 rounded-lg border border-line bg-wash px-3 py-2 text-[13px] text-txt">{reqMsg}</div>}
+
+        {missingPlaceId.length > 0 && (
+          <div className="mt-2 rounded-lg border p-2.5 text-[13px]" style={{ borderColor: "var(--warn)", background: "color-mix(in srgb, var(--warn) 8%, transparent)" }}>
+            <span className="font-semibold text-txt">Manca il Google Place ID</span>
+            <span className="text-dim"> per {missingPlaceId.map((s) => s.name).join(", ")}. Impostalo (pulsante «Google» tra le Fonti qui sotto) per generare il link recensione.</span>
+          </div>
+        )}
+
+        {checkouts.length === 0 ? (
+          <div className="mt-2"><EmptyState title="Nessun check-out recente" sub={`Le prenotazioni con partenza negli ultimi ${reqWindow} giorni compariranno qui per chiedere la recensione.`} /></div>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {checkouts.map(({ booking: b, guest: g, guestName, daysAgo, requested }) => {
+              const st = structures.find((s) => s.id === b.structureId);
+              const hasPid = Boolean((st?.googlePlaceId || "").trim());
+              const busy = reqBusy[b.id];
+              const ago = daysAgo === 1 ? "ieri" : `${daysAgo} giorni fa`;
+              const nn = stayNights(b);
+              return (
+                <div key={b.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-line bg-paper px-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-txt">{guestName}</span>
+                      {requested && <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }}>✓ Richiesta inviata{b.reviewRequestChannel ? ` · ${b.reviewRequestChannel === "whatsapp" ? "WhatsApp" : "email"}` : ""}</span>}
+                    </div>
+                    <div className="mt-0.5 truncate text-[11px] text-faint">
+                      {st?.name ? `${st.name} · ` : ""}Check-out {fmt(b.checkOut)} ({ago}){nn ? ` · ${nn} notti` : ""}
+                      {g?.phone ? ` · ${g.phone}` : ""}{g?.email ? ` · ${g.email}` : ""}
+                    </div>
+                  </div>
+                  {requested ? (
+                    <button onClick={() => undoRequested(b.id)} className="shrink-0 text-[11px] font-semibold text-faint hover:text-[color:var(--err)]">Segna come non inviata</button>
+                  ) : (
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <button onClick={() => requestWhatsapp(b.id)} disabled={!!busy || !hasPid || !g?.phone} title={!hasPid ? "Imposta il Google Place ID della struttura" : !g?.phone ? "L'ospite non ha un telefono" : "Chiedi la recensione via WhatsApp"} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>
+                        {busy === "wa" ? "…" : "WhatsApp"}
+                      </button>
+                      <button onClick={() => requestEmail(b.id)} disabled={!!busy || !hasPid || !g?.email} title={!hasPid ? "Imposta il Google Place ID della struttura" : !g?.email ? "L'ospite non ha un'email" : "Chiedi la recensione via email"} className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus transition hover:bg-wash disabled:opacity-40">
+                        {busy === "email" ? "…" : "Email"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <p className="mt-2 text-[11px] text-faint">Le recensioni effettivamente lasciate su Google non sono recuperabili senza API a pagamento: qui si gestisce la <strong>richiesta</strong> e il <strong>tracciamento dell&apos;invio</strong>. Le recensioni ricevute compaiono nell&apos;elenco sotto quando Google è collegato.</p>
+      </Card>
 
 
       {/* Finestra di configurazione Google: ricerca struttura + Place ID */}

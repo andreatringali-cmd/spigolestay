@@ -121,6 +121,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     for (const i of ids) if (i) set.add(i);
     deletedRef.current[key] = [...set];
   };
+  // Tombstone di CONTATTO (email/telefono normalizzati) per gli iscritti newsletter / lead
+  // cancellati: il tombstone per-id non basta perché il sito pubblico può re-inserirli con un id
+  // nuovo. La fusione (authsync) usa questo elenco per non farli "riapparire dopo la sync".
+  const deletedLeadsRef = useRef<string[]>([]);
+  const tombLeadContact = (g?: { email?: string; phone?: string }) => {
+    if (!g) return;
+    const set = new Set(deletedLeadsRef.current);
+    const email = (g.email ?? "").trim().toLowerCase(); if (email) set.add("email:" + email);
+    const phone = (g.phone ?? "").replace(/[\s+()./-]/g, ""); if (phone.length >= 6) set.add("tel:" + phone);
+    deletedLeadsRef.current = [...set];
+  };
   const currentActor = (): string | undefined => {
     try {
       const cur = localStorage.getItem("spigolestay:currentuser");
@@ -191,6 +202,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
         if (Array.isArray(d.units)) setUnits(d.units as Unit[]);
         if (d._deleted && typeof d._deleted === "object") deletedRef.current = d._deleted as Record<string, string[]>;
+        if (Array.isArray(d._deletedLeads)) deletedLeadsRef.current = d._deletedLeads as string[];
         if (Array.isArray(d.guests)) setGuests(d.guests);
         if (Array.isArray(d.bookings)) setBookings(d.bookings);
         if (Array.isArray(d.events)) setEvents(d.events);
@@ -210,7 +222,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // 2) Salvataggio ad ogni cambiamento, solo dopo il caricamento iniziale.
   useEffect(() => {
     if (!ready || isPublicMode()) return; // in pubblico non si scrive nel browser del visitatore
-    try { localStorage.setItem(KEY, JSON.stringify({ structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews, _deleted: deletedRef.current })); } catch {}
+    try { localStorage.setItem(KEY, JSON.stringify({ structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews, _deleted: deletedRef.current, _deletedLeads: deletedLeadsRef.current })); } catch {}
   }, [ready, structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews]);
 
   // Ri-idratazione IN-PLACE: quando la sincronizzazione col server aggiorna i dati (anche solo
@@ -235,6 +247,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (Array.isArray(d.activities)) setActivities(d.activities);
         if (Array.isArray(d.directReviews)) setDirectReviews(d.directReviews);
         if (d._deleted && typeof d._deleted === "object") deletedRef.current = d._deleted as Record<string, string[]>;
+        if (Array.isArray(d._deletedLeads)) deletedLeadsRef.current = d._deletedLeads as string[];
       } catch {}
     };
     const onVis = () => { if (document.visibilityState === "visible") rehydrate(); };
@@ -384,6 +397,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const g = guests.find((x) => x.id === id);
         const snap = g ? { firstName: g.firstName, lastName: g.lastName, sex: g.sex, birthDate: g.birthDate, birthPlace: g.birthPlace, citizenship: g.citizenship, docType: g.docType, docNumber: g.docNumber } : undefined;
         tomb("guests", id);
+        // Se è un contatto/lead (nessuna prenotazione reale, es. iscritto newsletter), tombstona
+        // anche il CONTATTO: così se il sito pubblico lo re-inserisce con un id nuovo non risorge.
+        const hasRealBooking = bookings.some((b) => b.guestId === id && b.status !== "cancelled" && b.channel !== "blocked");
+        if (g && !hasRealBooking) tombLeadContact(g);
         setBookings((prev) => prev.map((b) => (b.guestId === id ? { ...b, guestId: "", primaryGuest: b.primaryGuest ?? snap } : b)));
         setGuests((prev) => prev.filter((x) => x.id !== id));
       },

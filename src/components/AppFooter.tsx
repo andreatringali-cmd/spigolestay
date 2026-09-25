@@ -29,10 +29,10 @@ export default function AppFooter() {
   ] as { k: string; u: string; c: string }[];
 
   return (
-    <footer className="no-print flex flex-col items-center gap-2 border-t bg-surface px-4 py-3 text-center text-xs text-faint md:flex-row md:justify-between md:px-6" style={{ borderTopColor: "color-mix(in srgb, var(--txt) 14%, var(--line))" }}>
-      <span>© {new Date().getFullYear()} Xenora · Channel Manager — {t("Tutti i diritti riservati")}</span>
+    <footer className="no-print flex flex-row items-center justify-between gap-3 border-t bg-surface px-4 py-3 text-left text-xs text-faint md:px-6" style={{ borderTopColor: "color-mix(in srgb, var(--txt) 14%, var(--line))" }}>
+      <span className="min-w-0">© {new Date().getFullYear()} Xenora · Channel Manager — {t("Tutti i diritti riservati")}</span>
       {socials.length > 0 && (
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1">
           {socials.map((s) => (
             <a key={s.k} href={s.u} target="_blank" rel="noreferrer" title={s.k} aria-label={s.k} style={{ color: s.c }} className="grid h-9 w-9 place-items-center rounded-full transition hover:bg-wash hover:opacity-80">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d={PATHS[s.k]} /></svg>

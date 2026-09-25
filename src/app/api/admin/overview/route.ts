@@ -85,6 +85,11 @@ export async function GET(req: Request) {
       excludeIds = candidateColl.filter((uid) => !payerSet.has(uid));
     }
 
+    // Stato "email confermata" REALE per le sole righe della pagina corrente (owner + membri):
+    // popolato più sotto con getUserById in parallelo. Fallback a `true` se manca/errore
+    // (non allarmare a torto). Vedi FIX 1.
+    const confirmedByUid = new Map<string, boolean>();
+
     const rowFromProfile = (p: Record<string, unknown>): Row => {
       const uid = p.user_id as string;
       const cid = (p.stripe_customer_id as string) || null;
@@ -98,7 +103,7 @@ export async function GET(req: Request) {
         createdAt: (p.created_at as string) ?? null,
         lastSignIn: (p.last_active as string) ?? null,
         lastActive: (p.last_active as string) ?? null,
-        emailConfirmed: true, // in modalità DB non interroghiamo auth.users per riga
+        emailConfirmed: confirmedByUid.has(uid) ? confirmedByUid.get(uid)! : true, // FIX 1: stato reale per la pagina, fallback true
         plan: (p.plan as string) || null,
         structures: (p.structures_count as number) ?? 0,
         rooms: (p.rooms_count as number) ?? 0,
@@ -129,7 +134,13 @@ export async function GET(req: Request) {
       const in7 = new Date(Date.now() + 7 * 86400000).toISOString();
       query = query.or(`subscription_status.in.(past_due,unpaid,incomplete,incomplete_expired,canceled),cancel_at_period_end.eq.true,and(subscription_status.in.(active,trialing),current_period_end.gte.${now},current_period_end.lte.${in7})`);
     }
-    if (excludeIds.length) query = query.not("user_id", "in", `(${excludeIds.join(",")})`);
+    // FIX 2: non incollare TUTTI gli uuid dei collaboratori puri nell'URL (`.not in (...)` cresce
+    // senza limiti → rischio URL troppo lungo a scala). Se il set è piccolo (≤ soglia) manteniamo il
+    // filtro in query (paginazione e `total` esatti). Se è grande, NON filtriamo in query: escludiamo
+    // in memoria dopo il fetch e correggiamo `total` con un'approssimazione documentata (vedi sotto).
+    const EXCLUDE_INLINE_LIMIT = 100;
+    const useInlineExclude = excludeIds.length > 0 && excludeIds.length <= EXCLUDE_INLINE_LIMIT;
+    if (useInlineExclude) query = query.not("user_id", "in", `(${excludeIds.join(",")})`);
 
     const ordered =
       sort === "periodend" ? query.order("current_period_end", { ascending: true, nullsFirst: false })
@@ -140,8 +151,20 @@ export async function GET(req: Request) {
     const from = page * pageSize;
     const { data: pageProfiles, count } = await ordered.range(from, from + pageSize - 1);
 
+    // FIX 2 (segue): quando il set di esclusi è grande non lo abbiamo passato in query.
+    // Filtriamo qui i collaboratori puri e correggiamo `total`. L'approssimazione: sottraiamo dal
+    // conteggio grezzo il numero di esclusi (che compaiono in `profiles`). Con un filtro di stato
+    // attivo può sovrastimare la sottrazione, quindi limitiamo a >= 0. La pagina può risultare con
+    // meno righe di `pageSize` (esclusi rimossi in memoria): imperfezione accettata e documentata.
+    let owners = (pageProfiles || []) as Record<string, unknown>[];
+    let total = count ?? 0;
+    if (excludeIds.length && !useInlineExclude) {
+      const excludeSet = new Set(excludeIds);
+      owners = owners.filter((p) => !excludeSet.has(p.user_id as string));
+      total = Math.max(0, total - excludeIds.length);
+    }
+
     // Collaboratori annidati sotto i titolari di QUESTA pagina.
-    const owners = (pageProfiles || []) as Record<string, unknown>[];
     const memberIdSet = new Set<string>();
     for (const p of owners) for (const oid of (ownsOrgIds.get(p.user_id as string) || [])) for (const uid of (orgMemberIds.get(oid) || [])) if (uid !== (p.user_id as string)) memberIdSet.add(uid);
     const memberProfById = new Map<string, Record<string, unknown>>();
@@ -149,6 +172,18 @@ export async function GET(req: Request) {
       const { data: mp } = await admin.from("profiles").select("*").in("user_id", Array.from(memberIdSet));
       (mp || []).forEach((p) => memberProfById.set(p.user_id as string, p as Record<string, unknown>));
     }
+
+    // FIX 1: stato "email confermata" REALE per le sole righe della pagina (owner + membri).
+    // Poche chiamate (≈ pageSize) in parallelo; su errore lasciamo il fallback `true`.
+    const pageUids = new Set<string>();
+    owners.forEach((p) => pageUids.add(p.user_id as string));
+    memberProfById.forEach((_v, id) => pageUids.add(id));
+    await Promise.all(Array.from(pageUids).map(async (uid) => {
+      try {
+        const { data: u } = await admin.auth.admin.getUserById(uid);
+        confirmedByUid.set(uid, !!(u?.user as { email_confirmed_at?: string | null } | null)?.email_confirmed_at);
+      } catch { /* fallback true: non allarmare a torto */ }
+    }));
 
     const accounts: Account[] = owners.map((p) => {
       const owner = rowFromProfile(p);
@@ -162,7 +197,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       rows,
       accounts,
-      total: count ?? 0,
+      total,
       page,
       pageSize,
       stripeConfigured: !!process.env.STRIPE_SECRET_KEY,

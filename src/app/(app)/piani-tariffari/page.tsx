@@ -163,11 +163,7 @@ export default function PianiTariffariPage() {
                       <td className="px-3 py-2.5 text-xs text-dim">{depositLabel(p, t)}</td>
                       <td className="px-3 py-2.5 text-xs text-dim">{nRooms ? `${nRooms} ${t("tipologie")}` : t("Tutte")}</td>
                       <td className="px-3 py-2.5"><button onClick={(e) => { e.stopPropagation(); setPlan(p.id, { enabled: !on }); }} className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: on ? "var(--ok)" : "var(--faint)" }}><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: on ? "var(--ok)" : "var(--faint)" }} />{on ? t("Attivo") : t("Sospeso")}</button></td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button onClick={(e) => { e.stopPropagation(); delPlan(p.id); }} title={t("Elimina")} className="rounded-md border border-line px-2 py-1 text-[11px] font-medium text-[color:var(--err)] hover:bg-wash">✕</button>
-                        </div>
-                      </td>
+                      <td className="px-3 py-2.5 text-right text-faint" title={t("Apri scheda")}>›</td>
                     </tr>
                   );
                 })}

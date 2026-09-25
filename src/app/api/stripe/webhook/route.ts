@@ -279,6 +279,22 @@ async function reconcileRefund(paymentIntent: string, account: string, isDispute
   void account;
 }
 
+// Mappa configurabile price.id → chiave piano, letta da STRIPE_PRICE_MAP (JSON), es.
+// {"price_xxx":"basic","price_yyy":"pro","price_zzz":"ultimate"}. Usata SOLO come fallback quando
+// il piano non è nei metadata (né della subscription né del price). Parsing difensivo e memoizzato.
+let _priceMapCache: Record<string, string> | null = null;
+function planFromPriceId(priceId: string | null | undefined): string | null {
+  if (!priceId) return null;
+  if (_priceMapCache === null) {
+    try {
+      const parsed = JSON.parse(process.env.STRIPE_PRICE_MAP || "{}") as Record<string, unknown>;
+      _priceMapCache = {};
+      for (const [k, v] of Object.entries(parsed)) if (typeof v === "string") _priceMapCache[k] = v;
+    } catch { _priceMapCache = {}; }
+  }
+  return _priceMapCache[priceId] || null;
+}
+
 // Aggiorna la riga `profiles` del cliente con lo stato dell'abbonamento (per il back-office scalabile:
 // l'elenco si legge dal DB, senza chiamare Stripe per ogni riga). Best-effort.
 async function syncProfileFromSubscription(sub: Stripe.Subscription, deleted: boolean) {
@@ -298,6 +314,7 @@ async function syncProfileFromSubscription(sub: Stripe.Subscription, deleted: bo
     ?? null;
   const planKey = sub.metadata?.plan
     || (price?.metadata as Record<string, string> | undefined)?.plan
+    || planFromPriceId(price?.id)   // FIX 3: fallback via STRIPE_PRICE_MAP (price.id → piano)
     || null;
 
   const patch: Record<string, unknown> = {

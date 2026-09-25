@@ -8,9 +8,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/authsync";
-import { useTheme } from "@/lib/theme";
 import Icon from "@/components/Icon";
-import NeuralShell from "@/components/NeuralShell";
 import { eur } from "@/lib/format";
 import { bookingGrandTotal } from "@/lib/booking";
 import { nights } from "@/lib/dates";
@@ -19,13 +17,6 @@ import { CHANNELS, type Booking } from "@/lib/types";
 // Data locale (NON UTC): altrimenti vicino a mezzanotte "oggi" sfasa di un giorno.
 const todayISO = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; };
 const monthOf = (iso: string) => (iso || "").slice(0, 7);
-
-// Terracotta con alpha, per riflessi/aloni caldi coerenti col nucleo (niente azzurrino).
-function hexA(hex: string, a: number) {
-  const h = (hex || "#B65C3C").replace("#", "");
-  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
-  return `rgba(${isNaN(r) ? 182 : r},${isNaN(g) ? 92 : g},${isNaN(b) ? 60 : b},${Math.max(0, Math.min(1, a))})`;
-}
 
 // Glifo microfono in linea (l'icon-set non ha un "mic"): dà all'assistente un tono più "voce".
 function Mic({ size = 14 }: { size?: number }) {
@@ -44,6 +35,7 @@ export default function AssistentePage() {
   const { bookings, roomTypes, units, getGuest, getStructure, getUnit } = useData();
   const { user } = useAuth();
   const [q, setQ] = useState("");
+  const [sent, setSent] = useState(""); // solo visualizzazione: eco della domanda come "bolla utente"
   const [focused, setFocused] = useState(false);
   const [ans, setAns] = useState<Ans | null>(null);
   const [listening, setListening] = useState(false);
@@ -339,6 +331,7 @@ export default function AssistentePage() {
 
   const ask = useCallback(async (text: string) => {
     if (!text.trim()) return;
+    setSent(text.trim());
     const a = await answer(text);
     setAns(a);
     speak(a.speech ?? [a.title, a.value, a.detail].filter(Boolean).join(". "));
@@ -418,132 +411,170 @@ export default function AssistentePage() {
 
   const state = listening ? "listen" : speaking ? "speak" : "idle";
 
-  // ── Identità cromatica dell'Assistente (theme-aware): greige caldo + terracotta in chiaro,
-  //    notte calda con ambra/terracotta in scuro. NIENTE azzurrino. Stesse superfici del nucleo,
-  //    così hero, barra comandi e risposta sembrano UNA cosa sola col Neural Shell.
-  const { theme } = useTheme();
-  const light = theme !== "dark";
-  const accent = light ? "#B65C3C" : "#E08A5B";
-  const accentInk = light ? "#FFFFFF" : "#1B1510";
-  const gold = light ? "#C79544" : "#E7B968";
-  const panelBg = light
-    ? "radial-gradient(120% 100% at 50% 0%, #FCFBF9 0%, #F3EFE9 100%)"
-    : "radial-gradient(120% 100% at 50% 0%, #1B1510 0%, #120D09 100%)";
-  const panelBorder = light ? "rgba(160,152,138,.42)" : "rgba(120,110,95,.24)";
-  const panelShadow = light
-    ? "0 1px 0 rgba(255,255,255,.7) inset, 0 24px 56px -34px rgba(60,54,44,.4)"
-    : "0 1px 0 rgba(255,255,255,.05) inset, 0 28px 64px -38px rgba(0,0,0,.75)";
-  const eyebrowCol = light ? "rgba(90,85,76,.9)" : "rgba(210,200,188,.75)";
-  const softFill = light ? "rgba(255,255,255,.55)" : "rgba(255,255,255,.04)";
-  const panelStyle = { background: panelBg, borderColor: panelBorder, boxShadow: panelShadow };
+  // ── Presentazione: interfaccia chat moderna e sobria, costruita SOLO sui token del tema Xenora
+  //    (var(--surface/paper/wash/line/txt/dim/faint/focus…) → chiaro e scuro automatici). Accento = --focus
+  //    per coerenza col resto dell'app. Niente palette hardcoded, niente HUD: pulito e leggibile ovunque.
+  const statusLabel = state === "listen" ? "In ascolto…" : state === "speak" ? "Sta rispondendo…" : "Online";
+  const statusTone = state === "listen" ? "var(--err)" : state === "speak" ? "var(--focus)" : "var(--ok)";
+  const focusTint = (pct: number) => `color-mix(in srgb, var(--focus) ${pct}%, transparent)`;
 
-  // Briefing "vivo" del giorno reso a tessere eleganti (stessi dati del testo vocale `briefing`).
+  // Briefing "vivo" del giorno a chip essenziali (stessi dati del testo vocale `briefing`).
   const todayFacts: { k: string; v: string; tone: string }[] = [
-    { k: "Arrivi oggi", v: String(answers.arrivalsToday.length), tone: accent },
-    { k: "Partenze oggi", v: String(answers.departuresToday.length), tone: gold },
+    { k: "Arrivi oggi", v: String(answers.arrivalsToday.length), tone: "var(--ok)" },
+    { k: "Partenze oggi", v: String(answers.departuresToday.length), tone: "var(--warn)" },
   ];
-  if (answers.noCheckin.length) todayFacts.push({ k: "Check-in da fare", v: String(answers.noCheckin.length), tone: "var(--warn)" });
+  if (answers.noCheckin.length) todayFacts.push({ k: "Check-in da fare", v: String(answers.noCheckin.length), tone: "var(--focus)" });
   if (dueCents && dueCents > 0) todayFacts.push({ k: "Da incassare", v: eur(dueCents / 100), tone: "var(--err)" });
 
+  // Avatar leggero dell'assistente (coerente col tema): pallino sfumato sull'accento.
+  const avatar = (dim: string, icon = 16) => (
+    <span className={`grid ${dim} shrink-0 place-items-center rounded-full text-white shadow-sm`} style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }} aria-hidden>
+      <Icon name="chat" size={icon} />
+    </span>
+  );
+
   return (
-    <div className="space-y-4 sm:space-y-5">
-      {/* ─────────── HERO: saluto + briefing del giorno integrati, comandi voce eleganti ─────────── */}
-      <header className="relative overflow-hidden rounded-3xl border p-5 sm:p-7" style={panelStyle}>
-        <span aria-hidden className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full" style={{ background: `radial-gradient(circle, ${hexA(accent, light ? 0.14 : 0.22)} 0%, transparent 70%)` }} />
-        <span aria-hidden className="pointer-events-none absolute -left-24 top-1/3 h-52 w-52 rounded-full" style={{ background: `radial-gradient(circle, ${hexA(gold, light ? 0.1 : 0.16)} 0%, transparent 70%)` }} />
+    <div className="mx-auto w-full max-w-3xl">
+      <section className="flex flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
 
-        <div className="relative flex items-center justify-between gap-3">
-          <span className="inline-flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: eyebrowCol }}>
-            <span aria-hidden className="inline-flex gap-1">
-              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accent }} />
-              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: gold }} />
-            </span>
-            Assistente Xenora
+        {/* ─────────── HEADER del pannello ─────────── */}
+        <header className="flex items-center gap-3 border-b border-line px-4 py-3 sm:px-5">
+          <span className="relative">
+            {avatar("h-10 w-10", 18)}
+            {state !== "idle" && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 animate-pulse rounded-full border-2 border-surface" style={{ backgroundColor: statusTone }} />}
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ borderColor: hexA(accent, 0.35), color: accent, background: hexA(accent, light ? 0.06 : 0.12) }}>
-            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full" style={{ backgroundColor: accent }} />
-            {state === "listen" ? "In ascolto" : state === "speak" ? "Risposta" : "Online"}
-          </span>
-        </div>
-
-        <div className="relative mt-5 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <h1 className="font-display text-[26px] font-bold leading-[1.08] tracking-tight text-txt sm:text-3xl">
-              {greet}{firstName ? ` ${firstName}` : ""}<span style={{ color: accent }}>.</span>
-            </h1>
-            <div className="mt-3.5 flex flex-wrap items-center gap-2">
-              {todayFacts.map((f) => (
-                <span key={f.k} className="inline-flex items-baseline gap-1.5 rounded-full border px-3 py-1" style={{ borderColor: panelBorder, background: softFill }}>
-                  <span className="font-mono text-sm font-bold tabular-nums" style={{ color: f.tone }}>{f.v}</span>
-                  <span className="text-[11px] font-medium text-dim">{f.k}</span>
-                </span>
-              ))}
+            <div className="truncate font-display text-[15px] font-bold leading-tight text-txt">Assistente Xenora</div>
+            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-dim">
+              <span className={`inline-block h-1.5 w-1.5 rounded-full ${state === "idle" ? "" : "animate-pulse"}`} style={{ backgroundColor: statusTone }} />
+              {statusLabel}
             </div>
-            <p className="mt-3.5 max-w-md text-sm leading-relaxed text-dim">Chiedi a voce o scrivi: rispondo con i numeri reali della tua struttura.</p>
+          </div>
+          <div className="ml-auto flex items-center gap-1.5">
+            <button onClick={() => speak(briefing)} title="Ascolta il briefing del giorno" className="hidden items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-dim transition hover:bg-wash hover:text-txt sm:inline-flex"><Icon name="chat" size={14} /> Briefing</button>
+            <button onClick={toggleVoice} title={voiceOn ? "Voce attiva — tocca per spegnere" : "Voce spenta — tocca per attivare"} aria-pressed={voiceOn} className="grid h-9 w-9 place-items-center rounded-lg border text-base transition" style={voiceOn ? { borderColor: "transparent", background: focusTint(12) } : { borderColor: "var(--line)" }}>{voiceOn ? "🔊" : "🔇"}</button>
+          </div>
+        </header>
+
+        {/* ─────────── CONVERSAZIONE ─────────── */}
+        <div className="flex flex-col gap-4 px-4 py-5 sm:px-5">
+
+          {/* Bolla di benvenuto: briefing del giorno */}
+          <div className="flex items-start gap-2.5">
+            {avatar("h-8 w-8", 14)}
+            <div className="min-w-0 max-w-[85%]">
+              <div className="rounded-2xl rounded-tl-md border border-line bg-wash px-4 py-3">
+                <h1 className="font-display text-base font-bold leading-tight text-txt">{greet}{firstName ? ` ${firstName}` : ""}<span style={{ color: "var(--focus)" }}>.</span></h1>
+                <p className="mt-1.5 text-sm leading-relaxed text-txt">{briefing}</p>
+              </div>
+              {todayFacts.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {todayFacts.map((f) => (
+                    <span key={f.k} className="inline-flex items-baseline gap-1.5 rounded-full border border-line bg-paper px-2.5 py-1">
+                      <span className="font-mono text-xs font-bold tabular-nums" style={{ color: f.tone }}>{f.v}</span>
+                      <span className="text-[11px] font-medium text-dim">{f.k}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            {micAvailable && (
-              <button onClick={toggleListening} title={listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare"} className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold shadow-sm transition active:scale-95" style={{ backgroundColor: listening ? "var(--err)" : accent, color: listening ? "#fff" : accentInk }}><Mic /> {listening ? "Ascolto…" : "Parla"}</button>
-            )}
-            <button onClick={() => speak(briefing)} title="Ascolta il briefing del giorno" className="inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-xs font-semibold text-txt transition hover:bg-wash" style={{ borderColor: panelBorder }}><Icon name="chat" size={14} /> Ascolta</button>
-            <button onClick={toggleVoice} title="Attiva/disattiva la voce nelle risposte" className="inline-flex items-center gap-1.5 rounded-full border px-4 py-2.5 text-xs font-semibold transition" style={voiceOn ? { borderColor: hexA(accent, 0.5), color: accent, background: hexA(accent, light ? 0.05 : 0.1) } : { borderColor: panelBorder, color: "var(--dim)" }}>{voiceOn ? "🔊 Voce attiva" : "🔇 Voce spenta"}</button>
+          {/* Tessere dati reali (clic = domanda all'assistente) */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {tiles.map((it) => (
+              <button
+                key={it.label}
+                type="button"
+                onClick={() => { if (it.q) { setQ(it.q); ask(it.q); } }}
+                className="group flex flex-col items-start rounded-xl border border-line bg-paper px-3 py-2.5 text-left transition hover:-translate-y-px hover:border-focus hover:bg-wash"
+              >
+                <span className="font-mono text-[9px] font-semibold uppercase leading-none tracking-[0.12em] text-faint">{it.label}</span>
+                <span className="mt-1.5 font-mono text-lg font-bold leading-none tabular-nums" style={{ color: it.tone }}>{it.value}</span>
+                {it.spark && it.spark.length > 1 && (() => {
+                  const max = Math.max(1, ...it.spark!); const n = it.spark!.length; const w = n * 4;
+                  return (
+                    <svg viewBox={`0 0 ${w} 16`} preserveAspectRatio="none" className="mt-2 h-3 w-full opacity-70 transition-opacity group-hover:opacity-100" aria-hidden>
+                      {it.spark!.map((v, k) => { const h = Math.max(1.2, (v / max) * 14); return <rect key={k} x={k * 4} y={16 - h} width={2.4} height={h} rx={1.2} fill={it.tone} opacity={0.28 + 0.6 * (v / max)} />; })}
+                    </svg>
+                  );
+                })()}
+              </button>
+            ))}
           </div>
-        </div>
 
-        {(!micAvailable || micHint) && <p className="relative mt-4 text-xs font-medium" style={{ color: micHint ? "var(--err)" : "var(--faint)" }}>{micHint || "La voce in entrata si attiva aprendo Xenora in Chrome o Edge."}</p>}
-      </header>
-
-      {/* ─────────── NEURAL SHELL: il nucleo protagonista, con i dati che confluiscono al centro ─────────── */}
-      <NeuralShell inputs={tiles} state={state} onInput={(query) => { setQ(query); ask(query); }} />
-
-      {/* ─────────── BARRA COMANDI: input elegante + chips a pillola ─────────── */}
-      <section className="rounded-3xl border p-4 sm:p-5" style={panelStyle}>
-        <div className="mb-3 flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>
-          <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accent }} /> Chiedi all&apos;assistente
-        </div>
-        <form onSubmit={(e) => { e.preventDefault(); ask(q); }} className="flex items-center gap-2 rounded-2xl border p-1.5 transition-shadow" style={{ borderColor: focused ? accent : panelBorder, background: softFill, boxShadow: focused ? `0 0 0 3px ${hexA(accent, 0.14)}` : "none" }}>
-          {micAvailable && (
-            <button type="button" onClick={toggleListening} title="Parla" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl transition active:scale-95" style={listening ? { backgroundColor: "var(--err)", color: "#fff" } : { color: accent, background: hexA(accent, light ? 0.08 : 0.14) }}><Mic size={18} /></button>
+          {/* Bolla utente (eco della domanda) */}
+          {sent && (
+            <div className="anim-pop flex justify-end">
+              <div className="max-w-[85%] rounded-2xl rounded-tr-md px-4 py-2.5 text-white shadow-sm" style={{ backgroundColor: "var(--focus)" }}>
+                <p className="text-sm leading-relaxed">{sent}</p>
+              </div>
+            </div>
           )}
-          <input value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} placeholder={listening ? "Sto ascoltando…" : "Es. quanto ho incassato questo mese?"} className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-txt outline-none placeholder:text-faint" />
-          <button type="submit" className="shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:opacity-90 active:scale-95" style={{ backgroundColor: accent, color: accentInk }}>Chiedi</button>
-        </form>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {CHIPS.map((c) => (
-            <button key={c.q} onClick={() => { setQ(c.label); ask(c.q); }} className="rounded-full border px-3.5 py-1.5 text-xs font-medium text-dim transition-all hover:-translate-y-px" style={{ borderColor: panelBorder, background: softFill }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = accent; e.currentTarget.style.color = accent; e.currentTarget.style.background = hexA(accent, light ? 0.06 : 0.12); }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = panelBorder; e.currentTarget.style.color = ""; e.currentTarget.style.background = softFill; }}>{c.label}</button>
-          ))}
+
+          {/* Indicatore "sta scrivendo/rispondendo" */}
+          {state === "speak" && (
+            <div className="flex items-center gap-2.5">
+              {avatar("h-8 w-8", 14)}
+              <div className="inline-flex items-center gap-1 rounded-2xl rounded-tl-md border border-line bg-wash px-4 py-3">
+                {[0, 1, 2].map((i) => (
+                  <span key={i} className="h-1.5 w-1.5 animate-bounce rounded-full" style={{ backgroundColor: "var(--faint)", animationDelay: `${i * 0.15}s` }} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Bolla risposta dell'assistente */}
+          {ans && (
+            <div className="anim-pop flex items-start gap-2.5">
+              {avatar("h-8 w-8", 14)}
+              <div className="min-w-0 max-w-[92%] flex-1 rounded-2xl rounded-tl-md border border-line bg-wash px-4 py-3.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-txt">{ans.title}</div>
+                    {ans.value && <div className="mt-1 font-mono text-3xl font-bold tabular-nums text-txt">{ans.value}</div>}
+                    {ans.detail && <p className="mt-1.5 text-sm leading-relaxed text-dim">{ans.detail}</p>}
+                  </div>
+                  <button onClick={() => speak(ans.speech ?? [ans.title, ans.value, ans.detail].filter(Boolean).join(". "))} title="Rileggi ad alta voce" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-dim transition hover:bg-paper hover:text-txt"><Icon name="chat" size={14} /></button>
+                </div>
+
+                {ans.list && ans.list.length > 0 && (
+                  <div className="mt-3 flex flex-col gap-1.5">
+                    <button onClick={() => readAllList(ans.list!)} className="mb-0.5 inline-flex items-center justify-center gap-1.5 self-start rounded-full px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 active:scale-95" style={{ backgroundColor: "var(--focus)" }}><Icon name="chat" size={13} /> Leggimi tutti</button>
+                    {ans.list.map((it) => (
+                      <button key={it.id} onClick={() => pickBooking(it.id)} className="group flex items-center justify-between gap-3 rounded-xl border border-line bg-paper px-3.5 py-2.5 text-left transition hover:border-focus hover:bg-surface">
+                        <span className="min-w-0"><span className="block truncate text-sm font-semibold text-txt">{it.label}</span>{it.sub && <span className="block truncate text-[11px] text-faint">{it.sub}</span>}</span>
+                        <span className="shrink-0 text-xs font-semibold text-focus transition-transform group-hover:translate-x-0.5">Dettagli →</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {ans.go && <button onClick={() => router.push(ans.go!.href)} className="mt-3 inline-flex rounded-full border border-line bg-paper px-3.5 py-1.5 text-xs font-semibold text-txt transition hover:border-focus hover:bg-surface">{ans.go.label} →</button>}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ─────────── INPUT: chips + barra di richiesta ─────────── */}
+        <div className="border-t border-line bg-paper px-4 py-3 sm:px-5">
+          <div className="mb-2.5 flex flex-wrap gap-1.5">
+            {CHIPS.map((c) => (
+              <button key={c.q} onClick={() => { setQ(c.label); ask(c.q); }} className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-medium text-dim transition hover:border-focus hover:text-focus">{c.label}</button>
+            ))}
+          </div>
+          <form onSubmit={(e) => { e.preventDefault(); ask(q); }} className="flex items-center gap-2 rounded-2xl border bg-surface p-1.5 transition" style={{ borderColor: focused ? "var(--focus)" : "var(--line)", boxShadow: focused ? `0 0 0 3px ${focusTint(16)}` : "none" }}>
+            {micAvailable && (
+              <button type="button" onClick={toggleListening} title={listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare"} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl transition active:scale-95" style={listening ? { backgroundColor: "var(--err)", color: "#fff" } : { color: "var(--focus)", background: focusTint(12) }}><Mic size={18} /></button>
+            )}
+            <input value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} placeholder={listening ? "Sto ascoltando…" : "Chiedimi qualsiasi cosa…"} className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-txt outline-none placeholder:text-faint" />
+            <button type="submit" title="Invia" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white shadow-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }} disabled={!q.trim()}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><line x1="12" y1="19" x2="12" y2="5" /><polyline points="6 11 12 5 18 11" /></svg>
+            </button>
+          </form>
+          {(!micAvailable || micHint) && <p className="mt-2 text-xs font-medium" style={{ color: micHint ? "var(--err)" : "var(--faint)" }}>{micHint || "La voce in entrata si attiva aprendo Xenora in Chrome o Edge."}</p>}
         </div>
       </section>
-
-      {/* ─────────── AREA RISPOSTA ─────────── */}
-      {ans && (
-        <section className="anim-pop relative overflow-hidden rounded-3xl border p-5 sm:p-6" style={panelStyle}>
-          <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1.5" style={{ background: `linear-gradient(${accent}, ${gold})` }} />
-          <div className="flex items-start justify-between gap-3 pl-2.5">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>
-                <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accent }} /> {ans.title}
-              </div>
-              {ans.value && <div className="mt-1.5 font-mono text-3xl font-bold tabular-nums text-txt sm:text-4xl">{ans.value}</div>}
-              {ans.detail && <p className="mt-2 text-sm leading-relaxed text-dim">{ans.detail}</p>}
-            </div>
-            <button onClick={() => speak(ans.speech ?? [ans.title, ans.value, ans.detail].filter(Boolean).join(". "))} title="Rileggi ad alta voce" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border text-dim transition hover:bg-wash" style={{ borderColor: panelBorder }}><Icon name="chat" size={16} /></button>
-          </div>
-          {ans.list && ans.list.length > 0 && (
-            <div className="mt-4 flex flex-col gap-2 pl-2.5">
-              <button onClick={() => readAllList(ans.list!)} className="mb-1 inline-flex items-center justify-center gap-1.5 self-start rounded-full px-4 py-2 text-xs font-semibold shadow-sm transition hover:opacity-90 active:scale-95" style={{ backgroundColor: accent, color: accentInk }}><Icon name="chat" size={14} /> Leggimi tutti</button>
-              {ans.list.map((it) => (
-                <button key={it.id} onClick={() => pickBooking(it.id)} className="group flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition" style={{ borderColor: panelBorder, background: softFill }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = accent; e.currentTarget.style.background = hexA(accent, light ? 0.05 : 0.1); }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = panelBorder; e.currentTarget.style.background = softFill; }}>
-                  <span className="min-w-0"><span className="block truncate text-sm font-semibold text-txt">{it.label}</span>{it.sub && <span className="block truncate text-[11px] text-faint">{it.sub}</span>}</span>
-                  <span className="shrink-0 text-xs font-semibold transition-transform group-hover:translate-x-0.5" style={{ color: accent }}>Dettagli →</span>
-                </button>
-              ))}
-            </div>
-          )}
-          {ans.go && <button onClick={() => router.push(ans.go!.href)} className="mt-4 ml-2.5 inline-flex rounded-full border px-4 py-2 text-xs font-semibold text-txt transition hover:bg-wash" style={{ borderColor: panelBorder }}>{ans.go.label} →</button>}
-        </section>
-      )}
     </div>
   );
 }
