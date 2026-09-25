@@ -97,7 +97,24 @@ export default function CalendarGrid() {
   type Span = 3 | 7 | 14 | 30 | "month";
   interface ViewCfg { span: Span; rate: boolean; avail: boolean; occ: boolean; emptyRow: boolean; dense: boolean; fromYesterday: boolean; group: "struct" | "type" }
   const [vw, setVw] = useState<ViewCfg>({ span: "month", rate: true, avail: true, occ: true, emptyRow: false, dense: true, fromYesterday: false, group: "struct" });
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:calview:v2"); if (r) { const p = JSON.parse(r); if (p.span !== 7 && p.span !== "month") p.span = "month"; setVw((v) => ({ ...v, ...p })); } } catch {} }, []);
+  useEffect(() => {
+    try {
+      const r = localStorage.getItem("spigolestay:calview:v2");
+      if (r) {
+        const p = JSON.parse(r);
+        if (p.span !== 7 && p.span !== "month") p.span = "month";
+        setVw((v) => ({ ...v, ...p }));
+        // "Inizia da ieri" persistito: ricalcola subito il giorno di partenza (altrimenti al
+        // refresh l'impostazione resta salvata ma il calendario riparte comunque da oggi/mese).
+        // Se non e' attivo, lascia il valore iniziale di default (invariato).
+        if (p.fromYesterday) {
+          const t = new Date();
+          const base = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+          setStart(addDays(base, -1));
+        }
+      }
+    } catch {}
+  }, []);
   const patchView = (p: Partial<ViewCfg>) => setVw((v) => { const n = { ...v, ...p }; try { localStorage.setItem("spigolestay:calview:v2", JSON.stringify(n)); } catch {} return n; });
   const [vizOpen, setVizOpen] = useState(false);
   const vizRef = useRef<HTMLDivElement>(null);
