@@ -464,7 +464,7 @@ export default function AdempimentiPage() {
 
       {/* Ordine CRONOLOGICO: 1) check-in → 2) schedine Questura → 3) ISTAT → 4) incasso → 5) fattura/SdI → 6) fornitori */}
       {allClear ? (
-        <EmptyState title="Tutto in ordine per oggi" sub="Non c'è niente da inviare o gestire adesso. Comparirà qui appena serve." />
+        <EmptyState title="Tutto in ordine per oggi" sub="Non c'è niente da inviare o gestire adesso." />
       ) : (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* 1 · Check-in online → poi "passaggio di palla" alle schedine */}
