@@ -163,13 +163,17 @@ export default function ImportaPage() {
     if (!ready) return;
     const sRooms = roomTypes.filter((rt) => rt.structureId === structureId);
     const sUnits = units.filter((u) => u.structureId === structureId);
-    // Prova PRIMA a far combaciare il testo con la CAMERA FISICA esatta (es. "DEL1", come su
+    // Prova PRIMA a far combaciare il testo con la CAMERA FISICA esatta (es. "SH_#1", come su
     // Octorate): così la prenotazione va nella stessa camera già prevista, non solo nella
-    // tipologia. Se non trova una camera specifica, ripiega sulla sola tipologia (comportamento
-    // di prima: assegnazione manuale successiva).
+    // tipologia. Se la camera non esiste ancora in Xenora, la CREA al volo con lo stesso nome
+    // esatto (una volta sola per nome, riusata per le righe successive) — così non serve
+    // pre-creare a mano tutte le camere prima di importare, e si azzera il rischio di errori.
+    const unitByName = new Map<string, string>(sUnits.map((u) => [u.name.toLowerCase().trim(), u.id]));
     const findUnit = (txt: string) => {
       const s = (txt || "").toLowerCase().trim(); if (!s) return undefined;
-      return sUnits.find((u) => u.name.toLowerCase() === s) || sUnits.find((u) => s.includes(u.name.toLowerCase()) || u.name.toLowerCase().includes(s));
+      if (unitByName.has(s)) return unitByName.get(s)!;
+      const hit = sUnits.find((u) => s.includes(u.name.toLowerCase()) || u.name.toLowerCase().includes(s));
+      return hit?.id;
     };
     const findRoom = (txt: string) => {
       const s = (txt || "").toLowerCase().trim();
@@ -193,12 +197,26 @@ export default function ImportaPage() {
       seen.add(key);
       const guestId = addGuest({ fullName: name, email: val(r, "email") || undefined, phone: val(r, "phone") || undefined });
       const roomTxt = val(r, "room");
-      const unitHit = roomTxt ? findUnit(roomTxt) : undefined;
-      const roomTypeId = unitHit ? unitHit.roomTypeId : ((roomTxt && findRoom(roomTxt)) || rtFallback);
+      let unitId: string | null = null, roomTypeId = rtFallback;
+      if (roomTxt) {
+        const existingId = findUnit(roomTxt);
+        if (existingId) {
+          unitId = existingId;
+          roomTypeId = sUnits.find((u) => u.id === existingId)?.roomTypeId ?? rtFallback;
+        } else {
+          // Camera non ancora presente in Xenora: la creo con lo stesso nome esatto di
+          // Octorate, sotto la tipologia più simile al testo (o la prima disponibile).
+          roomTypeId = findRoom(roomTxt) || rtFallback;
+          const newId = addUnit({ structureId, roomTypeId, name: roomTxt.trim() });
+          sUnits.push({ id: newId, structureId, roomTypeId, name: roomTxt.trim() } as typeof sUnits[number]);
+          unitByName.set(roomTxt.toLowerCase().trim(), newId);
+          unitId = newId;
+        }
+      }
       const bookedOn = toISO(val(r, "bookedOn"));
       const noteTxt = val(r, "note");
       addBooking({
-        structureId, roomTypeId, unitId: unitHit ? unitHit.id : null, guestId,
+        structureId, roomTypeId, unitId, guestId,
         channel: toChannel(val(r, "channel")), status: "confirmed",
         checkIn: ci, checkOut: co, ...(bookedOn ? { bookedOn } : {}),
         adults: Math.max(1, Math.round(toNum(val(r, "adults")) ?? 2)),
@@ -358,7 +376,7 @@ export default function ImportaPage() {
             <Card>
               <SectionTitle>{t("2. Mappa le colonne")}</SectionTitle>
               <p className="mb-3 text-xs text-dim">{t("Abbina i campi di Xenora alle colonne del tuo file. * obbligatori.")}</p>
-              <p className="mb-3 rounded-lg border border-line bg-wash/50 p-2.5 text-[11px] text-dim">{t("Per rispettare l'assegnazione già fatta su Octorate: se la colonna \"Camera\" riporta il nome esatto della camera (es. DEL1), la prenotazione va in quella camera specifica. Se riporta solo la tipologia (es. Deluxe), viene assegnata alla tipologia e la camera fisica resta da scegliere a mano.")}</p>
+              <p className="mb-3 rounded-lg border border-line bg-wash/50 p-2.5 text-[11px] text-dim">{t("Per rispettare l'assegnazione già fatta su Octorate: se la colonna \"Camera\" riporta il nome esatto della camera (es. SH_#1), la prenotazione va in quella camera specifica — e se in Xenora non esiste ancora, viene CREATA in automatico con lo stesso nome. Se riporta solo la tipologia generica (es. Deluxe), viene assegnata solo alla tipologia.")}</p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {FIELDS.map((f) => (
                   <label key={f.key}><span className="mb-1 block text-xs font-medium text-dim">{t(f.label)}{f.req && <span className="text-focus"> *</span>}</span>
