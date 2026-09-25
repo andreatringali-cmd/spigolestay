@@ -57,6 +57,23 @@ function dayHue(d: Date): { tint?: string; text?: string } {
 const rangesOverlap = (aIn: string, aOut: string, bIn: string, bOut: string) =>
   aIn < bOut && bIn < aOut;
 
+// Corsie per prenotazioni sovrapposte nella stessa unit (stile Octorate): ordina per check-in e
+// assegna ad ognuna la prima corsia libera (nessuna sovrapposizione con l'ultima di quella corsia),
+// altrimenti apre una nuova corsia. Quasi sempre 1 sola corsia; più di 1 solo con un vero conflitto.
+function assignLanes<T extends { id: string; checkIn: string; checkOut: string }>(
+  list: T[]
+): { laneOf: Map<string, number>; lanes: number } {
+  const laneOf = new Map<string, number>();
+  const sorted = [...list].sort((a, b) => (a.checkIn < b.checkIn ? -1 : a.checkIn > b.checkIn ? 1 : 0));
+  const laneEnd: string[] = []; // checkOut dell'ultima prenotazione assegnata a ciascuna corsia
+  for (const b of sorted) {
+    let idx = laneEnd.findIndex((end) => b.checkIn >= end);
+    if (idx === -1) { idx = laneEnd.length; laneEnd.push(b.checkOut); }
+    else laneEnd[idx] = b.checkOut;
+    laneOf.set(b.id, idx);
+  }
+  return { laneOf, lanes: Math.max(1, laneEnd.length) };
+}
 
 // Iniziali della struttura (es. "Spigole House" → "SH").
 const initials = (name: string) => name.split(/\s+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 3).toUpperCase();
@@ -67,6 +84,7 @@ interface DragView {
   targetUnitId: string | null;
   valid: boolean;
   reason: string;
+  overbook?: boolean;
   x: number;
   y: number;
 }
@@ -356,7 +374,7 @@ export default function CalendarGrid() {
   useEffect(() => { typesRef.current = roomTypes; }, [roomTypes]);
   useEffect(() => { startRef.current = start; }, [start]);
 
-  function validate(bId: string, targetUnitId: string | null, dxDays: number): { valid: boolean; reason: string } {
+  function validate(bId: string, targetUnitId: string | null, dxDays: number): { valid: boolean; reason: string; overbook?: boolean } {
     const b = bookingsRef.current.find((x) => x.id === bId);
     if (!b) return { valid: false, reason: "—" };
     if (!targetUnitId) return { valid: false, reason: "Fuori griglia" };
@@ -371,7 +389,9 @@ export default function CalendarGrid() {
     const conflict = bookingsRef.current.some(
       (x) => x.id !== b.id && x.unitId === targetUnitId && x.status !== "cancelled" && rangesOverlap(newIn, newOut, x.checkIn, x.checkOut)
     );
-    if (conflict) return { valid: false, reason: "Occupata" };
+    // La sovrapposizione non blocca più il drop (comportamento stile Octorate): resta solo un
+    // avviso informativo. La camera mostrerà le prenotazioni sovrapposte in corsie separate.
+    if (conflict) return { valid: true, reason: "Sovrapposizione", overbook: true };
     return { valid: true, reason: "" };
   }
 
@@ -599,6 +619,13 @@ export default function CalendarGrid() {
   const unitRow = (unit: (typeof units)[number], s: (typeof structures)[number]) => {
     const uBookings = bookings.filter((b) => b.unitId === unit.id);
     const ghost = dragView && dragView.targetUnitId === unit.id ? dragView : null;
+    // Corsie per sovrapposizioni reali (stile Octorate): quasi sempre 1 corsia (comportamento
+    // identico a prima); più di 1 solo quando due prenotazioni si sovrappongono in date sulla
+    // stessa camera. Le prenotazioni cancellate non contano ai fini del conflitto (come in validate()).
+    const laneSource = unit.outOfService ? [] : uBookings.filter((b) => b.status !== "cancelled");
+    const { laneOf, lanes } = assignLanes(laneSource);
+    const hasConflict = lanes > 1;
+    const unitRowH = rowH * lanes;
     // Movimenti di OGGI (monocromatico): arrivo, partenza, turnover, occupata, libera, fuori servizio.
     const todayIso = toISO(new Date());
     const nc = (b: (typeof uBookings)[number]) => b.status !== "cancelled";
@@ -630,13 +657,14 @@ export default function CalendarGrid() {
     const linenTitle = !linenDue ? "Nessun cambio lenzuola oggi" : linenDoneToday ? "Lenzuola cambiate oggi" : "Lenzuola da cambiare";
     const linenEl = <span className="shrink-0" style={{ color: linenColor }} title={linenTitle}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8v10" /><path d="M3 14h18" /><path d="M21 18v-5a3 3 0 0 0-3-3H9v4" /><path d="M6 11.5h.01" /></svg></span>;
     return (
-      <div key={unit.id} className="flex border-b border-line">
-        <div className="sticky left-0 z-10 flex min-w-0 shrink-0 items-center gap-1.5 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: rowH }}>
+      <div key={unit.id} className="flex border-b border-line" style={hasConflict ? { backgroundColor: "color-mix(in srgb, var(--warn) 7%, transparent)" } : undefined}>
+        <div className="sticky left-0 z-10 flex min-w-0 shrink-0 items-center gap-1.5 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: unitRowH, backgroundColor: hasConflict ? "color-mix(in srgb, var(--warn) 7%, var(--surface))" : undefined }}>
           {showRoomIcons && <>{statusEl}{cleanEl}{linenEl}</>}
           <button onClick={() => setRoomInfoId(unit.id)} title="Apri scheda camera" className={`min-w-0 flex-1 truncate whitespace-nowrap text-left text-[13px] font-medium hover:text-focus hover:underline ${unit.outOfService ? "text-faint line-through" : "text-txt"}`}>{unit.name}</button>
+          {hasConflict && <span title="Sovrapposizione: due prenotazioni sulla stessa camera" className="shrink-0 text-[11px] leading-none" style={{ color: "var(--warn)" }}>⚠</span>}
           {vw.group === "type" && <span className="shrink-0 rounded px-1 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, ${s.photoColor ?? "var(--faint)"} 20%, transparent)`, color: s.photoColor ?? "var(--dim)" }} title={s.name}>{initials(s.name)}</span>}
         </div>
-        <div className="relative" data-unit-id={unit.id} style={{ width: gridW, height: rowH }}>
+        <div className="relative" data-unit-id={unit.id} style={{ width: gridW, height: unitRowH }}>
           {days.map((d, i) => {
             const iso = toISO(d);
             const inSel = sel?.kind === "booking" && sel.unitId === unit.id && !!(selLo && selHi && iso >= selLo && iso <= selHi);
@@ -647,7 +675,7 @@ export default function CalendarGrid() {
                 onMouseEnter={() => { if (sel?.kind === "booking" && sel.unitId === unit.id) setSelHover(iso); }}
                 title={unit.outOfService ? undefined : sel?.kind === "booking" && sel.unitId === unit.id ? "Clicca il giorno di partenza" : "Clicca per iniziare (poi clicca il giorno finale)"}
                 className={`group absolute top-0 border-r border-line ${unit.outOfService ? "" : "cursor-pointer"}`}
-                style={{ left: i * cellW, width: cellW, height: rowH, ...(inSel ? { backgroundColor: "color-mix(in srgb, var(--focus) 20%, transparent)" } : {}), ...(iso === todayISO ? { boxShadow: "inset 1px 0 0 var(--focus)" } : {}) }}
+                style={{ left: i * cellW, width: cellW, height: unitRowH, ...(inSel ? { backgroundColor: "color-mix(in srgb, var(--focus) 20%, transparent)" } : {}), ...(iso === todayISO ? { boxShadow: "inset 1px 0 0 var(--focus)" } : {}) }}
               >
                 {!unit.outOfService && !inSel && (
                   <span className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100" style={{ background: "color-mix(in srgb, var(--focus) 10%, transparent)" }} />
@@ -702,13 +730,14 @@ export default function CalendarGrid() {
                 <span title={`Pagamento: ${pay === "paid" ? "saldato" : pay === "partial" ? "acconto" : "da incassare"}`} className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: PAY_DOT[pay], boxShadow: "0 0 0 1.5px rgba(255,255,255,.75)" }} />
               </span>
             ) : null;
+            const lane = laneOf.get(b.id) ?? 0; // 0 se non conteggiata (es. cancellata): resta nella prima corsia come prima
             return (
               <div
                 key={b.id}
                 onPointerDown={(e) => onBarPointerDown(e, b.id)}
                 title={`${blocked ? `Fuori servizio${b.note ? ` · ${b.note}` : ""}` : `${guestName(b.guestId)} · ${pax} ospiti${gtot ? ` · €${Math.round(gtot)}` : ""}`} · ${b.checkIn} → ${b.checkOut}${tentative ? " · opzione" : ""}`}
                 className={`absolute overflow-hidden ${sotto ? "flex cursor-grab flex-col justify-end active:cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
-                style={{ left: g.left + 1, width: g.width - 2, top: 1, height: rowH - 2, opacity: dragging ? 0.35 : tentative ? 0.72 : 1, pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
+                style={{ left: g.left + 1, width: g.width - 2, top: lane * rowH + 1, height: rowH - 2, opacity: dragging ? 0.35 : tentative ? 0.72 : 1, pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
               >
                 {sotto ? (
                   <>
@@ -749,8 +778,10 @@ export default function CalendarGrid() {
             if (!b) return null;
             const g = geom(b.checkIn, b.checkOut);
             if (!g) return null;
+            // Sovrapposizione: consentita ma segnalata in arancione (invece del rosso "bloccato").
+            const ghostColor = !ghost.valid ? "var(--err)" : ghost.overbook ? "var(--warn)" : "var(--focus)";
             return (
-              <div className="pointer-events-none absolute border-2 border-dashed" style={{ left: g.left, width: g.width, top: 0, height: rowH, borderColor: ghost.valid ? "var(--focus)" : "var(--err)", background: ghost.valid ? "color-mix(in srgb, var(--focus) 15%, transparent)" : "color-mix(in srgb, var(--err) 15%, transparent)" }} />
+              <div className="pointer-events-none absolute border-2 border-dashed" style={{ left: g.left, width: g.width, top: 0, height: unitRowH, borderColor: ghostColor, background: `color-mix(in srgb, ${ghostColor} 15%, transparent)` }} />
             );
           })()}
         </div>
@@ -1396,8 +1427,8 @@ export default function CalendarGrid() {
 
       {/* Badge durante il drag */}
       {dragView && (
-        <div className="pointer-events-none fixed z-50 rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow-lg" style={{ left: dragView.x + 14, top: dragView.y + 14, backgroundColor: dragView.valid ? "var(--focus)" : "var(--err)", color: "#fff" }}>
-          {dragView.valid ? destinationLabel(dragView, bookings, units) : dragView.reason}
+        <div className="pointer-events-none fixed z-50 rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow-lg" style={{ left: dragView.x + 14, top: dragView.y + 14, backgroundColor: !dragView.valid ? "var(--err)" : dragView.overbook ? "var(--warn)" : "var(--focus)", color: "#fff" }}>
+          {dragView.valid ? `${destinationLabel(dragView, bookings, units)}${dragView.overbook ? " · Sovrapposizione" : ""}` : dragView.reason}
         </div>
       )}
 
