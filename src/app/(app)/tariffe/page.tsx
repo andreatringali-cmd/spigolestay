@@ -253,10 +253,11 @@ export default function TariffePage() {
                 {days.map((d) => {
                   const isToday = toISO(d) === toISO(s);
                   const we = isWeekend(d);
+                  const dow = d.getDay(); // 0 = domenica, 6 = sabato
                   const first = d.getDate() === 1 || toISO(d) === toISO(days[0]);
                   return (
                     <th key={toISO(d)} className="px-2 py-2 text-center text-xs font-medium" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
-                      <div className={we ? "font-semibold text-dim" : "text-faint"}>{weekdayShort(d)}</div>
+                      <div className="font-semibold" style={{ color: dow === 6 ? "#E08A3A" : dow === 0 ? "var(--err)" : we ? "var(--dim)" : "var(--faint)" }}>{weekdayShort(d)}</div>
                       <div className="font-mono font-semibold text-txt">{d.getDate()}</div>
                       {first && <div className="text-[9px] uppercase text-faint">{d.toLocaleDateString("it-IT", { month: "short" })}</div>}
                     </th>
