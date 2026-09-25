@@ -11,11 +11,24 @@ export type IcsEvent = {
 };
 
 // ── Helper date/numeri/canali ──
+const MESI_IT: Record<string, string> = { gen: "01", feb: "02", mar: "03", apr: "04", mag: "05", giu: "06", lug: "07", ago: "08", set: "09", ott: "10", nov: "11", dic: "12" };
 export function toISO(s: string): string {
   s = (s || "").trim(); if (!s) return "";
   let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
   m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
   if (m) { let [, d, mo, y] = m; if (y.length === 2) y = "20" + y; return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`; }
+  // Numero seriale Excel (es. "45923" = giorni dal 30/12/1899): capita quando un export perde
+  // la formattazione data della cella e la colonna arriva come numero puro.
+  if (/^\d{4,6}(\.\d+)?$/.test(s)) {
+    const serial = parseFloat(s);
+    if (serial > 20000 && serial < 80000) {
+      const dt = new Date(Date.UTC(1899, 11, 30) + Math.round(serial) * 86400000);
+      if (!isNaN(+dt)) return dt.toISOString().slice(0, 10);
+    }
+  }
+  // Data testuale in italiano: "24 settembre 2026", "mercoledì 24 settembre 2026", "24-set-2026".
+  const it = s.toLowerCase().match(/(\d{1,2})[\s-]+([a-zàèéìòù]{3,})[a-zàèéìòù]*\.?[\s-]+(\d{4})/i);
+  if (it) { const mo = MESI_IT[it[2].slice(0, 3)]; if (mo) return `${it[3]}-${mo}-${it[1].padStart(2, "0")}`; }
   const dt = new Date(s); return isNaN(+dt) ? "" : dt.toISOString().slice(0, 10);
 }
 export function toNum(s: string): number | undefined {

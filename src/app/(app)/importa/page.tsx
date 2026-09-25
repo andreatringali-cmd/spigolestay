@@ -208,6 +208,10 @@ export default function ImportaPage() {
     room: val(r, "room"), roomResolved: roomResolvedLabel(val(r, "room")), channel: CHANNELS[toChannel(val(r, "channel"))].label, total: toNum(val(r, "total")),
   }));
 
+  // Quante righe (su TUTTO il file, non solo l'anteprima) hanno una data non riconosciuta:
+  // se il conteggio è alto, l'import sembrerebbe "non fare nulla" (0 importate) senza questo avviso.
+  const dateIssues = useMemo(() => dataRows.filter((r) => !toISO(val(r, "checkIn")) || !toISO(val(r, "checkOut")) || !val(r, "guest")).length, [dataRows, map]);
+
   const runImport = () => {
     if (!ready) return;
     let rtFallback = sRoomsHere[0]?.id ?? "";
@@ -476,7 +480,12 @@ export default function ImportaPage() {
                 </table>
               </div>
               <p className="mt-3 text-xs text-faint">{t("Mostrate le prime 5 su")} {dataRows.length}. {csvRooms.length > 0 ? t("La camera va dove hai scelto sopra in \"Assegna le camere\".") : t("Nessuna colonna Camera mappata: le prenotazioni entrano senza camera fisica assegnata.")}</p>
-              <button onClick={runImport} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90">{t("Importa")} {dataRows.length} {t("prenotazioni")}</button>
+              {dateIssues > 0 && (
+                <div className="mt-3 rounded-lg border p-2.5 text-[12px] font-medium" style={{ borderColor: "var(--err)", color: "var(--err)", backgroundColor: "color-mix(in srgb, var(--err) 8%, transparent)" }}>
+                  ⚠️ {dateIssues} {t("righe su")} {dataRows.length} {t("hanno una data non riconosciuta o l'ospite mancante e NON verranno importate. Controlla il formato delle colonne Check-in/Check-out nel file (atteso GG/MM/AAAA o AAAA-MM-GG).")}
+                </div>
+              )}
+              <button onClick={runImport} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90">{t("Importa")} {dataRows.length - dateIssues} {t("prenotazioni")}</button>
             </Card>
           )}
         </div>
