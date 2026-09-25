@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { CHANNELS } from "@/lib/types";
 import { parseICS, importIcsEvents, toChannel, toISO, toNum, normName, type IcsEvent } from "@/lib/ics";
 import { buildTemplateCsv, bookingDedupeKey } from "@/lib/import/template";
@@ -62,6 +63,12 @@ export default function ImportaPage() {
   const [err, setErr] = useState("");
   const [icsUrl, setIcsUrl] = useState("");
   const [fetching, setFetching] = useState(false);
+  const [confirmUndo, setConfirmUndo] = useState(false);
+
+  // Prenotazioni importate in precedenza (qualsiasi import, CSV o ICS, tagga sempre la nota
+  // con "Importato da …"): permette di ANNULLARLE in un click, senza cercarle a mano.
+  const importedBookings = useMemo(() => bookings.filter((b) => (b.note || "").includes("Importato da")), [bookings]);
+  const undoImport = () => { importedBookings.forEach((b) => deleteBooking(b.id)); setConfirmUndo(false); };
 
   const icsRooms = useMemo(() => { const set = new Set<string>(); events.forEach((e) => { if (e.room) set.add(e.room.trim()); }); return [...set]; }, [events]);
   // Auto-mappatura camere ICS → tipologie esistenti (riempie solo le mancanti, così non fa loop).
@@ -155,6 +162,15 @@ export default function ImportaPage() {
   const runImport = () => {
     if (!ready) return;
     const sRooms = roomTypes.filter((rt) => rt.structureId === structureId);
+    const sUnits = units.filter((u) => u.structureId === structureId);
+    // Prova PRIMA a far combaciare il testo con la CAMERA FISICA esatta (es. "DEL1", come su
+    // Octorate): così la prenotazione va nella stessa camera già prevista, non solo nella
+    // tipologia. Se non trova una camera specifica, ripiega sulla sola tipologia (comportamento
+    // di prima: assegnazione manuale successiva).
+    const findUnit = (txt: string) => {
+      const s = (txt || "").toLowerCase().trim(); if (!s) return undefined;
+      return sUnits.find((u) => u.name.toLowerCase() === s) || sUnits.find((u) => s.includes(u.name.toLowerCase()) || u.name.toLowerCase().includes(s));
+    };
     const findRoom = (txt: string) => {
       const s = (txt || "").toLowerCase().trim();
       if (s) { const hit = sRooms.find((rt) => rt.name.toLowerCase() === s) || sRooms.find((rt) => s.includes(rt.name.toLowerCase()) || rt.name.toLowerCase().includes(s)); if (hit) return hit.id; }
@@ -177,11 +193,12 @@ export default function ImportaPage() {
       seen.add(key);
       const guestId = addGuest({ fullName: name, email: val(r, "email") || undefined, phone: val(r, "phone") || undefined });
       const roomTxt = val(r, "room");
-      const roomTypeId = (roomTxt && findRoom(roomTxt)) || rtFallback;
+      const unitHit = roomTxt ? findUnit(roomTxt) : undefined;
+      const roomTypeId = unitHit ? unitHit.roomTypeId : ((roomTxt && findRoom(roomTxt)) || rtFallback);
       const bookedOn = toISO(val(r, "bookedOn"));
       const noteTxt = val(r, "note");
       addBooking({
-        structureId, roomTypeId, unitId: null, guestId,
+        structureId, roomTypeId, unitId: unitHit ? unitHit.id : null, guestId,
         channel: toChannel(val(r, "channel")), status: "confirmed",
         checkIn: ci, checkOut: co, ...(bookedOn ? { bookedOn } : {}),
         adults: Math.max(1, Math.round(toNum(val(r, "adults")) ?? 2)),
@@ -203,6 +220,30 @@ export default function ImportaPage() {
   return (
     <div>
       <PageHeader title={t("Importa prenotazioni")} subtitle={t("Carica il file ICS o CSV esportato da Octorate (o da un altro gestionale)")} />
+
+      {importedBookings.length > 0 && done === null && (
+        <Card className="mb-4 border-[color:var(--warn)]/40 bg-[color:color-mix(in_srgb,var(--warn)_8%,transparent)]">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-txt">{importedBookings.length} {t("prenotazioni importate in precedenza")}</div>
+              <div className="text-xs text-dim">{t("Se qualcosa non va, puoi eliminarle tutte in un click e ripartire da capo.")}</div>
+            </div>
+            <button onClick={() => setConfirmUndo(true)} className="shrink-0 rounded-lg border border-[color:var(--err)] px-3 py-2 text-sm font-semibold text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_10%,transparent)]">{t("Elimina l'importazione")}</button>
+          </div>
+        </Card>
+      )}
+
+      {confirmUndo && (
+        <ConfirmDialog
+          title={t("Eliminare tutte le prenotazioni importate?")}
+          message={`${importedBookings.length} ${t("prenotazioni verranno eliminate definitivamente (ospiti collegati restano). Le prenotazioni create a mano non vengono toccate.")}`}
+          warning={t("Azione irreversibile.")}
+          confirmLabel={t("Elimina")}
+          tone="var(--err)"
+          onConfirm={undoImport}
+          onClose={() => setConfirmUndo(false)}
+        />
+      )}
 
       {done !== null ? (
         <Card>
@@ -317,6 +358,7 @@ export default function ImportaPage() {
             <Card>
               <SectionTitle>{t("2. Mappa le colonne")}</SectionTitle>
               <p className="mb-3 text-xs text-dim">{t("Abbina i campi di Xenora alle colonne del tuo file. * obbligatori.")}</p>
+              <p className="mb-3 rounded-lg border border-line bg-wash/50 p-2.5 text-[11px] text-dim">{t("Per rispettare l'assegnazione già fatta su Octorate: se la colonna \"Camera\" riporta il nome esatto della camera (es. DEL1), la prenotazione va in quella camera specifica. Se riporta solo la tipologia (es. Deluxe), viene assegnata alla tipologia e la camera fisica resta da scegliere a mano.")}</p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {FIELDS.map((f) => (
                   <label key={f.key}><span className="mb-1 block text-xs font-medium text-dim">{t(f.label)}{f.req && <span className="text-focus"> *</span>}</span>
