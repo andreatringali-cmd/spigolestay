@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import QRCode from "qrcode";
 import { buildVoucherPdf } from "@/lib/voucher-pdf";
 import { buildQuotePdf, type QuotePdfRoom, type QuotePdfExtra } from "@/lib/quote-pdf";
+import { uploadPublicAsset, dataUrlToBytes } from "@/lib/email-assets";
 
 export const runtime = "nodejs";
 
@@ -30,12 +32,25 @@ function brandFrom(b: BookingPayload): Brand {
 }
 
 // Blocco logo (immagine se presente, altrimenti pastiglia con l'iniziale nel colore struttura).
+// A questo punto brand.logo, se presente, è già un URL http(s) vero (vedi resolveLogoUrl): le
+// email non mostrano immagini incorporate come data: URI, quindi qui non se ne tenta mai il render.
 function logoBlock(brand: Brand, accent: string) {
-  if (brand.logo && /^data:image\//i.test(brand.logo)) {
-    return `<img src="${brand.logo}" alt="${esc(brand.name || "")}" width="52" height="52" style="display:block;width:52px;height:52px;border-radius:12px;object-fit:contain;background:#fff;border:1px solid #eceef1;" />`;
+  if (brand.logo && /^https?:\/\//i.test(brand.logo)) {
+    return `<img src="${esc(brand.logo)}" alt="${esc(brand.name || "")}" width="52" height="52" style="display:block;width:52px;height:52px;border-radius:12px;object-fit:contain;background:#fff;border:1px solid #eceef1;" />`;
   }
   const initials = esc((brand.name || "XN").replace(/[^\p{L}\p{N} ]/gu, "").split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "XN");
   return `<div style="width:52px;height:52px;border-radius:12px;background:${accent};color:#fff;text-align:center;line-height:52px;font-weight:800;font-size:20px;font-family:Arial,sans-serif;">${initials}</div>`;
+}
+
+// Carica il logo (data: URI) su storage pubblico e restituisce il brand con l'URL vero, pronto per
+// l'HTML dell'email. Se manca la configurazione Supabase o il caricamento fallisce, il logo viene
+// tolto (si vede comunque la pastiglia con le iniziali) invece di lasciare un'immagine rotta.
+async function resolveLogoUrl(brand?: Brand): Promise<Brand | undefined> {
+  if (!brand?.logo) return brand;
+  const parsed = dataUrlToBytes(brand.logo);
+  if (!parsed) return brand; // già un URL vero, o formato non gestito: lascialo così com'è
+  const url = await uploadPublicAsset(parsed.bytes, parsed.ext, parsed.contentType);
+  return { ...brand, logo: url ?? undefined };
 }
 
 // Carta intestata: barra colore struttura + header con logo/nome/contatti + corpo + footer con recapiti.
@@ -66,7 +81,7 @@ function shell(title: string, accent: string, inner: string, brand?: Brand) {
        <div style="text-align:center;color:#b9bfc9;font-size:10px;margin-top:8px;">Inviato con Xenora</div>`
     : `<div style="text-align:center;color:#9aa1ac;font-size:11px;margin-top:14px;">Inviato con Xenora · Digital Solution</div>`;
   return `<!doctype html><html lang="it"><body style="margin:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2430;">
-  <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
+  <div style="max-width:680px;margin:0 auto;padding:24px 16px;">
     <div style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e6e8ec;">
       <div style="height:5px;background:${accent};"></div>
       <div style="padding:22px 24px 18px;border-bottom:1px solid #f0f1f4;">${header}</div>
@@ -80,10 +95,28 @@ function row(label: string, value: string) {
   return `<tr><td style="padding:7px 0;color:#6b7280;font-size:13px;">${esc(label)}</td><td style="padding:7px 0;text-align:right;font-size:14px;font-weight:600;color:#1f2430;">${value}</td></tr>`;
 }
 
-function voucherHtml(b: BookingPayload, checkinUrl: string, manageUrl?: string) {
+async function voucherHtml(b: BookingPayload, checkinUrl: string, manageUrl?: string) {
   const accent = b.color || "#285f92";
   const cur = b.currency || "€";
   const people = `${b.adults ?? 1} adulti${b.children ? ` · ${b.children} bambini` : ""}`;
+  const brand = await resolveLogoUrl(brandFrom(b));
+  // QR per gestire la prenotazione dal telefono (come su Octorate): inquadrandolo si apre lo
+  // stesso link del pulsante "Gestisci". Se generazione/caricamento falliscono l'email parte
+  // comunque, solo senza QR.
+  let qrHtml = "";
+  const qrTarget = manageUrl || checkinUrl;
+  if (qrTarget) {
+    try {
+      const qrBytes = await QRCode.toBuffer(qrTarget, { type: "png", margin: 1, width: 220 });
+      const qrUrl = await uploadPublicAsset(qrBytes, "png", "image/png");
+      if (qrUrl) {
+        qrHtml = `<div style="margin:18px 0 0;text-align:center;">
+          <img src="${esc(qrUrl)}" width="120" height="120" alt="QR gestione prenotazione" style="display:inline-block;border:1px solid #eceef1;border-radius:10px;padding:6px;background:#fff;" />
+          <div style="margin-top:6px;font-size:11px;color:#9aa1ac;">Inquadra per gestire la prenotazione dal telefono</div>
+        </div>`;
+      }
+    } catch { /* niente QR se fallisce: non blocca l'invio */ }
+  }
   const inner = `
     <p style="margin:0 0 4px;font-size:16px;">Ciao <b>${esc((b.guestName || "").split(" ")[0] || "ospite")}</b>,</p>
     <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">la tua prenotazione presso <b>${esc(b.structureName)}</b> è confermata. Ecco il riepilogo.</p>
@@ -108,15 +141,17 @@ function voucherHtml(b: BookingPayload, checkinUrl: string, manageUrl?: string) 
     ${manageUrl ? `<div style="margin:12px 0 6px;">
       <a href="${esc(manageUrl)}" style="display:block;text-align:center;background:#fff;border:1px solid ${accent};color:${accent};text-decoration:none;font-weight:700;font-size:14px;padding:12px;border-radius:10px;">Gestisci la prenotazione (modifica o annulla)</a>
     </div>` : ""}
+    ${qrHtml}
   `;
-  return shell("Conferma prenotazione", accent, inner, brandFrom(b));
+  return shell("Conferma prenotazione", accent, inner, brand);
 }
 
 // Email di annullamento (all'ospite): conferma la cancellazione ed eventuale rimborso.
-function cancelHtml(b: BookingPayload) {
+async function cancelHtml(b: BookingPayload) {
   const accent = b.color || "#b4472e";
   const cur = b.currency || "€";
   const refunded = typeof b.refunded === "number" ? b.refunded : 0;
+  const brand = await resolveLogoUrl(brandFrom(b));
   const inner = `
     <p style="margin:0 0 4px;font-size:16px;">Ciao <b>${esc((b.guestName || "").split(" ")[0] || "ospite")}</b>,</p>
     <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">la tua prenotazione presso <b>${esc(b.structureName)}</b> è stata <b>annullata</b>.</p>
@@ -134,12 +169,13 @@ function cancelHtml(b: BookingPayload) {
     </div>
     <p style="margin:18px 0 0;font-size:13px;color:#4b5563;">Ci dispiace vederti annullare. Sarai sempre il benvenuto in futuro.</p>
   `;
-  return shell("Prenotazione annullata", accent, inner, brandFrom(b));
+  return shell("Prenotazione annullata", accent, inner, brand);
 }
 
 interface CheckinGuest { role?: string; firstName?: string; lastName?: string; sex?: string; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string; docPlace?: string }
-function checkinHtml(b: BookingPayload, guests: CheckinGuest[], arrival?: string) {
+async function checkinHtml(b: BookingPayload, guests: CheckinGuest[], arrival?: string) {
   const accent = b.color || "#0E9F6E";
+  const brand = await resolveLogoUrl(brandFrom(b));
   const list = guests.map((g, i) => `
     <div style="border:1px solid #eceef1;border-radius:10px;padding:12px 14px;margin-bottom:10px;">
       <div style="font-size:12px;color:#9aa1ac;margin-bottom:6px;">${i === 0 ? "Ospite principale" : `Ospite ${i + 1}`}</div>
@@ -163,12 +199,13 @@ function checkinHtml(b: BookingPayload, guests: CheckinGuest[], arrival?: string
     ${list}
     <p style="margin:14px 0 0;font-size:12px;color:#9aa1ac;">Apri il gestionale → Alloggiati Web per generare il tracciato e inviarlo alla Questura.</p>
   `;
-  return shell("Check-in ricevuto", accent, inner, brandFrom(b));
+  return shell("Check-in ricevuto", accent, inner, brand);
 }
 
 // Sollecito check-in all'OSPITE: email diretta con il link per compilare il check-in online.
-function reminderHtml(b: BookingPayload, checkinUrl: string) {
+async function reminderHtml(b: BookingPayload, checkinUrl: string) {
   const accent = b.color || "#0E9F6E";
+  const brand = await resolveLogoUrl(brandFrom(b));
   const inner = `
     <p style="margin:0 0 4px;font-size:16px;">Ciao <b>${esc((b.guestName || "").split(" ")[0] || "ospite")}</b>,</p>
     <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">manca poco al tuo arrivo presso <b>${esc(b.structureName)}</b>. Completa il <b>check-in online</b> adesso: è veloce e al tuo arrivo eviti l'attesa.</p>
@@ -181,7 +218,7 @@ function reminderHtml(b: BookingPayload, checkinUrl: string) {
     </div>
     <p style="margin:8px 0 0;font-size:12px;color:#9aa1ac;text-align:center;">Compila i dati prima dell'arrivo: risparmi tempo al check-in.</p>
   `;
-  return shell("Completa il check-in", accent, inner, brandFrom(b));
+  return shell("Completa il check-in", accent, inner, brand);
 }
 
 // Ricevuta di pagamento dell'ABBONAMENTO Xenora (email sobria all'abbonato).
@@ -242,26 +279,26 @@ export async function POST(req: Request) {
         const pdf = await buildVoucherPdf({ ...b, manageUrl: body.manageUrl });
         attachments = [{ filename: `voucher-${(b.code || "prenotazione").replace(/[^A-Za-z0-9_-]/g, "")}.pdf`, content: Buffer.from(pdf).toString("base64") }];
       } catch { attachments = undefined; }
-      const data = await send(b.guestEmail, subject, voucherHtml(b, body.checkinUrl || "", body.manageUrl), b.structureEmail, attachments);
+      const data = await send(b.guestEmail, subject, await voucherHtml(b, body.checkinUrl || "", body.manageUrl), b.structureEmail, attachments);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "cancel") {
       if (!b.guestEmail) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
       const subject = `Prenotazione annullata ${b.code || ""} · ${b.structureName || "Xenora"}`.trim();
-      const data = await send(b.guestEmail, subject, cancelHtml(b), b.structureEmail);
+      const data = await send(b.guestEmail, subject, await cancelHtml(b), b.structureEmail);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "checkin") {
       const to = body.operatorEmail || b.structureEmail;
       if (!to) return NextResponse.json({ ok: false, error: "Email struttura mancante" }, { status: 400 });
       const subject = `Check-in online · ${b.code || ""} · ${b.guestName || ""}`.trim();
-      const data = await send(to, subject, checkinHtml(b, body.guests || [], body.arrival), b.guestEmail);
+      const data = await send(to, subject, await checkinHtml(b, body.guests || [], body.arrival), b.guestEmail);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "checkin_reminder") {
       if (!b.guestEmail) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
       const subject = `Completa il check-in online · ${b.structureName || "Xenora"}`.trim();
-      const data = await send(b.guestEmail, subject, reminderHtml(b, body.checkinUrl || ""), b.structureEmail);
+      const data = await send(b.guestEmail, subject, await reminderHtml(b, body.checkinUrl || ""), b.structureEmail);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "guest_message") {
@@ -269,7 +306,7 @@ export async function POST(req: Request) {
       if (!body.to) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
       const subject = body.subject || (b.structureName ? `Messaggio da ${b.structureName}` : "Messaggio");
       const accent = body.accent || b.color || "#285f92";
-      const brand = body.brand || (b.structureName ? { ...brandFrom(b), accent } : undefined);
+      const brand = await resolveLogoUrl(body.brand || (b.structureName ? { ...brandFrom(b), accent } : undefined));
       const title = body.subject || "Messaggio";
       const html = shell(title, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>`, brand);
       const data = await send(body.to, subject, html, body.replyTo || b.structureEmail);
@@ -280,6 +317,9 @@ export async function POST(req: Request) {
       const subject = body.subject || "Preventivo";
       const accent = body.accent || body.brand?.accent || "#285f92";
       const brand = body.brand ? { ...body.brand, accent } : (b.structureName ? { ...brandFrom(b), accent } : undefined);
+      // Per l'HTML dell'email serve un URL pubblico vero (niente data: URI); il PDF invece usa il
+      // logo originale più sotto, incorporandolo direttamente nel file.
+      const emailBrand = await resolveLogoUrl(brand);
       // Pulsante di azione (Conferma e paga): l'URL viaggia dentro il bottone, non come testo lungo.
       const cta = body.ctaUrl
         ? `<div style="margin:22px 0 6px;">
@@ -287,7 +327,7 @@ export async function POST(req: Request) {
            </div>
            <p style="margin:8px 0 0;font-size:12px;color:#9aa1ac;text-align:center;">Pagamento sicuro con Stripe · carta, PayPal, Klarna e altri metodi.</p>`
         : "";
-      const html = shell(subject, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>${cta}`, brand);
+      const html = shell(subject, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>${cta}`, emailBrand);
       // Allega il preventivo in PDF (carta intestata). Se la generazione fallisce, invia comunque l'email.
       let attachments: { filename: string; content: string }[] | undefined;
       try {

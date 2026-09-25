@@ -44,7 +44,11 @@ export async function buildVoucherPdf(b: VoucherData): Promise<Uint8Array> {
     try {
       const isPng = /^data:image\/png/i.test(b.logo);
       const bytes = Buffer.from(b.logo.split(",")[1] || "", "base64");
-      const img = isPng ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
+      // Prova il formato dichiarato dal data: URI; se pdf-lib lo rifiuta (es. variante JPEG non
+      // supportata) prova l'altro formato prima di rinunciare al logo.
+      let img;
+      try { img = isPng ? await doc.embedPng(bytes) : await doc.embedJpg(bytes); }
+      catch { img = isPng ? await doc.embedJpg(bytes) : await doc.embedPng(bytes); }
       const box = 56; // riquadro bianco quadrato
       const scale = Math.min(box / img.width, box / img.height);
       const w = img.width * scale, h = img.height * scale;
@@ -52,7 +56,7 @@ export async function buildVoucherPdf(b: VoucherData): Promise<Uint8Array> {
       page.drawRectangle({ x: M, y: boxY, width: box, height: box, color: rgb(1, 1, 1) });
       page.drawImage(img, { x: M + (box - w) / 2, y: boxY + (box - h) / 2, width: w, height: h });
       textX = M + box + 14;
-    } catch { /* logo non valido: si continua col solo testo */ }
+    } catch (e) { console.error("buildVoucherPdf: logo non incorporabile:", e instanceof Error ? e.message : e); }
   }
   page.drawText(b.structureName || "Xenora", { x: textX, y: 841.89 - 52, size: 22, font: bold, color: rgb(1, 1, 1) });
   page.drawText("Conferma di prenotazione", { x: textX, y: 841.89 - 74, size: 12, font, color: rgb(1, 1, 1) });
