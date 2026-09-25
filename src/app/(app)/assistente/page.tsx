@@ -457,7 +457,7 @@ export default function AssistentePage() {
   );
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="w-full">
       <style>{`
         @keyframes xnOrbBreathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.045); } }
         @keyframes xnOrbRing { 0% { transform: scale(0.85); opacity: .6; } 100% { transform: scale(1.7); opacity: 0; } }
@@ -487,7 +487,7 @@ export default function AssistentePage() {
       </div>
 
       {/* ─────────── Barra di richiesta: il "centro comandi" ─────────── */}
-      <form onSubmit={(e) => { e.preventDefault(); ask(q); }} className="flex items-center gap-2 rounded-full border bg-surface p-1.5 pl-2 shadow-sm transition" style={{ borderColor: focused ? "var(--focus)" : "var(--line)", boxShadow: focused ? `0 0 0 3px ${focusTint(14)}` : undefined }}>
+      <form onSubmit={(e) => { e.preventDefault(); ask(q); }} className="flex max-w-3xl items-center gap-2 rounded-full border bg-surface p-1.5 pl-2 shadow-sm transition" style={{ borderColor: focused ? "var(--focus)" : "var(--line)", boxShadow: focused ? `0 0 0 3px ${focusTint(14)}` : undefined }}>
         {micAvailable && (
           <button type="button" onClick={toggleListening} title={listening ? "Sto ascoltando… tocca per fermare" : "Tocca per parlare"} className="grid h-10 w-10 shrink-0 place-items-center rounded-full transition active:scale-95" style={listening ? { backgroundColor: "var(--err)", color: "#fff" } : { color: "var(--focus)", background: focusTint(12) }}><Mic size={18} /></button>
         )}
@@ -499,7 +499,7 @@ export default function AssistentePage() {
       {(!micAvailable || micHint) && <p className="mt-2 px-1 text-xs font-medium" style={{ color: micHint ? "var(--err)" : "var(--faint)" }}>{micHint || "La voce in entrata si attiva aprendo Xenora in Chrome o Edge."}</p>}
 
       {/* Domande rapide */}
-      <div className="mt-3 flex flex-wrap gap-1.5">
+      <div className="mt-3 flex max-w-3xl flex-wrap gap-1.5">
         {CHIPS.map((c) => (
           <button key={c.q} onClick={() => { setQ(c.label); ask(c.q); }} className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-dim transition hover:border-focus hover:text-focus">{c.label}</button>
         ))}
@@ -507,7 +507,7 @@ export default function AssistentePage() {
 
       {/* ─────────── Risposta a fuoco (una sola alla volta, niente cronologia) ─────────── */}
       {ans && (
-        <div className="anim-pop relative mt-6 overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-sm">
+        <div className="anim-pop relative mt-6 max-w-3xl overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-sm">
           <span className="absolute inset-y-0 left-0 w-[3px]" style={{ backgroundColor: "var(--focus)" }} aria-hidden />
           {sent && <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">Hai chiesto · «{sent}»</div>}
           <div className="flex items-start justify-between gap-3">
@@ -541,7 +541,7 @@ export default function AssistentePage() {
         <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-faint">Panoramica di oggi</span>
         <div className="h-px flex-1" style={{ backgroundColor: "var(--line)" }} />
       </div>
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7">
         {tiles.map((it) => (
           <button
             key={it.label}
