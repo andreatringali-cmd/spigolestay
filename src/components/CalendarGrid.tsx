@@ -893,7 +893,7 @@ export default function CalendarGrid() {
                   <button key={String(v)} onClick={() => patchView({ span: v })} className={`rounded-md py-1 text-xs font-semibold transition ${vw.span === v ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>{lab}</button>
                 ))}
               </div>
-              <MenuToggle label="Inizia da ieri" on={vw.fromYesterday} title={vw.span === "month" ? "Passa alla vista a 7 giorni" : undefined} onClick={() => { const nf = !vw.fromYesterday; const nextSpan: Span = nf && vw.span === "month" ? 7 : vw.span; patchView({ fromYesterday: nf, span: nextSpan }); const t = new Date(); const base = new Date(t.getFullYear(), t.getMonth(), t.getDate()); if (nextSpan !== "month") setStart(nf ? addDays(base, -1) : base); }} />
+              <MenuToggle label="Inizia da ieri" on={vw.fromYesterday} onClick={() => { const nf = !vw.fromYesterday; patchView({ fromYesterday: nf }); const t = new Date(); const base = new Date(t.getFullYear(), t.getMonth(), t.getDate()); setStart(nf ? addDays(base, -1) : base); }} />
               <div className="my-1 border-t border-line" />
               <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Righe</div>
               <MenuToggle label="Tariffa" on={vw.rate} onClick={() => patchView({ rate: !vw.rate })} />
