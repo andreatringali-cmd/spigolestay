@@ -19,7 +19,7 @@ export default function ChannelLogo({ channel, size = 16, title }: { channel: Ch
     case "expedia":
       return <Tile bg="#FFC72C" t="Expedia / Vrbo"><svg width={size * 0.6} height={size * 0.6} viewBox="0 0 24 24" fill="#0A2A66"><path d="M2 21l20-9L2 3v6.5l13 2.5-13 2.5z" /></svg></Tile>;
     case "hotelbeds":
-      return <Tile bg="#0E86C7" t="HotelBeds"><svg width={size * 0.72} height={size * 0.72} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 5v14" /><path d="M2 10h16a4 4 0 0 1 4 4v5" /><path d="M2 15h20" /><circle cx="7" cy="8" r="1.6" fill="#fff" stroke="none" /></svg></Tile>;
+      return <Tile bg="#fff" t="HotelBeds"><svg width={size * 0.85} height={size * 0.85} viewBox="0 0 24 24"><rect x="1" y="5.5" width="7" height="7" fill="#A6DED2" /><rect x="1" y="12.5" width="7" height="7" fill="#A21A54" /><text x="10.5" y="18.5" fontFamily="Arial, sans-serif" fontSize="16" fontWeight="800" fill="#14284A">h</text></svg></Tile>;
     case "other":
       return <Tile bg="#5B5F6B" t="Altro / OTA"><svg width={size * 0.62} height={size * 0.62} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4.5l3 2" /></svg></Tile>;
     case "direct":
