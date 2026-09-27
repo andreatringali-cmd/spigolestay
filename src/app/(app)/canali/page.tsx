@@ -82,6 +82,8 @@ export default function CanaliPage() {
           next[l.structureId] = { propertyId: l.propertyId, rooms, at: new Date().toISOString() };
         }
         setChxMap(next); try { localStorage.setItem("spigolestay:channexmap", JSON.stringify(next)); } catch {}
+        // Struttura (ri)collegata → fai partire subito la sincronizzazione ARI iniziale.
+        try { window.dispatchEvent(new Event("spigolestay:channex-dirty")); } catch {}
         // Registra automaticamente il webhook Channex (ricezione prenotazioni in tempo reale),
         // una sola volta per sessione. Idempotente lato server: non crea doppioni.
         if (!webhookDone.current) {
@@ -129,6 +131,8 @@ export default function CanaliPage() {
       (j.rooms || []).forEach((r: { xid?: string; roomTypeId?: string; ratePlanId?: string; ok: boolean }) => { if (r.ok && r.xid && r.roomTypeId) roomMap[r.xid] = { roomTypeId: r.roomTypeId, ratePlanId: r.ratePlanId }; });
       const next = { ...chxMap, [sid]: { propertyId: j.propertyId, rooms: roomMap, at: new Date().toISOString() } };
       setChxMap(next); try { localStorage.setItem("spigolestay:channexmap", JSON.stringify(next)); } catch {}
+      // Struttura appena creata su Channex → invia subito la finestra ARI iniziale (500 giorni).
+      try { window.dispatchEvent(new Event("spigolestay:channex-dirty")); } catch {}
       setChxSync({ running: false, ok: true, msg: `Struttura creata su Channex ✓ · ${okRooms}/${rooms.length} camere` });
       saveLog([{ id: uid(), ts: Date.now(), text: `${t("Struttura sincronizzata su Channex")} — ${st.name}`, color: "var(--ok)" }, ...log]);
     } catch (e) {

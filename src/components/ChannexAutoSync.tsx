@@ -13,14 +13,42 @@ import { apiPost } from "@/lib/invoicing/client";
 const CHX_MAP_KEY = "spigolestay:channexmap";
 const CLOSES_KEY = "spigolestay:calcloses";
 const DEBOUNCE_MS = 4000;
+// Snapshot dell'ultimo ARI inviato con successo, per struttura. Serve al DELTA: prima di inviare
+// calcoliamo la finestra completa, la confrontiamo con lo snapshot e spediamo SOLO le righe cambiate.
+const SNAPSHOT_KEY = "spigolestay:channex-arisnapshot";
+// Timestamp (per struttura) dell'ultimo full-sync completo: lo forziamo al massimo 1 volta/24h.
+const LASTFULL_KEY = "spigolestay:channex-lastfullsync";
+// Finestra di sincronizzazione richiesta dalla certificazione Channex: 500 giorni.
+const FULL_DAYS = 500;
+const FULLSYNC_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24h
 // Evento custom emesso dal calendario quando cambiano le chiusure vendita (persistite in
 // localStorage, fuori dallo stato condiviso): serve a far scattare comunque la sincronizzazione.
 export const CHANNEX_DIRTY_EVENT = "spigolestay:channex-dirty";
 
+// Snapshot per struttura: mappa chiave→valore (stringa) delle righe già inviate.
+// - disponibilità:  chiave `${property_id}|${room_type_id}|${date}` → valore = numero disponibilità
+// - restrizioni:    chiave `${property_id}|${rate_plan_id}|${date}` → valore = JSON canonico dei campi
+type StructSnapshot = { availability: Record<string, string>; restrictions: Record<string, string> };
+type SnapshotStore = Record<string, StructSnapshot>;
+
+function loadJSON<T>(key: string, fallback: T): T {
+  try { const r = localStorage.getItem(key); return r ? (JSON.parse(r) as T) : fallback; } catch { return fallback; }
+}
+function saveJSON(key: string, value: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage pieno/negato: si riprova al prossimo giro */ }
+}
+
+// Chiave/valore per il diff.
+const availKey = (r: { property_id: string; room_type_id: string; date: string }) => `${r.property_id}|${r.room_type_id}|${r.date}`;
+const availVal = (r: { availability: number }) => String(r.availability);
+const restrKey = (r: { property_id: string; rate_plan_id: string; date: string }) => `${r.property_id}|${r.rate_plan_id}|${r.date}`;
+// Valore canonico (ordine campi fisso) così due righe identiche producono la stessa stringa.
+const restrVal = (r: { rate?: string; min_stay_arrival?: number; max_stay?: number; stop_sell?: boolean; closed_to_arrival?: boolean; closed_to_departure?: boolean }) =>
+  JSON.stringify({ rate: r.rate, min_stay_arrival: r.min_stay_arrival, max_stay: r.max_stay, stop_sell: r.stop_sell, closed_to_arrival: r.closed_to_arrival, closed_to_departure: r.closed_to_departure });
+
 export default function ChannexAutoSync() {
   const { roomTypes, units, bookings, rateOverrides } = useData();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const first = useRef(true);
   // Ultimi dati "vivi" a disposizione del push (aggiornati a ogni render): così anche il push
   // avviato da un evento esterno (chiusure vendita) usa lo stato corrente.
   const dataRef = useRef({ roomTypes, units, bookings, rateOverrides });
@@ -39,21 +67,75 @@ export default function ChannexAutoSync() {
         let closes: Record<string, number> = {};
         try { closes = JSON.parse(localStorage.getItem(CLOSES_KEY) || "{}"); } catch {}
         const { roomTypes: rt, units: un, bookings: bk, rateOverrides: ro } = dataRef.current;
+
+        const snapshots = loadJSON<SnapshotStore>(SNAPSHOT_KEY, {});
+        const lastFull = loadJSON<Record<string, number>>(LASTFULL_KEY, {});
+        const now = Date.now();
+
         for (const [sid, map] of linked) {
-          const { availability, rates } = buildAriPayload(map, sid, rt, un, bk, ro, { weekendPct, closes });
-          if (availability.length === 0 && rates.length === 0) continue;
+          // Finestra COMPLETA 500 giorni (una sola build: da qui si ricava full o delta).
+          const { availability, restrictions } = buildAriPayload(map, sid, rt, un, bk, ro, { days: FULL_DAYS, weekendPct, closes });
+          if (availability.length === 0 && restrictions.length === 0) continue;
+
+          const snap = snapshots[sid];
+          // Full-sync quando: manca lo snapshot (primo caricamento) oppure sono passate 24h.
+          const needFull = !snap || (now - (lastFull[sid] ?? 0) >= FULLSYNC_INTERVAL_MS);
+
+          // Mappe chiave→valore correnti (servono sia per il diff che per aggiornare lo snapshot).
+          const curAvail: Record<string, string> = {};
+          for (const a of availability) curAvail[availKey(a)] = availVal(a);
+          const curRestr: Record<string, string> = {};
+          for (const r of restrictions) curRestr[restrKey(r)] = restrVal(r);
+
+          // Righe da inviare: full = tutte; delta = solo quelle nuove o cambiate rispetto allo snapshot.
+          let sendAvail = availability;
+          let sendRestr = restrictions;
+          if (!needFull) {
+            const prevA = snap!.availability || {};
+            const prevR = snap!.restrictions || {};
+            sendAvail = availability.filter((a) => prevA[availKey(a)] !== availVal(a));
+            sendRestr = restrictions.filter((r) => prevR[restrKey(r)] !== restrVal(r));
+            if (sendAvail.length === 0 && sendRestr.length === 0) continue; // niente cambiato per questa struttura
+          }
+
+          let availOk = false, restrOk = false;
           try {
-            await fetch("/api/channex/ari", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ availability, rates }) });
-          } catch { /* rete assente: si riproverà al prossimo cambiamento */ }
+            const res = await fetch("/api/channex/ari", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ availability: sendAvail, restrictions: sendRestr }),
+            });
+            const j = await res.json().catch(() => null) as null | { availability?: { ok?: boolean }; restrictions?: { ok?: boolean } };
+            availOk = !!j?.availability?.ok;
+            restrOk = !!j?.restrictions?.ok;
+          } catch { /* rete assente: snapshot non aggiornato → si riprova al prossimo cambiamento */ }
+
+          // Aggiorna lo snapshot SOLO con le righe inviate con successo (per endpoint).
+          const nextSnap: StructSnapshot = snap ? { availability: { ...snap.availability }, restrictions: { ...snap.restrictions } } : { availability: {}, restrictions: {} };
+          if (needFull) {
+            // Full riuscito → lo snapshot diventa l'intera finestra corrente (reset), altrimenti lo si lascia com'è.
+            if (availOk) nextSnap.availability = curAvail;
+            if (restrOk) nextSnap.restrictions = curRestr;
+            // Registra il full-sync solo se ENTRAMBE le parti sono andate a buon fine, così un full
+            // fallito viene ritentato (e non "blindato" per 24h).
+            if (availOk && restrOk) { lastFull[sid] = now; saveJSON(LASTFULL_KEY, lastFull); }
+          } else {
+            // Delta → aggiorna nello snapshot solo le chiavi effettivamente inviate con successo.
+            if (availOk) for (const a of sendAvail) nextSnap.availability[availKey(a)] = availVal(a);
+            if (restrOk) for (const r of sendRestr) nextSnap.restrictions[restrKey(r)] = restrVal(r);
+          }
+          snapshots[sid] = nextSnap;
+          saveJSON(SNAPSHOT_KEY, snapshots);
         }
       }, DEBOUNCE_MS);
     };
 
-    // 1) Cambiamenti nello stato condiviso (prenotazioni, camere, prezzi): salta il primo render.
-    if (first.current) { first.current = false; }
-    else schedulePush();
+    // 1) Cambiamenti nello stato condiviso + primo caricamento: schedula sempre un push (il DELTA
+    // rende innocuo il caso "niente cambiato" = non invia nulla; se manca lo snapshot fa il full-sync
+    // iniziale, necessario per una struttura appena collegata).
+    schedulePush();
 
-    // 2) Chiusure vendita: vivono in localStorage fuori dallo stato condiviso → evento custom.
+    // 2) Chiusure vendita e collegamento struttura: vivono fuori dallo stato condiviso → evento custom.
     window.addEventListener(CHANNEX_DIRTY_EVENT, schedulePush);
     return () => { window.removeEventListener(CHANNEX_DIRTY_EVENT, schedulePush); if (timer.current) clearTimeout(timer.current); };
   }, [bookings, units, rateOverrides, roomTypes]);

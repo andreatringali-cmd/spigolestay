@@ -124,11 +124,35 @@ export async function createRoomType(propertyId: string, r: SyncRoom) {
 // ── ARI: aggiornamento disponibilità e prezzi ──
 export interface AvailValue { property_id: string; room_type_id: string; date?: string; date_from?: string; date_to?: string; availability: number }
 export interface RateValue { property_id: string; rate_plan_id: string; date?: string; date_from?: string; date_to?: string; rate: string }
+
+// Riga RESTRIZIONI Channex. Su Channex prezzo e restrizioni viaggiano sullo STESSO
+// endpoint /restrictions: si mandano insieme aggiungendo campi alla stessa riga
+// (rate + eventuali min_stay_arrival, stop_sell, …). I campi opzionali si inviano
+// SOLO quando abbiamo un dato reale: se assenti, Channex lascia invariata la restrizione.
+// NB: usiamo `min_stay_arrival` (soggiorno minimo all'ARRIVO) come nome del campo
+// per il soggiorno minimo — è la restrizione standard di Channex per il min stay.
+export interface RestrictionRow {
+  property_id: string;
+  rate_plan_id: string;
+  date: string;
+  rate?: string;
+  min_stay_arrival?: number;
+  max_stay?: number;
+  stop_sell?: boolean;
+  closed_to_arrival?: boolean;
+  closed_to_departure?: boolean;
+}
+
 export async function pushAvailability(values: AvailValue[]) {
   return channex("/availability", { method: "POST", body: JSON.stringify({ values }) });
 }
-export async function pushRates(values: RateValue[]) {
+// Invia prezzi + restrizioni insieme sullo stesso endpoint /restrictions.
+export async function pushRestrictions(values: RestrictionRow[]) {
   return channex("/restrictions", { method: "POST", body: JSON.stringify({ values }) });
+}
+// Compatibilità storica: pushRates ora delega a pushRestrictions (stesso endpoint).
+export async function pushRates(values: RateValue[]) {
+  return pushRestrictions(values as unknown as RestrictionRow[]);
 }
 
 // ── Prenotazioni in ENTRATA (feed booking revisions non ancora acked) ──
