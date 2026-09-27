@@ -435,7 +435,9 @@ export default function CalendarGrid() {
     const rowEl = el?.closest("[data-unit-id]") as HTMLElement | null;
     const targetUnitId = rowEl?.getAttribute("data-unit-id") || null;
     const res = validate(s.id, targetUnitId, dxDays);
-    setDragView({ id: s.id, dxDays, targetUnitId, x: e.clientX, y: e.clientY, ...res });
+    // Movimento SOLO verticale: l'anteprima segue il cursore in verticale ma resta
+    // ancorata in orizzontale al punto di partenza (le date non cambiano, cambia solo la camera).
+    setDragView({ id: s.id, dxDays, targetUnitId, x: s.startX, y: e.clientY, ...res });
   }
 
   function onPointerUp() {
