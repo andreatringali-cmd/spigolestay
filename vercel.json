@@ -3,6 +3,6 @@
     { "path": "/api/cron/checkin-reminders", "schedule": "0 7 * * *" },
     { "path": "/api/cron/alloggiati-auto", "schedule": "0 21 * * *" },
     { "path": "/api/cron/auto-messages", "schedule": "0 8 * * *" },
-    { "path": "/api/channex/cron", "schedule": "0 * * * *" }
+    { "path": "/api/channex/cron", "schedule": "30 6 * * *" }
   ]
 }
