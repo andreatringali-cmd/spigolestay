@@ -24,7 +24,7 @@ export function buildAriPayload(
   units: Unit[],
   bookings: Booking[],
   rateOverrides: Record<string, number>,
-  opts?: { days?: number; weekendPct?: number },
+  opts?: { days?: number; weekendPct?: number; closes?: Record<string, number> },
 ): { availability: AvailRow[]; rates: RateRow[] } {
   const availability: AvailRow[] = [];
   const rates: RateRow[] = [];
@@ -33,6 +33,10 @@ export function buildAriPayload(
   if (rts.length === 0) return { availability, rates };
   const DAYS = opts?.days ?? 60;
   const weekendPct = opts?.weekendPct ?? 25;
+  // Chiusure vendita manuali per (tipologia|giorno): quante camere chiudere alla vendita per quel
+  // giorno (può essere negativo = overbooking volontario, più camere offerte del reale). Stessa
+  // chiave del calendario ("spigolestay:calcloses"): `${roomTypeId}|${iso}`.
+  const closes = opts?.closes ?? {};
   const base0 = new Date();
   for (const rt of rts) {
     const mp = map.rooms![rt.id];
@@ -43,7 +47,8 @@ export function buildAriPayload(
       // Occupato = QUALSIASI prenotazione non annullata che copre il giorno, incluso il "blocked"
       // (fuori servizio a periodo). Il fuori servizio permanente è già escluso da totalUnits.
       const occupied = bookings.filter((b) => b.status !== "cancelled" && b.roomTypeId === rt.id && b.checkIn <= iso && iso < b.checkOut).length;
-      availability.push({ property_id: map.propertyId, room_type_id: mp.roomTypeId, date: iso, availability: Math.max(0, totalUnits - occupied) });
+      const closed = closes[`${rt.id}|${iso}`] ?? 0; // camere chiuse alla vendita per quel giorno
+      availability.push({ property_id: map.propertyId, room_type_id: mp.roomTypeId, date: iso, availability: Math.max(0, totalUnits - occupied - closed) });
       if (mp.ratePlanId) {
         const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(effectiveBase(rt, roomTypes) * (isWeekend(dt) ? 1 + weekendPct / 100 : 1));
         rates.push({ property_id: map.propertyId, rate_plan_id: mp.ratePlanId, date: iso, rate: Math.max(0, raw).toFixed(2) });

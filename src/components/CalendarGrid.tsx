@@ -247,7 +247,7 @@ export default function CalendarGrid() {
   // Chiusure vendita manuali per (tipologia, giorno): quante camere chiudere. Persistite.
   const [closes, setCloses] = useState<Record<string, number>>({});
   useEffect(() => { try { const r = localStorage.getItem("spigolestay:calcloses"); if (r) setCloses(JSON.parse(r)); } catch {} }, []);
-  const persistCloses = (next: Record<string, number>) => { setCloses(next); try { localStorage.setItem("spigolestay:calcloses", JSON.stringify(next)); } catch {} };
+  const persistCloses = (next: Record<string, number>) => { setCloses(next); try { localStorage.setItem("spigolestay:calcloses", JSON.stringify(next)); } catch {} try { window.dispatchEvent(new Event("spigolestay:channex-dirty")); } catch {} };
   const closeKey = (typeId: string, iso: string) => `${typeId}|${iso}`;
 
   const selAnchor = sel?.anchor ?? null;

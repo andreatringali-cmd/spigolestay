@@ -10,33 +10,51 @@ import { buildAriPayload, type ChxStructMap } from "@/lib/channex-ari";
 // l'aggiornamento a Channex per ogni struttura collegata (mappatura in localStorage). Silenzioso.
 // Montato nell'AppShell: gira sempre, indipendentemente dalla pagina aperta.
 const CHX_MAP_KEY = "spigolestay:channexmap";
+const CLOSES_KEY = "spigolestay:calcloses";
 const DEBOUNCE_MS = 4000;
+// Evento custom emesso dal calendario quando cambiano le chiusure vendita (persistite in
+// localStorage, fuori dallo stato condiviso): serve a far scattare comunque la sincronizzazione.
+export const CHANNEX_DIRTY_EVENT = "spigolestay:channex-dirty";
 
 export default function ChannexAutoSync() {
   const { roomTypes, units, bookings, rateOverrides } = useData();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const first = useRef(true);
+  // Ultimi dati "vivi" a disposizione del push (aggiornati a ogni render): così anche il push
+  // avviato da un evento esterno (chiusure vendita) usa lo stato corrente.
+  const dataRef = useRef({ roomTypes, units, bookings, rateOverrides });
+  dataRef.current = { roomTypes, units, bookings, rateOverrides };
 
   useEffect(() => {
-    // Salta il primo render (caricamento iniziale): non è una modifica dell'utente.
-    if (first.current) { first.current = false; return; }
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(async () => {
-      let chxMap: Record<string, ChxStructMap> = {};
-      try { chxMap = JSON.parse(localStorage.getItem(CHX_MAP_KEY) || "{}"); } catch { return; }
-      const linked = Object.entries(chxMap).filter(([, m]) => m?.propertyId && m?.rooms);
-      if (linked.length === 0) return; // nessuna struttura collegata a Channex
-      let weekendPct = 25;
-      try { weekendPct = JSON.parse(localStorage.getItem("spigolestay:pricerules") || "{}").weekendPct ?? 25; } catch {}
-      for (const [sid, map] of linked) {
-        const { availability, rates } = buildAriPayload(map, sid, roomTypes, units, bookings, rateOverrides, { weekendPct });
-        if (availability.length === 0 && rates.length === 0) continue;
-        try {
-          await fetch("/api/channex/ari", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ availability, rates }) });
-        } catch { /* rete assente: si riproverà al prossimo cambiamento */ }
-      }
-    }, DEBOUNCE_MS);
-    return () => { if (timer.current) clearTimeout(timer.current); };
+    const schedulePush = () => {
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(async () => {
+        let chxMap: Record<string, ChxStructMap> = {};
+        try { chxMap = JSON.parse(localStorage.getItem(CHX_MAP_KEY) || "{}"); } catch { return; }
+        const linked = Object.entries(chxMap).filter(([, m]) => m?.propertyId && m?.rooms);
+        if (linked.length === 0) return; // nessuna struttura collegata a Channex
+        let weekendPct = 25;
+        try { weekendPct = JSON.parse(localStorage.getItem("spigolestay:pricerules") || "{}").weekendPct ?? 25; } catch {}
+        let closes: Record<string, number> = {};
+        try { closes = JSON.parse(localStorage.getItem(CLOSES_KEY) || "{}"); } catch {}
+        const { roomTypes: rt, units: un, bookings: bk, rateOverrides: ro } = dataRef.current;
+        for (const [sid, map] of linked) {
+          const { availability, rates } = buildAriPayload(map, sid, rt, un, bk, ro, { weekendPct, closes });
+          if (availability.length === 0 && rates.length === 0) continue;
+          try {
+            await fetch("/api/channex/ari", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ availability, rates }) });
+          } catch { /* rete assente: si riproverà al prossimo cambiamento */ }
+        }
+      }, DEBOUNCE_MS);
+    };
+
+    // 1) Cambiamenti nello stato condiviso (prenotazioni, camere, prezzi): salta il primo render.
+    if (first.current) { first.current = false; }
+    else schedulePush();
+
+    // 2) Chiusure vendita: vivono in localStorage fuori dallo stato condiviso → evento custom.
+    window.addEventListener(CHANNEX_DIRTY_EVENT, schedulePush);
+    return () => { window.removeEventListener(CHANNEX_DIRTY_EVENT, schedulePush); if (timer.current) clearTimeout(timer.current); };
   }, [bookings, units, rateOverrides, roomTypes]);
 
   return null;
