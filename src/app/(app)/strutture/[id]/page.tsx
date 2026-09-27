@@ -246,25 +246,26 @@ export default function StrutturaSchedaPage() {
 
   // Salvataggio automatico ogni 10s (solo su struttura esistente): non si perde nulla di quanto digitato.
   const [autoSavedAt, setAutoSavedAt] = useState<number | null>(null);
-  const fRef = useRef(f); fRef.current = f;
   const updRef = useRef(updateStructure); updRef.current = updateStructure;
   const savedJson = useRef<string | null>(null);
   useEffect(() => { savedJson.current = JSON.stringify(f); /* baseline al montaggio */ // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Autosalvataggio con DEBOUNCE: salva ~1,5s dopo l'ultima modifica, non ogni 10s. Riduce
+  // drasticamente la finestra in cui una sincronizzazione/ricarica in background poteva perdere
+  // il testo appena scritto (es. la descrizione che "spariva").
   useEffect(() => {
     if (isNew) return;
-    const id = window.setInterval(() => {
-      const cur = JSON.stringify(fRef.current);
-      if (savedJson.current !== null && cur !== savedJson.current && fRef.current.name?.trim()) {
-        const patch: Partial<Structure> = { ...fRef.current };
-        delete (patch as { id?: string }).id;
-        updRef.current(params.id, patch);
-        savedJson.current = cur;
-        setAutoSavedAt(Date.now());
-      }
-    }, 10000);
-    return () => window.clearInterval(id);
-  }, [isNew, params.id]);
+    const cur = JSON.stringify(f);
+    if (savedJson.current === null || cur === savedJson.current || !f.name?.trim()) return;
+    const h = window.setTimeout(() => {
+      const patch: Partial<Structure> = { ...f };
+      delete (patch as { id?: string }).id;
+      updRef.current(params.id, patch);
+      savedJson.current = cur;
+      setAutoSavedAt(Date.now());
+    }, 1500);
+    return () => window.clearTimeout(h);
+  }, [f, isNew, params.id]);
 
   const mapsUrl = f.lat && f.lng ? `https://www.google.com/maps?q=${f.lat},${f.lng}` : f.address ? `https://www.google.com/maps/search/${encodeURIComponent(`${f.address} ${f.city ?? ""}`)}` : null;
   // Anteprima mappa (embed Google Maps, senza API key).

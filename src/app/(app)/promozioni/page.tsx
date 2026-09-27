@@ -213,7 +213,6 @@ export default function PromozioniPage() {
             {editId && <button onClick={resetEditor} className="mr-auto rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">Annulla modifica</button>}
             <button onClick={savePromo} disabled={!name.trim() && !subject.trim()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{editId ? "Salva modifiche" : "Salva promo"}</button>
           </div>
-          <p className="mt-3 text-[11px] text-faint">Qui crei e salvi la promo. L'invio è separato: lo fai dalla libreria qui sotto (a un segmento) o dalla pagina Ospiti (selezione multipla / singolo ospite).</p>
         </Card>
 
         {/* Anteprima */}
