@@ -7,6 +7,8 @@
 //  - Autenticazione Channex: header "user-api-key".
 // ============================================================
 
+import { channexFetch } from "@/lib/channex-queue";
+
 const BASE = process.env.CHANNEX_API_URL || "https://staging.channex.io/api/v1";
 const KEY = process.env.CHANNEX_API_KEY || "";
 
@@ -24,7 +26,10 @@ export interface ChannexResult<T = unknown> {
 export async function channex<T = unknown>(path: string, init?: RequestInit): Promise<ChannexResult<T>> {
   if (!KEY) return { ok: false, status: 0, error: "CHANNEX_API_KEY non configurata" };
   try {
-    const res = await fetch(`${BASE}${path}`, {
+    // La fetch passa dalla coda con throttling (max 20/min) + retry/backoff su
+    // 429 e 5xx. channexFetch ritorna la Response grezza, quindi la lettura sotto
+    // resta identica a prima.
+    const res = await channexFetch(`${BASE}${path}`, {
       ...init,
       headers: {
         "user-api-key": KEY,
