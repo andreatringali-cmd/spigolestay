@@ -257,20 +257,20 @@ export default function CanaliPage() {
         }
       />
 
-      {/* Sincronizzazione REALE verso Channex (staging) */}
+      {/* Stato distribuzione canali. Channex è il motore dietro le quinte e resta INVISIBILE
+         all'utente: qui niente nome fornitore, "staging" o ID tecnici — solo lo stato. */}
       <Card className="mb-5">
         <div className="flex flex-wrap items-center gap-3">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: chxMap[effStructure] ? "var(--ok)" : "var(--focus)" }}><Icon name="share" size={16} /></span>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-txt">{t("Connessione Channex")} <span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">staging</span></div>
+            <div className="text-sm font-semibold text-txt">{t("Distribuzione sui canali")}{chxMap[effStructure] && <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[color:var(--ok)]">● {t("Attiva")}</span>}</div>
             <div className="text-xs text-dim">
               {effStructure === "all"
-                ? t("Seleziona una struttura in alto per sincronizzarla con Channex.")
+                ? t("Seleziona una struttura in alto per attivare la distribuzione sui canali.")
                 : chxMap[effStructure]
-                  ? <>{t("Struttura collegata a Channex")} · <span className="font-mono text-[11px]">{chxMap[effStructure].propertyId.slice(0, 8)}…</span><span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[color:var(--ok)]">● {t("Sync automatica")}</span></>
-                  : t("Crea la struttura su Channex (property + camere + tariffe) partendo dai dati già inseriti in Xenora.")}
+                  ? t("Prezzi, disponibilità e fuori servizio vengono pubblicati sui canali collegati in automatico a ogni modifica. Le prenotazioni dalle OTA arrivano da sole.")
+                  : t("Attiva la distribuzione: le tue camere e tariffe verranno pubblicate sui canali collegati.")}
             </div>
-            {chxMap[effStructure] && <div className="mt-1 text-[11px] text-faint">{t("Prezzi e disponibilità (incluso il fuori servizio) vengono inviati a Channex in automatico a ogni modifica. Le prenotazioni dalle OTA arrivano da sole via webhook.")}</div>}
             {chxSync.msg && <div className="mt-1 text-[11px] font-semibold" style={{ color: chxSync.ok === false ? "var(--err)" : chxSync.ok ? "var(--ok)" : "var(--dim)" }}>{chxSync.msg}</div>}
             {impSync.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: impSync.ok === false ? "var(--err)" : impSync.ok ? "var(--ok)" : "var(--dim)" }}>{impSync.msg}</div>}
             {relink.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: relink.ok === false ? "var(--err)" : relink.ok ? "var(--ok)" : "var(--dim)" }}>{relink.msg}</div>}
@@ -278,22 +278,18 @@ export default function CanaliPage() {
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {chxMap[effStructure] ? (
               <>
-                <button onClick={importOta} disabled={impSync.running} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40" title={t("Le prenotazioni OTA arrivano da sole; usa questo solo per forzare un controllo immediato.")}>{impSync.running ? t("Importo…") : "↓ " + t("Controlla prenotazioni ora")}</button>
-                <button onClick={unlinkChannex} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Scollega")}</button>
+                <button onClick={importOta} disabled={impSync.running} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40" title={t("Le prenotazioni arrivano da sole; usa questo solo per forzare un controllo immediato.")}>{impSync.running ? t("Controllo…") : "↓ " + t("Controlla prenotazioni ora")}</button>
+                <button onClick={unlinkChannex} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Disattiva")}</button>
               </>
             ) : (
               <>
-                {/* «Ricollega» abbina la property GIÀ esistente su Channex (nessun doppione). Da preferire se la struttura è già su Channex. */}
-                <button onClick={() => doRelink(true)} disabled={relink.running} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{relink.running ? t("Ricollego…") : "⟳ " + t("Ricollega")}</button>
-                <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{chxSync.running ? t("Sincronizzo…") : t("Sincronizza con Channex")}</button>
+                <button onClick={() => doRelink(true)} disabled={relink.running} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{relink.running ? t("Ripristino…") : "⟳ " + t("Ripristina")}</button>
+                <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{chxSync.running ? t("Attivo…") : t("Attiva distribuzione")}</button>
               </>
             )}
           </div>
         </div>
       </Card>
-
-      {/* Sincronizzazione iCal reale (sola lettura) */}
-      <IcalSyncPanel />
 
       {/* ── Da qui in giù: simulazione dimostrativa del channel manager ── */}
       <div className="mb-3 mt-1 text-xs font-semibold uppercase tracking-wide text-faint">{t("Demo channel manager (connessione live in produzione)")}</div>
@@ -404,6 +400,11 @@ export default function CanaliPage() {
       </Card>
 
       <p className="mt-3 text-xs text-faint">{t("In produzione la connessione è reale (via Channex/Nuitée): push bidirezionale di tariffe, disponibilità e prenotazioni. Qui i dati sono dimostrativi e salvati nel browser.")}</p>
+
+      {/* Sincronizzazione iCal reale (sola lettura) — in fondo alla pagina */}
+      <div className="mt-6">
+        <IcalSyncPanel />
+      </div>
 
       {/* Pannello di connessione per canale */}
       {configuring && (() => {
