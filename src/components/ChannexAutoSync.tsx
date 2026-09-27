@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useData } from "@/lib/store";
 import { buildAriPayload, type ChxStructMap } from "@/lib/channex-ari";
+import { apiPost } from "@/lib/invoicing/client";
 
 // Sincronizzazione AUTOMATICA disponibilità+prezzi verso Channex.
 // Sostituisce il vecchio pulsante manuale "Prezzi & disponibilità": ogni volta che cambiano
@@ -56,6 +57,17 @@ export default function ChannexAutoSync() {
     window.addEventListener(CHANNEX_DIRTY_EVENT, schedulePush);
     return () => { window.removeEventListener(CHANNEX_DIRTY_EVENT, schedulePush); if (timer.current) clearTimeout(timer.current); };
   }, [bookings, units, rateOverrides, roomTypes]);
+
+  // ENTRATA: mentre Xenora è aperta, controlla da solo le nuove prenotazioni OTA dal feed Channex
+  // (in aggiunta al webhook in tempo reale e alla rete di sicurezza cron lato server). Così le
+  // prenotazioni compaiono senza premere nulla, anche per quelle già presenti prima del webhook.
+  useEffect(() => {
+    const hasLinked = () => { try { const m = JSON.parse(localStorage.getItem(CHX_MAP_KEY) || "{}"); return Object.values(m).some((x) => (x as ChxStructMap)?.propertyId); } catch { return false; } };
+    const pull = () => { if (!hasLinked()) return; apiPost("channex/import", {}).catch(() => {}); };
+    const firstPull = setTimeout(pull, 15000); // primo controllo ~15s dopo l'apertura
+    const iv = setInterval(pull, 3 * 60 * 1000); // poi ogni 3 minuti
+    return () => { clearTimeout(firstPull); clearInterval(iv); };
+  }, []);
 
   return null;
 }
