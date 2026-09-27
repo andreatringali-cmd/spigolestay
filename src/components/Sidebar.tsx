@@ -35,7 +35,7 @@ export default function Sidebar({
   const isOwner = !!user?.email && OWNER_EMAILS.includes(user.email.toLowerCase());
   // Mostra TUTTE le voci per cui hai i permessi (anche dei piani superiori): quelle non incluse
   // nel piano appaiono col lucchetto e, cliccandole, portano all'attivazione dall'Abbonamento.
-  const visible = NAV.filter((n) => can(n.perm));
+  const visible = NAV.filter((n) => can(n.perm) && (!n.ownerOnly || isOwner));
   const locked = (n: (typeof NAV)[number]) => !moduleOn(n.module);
   const TOP = visible.filter((n) => !n.group);
   const GROUPS = Array.from(new Set(visible.filter((n) => n.group).map((n) => n.group)));
@@ -154,20 +154,8 @@ export default function Sidebar({
           )}
         </nav>
 
-        {/* Footer: utente collegato */}
+        {/* Footer: utente collegato. Il Back-office è ora una voce sotto "Il mio abbonamento". */}
         <div className="border-t p-2" style={{ borderTopColor: "color-mix(in srgb, var(--txt) 14%, var(--line))" }}>
-          {isOwner && (
-            <Link
-              href="/admin"
-              onClick={onCloseMobile}
-              title="Back-office (solo titolare)"
-              className={`mb-2 flex items-center gap-2.5 rounded-lg py-2 text-sm font-medium transition hover:bg-wash ${collapsed ? "justify-center px-0" : "px-3"} ${pathname.startsWith("/admin") ? "font-semibold" : ""}`}
-              style={pathname.startsWith("/admin") ? { backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" } : { color: "var(--dim)" }}
-            >
-              <Icon name="grid" size={18} />
-              {!collapsed && <span>Back-office</span>}
-            </Link>
-          )}
           <UserSwitcher sidebar collapsed={collapsed} />
         </div>
       </aside>

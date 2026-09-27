@@ -5,6 +5,7 @@ export interface NavItem {
   icon: string;
   perm?: string;   // permesso richiesto (chiave in users.ts). Assente = sempre visibile.
   module?: string; // modulo richiesto (chiave in Abbonamento). Assente o "pms" = sempre attivo.
+  ownerOnly?: boolean; // visibile solo al titolare Xenora (back-office). Gestito nella Sidebar.
 }
 
 export const NAV: NavItem[] = [
@@ -78,6 +79,7 @@ export const NAV: NavItem[] = [
   { label: "Abbonamento", href: "/abbonamento", group: "Il mio abbonamento", icon: "card", perm: "abbonamento", module: "pms" },
   { label: "Informazioni pagamento", href: "/abbonamento/pagamento", group: "Il mio abbonamento", icon: "card", perm: "abbonamento", module: "pms" },
   { label: "Fatture", href: "/abbonamento/fatture", group: "Il mio abbonamento", icon: "receipt", perm: "abbonamento", module: "pms" },
+  { label: "Back-office", href: "/admin", group: "Il mio abbonamento", icon: "grid", perm: "abbonamento", module: "pms", ownerOnly: true },
 ];
 
 // Colore accento per categoria (palette terra: terracotta, oliva, ocra, tortora + accenti).

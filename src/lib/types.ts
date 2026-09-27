@@ -50,6 +50,7 @@ export interface Structure {
   facebook?: string;       // URL profilo Facebook
   instagram?: string;      // URL profilo Instagram
   linkedin?: string;       // URL profilo LinkedIn
+  tiktok?: string;         // URL profilo TikTok
   googlePlaceId?: string;  // Google Place ID (per le recensioni Google, anche sul sito pubblico)
   // Indirizzo / ubicazione
   streetNumber?: string;
