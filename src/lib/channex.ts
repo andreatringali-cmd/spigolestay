@@ -61,6 +61,18 @@ export async function listRatePlansForRoomType(roomTypeId: string) {
   return channex<{ data: { id: string; attributes?: { title?: string } }[] }>(`/rate_plans?filter[room_type_id]=${encodeURIComponent(roomTypeId)}`);
 }
 
+// ── Webhook (ricezione automatica prenotazioni in tempo reale) ──
+// Channex chiama il callback_url a ogni nuova prenotazione/modifica/cancellazione.
+export async function listWebhooks(propertyId: string) {
+  return channex<{ data: { id: string; attributes?: { callback_url?: string; is_active?: boolean } }[] }>(`/webhooks?filter[property_id]=${encodeURIComponent(propertyId)}`);
+}
+export async function createWebhook(propertyId: string, callbackUrl: string) {
+  return channex<Created>("/webhooks", {
+    method: "POST",
+    body: JSON.stringify({ webhook: { property_id: propertyId, callback_url: callbackUrl, event_mask: "booking", is_active: true, send_data: true } }),
+  });
+}
+
 type Created = { data?: { id?: string } };
 
 // ── Creazione (usata dalla sincronizzazione Xenora → Channex) ──

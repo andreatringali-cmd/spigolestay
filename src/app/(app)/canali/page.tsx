@@ -127,6 +127,7 @@ export default function CanaliPage() {
   // property già su Channex) così webhook/import sanno a chi assegnare le prenotazioni.
   // Robusto: non dipende dal localStorage. Gira una volta all'apertura.
   const relinkDone = useRef(false);
+  const webhookDone = useRef(false);
   const [relink, setRelink] = useState<{ running: boolean; msg?: string; ok?: boolean }>({ running: false });
   const doRelink = async (manual = false) => {
     setRelink({ running: true, msg: manual ? "Ricollego la mappatura…" : undefined });
@@ -146,6 +147,12 @@ export default function CanaliPage() {
           next[l.structureId] = { propertyId: l.propertyId, rooms, at: new Date().toISOString() };
         }
         setChxMap(next); try { localStorage.setItem("spigolestay:channexmap", JSON.stringify(next)); } catch {}
+        // Registra automaticamente il webhook Channex (ricezione prenotazioni in tempo reale),
+        // una sola volta per sessione. Idempotente lato server: non crea doppioni.
+        if (!webhookDone.current) {
+          webhookDone.current = true;
+          apiPost("channex/webhook-setup", {}).catch(() => { webhookDone.current = false; });
+        }
       }
       const n = linked.length;
       setRelink({ running: false, ok: true, msg: manual ? (n ? `Mappatura allineata ✓ · ${n} strutture` : "Nessuna struttura Channex abbinata per nome.") : undefined });
