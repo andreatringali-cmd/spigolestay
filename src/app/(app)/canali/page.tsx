@@ -94,12 +94,6 @@ export default function CanaliPage() {
     } catch (e) { setRelink({ running: false, ok: false, msg: manual ? (e instanceof Error ? e.message : "errore") : undefined }); }
   };
   useEffect(() => { if (relinkDone.current) return; relinkDone.current = true; doRelink(false); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
-  const unlinkChannex = () => {
-    const sid = effStructure;
-    const next = { ...chxMap }; delete next[sid];
-    setChxMap(next); try { localStorage.setItem("spigolestay:channexmap", JSON.stringify(next)); } catch {}
-    setChxSync({ running: false, msg: "Struttura scollegata. Puoi ricrearla su Channex." });
-  };
   const syncToChannex = async () => {
     const sid = effStructure;
     const st = structures.find((s) => s.id === sid);
@@ -183,7 +177,6 @@ export default function CanaliPage() {
             {chxMap[effStructure] ? (
               <>
                 <button onClick={importOta} disabled={impSync.running} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40" title={t("Le prenotazioni arrivano da sole; usa questo solo per forzare un controllo immediato.")}>{impSync.running ? t("Controllo…") : "↓ " + t("Controlla prenotazioni ora")}</button>
-                <button onClick={unlinkChannex} className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-dim hover:bg-wash">{t("Disattiva")}</button>
               </>
             ) : (
               <>
