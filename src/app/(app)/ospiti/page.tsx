@@ -118,11 +118,15 @@ export default function OspitiPage() {
     : seg.startsWith("ch:") ? r.topCh === seg.slice(3)
     : true;
 
-  // Due registri: OSPITI (con prenotazioni) e NEWSLETTER (contatti senza prenotazioni).
+  // Due registri: OSPITI (con prenotazioni) e NEWSLETTER.
+  // NEWSLETTER = SOLO chi si è iscritto dal sito pubblico (tag "newsletter", vedi /api/public-lead):
+  // non tutti i contatti senza prenotazioni. Così non finiscono nel registro contatti orfani
+  // (es. da import o da prenotazioni cancellate) che poi "ricomparivano" dopo lo svuotamento.
   // Se un iscritto newsletter prenota, ha "anyBookings" → passa automaticamente agli ospiti.
+  const isNewsletterLead = (g: { tags?: string[] }) => Array.isArray(g.tags) && g.tags.includes("newsletter");
   const guestSorted = sorted.filter((r) => r.anyBookings && segMatch(r));
-  const nlSorted = sorted.filter((r) => !r.anyBookings);
-  // Svuota il registro newsletter: elimina tutti i contatti senza prenotazioni (conferma in due passi).
+  const nlSorted = sorted.filter((r) => !r.anyBookings && isNewsletterLead(r.guest));
+  // Svuota il registro newsletter: elimina gli iscritti dal sito (conferma in due passi).
   const clearNewsletter = () => {
     if (!confirmClearNl) { setConfirmClearNl(true); return; }
     nlSorted.forEach((r) => deleteGuest(r.guest.id));
