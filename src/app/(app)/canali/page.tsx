@@ -257,8 +257,19 @@ export default function CanaliPage() {
         }
       />
 
-      {/* Stato distribuzione canali. Channex è il motore dietro le quinte e resta INVISIBILE
-         all'utente: qui niente nome fornitore, "staging" o ID tecnici — solo lo stato. */}
+      {/* ── Da qui in giù: simulazione dimostrativa del channel manager ── */}
+      <div className="mb-3 mt-1 text-xs font-semibold uppercase tracking-wide text-faint">{t("Demo channel manager (connessione live in produzione)")}</div>
+
+      {/* KPI */}
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="!p-4"><div className="text-xs text-dim">{t("Canali connessi")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{connectedOtas.length}<span className="text-sm font-normal text-faint">/{channels.length}</span></div></Card>
+        <Card className="!p-4"><div className="text-xs text-dim">{t("Tipologie mappate")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{mappedTypes}<span className="text-sm font-normal text-faint">/{types.length}</span></div></Card>
+        <Card className="!p-4"><div className="text-xs text-dim">{t("Ultima sincronizzazione")}</div><div className="mt-1 text-lg font-bold text-txt">{lastSyncTs ? relTime(lastSyncTs) : "—"}</div></Card>
+        <Card className="!p-4"><div className="text-xs text-dim">{t("Prenotazioni via OTA")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{otaBookings}</div></Card>
+      </div>
+
+      {/* Stato distribuzione canali (sotto le card KPI). Channex è il motore dietro le quinte e
+         resta INVISIBILE all'utente: niente nome fornitore, "staging" o ID tecnici — solo lo stato. */}
       <Card className="mb-5">
         <div className="flex flex-wrap items-center gap-3">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: chxMap[effStructure] ? "var(--ok)" : "var(--focus)" }}><Icon name="share" size={16} /></span>
@@ -291,28 +302,13 @@ export default function CanaliPage() {
         </div>
       </Card>
 
-      {/* ── Da qui in giù: simulazione dimostrativa del channel manager ── */}
-      <div className="mb-3 mt-1 text-xs font-semibold uppercase tracking-wide text-faint">{t("Demo channel manager (connessione live in produzione)")}</div>
-
-      {/* KPI */}
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Canali connessi")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{connectedOtas.length}<span className="text-sm font-normal text-faint">/{channels.length}</span></div></Card>
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Tipologie mappate")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{mappedTypes}<span className="text-sm font-normal text-faint">/{types.length}</span></div></Card>
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Ultima sincronizzazione")}</div><div className="mt-1 text-lg font-bold text-txt">{lastSyncTs ? relTime(lastSyncTs) : "—"}</div></Card>
-        <Card className="!p-4"><div className="text-xs text-dim">{t("Prenotazioni via OTA")}</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{otaBookings}</div></Card>
-      </div>
-
       {/* Connessioni — doppia vista card/lista, clic per aprire la scheda */}
       <div className="mb-6">
         <div className="mb-2 flex items-center justify-between gap-2">
           <SectionTitle>{t("Connessioni")}</SectionTitle>
-          <div className="inline-flex rounded-lg border border-line bg-surface p-0.5">
-            <button onClick={() => setView("list")} title={t("Vista lista")} className={`rounded-md p-1.5 transition ${view === "list" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}><Icon name="menu" size={16} /></button>
-            <button onClick={() => setView("card")} title={t("Vista card")} className={`rounded-md p-1.5 transition ${view === "card" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}><Icon name="grid" size={16} /></button>
-          </div>
         </div>
 
-        {/* Aggiungi un canale dal catalogo Channex tramite menu a tendina */}
+        {/* Aggiungi un canale dal catalogo + toggle vista lista/card nella stessa riga filtri */}
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-line bg-surface p-3">
           <span className="text-sm font-semibold text-txt">➕ {t("Aggiungi canale")}</span>
           <select value={addKey} onChange={(e) => addChannel(e.target.value)} className="min-w-[240px] flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
@@ -322,6 +318,10 @@ export default function CanaliPage() {
             ))}
           </select>
           <span className="text-[11px] text-faint">{OTA_CATALOG.filter((d) => !enabledKeys.includes(d.key)).length} {t("portali disponibili")}</span>
+          <div className="ml-auto inline-flex rounded-lg border border-line bg-paper p-0.5">
+            <button onClick={() => setView("list")} title={t("Vista lista")} className={`rounded-md p-1.5 transition ${view === "list" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}><Icon name="menu" size={16} /></button>
+            <button onClick={() => setView("card")} title={t("Vista card")} className={`rounded-md p-1.5 transition ${view === "card" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}><Icon name="grid" size={16} /></button>
+          </div>
         </div>
 
         {view === "card" ? (
