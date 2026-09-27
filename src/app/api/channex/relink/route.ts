@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
-import { channexEnabled, listProperties, listRoomTypesFor } from "@/lib/channex";
+import { channexEnabled, listProperties, listRoomTypesFor, listRatePlansForRoomType } from "@/lib/channex";
 import { saveChannexMap } from "@/lib/channex-inbound";
 
 export const runtime = "nodejs";
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
   // Per ogni property Channex trova la struttura per nome e le camere abbinate. Se PIÙ property
   // combaciano con la stessa struttura (doppioni su Channex), tengo solo la più COMPLETA
   // (più camere abbinate) per non creare mappature doppie.
-  type Match = { c: Candidate; propertyId: string; propertyTitle: string; rooms: Record<string, string>; count: number };
+  type Match = { c: Candidate; propertyId: string; propertyTitle: string; rooms: Record<string, string>; ratePlans: Record<string, string>; count: number };
   const bestByStruct = new Map<string, Match>();
   const unmatched: string[] = [];
   for (const p of propList) {
@@ -82,16 +82,24 @@ export async function POST(req: Request) {
     if (!c) { unmatched.push(p.attributes?.title || p.id); continue; }
     const rt = await listRoomTypesFor(p.id);
     const rooms: Record<string, string> = {}; // channex_room_type_id → xenora_room_type_id
+    const ratePlans: Record<string, string> = {}; // channex_room_type_id → channex_rate_plan_id (per inviare i prezzi)
     for (const cr of (rt.data?.data ?? [])) {
       const x = c.roomTypes.find((r) => norm(r.name) === norm(cr.attributes?.title));
-      if (x) rooms[cr.id] = x.id;
+      if (x) {
+        rooms[cr.id] = x.id;
+        // Recupera il piano tariffario della tipologia: senza rate_plan_id l'ARI invia solo
+        // la disponibilità e MAI i prezzi.
+        const rp = await listRatePlansForRoomType(cr.id);
+        const rpId = rp.data?.data?.[0]?.id;
+        if (rpId) ratePlans[cr.id] = rpId;
+      }
     }
     const count = Object.keys(rooms).length;
     const cur = bestByStruct.get(c.structureId);
-    if (!cur || count > cur.count) bestByStruct.set(c.structureId, { c, propertyId: p.id, propertyTitle: p.attributes?.title || p.id, rooms, count });
+    if (!cur || count > cur.count) bestByStruct.set(c.structureId, { c, propertyId: p.id, propertyTitle: p.attributes?.title || p.id, rooms, ratePlans, count });
   }
 
-  const linked: { property: string; structure: string; structureId: string; propertyId: string; orgId: string | null; rooms: number; roomsMap: Record<string, string> }[] = [];
+  const linked: { property: string; structure: string; structureId: string; propertyId: string; orgId: string | null; rooms: number; roomsMap: Record<string, string>; ratePlans: Record<string, string> }[] = [];
   for (const [sid, m] of bestByStruct) {
     await saveChannexMap(auth.admin, auth.tenantId, sid, m.propertyId, m.rooms, m.c.orgId);
     // Auto-pulizia doppioni: rimuovi altre mappature per la STESSA struttura che puntano a
@@ -99,7 +107,7 @@ export async function POST(req: Request) {
     let del = auth.admin.from("channex_map").delete().eq("structure_id", sid).neq("channex_property_id", m.propertyId);
     del = m.c.orgId ? del.eq("org_id", m.c.orgId) : del.eq("tenant_id", auth.tenantId).is("org_id", null);
     await del;
-    linked.push({ property: m.propertyTitle, structure: m.c.name || sid, structureId: sid, propertyId: m.propertyId, orgId: m.c.orgId, rooms: m.count, roomsMap: m.rooms });
+    linked.push({ property: m.propertyTitle, structure: m.c.name || sid, structureId: sid, propertyId: m.propertyId, orgId: m.c.orgId, rooms: m.count, roomsMap: m.rooms, ratePlans: m.ratePlans });
   }
 
   return NextResponse.json({ ok: true, linked, unmatched });

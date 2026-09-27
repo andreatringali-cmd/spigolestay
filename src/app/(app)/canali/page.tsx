@@ -134,7 +134,7 @@ export default function CanaliPage() {
   const doRelink = async (manual = false) => {
     setRelink({ running: true, msg: manual ? "Ricollego la mappatura…" : undefined });
     try {
-      type Linked = { property: string; structure: string; structureId: string; propertyId: string; orgId?: string | null; rooms: number; roomsMap?: Record<string, string> };
+      type Linked = { property: string; structure: string; structureId: string; propertyId: string; orgId?: string | null; rooms: number; roomsMap?: Record<string, string>; ratePlans?: Record<string, string> };
       const j = await apiPost<{ ok: boolean; linked?: Linked[]; unmatched?: string[]; error?: string }>("channex/relink", {});
       if (!j.ok) { setRelink({ running: false, ok: false, msg: manual ? (j.error || "Ricollegamento non riuscito") : undefined }); return; }
       const linked = j.linked ?? [];
@@ -144,7 +144,8 @@ export default function CanaliPage() {
         const next = { ...chxMap };
         for (const l of linked) {
           const rooms: Record<string, { roomTypeId: string; ratePlanId?: string }> = {};
-          for (const [chxRt, xid] of Object.entries(l.roomsMap || {})) rooms[xid] = { roomTypeId: chxRt };
+          // ratePlanId (dal server) è indispensabile per inviare i PREZZI in ARI, non solo la disponibilità.
+          for (const [chxRt, xid] of Object.entries(l.roomsMap || {})) rooms[xid] = { roomTypeId: chxRt, ratePlanId: l.ratePlans?.[chxRt] };
           next[l.structureId] = { propertyId: l.propertyId, rooms, at: new Date().toISOString() };
         }
         setChxMap(next); try { localStorage.setItem("spigolestay:channexmap", JSON.stringify(next)); } catch {}

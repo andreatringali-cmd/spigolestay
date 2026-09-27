@@ -55,6 +55,11 @@ export async function listProperties() {
 export async function listRoomTypesFor(propertyId: string) {
   return channex<{ data: { id: string; attributes?: { title?: string } }[] }>(`/room_types?filter[property_id]=${encodeURIComponent(propertyId)}`);
 }
+// Piani tariffari di una tipologia camera (serve il rate_plan_id per inviare i PREZZI in ARI:
+// senza di esso si spinge solo la disponibilità). Restituiamo il primo piano trovato.
+export async function listRatePlansForRoomType(roomTypeId: string) {
+  return channex<{ data: { id: string; attributes?: { title?: string } }[] }>(`/rate_plans?filter[room_type_id]=${encodeURIComponent(roomTypeId)}`);
+}
 
 type Created = { data?: { id?: string } };
 
