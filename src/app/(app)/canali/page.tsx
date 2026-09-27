@@ -380,6 +380,11 @@ export default function CanaliPage() {
         )}
       </div>
 
+      {/* Sincronizzazione iCal reale (sola lettura) — prima del registro sincronizzazioni */}
+      <div className="mt-6">
+        <IcalSyncPanel />
+      </div>
+
       {/* Registro sincronizzazioni */}
       <Card className="mt-5">
         <div className="mb-3 flex items-center justify-between">
@@ -400,11 +405,6 @@ export default function CanaliPage() {
       </Card>
 
       <p className="mt-3 text-xs text-faint">{t("In produzione la connessione è reale (via Channex/Nuitée): push bidirezionale di tariffe, disponibilità e prenotazioni. Qui i dati sono dimostrativi e salvati nel browser.")}</p>
-
-      {/* Sincronizzazione iCal reale (sola lettura) — in fondo alla pagina */}
-      <div className="mt-6">
-        <IcalSyncPanel />
-      </div>
 
       {/* Pannello di connessione per canale */}
       {configuring && (() => {
