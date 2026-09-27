@@ -122,6 +122,9 @@ export interface ChxRoom { room_type_id?: string; rate_plan_id?: string; checkin
 export interface ChxRevision {
   id: string; property_id?: string; booking_id?: string; status?: string; ota_reservation_code?: string;
   ota_name?: string; arrival_date?: string; departure_date?: string; amount?: string; currency?: string;
+  // Commissione OTA reale (quando il canale la manda): il campo varia per OTA, quindi accettiamo
+  // più nomi possibili. Non tutti gli OTA lo espongono → resta opzionale (fallback: % di default).
+  ota_commission?: string | number; commission?: string | number;
   customer?: { name?: string; surname?: string; mail?: string; email?: string; phone?: string };
   rooms?: ChxRoom[];
 }

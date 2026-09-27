@@ -141,6 +141,13 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
 
       const channel = channelFromOta(r.ota_name);
       const groupId = uid();
+      // Commissione OTA reale, se il canale la manda (importo € → % sul totale prenotazione).
+      // Se assente, si lascia undefined e vale la % di default del canale (vedi CHANNELS).
+      const commAmt = num(r.ota_commission ?? r.commission, NaN);
+      const bookingTotal = num(r.amount, NaN);
+      const commissionPct = (Number.isFinite(commAmt) && commAmt > 0 && Number.isFinite(bookingTotal) && bookingTotal > 0)
+        ? Math.round((commAmt / bookingTotal) * 1000) / 10
+        : undefined;
       const roomsArr = r.rooms && r.rooms.length ? r.rooms : [{}];
       let added = 0;
       roomsArr.forEach((room, idx) => {
@@ -157,6 +164,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           guestId, channel, status: "confirmed", checkIn: ci, checkOut: co, bookedOn: new Date().toISOString().slice(0, 10),
           adults: Math.max(1, num(room.occupancy?.adults, 1)), children: num(room.occupancy?.children, 0),
           total: total || undefined, cleaningFee: 0, paid: 0, cityTaxPaid: false,
+          ...(commissionPct != null ? { commissionPct } : {}),
           extId, code: r.ota_reservation_code || undefined, source: "channex",
           note: `Prenotazione ${channel.toUpperCase()} via Channex${r.ota_reservation_code ? ` · ${r.ota_reservation_code}` : ""}`,
         } as Booking);
