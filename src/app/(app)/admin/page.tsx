@@ -6,6 +6,7 @@
 // I dati arrivano da /api/admin/overview e /api/admin/payments (service_role lato server).
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader, Card, StatCard } from "@/components/ui";
 import { useAuth } from "@/lib/authsync";
@@ -284,7 +285,8 @@ export default function AdminPage() {
 
   return (
     <div>
-      <PageHeader title="Back-office" subtitle="Chi paga, abbonati, scadenze, piani e storico fatture di Xenora" hideHelp />
+      <PageHeader title="Back-office" subtitle="Chi paga, abbonati, scadenze, piani e storico fatture di Xenora" hideHelp
+        actions={<Link href="/admin/channex-cert" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">🔗 Certificazione Channex</Link>} />
 
       {!stripeOn && !err && (
         <div className="mb-4 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 12%, transparent)", color: "var(--dim)" }}>

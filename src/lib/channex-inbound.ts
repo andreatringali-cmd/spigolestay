@@ -121,16 +121,31 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
     const applied: { rev: ChxRevision }[] = [];
 
     for (const { rev: r, map } of items) {
-      const extId = `channex:${r.booking_id || r.id}`;
-      // Rimuovi eventuali prenotazioni precedenti di questa stessa booking (modifica/cancellazione).
-      const prevIdx = bookings.map((b, i) => (b.extId === extId ? i : -1)).filter((i) => i >= 0);
+      // Chiave STABILE della prenotazione: SEMPRE booking_id quando presente (Channex lo
+      // mantiene uguale tra le revision della stessa prenotazione), id-revision solo come
+      // fallback se booking_id manca. È la chiave con cui SCRIVIAMO le nuove righe.
+      const stableKey = `channex:${r.booking_id || r.id}`;
+      // Per RITROVARE le prenotazioni già importate accettiamo ENTRAMBE le chiavi possibili
+      // (booking_id e id-revision): così una modifica/cancellazione ritrova la prenotazione
+      // anche se una revision precedente fosse stata salvata con l'altra chiave. Questo è il
+      // punto critico del Test 11: senza questo, una modifica con id-revision diverso
+      // creerebbe un doppione invece di aggiornare quella esistente.
+      const candidates = new Set<string>([stableKey]);
+      if (r.booking_id) candidates.add(`channex:${r.booking_id}`);
+      if (r.id) candidates.add(`channex:${r.id}`);
+      const prevIdx = bookings.map((b, i) => (b.extId && candidates.has(b.extId) ? i : -1)).filter((i) => i >= 0);
+      const bidLog = r.booking_id || r.id;
       if (r.status === "cancelled") {
         prevIdx.forEach((i) => { bookings[i].status = "cancelled"; });
         applied.push({ rev: r }); out.cancelled++;
+        console.log(`[channex inbound] CANCELLAZIONE booking_id=${bidLog} → ${prevIdx.length} prenotazione/i marcata/e cancelled (ack)`);
         continue;
       }
-      // new / modified → ricrea
-      for (const i of prevIdx.sort((a, b) => b - a)) bookings.splice(i, 1);
+      // new / modified → rimuovi le versioni precedenti (per riga stabile) e ricrea.
+      // Le righe rimosse si conservano: se questa revision non ha camere mappate le
+      // ripristiniamo (vedi sotto) così una modifica non-mappabile non cancella il dato.
+      const isUpdate = prevIdx.length > 0;
+      const removed = prevIdx.sort((a, b) => b - a).map((i) => bookings.splice(i, 1)[0]);
 
       // Ospite (riusa per email)
       const c = r.customer || {};
@@ -165,13 +180,21 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           adults: Math.max(1, num(room.occupancy?.adults, 1)), children: num(room.occupancy?.children, 0),
           total: total || undefined, cleaningFee: 0, paid: 0, cityTaxPaid: false,
           ...(commissionPct != null ? { commissionPct } : {}),
-          extId, code: r.ota_reservation_code || undefined, source: "channex",
+          extId: stableKey, code: r.ota_reservation_code || undefined, source: "channex",
           note: `Prenotazione ${channel.toUpperCase()} via Channex${r.ota_reservation_code ? ` · ${r.ota_reservation_code}` : ""}`,
         } as Booking);
         added++;
       });
-      if (added > 0) { applied.push({ rev: r }); out.imported++; }
-      else out.skipped++; // nessuna camera mappata: non ackare (resta nel feed finché mappi)
+      if (added > 0) {
+        applied.push({ rev: r }); out.imported++;
+        console.log(`[channex inbound] ${isUpdate ? "MODIFICA" : "NUOVA"} booking_id=${bidLog} → ${added} camera/e ${isUpdate ? "aggiornata/e" : "creata/e"} (ack)`);
+      } else {
+        // Nessuna camera mappata: NON ackare (la revision resta nel feed finché non mappi).
+        // Se era una modifica, ripristina le righe rimosse così non perdiamo la prenotazione.
+        if (removed.length) bookings.push(...removed);
+        out.skipped++;
+        console.log(`[channex inbound] ${isUpdate ? "MODIFICA" : "NUOVA"} booking_id=${bidLog} → 0 camere mappate, NON ackata (resta nel feed)`);
+      }
     }
 
     data.bookings = bookings; data.guests = guests; blob[DATA_KEY] = JSON.stringify(data);
