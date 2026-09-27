@@ -115,10 +115,16 @@ export default function CanaliPage() {
   const importOta = async () => {
     setImpSync({ running: true, msg: "Controllo nuove prenotazioni dalle OTA…" });
     try {
-      const j = await apiPost<{ ok: boolean; imported?: number; cancelled?: number; feed?: number; error?: string }>("channex/import", {});
+      const j = await apiPost<{ ok: boolean; imported?: number; cancelled?: number; feed?: number; skipped?: number; acked?: number; errors?: string[]; error?: string }>("channex/import", {});
       if (!j.ok) { setImpSync({ running: false, ok: false, msg: j.error || "Import non riuscito" }); return; }
       const n = (j.imported ?? 0) + (j.cancelled ?? 0);
-      setImpSync({ running: false, ok: true, msg: n > 0 ? `Importate ${j.imported ?? 0} prenotazioni${j.cancelled ? `, ${j.cancelled} cancellazioni` : ""} ✓` : "Nessuna nuova prenotazione." });
+      // Diagnostica: se il feed ha righe ma nulla è stato importato, spiega il perché (di solito
+      // tipologia non mappata o property non collegata) invece del generico "nessuna prenotazione".
+      let msg: string;
+      if (n > 0) msg = `Importate ${j.imported ?? 0} prenotazioni${j.cancelled ? `, ${j.cancelled} cancellazioni` : ""} ✓`;
+      else if ((j.feed ?? 0) === 0) msg = "Nessuna prenotazione nel feed Channex (nessuna in attesa di conferma).";
+      else msg = `${j.feed} nel feed ma 0 importate · ${j.skipped ?? 0} saltate${j.errors?.length ? ` · ${j.errors[0]}` : " (probabile tipologia non mappata o soggiorno già concluso)"}`;
+      setImpSync({ running: false, ok: n > 0, msg });
       if (n > 0) saveLog([{ id: uid(), ts: Date.now(), text: `${t("Prenotazioni OTA importate da Channex")} — ${j.imported ?? 0}`, color: "var(--ok)" }, ...log]);
     } catch (e) { setImpSync({ running: false, ok: false, msg: e instanceof Error ? e.message : "errore di rete" }); }
   };
