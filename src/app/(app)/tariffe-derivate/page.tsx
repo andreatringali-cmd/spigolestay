@@ -211,11 +211,7 @@ export default function TariffeDerivatePage() {
                                       : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)", color: "var(--ok)" }}>{t("In vendita")}</span>}
                                     {k.deriveInherit && <span className="ml-1 whitespace-nowrap rounded bg-wash px-1 py-0.5 text-[9px] font-medium text-faint" title={t("Disponibilità ereditata dalla tipologia madre")}>{t("da madre")}</span>}
                                   </td>
-                                  <td className="px-3 py-2.5">
-                                    <div className="flex items-center justify-end gap-1.5">
-                                      <button onClick={async (e) => { e.stopPropagation(); if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${k.name}"?`, danger: true, confirmLabel: t("Elimina") })) deleteRoomType(k.id); }} title={t("Elimina")} className="rounded-md border border-line px-2 py-1 text-[11px] font-medium text-[color:var(--err)] hover:bg-wash">✕</button>
-                                    </div>
-                                  </td>
+                                  <td className="px-3 py-2.5 text-right text-faint">›</td>
                                 </tr>
                               ); })}
                             </Fragment>
@@ -280,10 +276,7 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
           <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-1.5 text-xs">
             <button onClick={() => onAdd(rt.id)} className="font-semibold text-focus hover:underline">＋ {t("Derivata")}</button>
             {derived ? (
-              <span className="flex items-center gap-2.5">
-                <button onClick={() => onEdit(rt.id)} className="font-medium text-dim hover:underline">{t("Modifica")}</button>
-                <button onClick={() => onDelete(rt.id, rt.name)} title={t("Elimina")} className="font-medium text-[color:var(--err)] hover:underline">✕</button>
-              </span>
+              <button onClick={() => onEdit(rt.id)} className="font-medium text-dim hover:underline">{t("Modifica")}</button>
             ) : (
               <button onClick={() => onOpenType(rt.id)} className="font-medium text-dim hover:underline">{t("Modifica")}</button>
             )}

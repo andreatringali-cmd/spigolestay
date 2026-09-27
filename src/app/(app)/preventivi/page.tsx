@@ -993,6 +993,18 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // Documento PDF visivo (foglio bianco) mostrato in anteprima. Colori fissi = come stampato.
 // Foglio A4 in scala: canvas fisso 794×1123 (A4 @96dpi) scalato per riempire la larghezza disponibile.
 // Entrambe le pagine hanno così identiche dimensioni A4 nell'anteprima.
+// Miscela un colore esadecimale con il bianco (pct = quota del colore, 0..1) e ritorna un hex.
+// Usato al posto di CSS color-mix() perché html2canvas (cattura PDF) non sa interpretare color-mix.
+function tintWhite(hex: string, pct: number): string {
+  const h = (hex || "#000000").replace("#", "");
+  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const int = parseInt(n.slice(0, 6) || "000000", 16);
+  const r = (int >> 16) & 255, g = (int >> 8) & 255, b = int & 255;
+  const mix = (c: number) => Math.round(255 * (1 - pct) + c * pct);
+  const to2 = (v: number) => v.toString(16).padStart(2, "0");
+  return `#${to2(mix(r))}${to2(mix(g))}${to2(mix(b))}`;
+}
+
 function A4Page({ scale, accent, children }: { scale: number; accent: string; children: React.ReactNode }) {
   return (
     <div style={{ width: "100%", aspectRatio: "794 / 1123", overflow: "hidden", borderRadius: 10, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.08), 0 12px 30px -14px rgba(0,0,0,.2)", marginBottom: 14 }}>
@@ -1060,7 +1072,7 @@ function QuoteDoc(p: {
           {p.parking && <div style={row}><span>{p.L.parcheggio}</span><span style={{ color: muted }}>{p.parkText}</span></div>}
           {p.cot && <div style={row}><span>{p.L.culla}</span><span style={{ color: muted }}>{p.cotText}</span></div>}
           <div style={row}><span>{p.L.tassa} <span style={{ color: muted }}>({p.taxPersons} {p.L.persone})</span></span><span>{p.cityTax}</span></div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 18px", marginTop: 14, background: `color-mix(in srgb, ${p.accent} 9%, #fff)`, borderRadius: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 18px", marginTop: 14, background: tintWhite(p.accent, 0.09), borderRadius: 10 }}>
             <b style={{ fontSize: 13.5, letterSpacing: ".04em" }}>{p.L.totale}</b><b style={{ fontSize: 22, color: p.accent }}>{p.total}</b>
           </div>
 
