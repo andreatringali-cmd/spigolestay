@@ -10,6 +10,7 @@ import { AccessProvider } from "@/lib/access";
 import { ConfirmProvider } from "./ConfirmProvider";
 import { ToastProvider } from "./ToastProvider";
 import AutopilotRunner from "./AutopilotRunner";
+import ChannexAutoSync from "./ChannexAutoSync";
 import Sidebar from "./Sidebar";
 import Icon from "./Icon";
 import BookingDrawer from "./BookingDrawer";
@@ -43,6 +44,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <ConfirmProvider>
         <ToastProvider>
         <AutopilotRunner />
+        <ChannexAutoSync />
         <PendingInvite />
         <WheelScroll />
         <StyleLoader />
