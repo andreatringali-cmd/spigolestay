@@ -263,9 +263,13 @@ export async function POST(req: Request) {
   let body: {
     kind?: string; booking?: BookingPayload; brand?: Brand; checkinUrl?: string; manageUrl?: string; guests?: CheckinGuest[]; arrival?: string; operatorEmail?: string;
     to?: string; subject?: string; text?: string; accent?: string; replyTo?: string; ctaUrl?: string; ctaLabel?: string; subscription?: SubReceiptPayload;
-    // Dati strutturati del preventivo (kind: "quote"), usati per generare il PDF allegato.
+    // Dati strutturati del preventivo (kind: "quote"), usati per generare il PDF allegato SOLO come
+    // fallback (vedi pdfBase64 sotto) quando il chiamante non fornisce già un PDF pronto.
     guestName?: string; checkIn?: string; checkOut?: string; nights?: number; adults?: number; children?: number;
     rooms?: QuotePdfRoom[]; total?: number; deposit?: number; ref?: string; extras?: QuotePdfExtra[];
+    // PDF già pronto generato lato browser (kind: "quote") catturando l'anteprima reale (QuoteDoc) con
+    // html2canvas+jsPDF: quando presente si usa questo, niente rigenerazione via pdf-lib.
+    pdfBase64?: string; pdfFilename?: string;
   };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "JSON non valido" }, { status: 400 }); }
   const b = body.booking || {};
@@ -328,20 +332,31 @@ export async function POST(req: Request) {
            <p style="margin:8px 0 0;font-size:12px;color:#9aa1ac;text-align:center;">Pagamento sicuro con Stripe · carta, PayPal, Klarna e altri metodi.</p>`
         : "";
       const html = shell(subject, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>${cta}`, emailBrand);
-      // Allega il preventivo in PDF (carta intestata). Se la generazione fallisce, invia comunque l'email.
+      // Allega il preventivo in PDF (carta intestata). Preferenza: il PDF già generato lato browser
+      // catturando l'anteprima REALE (QuoteDoc, con logo garantito visibile — vedi preventivi/page.tsx
+      // buildQuotePdfBlob). Se il chiamante non lo fornisce (es. invio programmatico senza browser),
+      // ripiega su buildQuotePdf (pdf-lib) come rete di sicurezza. Se anche questo fallisce, invia
+      // comunque l'email senza allegato.
       let attachments: { filename: string; content: string }[] | undefined;
-      try {
-        const pdf = await buildQuotePdf({
-          ref: body.ref,
-          structureName: brand?.name, structureEmail: brand?.email, phone: brand?.phone, address: brand?.address,
-          guestName: body.guestName, guestEmail: body.to,
-          checkIn: body.checkIn, checkOut: body.checkOut, nights: body.nights, adults: body.adults, children: body.children,
-          rooms: body.rooms, total: body.total, deposit: body.deposit,
-          color: accent, logo: brand?.logo, website: brand?.website, cin: brand?.cin, vat: brand?.vat,
-          extras: body.extras,
-        });
-        attachments = [{ filename: `preventivo-${(body.ref || "preventivo").replace(/[^A-Za-z0-9_-]/g, "-")}.pdf`, content: Buffer.from(pdf).toString("base64") }];
-      } catch { attachments = undefined; }
+      if (body.pdfBase64) {
+        try {
+          const filename = body.pdfFilename || `preventivo-${(body.ref || "preventivo").replace(/[^A-Za-z0-9_-]/g, "-")}.pdf`;
+          attachments = [{ filename, content: body.pdfBase64 }];
+        } catch { attachments = undefined; }
+      } else {
+        try {
+          const pdf = await buildQuotePdf({
+            ref: body.ref,
+            structureName: brand?.name, structureEmail: brand?.email, phone: brand?.phone, address: brand?.address,
+            guestName: body.guestName, guestEmail: body.to,
+            checkIn: body.checkIn, checkOut: body.checkOut, nights: body.nights, adults: body.adults, children: body.children,
+            rooms: body.rooms, total: body.total, deposit: body.deposit,
+            color: accent, logo: brand?.logo, website: brand?.website, cin: brand?.cin, vat: brand?.vat,
+            extras: body.extras,
+          });
+          attachments = [{ filename: `preventivo-${(body.ref || "preventivo").replace(/[^A-Za-z0-9_-]/g, "-")}.pdf`, content: Buffer.from(pdf).toString("base64") }];
+        } catch { attachments = undefined; }
+      }
       const data = await send(body.to, subject, html, body.replyTo, attachments);
       return NextResponse.json({ ok: true, id: data?.id });
     }

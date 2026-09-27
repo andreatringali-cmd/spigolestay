@@ -166,7 +166,10 @@ export default function CanaliPage() {
     if (!st) { setChxSync({ running: false, ok: false, msg: "Seleziona una struttura specifica (non 'Tutte')." }); return; }
     // Idempotente: se già collegata, NON creare un doppione. Per aggiornare si usa "Prezzi & disponibilità".
     if (chxMap[sid]) { setChxSync({ running: false, ok: false, msg: "Struttura già collegata a Channex: per aggiornare usa «Prezzi & disponibilità». Per ricrearla, prima «Scollega»." }); return; }
-    const rts = roomTypes.filter((rt) => rt.structureId === sid);
+    // Le tariffe derivate (Dus, Quadrupla, Matrimoniale...) non sono camere fisiche proprie:
+    // condividono le camere della tipologia madre (vedi RoomType.deriveFrom in lib/types.ts).
+    // Vanno escluse dal push: altrimenti Channex le vede come tipologie/camere fantasma in più.
+    const rts = roomTypes.filter((rt) => rt.structureId === sid && !rt.deriveFrom);
     if (rts.length === 0) { setChxSync({ running: false, ok: false, msg: "Nessuna tipologia in questa struttura." }); return; }
     const rooms = rts.map((rt) => ({
       xid: rt.id,

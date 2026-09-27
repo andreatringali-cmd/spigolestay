@@ -155,6 +155,11 @@ export default function PreventiviPage() {
     window.addEventListener("resize", measure);
     return () => { cancelAnimationFrame(raf); ro.disconnect(); window.removeEventListener("resize", measure); };
   }, [tab]);
+  // Contenitore fuori schermo (sempre montato, mai display:none) usato per catturare il documento
+  // a piena risoluzione (scale 1) con html2canvas e generare il vero PDF allegato all'email.
+  // Reso SEMPRE (non solo quando si invia) così i ref sono già pronti al click su "Invia via email".
+  const pdfPage1Ref = useRef<HTMLDivElement>(null);
+  const pdfPage2Ref = useRef<HTMLDivElement>(null);
   // Dati di pagamento (salvati nel browser, si inseriscono una volta).
   const [payHolder, setPayHolder] = useState("");
   const [payIban, setPayIban] = useState("");
@@ -329,6 +334,24 @@ export default function PreventiviPage() {
   const stLegal = [structure?.cin ? "CIN " + structure.cin : "", structure?.vat ? "P.IVA " + structure.vat : ""].filter(Boolean).join(" · ");
   const stSocials = ([["facebook", structure?.facebook], ["instagram", structure?.instagram], ["linkedin", structure?.linkedin]] as [string, string | undefined][])
     .filter(([, u]) => u && u.trim()).map(([k, u]) => ({ k, url: socialHref(u!) }));
+  // Props di QuoteDoc: UNICA fonte di verità condivisa fra l'anteprima a schermo e il contenitore
+  // fuori schermo usato per catturare il PDF (vedi sendQuoteEmail/buildQuotePdfBlob più sotto) —
+  // così i due sono garantiti identici, niente dati duplicati/ricalcolati altrove.
+  const quoteDocProps = {
+    accent: structure?.photoColor || "#BE5D38", logo: structure?.logo,
+    structureName, address: stAddress, contacts: stContacts, legal: stLegal, socials: stSocials,
+    L: QL[lang], quoteNo: quoteRef, date: todayStr, guest: name,
+    checkIn: fmt(checkIn), checkOut: fmt(checkOut), nights: n, nWord: n === 1 ? QL[lang].notte : QL[lang].notti,
+    roomLines: mergedLines.map((l) => ({ label: `${l.qty} ${rtName(l.roomTypeId) || QL[lang].room}`, sub: `${eur(l.price)} ${QL[lang].aNotte} × ${n} ${n === 1 ? QL[lang].notte : QL[lang].notti}`, amount: eur(l.qty * l.price * n) })),
+    breakfast, breakfastText: breakfastPrice > 0 ? `${eur(breakfastPrice)} ${QL[lang].aNotte}` : QL[lang].inclusa, parking, parkText: parkingPrice > 0 ? `${eur(parkingPrice)} ${QL[lang].aNotte}` : QL[lang].parkIncl,
+    cot: wantsCot, cotText: QL[lang].cullaIncl,
+    extras: extrasPage ? structExtras.map((e) => ({ name: e.name, desc: e.desc, price: eur(e.price), per: perLabel(e.per, QL[lang]) })) : [], extrasTitle: QL[lang].extrasTitle, extrasNote: QL[lang].extrasNote,
+    cityTax: eur(cityTax), taxPersons, total: eur(total),
+    accText: acconto === 0 ? QL[lang].accNone.replace("{tot}", eur(total)) : acconto === 100 ? QL[lang].accFull.replace("{tot}", eur(total)) : QL[lang].accPart.replace("{dep}", eur(deposit)).replace("{bal}", eur(balance)).replace("{pct}", String(acconto)),
+    payHolder: docHolder, payIban: docIban, payExtra,
+    causale: `${(name || "").trim()} ${fmt(checkIn)}-${fmt(checkOut)}`.trim(), note,
+  };
+  const includeExtrasPage = extrasPage && structExtras.length > 0;
   // Link pubblico "Conferma e paga": l'ospite apre, vede l'importo del preventivo e paga (Stripe).
   // "extras": i servizi extra PROPONIBILI (attivi sulla struttura) — sulla pagina pubblica l'ospite
   // può aggiungerli alla prenotazione; non sono ancora una scelta, solo il catalogo disponibile.
@@ -354,6 +377,60 @@ export default function PreventiviPage() {
     const s = await shortenLink(payUrl); payShortRef.current[payUrl] = s; return s;
   };
   const [mailState, setMailState] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
+
+  // Attende che tutte le <img> dentro un contenitore (in particolare il logo) siano caricate prima
+  // di catturarlo con html2canvas — altrimenti il logo rischia di mancare per un problema di TIMING
+  // (immagine non ancora decodificata), non di formato. Timeout breve di sicurezza: se un'immagine
+  // non carica mai (es. URL rotto), non blocchiamo comunque l'invio dell'email.
+  const waitForImages = (container: HTMLElement, timeoutMs = 3000): Promise<void> => {
+    const imgs = Array.from(container.querySelectorAll("img"));
+    if (imgs.length === 0) return Promise.resolve();
+    const allLoaded = Promise.all(imgs.map((img) => (img.complete ? Promise.resolve() : new Promise<void>((resolve) => {
+      img.addEventListener("load", () => resolve(), { once: true });
+      img.addEventListener("error", () => resolve(), { once: true }); // non blocca: meglio un PDF senza logo che nessun PDF
+    }))));
+    const timeout = new Promise<void>((resolve) => setTimeout(resolve, timeoutMs));
+    return Promise.race([allLoaded, timeout]).then(() => undefined);
+  };
+
+  // Converte un Blob in stringa base64 pura (senza il prefisso "data:...;base64,").
+  const blobToBase64 = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      const idx = result.indexOf(",");
+      resolve(idx >= 0 ? result.slice(idx + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Lettura del PDF fallita"));
+    reader.readAsDataURL(blob);
+  });
+
+  // Genera il vero PDF allegato catturando l'ANTEPRIMA REALE (componente QuoteDoc), la stessa che
+  // l'utente vede a schermo con logo e stile corretti — invece di ridisegnare tutto a mano con
+  // pdf-lib (che non riusciva a mostrare il logo in modo affidabile). Il componente viene renderizzato
+  // a piena risoluzione (scale=1) in un contenitore fuori schermo sempre montato (pdfPage1Ref/pdfPage2Ref).
+  const buildQuotePdfBlob = async (): Promise<Blob> => {
+    // Import dinamico: sono librerie pure client-side, mai eseguite lato server (route API).
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
+    // Aspetta un frame perché React committi il DOM del contenitore fuori schermo (props appena
+    // aggiornate) prima di leggerlo — evita la race fra render e cattura.
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    const els = [pdfPage1Ref.current, ...(includeExtrasPage ? [pdfPage2Ref.current] : [])].filter((el): el is HTMLDivElement => !!el);
+    if (els.length === 0) throw new Error("Contenitore anteprima PDF non pronto");
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    for (let i = 0; i < els.length; i++) {
+      const el = els[i];
+      await waitForImages(el);
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+      if (i > 0) doc.addPage();
+      doc.addImage(imgData, "JPEG", 0, 0, pageW, pageH);
+    }
+    return doc.output("blob");
+  };
+
   // Invio del preventivo via server (Resend), come la conferma prenotazione: niente client di posta.
   const sendQuoteEmail = async () => {
     if (!email.trim()) { setMailState({ ok: false, msg: "Inserisci l'email del destinatario" }); return; }
@@ -361,8 +438,20 @@ export default function PreventiviPage() {
     setMailState({ sending: true });
     try {
       const payLink = await getPayLink();
+      // PDF allegato = cattura dell'anteprima reale (logo/stile garantiti identici a quanto visto
+      // a schermo). Se la generazione fallisce per qualsiasi motivo, l'email parte comunque senza
+      // allegato PDF (il server ripiega su buildQuotePdf via pdf-lib solo se manca pdfBase64).
+      let pdfBase64: string | undefined;
+      let pdfFilename: string | undefined;
+      try {
+        const blob = await buildQuotePdfBlob();
+        pdfBase64 = await blobToBase64(blob);
+        pdfFilename = `preventivo-${quoteRef.replace("/", "-")}.pdf`;
+      } catch (e) {
+        console.error("sendQuoteEmail: cattura PDF anteprima fallita, invio senza allegato:", e instanceof Error ? e.message : e);
+      }
       // Dati strutturati per il PDF allegato (riuso payData/variabili già calcolate, niente doppia logica).
-      const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: email.trim(), subject: `Preventivo ${structureName}`, text: outMsg, ctaUrl: payLink, ctaLabel: "Conferma e paga online →", accent: structure?.photoColor, replyTo: structure?.email, brand: { name: structure?.name, logo: structure?.logo, address: [structure?.address, structure?.streetNumber, structure?.city].filter(Boolean).join(" "), phone: structure?.phone, email: structure?.email, website: structure?.website, accent: structure?.photoColor, cin: structure?.cin, vat: structure?.vat }, guestName: payData.gn, checkIn: payData.ci, checkOut: payData.co, nights: n, adults: payData.ad, children: payData.ch, rooms: payData.rooms, total: payData.tot, deposit: payData.dep, ref: payData.ref, extras: extrasPage ? payData.extras : undefined }) });
+      const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to: email.trim(), subject: `Preventivo ${structureName}`, text: outMsg, ctaUrl: payLink, ctaLabel: "Conferma e paga online →", accent: structure?.photoColor, replyTo: structure?.email, brand: { name: structure?.name, logo: structure?.logo, address: [structure?.address, structure?.streetNumber, structure?.city].filter(Boolean).join(" "), phone: structure?.phone, email: structure?.email, website: structure?.website, accent: structure?.photoColor, cin: structure?.cin, vat: structure?.vat }, guestName: payData.gn, checkIn: payData.ci, checkOut: payData.co, nights: n, adults: payData.ad, children: payData.ch, rooms: payData.rooms, total: payData.tot, deposit: payData.dep, ref: payData.ref, extras: extrasPage ? payData.extras : undefined, pdfBase64, pdfFilename }) });
       const j = await r.json().catch(() => ({}));
       setMailState({ sending: false, ok: r.ok && j?.ok, msg: (r.ok && j?.ok) ? `Inviato a ${email.trim()}` : (j?.error || `Errore ${r.status}`) });
     } catch (e) { setMailState({ sending: false, ok: false, msg: e instanceof Error ? e.message : "Rete non disponibile" }); }
@@ -753,20 +842,20 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
           <div ref={previewRef} className="flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-line bg-wash p-2" style={{ minHeight: 340 }}>
             <style>{`@keyframes qpSlideNext{from{transform:translateX(34px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes qpSlidePrev{from{transform:translateX(-34px);opacity:0}to{transform:translateX(0);opacity:1}}`}</style>
             <div key={previewPage} style={{ animation: `${flipDir >= 0 ? "qpSlideNext" : "qpSlidePrev"} .8s cubic-bezier(.2,.7,.3,1)` }}>
-            <QuoteDoc scale={pw / 794} page={(extrasPage && structExtras.length > 0) ? previewPage : 0}
-              accent={structure?.photoColor || "#BE5D38"} logo={structure?.logo}
-              structureName={structureName} address={stAddress} contacts={stContacts} legal={stLegal} socials={stSocials}
-              L={QL[lang]} quoteNo={quoteRef} date={todayStr} guest={name}
-              checkIn={fmt(checkIn)} checkOut={fmt(checkOut)} nights={n} nWord={n === 1 ? QL[lang].notte : QL[lang].notti}
-              roomLines={mergedLines.map((l) => ({ label: `${l.qty} ${rtName(l.roomTypeId) || QL[lang].room}`, sub: `${eur(l.price)} ${QL[lang].aNotte} × ${n} ${n === 1 ? QL[lang].notte : QL[lang].notti}`, amount: eur(l.qty * l.price * n) }))}
-              breakfast={breakfast} breakfastText={breakfastPrice > 0 ? `${eur(breakfastPrice)} ${QL[lang].aNotte}` : QL[lang].inclusa} parking={parking} parkText={parkingPrice > 0 ? `${eur(parkingPrice)} ${QL[lang].aNotte}` : QL[lang].parkIncl}
-              cot={wantsCot} cotText={QL[lang].cullaIncl}
-              extras={extrasPage ? structExtras.map((e) => ({ name: e.name, desc: e.desc, price: eur(e.price), per: perLabel(e.per, QL[lang]) })) : []} extrasTitle={QL[lang].extrasTitle} extrasNote={QL[lang].extrasNote}
-              cityTax={eur(cityTax)} taxPersons={taxPersons} total={eur(total)}
-              accText={acconto === 0 ? QL[lang].accNone.replace("{tot}", eur(total)) : acconto === 100 ? QL[lang].accFull.replace("{tot}", eur(total)) : QL[lang].accPart.replace("{dep}", eur(deposit)).replace("{bal}", eur(balance)).replace("{pct}", String(acconto))}
-              payHolder={docHolder} payIban={docIban} payExtra={payExtra}
-              causale={`${(name || "").trim()} ${fmt(checkIn)}-${fmt(checkOut)}`.trim()} note={note}
-            />
+            <QuoteDoc {...quoteDocProps} scale={pw / 794} page={includeExtrasPage ? previewPage : 0} />
+            </div>
+          </div>
+
+          {/* Contenitore fuori schermo (MAI display:none, altrimenti html2canvas non lo cattura):
+             stesse identiche props dell'anteprima sopra (quoteDocProps), a piena risoluzione (scale=1),
+             usato solo al momento dell'invio email per generare il vero PDF allegato (vedi
+             buildQuotePdfBlob in sendQuoteEmail). Sempre montato così i ref sono già pronti al click. */}
+          <div aria-hidden="true" style={{ position: "fixed", left: -10000, top: 0, width: 794, zIndex: -1, pointerEvents: "none" }}>
+            <div ref={pdfPage1Ref} style={{ width: 794 }}>
+              <QuoteDoc {...quoteDocProps} scale={1} page={0} />
+            </div>
+            <div ref={pdfPage2Ref} style={{ width: 794 }}>
+              <QuoteDoc {...quoteDocProps} scale={1} page={1} />
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
