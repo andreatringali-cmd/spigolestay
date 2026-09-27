@@ -16,6 +16,7 @@ import {
   weekdayShort,
 } from "@/lib/dates";
 import { eur } from "@/lib/format";
+import { apiPost } from "@/lib/invoicing/client";
 import { bookingGrandTotal } from "@/lib/booking";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 import { sortUnitsByName } from "@/lib/sortUnits";
@@ -176,18 +177,27 @@ export default function CalendarGrid() {
       setLastRun(new Date(ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }));
     } catch {}
   }, []);
-  // Forza una sincronizzazione manuale del channel manager (prototipo: aggiorna l'orario dell'ultimo processo).
-  const syncNow = () => {
+  // Sincronizzazione REALE con Channex: invia subito disponibilità/prezzi (via l'evento che
+  // ChannexAutoSync ascolta) e controlla le nuove prenotazioni OTA dal feed. Aggiorna l'orario.
+  const syncNow = async () => {
     if (syncing) return;
     setSyncing(true);
     const now = Date.now();
+    // 1) Uscita: forza subito il push disponibilità/prezzi a Channex.
+    try { window.dispatchEvent(new Event("spigolestay:channex-dirty")); } catch {}
+    // 2) Entrata: tira le nuove prenotazioni OTA (se c'è almeno una struttura collegata a Channex).
+    try {
+      const hasLinked = (() => { try { const m = JSON.parse(localStorage.getItem("spigolestay:channexmap") || "{}"); return Object.values(m).some((x) => (x as { propertyId?: string })?.propertyId); } catch { return false; } })();
+      if (hasLinked) await apiPost("channex/import", {});
+    } catch {}
     try {
       const raw = localStorage.getItem("spigolestay:canali:conn");
       const conn: Record<string, { connected?: boolean; lastSync?: string }> = raw ? JSON.parse(raw) : {};
       Object.keys(conn).forEach((k) => { if (conn[k]?.connected) conn[k].lastSync = new Date(now).toISOString(); });
       localStorage.setItem("spigolestay:canali:conn", JSON.stringify(conn));
     } catch {}
-    setTimeout(() => { setLastRun(new Date(now).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })); setSyncing(false); }, 900);
+    setLastRun(new Date(now).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }));
+    setSyncing(false);
   };
   // true = collegato, false = non collegato, null = non applicabile (Diretta/Bloccato).
   const chConnected = (c: string): boolean | null =>
