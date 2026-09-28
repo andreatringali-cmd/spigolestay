@@ -141,8 +141,8 @@ export default function LoginPage() {
       <main className="flex w-full flex-1 flex-col items-center justify-center">
         <div className="w-full max-w-sm">
           {/* Logo centrato */}
-          <div className="mb-5 mt-2 flex justify-center">
-            <Image src="/xenora-logo.png" alt="Xenora" width={180} height={50} priority className="object-contain" style={{ width: 180, height: "auto" }} />
+          <div className="mb-4 -mt-2 flex justify-center">
+            <Image src="/xenora-logo.png" alt="Xenora" width={210} height={58} priority className="object-contain" style={{ width: 210, height: "auto" }} />
           </div>
 
           {recovery ? (
