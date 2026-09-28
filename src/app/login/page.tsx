@@ -143,7 +143,7 @@ export default function LoginPage() {
         <span className="blob blob-2" />
         <span className="blob blob-3" />
       </div>
-      <main className="relative flex w-full min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto">
+      <main className="relative flex w-full min-h-0 flex-1 flex-col items-center justify-center overflow-x-hidden overflow-y-auto">
         <div className="w-full max-w-md rounded-3xl bg-white/70 px-6 pb-6 pt-3 shadow-[0_20px_60px_-24px_rgba(80,60,140,0.25)] backdrop-blur-xl sm:px-8 sm:pb-8 sm:pt-4">
           {/* Logo allineato a sinistra, dimensioni invariate, piu in alto (padding del box ridotto sopra) */}
           <div className="mb-4 flex">
@@ -231,7 +231,7 @@ export default function LoginPage() {
 
               {mode === "login" ? (
                 <div className="mt-6 text-center">
-                  <div className="whitespace-nowrap text-[13px] text-[#4a453d] sm:text-sm">
+                  <div className="text-[13px] text-[#4a453d] sm:whitespace-nowrap sm:text-sm">
                     Non hai un account? Accesso su invito, <a href="https://xenoradigitalsolutions.it#contatti" target="_blank" rel="noreferrer" className="text-[#2f6bb0] hover:underline">richiedi la demo</a>.
                   </div>
                   <div className="mt-2 text-[11px] text-[#9a9186]">© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</div>
