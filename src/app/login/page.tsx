@@ -242,10 +242,10 @@ export default function LoginPage() {
           )}
         </div>
       </main>
-      <footer className="mt-8 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 px-4 text-[11px] text-[#a8a094]">
-        <span>© {new Date().getFullYear()} Xenora · All rights reserved</span>
-        <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
-        <span className="flex items-center gap-0.5">
+      <footer className="mt-8 grid grid-cols-1 items-center gap-2 px-2 text-[11px] text-[#a8a094] sm:grid-cols-3">
+        <span className="text-center sm:text-left">© {new Date().getFullYear()} Xenora · All rights reserved</span>
+        <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="text-center hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
+        <span className="flex items-center justify-center gap-0.5 sm:justify-end">
           {[
             { k: "instagram", u: "https://www.instagram.com", c: "#E4405F" },
             { k: "tiktok", u: "https://www.tiktok.com", c: "#010101" },
