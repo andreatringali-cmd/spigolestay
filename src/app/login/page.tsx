@@ -144,10 +144,10 @@ export default function LoginPage() {
         <span className="blob blob-3" />
       </div>
       <main className="relative flex w-full flex-1 flex-col items-center justify-center">
-        <div className="w-full max-w-sm rounded-3xl bg-white/70 p-6 shadow-[0_20px_60px_-24px_rgba(80,60,140,0.25)] backdrop-blur-xl sm:p-8">
-          {/* Logo centrato, largo poco meno dei campi */}
-          <div className="mb-4 -mt-6 flex justify-center">
-            <Image src="/xenora-logo.png" alt="Xenora" width={320} height={88} priority className="h-auto w-[82%] object-contain" />
+        <div className="w-full max-w-md rounded-3xl bg-white/70 p-6 shadow-[0_20px_60px_-24px_rgba(80,60,140,0.25)] backdrop-blur-xl sm:p-8">
+          {/* Logo allineato a sinistra, dimensioni originali */}
+          <div className="mb-3 mt-2 flex">
+            <Image src="/xenora-logo.png" alt="Xenora" width={170} height={48} priority className="object-contain" style={{ width: 170, height: "auto" }} />
           </div>
 
           {recovery ? (
@@ -230,7 +230,7 @@ export default function LoginPage() {
               </button>
 
               {mode === "login" ? (
-                <div className="mt-6 text-center text-sm text-[#4a453d]">
+                <div className="mt-6 whitespace-nowrap text-center text-[13px] text-[#4a453d] sm:text-sm">
                   Non hai un account? Accesso su invito, <a href="https://xenoradigitalsolutions.it#contatti" target="_blank" rel="noreferrer" className="text-[#2f6bb0] hover:underline">richiedi la demo</a>.
                 </div>
               ) : (
