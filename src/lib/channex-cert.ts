@@ -444,13 +444,13 @@ export async function runCertScenario(admin: SupabaseClient, tenantId: string, s
       return done(scenario, [toCall("/restrictions", restr.length, await pushRestrictions(restr))]);
     }
 
-    // 5) MIN STAY — SOLO min_stay_through (nessun altro campo), 1 chiamata.
+    // 5) MIN STAY — SOLO min_stay_arrival (nessun altro campo), 1 chiamata.
     case "5": {
       const miss = missingCtx(scenario, label, [["Twin Best Available Rate", twinBAR], ["Double Best Available Rate", dblBAR], ["Double Bed & Breakfast Rate", dblBB]]); if (miss) return miss;
       const restr = [
-        R(twinBAR!, { date: "2026-11-23", min_stay_through: 3 }),
-        R(dblBAR!, { date: "2026-11-25", min_stay_through: 2 }),
-        R(dblBB!, { date: "2026-11-15", min_stay_through: 5 }),
+        R(twinBAR!, { date: "2026-11-23", min_stay_arrival: 3 }),
+        R(dblBAR!, { date: "2026-11-25", min_stay_arrival: 2 }),
+        R(dblBB!, { date: "2026-11-15", min_stay_arrival: 5 }),
       ];
       return done(scenario, [toCall("/restrictions", restr.length, await pushRestrictions(restr))]);
     }
@@ -470,20 +470,20 @@ export async function runCertScenario(admin: SupabaseClient, tenantId: string, s
     case "7": {
       const miss = missingCtx(scenario, label, [["Twin Best Available Rate", twinBAR], ["Twin Bed & Breakfast Rate", twinBB], ["Double Best Available Rate", dblBAR], ["Double Bed & Breakfast Rate", dblBB]]); if (miss) return miss;
       const restr = [
-        R(twinBAR!, { date_from: "2026-11-01", date_to: "2026-11-10", closed_to_arrival: true, closed_to_departure: false, max_stay: 4, min_stay_through: 1 }),
-        R(twinBB!, { date_from: "2026-11-12", date_to: "2026-11-16", closed_to_arrival: false, closed_to_departure: true, min_stay_through: 6 }),
-        R(dblBAR!, { date_from: "2026-11-10", date_to: "2026-11-16", closed_to_arrival: true, min_stay_through: 2 }),
-        R(dblBB!, { date_from: "2026-11-01", date_to: "2026-11-20", min_stay_through: 10 }),
+        R(twinBAR!, { date_from: "2026-11-01", date_to: "2026-11-10", closed_to_arrival: true, closed_to_departure: false, max_stay: 4, min_stay_arrival: 1 }),
+        R(twinBB!, { date_from: "2026-11-12", date_to: "2026-11-16", closed_to_arrival: false, closed_to_departure: true, min_stay_arrival: 6 }),
+        R(dblBAR!, { date_from: "2026-11-10", date_to: "2026-11-16", closed_to_arrival: true, min_stay_arrival: 2 }),
+        R(dblBB!, { date_from: "2026-11-01", date_to: "2026-11-20", min_stay_arrival: 10 }),
       ];
       return done(scenario, [toCall("/restrictions", restr.length, await pushRestrictions(restr))]);
     }
 
-    // 8) HALF-YEAR — 2026-12-01..2027-05-01, rate + min_stay_through, 1 chiamata.
+    // 8) HALF-YEAR — 2026-12-01..2027-05-01, rate + min_stay_arrival, 1 chiamata.
     case "8": {
       const miss = missingCtx(scenario, label, [["Twin Best Available Rate", twinBAR], ["Double Best Available Rate", dblBAR]]); if (miss) return miss;
       const restr = [
-        R(twinBAR!, { date_from: "2026-12-01", date_to: "2027-05-01", rate: RATE(432), min_stay_through: 2 }),
-        R(dblBAR!, { date_from: "2026-12-01", date_to: "2027-05-01", rate: RATE(342), min_stay_through: 3 }),
+        R(twinBAR!, { date_from: "2026-12-01", date_to: "2027-05-01", rate: RATE(432), min_stay_arrival: 2 }),
+        R(dblBAR!, { date_from: "2026-12-01", date_to: "2027-05-01", rate: RATE(342), min_stay_arrival: 3 }),
       ];
       return done(scenario, [toCall("/restrictions", restr.length, await pushRestrictions(restr))]);
     }

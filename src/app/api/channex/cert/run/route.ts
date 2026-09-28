@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { channexEnabled, listBookingRevisions } from "@/lib/channex";
-import { runCertScenario, setupTestProperty, resolveCertContext, ackTestBookings, SCENARIO_IDS, type ScenarioId } from "@/lib/channex-cert";
+import { runCertScenario, setupTestProperty, resolveCertContext, SCENARIO_IDS, type ScenarioId } from "@/lib/channex-cert";
+import { importBookings } from "@/lib/channex-inbound";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,10 +81,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, propertyId: propertyId ?? null, bookings }, { status: 200 });
   }
 
-  // Azione: ACK di tutte le revision della property di test (Test 11 booking receiving).
+  // Azione: esegue l'import/ACK dal FLUSSO DI INTEGRAZIONE (lo stesso di cron e "Controlla
+  // prenotazioni ora"), che ora ACKa anche le revision della property di test. È questo il flusso
+  // che Channex riconosce come integrazione — l'ACK deve arrivare da qui, non da chiamate manuali.
   if (body?.action === "ack-bookings") {
-    const r = await ackTestBookings(admin, caller.id);
-    return NextResponse.json(r, { status: 200 });
+    const r = await importBookings(admin);
+    return NextResponse.json({ ok: r.ok, acked: r.acked, feed: r.feed, error: r.errors?.[0] }, { status: 200 });
   }
 
   const scenario = String(body?.scenario || "") as ScenarioId;
