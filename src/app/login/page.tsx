@@ -137,16 +137,16 @@ export default function LoginPage() {
   const linkCls = "font-semibold text-[#2f6bb0] hover:underline";
 
   return (
-    <div className="login-bg relative flex min-h-screen flex-col overflow-hidden px-6 pb-4 pt-10 text-[#1f1b16]">
+    <div className="login-bg relative flex flex-col overflow-hidden px-6 pb-3 pt-6 text-[#1f1b16]">
       <div className="login-blobs pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         <span className="blob blob-1" />
         <span className="blob blob-2" />
         <span className="blob blob-3" />
       </div>
-      <main className="relative flex w-full flex-1 flex-col items-center justify-center">
-        <div className="w-full max-w-md rounded-3xl bg-white/70 p-6 shadow-[0_20px_60px_-24px_rgba(80,60,140,0.25)] backdrop-blur-xl sm:p-8">
-          {/* Logo allineato a sinistra, dimensioni invariate, piu in alto */}
-          <div className="mb-4 -mt-6 flex sm:-mt-8">
+      <main className="relative flex w-full min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto">
+        <div className="w-full max-w-md rounded-3xl bg-white/70 px-6 pb-6 pt-3 shadow-[0_20px_60px_-24px_rgba(80,60,140,0.25)] backdrop-blur-xl sm:px-8 sm:pb-8 sm:pt-4">
+          {/* Logo allineato a sinistra, dimensioni invariate, piu in alto (padding del box ridotto sopra) */}
+          <div className="mb-4 flex">
             <Image src="/xenora-logo.png" alt="Xenora" width={220} height={62} priority className="object-contain" style={{ width: 220, height: "auto" }} />
           </div>
 
@@ -270,7 +270,8 @@ export default function LoginPage() {
       </footer>
 
       <style>{`
-        .login-bg{background:#eae6f4}
+        html,body{overscroll-behavior-y:none}
+        .login-bg{background:#eae6f4;height:100vh;height:100dvh}
         .login-blobs .blob{position:absolute;border-radius:9999px;filter:blur(70px);opacity:.55;will-change:transform}
         .login-blobs .blob-1{top:-12%;left:-10%;width:44vw;height:44vw;max-width:520px;max-height:520px;opacity:.32;background:radial-gradient(circle at 35% 35%,#e3c3e0,#cfa8d6 55%,transparent 75%);animation:loginFloat1 26s ease-in-out infinite}
         .login-blobs .blob-2{bottom:-16%;right:-12%;width:58vw;height:58vw;max-width:700px;max-height:700px;opacity:.62;background:radial-gradient(circle at 60% 40%,#aebdf2,#7690e8 55%,transparent 75%);animation:loginFloat2 32s ease-in-out infinite}
