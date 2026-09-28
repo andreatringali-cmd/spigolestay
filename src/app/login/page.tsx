@@ -242,20 +242,21 @@ export default function LoginPage() {
           )}
         </div>
       </main>
-      <footer className="mt-8 flex flex-col items-center gap-2 px-4 text-center">
-        <div className="flex items-center gap-1">
+      <footer className="mt-8 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 px-4 text-[11px] text-[#a8a094]">
+        <span>© {new Date().getFullYear()} Xenora · All rights reserved</span>
+        <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
+        <span className="flex items-center gap-0.5">
           {[
-            { k: "instagram", u: "https://www.instagram.com" },
-            { k: "tiktok", u: "https://www.tiktok.com" },
-            { k: "facebook", u: "https://www.facebook.com" },
-            { k: "linkedin", u: "https://www.linkedin.com" },
+            { k: "instagram", u: "https://www.instagram.com", c: "#E4405F" },
+            { k: "tiktok", u: "https://www.tiktok.com", c: "#010101" },
+            { k: "facebook", u: "https://www.facebook.com", c: "#1877F2" },
+            { k: "linkedin", u: "https://www.linkedin.com", c: "#0A66C2" },
           ].map((s) => (
-            <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.k} className="grid h-8 w-8 place-items-center rounded-full text-[#a8a094] transition hover:bg-[#f2eee6] hover:text-[#4a453d]">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d={SOCIAL_PATHS[s.k]} /></svg>
+            <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.k} style={{ color: s.c }} className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-[#f2eee6] hover:opacity-80">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d={SOCIAL_PATHS[s.k]} /></svg>
             </a>
           ))}
-        </div>
-        <span className="text-[11px] text-[#a8a094]">© {new Date().getFullYear()} Xenora · All rights reserved</span>
+        </span>
       </footer>
     </div>
   );
