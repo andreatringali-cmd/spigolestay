@@ -17,12 +17,16 @@ const fmtDate = (iso?: string) => {
 };
 
 interface BookingPayload {
-  code?: string; structureName?: string; structureEmail?: string; guestName?: string; guestEmail?: string;
+  code?: string; status?: string; structureName?: string; structureEmail?: string; guestName?: string; guestEmail?: string;
   roomType?: string; unitName?: string; checkIn?: string; checkOut?: string; nights?: number;
   adults?: number; children?: number; total?: number; currency?: string;
-  checkInFrom?: string; checkOutBy?: string; address?: string; phone?: string; color?: string;
-  ratePlan?: string; cancelPolicy?: string; refunded?: number;
+  checkInFrom?: string; checkOutBy?: string; address?: string; mapsUrl?: string; phone?: string; color?: string;
+  ratePlan?: string; ratePlanName?: string; cancelPolicy?: string; refunded?: number;
   logo?: string; website?: string; cin?: string; vat?: string;
+  // Dettaglio in stile Octorate (vedi voucherHtml): extra, tassa di soggiorno, incassi, richieste.
+  extras?: { name: string; price: number }[]; extrasTotal?: number; bookingTotal?: number;
+  cityTaxAmount?: number; cityTaxRuleText?: string; grandTotal?: number; paid?: number; due?: number;
+  guestRequests?: string;
 }
 
 // Identità della struttura da mostrare come carta intestata (header + footer).
@@ -98,7 +102,17 @@ function row(label: string, value: string) {
 async function voucherHtml(b: BookingPayload, checkinUrl: string, manageUrl?: string) {
   const accent = b.color || "#285f92";
   const cur = b.currency || "€";
-  const people = `${b.adults ?? 1} adulti${b.children ? ` · ${b.children} bambini` : ""}`;
+  const money = (n?: number) => `${cur} ${(n ?? 0).toLocaleString("it-IT")}`;
+  // Calcolati qui (non fidandosi del chiamante) così ogni punto che manda un voucher — dal pannello
+  // prenotazioni o dalla prenotazione diretta dal sito — mostra totali corretti anche se non passa
+  // già tutti i campi derivati (es. public-booking manda solo "total", non extrasTotal/grandTotal).
+  const extrasTotal = b.extrasTotal ?? (b.extras || []).reduce((s, e) => s + (e.price || 0), 0);
+  const bookingTotal = b.bookingTotal ?? ((b.total ?? 0) + extrasTotal);
+  const cityTaxAmount = b.cityTaxAmount ?? 0;
+  const grandTotal = b.grandTotal ?? (bookingTotal + cityTaxAmount);
+  const paid = b.paid ?? 0;
+  const due = b.due ?? Math.max(0, grandTotal - paid);
+  const ratePlanName = b.ratePlanName || b.ratePlan;
   const brand = await resolveLogoUrl(brandFrom(b));
   // QR per gestire la prenotazione dal telefono (come su Octorate): inquadrandolo si apre lo
   // stesso link del pulsante "Gestisci". Se generazione/caricamento falliscono l'email parte
@@ -117,31 +131,61 @@ async function voucherHtml(b: BookingPayload, checkinUrl: string, manageUrl?: st
       }
     } catch { /* niente QR se fallisce: non blocca l'invio */ }
   }
+  const extrasLines = (b.extras || []).filter((e) => e.name);
   const inner = `
     <p style="margin:0 0 4px;font-size:16px;">Ciao <b>${esc((b.guestName || "").split(" ")[0] || "ospite")}</b>,</p>
-    <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">la tua prenotazione presso <b>${esc(b.structureName)}</b> è confermata. Ecco il riepilogo.</p>
-    <div style="background:#f8f9fb;border:1px solid #eceef1;border-radius:12px;padding:14px 16px;margin-bottom:18px;">
-      <div style="font-size:12px;color:#9aa1ac;">Codice prenotazione</div>
-      <div style="font-size:20px;font-weight:800;letter-spacing:1px;color:${accent};font-family:monospace;">${esc(b.code || "")}</div>
+    <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">la tua prenotazione presso <b>${esc(b.structureName)}</b> è confermata. Ecco il riepilogo completo.</p>
+    <div style="background:#f8f9fb;border:1px solid #eceef1;border-radius:12px;padding:14px 16px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div><div style="font-size:12px;color:#9aa1ac;">Codice prenotazione</div>
+      <div style="font-size:20px;font-weight:800;letter-spacing:1px;color:${accent};font-family:monospace;">${esc(b.code || "")}</div></div>
+      ${b.status ? `<div style="background:${accent};color:#fff;font-size:11px;font-weight:700;padding:5px 12px;border-radius:99px;">${esc(b.status)}</div>` : ""}
     </div>
     <table style="width:100%;border-collapse:collapse;">
-      ${row("Struttura", esc(b.structureName))}
-      ${row("Sistemazione", esc([b.roomType, b.unitName].filter(Boolean).join(" · ")))}
-      ${row("Check-in", esc(fmtDate(b.checkIn)) + (b.checkInFrom ? ` <span style="color:#9aa1ac;font-weight:400;">dalle ${esc(b.checkInFrom)}</span>` : ""))}
-      ${row("Check-out", esc(fmtDate(b.checkOut)) + (b.checkOutBy ? ` <span style="color:#9aa1ac;font-weight:400;">entro ${esc(b.checkOutBy)}</span>` : ""))}
-      ${row("Ospiti", esc(people))}
-      ${b.ratePlan ? row("Tariffa", esc(b.ratePlan)) : ""}
-      ${typeof b.total === "number" && b.total > 0 ? row("Totale soggiorno", `${cur} ${b.total.toLocaleString("it-IT")}`) : ""}
+      ${row("Arrivo", esc(fmtDate(b.checkIn)) + (b.checkInFrom ? ` <span style="color:#9aa1ac;font-weight:400;">dalle ${esc(b.checkInFrom)}</span>` : ""))}
+      ${row("Partenza", esc(fmtDate(b.checkOut)) + (b.checkOutBy ? ` <span style="color:#9aa1ac;font-weight:400;">entro ${esc(b.checkOutBy)}</span>` : ""))}
+      ${row("Notti", String(b.nights ?? ""))}
     </table>
-    ${b.cancelPolicy ? `<div style="margin:14px 0 0;background:#f8f9fb;border:1px solid #eceef1;border-radius:10px;padding:12px 14px;font-size:12px;color:#4b5563;"><b style="color:#1f2430;">Condizioni di cancellazione</b><br>${esc(b.cancelPolicy)}</div>` : ""}
+
+    <div style="margin:18px 0 6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9aa1ac;">Riepilogo economico</div>
+    <table style="width:100%;border-collapse:collapse;">
+      ${row("Totale camere", money(b.total))}
+      ${row("Totale extra", money(extrasTotal))}
+      ${row("Totale prenotazione", money(bookingTotal))}
+      ${cityTaxAmount > 0 ? row("Tassa di soggiorno", money(cityTaxAmount)) : ""}
+      ${row("Totale", `<b style="color:${accent};">${money(grandTotal)}</b>`)}
+      ${row("Totale incassato", money(paid))}
+      ${row("Totale da incassare", money(due))}
+    </table>
+
+    <div style="margin:18px 0 6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9aa1ac;">Dettaglio costi</div>
+    <table style="width:100%;border-collapse:collapse;">
+      ${row("Camera", esc([b.roomType, b.unitName].filter(Boolean).join(" · ")))}
+      ${row("Totale camera", money(b.total))}
+      ${ratePlanName ? row("Tariffa", esc(ratePlanName)) : ""}
+      ${row("Servizi extra", extrasLines.length ? extrasLines.map((e) => esc(e.name) + (e.price ? ` (${money(e.price)})` : "")).join(", ") : "Nessuno")}
+      ${cityTaxAmount > 0 ? row("Tassa di soggiorno", money(cityTaxAmount)) : ""}
+      ${row("Ospiti", String(b.adults ?? 1))}
+      ${row("Bambini", String(b.children ?? 0))}
+    </table>
+
+    <div style="margin:18px 0 6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9aa1ac;">Richieste speciali</div>
+    <p style="margin:0;font-size:13px;color:#4b5563;">${b.guestRequests ? esc(b.guestRequests) : "Nessuna richiesta specificata."}</p>
+
+    ${(b.cancelPolicy || b.cityTaxRuleText) ? `<div style="margin:18px 0 0;background:#f8f9fb;border:1px solid #eceef1;border-radius:10px;padding:12px 14px;font-size:12px;color:#4b5563;line-height:1.6;"><b style="color:#1f2430;">Termini e condizioni di prenotazione</b><br>${b.cancelPolicy ? esc(b.cancelPolicy) : ""}${b.cancelPolicy && b.cityTaxRuleText ? "<br><br>" : ""}${b.cityTaxRuleText ? esc(b.cityTaxRuleText) : ""}</div>` : ""}
+
     <div style="margin:22px 0 6px;">
       <a href="${esc(checkinUrl)}" style="display:block;text-align:center;background:${accent};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:10px;">Gestisci la tua prenotazione →</a>
     </div>
-    <p style="margin:8px 0 0;font-size:12px;color:#9aa1ac;text-align:center;">Completa i dati mancanti, fai il <b>check-in online</b>, <b>paga</b> il saldo e invia le tue <b>richieste</b> — tutto da qui.</p>
+    <ul style="margin:8px 0 0;padding:0 0 0 18px;font-size:12px;color:#6b7280;line-height:1.9;">
+      <li>Completare i dati mancanti e fare il <b>check-in online</b></li>
+      <li>Vedere lo stato del pagamento e <b>saldare</b> l'importo dovuto</li>
+      <li>Inviare <b>richieste particolari</b> alla struttura</li>
+    </ul>
     ${manageUrl ? `<div style="margin:12px 0 6px;">
       <a href="${esc(manageUrl)}" style="display:block;text-align:center;background:#fff;border:1px solid ${accent};color:${accent};text-decoration:none;font-weight:700;font-size:14px;padding:12px;border-radius:10px;">Gestisci la prenotazione (modifica o annulla)</a>
     </div>` : ""}
     ${qrHtml}
+    ${(b.website || b.mapsUrl) ? `<div style="margin:16px 0 0;text-align:center;font-size:12px;">${b.website ? `<a href="${esc(/^https?:\/\//i.test(b.website) ? b.website : `https://${b.website}`)}" style="color:${accent};text-decoration:none;font-weight:600;">Visita il nostro sito</a>` : ""}${b.website && b.mapsUrl ? " &nbsp;·&nbsp; " : ""}${b.mapsUrl ? `<a href="${esc(b.mapsUrl)}" style="color:${accent};text-decoration:none;font-weight:600;">Apri in Google Maps</a>` : ""}</div>` : ""}
   `;
   return shell("Conferma prenotazione", accent, inner, brand);
 }
@@ -277,11 +321,18 @@ export async function POST(req: Request) {
     if (body.kind === "voucher") {
       if (!b.guestEmail) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
       const subject = `Conferma prenotazione ${b.code || ""} · ${b.structureName || "Xenora"}`.trim();
-      // Allega il voucher in PDF (carta intestata). Se la generazione fallisce, invia comunque l'email.
+      // Allega il voucher in PDF (carta intestata). Se il chiamante ha già catturato l'anteprima
+      // reale (VoucherDoc via html2canvas, vedi BookingDrawer) usa quella — fotocopia esatta di
+      // quanto si vede a schermo. Solo se manca (es. invii automatici senza browser) si ripiega
+      // sul disegno pdf-lib. Se anche quello fallisce, l'email parte comunque senza allegato.
       let attachments: { filename: string; content: string }[] | undefined;
       try {
-        const pdf = await buildVoucherPdf({ ...b, manageUrl: body.manageUrl });
-        attachments = [{ filename: `voucher-${(b.code || "prenotazione").replace(/[^A-Za-z0-9_-]/g, "")}.pdf`, content: Buffer.from(pdf).toString("base64") }];
+        if (body.pdfBase64) {
+          attachments = [{ filename: body.pdfFilename || `voucher-${(b.code || "prenotazione").replace(/[^A-Za-z0-9_-]/g, "")}.pdf`, content: body.pdfBase64 }];
+        } else {
+          const pdf = await buildVoucherPdf({ ...b, manageUrl: body.manageUrl });
+          attachments = [{ filename: `voucher-${(b.code || "prenotazione").replace(/[^A-Za-z0-9_-]/g, "")}.pdf`, content: Buffer.from(pdf).toString("base64") }];
+        }
       } catch { attachments = undefined; }
       const data = await send(b.guestEmail, subject, await voucherHtml(b, body.checkinUrl || "", body.manageUrl), b.structureEmail, attachments);
       return NextResponse.json({ ok: true, id: data?.id });

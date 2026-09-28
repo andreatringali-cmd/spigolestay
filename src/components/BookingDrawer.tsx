@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import { bookingCode } from "@/lib/bookingCode";
-import { sendVoucher } from "@/lib/mailer";
+import { sendVoucher, voucherPayload } from "@/lib/mailer";
+import { captureA4ToPdfBlob, blobToBase64 } from "@/lib/pdf-capture";
+import VoucherDoc from "@/components/pdf/VoucherDoc";
 import { buildGuestLink, buildGroupGuestLink, guideMessage, shortenGuideLink, shortenLink } from "@/lib/guestlink";
 import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
 import { nights, parseISO, shiftISO } from "@/lib/dates";
@@ -88,6 +90,7 @@ export default function BookingDrawer() {
   const [extraName, setExtraName] = useState("");
   const [extraPrice, setExtraPrice] = useState("");
   const checkinRef = useRef<HTMLDivElement>(null);
+  const voucherPdfRef = useRef<HTMLDivElement>(null);
 
   const loadForm = () => {
     if (!booking) { setForm(null); return; }
@@ -252,7 +255,18 @@ export default function BookingDrawer() {
     if (!booking) return;
     if (!guest?.email) { setVoucher({ ok: false, msg: t("L'ospite non ha un'email.") }); return; }
     setVoucher({ sending: true });
-    const r = await sendVoucher(booking, { getStructure, getGuest, getRoomType, getUnit });
+    // Cattura l'anteprima reale del voucher (VoucherDoc, fuori schermo) come vero PDF allegato —
+    // stessa tecnica dei preventivi (fotocopia html2canvas), invece del disegno pdf-lib a parte.
+    // Se la cattura fallisce per qualsiasi motivo, l'email parte comunque (il server ripiega sul
+    // disegno pdf-lib): non blocchiamo mai l'invio per questo.
+    let pdf: { pdfBase64?: string; pdfFilename?: string } | undefined;
+    try {
+      if (voucherPdfRef.current) {
+        const blob = await captureA4ToPdfBlob([voucherPdfRef.current]);
+        pdf = { pdfBase64: await blobToBase64(blob), pdfFilename: `voucher-${bookingCode(booking)}.pdf` };
+      }
+    } catch (e) { console.error("sendVoucherNow: cattura PDF anteprima fallita, invio con fallback server:", e instanceof Error ? e.message : e); }
+    const r = await sendVoucher(booking, { getStructure, getGuest, getRoomType, getUnit }, pdf);
     setVoucher({ sending: false, ok: r.ok, msg: r.ok ? t("Voucher inviato a") + " " + guest.email : r.error });
   };
 
@@ -619,6 +633,32 @@ export default function BookingDrawer() {
         </button>
         {voucher.msg && <div className={`mt-1.5 text-center text-[11px] ${voucher.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{voucher.msg}</div>}
         <button onClick={() => { const gid = booking.guestId; closeBooking(); router.push(`/ospiti/${gid}`); }} className="mt-2 w-full rounded-lg border border-line px-3 py-2 text-xs font-medium text-focus hover:bg-wash">{t("Scheda completa ospite")} →</button>
+      </div>
+
+      {/* Contenitore fuori schermo (MAI display:none, altrimenti html2canvas non lo cattura):
+         anteprima reale del voucher, a piena risoluzione (scale=1), usata solo al momento
+         dell'invio per generare il vero PDF allegato (vedi sendVoucherNow). Sempre montato così
+         il ref è già pronto al click. Stessi dati inviati nell'email (voucherPayload), niente
+         calcoli duplicati. */}
+      <div aria-hidden="true" style={{ position: "fixed", left: -10000, top: 0, width: 794, zIndex: -1, pointerEvents: "none" }}>
+        <div ref={voucherPdfRef} style={{ width: 794 }}>
+          {(() => {
+            const vp = voucherPayload(booking, { getStructure, getGuest, getRoomType, getUnit });
+            const fmtLong = (iso?: string) => { if (!iso) return ""; try { return new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; } };
+            return (
+              <VoucherDoc
+                scale={1} accent={vp.color || "#285f92"} logo={vp.logo} structureName={vp.structureName || "Xenora"}
+                address={vp.address || ""} contacts={[vp.phone, vp.structureEmail, vp.website].filter(Boolean).join("  ·  ")}
+                legal={[vp.cin ? `CIN ${vp.cin}` : "", vp.vat ? `P.IVA ${vp.vat}` : ""].filter(Boolean).join(" · ")}
+                code={vp.code} guestName={vp.guestName || ""} guestEmail={vp.guestEmail}
+                roomType={vp.roomType || ""} unitName={vp.unitName} checkIn={fmtLong(vp.checkIn)} checkOut={fmtLong(vp.checkOut)}
+                checkInFrom={vp.checkInFrom} checkOutBy={vp.checkOutBy} adults={vp.adults ?? 1} children={vp.children ?? 0}
+                nights={vp.nights} ratePlan={vp.ratePlanName} total={typeof vp.grandTotal === "number" ? `${vp.currency || "€"} ${vp.grandTotal.toLocaleString("it-IT")}` : undefined}
+                cancelText={vp.cancelPolicy || ""}
+              />
+            );
+          })()}
+        </div>
       </div>
     </>
   );
