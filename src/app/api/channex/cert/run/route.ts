@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { channexEnabled } from "@/lib/channex";
-import { runCertScenario, SCENARIO_IDS, type ScenarioId } from "@/lib/channex-cert";
+import { runCertScenario, setupTestProperty, SCENARIO_IDS, type ScenarioId } from "@/lib/channex-cert";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +31,14 @@ export async function POST(req: Request) {
 
   if (!channexEnabled()) return NextResponse.json({ ok: false, error: "CHANNEX_API_KEY non configurata" }, { status: 200 });
 
-  const body = await req.json().catch(() => null) as { scenario?: string } | null;
+  const body = await req.json().catch(() => null) as { scenario?: string; action?: string } | null;
+
+  // Azione: crea (o riusa) la property di test dedicata alla certificazione e restituisce tutti gli ID.
+  if (body?.action === "setup-test-property") {
+    const setup = await setupTestProperty();
+    return NextResponse.json({ ok: setup.ok, setup }, { status: 200 });
+  }
+
   const scenario = String(body?.scenario || "") as ScenarioId;
   if (!SCENARIO_IDS.includes(scenario)) return NextResponse.json({ ok: false, error: "scenario non valido" }, { status: 400 });
 

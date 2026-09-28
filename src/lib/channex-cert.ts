@@ -12,8 +12,12 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  listProperties,
   listRoomTypesFor,
   listRatePlansForRoomType,
+  createProperty,
+  createRoomType,
+  createRatePlan,
   pushAvailability,
   pushRestrictions,
   type AvailValue,
@@ -121,7 +125,157 @@ function toCall(endpoint: string, sent: number, res: ChannexResult): CertCall {
 // ── Contesto: property + room_type + rate_plan REALI presi da Channex ──────
 type ChannexListRow = { id: string; attributes?: { title?: string } };
 
+// ============================================================
+//  Property di TEST dedicata alla certificazione Channex.
+//  La certificazione va eseguita su una property SEPARATA dalla struttura reale.
+//  La creiamo via API con una spec fissa e restituiamo TUTTI gli ID da incollare
+//  nel form di certificazione.
+// ============================================================
+export const TEST_PROPERTY_TITLE = "Test Property - Xenora";
+const TEST_TWIN_TITLE = "Twin Room";
+const TEST_DOUBLE_TITLE = "Double Room";
+const TEST_BAR_TITLE = "Best Available Rate";
+const TEST_BB_TITLE = "Bed & Breakfast Rate";
+const TEST_CURRENCY = "USD";
+
+// Risultato del setup: tutti gli ID Channex + i titoli (per chiarezza) + eventuali errori per-step.
+// Due rate plan per tipologia (BAR + B&B): 4 rate plan totali.
+export interface TestPropertySetup {
+  ok: boolean;
+  reused: boolean;              // true se la property esisteva già ed è stata riusata
+  propertyId: string | null;
+  propertyTitle: string;
+  twinRoomId: string | null;
+  twinRoomTitle: string;
+  twinBarId: string | null;    // rate plan "Best Available Rate" della Twin Room
+  twinBbId: string | null;     // rate plan "Bed & Breakfast Rate" della Twin Room
+  doubleRoomId: string | null;
+  doubleRoomTitle: string;
+  doubleBarId: string | null;  // rate plan "Best Available Rate" della Double Room
+  doubleBbId: string | null;   // rate plan "Bed & Breakfast Rate" della Double Room
+  errors: string[];
+}
+
+// Estrae l'id dalla risposta di una create* (forma { data: { id } }).
+function createdId(res: ChannexResult<{ data?: { id?: string } }>): string | null {
+  return res.ok && res.data?.data?.id ? String(res.data.data.id) : null;
+}
+
+// Crea (o riusa) la property di test con i due room type e un rate plan per tipologia.
+// IDEMPOTENTE: se una property con lo stesso title esiste già, la riusa; idem per
+// room type e rate plan (match per title). Cliccare due volte NON crea doppioni.
+export async function setupTestProperty(): Promise<TestPropertySetup> {
+  const errors: string[] = [];
+  const out: TestPropertySetup = {
+    ok: false,
+    reused: false,
+    propertyId: null,
+    propertyTitle: TEST_PROPERTY_TITLE,
+    twinRoomId: null,
+    twinRoomTitle: TEST_TWIN_TITLE,
+    twinBarId: null,
+    twinBbId: null,
+    doubleRoomId: null,
+    doubleRoomTitle: TEST_DOUBLE_TITLE,
+    doubleBarId: null,
+    doubleBbId: null,
+    errors,
+  };
+
+  // 1) PROPERTY — riusa se già presente (match per title), altrimenti creala (currency USD).
+  const listed = await listProperties();
+  if (!listed.ok) {
+    errors.push(`Elenco property fallito: ${listed.error ?? listed.status}`);
+    return out;
+  }
+  const existingProp = (listed.data?.data ?? []).find(
+    (p) => String(p.attributes?.title ?? "").trim() === TEST_PROPERTY_TITLE,
+  );
+  if (existingProp) {
+    out.propertyId = String(existingProp.id);
+    out.reused = true;
+  } else {
+    const created = await createProperty({ title: TEST_PROPERTY_TITLE, currency: TEST_CURRENCY, country: "IT" });
+    const pid = createdId(created);
+    if (!pid) {
+      errors.push(`Creazione property fallita: ${created.error ?? created.status}`);
+      return out;
+    }
+    out.propertyId = pid;
+  }
+  const propertyId = out.propertyId;
+
+  // 2) ROOM TYPE — Twin (count 8) e Double (count 1), occupancy adulti 2.
+  //    Riusa quelli già presenti (match per title), crea solo i mancanti.
+  const rtRes = await listRoomTypesFor(propertyId);
+  const existingRooms = (rtRes.ok ? (rtRes.data?.data ?? []) : []) as ChannexListRow[];
+  const ensureRoom = async (title: string, count: number): Promise<string | null> => {
+    const found = existingRooms.find((r) => String(r.attributes?.title ?? "").trim() === title);
+    if (found) return String(found.id);
+    const created = await createRoomType(propertyId, { title, count, occAdults: 2 });
+    const id = createdId(created);
+    if (!id) errors.push(`Creazione room type "${title}" fallita: ${created.error ?? created.status}`);
+    return id;
+  };
+  out.twinRoomId = await ensureRoom(TEST_TWIN_TITLE, 8);
+  out.doubleRoomId = await ensureRoom(TEST_DOUBLE_TITLE, 1);
+
+  // 3) RATE PLAN — DUE per tipologia: "Best Available Rate" (100) e "Bed & Breakfast Rate" (120), USD.
+  //    Riusa (match ESATTO per title) il rate plan esistente, crea solo i mancanti → niente doppioni.
+  const ensureRate = async (roomTypeId: string | null, title: string, rate: number, label: string): Promise<string | null> => {
+    if (!roomTypeId) return null;
+    const rpRes = await listRatePlansForRoomType(roomTypeId);
+    const rows = (rpRes.ok ? (rpRes.data?.data ?? []) : []) as ChannexListRow[];
+    const found = rows.find((r) => String(r.attributes?.title ?? "").trim() === title);
+    if (found) return String(found.id);
+    const created = await createRatePlan(propertyId, roomTypeId, { title, occupancy: 2, rate, currency: TEST_CURRENCY });
+    const id = createdId(created);
+    if (!id) errors.push(`Creazione rate plan "${title}" per ${label} fallita: ${created.error ?? created.status}`);
+    return id;
+  };
+  out.twinBarId = await ensureRate(out.twinRoomId, TEST_BAR_TITLE, 100, "Twin Room");
+  out.twinBbId = await ensureRate(out.twinRoomId, TEST_BB_TITLE, 120, "Twin Room");
+  out.doubleBarId = await ensureRate(out.doubleRoomId, TEST_BAR_TITLE, 100, "Double Room");
+  out.doubleBbId = await ensureRate(out.doubleRoomId, TEST_BB_TITLE, 120, "Double Room");
+
+  out.ok = !!(out.propertyId && out.twinRoomId && out.twinBarId && out.twinBbId && out.doubleRoomId && out.doubleBarId && out.doubleBbId);
+  return out;
+}
+
+// Contesto ricavato dalla property di TEST (se esiste su Channex). Serve a far girare
+// gli scenari 1..10 sulla property di test invece che sulla struttura reale.
+async function testPropertyContext(): Promise<CertContext | null> {
+  const listed = await listProperties();
+  if (!listed.ok) return null;
+  const found = (listed.data?.data ?? []).find(
+    (p) => String(p.attributes?.title ?? "").trim() === TEST_PROPERTY_TITLE,
+  );
+  if (!found) return null;
+
+  const propertyId = String(found.id);
+  const rtRes = await listRoomTypesFor(propertyId);
+  if (!rtRes.ok) return null;
+  const roomRows = (rtRes.data?.data ?? []) as ChannexListRow[];
+  if (roomRows.length === 0) return null;
+
+  const roomTypes: CertRoomType[] = roomRows.map((r) => ({ roomTypeId: String(r.id), roomTitle: String(r.attributes?.title ?? r.id) }));
+  const combos: CertCombo[] = [];
+  for (const rt of roomTypes) {
+    const rpRes = await listRatePlansForRoomType(rt.roomTypeId);
+    const rpRows = (rpRes.ok ? (rpRes.data?.data ?? []) : []) as ChannexListRow[];
+    for (const rp of rpRows) {
+      combos.push({ roomTypeId: rt.roomTypeId, roomTitle: rt.roomTitle, ratePlanId: String(rp.id), ratePlanTitle: String(rp.attributes?.title ?? rp.id) });
+    }
+  }
+  return { propertyId, structureId: "", roomTypes, combos };
+}
+
 export async function resolveCertContext(admin: SupabaseClient, tenantId: string): Promise<CertContext | { error: string }> {
+  // Preferisci SEMPRE la property di test se esiste: gli scenari girano su di essa,
+  // separata dalla struttura reale. Se non c'è, si ripiega su channex_map.
+  const test = await testPropertyContext();
+  if (test) return test;
+
   const { data: maps } = await admin
     .from("channex_map")
     .select("channex_property_id, structure_id, rooms")
