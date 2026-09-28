@@ -45,10 +45,12 @@ export default function PreventivoPubblico() {
         const sp = new URLSearchParams(window.location.search);
         let parsed: QData | null = null;
         const c = sp.get("c"), q = sp.get("q");
-        // Link corto: /preventivo?c=<codice> → carico il preventivo dal server (tabella quotes).
+        // Link corto: /preventivo?c=<codice> → carico il preventivo tramite la funzione get_quote,
+        // che restituisce SOLO il preventivo corrispondente al codice. La tabella quotes non è più
+        // leggibile in blocco dall'API pubblica (niente enumerazione dei preventivi altrui).
         if (c && supabase) {
-          const { data: row } = await supabase.from("quotes").select("data").eq("code", c).maybeSingle();
-          if (row?.data) parsed = row.data as QData;
+          const { data: qd } = await supabase.rpc("get_quote", { p_code: c });
+          if (qd) parsed = qd as QData;
         }
         // Compatibilità: vecchi link con il payload in base64 (?q=…).
         if (!parsed && q) parsed = JSON.parse(decodeURIComponent(atob(q))) as QData;
