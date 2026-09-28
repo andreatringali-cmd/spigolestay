@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel, type RoomType, type Booking, type Guest } from "@/lib/types";
-import { sendVoucher } from "@/lib/mailer";
+import { sendVoucher, voucherPayload, type VoucherPayload } from "@/lib/mailer";
+import { bookingCode } from "@/lib/bookingCode";
+import { captureA4ToPdfBlob, blobToBase64 } from "@/lib/pdf-capture";
+import VoucherDoc from "@/components/pdf/VoucherDoc";
 import { shortenLink } from "@/lib/guestlink";
 import { rateForDay } from "@/lib/pricing";
 import { shiftISO, toISO, nights } from "@/lib/dates";
@@ -23,6 +26,10 @@ export default function NuovaPrenotazionePage() {
   const router = useRouter();
   const { structures, roomTypes, units, bookings, guests, rateOverrides, addGuest, updateGuest, addBooking, getStructure, getGuest, getRoomType, getUnit, activeStructureId } = useData();
   const weekendPct = useMemo(() => { try { const r = localStorage.getItem("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {} return 25; }, []);
+  // Dati per l'anteprima fuori schermo del voucher (VoucherDoc), usata SOLO per catturare il vero
+  // PDF allegato al momento dell'invio della conferma — vedi confirm() più sotto.
+  const [pdfVp, setPdfVp] = useState<VoucherPayload | null>(null);
+  const voucherPdfRef = useRef<HTMLDivElement>(null);
 
   const locked = activeStructureId !== "all";
   const structColor = (sId: string) => structures.find((s) => s.id === sId)?.photoColor || "var(--focus)";
@@ -185,7 +192,25 @@ export default function NuovaPrenotazionePage() {
     // Conferma all'ospite (voucher via email). Uso i dati appena inseriti per evitare i ritardi dello stato.
     if (sendConfirm && email.trim() && primary) {
       const guestObj = { id: guestId, fullName: `${firstName} ${lastName}`.trim(), firstName, lastName, email: email.trim(), phone: phone.trim() } as Guest;
-      sendVoucher(primary, { getStructure, getGuest: () => guestObj, getRoomType, getUnit });
+      const deps = { getStructure, getGuest: () => guestObj, getRoomType, getUnit };
+      const primaryBooking = primary;
+      // Cattura l'anteprima reale del voucher (VoucherDoc, fuori schermo) come vero PDF allegato —
+      // stessa tecnica dei preventivi. Serve prima renderizzare l'anteprima con i dati appena creati
+      // (setPdfVp) e aspettare che React la disegni, poi si può catturare. Se qualcosa va storto,
+      // l'email parte comunque (il server ripiega sul disegno pdf-lib): non blocca mai l'invio.
+      (async () => {
+        let pdf: { pdfBase64?: string; pdfFilename?: string } | undefined;
+        try {
+          const vp = voucherPayload(primaryBooking, deps);
+          setPdfVp(vp);
+          await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+          if (voucherPdfRef.current) {
+            const blob = await captureA4ToPdfBlob([voucherPdfRef.current]);
+            pdf = { pdfBase64: await blobToBase64(blob), pdfFilename: `voucher-${bookingCode(primaryBooking)}.pdf` };
+          }
+        } catch (e) { console.error("confirm: cattura PDF anteprima fallita, invio con fallback server:", e instanceof Error ? e.message : e); }
+        sendVoucher(primaryBooking, deps, pdf);
+      })();
     }
     // Mostra il pannello di conferma con il link di gestione (self check-in) invece di uscire subito.
     setCreated(primary ?? null);
@@ -642,8 +667,35 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
           </Card>
         );
       })()}
+
+      {/* Contenitore fuori schermo (MAI display:none, altrimenti html2canvas non lo cattura): usato
+         solo per generare il PDF allegato alla conferma appena inviata (vedi confirm()). */}
+      {pdfVp && (
+        <div aria-hidden="true" style={{ position: "fixed", left: -10000, top: 0, width: 794, zIndex: -1, pointerEvents: "none" }}>
+          <div ref={voucherPdfRef} style={{ width: 794 }}>
+            <VoucherDoc
+              scale={1} accent={pdfVp.color || "#285f92"} logo={pdfVp.logo} structureName={pdfVp.structureName || "Xenora"}
+              address={pdfVp.address || ""} contacts={[pdfVp.phone, pdfVp.structureEmail, pdfVp.website].filter(Boolean).join("  ·  ")}
+              legal={[pdfVp.cin ? `CIN ${pdfVp.cin}` : "", pdfVp.vat ? `P.IVA ${pdfVp.vat}` : ""].filter(Boolean).join(" · ")}
+              code={pdfVp.code} guestName={pdfVp.guestName || ""} guestEmail={pdfVp.guestEmail}
+              roomType={pdfVp.roomType || ""} unitName={pdfVp.unitName}
+              checkIn={fmtLongDate(pdfVp.checkIn)} checkOut={fmtLongDate(pdfVp.checkOut)}
+              checkInFrom={pdfVp.checkInFrom} checkOutBy={pdfVp.checkOutBy} adults={pdfVp.adults ?? 1} children={pdfVp.children ?? 0}
+              nights={pdfVp.nights} ratePlan={pdfVp.ratePlanName}
+              total={typeof pdfVp.grandTotal === "number" ? `${pdfVp.currency || "€"} ${pdfVp.grandTotal.toLocaleString("it-IT")}` : undefined}
+              cancelText={pdfVp.cancelPolicy || ""}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+// Data lunga in italiano, coerente con lo stile degli altri documenti (preventivo/voucher).
+function fmtLongDate(iso?: string): string {
+  if (!iso) return "";
+  try { return new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; }
 }
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";

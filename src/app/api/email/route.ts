@@ -160,10 +160,8 @@ async function voucherHtml(b: BookingPayload, checkinUrl: string, manageUrl?: st
     <div style="margin:18px 0 6px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9aa1ac;">Dettaglio costi</div>
     <table style="width:100%;border-collapse:collapse;">
       ${row("Camera", esc([b.roomType, b.unitName].filter(Boolean).join(" · ")))}
-      ${row("Totale camera", money(b.total))}
       ${ratePlanName ? row("Tariffa", esc(ratePlanName)) : ""}
       ${row("Servizi extra", extrasLines.length ? extrasLines.map((e) => esc(e.name) + (e.price ? ` (${money(e.price)})` : "")).join(", ") : "Nessuno")}
-      ${cityTaxAmount > 0 ? row("Tassa di soggiorno", money(cityTaxAmount)) : ""}
       ${row("Ospiti", String(b.adults ?? 1))}
       ${row("Bambini", String(b.children ?? 0))}
     </table>
@@ -291,11 +289,14 @@ function subReceiptHtml(s: SubReceiptPayload) {
   return shell("Ricevuta abbonamento", accent, inner);
 }
 
-async function send(to: string, subject: string, html: string, replyTo?: string, attachments?: { filename: string; content: string }[]) {
+// fromName: nome visualizzato del mittente (es. "B&b Spigolehouse") — l'indirizzo resta sempre
+// quello verificato su Resend, cambia solo il nome che l'ospite vede in casella, come fa Octorate
+// (mittente = la struttura, non la piattaforma). "Xenora" resta il default per le email di sistema.
+async function send(to: string, subject: string, html: string, replyTo?: string, attachments?: { filename: string; content: string }[], fromName?: string) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: `Xenora <${FROM}>`, to: [to], subject, html, ...(replyTo ? { reply_to: replyTo } : {}), ...(attachments && attachments.length ? { attachments } : {}) }),
+    body: JSON.stringify({ from: `${(fromName || "Xenora").replace(/[<>]/g, "")} <${FROM}>`, to: [to], subject, html, ...(replyTo ? { reply_to: replyTo } : {}), ...(attachments && attachments.length ? { attachments } : {}) }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || `Resend ${res.status}`);
@@ -334,13 +335,13 @@ export async function POST(req: Request) {
           attachments = [{ filename: `voucher-${(b.code || "prenotazione").replace(/[^A-Za-z0-9_-]/g, "")}.pdf`, content: Buffer.from(pdf).toString("base64") }];
         }
       } catch { attachments = undefined; }
-      const data = await send(b.guestEmail, subject, await voucherHtml(b, body.checkinUrl || "", body.manageUrl), b.structureEmail, attachments);
+      const data = await send(b.guestEmail, subject, await voucherHtml(b, body.checkinUrl || "", body.manageUrl), b.structureEmail, attachments, b.structureName);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "cancel") {
       if (!b.guestEmail) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
       const subject = `Prenotazione annullata ${b.code || ""} · ${b.structureName || "Xenora"}`.trim();
-      const data = await send(b.guestEmail, subject, await cancelHtml(b), b.structureEmail);
+      const data = await send(b.guestEmail, subject, await cancelHtml(b), b.structureEmail, undefined, b.structureName);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "checkin") {
@@ -353,7 +354,7 @@ export async function POST(req: Request) {
     if (body.kind === "checkin_reminder") {
       if (!b.guestEmail) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });
       const subject = `Completa il check-in online · ${b.structureName || "Xenora"}`.trim();
-      const data = await send(b.guestEmail, subject, await reminderHtml(b, body.checkinUrl || ""), b.structureEmail);
+      const data = await send(b.guestEmail, subject, await reminderHtml(b, body.checkinUrl || ""), b.structureEmail, undefined, b.structureName);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "guest_message") {
@@ -364,7 +365,7 @@ export async function POST(req: Request) {
       const brand = await resolveLogoUrl(body.brand || (b.structureName ? { ...brandFrom(b), accent } : undefined));
       const title = body.subject || "Messaggio";
       const html = shell(title, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>`, brand);
-      const data = await send(body.to, subject, html, body.replyTo || b.structureEmail);
+      const data = await send(body.to, subject, html, body.replyTo || b.structureEmail, undefined, brand?.name || b.structureName);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "quote") {
@@ -408,7 +409,7 @@ export async function POST(req: Request) {
           attachments = [{ filename: `preventivo-${(body.ref || "preventivo").replace(/[^A-Za-z0-9_-]/g, "-")}.pdf`, content: Buffer.from(pdf).toString("base64") }];
         } catch { attachments = undefined; }
       }
-      const data = await send(body.to, subject, html, body.replyTo, attachments);
+      const data = await send(body.to, subject, html, body.replyTo, attachments, brand?.name);
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "sub_receipt") {
