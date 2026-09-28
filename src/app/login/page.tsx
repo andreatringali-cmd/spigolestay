@@ -138,15 +138,10 @@ export default function LoginPage() {
 
   return (
     <div className="login-bg relative flex flex-col overflow-hidden px-6 pb-3 pt-6 text-[#1f1b16]">
-      <div className="login-blobs pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <span className="blob blob-1" />
-        <span className="blob blob-2" />
-        <span className="blob blob-3" />
-      </div>
       <main className="relative flex w-full min-h-0 flex-1 flex-col items-center justify-center overflow-x-hidden overflow-y-auto">
-        <div className="w-full max-w-md rounded-3xl bg-white/70 px-6 pb-6 pt-3 shadow-[0_20px_60px_-24px_rgba(80,60,140,0.25)] backdrop-blur-xl sm:px-8 sm:pb-8 sm:pt-4">
-          {/* Logo allineato a sinistra, dimensioni invariate, piu in alto (padding del box ridotto sopra) */}
-          <div className="mb-4 flex">
+        <div className="w-full max-w-md rounded-3xl border border-[#eceae4] bg-white px-6 pb-6 pt-3 shadow-[0_20px_50px_-28px_rgba(31,27,22,0.35)] sm:px-8 sm:pb-8 sm:pt-4">
+          {/* Logo centrato, dimensioni invariate */}
+          <div className="mb-4 flex justify-center">
             <Image src="/xenora-logo.png" alt="Xenora" width={220} height={62} priority className="object-contain" style={{ width: 220, height: "auto" }} />
           </div>
 
@@ -271,16 +266,7 @@ export default function LoginPage() {
 
       <style>{`
         html,body{overscroll-behavior-y:none}
-        .login-bg{background:#eae6f4;height:100vh;height:100dvh}
-        .login-blobs .blob{position:absolute;border-radius:9999px;filter:blur(70px);opacity:.55;will-change:transform}
-        .login-blobs .blob-1{top:-12%;left:-10%;width:44vw;height:44vw;max-width:520px;max-height:520px;opacity:.32;background:radial-gradient(circle at 35% 35%,#e3c3e0,#cfa8d6 55%,transparent 75%);animation:loginFloat1 26s ease-in-out infinite}
-        .login-blobs .blob-2{bottom:-16%;right:-12%;width:58vw;height:58vw;max-width:700px;max-height:700px;opacity:.62;background:radial-gradient(circle at 60% 40%,#aebdf2,#7690e8 55%,transparent 75%);animation:loginFloat2 32s ease-in-out infinite}
-        .login-blobs .blob-3{top:32%;left:38%;width:46vw;height:46vw;max-width:540px;max-height:540px;opacity:.58;background:radial-gradient(circle at 50% 50%,#d3b8f2,#a674e8 55%,transparent 75%);animation:loginFloat3 29s ease-in-out infinite}
-        @keyframes loginFloat1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6vw,5vh) scale(1.08)}}
-        @keyframes loginFloat2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-5vw,-6vh) scale(1.1)}}
-        @keyframes loginFloat3{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-46%,-54%) scale(1.12)}}
-        .login-blobs .blob-3{transform:translate(-50%,-50%)}
-        @media (prefers-reduced-motion: reduce){.login-blobs .blob{animation:none !important}}
+        .login-bg{height:100vh;height:100dvh;background:linear-gradient(180deg,#ffffff 0%,#eef0f5 100%)}
       `}</style>
     </div>
   );
