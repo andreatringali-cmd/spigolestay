@@ -145,8 +145,8 @@ export default function LoginPage() {
       </div>
       <main className="relative flex w-full flex-1 flex-col items-center justify-center">
         <div className="w-full max-w-md rounded-3xl bg-white/70 p-6 shadow-[0_20px_60px_-24px_rgba(80,60,140,0.25)] backdrop-blur-xl sm:p-8">
-          {/* Logo allineato a sinistra, piu grande/alto */}
-          <div className="mb-4 mt-2 flex">
+          {/* Logo allineato a sinistra, dimensioni invariate, piu in alto */}
+          <div className="mb-4 -mt-3 flex">
             <Image src="/xenora-logo.png" alt="Xenora" width={220} height={62} priority className="object-contain" style={{ width: 220, height: "auto" }} />
           </div>
 
@@ -230,8 +230,11 @@ export default function LoginPage() {
               </button>
 
               {mode === "login" ? (
-                <div className="mt-6 whitespace-nowrap text-center text-[13px] text-[#4a453d] sm:text-sm">
-                  Non hai un account? Accesso su invito, <a href="https://xenoradigitalsolutions.it#contatti" target="_blank" rel="noreferrer" className="text-[#2f6bb0] hover:underline">richiedi la demo</a>.
+                <div className="mt-6 text-center">
+                  <div className="whitespace-nowrap text-[13px] text-[#4a453d] sm:text-sm">
+                    Non hai un account? Accesso su invito, <a href="https://xenoradigitalsolutions.it#contatti" target="_blank" rel="noreferrer" className="text-[#2f6bb0] hover:underline">richiedi la demo</a>.
+                  </div>
+                  <div className="mt-2 text-[11px] text-[#9a9186]">© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</div>
                 </div>
               ) : (
                 <div className="mt-6 text-center text-sm text-[#4a453d]">
@@ -245,12 +248,11 @@ export default function LoginPage() {
         </div>
       </main>
       <footer className="mt-6 border-t border-[#eceae4] px-2 pt-3 text-[11px] text-[#9a9186]">
-        {/* Mobile: riga 1 = sito + social a destra · riga 2 = copyright, centrato */}
+        {/* Mobile: sito + social sulla stessa riga */}
         <div className="flex items-center justify-between gap-2 sm:hidden">
           <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
           <SocialIcons />
         </div>
-        <div className="mt-1.5 text-center sm:hidden">© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</div>
 
         {/* Desktop: tutto su una riga */}
         <div className="hidden sm:flex sm:items-center sm:justify-between">
@@ -262,19 +264,17 @@ export default function LoginPage() {
             <a href="/cookie" className="hover:text-[#4a453d] hover:underline">Cookie</a>
             <span className="text-[#dcd6cc]">·</span>
             <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
-            <span className="text-[#dcd6cc]">·</span>
-            <span>© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</span>
           </div>
           <SocialIcons />
         </div>
       </footer>
 
       <style>{`
-        .login-bg{background:#f6f3ff}
+        .login-bg{background:#eae6f4}
         .login-blobs .blob{position:absolute;border-radius:9999px;filter:blur(70px);opacity:.55;will-change:transform}
-        .login-blobs .blob-1{top:-12%;left:-10%;width:52vw;height:52vw;max-width:620px;max-height:620px;background:radial-gradient(circle at 35% 35%,#ffd6ec,#ffb3d9 55%,transparent 75%);animation:loginFloat1 26s ease-in-out infinite}
-        .login-blobs .blob-2{bottom:-16%;right:-12%;width:56vw;height:56vw;max-width:680px;max-height:680px;background:radial-gradient(circle at 60% 40%,#c9d6ff,#8fa8ff 55%,transparent 75%);animation:loginFloat2 32s ease-in-out infinite}
-        .login-blobs .blob-3{top:32%;left:38%;width:44vw;height:44vw;max-width:520px;max-height:520px;background:radial-gradient(circle at 50% 50%,#e6d1ff,#b98bff 55%,transparent 75%);animation:loginFloat3 29s ease-in-out infinite}
+        .login-blobs .blob-1{top:-12%;left:-10%;width:44vw;height:44vw;max-width:520px;max-height:520px;opacity:.32;background:radial-gradient(circle at 35% 35%,#e3c3e0,#cfa8d6 55%,transparent 75%);animation:loginFloat1 26s ease-in-out infinite}
+        .login-blobs .blob-2{bottom:-16%;right:-12%;width:58vw;height:58vw;max-width:700px;max-height:700px;opacity:.62;background:radial-gradient(circle at 60% 40%,#aebdf2,#7690e8 55%,transparent 75%);animation:loginFloat2 32s ease-in-out infinite}
+        .login-blobs .blob-3{top:32%;left:38%;width:46vw;height:46vw;max-width:540px;max-height:540px;opacity:.58;background:radial-gradient(circle at 50% 50%,#d3b8f2,#a674e8 55%,transparent 75%);animation:loginFloat3 29s ease-in-out infinite}
         @keyframes loginFloat1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6vw,5vh) scale(1.08)}}
         @keyframes loginFloat2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-5vw,-6vh) scale(1.1)}}
         @keyframes loginFloat3{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-46%,-54%) scale(1.12)}}
