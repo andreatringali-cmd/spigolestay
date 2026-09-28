@@ -229,7 +229,7 @@ export default function LoginPage() {
 
               {mode === "login" ? (
                 <div className="mt-6 text-center text-sm text-[#4a453d]">
-                  Non hai un account? Accesso su invito, <a href="https://xenoradigitalsolutions.it#contatti" target="_blank" rel="noreferrer" className={linkCls}>richiedi la demo</a>.
+                  Non hai un account? Accesso su invito, <a href="https://xenoradigitalsolutions.it#contatti" target="_blank" rel="noreferrer" className="text-[#2f6bb0] hover:underline">richiedi la demo</a>.
                 </div>
               ) : (
                 <div className="mt-6 text-center text-sm text-[#4a453d]">
