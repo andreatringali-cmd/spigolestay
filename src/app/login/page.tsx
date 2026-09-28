@@ -219,13 +219,19 @@ export default function LoginPage() {
                 <GoogleIcon /> Google
               </button>
 
-              <div className="mt-6 text-center text-sm text-[#4a453d]">
-                {mode === "login" ? (
-                  <>Non hai ancora un account? <a href="https://www.xenoradigitalsolutions.it" target="_blank" rel="noreferrer" className={linkCls}>Contattaci e richiedi una demo</a></>
-                ) : (
-                  <>Hai già un account? <button onClick={() => { setMode("login"); setErr(null); setInfo(null); }} className={linkCls}>Accedi</button></>
-                )}
-              </div>
+              {mode === "login" ? (
+                <div className="mt-6 rounded-xl border border-[#e2ded7] bg-[#f9f7f4] px-4 py-4 text-center">
+                  <div className="text-sm font-semibold text-[#1f1b16]">Non hai ancora un account?</div>
+                  <div className="mt-0.5 text-[12px] text-[#6b6459]">Xenora è ad accesso su invito.</div>
+                  <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="mt-3 inline-block rounded-lg bg-[#1f1b16] px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90">
+                    Richiedi una demo →
+                  </a>
+                </div>
+              ) : (
+                <div className="mt-6 text-center text-sm text-[#4a453d]">
+                  Hai già un account? <button onClick={() => { setMode("login"); setErr(null); setInfo(null); }} className={linkCls}>Accedi</button>
+                </div>
+              )}
 
               {!supabaseEnabled && <div className="mt-3 text-center text-xs text-[#9a9186]">Accesso dimostrativo · backend non configurato</div>}
             </>
