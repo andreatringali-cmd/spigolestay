@@ -220,11 +220,16 @@ export default function LoginPage() {
               </button>
 
               {mode === "login" ? (
-                <div className="mt-6 rounded-xl border border-[#e2ded7] bg-[#f9f7f4] px-4 py-4 text-center">
-                  <div className="text-sm font-semibold text-[#1f1b16]">Non hai ancora un account?</div>
-                  <div className="mt-0.5 text-[12px] text-[#6b6459]">Xenora è ad accesso su invito.</div>
-                  <a href="https://xenoradigitalsolutions.it" target="_blank" rel="noreferrer" className="mt-3 inline-block rounded-lg bg-[#1f1b16] px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90">
-                    Richiedi una demo →
+                <div className="mt-6 overflow-hidden rounded-2xl border border-[#e6e1d8] bg-gradient-to-b from-[#faf8f4] to-[#f2eee6] p-5 text-center shadow-[0_12px_32px_-20px_rgba(31,27,22,0.4)]">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e4dccb] bg-white/70 px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.08em] text-[#8a6d1f]">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                    Accesso su invito
+                  </span>
+                  <div className="mt-2.5 text-[15px] font-bold text-[#1f1b16]">Non hai ancora un account?</div>
+                  <p className="mx-auto mt-1 max-w-[30ch] text-[13px] leading-snug text-[#6b6459]">Xenora è riservato agli operatori. Prenota una demo e ti diamo l&apos;accesso.</p>
+                  <a href="https://xenoradigitalsolutions.it" target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#2f6bb0] to-[#7b5cff] px-6 py-3 text-sm font-bold text-white shadow-[0_14px_28px_-12px_rgba(79,70,229,0.75)] transition hover:-translate-y-0.5 hover:opacity-95">
+                    Richiedi una demo
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                   </a>
                 </div>
               ) : (
