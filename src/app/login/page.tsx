@@ -137,8 +137,8 @@ export default function LoginPage() {
   const linkCls = "font-semibold text-[#2f6bb0] hover:underline";
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white px-6 py-10 text-[#1f1b16]">
-      <main className="flex w-full flex-col items-center justify-center">
+    <div className="flex min-h-screen flex-col bg-white px-6 py-10 text-[#1f1b16]">
+      <main className="flex w-full flex-1 flex-col items-center justify-center">
         <div className="w-full max-w-sm">
           {/* Logo allineato a sinistra, come i campi */}
           <div className="mb-3 mt-2 flex">
@@ -242,7 +242,7 @@ export default function LoginPage() {
           )}
         </div>
       </main>
-      <footer className="flex flex-col items-center gap-2 px-4 pb-8 pt-2 text-center">
+      <footer className="mt-8 flex flex-col items-center gap-2 px-4 text-center">
         <div className="flex items-center gap-1">
           {[
             { k: "instagram", u: "https://www.instagram.com" },
