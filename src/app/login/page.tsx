@@ -137,7 +137,7 @@ export default function LoginPage() {
   const linkCls = "font-semibold text-[#2f6bb0] hover:underline";
 
   return (
-    <div className="flex min-h-screen flex-col bg-white px-6 py-10 text-[#1f1b16]">
+    <div className="flex min-h-screen flex-col bg-white px-6 pb-4 pt-10 text-[#1f1b16]">
       <main className="flex w-full flex-1 flex-col items-center justify-center">
         <div className="w-full max-w-sm">
           {/* Logo allineato a sinistra, come i campi */}
