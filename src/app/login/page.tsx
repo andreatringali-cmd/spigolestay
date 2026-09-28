@@ -140,11 +140,6 @@ export default function LoginPage() {
     <div className="login-bg relative flex flex-col overflow-hidden px-6 py-6 text-[#1f1b16]">
       <main className="relative flex w-full min-h-0 flex-1 flex-col items-center justify-center overflow-x-hidden overflow-y-auto">
         <div className="w-full max-w-md rounded-3xl border border-[#eceae4] bg-white px-6 py-6 shadow-[0_20px_50px_-28px_rgba(31,27,22,0.35)] sm:px-8 sm:py-8">
-          {/* Logo centrato, dimensioni invariate */}
-          <div className="mb-4 flex justify-center">
-            <Image src="/xenora-logo.png" alt="Xenora" width={220} height={62} priority className="object-contain" style={{ width: 220, height: "auto" }} />
-          </div>
-
           {recovery ? (
             <>
               <h1 className="text-2xl font-bold tracking-tight">Imposta una nuova password</h1>
@@ -240,6 +235,11 @@ export default function LoginPage() {
               {!supabaseEnabled && <div className="mt-3 text-center text-xs text-[#9a9186]">Accesso dimostrativo · backend non configurato</div>}
             </>
           )}
+        </div>
+
+        {/* Logo fuori dal box, sotto la finestra di accesso */}
+        <div className="mt-6 flex justify-center">
+          <Image src="/xenora-logo.png" alt="Xenora" width={220} height={62} priority className="object-contain" style={{ width: 220, height: "auto" }} />
         </div>
       </main>
       <footer className="mt-6 border-t border-[#eceae4] px-2 pt-3 text-[11px] text-[#9a9186]">
