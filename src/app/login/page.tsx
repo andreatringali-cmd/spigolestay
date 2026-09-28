@@ -139,12 +139,12 @@ export default function LoginPage() {
   return (
     <div className="login-bg relative flex flex-col overflow-hidden px-6 py-6 text-[#1f1b16]">
       <main className="relative flex w-full min-h-0 flex-1 flex-col items-center justify-center overflow-x-hidden overflow-y-auto">
-        {/* Logo fuori dal box, sopra la finestra di accesso */}
-        <div className="mb-6 flex justify-center">
-          <Image src="/xenora-logo.png" alt="Xenora" width={220} height={62} priority className="object-contain" style={{ width: 220, height: "auto" }} />
-        </div>
-
         <div className="w-full max-w-md rounded-3xl border border-[#eceae4] bg-white px-6 py-6 shadow-[0_20px_50px_-28px_rgba(31,27,22,0.35)] sm:px-8 sm:py-8">
+          {/* Logo dentro il box, centrato */}
+          <div className="mb-4 flex justify-center">
+            <Image src="/xenora-logo.png" alt="Xenora" width={220} height={62} priority className="object-contain" style={{ width: 220, height: "auto" }} />
+          </div>
+
           {recovery ? (
             <>
               <h1 className="text-2xl font-bold tracking-tight">Imposta una nuova password</h1>
@@ -243,7 +243,7 @@ export default function LoginPage() {
         </div>
 
       </main>
-      <footer className="mt-6 border-t border-[#eceae4] px-2 pt-3 text-[11px] text-[#9a9186]">
+      <footer className="mt-3 border-t border-[#eceae4] px-2 pt-2 text-[11px] text-[#9a9186]">
         {/* Mobile: sito + social sulla stessa riga */}
         <div className="flex items-center justify-between gap-2 sm:hidden">
           <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
@@ -282,7 +282,7 @@ function SocialIcons() {
         { k: "instagram", u: "https://www.instagram.com", c: "#E4405F" },
         { k: "tiktok", u: "https://www.tiktok.com", c: "#010101" },
       ].map((s) => (
-        <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.k} style={{ color: s.c }} className="grid h-7 w-7 place-items-center rounded-lg border border-[#e6e1d8] transition hover:bg-[#f2eee6] hover:opacity-90">
+        <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.k} style={{ color: s.c }} className="grid h-6 w-6 place-items-center rounded-md border border-[#e6e1d8] transition hover:bg-[#f2eee6] hover:opacity-90">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d={SOCIAL_PATHS[s.k]} /></svg>
         </a>
       ))}
