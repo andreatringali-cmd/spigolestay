@@ -438,6 +438,35 @@ export default function BookingDrawer() {
         <Row label={t("Netto struttura")} value={eur(nettoV)} mono strong />
       </Section>
 
+      {booking.otaCard?.present && (() => {
+        const c = booking.otaCard!;
+        const fmtDate = (s?: string) => { if (!s) return null; const d = new Date(s); return isNaN(+d) ? s : d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }); };
+        const eff = fmtDate(c.effectiveDate); const exp = fmtDate(c.expirationDate);
+        return (
+          <Section title={t("Carta virtuale OTA")}>
+            <div className="rounded-xl border border-line bg-wash px-3 py-2.5 text-sm">
+              {c.balance != null && (
+                <div className="flex items-baseline justify-between gap-4">
+                  <span className="text-dim">{t("Importo addebitabile")}</span>
+                  <span className="font-mono font-bold tabular-nums text-txt">{c.balance.toFixed(2)} {c.currency || ""}</span>
+                </div>
+              )}
+              {eff && <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-dim">{t("Addebitabile dal")}</span><span className="font-mono tabular-nums text-txt">{eff}</span></div>}
+              {exp && <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-dim">{t("Scadenza carta")}</span><span className="font-mono tabular-nums text-txt">{exp}</span></div>}
+              <p className="mt-2 text-[12px] leading-snug text-faint">
+                {t("Per sicurezza (PCI) Xenora non mostra né salva il numero della carta. Addebitala dal tuo POS o dall'extranet del canale, poi segnala come addebitata qui sotto.")}
+              </p>
+              <label className="mt-2 flex items-center gap-2 text-sm font-medium text-txt">
+                <input type="checkbox" checked={!!c.charged} onChange={(e) => updateBooking(booking.id, { otaCard: { ...c, charged: e.target.checked } })} />
+                {c.charged
+                  ? <span className="rounded bg-[color:color-mix(in_srgb,var(--ok)_18%,transparent)] px-1.5 py-0.5 text-[11px] font-semibold text-[color:var(--ok)]">{t("Addebitata ✓")}</span>
+                  : t("Segna come addebitata")}
+              </label>
+            </div>
+          </Section>
+        );
+      })()}
+
       {booking.movedFrom && (
         <div className="mx-5 mt-3 flex items-start gap-2 rounded-xl px-3 py-2.5 text-sm" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)" }}>
           <span className="font-bold" style={{ color: "var(--warn)" }}>⇄</span>

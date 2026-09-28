@@ -334,10 +334,16 @@ export async function sendReady(admin: SupabaseClient, tenantId: string, structu
   const sentIds = list.filter((_, i) => (res.perLine ? res.perLine[i] : res.ok)).map((s) => s.id);
   if (sentIds.length) {
     await admin.from("alloggiati_schedine").update({ stato: "inviata", submission_id: sub!.id, ricevuta: res.ricevuta ?? null }).in("id", sentIds);
-    const sentBookings = list.filter((_, i) => (res.perLine ? res.perLine[i] : res.ok)).map((s) => s.booking_id);
-    for (const bid of Array.from(new Set(sentBookings.filter(Boolean))) as string[]) {
+    const sentBookings = Array.from(new Set(list.filter((_, i) => (res.perLine ? res.perLine[i] : res.ok)).map((s) => s.booking_id).filter(Boolean))) as string[];
+    for (const bid of sentBookings) {
       await logBookingEvent(admin, tenantId, bid, "schedina", "Schedina Alloggiati inviata alla Questura");
     }
+    // Protezione dati: adempimento concluso → rimuovi le foto del documento (il dato più
+    // sensibile). Best-effort, non blocca l'esito dell'invio.
+    try {
+      const { purgeDocPhotos } = await import("./purge");
+      await purgeDocPhotos(admin, tenantId, sentBookings);
+    } catch { /* purga non critica */ }
   }
   return { ok: res.ok, message: res.message, sent: sentIds.length };
 }

@@ -39,6 +39,28 @@ function channelFromOta(ota?: string): string {
 }
 
 const num = (v: unknown, d = 0) => { const n = Number(v); return isNaN(n) ? d : n; };
+
+// Estrae i SOLI METADATI della carta virtuale OTA (VCC) da una revision Channex.
+// PCI-safe per costruzione: legge esclusivamente importo/valuta/decimali/date; NON legge
+// (e non deve mai leggere) numero carta, titolare o CVV — Channex li invia solo ai partner
+// certificati PCI DSS, e Xenora non lo è. Ritorna undefined se non c'è una VCC.
+type OtaCard = { present: boolean; currency?: string; balance?: number; effectiveDate?: string; expirationDate?: string; charged?: boolean };
+function otaCardFrom(r: ChxRevision): OtaCard | undefined {
+  const raw = r as unknown as Record<string, unknown>;
+  const cc = ((raw.credit_card ?? raw.payment_card ?? raw.payment ?? {}) as Record<string, unknown>) || {};
+  const pick = (k: string) => raw[k] ?? cc[k];
+  const isVirtual = pick("is_virtual_card") === true || pick("is_virtual") === true
+    || String(pick("payment_type") ?? pick("payment_collect") ?? "").toLowerCase().includes("virtual");
+  const rawBal = num(pick("virtual_card_current_balance"), NaN);
+  const decimals = num(pick("virtual_card_decimal_places"), 0);
+  const balance = Number.isFinite(rawBal) ? (decimals > 0 ? rawBal / Math.pow(10, decimals) : rawBal) : undefined;
+  const currency = (pick("virtual_card_currency_code") as string | undefined) || undefined;
+  const effectiveDate = (pick("virtual_card_effective_date") as string | undefined) || undefined;
+  const expirationDate = (pick("virtual_card_expiration_date") as string | undefined) || undefined;
+  // "Presente" solo con un segnale chiaro di VCC: flag virtuale, un saldo, o una data VCC.
+  if (!isVirtual && balance == null && !effectiveDate && !expirationDate) return undefined;
+  return { present: true, currency, balance, effectiveDate, expirationDate };
+}
 const sumDays = (days?: Record<string, string>) => days ? Object.values(days).reduce((a, v) => a + num(v), 0) : 0;
 
 export interface ImportSummary { ok: boolean; feed: number; imported: number; cancelled: number; acked: number; skipped: number; errors: string[] }
@@ -163,6 +185,14 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       const commissionPct = (Number.isFinite(commAmt) && commAmt > 0 && Number.isFinite(bookingTotal) && bookingTotal > 0)
         ? Math.round((commAmt / bookingTotal) * 1000) / 10
         : undefined;
+      // Carta virtuale OTA: SOLO metadati (mai numero/CVV). Se una revision precedente aveva
+      // già la carta o era stata segnata "addebitata", conserviamo quell'informazione.
+      const prevOtaCard = removed.reduce<OtaCard | undefined>((acc, b) => acc ?? (b.otaCard as OtaCard | undefined), undefined);
+      const newOtaCard = otaCardFrom(r);
+      const otaCard: OtaCard | undefined = newOtaCard
+        ? { ...newOtaCard, charged: prevOtaCard?.charged ?? newOtaCard.charged }
+        : prevOtaCard;
+
       const roomsArr = r.rooms && r.rooms.length ? r.rooms : [{}];
       let added = 0;
       roomsArr.forEach((room, idx) => {
@@ -180,6 +210,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           adults: Math.max(1, num(room.occupancy?.adults, 1)), children: num(room.occupancy?.children, 0),
           total: total || undefined, cleaningFee: 0, paid: 0, cityTaxPaid: false,
           ...(commissionPct != null ? { commissionPct } : {}),
+          ...(otaCard && idx === 0 ? { otaCard } : {}), // la VCC copre la prenotazione: la attacchiamo alla prima camera
           extId: stableKey, code: r.ota_reservation_code || undefined, source: "channex",
           note: `Prenotazione ${channel.toUpperCase()} via Channex${r.ota_reservation_code ? ` · ${r.ota_reservation_code}` : ""}`,
         } as Booking);

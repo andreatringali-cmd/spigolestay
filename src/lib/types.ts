@@ -305,6 +305,18 @@ export interface Booking {
   parking?: boolean; // l'ospite ha prenotato il parcheggio (seleziona i codici "con parcheggio" nella guida)
   paid?: number; // € già incassati (acconto/saldo)
   commissionPct?: number; // % di commissione OTA specifica di questa prenotazione
+  // Carta virtuale OTA (VCC): SOLO METADATI, MAI il numero carta o il CVV. Il numero completo
+  // viene inviato da Channex esclusivamente ai partner certificati PCI DSS; Xenora non lo è e
+  // NON lo riceve/salva. Qui teniamo solo importo, valuta, quando è addebitabile e la scadenza,
+  // per avvisare il gestore (che addebita dal proprio POS/extranet) e tracciare l'addebito.
+  otaCard?: {
+    present: boolean;          // il canale ha fornito una carta virtuale per questa prenotazione
+    currency?: string;         // valuta della VCC
+    balance?: number;          // importo addebitabile sulla VCC
+    effectiveDate?: string;    // ISO — data da cui la carta è addebitabile
+    expirationDate?: string;   // ISO — scadenza della carta
+    charged?: boolean;         // il gestore l'ha addebitata (tracciamento manuale)
+  };
   webCheckin?: boolean; // l'ospite ha completato il check-in online
   movedFrom?: { structureId: string; structureName: string; at: string }; // spostata dal calendario da un'altra struttura (avviso)
   arrivalTime?: string; // orario di arrivo comunicato
