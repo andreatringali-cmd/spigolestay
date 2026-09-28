@@ -81,6 +81,7 @@ export const NAV: NavItem[] = [
   { label: "Fatture", href: "/abbonamento/fatture", group: "Il mio abbonamento", icon: "receipt", perm: "abbonamento", module: "pms" },
   { label: "Back-office", href: "/admin", group: "Il mio abbonamento", icon: "grid", perm: "abbonamento", module: "pms", ownerOnly: true },
   { label: "Accessi (invito)", href: "/admin/accessi", group: "Il mio abbonamento", icon: "lock", perm: "abbonamento", module: "pms", ownerOnly: true },
+  { label: "Certificazione Channex", href: "/admin/channex-cert", group: "Il mio abbonamento", icon: "share", perm: "abbonamento", module: "pms", ownerOnly: true },
 ];
 
 // Colore accento per categoria (palette terra: terracotta, oliva, ocra, tortora + accenti).
