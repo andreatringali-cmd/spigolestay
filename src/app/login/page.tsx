@@ -140,9 +140,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col bg-white px-6 pb-4 pt-10 text-[#1f1b16]">
       <main className="flex w-full flex-1 flex-col items-center justify-center">
         <div className="w-full max-w-sm">
-          {/* Logo centrato */}
-          <div className="mb-4 -mt-2 flex justify-center">
-            <Image src="/xenora-logo.png" alt="Xenora" width={210} height={58} priority className="object-contain" style={{ width: 210, height: "auto" }} />
+          {/* Logo centrato, largo poco meno dei campi */}
+          <div className="mb-4 -mt-6 flex justify-center">
+            <Image src="/xenora-logo.png" alt="Xenora" width={320} height={88} priority className="h-auto w-[82%] object-contain" />
           </div>
 
           {recovery ? (
@@ -240,18 +240,18 @@ export default function LoginPage() {
         </div>
       </main>
       <footer className="mt-6 flex flex-col items-center gap-2 border-t border-[#eceae4] px-2 pt-3 text-[11px] text-[#9a9186] sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 sm:justify-start">
-          <a href="/termini" className="hover:text-[#4a453d] hover:underline">Termini di servizio</a>
-          <span className="text-[#dcd6cc]">·</span>
-          <a href="/privacy" className="hover:text-[#4a453d] hover:underline">Informativa privacy</a>
-          <span className="text-[#dcd6cc]">·</span>
-          <a href="/cookie" className="hover:text-[#4a453d] hover:underline">Cookie</a>
-          <span className="text-[#dcd6cc]">·</span>
+        <div className="order-2 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 sm:order-1 sm:justify-start">
+          <a href="/termini" className="hidden hover:text-[#4a453d] hover:underline sm:inline">Termini di servizio</a>
+          <span className="hidden text-[#dcd6cc] sm:inline">·</span>
+          <a href="/privacy" className="hidden hover:text-[#4a453d] hover:underline sm:inline">Informativa privacy</a>
+          <span className="hidden text-[#dcd6cc] sm:inline">·</span>
+          <a href="/cookie" className="hidden hover:text-[#4a453d] hover:underline sm:inline">Cookie</a>
+          <span className="hidden text-[#dcd6cc] sm:inline">·</span>
           <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
           <span className="text-[#dcd6cc]">·</span>
           <span>© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="order-1 flex items-center gap-1.5 sm:order-2">
           {[
             { k: "facebook", u: "https://www.facebook.com", c: "#1877F2" },
             { k: "linkedin", u: "https://www.linkedin.com", c: "#0A66C2" },
