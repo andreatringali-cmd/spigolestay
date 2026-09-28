@@ -227,7 +227,7 @@ export default function LoginPage() {
               {mode === "login" ? (
                 <div className="mt-6 text-center">
                   <div className="text-[13px] text-[#4a453d] sm:whitespace-nowrap sm:text-sm">
-                    Non hai un account? Accesso su invito, <a href="https://xenoradigitalsolutions.it#contatti" target="_blank" rel="noreferrer" className="text-[#2f6bb0] hover:underline">richiedi la demo</a>.
+                    Non hai un account? <a href="https://xenoradigitalsolutions.it#contatti" target="_blank" rel="noreferrer" className="text-[#2f6bb0] hover:underline">Richiedi la demo</a>.
                   </div>
                   <div className="mt-2 text-[11px] text-[#9a9186]">© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</div>
                 </div>
