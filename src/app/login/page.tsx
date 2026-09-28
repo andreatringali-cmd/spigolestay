@@ -21,6 +21,14 @@ function afterLoginPath(): string {
 }
 type Provider = "google";
 
+// Glifi social (path SVG) — coerenti con il footer dell'app.
+const SOCIAL_PATHS: Record<string, string> = {
+  instagram: "M12 2c2.7 0 3 0 4.1.1 1 .1 1.7.2 2.3.5.6.2 1.1.5 1.6 1 .5.5.8 1 1 1.6.2.6.4 1.3.5 2.3.1 1.1.1 1.4.1 4.1s0 3-.1 4.1c-.1 1-.2 1.7-.5 2.3-.2.6-.5 1.1-1 1.6-.5.5-1 .8-1.6 1-.6.2-1.3.4-2.3.5-1.1.1-1.4.1-4.1.1s-3 0-4.1-.1c-1-.1-1.7-.2-2.3-.5-.6-.2-1.1-.5-1.6-1-.5-.5-.8-1-1-1.6-.2-.6-.4-1.3-.5-2.3C2 15 2 14.7 2 12s0-3 .1-4.1c.1-1 .2-1.7.5-2.3.2-.6.5-1.1 1-1.6.5-.5 1-.8 1.6-1 .6-.2 1.3-.4 2.3-.5C9 2 9.3 2 12 2zm0 1.8c-2.7 0-3 0-4 .1-.8 0-1.2.2-1.5.3-.4.1-.7.3-1 .6-.3.3-.5.6-.6 1-.1.3-.3.7-.3 1.5-.1 1-.1 1.3-.1 4s0 3 .1 4c0 .8.2 1.2.3 1.5.1.4.3.7.6 1 .3.3.6.5 1 .6.3.1.7.3 1.5.3 1 .1 1.3.1 4 .1s3 0 4-.1c.8 0 1.2-.2 1.5-.3.4-.1.7-.3 1-.6.3-.3.5-.6.6-1 .1-.3.3-.7.3-1.5.1-1 .1-1.3.1-4s0-3-.1-4c0-.8-.2-1.2-.3-1.5-.1-.4-.3-.7-.6-1-.3-.3-.6-.5-1-.6-.3-.1-.7-.3-1.5-.3-1-.1-1.3-.1-4-.1zm0 3.1a5.1 5.1 0 1 1 0 10.2 5.1 5.1 0 0 1 0-10.2zm0 1.8a3.3 3.3 0 1 0 0 6.6 3.3 3.3 0 0 0 0-6.6zm5.3-3.1a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z",
+  tiktok: "M16.5 3c.3 2.1 1.5 3.4 3.5 3.5v2.4c-1.2.1-2.3-.3-3.5-1v5.9c0 3.5-2.6 5.9-5.9 5.9-2.8 0-5.1-2-5.1-4.9 0-3 2.4-5 5.6-4.7v2.5c-.5-.1-1-.2-1.4-.1-1.2.2-2 1-1.9 2.3.1 1.2 1 2 2.2 1.9 1.3-.1 2.1-1 2.1-2.5V3h2.9z",
+  facebook: "M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.2c-1.2 0-1.6.8-1.6 1.6V12h2.7l-.4 2.9h-2.3v7A10 10 0 0 0 22 12z",
+  linkedin: "M20.4 3H3.6C3 3 2.5 3.5 2.5 4.1v15.8c0 .6.5 1.1 1.1 1.1h16.8c.6 0 1.1-.5 1.1-1.1V4.1c0-.6-.5-1.1-1.1-1.1zM8.3 18.3H5.6V9.5h2.7v8.8zM6.9 8.3a1.6 1.6 0 1 1 0-3.2 1.6 1.6 0 0 1 0 3.2zm11.4 10H15.6v-4.3c0-1 0-2.3-1.4-2.3s-1.6 1.1-1.6 2.2v4.4H9.9V9.5h2.6v1.2h.1c.4-.7 1.2-1.4 2.5-1.4 2.7 0 3.2 1.8 3.2 4.1v4.9z",
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
@@ -221,7 +229,7 @@ export default function LoginPage() {
 
               {mode === "login" ? (
                 <div className="mt-6 text-center text-sm text-[#4a453d]">
-                  Non hai un account? Accesso su invito, <a href="https://xenoradigitalsolutions.it" target="_blank" rel="noreferrer" className={linkCls}>richiedi la demo</a>.
+                  Non hai un account? Accesso su invito, <a href="https://xenoradigitalsolutions.it#contatti" target="_blank" rel="noreferrer" className={linkCls}>richiedi la demo</a>.
                 </div>
               ) : (
                 <div className="mt-6 text-center text-sm text-[#4a453d]">
@@ -234,6 +242,21 @@ export default function LoginPage() {
           )}
         </div>
       </main>
+      <footer className="flex flex-col items-center gap-2 px-4 pb-8 pt-2 text-center">
+        <div className="flex items-center gap-1">
+          {[
+            { k: "instagram", u: "https://www.instagram.com" },
+            { k: "tiktok", u: "https://www.tiktok.com" },
+            { k: "facebook", u: "https://www.facebook.com" },
+            { k: "linkedin", u: "https://www.linkedin.com" },
+          ].map((s) => (
+            <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.k} className="grid h-8 w-8 place-items-center rounded-full text-[#a8a094] transition hover:bg-[#f2eee6] hover:text-[#4a453d]">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d={SOCIAL_PATHS[s.k]} /></svg>
+            </a>
+          ))}
+        </div>
+        <span className="text-[11px] text-[#a8a094]">© {new Date().getFullYear()} Xenora · All rights reserved</span>
+      </footer>
     </div>
   );
 }
