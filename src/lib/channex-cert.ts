@@ -52,6 +52,7 @@ export interface CertCombo { roomTypeId: string; roomTitle: string; ratePlanId: 
 
 export interface CertContext {
   propertyId: string;
+  propertyTitle: string;
   structureId: string;
   roomTypes: CertRoomType[];
   combos: CertCombo[];
@@ -253,6 +254,7 @@ async function testPropertyContext(): Promise<CertContext | null> {
   if (!found) return null;
 
   const propertyId = String(found.id);
+  const propertyTitle = String(found.attributes?.title ?? TEST_PROPERTY_TITLE);
   const rtRes = await listRoomTypesFor(propertyId);
   if (!rtRes.ok) return null;
   const roomRows = (rtRes.data?.data ?? []) as ChannexListRow[];
@@ -267,7 +269,7 @@ async function testPropertyContext(): Promise<CertContext | null> {
       combos.push({ roomTypeId: rt.roomTypeId, roomTitle: rt.roomTitle, ratePlanId: String(rp.id), ratePlanTitle: String(rp.attributes?.title ?? rp.id) });
     }
   }
-  return { propertyId, structureId: "", roomTypes, combos };
+  return { propertyId, propertyTitle, structureId: "", roomTypes, combos };
 }
 
 export async function resolveCertContext(admin: SupabaseClient, tenantId: string): Promise<CertContext | { error: string }> {
@@ -288,6 +290,14 @@ export async function resolveCertContext(admin: SupabaseClient, tenantId: string
   const propertyId = String(map.channex_property_id);
   const structureId = String(map.structure_id ?? "");
 
+  // Titolo della property reale (per chiarezza nel form): lo cerchiamo nell'elenco property.
+  let propertyTitle = propertyId;
+  const propsList = await listProperties();
+  if (propsList.ok) {
+    const p = (propsList.data?.data ?? []).find((x) => String(x.id) === propertyId);
+    if (p) propertyTitle = String(p.attributes?.title ?? propertyId);
+  }
+
   const rtRes = await listRoomTypesFor(propertyId);
   if (!rtRes.ok) return { error: `Impossibile leggere le tipologie camera da Channex: ${rtRes.error ?? rtRes.status}` };
   const roomRows = (rtRes.data?.data ?? []) as ChannexListRow[];
@@ -303,7 +313,7 @@ export async function resolveCertContext(admin: SupabaseClient, tenantId: string
       combos.push({ roomTypeId: rt.roomTypeId, roomTitle: rt.roomTitle, ratePlanId: String(rp.id), ratePlanTitle: String(rp.attributes?.title ?? rp.id) });
     }
   }
-  return { propertyId, structureId, roomTypes, combos };
+  return { propertyId, propertyTitle, structureId, roomTypes, combos };
 }
 
 // ── Helper per date/valori ────────────────────────────────────────────────

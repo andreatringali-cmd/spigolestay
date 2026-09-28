@@ -34,6 +34,12 @@ interface TestPropertySetup {
   errors: string[];
 }
 
+// Contesto REALE su cui girano gli scenari (property + tipologie + piani con i loro ID Channex).
+// È ciò che va incollato nel form di certificazione (pagina "Setup Property").
+interface CertRoomType { roomTypeId: string; roomTitle: string }
+interface CertCombo { roomTypeId: string; roomTitle: string; ratePlanId: string; ratePlanTitle: string }
+interface CertContext { propertyId: string; propertyTitle: string; roomTypes: CertRoomType[]; combos: CertCombo[] }
+
 interface ScenarioMeta { id: ScenarioId; name: string; desc: string }
 const SCENARIOS: ScenarioMeta[] = [
   { id: "1", name: "Full Data Sync", desc: "500 giorni di disponibilità + tariffe + restrizioni per tutte le camere e piani, in 2 chiamate (1 availability, 1 restrictions). Valori realistici variabili per data." },
@@ -66,6 +72,31 @@ export default function ChannexCertPage() {
   const [setup, setSetup] = useState<TestPropertySetup | undefined>();
   const [setupErr, setSetupErr] = useState<string>("");
   const [settingUp, setSettingUp] = useState(false);
+  const [ctx, setCtx] = useState<CertContext | undefined>();
+  const [ctxErr, setCtxErr] = useState<string>("");
+  const [loadingCtx, setLoadingCtx] = useState(false);
+
+  const loadContext = async () => {
+    setLoadingCtx(true);
+    setCtxErr("");
+    try {
+      const token = await authToken();
+      if (!token) { setCtxErr("Sessione scaduta: rientra."); return; }
+      const res = await fetch("/api/channex/cert/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "context" }),
+      });
+      if (res.status === 403) { setForbidden(true); return; }
+      const d = await res.json().catch(() => null) as { ok?: boolean; context?: CertContext; error?: string } | null;
+      if (d?.ok && d.context) setCtx(d.context);
+      else setCtxErr(d?.error || `Errore ${res.status}`);
+    } catch {
+      setCtxErr("Errore di rete.");
+    } finally {
+      setLoadingCtx(false);
+    }
+  };
 
   const setupTestProperty = async () => {
     setSettingUp(true);
@@ -146,7 +177,83 @@ export default function ChannexCertPage() {
       <Card className="mb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="font-semibold text-txt">Property di test per la certificazione</div>
+            <div className="font-semibold text-txt">① ID per il form (property reale su Channex)</div>
+            <p className="mt-1 text-[13px] text-dim">
+              Via <strong>consigliata</strong> per un B&amp;B (confermata da Channex): si certifica sulla
+              struttura <strong>reale</strong> già collegata, senza creare una property Twin/Double di test.
+              Questo pulsante legge (in sola lettura) property, tipologie e piani tariffari presenti su Channex
+              e mostra gli <strong>ID esatti</strong> da incollare nel form. È anche la diagnostica: ti dice
+              cosa vede davvero Xenora su Channex.
+            </p>
+          </div>
+          <button
+            onClick={loadContext}
+            disabled={loadingCtx}
+            className="shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            style={{ backgroundColor: "var(--focus)" }}
+          >
+            {loadingCtx ? "Leggo…" : "Mostra ID Channex"}
+          </button>
+        </div>
+
+        {ctxErr && <div className="mt-3 text-[13px]" style={{ color: "var(--err)" }}>⚠ {ctxErr}</div>}
+
+        {ctx && (
+          <div className="mt-3 rounded-lg border border-line bg-surface p-3 text-[13px]">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>
+                {ctx.propertyTitle}
+              </span>
+              <span className="text-[11px] text-faint">{ctx.roomTypes.length} tipologie · {ctx.combos.length} piani tariffari</span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="rounded-md border border-line/60 bg-paper p-2">
+                <div className="text-[11px] font-semibold text-dim">Property ID at Channex</div>
+                <div className="mt-1 flex items-center gap-2">
+                  <code className="select-all break-all rounded bg-wash px-1.5 py-0.5 text-[12px] text-txt">{ctx.propertyId}</code>
+                  <button onClick={() => copy(ctx.propertyId, "ctx-prop")} className="shrink-0 rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">
+                    {copied === "ctx-prop" ? "Copiato ✓" : "Copia"}
+                  </button>
+                </div>
+              </div>
+
+              {ctx.roomTypes.map((rt) => (
+                <div key={rt.roomTypeId} className="rounded-md border border-line/60 bg-paper p-2">
+                  <div className="text-[11px] font-semibold text-dim">Room type · {rt.roomTitle}</div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <code className="select-all break-all rounded bg-wash px-1.5 py-0.5 text-[12px] text-txt">{rt.roomTypeId}</code>
+                    <button onClick={() => copy(rt.roomTypeId, `ctx-rt-${rt.roomTypeId}`)} className="shrink-0 rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">
+                      {copied === `ctx-rt-${rt.roomTypeId}` ? "Copiato ✓" : "Copia"}
+                    </button>
+                  </div>
+                  {ctx.combos.filter((c) => c.roomTypeId === rt.roomTypeId).map((c) => (
+                    <div key={c.ratePlanId} className="mt-1 flex items-center gap-2 pl-3">
+                      <span className="text-[11px] text-faint">Rate plan · {c.ratePlanTitle}</span>
+                      <code className="select-all break-all rounded bg-wash px-1.5 py-0.5 text-[12px] text-txt">{c.ratePlanId}</code>
+                      <button onClick={() => copy(c.ratePlanId, `ctx-rp-${c.ratePlanId}`)} className="shrink-0 rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">
+                        {copied === `ctx-rp-${c.ratePlanId}` ? "Copiato ✓" : "Copia"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            <p className="mt-3 text-[11px] text-faint">
+              Incolla questi ID nella pagina &quot;Setup Property&quot; del form. Gli scenari qui sotto girano
+              automaticamente su <strong>questa</strong> property. Nota EN da mettere nel form: &quot;Xenora is a PMS
+              for small B&amp;Bs; staging mirrors our real model. Tests assuming multi room/rate were run against our
+              real (smaller) room/rate set, reusing available combinations.&quot;
+            </p>
+          </div>
+        )}
+      </Card>
+
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-txt">② Property di test dedicata (opzionale)</div>
             <p className="mt-1 text-[13px] text-dim">
               La certificazione richiede una property <strong>dedicata e separata</strong> dalla struttura reale.
               Questo pulsante la crea su Channex (staging) con la spec richiesta e mostra gli ID da incollare nel form.

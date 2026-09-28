@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { channexEnabled } from "@/lib/channex";
-import { runCertScenario, setupTestProperty, SCENARIO_IDS, type ScenarioId } from "@/lib/channex-cert";
+import { runCertScenario, setupTestProperty, resolveCertContext, SCENARIO_IDS, type ScenarioId } from "@/lib/channex-cert";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +37,23 @@ export async function POST(req: Request) {
   if (body?.action === "setup-test-property") {
     const setup = await setupTestProperty();
     return NextResponse.json({ ok: setup.ok, setup }, { status: 200 });
+  }
+
+  // Azione: mostra gli ID REALI su cui gireranno gli scenari (property + tipologie + piani
+  // tariffari, con id e titolo). Read-only: non crea né modifica nulla su Channex. Serve a
+  // compilare il form di certificazione con gli ID veri (property di test se esiste, altrimenti
+  // la struttura reale collegata) e a diagnosticare cosa "vede" davvero Xenora su Channex.
+  if (body?.action === "context") {
+    const ctx = await resolveCertContext(admin, caller.id);
+    if ("error" in ctx) return NextResponse.json({ ok: false, error: ctx.error }, { status: 200 });
+    return NextResponse.json({
+      ok: true,
+      context: {
+        propertyId: ctx.propertyId,
+        roomTypes: ctx.roomTypes,
+        combos: ctx.combos,
+      },
+    }, { status: 200 });
   }
 
   const scenario = String(body?.scenario || "") as ScenarioId;
