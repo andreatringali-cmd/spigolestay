@@ -137,9 +137,9 @@ export default function LoginPage() {
   const linkCls = "font-semibold text-[#2f6bb0] hover:underline";
 
   return (
-    <div className="login-bg relative flex flex-col overflow-hidden px-6 pb-3 pt-6 text-[#1f1b16]">
+    <div className="login-bg relative flex flex-col overflow-hidden px-6 py-6 text-[#1f1b16]">
       <main className="relative flex w-full min-h-0 flex-1 flex-col items-center justify-center overflow-x-hidden overflow-y-auto">
-        <div className="w-full max-w-md rounded-3xl border border-[#eceae4] bg-white px-6 pb-6 pt-3 shadow-[0_20px_50px_-28px_rgba(31,27,22,0.35)] sm:px-8 sm:pb-8 sm:pt-4">
+        <div className="w-full max-w-md rounded-3xl border border-[#eceae4] bg-white px-6 py-6 shadow-[0_20px_50px_-28px_rgba(31,27,22,0.35)] sm:px-8 sm:py-8">
           {/* Logo centrato, dimensioni invariate */}
           <div className="mb-4 flex justify-center">
             <Image src="/xenora-logo.png" alt="Xenora" width={220} height={62} priority className="object-contain" style={{ width: 220, height: "auto" }} />
@@ -266,7 +266,7 @@ export default function LoginPage() {
 
       <style>{`
         html,body{overscroll-behavior-y:none}
-        .login-bg{height:100vh;height:100dvh;background:linear-gradient(180deg,#e9edf5 0%,#ffffff 100%)}
+        .login-bg{height:100vh;height:100dvh;background:linear-gradient(180deg,#FAF9F7 0%,#ffffff 100%)}
       `}</style>
     </div>
   );
