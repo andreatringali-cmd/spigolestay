@@ -137,9 +137,14 @@ export default function LoginPage() {
   const linkCls = "font-semibold text-[#2f6bb0] hover:underline";
 
   return (
-    <div className="flex min-h-screen flex-col bg-white px-6 pb-4 pt-10 text-[#1f1b16]">
-      <main className="flex w-full flex-1 flex-col items-center justify-center">
-        <div className="w-full max-w-sm">
+    <div className="login-bg relative flex min-h-screen flex-col overflow-hidden px-6 pb-4 pt-10 text-[#1f1b16]">
+      <div className="login-blobs pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <span className="blob blob-1" />
+        <span className="blob blob-2" />
+        <span className="blob blob-3" />
+      </div>
+      <main className="relative flex w-full flex-1 flex-col items-center justify-center">
+        <div className="w-full max-w-sm rounded-3xl bg-white/70 p-6 shadow-[0_20px_60px_-24px_rgba(80,60,140,0.25)] backdrop-blur-xl sm:p-8">
           {/* Logo centrato, largo poco meno dei campi */}
           <div className="mb-4 -mt-6 flex justify-center">
             <Image src="/xenora-logo.png" alt="Xenora" width={320} height={88} priority className="h-auto w-[82%] object-contain" />
@@ -239,31 +244,60 @@ export default function LoginPage() {
           )}
         </div>
       </main>
-      <footer className="mt-6 flex flex-col items-center gap-2 border-t border-[#eceae4] px-2 pt-3 text-[11px] text-[#9a9186] sm:flex-row sm:items-center sm:justify-between">
-        <div className="order-2 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 sm:order-1 sm:justify-start">
-          <a href="/termini" className="hidden hover:text-[#4a453d] hover:underline sm:inline">Termini di servizio</a>
-          <span className="hidden text-[#dcd6cc] sm:inline">·</span>
-          <a href="/privacy" className="hidden hover:text-[#4a453d] hover:underline sm:inline">Informativa privacy</a>
-          <span className="hidden text-[#dcd6cc] sm:inline">·</span>
-          <a href="/cookie" className="hidden hover:text-[#4a453d] hover:underline sm:inline">Cookie</a>
-          <span className="hidden text-[#dcd6cc] sm:inline">·</span>
+      <footer className="mt-6 border-t border-[#eceae4] px-2 pt-3 text-[11px] text-[#9a9186]">
+        {/* Mobile: riga 1 = sito + social a destra · riga 2 = copyright, centrato */}
+        <div className="flex items-center justify-between gap-2 sm:hidden">
           <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
-          <span className="text-[#dcd6cc]">·</span>
-          <span>© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</span>
+          <SocialIcons />
         </div>
-        <div className="order-1 flex items-center gap-1.5 sm:order-2">
-          {[
-            { k: "facebook", u: "https://www.facebook.com", c: "#1877F2" },
-            { k: "linkedin", u: "https://www.linkedin.com", c: "#0A66C2" },
-            { k: "instagram", u: "https://www.instagram.com", c: "#E4405F" },
-            { k: "tiktok", u: "https://www.tiktok.com", c: "#010101" },
-          ].map((s) => (
-            <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.k} style={{ color: s.c }} className="grid h-7 w-7 place-items-center rounded-lg border border-[#e6e1d8] transition hover:bg-[#f2eee6] hover:opacity-90">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d={SOCIAL_PATHS[s.k]} /></svg>
-            </a>
-          ))}
+        <div className="mt-1.5 text-center sm:hidden">© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</div>
+
+        {/* Desktop: tutto su una riga */}
+        <div className="hidden sm:flex sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <a href="/termini" className="hover:text-[#4a453d] hover:underline">Termini di servizio</a>
+            <span className="text-[#dcd6cc]">·</span>
+            <a href="/privacy" className="hover:text-[#4a453d] hover:underline">Informativa privacy</a>
+            <span className="text-[#dcd6cc]">·</span>
+            <a href="/cookie" className="hover:text-[#4a453d] hover:underline">Cookie</a>
+            <span className="text-[#dcd6cc]">·</span>
+            <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
+            <span className="text-[#dcd6cc]">·</span>
+            <span>© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</span>
+          </div>
+          <SocialIcons />
         </div>
       </footer>
+
+      <style>{`
+        .login-bg{background:#f6f3ff}
+        .login-blobs .blob{position:absolute;border-radius:9999px;filter:blur(70px);opacity:.55;will-change:transform}
+        .login-blobs .blob-1{top:-12%;left:-10%;width:52vw;height:52vw;max-width:620px;max-height:620px;background:radial-gradient(circle at 35% 35%,#ffd6ec,#ffb3d9 55%,transparent 75%);animation:loginFloat1 26s ease-in-out infinite}
+        .login-blobs .blob-2{bottom:-16%;right:-12%;width:56vw;height:56vw;max-width:680px;max-height:680px;background:radial-gradient(circle at 60% 40%,#c9d6ff,#8fa8ff 55%,transparent 75%);animation:loginFloat2 32s ease-in-out infinite}
+        .login-blobs .blob-3{top:32%;left:38%;width:44vw;height:44vw;max-width:520px;max-height:520px;background:radial-gradient(circle at 50% 50%,#e6d1ff,#b98bff 55%,transparent 75%);animation:loginFloat3 29s ease-in-out infinite}
+        @keyframes loginFloat1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6vw,5vh) scale(1.08)}}
+        @keyframes loginFloat2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-5vw,-6vh) scale(1.1)}}
+        @keyframes loginFloat3{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-46%,-54%) scale(1.12)}}
+        .login-blobs .blob-3{transform:translate(-50%,-50%)}
+        @media (prefers-reduced-motion: reduce){.login-blobs .blob{animation:none !important}}
+      `}</style>
+    </div>
+  );
+}
+
+function SocialIcons() {
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      {[
+        { k: "facebook", u: "https://www.facebook.com", c: "#1877F2" },
+        { k: "linkedin", u: "https://www.linkedin.com", c: "#0A66C2" },
+        { k: "instagram", u: "https://www.instagram.com", c: "#E4405F" },
+        { k: "tiktok", u: "https://www.tiktok.com", c: "#010101" },
+      ].map((s) => (
+        <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.k} style={{ color: s.c }} className="grid h-7 w-7 place-items-center rounded-lg border border-[#e6e1d8] transition hover:bg-[#f2eee6] hover:opacity-90">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d={SOCIAL_PATHS[s.k]} /></svg>
+        </a>
+      ))}
     </div>
   );
 }
