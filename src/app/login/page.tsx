@@ -140,9 +140,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-col bg-white px-6 pb-4 pt-10 text-[#1f1b16]">
       <main className="flex w-full flex-1 flex-col items-center justify-center">
         <div className="w-full max-w-sm">
-          {/* Logo allineato a sinistra, come i campi */}
-          <div className="mb-3 mt-2 flex">
-            <Image src="/xenora-logo.png" alt="Xenora" width={170} height={48} priority className="object-contain" style={{ width: 170, height: "auto" }} />
+          {/* Logo centrato */}
+          <div className="mb-5 mt-2 flex justify-center">
+            <Image src="/xenora-logo.png" alt="Xenora" width={180} height={50} priority className="object-contain" style={{ width: 180, height: "auto" }} />
           </div>
 
           {recovery ? (
@@ -164,10 +164,7 @@ export default function LoginPage() {
             </>
           ) : (
             <>
-              <h1 className="text-2xl font-bold tracking-tight">{mode === "login" ? "Accedi al tuo account" : "Crea il tuo account"}</h1>
-              <p className="mt-1 text-sm text-[#6b6459]">{mode === "login" ? "Bentornato. Inserisci le tue credenziali." : "Bastano pochi dati per iniziare."}</p>
-
-              <form onSubmit={submit} className="mt-6">
+              <form onSubmit={submit} className="mt-2">
                 {mode === "signup" && (
                   <label className="mb-3 block">
                     <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Nome e cognome</span>
@@ -243,16 +240,15 @@ export default function LoginPage() {
         </div>
       </main>
       <footer className="mt-6 flex flex-col items-center gap-2 border-t border-[#eceae4] px-2 pt-3 text-[11px] text-[#9a9186] sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col items-center gap-0.5 sm:items-start">
-          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 sm:justify-start">
-            <a href="/termini" className="hover:text-[#4a453d] hover:underline">Termini di servizio</a>
-            <span className="text-[#dcd6cc]">·</span>
-            <a href="/privacy" className="hover:text-[#4a453d] hover:underline">Informativa privacy</a>
-            <span className="text-[#dcd6cc]">·</span>
-            <a href="/cookie" className="hover:text-[#4a453d] hover:underline">Cookie</a>
-            <span className="text-[#dcd6cc]">·</span>
-            <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
-          </div>
+        <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 sm:justify-start">
+          <a href="/termini" className="hover:text-[#4a453d] hover:underline">Termini di servizio</a>
+          <span className="text-[#dcd6cc]">·</span>
+          <a href="/privacy" className="hover:text-[#4a453d] hover:underline">Informativa privacy</a>
+          <span className="text-[#dcd6cc]">·</span>
+          <a href="/cookie" className="hover:text-[#4a453d] hover:underline">Cookie</a>
+          <span className="text-[#dcd6cc]">·</span>
+          <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
+          <span className="text-[#dcd6cc]">·</span>
           <span>© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</span>
         </div>
         <div className="flex items-center gap-1.5">
