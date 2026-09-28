@@ -25,7 +25,7 @@ export function buildAriPayload(
   units: Unit[],
   bookings: Booking[],
   rateOverrides: Record<string, number>,
-  opts?: { days?: number; weekendPct?: number; closes?: Record<string, number> },
+  opts?: { days?: number; weekendPct?: number; closes?: Record<string, number>; cta?: Record<string, true>; ctd?: Record<string, true> },
 ): { availability: AvailRow[]; restrictions: RestrictionRow[] } {
   const availability: AvailRow[] = [];
   const restrictions: RestrictionRow[] = [];
@@ -38,6 +38,10 @@ export function buildAriPayload(
   // giorno (può essere negativo = overbooking volontario, più camere offerte del reale). Stessa
   // chiave del calendario ("spigolestay:calcloses"): `${roomTypeId}|${iso}`.
   const closes = opts?.closes ?? {};
+  // Restrizioni OTA impostate dall'owner sul calendario (mappa `${roomTypeId}|${iso}` → true):
+  // chiuso all'arrivo (nessun check-in) e chiuso alla partenza (nessun check-out) per quel giorno.
+  const cta = opts?.cta ?? {};
+  const ctd = opts?.ctd ?? {};
   const base0 = new Date();
   for (const rt of rts) {
     const mp = map.rooms![rt.id];
@@ -69,8 +73,12 @@ export function buildAriPayload(
         // camere chiuse a mano ≥ camere totali della tipologia (nessuna camera realmente vendibile).
         // Il guardia totalUnits > 0 evita di marcare stop_sell per il caso degenere 0 ≥ 0.
         if (typeClosed || (totalUnits > 0 && closed >= totalUnits)) row.stop_sell = true;
-        // max_stay / closed_to_arrival / closed_to_departure: NON inviati — Xenora non ha ancora
-        // un dato reale per queste restrizioni, quindi non li inventiamo.
+        // closed_to_arrival / closed_to_departure: inviati SOLO quando l'owner li ha attivati per
+        // quel (tipologia, giorno). Come per gli altri campi, si spedisce solo il valore true quando
+        // serve (campo omesso quando assente, per non sovrascrivere le impostazioni del canale).
+        if (cta[`${rt.id}|${iso}`]) row.closed_to_arrival = true;
+        if (ctd[`${rt.id}|${iso}`]) row.closed_to_departure = true;
+        // max_stay: NON inviato — Xenora non ha ancora un dato reale per questa restrizione.
         restrictions.push(row);
       }
     }

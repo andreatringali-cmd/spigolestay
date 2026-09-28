@@ -252,13 +252,20 @@ export default function CalendarGrid() {
   const [pick, setPick] = useState<null | { unitId: string; structureId: string; roomTypeId: string; from: string; to: string }>(null);
   const [evDraft, setEvDraft] = useState<null | { id?: string; name: string; from: string; to: string; color: string }>(null);
   const [rateEdit, setRateEdit] = useState<null | { typeId: string; typeIds?: string[]; from: string; to: string; mode: "fixed" | "percent"; value: number }>(null);
-  const [availEdit, setAvailEdit] = useState<null | { typeId: string; from: string; to: string; closed: number }>(null);
+  const [availEdit, setAvailEdit] = useState<null | { typeId: string; from: string; to: string; closed: number; cta: boolean; ctd: boolean }>(null);
   const [availStr, setAvailStr] = useState<string | null>(null); // valore digitato manualmente nel campo camere (null = usa il derivato)
   // Chiusure vendita manuali per (tipologia, giorno): quante camere chiudere. Persistite.
   const [closes, setCloses] = useState<Record<string, number>>({});
   useEffect(() => { try { const r = localStorage.getItem("spigolestay:calcloses"); if (r) setCloses(JSON.parse(r)); } catch {} }, []);
   const persistCloses = (next: Record<string, number>) => { setCloses(next); try { localStorage.setItem("spigolestay:calcloses", JSON.stringify(next)); } catch {} try { window.dispatchEvent(new Event("spigolestay:channex-dirty")); } catch {} };
   const closeKey = (typeId: string, iso: string) => `${typeId}|${iso}`;
+  // Restrizioni OTA per (tipologia, giorno): chiuso all'arrivo (CTA) e chiuso alla partenza (CTD).
+  // Stessa chiave delle chiusure vendita (`${roomTypeId}|${iso}`); mappa Record<string, true> = solo giorni chiusi.
+  const [cta, setCta] = useState<Record<string, true>>({});
+  const [ctd, setCtd] = useState<Record<string, true>>({});
+  useEffect(() => { try { const r = localStorage.getItem("spigolestay:calcta"); if (r) setCta(JSON.parse(r)); } catch {} try { const r = localStorage.getItem("spigolestay:calctd"); if (r) setCtd(JSON.parse(r)); } catch {} }, []);
+  const persistCta = (next: Record<string, true>) => { setCta(next); try { localStorage.setItem("spigolestay:calcta", JSON.stringify(next)); } catch {} try { window.dispatchEvent(new Event("spigolestay:channex-dirty")); } catch {} };
+  const persistCtd = (next: Record<string, true>) => { setCtd(next); try { localStorage.setItem("spigolestay:calctd", JSON.stringify(next)); } catch {} try { window.dispatchEvent(new Event("spigolestay:channex-dirty")); } catch {} };
 
   const selAnchor = sel?.anchor ?? null;
   const selLo = selAnchor ? (selAnchor <= (selHover ?? selAnchor) ? selAnchor : (selHover ?? selAnchor)) : null;
@@ -279,7 +286,7 @@ export default function CalendarGrid() {
     setSel({ kind: "rate", typeId, anchor: iso }); setSelHover(iso);
   };
   const clickAvail = (typeId: string, iso: string) => {
-    if (sel?.kind === "avail" && sel.typeId === typeId && selLo && selHi) { const tp = sel.typeId; setSel(null); setSelHover(null); setAvailEdit({ typeId: tp, from: selLo, to: selHi, closed: closes[closeKey(tp, selLo)] ?? 0 }); return; }
+    if (sel?.kind === "avail" && sel.typeId === typeId && selLo && selHi) { const tp = sel.typeId; setSel(null); setSelHover(null); setAvailEdit({ typeId: tp, from: selLo, to: selHi, closed: closes[closeKey(tp, selLo)] ?? 0, cta: !!cta[closeKey(tp, selLo)], ctd: !!ctd[closeKey(tp, selLo)] }); return; }
     setSel({ kind: "avail", typeId, anchor: iso }); setSelHover(iso);
   };
   const clickCell = (unit: { id: string; roomTypeId: string }, structureId: string, iso: string) => {
@@ -306,8 +313,16 @@ export default function CalendarGrid() {
   const saveAvail = () => {
     if (!availEdit) return;
     const next = { ...closes };
-    for (const iso of rangeIsos(availEdit.from, availEdit.to)) { const k = closeKey(availEdit.typeId, iso); if (availEdit.closed !== 0) next[k] = Math.round(availEdit.closed); else delete next[k]; }
-    persistCloses(next); setAvailEdit(null);
+    // Restrizioni OTA: imposta/rimuove CTA e CTD per ogni giorno dell'intervallo, specularmente alle chiusure.
+    const nextCta = { ...cta };
+    const nextCtd = { ...ctd };
+    for (const iso of rangeIsos(availEdit.from, availEdit.to)) {
+      const k = closeKey(availEdit.typeId, iso);
+      if (availEdit.closed !== 0) next[k] = Math.round(availEdit.closed); else delete next[k];
+      if (availEdit.cta) nextCta[k] = true; else delete nextCta[k];
+      if (availEdit.ctd) nextCtd[k] = true; else delete nextCtd[k];
+    }
+    persistCloses(next); persistCta(nextCta); persistCtd(nextCtd); setAvailEdit(null);
   };
   const saveEvent = () => {
     if (!evDraft || !evDraft.name.trim()) return;
@@ -1648,6 +1663,17 @@ export default function CalendarGrid() {
                   </>
                 );
               })()}
+              {/* Restrizioni OTA: chiuso all'arrivo (CTA) e chiuso alla partenza (CTD) per il periodo selezionato. */}
+              <div className="mt-3 space-y-2">
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-line bg-paper px-3 py-2 text-xs">
+                  <span className="font-medium text-txt">Chiuso all&apos;arrivo (CTA) <span className="font-normal text-faint">· niente check-in nel periodo</span></span>
+                  <input type="checkbox" checked={availEdit.cta} onChange={(e) => setAvailEdit({ ...availEdit, cta: e.target.checked })} className="h-4 w-4 shrink-0 accent-[color:var(--focus)]" />
+                </label>
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-line bg-paper px-3 py-2 text-xs">
+                  <span className="font-medium text-txt">Chiuso alla partenza (CTD) <span className="font-normal text-faint">· niente check-out nel periodo</span></span>
+                  <input type="checkbox" checked={availEdit.ctd} onChange={(e) => setAvailEdit({ ...availEdit, ctd: e.target.checked })} className="h-4 w-4 shrink-0 accent-[color:var(--focus)]" />
+                </label>
+              </div>
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button onClick={() => setAvailEdit(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>
                 <button onClick={saveAvail} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Applica</button>

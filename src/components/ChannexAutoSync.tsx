@@ -12,6 +12,8 @@ import { apiPost } from "@/lib/invoicing/client";
 // Montato nell'AppShell: gira sempre, indipendentemente dalla pagina aperta.
 const CHX_MAP_KEY = "spigolestay:channexmap";
 const CLOSES_KEY = "spigolestay:calcloses";
+const CTA_KEY = "spigolestay:calcta";
+const CTD_KEY = "spigolestay:calctd";
 const DEBOUNCE_MS = 4000;
 // Snapshot dell'ultimo ARI inviato con successo, per struttura. Serve al DELTA: prima di inviare
 // calcoliamo la finestra completa, la confrontiamo con lo snapshot e spediamo SOLO le righe cambiate.
@@ -66,6 +68,11 @@ export default function ChannexAutoSync() {
         try { weekendPct = JSON.parse(localStorage.getItem("spigolestay:pricerules") || "{}").weekendPct ?? 25; } catch {}
         let closes: Record<string, number> = {};
         try { closes = JSON.parse(localStorage.getItem(CLOSES_KEY) || "{}"); } catch {}
+        // Restrizioni OTA impostate dall'owner (chiuso all'arrivo / alla partenza), fuori dallo stato condiviso.
+        let cta: Record<string, true> = {};
+        try { cta = JSON.parse(localStorage.getItem(CTA_KEY) || "{}"); } catch {}
+        let ctd: Record<string, true> = {};
+        try { ctd = JSON.parse(localStorage.getItem(CTD_KEY) || "{}"); } catch {}
         const { roomTypes: rt, units: un, bookings: bk, rateOverrides: ro } = dataRef.current;
 
         const snapshots = loadJSON<SnapshotStore>(SNAPSHOT_KEY, {});
@@ -74,7 +81,7 @@ export default function ChannexAutoSync() {
 
         for (const [sid, map] of linked) {
           // Finestra COMPLETA 500 giorni (una sola build: da qui si ricava full o delta).
-          const { availability, restrictions } = buildAriPayload(map, sid, rt, un, bk, ro, { days: FULL_DAYS, weekendPct, closes });
+          const { availability, restrictions } = buildAriPayload(map, sid, rt, un, bk, ro, { days: FULL_DAYS, weekendPct, closes, cta, ctd });
           if (availability.length === 0 && restrictions.length === 0) continue;
 
           const snap = snapshots[sid];
