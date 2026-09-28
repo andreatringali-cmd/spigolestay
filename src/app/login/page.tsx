@@ -266,7 +266,7 @@ export default function LoginPage() {
 
       <style>{`
         html,body{overscroll-behavior-y:none}
-        .login-bg{height:100vh;height:100dvh;background:linear-gradient(180deg,#ffffff 0%,#eef0f5 100%)}
+        .login-bg{height:100vh;height:100dvh;background:linear-gradient(180deg,#e9edf5 0%,#ffffff 100%)}
       `}</style>
     </div>
   );
