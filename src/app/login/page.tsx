@@ -34,6 +34,7 @@ export default function LoginPage() {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [recovery, setRecovery] = useState(false);
+  const [denied, setDenied] = useState(false); // l'utente ha tentato l'accesso ma non è abilitato (su invito)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaKey, setCaptchaKey] = useState(0); // cambiando la key si rigenera il token (monouso)
   const resetCaptcha = () => { setCaptchaToken(null); setCaptchaKey((k) => k + 1); };
@@ -55,6 +56,9 @@ export default function LoginPage() {
     }
     supabase.auth.getSession().then(({ data }) => { if (data.session) router.replace(afterLoginPath()); });
   }, [router]);
+
+  // Se il cancello di accesso ha rifiutato l'utente (registrazione su invito), mostra l'avviso.
+  useEffect(() => { try { if (localStorage.getItem("xn-access-denied")) setDenied(true); } catch {} }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,6 +197,12 @@ export default function LoginPage() {
 
                 {TURNSTILE_SITE_KEY && <Turnstile key={captchaKey} siteKey={TURNSTILE_SITE_KEY} onToken={setCaptchaToken} />}
 
+                {denied && (
+                  <div className="mt-4 rounded-lg border border-[#e6cfa2] bg-[#fbf3e2] px-3 py-2.5 text-[13px] text-[#8a6d1f]">
+                    Il tuo account non è ancora abilitato. Xenora è ad <strong>accesso su invito</strong>: {" "}
+                    <a href="https://www.xenoradigitalsolutions.it" target="_blank" rel="noreferrer" className={linkCls}>richiedi una demo</a> per ottenere l&apos;accesso.
+                  </div>
+                )}
                 {err && <div className="mt-4 rounded-lg border border-[#f0c2c2] bg-[#fdf1f1] px-3 py-2.5 text-[13px] font-medium text-[#c0392b]">{err}</div>}
                 {info && <div className="mt-4 rounded-lg border border-[#e2ded7] bg-[#f6f4f1] px-3 py-2.5 text-[13px] text-[#4a453d]">{info}</div>}
 
@@ -211,7 +221,7 @@ export default function LoginPage() {
 
               <div className="mt-6 text-center text-sm text-[#4a453d]">
                 {mode === "login" ? (
-                  <>Non hai ancora un account? <a href="https://www.xenoradigitalsolutions.it" target="_blank" rel="noreferrer" className={linkCls}>Contattaci</a></>
+                  <>Non hai ancora un account? <a href="https://www.xenoradigitalsolutions.it" target="_blank" rel="noreferrer" className={linkCls}>Contattaci e richiedi una demo</a></>
                 ) : (
                   <>Hai già un account? <button onClick={() => { setMode("login"); setErr(null); setInfo(null); }} className={linkCls}>Accedi</button></>
                 )}
