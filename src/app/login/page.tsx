@@ -146,7 +146,7 @@ export default function LoginPage() {
       <main className="relative flex w-full flex-1 flex-col items-center justify-center">
         <div className="w-full max-w-md rounded-3xl bg-white/70 p-6 shadow-[0_20px_60px_-24px_rgba(80,60,140,0.25)] backdrop-blur-xl sm:p-8">
           {/* Logo allineato a sinistra, dimensioni invariate, piu in alto */}
-          <div className="mb-4 -mt-3 flex">
+          <div className="mb-4 -mt-6 flex sm:-mt-8">
             <Image src="/xenora-logo.png" alt="Xenora" width={220} height={62} priority className="object-contain" style={{ width: 220, height: "auto" }} />
           </div>
 
