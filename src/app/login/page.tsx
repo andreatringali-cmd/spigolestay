@@ -242,8 +242,8 @@ export default function LoginPage() {
           )}
         </div>
       </main>
-      <footer className="mt-8 flex flex-col items-center gap-3 border-t border-[#eceae4] px-2 pt-5 text-[11px] text-[#9a9186] sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col items-center gap-1 sm:items-start">
+      <footer className="mt-6 flex flex-col items-center gap-2 border-t border-[#eceae4] px-2 pt-3 text-[11px] text-[#9a9186] sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col items-center gap-0.5 sm:items-start">
           <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 sm:justify-start">
             <a href="/termini" className="hover:text-[#4a453d] hover:underline">Termini di servizio</a>
             <span className="text-[#dcd6cc]">·</span>
@@ -262,7 +262,7 @@ export default function LoginPage() {
             { k: "instagram", u: "https://www.instagram.com", c: "#E4405F" },
             { k: "tiktok", u: "https://www.tiktok.com", c: "#010101" },
           ].map((s) => (
-            <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.k} style={{ color: s.c }} className="grid h-8 w-8 place-items-center rounded-lg border border-[#e6e1d8] transition hover:bg-[#f2eee6] hover:opacity-90">
+            <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.k} style={{ color: s.c }} className="grid h-7 w-7 place-items-center rounded-lg border border-[#e6e1d8] transition hover:bg-[#f2eee6] hover:opacity-90">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d={SOCIAL_PATHS[s.k]} /></svg>
             </a>
           ))}
