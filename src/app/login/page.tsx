@@ -242,23 +242,31 @@ export default function LoginPage() {
           )}
         </div>
       </main>
-      <footer className="mt-8 flex flex-col items-center gap-2 px-2 text-[11px] text-[#a8a094] sm:flex-row sm:justify-between">
-        <span className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center sm:justify-start">
-          <span>© {new Date().getFullYear()} Xenora · All rights reserved ·</span>
-          <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
-        </span>
-        <span className="flex items-center gap-0.5">
+      <footer className="mt-8 flex flex-col items-center gap-3 border-t border-[#eceae4] px-2 pt-5 text-[11px] text-[#9a9186] sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col items-center gap-1 sm:items-start">
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 sm:justify-start">
+            <a href="/termini" className="hover:text-[#4a453d] hover:underline">Termini di servizio</a>
+            <span className="text-[#dcd6cc]">·</span>
+            <a href="/privacy" className="hover:text-[#4a453d] hover:underline">Informativa privacy</a>
+            <span className="text-[#dcd6cc]">·</span>
+            <a href="/cookie" className="hover:text-[#4a453d] hover:underline">Cookie</a>
+            <span className="text-[#dcd6cc]">·</span>
+            <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
+          </div>
+          <span>© {new Date().getFullYear()} Xenora Digital Solutions · Tutti i diritti riservati</span>
+        </div>
+        <div className="flex items-center gap-1.5">
           {[
-            { k: "instagram", u: "https://www.instagram.com", c: "#E4405F" },
-            { k: "tiktok", u: "https://www.tiktok.com", c: "#010101" },
             { k: "facebook", u: "https://www.facebook.com", c: "#1877F2" },
             { k: "linkedin", u: "https://www.linkedin.com", c: "#0A66C2" },
+            { k: "instagram", u: "https://www.instagram.com", c: "#E4405F" },
+            { k: "tiktok", u: "https://www.tiktok.com", c: "#010101" },
           ].map((s) => (
-            <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.k} style={{ color: s.c }} className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-[#f2eee6] hover:opacity-80">
+            <a key={s.k} href={s.u} target="_blank" rel="noreferrer" aria-label={s.k} style={{ color: s.c }} className="grid h-8 w-8 place-items-center rounded-lg border border-[#e6e1d8] transition hover:bg-[#f2eee6] hover:opacity-90">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d={SOCIAL_PATHS[s.k]} /></svg>
             </a>
           ))}
-        </span>
+        </div>
       </footer>
     </div>
   );
