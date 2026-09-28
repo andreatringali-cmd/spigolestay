@@ -20,6 +20,8 @@ import {
   createRatePlan,
   pushAvailability,
   pushRestrictions,
+  ackBookingRevision,
+  listBookingRevisions,
   type AvailValue,
   type RestrictionRow,
   type ChannexResult,
@@ -316,23 +318,53 @@ export async function resolveCertContext(admin: SupabaseClient, tenantId: string
   return { propertyId, propertyTitle, structureId, roomTypes, combos };
 }
 
-// ── Helper per date/valori ────────────────────────────────────────────────
-// Tutte le date partono da OGGI + offset, così sono sempre valide (nel futuro).
-const nowBase = () => new Date();
-const dISO = (offset: number) => toISO(addDays(nowBase(), offset));
-// Prezzo variabile e realistico per data (base + oscillazione + maggiorazione weekend).
-function variableRate(offset: number, seed = 0): string {
-  const d = addDays(nowBase(), offset);
-  const weekend = d.getDay() === 0 || d.getDay() === 6;
-  const val = 70 + ((offset * 3 + seed * 7) % 45) + (weekend ? 20 : 0);
-  return val.toFixed(2);
+// ── Helper (valori FISSI come da specifica certificazione Channex) ─────────
+// Prezzo come stringa a 2 decimali.
+const RATE = (n: number) => n.toFixed(2);
+// Base date per il full sync (500 giorni deterministici).
+const FULL_START = new Date("2026-11-01T00:00:00Z");
+const isoFull = (o: number) => toISO(addDays(FULL_START, o));
+
+// Risolve il rate_plan per (titolo camera, titolo piano): match esatto, poi "contiene".
+// Così targettiamo ESATTAMENTE i 4 piani richiesti (Twin/Double × Best Available/Bed & Breakfast)
+// e non includiamo piani extra (es. eventuali piani di default creati da Channex).
+function planId(ctx: CertContext, roomTitle: string, planTitle: string): string | undefined {
+  const rt = roomTitle.trim().toLowerCase(), pt = planTitle.trim().toLowerCase();
+  const exact = ctx.combos.find((c) => c.roomTitle.trim().toLowerCase() === rt && c.ratePlanTitle.trim().toLowerCase() === pt);
+  if (exact) return exact.ratePlanId;
+  const rk = rt.split(" ")[0], pk = pt.split(" ")[0]; // "twin"/"double", "best"/"bed"
+  return ctx.combos.find((c) => c.roomTitle.toLowerCase().includes(rk) && c.ratePlanTitle.toLowerCase().includes(pk))?.ratePlanId;
 }
-// Sceglie una combo ciclando: così scenari che vogliono 3-4 combinazioni funzionano
-// anche quando la struttura ne ha meno.
-const pickCombo = (combos: CertCombo[], i: number) => combos[i % combos.length];
+function roomId(ctx: CertContext, roomTitle: string): string | undefined {
+  const rt = roomTitle.trim().toLowerCase();
+  return (ctx.roomTypes.find((r) => r.roomTitle.trim().toLowerCase() === rt)
+    ?? ctx.roomTypes.find((r) => r.roomTitle.toLowerCase().includes(rt.split(" ")[0])))?.roomTypeId;
+}
+// Se manca qualche piano/camera richiesto, ritorna un errore chiaro (altrimenti null).
+function missingCtx(scenario: ScenarioId, label: string, pairs: [string, string | undefined][]): CertResult | null {
+  const miss = pairs.filter(([, v]) => !v).map(([n]) => n);
+  return miss.length ? { ok: false, scenario, label, calls: [], error: `Non trovati su Channex: ${miss.join(", ")}. Ricrea la property di test (i titoli devono essere Twin Room / Double Room · Best Available Rate / Bed & Breakfast Rate).` } : null;
+}
 
 function done(scenario: ScenarioId, calls: CertCall[]): CertResult {
   return { ok: calls.length > 0 && calls.every((c) => c.ok), scenario, label: SCENARIO_LABELS[scenario], calls };
+}
+
+// ── Test 11: ACK delle prenotazioni di test ────────────────────────────────
+// La property di test NON è in channex_map, quindi l'import normale la salta senza fare ack.
+// Qui leggiamo tutte le revision della property di test e facciamo ACK di ciascuna, così Channex
+// registra `booking_revision_acknowledged` per la nuova/modificata/cancellata (dal nostro IP server).
+export interface AckResult { ok: boolean; acked: number; ids: string[]; error?: string }
+export async function ackTestBookings(admin: SupabaseClient, tenantId: string): Promise<AckResult> {
+  const ctx = await resolveCertContext(admin, tenantId);
+  if ("error" in ctx) return { ok: false, acked: 0, ids: [], error: ctx.error };
+  const list = await listBookingRevisions({ propertyId: ctx.propertyId, limit: 100 });
+  if (!list.ok) return { ok: false, acked: 0, ids: [], error: list.error };
+  const ids = Array.from(new Set(list.rows.map((r) => r.id).filter(Boolean)));
+  if (ids.length === 0) return { ok: true, acked: 0, ids: [], error: "Nessuna revision trovata: crea prima la prenotazione di test (Booking CRS) e modificala/cancellala." };
+  let acked = 0;
+  for (const id of ids) { const a = await ackBookingRevision(id); if (a.ok) acked++; }
+  return { ok: true, acked, ids };
 }
 
 // ── Esecutore principale ──────────────────────────────────────────────────
@@ -341,146 +373,137 @@ export async function runCertScenario(admin: SupabaseClient, tenantId: string, s
   const ctx = await resolveCertContext(admin, tenantId);
   if ("error" in ctx) return { ok: false, scenario, label, calls: [], error: ctx.error };
 
-  const { propertyId, roomTypes, combos } = ctx;
-  const P = propertyId;
+  const P = ctx.propertyId;
 
-  // Scenari su prezzi/restrizioni: serve almeno un rate_plan reale.
-  const needsRates: ScenarioId[] = ["2", "3", "4", "5", "6", "7", "8"];
-  if (needsRates.includes(scenario) && combos.length === 0) {
-    return { ok: false, scenario, label, calls: [], error: "Nessun piano tariffario trovato su Channex per questa struttura." };
-  }
+  // Risolvi i 4 piani e le 2 camere richiesti dalla certificazione (per titolo).
+  const twinBAR = planId(ctx, "Twin Room", "Best Available Rate");
+  const twinBB = planId(ctx, "Twin Room", "Bed & Breakfast Rate");
+  const dblBAR = planId(ctx, "Double Room", "Best Available Rate");
+  const dblBB = planId(ctx, "Double Room", "Bed & Breakfast Rate");
+  const twinRoom = roomId(ctx, "Twin Room");
+  const dblRoom = roomId(ctx, "Double Room");
+  // Costruttore riga restrizione (property fissa).
+  const R = (rate_plan_id: string, extra: Partial<RestrictionRow>): RestrictionRow => ({ property_id: P, rate_plan_id, ...extra });
 
   switch (scenario) {
-    // 1) FULL DATA SYNC — 500 giorni di disponibilità + tariffe/restrizioni per
-    //    tutte le camere/piani, in 2 chiamate (1 availability, 1 restrictions).
+    // 1) FULL SYNC — 500 gg, 2 chiamate. Ogni riga restrizione include TUTTE le restrizioni
+    //    dichiarate (rate, min_stay_arrival, min_stay_through, stop_sell, closed_to_arrival/departure).
     case "1": {
+      const miss = missingCtx(scenario, label, [["Twin Room", twinRoom], ["Double Room", dblRoom], ["Twin Best Available Rate", twinBAR], ["Twin Bed & Breakfast Rate", twinBB], ["Double Best Available Rate", dblBAR], ["Double Bed & Breakfast Rate", dblBB]]);
+      if (miss) return miss;
       const days = 500;
+      const rooms = [twinRoom!, dblRoom!];
+      const plans = [twinBAR!, twinBB!, dblBAR!, dblBB!];
       const avail: AvailValue[] = [];
-      for (const rt of roomTypes) {
-        for (let o = 0; o < days; o++) {
-          avail.push({ property_id: P, room_type_id: rt.roomTypeId, date: dISO(o), availability: 2 + (o % 4) });
-        }
-      }
+      for (const rid of rooms) for (let o = 0; o < days; o++) avail.push({ property_id: P, room_type_id: rid, date: isoFull(o), availability: 1 + ((o * 7) % 9) });
       const restr: RestrictionRow[] = [];
-      for (let ci = 0; ci < combos.length; ci++) {
-        const c = combos[ci];
+      for (let pi = 0; pi < plans.length; pi++) {
         for (let o = 0; o < days; o++) {
-          const row: RestrictionRow = { property_id: P, rate_plan_id: c.ratePlanId, date: dISO(o), rate: variableRate(o, ci) };
-          if (o % 30 === 0) row.min_stay_arrival = 2; // qualche restrizione sparsa, realistica
-          restr.push(row);
+          const wd = addDays(FULL_START, o).getUTCDay();
+          const weekend = wd === 0 || wd === 6;
+          restr.push(R(plans[pi], {
+            date: isoFull(o),
+            rate: RATE(80 + ((o * 3 + pi * 11) % 60) + (weekend ? 20 : 0)),
+            min_stay_arrival: 1, min_stay_through: 1,
+            stop_sell: false, closed_to_arrival: false, closed_to_departure: false,
+          }));
         }
       }
       const calls: CertCall[] = [];
       calls.push(toCall("/availability", avail.length, await pushAvailability(avail)));
-      if (restr.length > 0) calls.push(toCall("/restrictions", restr.length, await pushRestrictions(restr)));
+      calls.push(toCall("/restrictions", restr.length, await pushRestrictions(restr)));
       return done(scenario, calls);
     }
 
-    // 2) SINGLE DATE, SINGLE RATE — 1 combinazione, 1 data (+30gg), prezzo 333. 1 chiamata.
+    // 2) SINGLE DATE / SINGLE RATE — Twin BAR, 2026-11-22, 333.
     case "2": {
-      const c = combos[0];
-      const restr: RestrictionRow[] = [{ property_id: P, rate_plan_id: c.ratePlanId, date: dISO(30), rate: "333.00" }];
+      const miss = missingCtx(scenario, label, [["Twin Best Available Rate", twinBAR]]); if (miss) return miss;
+      const restr = [R(twinBAR!, { date: "2026-11-22", rate: RATE(333) })];
       return done(scenario, [toCall("/restrictions", restr.length, await pushRestrictions(restr))]);
     }
 
-    // 3) SINGLE DATE, MULTIPLE RATES — 3 combinazioni su date diverse, in 1 chiamata.
+    // 3) SINGLE DATE / MULTIPLE RATES — 1 chiamata.
     case "3": {
-      const offsets = [10, 20, 40];
-      const rates = ["150.00", "199.00", "240.00"];
-      const restr: RestrictionRow[] = [0, 1, 2].map((i) => {
-        const c = pickCombo(combos, i);
-        return { property_id: P, rate_plan_id: c.ratePlanId, date: dISO(offsets[i]), rate: rates[i] };
-      });
+      const miss = missingCtx(scenario, label, [["Twin Best Available Rate", twinBAR], ["Double Best Available Rate", dblBAR], ["Double Bed & Breakfast Rate", dblBB]]); if (miss) return miss;
+      const restr = [
+        R(twinBAR!, { date: "2026-11-21", rate: RATE(333) }),
+        R(dblBAR!, { date: "2026-11-25", rate: RATE(444) }),
+        R(dblBB!, { date: "2026-11-29", rate: "456.23" }),
+      ];
       return done(scenario, [toCall("/restrictions", restr.length, await pushRestrictions(restr))]);
     }
 
-    // 4) MULTIPLE DATES, MULTIPLE RATES — intervalli (gg 1-10, 10-16, 1-20) per più
-    //    combinazioni, espansi a una riga per data, in 1 chiamata.
+    // 4) MULTIPLE DATES / MULTIPLE RATES — intervalli (date_range), 1 chiamata.
     case "4": {
-      const ranges = [
-        { from: 1, to: 10, combo: 0, rate: "120.00" },
-        { from: 10, to: 16, combo: 1, rate: "175.00" },
-        { from: 1, to: 20, combo: 2, rate: "210.00" },
+      const miss = missingCtx(scenario, label, [["Twin Best Available Rate", twinBAR], ["Double Best Available Rate", dblBAR], ["Double Bed & Breakfast Rate", dblBB]]); if (miss) return miss;
+      const restr = [
+        R(twinBAR!, { date_from: "2026-11-01", date_to: "2026-11-10", rate: RATE(241) }),
+        R(dblBAR!, { date_from: "2026-11-10", date_to: "2026-11-16", rate: "312.66" }),
+        R(dblBB!, { date_from: "2026-11-01", date_to: "2026-11-20", rate: RATE(111) }),
       ];
-      const restr: RestrictionRow[] = [];
-      for (const r of ranges) {
-        const c = pickCombo(combos, r.combo);
-        for (let o = r.from; o <= r.to; o++) {
-          restr.push({ property_id: P, rate_plan_id: c.ratePlanId, date: dISO(o), rate: r.rate });
-        }
-      }
       return done(scenario, [toCall("/restrictions", restr.length, await pushRestrictions(restr))]);
     }
 
-    // 5) MIN STAY UPDATE — min_stay (3,2,5) per tre combinazioni su date indicate, 1 chiamata.
+    // 5) MIN STAY — SOLO min_stay_through (nessun altro campo), 1 chiamata.
     case "5": {
-      const mins = [3, 2, 5];
-      const offsets = [5, 12, 25];
-      const restr: RestrictionRow[] = [0, 1, 2].map((i) => {
-        const c = pickCombo(combos, i);
-        return { property_id: P, rate_plan_id: c.ratePlanId, date: dISO(offsets[i]), min_stay_arrival: mins[i] };
-      });
-      return done(scenario, [toCall("/restrictions", restr.length, await pushRestrictions(restr))]);
-    }
-
-    // 6) STOP SELL UPDATE — stop_sell attivo per tre combinazioni, 1 chiamata.
-    case "6": {
-      const restr: RestrictionRow[] = [0, 1, 2].map((i) => {
-        const c = pickCombo(combos, i);
-        return { property_id: P, rate_plan_id: c.ratePlanId, date: dISO(7 + i * 3), stop_sell: true };
-      });
-      return done(scenario, [toCall("/restrictions", restr.length, await pushRestrictions(restr))]);
-    }
-
-    // 7) MULTIPLE RESTRICTIONS — closed_to_arrival, closed_to_departure, min_stay,
-    //    max_stay su 4 combinazioni, 1 chiamata.
-    case "7": {
-      const restr: RestrictionRow[] = [
-        { property_id: P, rate_plan_id: pickCombo(combos, 0).ratePlanId, date: dISO(9), closed_to_arrival: true },
-        { property_id: P, rate_plan_id: pickCombo(combos, 1).ratePlanId, date: dISO(11), closed_to_departure: true },
-        { property_id: P, rate_plan_id: pickCombo(combos, 2).ratePlanId, date: dISO(13), min_stay_arrival: 4 },
-        { property_id: P, rate_plan_id: pickCombo(combos, 3).ratePlanId, date: dISO(15), max_stay: 10 },
+      const miss = missingCtx(scenario, label, [["Twin Best Available Rate", twinBAR], ["Double Best Available Rate", dblBAR], ["Double Bed & Breakfast Rate", dblBB]]); if (miss) return miss;
+      const restr = [
+        R(twinBAR!, { date: "2026-11-23", min_stay_through: 3 }),
+        R(dblBAR!, { date: "2026-11-25", min_stay_through: 2 }),
+        R(dblBB!, { date: "2026-11-15", min_stay_through: 5 }),
       ];
       return done(scenario, [toCall("/restrictions", restr.length, await pushRestrictions(restr))]);
     }
 
-    // 8) HALF-YEAR UPDATE — tariffe + restrizioni su un semestre (+30 → +210 gg) per
-    //    più camere, 1 chiamata.
-    case "8": {
-      const restr: RestrictionRow[] = [];
-      for (let ci = 0; ci < combos.length; ci++) {
-        const c = combos[ci];
-        for (let o = 30; o <= 210; o++) {
-          const row: RestrictionRow = { property_id: P, rate_plan_id: c.ratePlanId, date: dISO(o), rate: variableRate(o, ci + 3) };
-          if ((o - 30) % 14 === 0) row.min_stay_arrival = 3; // una restrizione ogni 2 settimane
-          restr.push(row);
-        }
-      }
+    // 6) STOP SELL — SOLO stop_sell, 1 chiamata.
+    case "6": {
+      const miss = missingCtx(scenario, label, [["Twin Best Available Rate", twinBAR], ["Double Best Available Rate", dblBAR], ["Double Bed & Breakfast Rate", dblBB]]); if (miss) return miss;
+      const restr = [
+        R(twinBAR!, { date: "2026-11-14", stop_sell: true }),
+        R(dblBAR!, { date: "2026-11-16", stop_sell: true }),
+        R(dblBB!, { date: "2026-11-20", stop_sell: true }),
+      ];
       return done(scenario, [toCall("/restrictions", restr.length, await pushRestrictions(restr))]);
     }
 
-    // 9) SINGLE DATE AVAILABILITY — riduce l'inventario simulando una prenotazione:
-    //    camera1 da N a N-1, camera2 da 1 a 0, su 2 date. 1 chiamata.
+    // 7) MULTIPLE RESTRICTIONS — intervalli + campi multipli, 1 chiamata.
+    case "7": {
+      const miss = missingCtx(scenario, label, [["Twin Best Available Rate", twinBAR], ["Twin Bed & Breakfast Rate", twinBB], ["Double Best Available Rate", dblBAR], ["Double Bed & Breakfast Rate", dblBB]]); if (miss) return miss;
+      const restr = [
+        R(twinBAR!, { date_from: "2026-11-01", date_to: "2026-11-10", closed_to_arrival: true, closed_to_departure: false, max_stay: 4, min_stay_through: 1 }),
+        R(twinBB!, { date_from: "2026-11-12", date_to: "2026-11-16", closed_to_arrival: false, closed_to_departure: true, min_stay_through: 6 }),
+        R(dblBAR!, { date_from: "2026-11-10", date_to: "2026-11-16", closed_to_arrival: true, min_stay_through: 2 }),
+        R(dblBB!, { date_from: "2026-11-01", date_to: "2026-11-20", min_stay_through: 10 }),
+      ];
+      return done(scenario, [toCall("/restrictions", restr.length, await pushRestrictions(restr))]);
+    }
+
+    // 8) HALF-YEAR — 2026-12-01..2027-05-01, rate + min_stay_through, 1 chiamata.
+    case "8": {
+      const miss = missingCtx(scenario, label, [["Twin Best Available Rate", twinBAR], ["Double Best Available Rate", dblBAR]]); if (miss) return miss;
+      const restr = [
+        R(twinBAR!, { date_from: "2026-12-01", date_to: "2027-05-01", rate: RATE(432), min_stay_through: 2 }),
+        R(dblBAR!, { date_from: "2026-12-01", date_to: "2027-05-01", rate: RATE(342), min_stay_through: 3 }),
+      ];
+      return done(scenario, [toCall("/restrictions", restr.length, await pushRestrictions(restr))]);
+    }
+
+    // 9) SINGLE DATE AVAILABILITY — Twin 2026-11-21 = 7, Double 2026-11-25 = 0.
     case "9": {
-      const rt0 = roomTypes[0];
-      const rt1 = roomTypes[1] ?? roomTypes[0];
+      const miss = missingCtx(scenario, label, [["Twin Room", twinRoom], ["Double Room", dblRoom]]); if (miss) return miss;
       const avail: AvailValue[] = [
-        { property_id: P, room_type_id: rt0.roomTypeId, date: dISO(3), availability: 1 },
-        { property_id: P, room_type_id: rt0.roomTypeId, date: dISO(4), availability: 1 },
-        { property_id: P, room_type_id: rt1.roomTypeId, date: dISO(3), availability: 0 },
-        { property_id: P, room_type_id: rt1.roomTypeId, date: dISO(4), availability: 0 },
+        { property_id: P, room_type_id: twinRoom!, date: "2026-11-21", availability: 7 },
+        { property_id: P, room_type_id: dblRoom!, date: "2026-11-25", availability: 0 },
       ];
       return done(scenario, [toCall("/availability", avail.length, await pushAvailability(avail))]);
     }
 
-    // 10) MULTIPLE DATE AVAILABILITY — aggiorna inventario su intervalli per due
-    //     camere (usa date_from/date_to), 1 chiamata.
+    // 10) MULTIPLE DATE AVAILABILITY — intervalli (date_range).
     case "10": {
-      const rt0 = roomTypes[0];
-      const rt1 = roomTypes[1] ?? roomTypes[0];
+      const miss = missingCtx(scenario, label, [["Twin Room", twinRoom], ["Double Room", dblRoom]]); if (miss) return miss;
       const avail: AvailValue[] = [
-        { property_id: P, room_type_id: rt0.roomTypeId, date_from: dISO(5), date_to: dISO(15), availability: 3 },
-        { property_id: P, room_type_id: rt1.roomTypeId, date_from: dISO(8), date_to: dISO(20), availability: 2 },
+        { property_id: P, room_type_id: twinRoom!, date_from: "2026-11-10", date_to: "2026-11-16", availability: 3 },
+        { property_id: P, room_type_id: dblRoom!, date_from: "2026-11-17", date_to: "2026-11-24", availability: 4 },
       ];
       return done(scenario, [toCall("/availability", avail.length, await pushAvailability(avail))]);
     }

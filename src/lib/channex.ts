@@ -134,9 +134,12 @@ export interface RateValue { property_id: string; rate_plan_id: string; date?: s
 export interface RestrictionRow {
   property_id: string;
   rate_plan_id: string;
-  date: string;
+  date?: string;              // singola data
+  date_from?: string;        // intervallo: inizio (con date_to). Channex accetta date OPPURE date_from/date_to.
+  date_to?: string;          // intervallo: fine
   rate?: string;
   min_stay_arrival?: number;
+  min_stay_through?: number;  // soggiorno minimo "through" (quello verificato dalla certificazione Channex)
   max_stay?: number;
   stop_sell?: boolean;
   closed_to_arrival?: boolean;

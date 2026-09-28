@@ -81,6 +81,22 @@ export default function ChannexCertPage() {
   const [revs, setRevs] = useState<RevGroup[] | undefined>();
   const [revErr, setRevErr] = useState<string>("");
   const [loadingRevs, setLoadingRevs] = useState(false);
+  const [acking, setAcking] = useState(false);
+  const [ackMsg, setAckMsg] = useState<string>("");
+
+  const ackBookings = async () => {
+    setAcking(true); setAckMsg("");
+    try {
+      const token = await authToken();
+      if (!token) { setAckMsg("Sessione scaduta: rientra."); return; }
+      const res = await fetch("/api/channex/cert/run", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ action: "ack-bookings" }) });
+      if (res.status === 403) { setForbidden(true); return; }
+      const d = await res.json().catch(() => null) as { ok?: boolean; acked?: number; ids?: string[]; error?: string } | null;
+      if (d?.ok) setAckMsg(`ACK inviati: ${d.acked ?? 0} revision${d.error ? " · " + d.error : ""}`);
+      else setAckMsg(d?.error || `Errore ${res.status}`);
+    } catch { setAckMsg("Errore di rete."); }
+    finally { setAcking(false); }
+  };
 
   const loadRevisions = async () => {
     setLoadingRevs(true);
@@ -452,16 +468,27 @@ export default function ChannexCertPage() {
                 il <strong>Booking ID</strong> e l&apos;ID di ogni revision <strong>Nuova / Modificata / Cancellata</strong>.
               </p>
             </div>
-            <button
-              onClick={loadRevisions}
-              disabled={loadingRevs}
-              className="shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-              style={{ backgroundColor: "var(--focus)" }}
-            >
-              {loadingRevs ? "Leggo…" : "Leggi revisioni"}
-            </button>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <button
+                onClick={loadRevisions}
+                disabled={loadingRevs}
+                className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-60"
+              >
+                {loadingRevs ? "Leggo…" : "Leggi revisioni"}
+              </button>
+              <button
+                onClick={ackBookings}
+                disabled={acking}
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                style={{ backgroundColor: "var(--focus)" }}
+                title="Fa l'ACK di tutte le revision della property di test (necessario per superare il Test 11)"
+              >
+                {acking ? "ACK…" : "ACK prenotazioni"}
+              </button>
+            </div>
           </div>
 
+          {ackMsg && <div className="mt-3 text-[13px]" style={{ color: "var(--ok)" }}>✓ {ackMsg}</div>}
           {revErr && <div className="mt-3 text-[13px]" style={{ color: "var(--err)" }}>⚠ {revErr}</div>}
 
           {revs && (

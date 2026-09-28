@@ -43,7 +43,7 @@ function saveJSON(key: string, value: unknown) {
 // Chiave/valore per il diff.
 const availKey = (r: { property_id: string; room_type_id: string; date: string }) => `${r.property_id}|${r.room_type_id}|${r.date}`;
 const availVal = (r: { availability: number }) => String(r.availability);
-const restrKey = (r: { property_id: string; rate_plan_id: string; date: string }) => `${r.property_id}|${r.rate_plan_id}|${r.date}`;
+const restrKey = (r: { property_id: string; rate_plan_id: string; date?: string; date_from?: string }) => `${r.property_id}|${r.rate_plan_id}|${r.date ?? r.date_from ?? ""}`;
 // Valore canonico (ordine campi fisso) così due righe identiche producono la stessa stringa.
 const restrVal = (r: { rate?: string; min_stay_arrival?: number; max_stay?: number; stop_sell?: boolean; closed_to_arrival?: boolean; closed_to_departure?: boolean }) =>
   JSON.stringify({ rate: r.rate, min_stay_arrival: r.min_stay_arrival, max_stay: r.max_stay, stop_sell: r.stop_sell, closed_to_arrival: r.closed_to_arrival, closed_to_departure: r.closed_to_departure });

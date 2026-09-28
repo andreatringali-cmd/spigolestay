@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { channexEnabled, listBookingRevisions } from "@/lib/channex";
-import { runCertScenario, setupTestProperty, resolveCertContext, SCENARIO_IDS, type ScenarioId } from "@/lib/channex-cert";
+import { runCertScenario, setupTestProperty, resolveCertContext, ackTestBookings, SCENARIO_IDS, type ScenarioId } from "@/lib/channex-cert";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,6 +78,12 @@ export async function POST(req: Request) {
       revisions: [...rows].sort((a, b) => ord(a) - ord(b) || String(a.inserted_at ?? "").localeCompare(String(b.inserted_at ?? ""))),
     }));
     return NextResponse.json({ ok: true, propertyId: propertyId ?? null, bookings }, { status: 200 });
+  }
+
+  // Azione: ACK di tutte le revision della property di test (Test 11 booking receiving).
+  if (body?.action === "ack-bookings") {
+    const r = await ackTestBookings(admin, caller.id);
+    return NextResponse.json(r, { status: 200 });
   }
 
   const scenario = String(body?.scenario || "") as ScenarioId;
