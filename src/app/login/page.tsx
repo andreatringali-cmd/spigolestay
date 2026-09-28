@@ -220,12 +220,8 @@ export default function LoginPage() {
               </button>
 
               {mode === "login" ? (
-                <div className="mt-5 rounded-xl border border-[#e6e1d8] bg-[#f9f7f4] px-4 py-3 text-center">
-                  <div className="text-[13px] text-[#4a453d]"><span className="font-semibold text-[#1f1b16]">Non hai un account?</span> Accesso su invito.</div>
-                  <a href="https://xenoradigitalsolutions.it" target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#2f6bb0] to-[#7b5cff] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_8px_18px_-10px_rgba(79,70,229,0.7)] transition hover:opacity-95">
-                    Richiedi una demo
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                  </a>
+                <div className="mt-6 text-center text-sm text-[#4a453d]">
+                  Non hai un account? Accesso su invito, <a href="https://xenoradigitalsolutions.it" target="_blank" rel="noreferrer" className={linkCls}>richiedi la demo</a>.
                 </div>
               ) : (
                 <div className="mt-6 text-center text-sm text-[#4a453d]">
