@@ -187,6 +187,55 @@ export async function ackBookingRevision(id: string) {
   return channex(`/booking_revisions/${encodeURIComponent(id)}/ack`, { method: "POST", body: "{}" });
 }
 
+// Elenco COMPLETO delle revision (ackate e non), opzionalmente filtrato per property o
+// per booking. A differenza del feed (solo non-ackate), qui restiamo di sola lettura e NON
+// facciamo ack: serve a raccogliere gli ID (booking + revision) per la certificazione (Test #11),
+// dove il form chiede l'ID della revision NUOVA, MODIFICATA e CANCELLATA. `revision` è il numero
+// progressivo (1 = nuova), `status`/`is_cancellation` distinguono modifica da cancellazione.
+export interface ChxRevisionRow {
+  id: string;
+  booking_id: string;
+  property_id?: string;
+  status?: string;
+  revision?: number;
+  is_cancellation?: boolean;
+  ota_name?: string;
+  ota_reservation_code?: string;
+  arrival_date?: string;
+  departure_date?: string;
+  inserted_at?: string;
+}
+export async function listBookingRevisions(opts: { propertyId?: string; bookingId?: string; limit?: number } = {}) {
+  const params: string[] = [];
+  if (opts.propertyId) params.push(`filter[property_id]=${encodeURIComponent(opts.propertyId)}`);
+  if (opts.bookingId) params.push(`filter[booking_id]=${encodeURIComponent(opts.bookingId)}`);
+  params.push(`order[inserted_at]=desc`);
+  params.push(`pagination[limit]=${Math.max(1, Math.min(100, opts.limit ?? 50))}`);
+  const q = params.length ? `?${params.join("&")}` : "";
+  const res = await channex<{ data?: unknown[] }>(`/booking_revisions${q}`);
+  if (!res.ok) return { ok: false as const, status: res.status, error: res.error, rows: [] as ChxRevisionRow[] };
+  const list = Array.isArray(res.data?.data) ? res.data!.data! : [];
+  const rows: ChxRevisionRow[] = list.map((row) => {
+    const r = row as { id?: string; attributes?: Record<string, unknown> } & Record<string, unknown>;
+    const a = (r.attributes ?? r) as Record<string, unknown>;
+    const str = (v: unknown) => (v == null ? undefined : String(v));
+    return {
+      id: String(r.id ?? a.id ?? ""),
+      booking_id: String(a.booking_id ?? a.unique_id ?? ""),
+      property_id: str(a.property_id),
+      status: str(a.status),
+      revision: a.revision != null ? Number(a.revision) : undefined,
+      is_cancellation: a.is_cancellation === true || String(a.status).toLowerCase() === "cancelled" || String(a.status).toLowerCase() === "cancellation",
+      ota_name: str(a.ota_name),
+      ota_reservation_code: str(a.ota_reservation_code),
+      arrival_date: str(a.arrival_date),
+      departure_date: str(a.departure_date),
+      inserted_at: str(a.inserted_at),
+    };
+  });
+  return { ok: true as const, status: res.status, rows };
+}
+
 export async function createRatePlan(propertyId: string, roomTypeId: string, opts: { title?: string; occupancy: number; rate: number; currency?: string }) {
   return channex<Created>("/rate_plans", {
     method: "POST",

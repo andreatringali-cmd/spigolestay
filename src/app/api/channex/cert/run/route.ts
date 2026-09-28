@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { channexEnabled } from "@/lib/channex";
+import { channexEnabled, listBookingRevisions } from "@/lib/channex";
 import { runCertScenario, setupTestProperty, resolveCertContext, SCENARIO_IDS, type ScenarioId } from "@/lib/channex-cert";
 
 export const runtime = "nodejs";
@@ -54,6 +54,27 @@ export async function POST(req: Request) {
         combos: ctx.combos,
       },
     }, { status: 200 });
+  }
+
+  // Azione: legge (sola lettura, NESSUN ack) le revision delle prenotazioni su Channex per la
+  // property di certificazione. Serve al Test #11: raccogliere booking_id + revision id (nuova/
+  // modificata/cancellata). Le raggruppa per prenotazione.
+  if (body?.action === "booking-revisions") {
+    const ctx = await resolveCertContext(admin, caller.id);
+    const propertyId = "error" in ctx ? undefined : ctx.propertyId;
+    const res = await listBookingRevisions({ propertyId, limit: 60 });
+    if (!res.ok) return NextResponse.json({ ok: false, error: res.error || `Errore ${res.status}` }, { status: 200 });
+    // Raggruppa per booking_id e ordina le revision per numero progressivo.
+    const groups: Record<string, typeof res.rows> = {};
+    for (const r of res.rows) {
+      const k = r.booking_id || r.id;
+      (groups[k] ||= []).push(r);
+    }
+    const bookings = Object.entries(groups).map(([bookingId, rows]) => ({
+      bookingId,
+      revisions: [...rows].sort((a, b) => (a.revision ?? 0) - (b.revision ?? 0)),
+    }));
+    return NextResponse.json({ ok: true, propertyId: propertyId ?? null, bookings }, { status: 200 });
   }
 
   const scenario = String(body?.scenario || "") as ScenarioId;

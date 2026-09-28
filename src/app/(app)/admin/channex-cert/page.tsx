@@ -40,6 +40,10 @@ interface CertRoomType { roomTypeId: string; roomTitle: string }
 interface CertCombo { roomTypeId: string; roomTitle: string; ratePlanId: string; ratePlanTitle: string }
 interface CertContext { propertyId: string; propertyTitle: string; roomTypes: CertRoomType[]; combos: CertCombo[] }
 
+// Revision prenotazioni per il Test #11 (booking receiving).
+interface RevRow { id: string; booking_id: string; status?: string; revision?: number; is_cancellation?: boolean; ota_name?: string; arrival_date?: string; departure_date?: string }
+interface RevGroup { bookingId: string; revisions: RevRow[] }
+
 interface ScenarioMeta { id: ScenarioId; name: string; desc: string }
 const SCENARIOS: ScenarioMeta[] = [
   { id: "1", name: "Full Data Sync", desc: "500 giorni di disponibilità + tariffe + restrizioni per tutte le camere e piani, in 2 chiamate (1 availability, 1 restrictions). Valori realistici variabili per data." },
@@ -56,7 +60,6 @@ const SCENARIOS: ScenarioMeta[] = [
 
 interface InfoScenario { n: number; name: string; note: string }
 const INFO_SCENARIOS: InfoScenario[] = [
-  { n: 11, name: "Booking lifecycle", note: "Già coperto dal ciclo prenotazioni (import/webhook/ack)." },
   { n: 12, name: "Rate limit handling", note: "Già coperto dall'infrastruttura: coda con throttling + retry/backoff in channex.ts." },
   { n: 13, name: "Delta update", note: "Già coperto dall'infrastruttura: invio delta (solo righe cambiate) in ChannexAutoSync." },
 ];
@@ -75,6 +78,34 @@ export default function ChannexCertPage() {
   const [ctx, setCtx] = useState<CertContext | undefined>();
   const [ctxErr, setCtxErr] = useState<string>("");
   const [loadingCtx, setLoadingCtx] = useState(false);
+  const [revs, setRevs] = useState<RevGroup[] | undefined>();
+  const [revErr, setRevErr] = useState<string>("");
+  const [loadingRevs, setLoadingRevs] = useState(false);
+
+  const loadRevisions = async () => {
+    setLoadingRevs(true);
+    setRevErr("");
+    try {
+      const token = await authToken();
+      if (!token) { setRevErr("Sessione scaduta: rientra."); return; }
+      const res = await fetch("/api/channex/cert/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "booking-revisions" }),
+      });
+      if (res.status === 403) { setForbidden(true); return; }
+      const d = await res.json().catch(() => null) as { ok?: boolean; bookings?: RevGroup[]; error?: string } | null;
+      if (d?.ok && d.bookings) setRevs(d.bookings);
+      else setRevErr(d?.error || `Errore ${res.status}`);
+    } catch {
+      setRevErr("Errore di rete.");
+    } finally {
+      setLoadingRevs(false);
+    }
+  };
+
+  // Etichetta il tipo di revision: 1ª = Nuova, cancellazione = Cancellata, altrimenti Modificata.
+  const revLabel = (r: RevRow, idx: number) => r.is_cancellation ? "Cancellata" : (r.revision === 1 || idx === 0) ? "Nuova" : "Modificata";
 
   const loadContext = async () => {
     setLoadingCtx(true);
@@ -398,6 +429,69 @@ export default function ChannexCertPage() {
             </Card>
           );
         })}
+
+        <Card>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-wash text-xs font-bold text-dim">11</span>
+                <span className="font-semibold text-txt">Booking Receiving</span>
+              </div>
+              <p className="mt-1 text-[13px] text-dim">
+                Crea una prenotazione di prova su Channex (Applications → app <strong>&quot;Booking CRS&quot;</strong> →
+                pagina Bookings → <strong>Create</strong>), poi <strong>modificala</strong> e infine
+                <strong> cancellala</strong>: ogni azione genera una revision. Xenora le riceve e fa l&apos;ack in
+                automatico (le vedi in Prenotazioni). Questo pulsante legge da Channex (sola lettura) e ti mostra
+                il <strong>Booking ID</strong> e l&apos;ID di ogni revision <strong>Nuova / Modificata / Cancellata</strong>.
+              </p>
+            </div>
+            <button
+              onClick={loadRevisions}
+              disabled={loadingRevs}
+              className="shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              style={{ backgroundColor: "var(--focus)" }}
+            >
+              {loadingRevs ? "Leggo…" : "Leggi revisioni"}
+            </button>
+          </div>
+
+          {revErr && <div className="mt-3 text-[13px]" style={{ color: "var(--err)" }}>⚠ {revErr}</div>}
+
+          {revs && (
+            revs.length === 0 ? (
+              <div className="mt-3 text-[13px] text-dim">Nessuna prenotazione trovata su Channex per questa property. Crea prima la prenotazione di prova (Booking CRS → Create).</div>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {revs.map((g) => (
+                  <div key={g.bookingId} className="rounded-lg border border-line bg-surface p-3 text-[13px]">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-semibold text-dim">Booking ID</span>
+                      <code className="select-all break-all rounded bg-wash px-1.5 py-0.5 text-[12px] text-txt">{g.bookingId}</code>
+                      <button onClick={() => copy(g.bookingId, `bk-${g.bookingId}`)} className="shrink-0 rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">
+                        {copied === `bk-${g.bookingId}` ? "Copiato ✓" : "Copia"}
+                      </button>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      {g.revisions.map((r, i) => (
+                        <div key={r.id} className="flex flex-wrap items-center gap-2 pl-2">
+                          <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{
+                            backgroundColor: r.is_cancellation ? "color-mix(in srgb, var(--err) 14%, transparent)" : "color-mix(in srgb, var(--ok) 14%, transparent)",
+                            color: r.is_cancellation ? "var(--err)" : "var(--ok)",
+                          }}>{revLabel(r, i)}</span>
+                          <code className="select-all break-all rounded bg-wash px-1.5 py-0.5 text-[12px] text-txt">{r.id}</code>
+                          <button onClick={() => copy(r.id, `rev-${r.id}`)} className="shrink-0 rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-dim hover:bg-wash">
+                            {copied === `rev-${r.id}` ? "Copiato ✓" : "Copia"}
+                          </button>
+                          {r.status && <span className="text-[11px] text-faint">{r.status}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+        </Card>
 
         {INFO_SCENARIOS.map((s) => (
           <Card key={s.n} className="opacity-90">
