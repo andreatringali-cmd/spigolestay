@@ -70,9 +70,12 @@ export async function POST(req: Request) {
       const k = r.booking_id || r.id;
       (groups[k] ||= []).push(r);
     }
+    // Ordine cronologico: per numero revision se presente, altrimenti per data di inserimento
+    // (così l'ordine è sempre Nuova → Modificata → Cancellata).
+    const ord = (r: { revision?: number; inserted_at?: string }) => r.revision ?? 0;
     const bookings = Object.entries(groups).map(([bookingId, rows]) => ({
       bookingId,
-      revisions: [...rows].sort((a, b) => (a.revision ?? 0) - (b.revision ?? 0)),
+      revisions: [...rows].sort((a, b) => ord(a) - ord(b) || String(a.inserted_at ?? "").localeCompare(String(b.inserted_at ?? ""))),
     }));
     return NextResponse.json({ ok: true, propertyId: propertyId ?? null, bookings }, { status: 200 });
   }

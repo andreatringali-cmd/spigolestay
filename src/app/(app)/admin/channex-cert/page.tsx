@@ -104,8 +104,15 @@ export default function ChannexCertPage() {
     }
   };
 
-  // Etichetta il tipo di revision: 1ª = Nuova, cancellazione = Cancellata, altrimenti Modificata.
-  const revLabel = (r: RevRow, idx: number) => r.is_cancellation ? "Cancellata" : (r.revision === 1 || idx === 0) ? "Nuova" : "Modificata";
+  // Etichetta il tipo di revision. Lo `status` di Channex è la verità (new/modified/cancelled);
+  // solo se manca si ripiega su cancellazione / numero revision / posizione.
+  const revLabel = (r: RevRow, idx: number) => {
+    const s = (r.status || "").toLowerCase();
+    if (r.is_cancellation || s === "cancelled" || s === "cancellation") return "Cancellata";
+    if (s === "new" || r.revision === 1) return "Nuova";
+    if (s === "modified" || s === "modification") return "Modificata";
+    return idx === 0 ? "Nuova" : "Modificata";
+  };
 
   const loadContext = async () => {
     setLoadingCtx(true);
