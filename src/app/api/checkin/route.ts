@@ -77,7 +77,7 @@ export async function GET(req: Request) {
       roomType: { name: s(rt.name) },
       unit: unit ? { name: s(unit.name), accessInfo: s(unit.accessInfo) } : null,
       structure: {
-        name: s(st.name), color: s(st.photoColor), phone: s(st.phone), email: s(st.email),
+        name: s(st.name), color: s(st.photoColor), logo: s(st.logo), phone: s(st.phone), email: s(st.email),
         address: s(st.address), streetNumber: s(st.streetNumber), city: s(st.city),
         checkInFrom: s(st.checkInFrom), checkOutBy: s(st.checkOutBy), accessInfo: s(st.accessInfo),
         currency: s(st.currency) || "€", cityTax: (st.cityTax as Json) || null,

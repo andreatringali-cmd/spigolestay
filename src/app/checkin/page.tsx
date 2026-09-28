@@ -5,6 +5,7 @@ import { DOC_TYPES } from "@/lib/types";
 import { downscaleImage } from "@/lib/images";
 import { eur } from "@/lib/format";
 import SignaturePad from "@/components/SignaturePad";
+import { supabase } from "@/lib/supabase";
 
 // Check-in online per l'OSPITE — pagina PUBBLICA e SERVER-backed.
 // Carica e salva tutto tramite /api/checkin (service role): funziona per l'ospite
@@ -60,7 +61,7 @@ interface Info {
   guest: { firstName: string; lastName: string; email: string; phone: string; sex: string; birthDate: string; birthPlace: string; citizenship: string; docType: string; docNumber: string; docPlace: string; docPhotoFront?: string | null; docPhotoBack?: string | null };
   roomType: { name: string };
   unit: { name: string; accessInfo: string } | null;
-  structure: { name: string; color: string; phone: string; email: string; address: string; streetNumber: string; city: string; checkInFrom: string; checkOutBy: string; accessInfo: string; currency: string; stripeAccount: string; stripeChargesEnabled: boolean; extras: { id: string; name: string; desc: string; price: number; per: string }[] };
+  structure: { name: string; color: string; logo?: string; phone: string; email: string; address: string; streetNumber: string; city: string; checkInFrom: string; checkOutBy: string; accessInfo: string; currency: string; stripeAccount: string; stripeChargesEnabled: boolean; extras: { id: string; name: string; desc: string; price: number; per: string }[] };
 }
 
 export default function CheckinPage() {
@@ -81,6 +82,10 @@ function Engine() {
   const [photoFront, setPhotoFront] = useState<string | undefined>();
   const [photoBack, setPhotoBack] = useState<string | undefined>();
   const [signature, setSignature] = useState<string | undefined>();
+  // L'operatore (loggato in Xenora) può compilare per conto dell'ospite: in quel caso la firma
+  // NON è obbligatoria. L'ospite anonimo (dal link) invece deve firmare.
+  const [isOperator, setIsOperator] = useState(false);
+  useEffect(() => { let ok = true; (async () => { try { const { data } = await (supabase?.auth.getSession() ?? Promise.resolve({ data: { session: null } })); if (ok) setIsOperator(!!data.session); } catch {} })(); return () => { ok = false; }; }, []);
   const [consent, setConsent] = useState(false);
   const [inv, setInv] = useState({ wants: false, kind: "privato", name: "", vat: "", taxCode: "", address: "", city: "", cap: "", province: "", sdiCode: "", pec: "" });
   const setI = (k: string, v: string | boolean) => setInv((p) => ({ ...p, [k]: v }));
@@ -190,7 +195,7 @@ function Engine() {
   const setD = <K extends keyof DocData>(k: K, v: string) => setDoc((p) => (p ? { ...p, [k]: v } : p));
   const setExtra = (i: number, k: string, v: string) => setExtras((p) => p.map((e, j) => (j === i ? { ...e, [k]: v } : e)));
 
-  const valid = !!doc && doc.firstName.trim() && doc.lastName.trim() && doc.birthDate && doc.docNumber.trim() && consent && !!signature;
+  const valid = !!doc && doc.firstName.trim() && doc.lastName.trim() && doc.birthDate && doc.docNumber.trim() && consent && (isOperator || !!signature);
 
   // ── Upsell + riepilogo pagamento ──
   const b = info?.booking;
@@ -227,7 +232,7 @@ function Engine() {
   // Invio di GRUPPO: distribuisce gli ospiti per camera e salva ogni camera.
   const submitGroup = async () => {
     const reqOk = !!doc && !!doc.firstName.trim() && !!doc.lastName.trim() && !!doc.birthDate && !!doc.docNumber.trim();
-    if (!info || !doc || !reqOk || !consent || !signature || submitting) return;
+    if (!info || !doc || !reqOk || !consent || (!isOperator && !signature) || submitting) return;
     type Person = { room: string; d: DocData; pf?: string; pb?: string };
     const people: Person[] = [{ room: primaryRoom || groupRooms[0].b, d: doc, pf: photoFront, pb: photoBack }];
     extras.filter((e) => e.firstName.trim() && e.lastName.trim()).forEach((e) => people.push({ room: e.room || groupRooms[0].b, d: e as unknown as DocData, pf: e.photoFront || undefined, pb: e.photoBack || undefined }));
@@ -263,7 +268,7 @@ function Engine() {
   const submit = async (opts?: { assumeConsent?: boolean }) => {
     const consented = opts?.assumeConsent || consent;
     const reqOk = !!doc && !!doc.firstName.trim() && !!doc.lastName.trim() && !!doc.birthDate && !!doc.docNumber.trim();
-    if (!info || !doc || !reqOk || !consented || !signature || submitting) return;
+    if (!info || !doc || !reqOk || !consented || (!isOperator && !signature) || submitting) return;
     setSubmitting(true); setSubmitErr("");
     try {
       const r = await fetch("/api/checkin", {
@@ -305,7 +310,9 @@ function Engine() {
   const header = (
     <div className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-3">
-        <div className="grid h-9 w-9 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: accent }}>{(st?.name ?? "SS").slice(0, 2).toUpperCase()}</div>
+        {st?.logo
+          ? <img src={st.logo} alt={st?.name ?? "Logo"} className="h-9 w-auto max-w-[150px] object-contain" />
+          : <div className="grid h-9 w-9 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: accent }}>{(st?.name ?? "SS").slice(0, 2).toUpperCase()}</div>}
         <div className="leading-tight"><div className="text-sm font-bold text-txt">{st?.name ?? "Xenora"}</div><div className="text-[11px] text-faint">Gestisci la tua prenotazione</div></div>
       </div>
     </div>
@@ -377,8 +384,8 @@ function Engine() {
           <div className={`${box} mb-4 p-4`} style={{ borderColor: "var(--ok)" }}>
             <div className="flex items-center gap-2"><span className="text-lg">👋</span><h2 className="font-display text-base font-bold text-txt">Bentornato, {info.guest.firstName || doc?.firstName}!</h2></div>
             <p className="mt-1 text-xs text-dim">Abbiamo già i tuoi dati e il documento del soggiorno precedente. Controlla che sia tutto corretto qui sotto e conferma — oppure invia subito.</p>
-            <button onClick={() => submit({ assumeConsent: true })} disabled={submitting || !signature} className="mt-3 w-full rounded-lg py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--ok)" }}>{submitting ? "Invio…" : "Confermo: i dati sono corretti → invia check-in"}</button>
-            <p className="mt-2 text-center text-[10px] text-faint">{signature ? "Confermando dichiari che i dati sono corretti e acconsenti al trattamento per la registrazione alla Questura." : "Per inviare, apponi la firma in fondo alla pagina."}</p>
+            <button onClick={() => submit({ assumeConsent: true })} disabled={submitting || (!isOperator && !signature)} className="mt-3 w-full rounded-lg py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--ok)" }}>{submitting ? "Invio…" : "Confermo: i dati sono corretti → invia check-in"}</button>
+            <p className="mt-2 text-center text-[10px] text-faint">{(isOperator || signature) ? "Confermando dichiari che i dati sono corretti e acconsenti al trattamento per la registrazione alla Questura." : "Per inviare, apponi la firma in fondo alla pagina."}</p>
           </div>
         )}
 
@@ -534,15 +541,17 @@ function Engine() {
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[color:var(--focus)]" />
             <span>Confermo che i dati sono corretti e acconsento al trattamento dei dati personali e del documento ai fini della registrazione degli alloggiati (Questura) e degli adempimenti di legge.</span>
           </label>
-          {/* Firma OBBLIGATORIA, subito prima dell'invio */}
-          <div className="mt-4 border-t border-line pt-4">
-            <h2 className="mb-1 font-display text-base font-bold text-txt">Firma <span style={{ color: "var(--err)" }}>*</span></h2>
-            <p className="mb-3 text-xs text-dim">Firma per confermare la correttezza dei dati e l&apos;accettazione delle condizioni.</p>
-            <SignaturePad value={signature} onChange={setSignature} />
-          </div>
+          {/* Firma: obbligatoria per l'OSPITE; se compila l'operatore (loggato) NON serve. */}
+          {!isOperator && (
+            <div className="mt-4 border-t border-line pt-4">
+              <h2 className="mb-1 font-display text-base font-bold text-txt">Firma <span style={{ color: "var(--err)" }}>*</span></h2>
+              <p className="mb-3 text-xs text-dim">Firma per confermare la correttezza dei dati e l&apos;accettazione delle condizioni.</p>
+              <SignaturePad value={signature} onChange={setSignature} />
+            </div>
+          )}
           {submitErr && <div className="mt-3 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)", color: "var(--err)" }}>{submitErr}</div>}
           <button onClick={() => (isGroup ? submitGroup() : submit())} disabled={!valid || submitting} className="mt-4 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{submitting ? "Invio…" : isGroup ? "Invia il check-in del gruppo" : "Invia il check-in"}</button>
-          {!valid && <div className="mt-2 text-center text-[11px] text-faint">Per inviare: compila nome, cognome, data di nascita, numero documento, spunta il consenso e <b>firma</b>.</div>}
+          {!valid && <div className="mt-2 text-center text-[11px] text-faint">Per inviare: compila nome, cognome, data di nascita, numero documento, spunta il consenso{isOperator ? "." : " e "}{!isOperator && <b>firma</b>}{!isOperator && "."}</div>}
         </div>
       </div>
     </div>

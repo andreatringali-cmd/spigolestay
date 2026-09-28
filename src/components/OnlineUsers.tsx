@@ -98,7 +98,7 @@ export default function OnlineUsers() {
         </div>
         <span className="hidden items-center gap-1 text-xs font-medium text-dim sm:flex">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: selfOnline ? "var(--ok)" : "var(--faint)" }} />
-          {peers.length ? `${peers.length === 1 ? peers[0].name.split(" ")[0] : `${peers.length} ${t("soci")}`} ${t("online")}` : `${online.length} ${t("online")}`}
+          {peers.length ? `${peers.length === 1 ? peers[0].name.split(" ")[0] : `${peers.length} ${t("soci")}`} ${t("online")}` : myName}
         </span>
       </button>
       {open && (

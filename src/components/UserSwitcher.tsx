@@ -10,7 +10,7 @@ const roleLabel = (k: string) => (k === "custom" ? "Personalizzato" : PERM_TEMPL
 
 // Utente "collegato": in produzione arriva dall'autenticazione. Qui puoi cambiarlo per provare i ruoli.
 export default function UserSwitcher({ sidebar, collapsed }: { sidebar?: boolean; collapsed?: boolean }) {
-  const { user, users, setUserId } = useAccess();
+  const { user } = useAccess();
   const { enabled: authEnabled, signOut, user: authUser } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -25,16 +25,15 @@ export default function UserSwitcher({ sidebar, collapsed }: { sidebar?: boolean
       </button>
       {open && (
         <div className={`absolute z-40 overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-xl ${sidebar ? "bottom-full left-0 mb-1 w-64 max-w-[calc(100vw-2rem)]" : "right-0 top-full mt-1 w-64"}`}>
-          <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Collegato come (prova ruoli)</div>
-          {users.map((u) => (
-            <button key={u.id} onClick={() => { const isSame = u.id === user.id; setUserId(u.id); setOpen(false); playSound(isSame ? "logout" : "login"); }} className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left ${u.id === user.id ? "bg-wash" : "hover:bg-wash"}`}>
-              <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full text-xs font-bold text-white" style={{ backgroundColor: u.avatarColor }}>{u.photo ? <img src={u.photo} alt="" className="h-full w-full object-cover" /> : initials(u.firstName, u.lastName)}</span>
-              <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-txt">{u.firstName} {u.lastName}</span><span className="block text-[11px] text-dim">{roleLabel(u.templateKey)}</span></span>
-              {u.id === user.id && <span className="text-focus">✓</span>}
-            </button>
-          ))}
+          <div className="flex items-center gap-2 px-2 py-2">
+            <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full text-xs font-bold text-white" style={{ backgroundColor: user.avatarColor }}>{user.photo ? <img src={user.photo} alt="" className="h-full w-full object-cover" /> : initials(user.firstName, user.lastName)}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold text-txt">{user.firstName} {user.lastName}</span>
+              <span className="block text-[11px] text-dim">{roleLabel(user.templateKey)}</span>
+            </span>
+          </div>
           {authEnabled && (
-            <div className="mt-1 border-t border-line pt-1">
+            <div className="border-t border-line pt-1">
               {authUser?.email && <div className="px-2 pb-1 pt-0.5 text-[11px] text-faint truncate" title={authUser.email}>Account: {authUser.email}</div>}
               <button onClick={() => { setOpen(false); playSound("logout"); void signOut(); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium text-[color:var(--bad)] hover:bg-wash">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
@@ -42,7 +41,6 @@ export default function UserSwitcher({ sidebar, collapsed }: { sidebar?: boolean
               </button>
             </div>
           )}
-          <div className="border-t border-line px-2 py-1.5 text-[10px] text-faint">In produzione l&apos;utente interno arriva dal login. Il menu e le pagine si adattano ai suoi permessi e ai moduli attivi.</div>
         </div>
       )}
     </div>
