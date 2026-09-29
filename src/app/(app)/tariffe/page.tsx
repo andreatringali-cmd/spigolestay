@@ -207,7 +207,15 @@ export default function TariffePage() {
 
         <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-sm">
+            <table className="w-full min-w-[680px] table-fixed text-sm">
+              <colgroup>
+                <col style={{ width: "30%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "14%" }} />
+              </colgroup>
               <thead>
                 <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
                   <th className="px-3 py-2.5 font-semibold">{t("Tipologia")}</th>
@@ -238,27 +246,21 @@ export default function TariffePage() {
           <span className="text-[11px] text-faint">{t("su ven/sab/dom, se non c'è un prezzo forzato dal calendario")}</span>
         </div>
 
-        {types.some((rt) => rt.deriveFrom) && (
-          <div className="mt-3 flex justify-end">
-            <a href="/tariffe-derivate" className="whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-sm font-medium text-focus hover:bg-wash">{t("Tariffe derivate")} →</a>
-          </div>
-        )}
       </section>
 
       {/* Anteprima prezzi */}
       <section>
-        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <SectionTitle>{t("Anteprima prezzi")}</SectionTitle>
-          <div className="flex items-center gap-2">
-            <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">{plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.adjPct >= 0 ? "+" : ""}{p.adjPct}%)</option>)}</select>
-            <a href="/piani-tariffari" className="whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-sm font-medium text-focus hover:bg-wash">{t("Gestisci piani")} →</a>
-          </div>
-        </div>
-        {/* Legenda */}
-        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-faint">
+        <SectionTitle>{t("Anteprima prezzi")}</SectionTitle>
+        {/* Legenda + azioni: tutto in un'unica riga */}
+        <div className="mb-3 mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-xs shadow-sm">
           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded border border-line bg-wash" /> {t("weekend")}</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 22%, transparent)" }} /> {t("oggi")}</span>
           <span className="flex items-center gap-1.5"><span className="rounded px-1 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>€</span> {t("prezzo forzato dal calendario")}</span>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {types.some((rt) => rt.deriveFrom) && <a href="/tariffe-derivate" className="whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-sm font-medium text-focus hover:bg-wash">{t("Tariffe derivate")} →</a>}
+            <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">{plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.adjPct >= 0 ? "+" : ""}{p.adjPct}%)</option>)}</select>
+            <a href="/piani-tariffari" className="whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-sm font-medium text-focus hover:bg-wash">{t("Gestisci piani")} →</a>
+          </div>
         </div>
         <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
           <table className="w-full min-w-[900px] border-collapse text-sm">
