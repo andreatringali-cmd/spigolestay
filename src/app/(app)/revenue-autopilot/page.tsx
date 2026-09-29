@@ -15,6 +15,7 @@ import { italianHolidays, italianBridges } from "@/lib/holidays";
 import { computeSuggestions, loadAutopilot, saveAutopilot, toOverrideMap, highDemandMap, type AutopilotCfg, type Suggestion } from "@/lib/autopilot";
 import { explainSuggestion, explainSuggestionCompact, summarizeAppliedSuggestions } from "@/lib/autopilot-explain";
 import { fetchCityPulse, computeMarketSignal, pulseHasDemo, MARKET_WINDOW, type MarketPulse } from "@/lib/market";
+import { forecastOccupancy, nextWeekendISOs, FORECAST_DEMO_NOTE } from "@/lib/forecast";
 
 const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
 
@@ -66,6 +67,19 @@ export default function RevenueAutopilotPage() {
     [bookings, roomTypes, units, rateOverrides, cfg, todayISO, scope, highDemand, signal],
   );
 
+  // Previsione storica (lib/forecast.ts): segnale INFORMATIVO in più per il prossimo
+  // weekend, separato dal motore prezzi vero e proprio (non altera suggestions/mult).
+  // Mostrata solo se la confidenza supera la soglia minima: mai un numero inventato.
+  const weekendForecast = useMemo(() => {
+    const scopeUnits = units.filter((u) => !u.outOfService && (scope === "all" || u.structureId === scope));
+    if (!scopeUnits.length) return [];
+    const [sat, sun] = nextWeekendISOs(todayISO);
+    return [sat, sun]
+      .map((iso) => forecastOccupancy(bookings, scopeUnits.length, scope, iso, todayISO, pulse))
+      .filter((f) => f.occPct != null && f.label);
+  }, [bookings, units, scope, todayISO, pulse]);
+  const weekendForecastHasDemo = weekendForecast.some((f) => f.networkHasDemo);
+
   const setCfgPersist = (patch: Partial<AutopilotCfg>) => { const next = { ...cfg, ...patch }; setCfg(next); saveAutopilot(next); };
 
   // Autopilot attivo: applica automaticamente i suggerimenti una volta appena pronti.
@@ -111,6 +125,21 @@ export default function RevenueAutopilotPage() {
           <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title="La media di zona include strutture demo dimostrative, non solo concorrenti reali.">Include dati dimostrativi</span>
         )}
       </div>
+
+      {/* Previsione storica per il prossimo weekend: solo se la confidenza è sufficiente (mai un numero inventato). */}
+      {weekendForecast.length > 0 && (
+        <Card className="mb-4">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-faint">Previsione basata sullo storico · non è intelligenza artificiale, è una media pesata dei tuoi dati reali</div>
+          <ul className="space-y-1 text-sm text-txt">
+            {weekendForecast.map((f) => (
+              <li key={f.iso}>
+                {f.label}
+              </li>
+            ))}
+          </ul>
+          {weekendForecastHasDemo && <p className="mt-2 text-[11px] text-faint">{FORECAST_DEMO_NOTE}</p>}
+        </Card>
+      )}
 
       {/* Riepilogo + interruttore autopilot */}
       <div className="mb-4 grid gap-3 lg:grid-cols-4">
