@@ -32,7 +32,10 @@ export default function StatistichePage() {
   const [chartsOn, setChartsOn] = useState(true);
   useEffect(() => { try { const r = localStorage.getItem("spigolestay:statscharts:on"); if (r !== null) setChartsOn(r === "1"); } catch {} }, []);
   const toggleCharts = () => setChartsOn((v) => { const n = !v; try { localStorage.setItem("spigolestay:statscharts:on", n ? "1" : "0"); } catch {} return n; });
-  // Report attivo: i tanti report di Octorate condensati in 3 (Produzione, Previsionale, Annuale).
+  // Report attivo: i tanti report di Octorate condensati in 3 (Mensile, Previsionale, Annuale).
+  // La chiave interna resta "produzione" per non toccare la persistenza/tipizzazione esistente;
+  // solo l'etichetta è cambiata in "Mensile" perché il contenuto (KPI/grafici del mese di
+  // soggiorno) non corrisponde al significato standard di "produzione" (prenotazioni acquisite).
   const [report, setReport] = useState<"produzione" | "previsionale" | "annuale">("produzione");
 
   const active = bookings.filter((b) => b.status !== "cancelled" && (activeStructureId === "all" || b.structureId === activeStructureId));
@@ -213,23 +216,26 @@ export default function StatistichePage() {
 
   return (
     <div>
-      <PageHeader title={t("Statistiche")} subtitle={t("Tre report: produzione del mese, previsionale e annuale")} />
+      <PageHeader title={t("Statistiche")} subtitle={t("Tre report: riepilogo del mese, previsionale e annuale")} />
 
-      {/* Selettore report: Produzione · Previsionale · Annuale */}
-      <div className="mb-4 inline-flex rounded-xl border border-line bg-surface p-0.5 text-sm shadow-sm">
-        {([["produzione", t("Produzione")], ["previsionale", t("Previsionale")], ["annuale", t("Annuale")]] as const).map(([k, lab]) => (
-          <button key={k} onClick={() => setReport(k)} className={`rounded-lg px-4 py-1.5 font-semibold transition ${report === k ? "bg-focus text-white shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
-        ))}
-      </div>
-
-      {/* Base di attribuzione dei ricavi */}
-      <div className={`mb-3 flex flex-wrap items-center gap-2 text-xs ${report === "previsionale" ? "hidden" : ""}`}>
-        <span className="text-dim">{t("Ricavi calcolati")}:</span>
-        <div className="inline-flex rounded-lg border border-line p-0.5">
-          {([["notte", t("Per notte (competenza)")], ["arrivo", t("Per data di arrivo")], ["incasso", t("All'incasso")]] as const).map(([k, lab]) => (
-            <button key={k} onClick={() => setBasis(k)} className={`rounded-md px-2.5 py-1 font-semibold transition ${basis === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>
+      {/* Riga report: selettore Produzione/Previsionale/Annuale + base di attribuzione ricavi.
+          Un'unica card, coerente con le altre righe-filtro dell'app, invece di due pillole sciolte. */}
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-2 shadow-sm">
+        <div className="inline-flex rounded-lg bg-wash p-0.5 text-sm">
+          {([["produzione", t("Mensile")], ["previsionale", t("Previsionale")], ["annuale", t("Annuale")]] as const).map(([k, lab]) => (
+            <button key={k} onClick={() => setReport(k)} className={`rounded-md px-4 py-1.5 font-semibold transition ${report === k ? "bg-focus text-white shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
           ))}
         </div>
+        {report !== "previsionale" && (
+          <div className="ml-auto flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-dim">{t("Ricavi calcolati")}:</span>
+            <div className="inline-flex rounded-lg bg-wash p-0.5">
+              {([["notte", t("Per notte (competenza)")], ["arrivo", t("Per data di arrivo")], ["incasso", t("All'incasso")]] as const).map(([k, lab]) => (
+                <button key={k} onClick={() => setBasis(k)} className={`rounded-md px-2.5 py-1 font-semibold transition ${basis === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {report === "produzione" && (<>
