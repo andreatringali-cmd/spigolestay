@@ -13,7 +13,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { italianHolidays, italianBridges } from "@/lib/holidays";
 import { DEFAULT_STRAT, RISK_PRESET, MONTHS, cellKey, runNettare, applyMod, hasMod, normalizeStrategy, type Cell, type Mod, type Period, type Risk, type Strategy, type Step } from "@/lib/nettare";
 import { effBase } from "@/lib/pricing";
-import { fetchCityPulse, computeMarketSignal, type MarketPulse } from "@/lib/market";
+import { fetchCityPulse, computeMarketSignal, pulseHasDemo, type MarketPulse } from "@/lib/market";
 
 const WINDOW = 90;
 const FUTURE = 30;
@@ -195,6 +195,9 @@ export default function NettarePage() {
           {market.hasZoneData
             ? <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2 py-0.5 text-[11px] font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--focus) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--focus)" }} />{t("Media di zona attiva")}</span>
             : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2 py-0.5 text-[11px] font-medium text-faint">{t("Media di zona (Rete città): in arrivo")}</span>}
+          {market.hasZoneData && pulseHasDemo(pulse) && (
+            <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={t("La media di zona include strutture demo dimostrative, non solo concorrenti reali.")}>{t("Include dati dimostrativi")}</span>
+          )}
           {city && <Link href="/mercato" className="font-medium" style={{ color: "var(--focus)" }}>{t("Vedi i dati della Rete città")} →</Link>}
         </div>
       </div>

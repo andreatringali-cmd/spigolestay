@@ -13,8 +13,8 @@ const WINDOW = 90;
 const THRESHOLD = 3;
 
 type Consents = { occupancy: boolean; adr: boolean; demand: boolean; channels: boolean };
-type Row = { idx: number; is_me: boolean; occupancy: number | null; adr: number | null; revpar: number | null; future_occ: number | null; pickup_pct: number | null; lead_avg: number | null; los_avg: number | null; cancel_rate: number | null; direct_pct: number | null; foreign_pct: number | null };
-type Pulse = { n_structures: number; occupancy: number | null; adr: number | null; revpar: number | null; my_occupancy: number | null; my_adr: number | null; my_revpar: number | null };
+type Row = { idx: number; is_me: boolean; is_demo: boolean; occupancy: number | null; adr: number | null; revpar: number | null; future_occ: number | null; pickup_pct: number | null; lead_avg: number | null; los_avg: number | null; cancel_rate: number | null; direct_pct: number | null; foreign_pct: number | null };
+type Pulse = { n_structures: number; n_demo_structures: number; occupancy: number | null; adr: number | null; revpar: number | null; my_occupancy: number | null; my_adr: number | null; my_revpar: number | null };
 
 const dow = (iso: string) => new Date(iso + "T00:00:00").getDay();
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -143,6 +143,13 @@ export default function MercatoPage() {
     <div>
       <PageHeader title={t("Rete città")} subtitle={`${city} · ${t("confronto anonimo con i B&B della tua città")}`} />
 
+      {!!pulse?.n_demo_structures && (
+        <div className="mb-4 flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px]" style={{ borderColor: "color-mix(in srgb,#f59e0b 35%,var(--line))", background: "color-mix(in srgb,#f59e0b 8%,var(--surface))", color: "#B45309" }}>
+          <span className="font-bold uppercase tracking-wide">{t("Include dati dimostrativi")}:</span>
+          <span>{t("su")} {pulse.n_structures} {t("strutture della rete")}, {pulse.n_demo_structures} {t("sono demo dimostrative (non concorrenti reali) — usate per mostrare la funzione. Le medie qui sotto le includono.")}</span>
+        </div>
+      )}
+
       {/* KPI: come vai rispetto alla città */}
       <section className="mt-4">
         <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Come vai rispetto alla città")}</h3>
@@ -173,9 +180,16 @@ export default function MercatoPage() {
       <section className="mt-4">
         <div className="flex items-center justify-between">
           <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Le strutture della rete")} · {city}</h3>
-          <span className="inline-flex items-center gap-1.5 text-xs text-faint"><span className={`h-2 w-2 rounded-full ${loading ? "animate-pulse" : ""}`} style={{ background: enough ? "var(--ok)" : "var(--warn)" }} />{pulse?.n_structures ?? 0} {t("nella rete")}</span>
+          <span className="inline-flex items-center gap-2 text-xs text-faint">
+            <span className="inline-flex items-center gap-1.5"><span className={`h-2 w-2 rounded-full ${loading ? "animate-pulse" : ""}`} style={{ background: enough ? "var(--ok)" : "var(--warn)" }} />{pulse?.n_structures ?? 0} {t("nella rete")}</span>
+            {!!pulse?.n_demo_structures && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={t("Include dati dimostrativi: strutture demo usate per mostrare la funzione, non concorrenti reali.")}>
+                {t("Include dati dimostrativi")} ({pulse.n_demo_structures})
+              </span>
+            )}
+          </span>
         </div>
-        <p className="mb-2 mt-0.5 text-xs text-dim">{t("Sono queste strutture, insieme, a formare le medie. Anonime; la tua è evidenziata.")}</p>
+        <p className="mb-2 mt-0.5 text-xs text-dim">{t("Sono queste strutture, insieme, a formare le medie. Anonime; la tua è evidenziata.")}{!!pulse?.n_demo_structures && ` ${t("Alcune sono strutture demo dimostrative (etichettate sotto), non concorrenti reali.")}`}</p>
         <div className="rounded-2xl border border-line px-4 py-3" style={{ background: "var(--surface)" }}>
           {breakdown.length ? (
             <div className="overflow-x-auto">
@@ -205,6 +219,7 @@ export default function MercatoPage() {
                         <span className="inline-flex items-center gap-2">
                           <span className="inline-grid h-6 w-6 place-items-center rounded-lg text-[11px] font-bold" style={{ background: r.is_me ? "var(--focus)" : "var(--wash)", color: r.is_me ? "#fff" : "var(--dim)" }}>{r.is_me ? "★" : r.idx}</span>
                           <span className={r.is_me ? "font-semibold text-txt" : "text-dim"}>{r.is_me ? t("La tua struttura") : `${t("Struttura")} ${r.idx}`}</span>
+                          {r.is_demo && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={t("Struttura demo dimostrativa: dati sintetici, non un concorrente reale.")}>{t("Demo")}</span>}
                         </span>
                       </td>
                       <td className="border-t border-line py-2.5">{r.occupancy != null ? (<span className="inline-flex items-center gap-2"><span className="inline-block h-1.5 w-16 overflow-hidden rounded-full" style={{ background: "var(--wash)" }}><span className="block h-full rounded-full" style={{ width: `${Math.round(r.occupancy * 100)}%`, background: r.is_me ? "var(--focus)" : "var(--dim)" }} /></span><span className="font-mono text-xs text-txt">{Math.round(r.occupancy * 100)}%</span></span>) : <span className="text-faint">—</span>}</td>

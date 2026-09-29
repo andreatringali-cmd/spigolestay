@@ -9,7 +9,7 @@ import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 import { shiftISO, nights, toISO } from "@/lib/dates";
-import { fetchCityPulse, computeMarketSignal, revenueSuggestion, MARKET_WINDOW, type MarketPulse } from "@/lib/market";
+import { fetchCityPulse, computeMarketSignal, revenueSuggestion, pulseHasDemo, MARKET_WINDOW, type MarketPulse } from "@/lib/market";
 
 const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -96,6 +96,9 @@ export default function RevenuePage() {
         {signal.hasZoneData
           ? <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--focus) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--focus)" }} />{t("Media di zona attiva")}{city ? ` · ${city}` : ""}</span>
           : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 font-medium text-faint">{t("Media di zona (Rete città): in arrivo")}</span>}
+        {signal.hasZoneData && pulseHasDemo(pulse) && (
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={t("La media di zona include strutture demo dimostrative, non solo concorrenti reali.")}>{t("Include dati dimostrativi")}</span>
+        )}
       </div>
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">

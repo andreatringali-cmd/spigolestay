@@ -14,7 +14,7 @@ import { useToast } from "@/components/ToastProvider";
 import { italianHolidays, italianBridges } from "@/lib/holidays";
 import { computeSuggestions, loadAutopilot, saveAutopilot, toOverrideMap, highDemandMap, type AutopilotCfg, type Suggestion } from "@/lib/autopilot";
 import { explainSuggestion, explainSuggestionCompact, summarizeAppliedSuggestions } from "@/lib/autopilot-explain";
-import { fetchCityPulse, computeMarketSignal, MARKET_WINDOW, type MarketPulse } from "@/lib/market";
+import { fetchCityPulse, computeMarketSignal, pulseHasDemo, MARKET_WINDOW, type MarketPulse } from "@/lib/market";
 
 const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
 
@@ -107,6 +107,9 @@ export default function RevenueAutopilotPage() {
         {signal.hasZoneData
           ? <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-semibold text-txt" style={{ background: "color-mix(in srgb,var(--focus) 12%,var(--surface))" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--focus)" }} />Media di zona attiva{city ? ` · ${city}` : ""}</span>
           : <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 font-medium text-faint">Media di zona (Rete città): in arrivo</span>}
+        {signal.hasZoneData && pulseHasDemo(pulse) && (
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title="La media di zona include strutture demo dimostrative, non solo concorrenti reali.">Include dati dimostrativi</span>
+        )}
       </div>
 
       {/* Riepilogo + interruttore autopilot */}

@@ -54,7 +54,7 @@ export type Cell = {
   occ: number; sold: number; total: number; adr: number;
   mod?: Mod; modSet: boolean; modActive: boolean; minNights: number;
 };
-export type Market = { cityHot: boolean; adrGap: number };
+export type Market = { cityHot: boolean; adrGap: number; hasDemo?: boolean };
 
 export const cellKey = (rtId: string, iso: string) => `${rtId}|${iso}`;
 const dow = (iso: string) => new Date(iso + "T00:00:00").getDay();
@@ -145,10 +145,13 @@ export function runNettare(inp: Input): { days: DayInfo[]; cells: Record<string,
     if (strat.events && evs.length && eff.eventImpact) mults.push({ label: `Evento · ${evs.map((e) => e.name).join(", ")}`, m: 1 + eff.eventImpact / 100 });
     if (pickup >= 0.7) mults.push({ label: "Struttura quasi al completo", m: eff.goal === "revenue" ? 1.22 : 1.13 });
     else if (pickup <= 0.2 && i >= 0 && i <= 10 && strat.lastMinute) mults.push({ label: `Distanza dalla data · ancora vuoto a ${i} gg`, m: eff.goal === "fill" ? 0.86 : 0.93 });
-    if (strat.followMarket && market.cityHot) mults.push({ label: "Città molto piena (Rete città)", m: 1.08 });
-    if (strat.followMarket && market.adrGap > 0.05) mults.push({ label: "Sotto il prezzo medio della città", m: 1 + clamp(market.adrGap, 0, 0.15) });
-    else if (strat.followMarket && market.adrGap < -0.08) mults.push({ label: "Sopra il prezzo medio della città", m: 0.96 });
-    if (strat.events && strat.followMarket && market.cityHot && (wd === 5 || wd === 6)) mults.push({ label: "Picco: weekend + città piena", m: 1.05 });
+    // Se la Rete città include strutture demo, le etichette portano un asterisco: onesto
+    // anche nel dettaglio del prezzo (Breakdown), non solo nel badge di pagina.
+    const zoneStar = market.hasDemo ? " *" : "";
+    if (strat.followMarket && market.cityHot) mults.push({ label: `Città molto piena (Rete città)${zoneStar}`, m: 1.08 });
+    if (strat.followMarket && market.adrGap > 0.05) mults.push({ label: `Sotto il prezzo medio della città${zoneStar}`, m: 1 + clamp(market.adrGap, 0, 0.15) });
+    else if (strat.followMarket && market.adrGap < -0.08) mults.push({ label: `Sopra il prezzo medio della città${zoneStar}`, m: 0.96 });
+    if (strat.events && strat.followMarket && market.cityHot && (wd === 5 || wd === 6)) mults.push({ label: `Picco: weekend + città piena${zoneStar}`, m: 1.05 });
     if (eff.goal === "fill") mults.push({ label: "Obiettivo: riempi", m: 0.97 });
     else if (eff.goal === "revenue") mults.push({ label: "Obiettivo: massimo ricavo", m: 1.03 });
 

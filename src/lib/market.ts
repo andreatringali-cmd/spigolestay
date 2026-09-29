@@ -19,7 +19,10 @@ export const MARKET_THRESHOLD = 3;
 export const MARKET_WINDOW = 90;
 
 /** Aggregato anonimo della città restituito dalla RPC `market_pulse`. */
-export type MarketPulse = { n_structures: number; occupancy: number | null; adr: number | null; revpar?: number | null };
+export type MarketPulse = { n_structures: number; n_demo_structures: number; occupancy: number | null; adr: number | null; revpar?: number | null };
+
+/** true se l'aggregato include almeno una struttura demo (bootstrap dimostrativo, non un concorrente reale). */
+export const pulseHasDemo = (p: MarketPulse | null): boolean => !!p && p.n_demo_structures > 0;
 
 /**
  * Segnale di mercato normalizzato per il motore prezzi.
@@ -31,9 +34,10 @@ export type MarketSignal = {
   cityAdr: number | null; // ADR medio di zona € (null = non disponibile)
   cityHot: boolean;       // la zona è più piena di te → alza
   adrGap: number;         // (ADR zona − tuo ADR)/tuo ADR: > 0 = sei sotto la zona
+  hasDemo: boolean;       // true se l'aggregato di zona include strutture demo (dimostrative, non concorrenti reali)
 };
 
-export const EMPTY_SIGNAL: MarketSignal = { hasZoneData: false, cityOcc: null, cityAdr: null, cityHot: false, adrGap: 0 };
+export const EMPTY_SIGNAL: MarketSignal = { hasZoneData: false, cityOcc: null, cityAdr: null, cityHot: false, adrGap: 0, hasDemo: false };
 
 /** Normalizza il risultato grezzo della RPC (array o oggetto) in un MarketPulse coerente. */
 export function normalizePulse(raw: unknown): MarketPulse | null {
@@ -41,7 +45,7 @@ export function normalizePulse(raw: unknown): MarketPulse | null {
   if (!p || typeof p !== "object") return null;
   const o = p as Record<string, unknown>;
   const num = (v: unknown) => (v == null || Number.isNaN(Number(v)) ? null : Number(v));
-  return { n_structures: Number(o.n_structures) || 0, occupancy: num(o.occupancy), adr: num(o.adr), revpar: num(o.revpar) };
+  return { n_structures: Number(o.n_structures) || 0, n_demo_structures: Number(o.n_demo_structures) || 0, occupancy: num(o.occupancy), adr: num(o.adr), revpar: num(o.revpar) };
 }
 
 /**
@@ -72,6 +76,7 @@ export function computeMarketSignal(myOcc: number, myAdr: number, pulse: MarketP
     cityAdr,
     cityHot: cityOcc != null && cityOcc > myOcc + 0.05,
     adrGap: cityAdr != null && myAdr > 0 ? (cityAdr - myAdr) / myAdr : 0,
+    hasDemo: pulseHasDemo(pulse),
   };
 }
 
@@ -98,9 +103,13 @@ export function zoneMultiplier(signal: MarketSignal | undefined, occ: number): {
   const reasons: string[] = [];
   let mult = 1;
   if (!signal?.hasZoneData) return { mult, reasons };
-  if (signal.cityHot && occ >= 0.25) { mult *= 1.06; reasons.push("Zona molto piena (Rete città)"); }
-  if (signal.adrGap > 0.05) { mult *= 1 + Math.min(signal.adrGap, 0.15); reasons.push(`Sotto l'ADR di zona (+${Math.round(signal.adrGap * 100)}%)`); }
-  else if (signal.adrGap < -0.08) { mult *= 0.97; reasons.push("Sopra l'ADR di zona"); }
+  // Se l'aggregato di zona include strutture demo, la frase porta un asterisco: chi legge
+  // (anche a distanza, nel registro attività) deve sempre poter capire che non è un dato
+  // di mercato al 100% reale. Vedi autopilot-explain.ts → zoneClause per la nota estesa.
+  const star = signal.hasDemo ? " *" : "";
+  if (signal.cityHot && occ >= 0.25) { mult *= 1.06; reasons.push(`Zona molto piena (Rete città)${star}`); }
+  if (signal.adrGap > 0.05) { mult *= 1 + Math.min(signal.adrGap, 0.15); reasons.push(`Sotto l'ADR di zona (+${Math.round(signal.adrGap * 100)}%)${star}`); }
+  else if (signal.adrGap < -0.08) { mult *= 0.97; reasons.push(`Sopra l'ADR di zona${star}`); }
   return { mult, reasons };
 }
 

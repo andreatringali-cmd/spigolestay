@@ -28,12 +28,21 @@ function joinIt(parts: string[]): string {
 
 // Le frasi di zona (lib/market.ts → zoneMultiplier) sono già testo umano onesto
 // (attivo solo con dati reali di rete): le rendiamo solo minuscole/discorsive.
-function zoneClause(r: string): string {
+// Se la Rete città includeva strutture demo, zoneMultiplier aggiunge un asterisco finale
+// (" *") alla frase originale: lo togliamo dalla clausola e lo segnaliamo a parte, così
+// anche il registro attività resta onesto su cosa è dato demo e cosa è mercato reale.
+const DEMO_MARK = " *";
+function zoneClause(rawReason: string): string {
+  const r = rawReason.endsWith(DEMO_MARK) ? rawReason.slice(0, -DEMO_MARK.length) : rawReason;
   if (r.startsWith("Zona molto piena")) return "la Rete città segnala una zona molto piena rispetto alla tua occupazione";
   if (r.startsWith("Sotto l'ADR")) return `il tuo prezzo medio è sotto la media di zona (${r.match(/\+\d+%/)?.[0] ?? "sotto media"})`;
   if (r.startsWith("Sopra l'ADR")) return "il tuo prezzo medio è già sopra la media di zona";
   return r.charAt(0).toLowerCase() + r.slice(1);
 }
+
+// true se almeno una motivazione di zona porta l'asterisco demo (vedi DEMO_MARK sopra).
+const hasDemoZone = (reasons: string[]): boolean => reasons.some((r) => r.endsWith(DEMO_MARK));
+const DEMO_NOTE = "* la Rete città di zona include, per ora, anche strutture demo dimostrative insieme a quelle reali";
 
 /**
  * Spiegazione completa (soggetto + giorno) di una proposta, pensata per il registro
@@ -57,7 +66,8 @@ export function explainSuggestion(s: Suggestion): string {
   clauses.push(...signals.zoneReasons.map(zoneClause));
 
   const why = clauses.length ? joinIt(clauses) : "l'andamento delle prenotazioni rilevato dal motore prezzi";
-  return `Ho ${verb} il prezzo di ${s.typeName} per ${day} del ${pct}% perché ${why}.`;
+  const note = hasDemoZone(signals.zoneReasons) ? ` (${DEMO_NOTE})` : "";
+  return `Ho ${verb} il prezzo di ${s.typeName} per ${day} del ${pct}% perché ${why}${note}.`;
 }
 
 /**
@@ -81,7 +91,8 @@ export function explainSuggestionCompact(s: Suggestion): string {
   clauses.push(...signals.zoneReasons.map(zoneClause));
 
   const why = clauses.length ? joinIt(clauses) : "andamento prenotazioni";
-  return `${verb === "alza" ? "Alza" : "Abbassa"} del ${pct}% perché ${why}.`;
+  const note = hasDemoZone(signals.zoneReasons) ? ` (${DEMO_NOTE})` : "";
+  return `${verb === "alza" ? "Alza" : "Abbassa"} del ${pct}% perché ${why}${note}.`;
 }
 
 /**
