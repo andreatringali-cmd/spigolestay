@@ -155,18 +155,17 @@ export default function CamerePage() {
       <PageHeader
         title={t("Camere")}
         subtitle={t("Tipologie e singole camere di ogni struttura")}
-        actions={
-          <div className="flex items-center gap-2">
-            {activeStructureId === "all" && (
-              <select value={localS} onChange={(e) => setLocalS(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
-                <option value="all">{t("Tutte le strutture")}</option>
-                {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            )}
-            <WeatherWidget compact />
-          </div>
-        }
+        actions={<WeatherWidget compact />}
       />
+
+      {activeStructureId === "all" && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm">
+          <select value={localS} onChange={(e) => setLocalS(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+            <option value="all">{t("Tutte le strutture")}</option>
+            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+      )}
 
       {scoped.length === 0 && <Card><div className="py-8 text-center text-sm text-faint">{t("Nessuna struttura. Creane una in")} <Link href="/strutture" className="text-focus underline">{t("Strutture")}</Link>.</div></Card>}
 

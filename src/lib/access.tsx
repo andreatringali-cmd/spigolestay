@@ -9,6 +9,13 @@ import { usePathname } from "next/navigation";
 import { loadUsers, saveUsers, type User, type PermLevel } from "./users";
 import { TIERS } from "./plans";
 import { supabase } from "./supabase";
+import { coManagerPerms } from "./comanager";
+
+// Se il proprietario non ha ancora scelto un livello per un co-gestore, la membership resta con
+// permissions=null in DB. La UI del proprietario (scheda struttura) mostra comunque "Co-gestore"
+// come livello di default (vedi comanager.ts:levelOf), quindi qui applichiamo lo stesso default
+// invece di trattare "permissions assente" come "nessun permesso su nulla".
+const DEFAULT_CO_MANAGER_PERMS = coManagerPerms("manager") as Record<string, PermLevel>;
 
 interface AccessValue {
   user: User | null;
@@ -126,7 +133,10 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     const own: PermLevel = user ? ((user.perms?.[perm] as PermLevel) ?? "none") : "edit";
     if (restriction) {
       if (restriction.paused) return "none";                              // accesso in pausa dal proprietario
-      const g = ((restriction.perms?.[perm] as PermLevel) ?? "none");
+      // permissions=null → livello non ancora scelto dal proprietario: default "Co-gestore" (pieno),
+      // non "nessun permesso" (altrimenti la struttura condivisa risulta bloccata ovunque finché
+      // il proprietario non tocca esplicitamente il selettore livello).
+      const g = restriction.perms ? ((restriction.perms[perm] as PermLevel) ?? "none") : (DEFAULT_CO_MANAGER_PERMS[perm] ?? "none");
       return minLvl(own, g);
     }
     return own;
