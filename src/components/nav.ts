@@ -20,7 +20,7 @@ export const NAV: NavItem[] = [
   { label: "Pulizie", href: "/pulizie", group: "PMS", icon: "sparkles", perm: "pulizie", module: "housekeeping" },
   { label: "Ospiti", href: "/ospiti", group: "PMS", icon: "users", perm: "prenotazioni", module: "pms" },
   { label: "Messaggi", href: "/messaggi", group: "PMS", icon: "chat", perm: "webconcierge", module: "messaging" },
-  { label: "Assistente", href: "/assistente", group: "PMS", icon: "sparkles", perm: "prenotazioni", module: "pms" },
+  { label: "Assistente (beta)", href: "/assistente", group: "PMS", icon: "sparkles", perm: "prenotazioni", module: "pms" },
 
   // Channel Manager: distribuzione sui portali + catena del prezzo (tariffe).
   { label: "Channel Manager", href: "/canali", group: "Channel Manager", icon: "share", perm: "canali", module: "cm" },
