@@ -220,6 +220,19 @@ export default function CamerePage() {
               </tr>
             );
           };
+          // Filtri camere: ricerca + azioni. Posizione diversa a seconda del contesto:
+          // in cima al blocco quando si sta guardando "tutte le strutture" (subito sotto il box
+          // di quella struttura), sotto le card Tipologie quando in alto a destra è già
+          // selezionata una struttura specifica (torna la posizione "classica" pre-camere).
+          const filtriRow = () => (
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm">
+              <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="w-full flex-1 sm:w-auto" />
+              <div className="ml-auto flex items-center gap-2">
+                <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
+                <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
+              </div>
+            </div>
+          );
           return (
             <div key={s.id}>
               <div className="mb-2 flex items-center justify-between">
@@ -229,14 +242,7 @@ export default function CamerePage() {
                 </div>
               </div>
 
-              {/* Filtri camere: ricerca + azioni, in cima al blocco struttura. */}
-              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm">
-                <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="w-full flex-1 sm:w-auto" />
-                <div className="ml-auto flex items-center gap-2">
-                  <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
-                  <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
-                </div>
-              </div>
+              {activeStructureId === "all" && filtriRow()}
 
               {/* Statistiche */}
               <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -275,6 +281,8 @@ export default function CamerePage() {
                 })}
                 {types.length === 0 && <div className="w-full rounded-xl border border-dashed border-line"><EmptyState title={t("Nessuna tipologia. Aggiungine una col pulsante “+ Tipologia”.")} /></div>}
               </div>
+
+              {activeStructureId !== "all" && filtriRow()}
 
               {/* Camere — un box separato per ogni tipologia */}
               <SectionTitle>{t("Camere")}</SectionTitle>
