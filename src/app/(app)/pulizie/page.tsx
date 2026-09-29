@@ -21,12 +21,15 @@ const fmtLong = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { wee
 const STRUCT_COLORS = ["#4F46E5", "#2F9E6F", "#C08A3A", "#B3453A", "#0891B2", "#DB2777"];
 
 type ActionKey = "turnover" | "arrivo" | "partenza" | "riassetto" | "niente";
+// Un colore chiaramente diverso per ciascun caso — "niente" era colorato come un'azione
+// primaria (stesso blu dei pulsanti), confondibile con le camere che richiedono davvero
+// attenzione: ora è neutro (grigio), coerente col fatto che non c'è nulla da fare.
 const ACT: Record<ActionKey, { label: string; color: string }> = {
   turnover: { label: "Partenza + Arrivo", color: "#7C3AED" },
   arrivo: { label: "Arrivo", color: "var(--ok)" },
   partenza: { label: "Partenza", color: "var(--err)" },
   riassetto: { label: "Riassetto", color: "var(--warn)" },
-  niente: { label: "Niente", color: "var(--focus)" },
+  niente: { label: "Niente", color: "var(--faint)" },
 };
 
 interface Issue { id: string; unitId: string; unitName: string; structureName: string; date: string; type: string; note: string; photo?: string; createdAt: string; resolved?: boolean; resolvedAt?: string; updatedAt?: number; _deleted?: boolean }
@@ -608,6 +611,16 @@ export default function PuliziePage() {
           )}
         </div>
       )}
+
+      {/* Didascalia colori: cosa significa ogni colore nel planning sotto. */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim">
+        {(Object.keys(ACT) as ActionKey[]).map((k) => (
+          <span key={k} className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: ACT[k].color }} />
+            {t(ACT[k].label)}
+          </span>
+        ))}
+      </div>
 
       {/* Planning */}
       <div className="flex flex-col gap-5">
