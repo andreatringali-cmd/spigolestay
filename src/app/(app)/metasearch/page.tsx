@@ -13,10 +13,47 @@ import { slugify } from "@/lib/publicdata";
 const META = [
   { key: "google", name: "Google Hotel Ads", desc: "Comparatore n°1: appare nella scheda Google e Maps.", color: "#4285F4" },
   { key: "trivago", name: "Trivago", desc: "Metasearch europeo, forte sul mercato DACH.", color: "#E32851" },
-  { key: "tripadvisor", name: "Tripadvisor", desc: "Recensioni + confronto prezzi diretti.", color: "#00AA6C" },
-  { key: "trip", name: "Trip.com", desc: "Copertura sul mercato asiatico.", color: "#2577E3" },
+  { key: "tripadvisor", name: "Tripadvisor", desc: "Recensioni + confronto prezzi diretti.", color: "#34E0A1" },
+  { key: "trip", name: "Trip.com", desc: "Copertura sul mercato asiatico.", color: "#287DFA" },
   { key: "kayak", name: "Kayak", desc: "Aggregatore viaggi USA/EU.", color: "#FF690F" },
 ];
+
+// Icone ufficiali dei comparatori (simple-icons). Kayak non ha un'icona single-color
+// affidabile in quella libreria: resta l'iniziale su sfondo colorato come fallback onesto.
+const META_ICON_PATHS: Record<string, string> = {
+  trivago: "M7.8112 0a.2537.2537 0 0 0-.1336.0416L2.8311 3.1804a.4265.4265 0 0 0-.1947.3579v9.285c0 .141.1144.2554.2555.2554h5.1808l10.358-5.7274a.4263.4263 0 0 0 .22-.3732V1.6774c0-.1949-.2092-.3182-.3797-.2239L8.0727 7.0923V.2563c0-.1521-.1265-.2589-.2615-.2563zm.0172 14.7072-4.9307.0002c-.1457 0-.2607.1216-.2555.2672C2.822 19.9896 6.9445 24 12.0032 24c5.059 0 9.18-4.01 9.3602-9.0246.0053-.1461-.1102-.2682-.2564-.2682h-4.9319c-.1312 0-.2442.1073-.2545.238-.1592 2.025-1.8517 3.6185-3.9173 3.6185-2.4784 0-3.4806-2.1046-3.4808-2.105-.3197-.6025-.4129-1.1898-.4394-1.5183a.255.255 0 0 0-.2547-.2332Z",
+  tripadvisor: "M12.006 4.295c-2.67 0-5.338.784-7.645 2.353H0l1.963 2.135a5.997 5.997 0 0 0 4.04 10.43 5.976 5.976 0 0 0 4.075-1.6L12 19.705l1.922-2.09a5.972 5.972 0 0 0 4.072 1.598 6 6 0 0 0 6-5.998 5.982 5.982 0 0 0-1.957-4.432L24 6.648h-4.35a13.573 13.573 0 0 0-7.644-2.353zM12 6.255c1.531 0 3.063.303 4.504.903C13.943 8.138 12 10.43 12 13.1c0-2.671-1.942-4.962-4.504-5.942A11.72 11.72 0 0 1 12 6.256zM6.002 9.157a4.059 4.059 0 1 1 0 8.118 4.059 4.059 0 0 1 0-8.118zm11.992.002a4.057 4.057 0 1 1 .003 8.115 4.057 4.057 0 0 1-.003-8.115zm-11.992 1.93a2.128 2.128 0 0 0 0 4.256 2.128 2.128 0 0 0 0-4.256zm11.992 0a2.128 2.128 0 0 0 0 4.256 2.128 2.128 0 0 0 0-4.256z",
+  trip: "M17.834 9.002c-.68 0-1.29.31-1.707.799v-.514h-1.708v8.348h1.897v-2.923c.416.344.943.551 1.518.551 1.677 0 3.036-1.401 3.036-3.13s-1.36-3.13-3.036-3.13zm-.19 4.516c-.733 0-1.328-.62-1.328-1.385s.595-1.385 1.328-1.385c.734 0 1.328.62 1.328 1.385s-.594 1.385-1.328 1.385zm6.356.607a1.138 1.138 0 1 1-2.277 0 1.138 1.138 0 0 1 2.277 0zM13.205 7.428a1.062 1.062 0 1 1-2.125 0 1.062 1.062 0 0 1 2.125 0zm-2.011 1.859h1.897v5.692h-1.897V9.287zM6.83 8.225H4.364v6.754H2.466V8.225H0V6.63h6.83v1.594zm3.035 1.033c.13 0 .255.012.38.03v1.74a1.55 1.55 0 0 0-.297-.031c-.88 0-1.594.612-1.594 1.593v2.389H6.451V9.287h1.707v.9c.363-.558.991-.93 1.707-.93z",
+};
+
+// Google usa la "G" ufficiale a 4 colori (stessa di src/app/login/page.tsx) invece del colore piatto.
+function GoogleMark() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden>
+      <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.1 0 24 0 14.6 0 6.4 5.4 2.5 13.3l7.8 6.1C12.2 13.3 17.6 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.1 5.5c4.2-3.9 6.9-9.6 6.9-16.9z" />
+      <path fill="#FBBC05" d="M10.3 28.6c-.5-1.4-.8-2.9-.8-4.6s.3-3.2.8-4.6l-7.8-6.1C.9 16.5 0 20.1 0 24s.9 7.5 2.5 10.7l7.8-6.1z" />
+      <path fill="#34A853" d="M24 48c6.1 0 11.3-2 15-5.5l-7.1-5.5c-2 1.3-4.6 2.1-7.9 2.1-6.4 0-11.8-3.8-13.7-9.4l-7.8 6.1C6.4 42.6 14.6 48 24 48z" />
+    </svg>
+  );
+}
+
+// Badge icona di un comparatore: logo ufficiale su sfondo bianco quando disponibile,
+// altrimenti l'iniziale su sfondo colore-marchio (fallback onesto per Kayak).
+function MetaBadge({ m }: { m: (typeof META)[number] }) {
+  const path = META_ICON_PATHS[m.key];
+  if (m.key === "google") {
+    return <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line bg-white"><GoogleMark /></span>;
+  }
+  if (path) {
+    return (
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line bg-white">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill={m.color}><path d={path} /></svg>
+      </span>
+    );
+  }
+  return <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: m.color }}>{m.name[0]}</span>;
+}
 type MetaCfg = { on: boolean; model: "cpc" | "commission"; value: number };
 const KEY = "spigolestay:metasearch:v2";
 const COMM_KEY = "spigolestay:metasearch:avgcomm";
@@ -221,7 +258,7 @@ export default function MetaSearchPage() {
             const c = getCfg(m.key);
             return (
               <div key={m.key} className="flex flex-wrap items-center gap-3 py-3">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: m.color }}>{m.name[0]}</span>
+                <MetaBadge m={m} />
                 <div className="min-w-[160px] flex-1">
                   <div className="text-sm font-semibold text-txt">{m.name}</div>
                   <div className="mt-0.5 text-xs text-dim">{t(m.desc)}</div>
