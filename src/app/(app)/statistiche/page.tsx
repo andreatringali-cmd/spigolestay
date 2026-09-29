@@ -32,11 +32,11 @@ export default function StatistichePage() {
   const [chartsOn, setChartsOn] = useState(true);
   useEffect(() => { try { const r = localStorage.getItem("spigolestay:statscharts:on"); if (r !== null) setChartsOn(r === "1"); } catch {} }, []);
   const toggleCharts = () => setChartsOn((v) => { const n = !v; try { localStorage.setItem("spigolestay:statscharts:on", n ? "1" : "0"); } catch {} return n; });
-  // Report attivo: i tanti report di Octorate condensati in 3 (Mensile, Previsionale, Annuale).
-  // La chiave interna resta "produzione" per non toccare la persistenza/tipizzazione esistente;
-  // solo l'etichetta è cambiata in "Mensile" perché il contenuto (KPI/grafici del mese di
-  // soggiorno) non corrisponde al significato standard di "produzione" (prenotazioni acquisite).
-  const [report, setReport] = useState<"produzione" | "previsionale" | "annuale">("produzione");
+  // Report attivo: i tanti report di Octorate condensati in 2 (Mensile, Annuale). Mensile e
+  // Previsionale erano diventati sostanzialmente uguali (stessa tabella giorno per giorno, stesse
+  // colonne) quindi sono stati uniti in un'unica scheda — KPI+grafici+tabella insieme.
+  // La chiave interna resta "produzione" per non toccare la persistenza/tipizzazione esistente.
+  const [report, setReport] = useState<"produzione" | "annuale">("produzione");
 
   const active = bookings.filter((b) => b.status !== "cancelled" && (activeStructureId === "all" || b.structureId === activeStructureId));
   const scopedStructures = activeStructureId === "all" ? structures : structures.filter((s) => s.id === activeStructureId);
@@ -205,6 +205,53 @@ export default function StatistichePage() {
   const annPrev = yearMetrics(annualYear - 1);
   const annualBars = annCur.months.map((m) => ({ label: m.label, value: m.revenue, color: "var(--focus)" }));
 
+  // Tabella Annuale con le STESSE colonne/regole del Previsionale (madre): accrual per notte,
+  // indipendente dal selettore "Ricavi calcolati" — un mese al posto di un giorno, sommando lo
+  // stesso calcolo giorno per giorno usato in `rep`, non i totali di `metrics()` (che seguono
+  // `basis`). Così Mensile/Previsionale/Annuale mostrano davvero le stesse colonne allo stesso modo.
+  const yearRep = useMemo(() => {
+    const yr = annualYear;
+    const buckets = Array.from({ length: 12 }, (_, i) => ({
+      i, label: new Date(yr, i, 1).toLocaleDateString("it-IT", { month: "short" }),
+      camere: 0, arrivi: 0, partenze: 0, ospiti: 0, lordo: 0, commissioni: 0, days: 0,
+      lastDayISO: toISO(new Date(yr, i + 1, 0)),
+    }));
+    const dim = daysInYear(yr);
+    const start = new Date(yr, 0, 1);
+    for (let d = 0; d < dim; d++) {
+      const date = new Date(start); date.setDate(start.getDate() + d);
+      const iso = toISO(date);
+      const occBks = bks.filter((b) => b.checkIn <= iso && iso < b.checkOut);
+      const camere = occBks.filter((b) => b.unitId).length;
+      const lordo = occBks.reduce((a, b) => a + (b.total ? b.total / nights(b.checkIn, b.checkOut) : 0), 0);
+      const commissioni = occBks.reduce((a, b) => { const nightly = b.total ? b.total / nights(b.checkIn, b.checkOut) : 0; const pct = b.commissionPct ?? CHANNELS[b.channel].commission * 100; return a + (nightly * pct) / 100; }, 0);
+      const ospiti = occBks.reduce((a, b) => a + b.adults + b.children, 0);
+      const arrivi = bks.filter((b) => b.checkIn === iso).length;
+      const partenze = bks.filter((b) => b.checkOut === iso).length;
+      const bucket = buckets[date.getMonth()];
+      bucket.camere += camere; bucket.arrivi += arrivi; bucket.partenze += partenze; bucket.ospiti += ospiti;
+      bucket.lordo += lordo; bucket.commissioni += commissioni; bucket.days += 1;
+    }
+    return buckets.map((b) => ({
+      iso: String(b.i), label: b.label, storico: b.lastDayISO < todayISO, days: b.days,
+      camere: Math.round(b.camere), occ: scopedUnits.length && b.days ? b.camere / (scopedUnits.length * b.days) : 0,
+      arrivi: b.arrivi, partenze: b.partenze, ospiti: Math.round(b.ospiti),
+      adr: b.camere ? b.lordo / b.camere : 0, lordo: Math.round(b.lordo), commissioni: Math.round(b.commissioni),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annualYear, bookings, activeStructureId, scopedUnits.length, todayISO]);
+  const yearSum = (pred: (r: (typeof yearRep)[number]) => boolean) => {
+    const rows = yearRep.filter(pred);
+    const camere = rows.reduce((a, r) => a + r.camere, 0);
+    const lordo = rows.reduce((a, r) => a + r.lordo, 0);
+    const commissioni = rows.reduce((a, r) => a + r.commissioni, 0);
+    const days = rows.reduce((a, r) => a + r.days, 0);
+    return { camere, arrivi: rows.reduce((a, r) => a + r.arrivi, 0), partenze: rows.reduce((a, r) => a + r.partenze, 0), ospiti: rows.reduce((a, r) => a + r.ospiti, 0), adr: camere ? lordo / camere : 0, lordo, commissioni, netto: lordo - commissioni, occ: scopedUnits.length && days ? camere / (scopedUnits.length * days) : 0 };
+  };
+  const yearTotStorico = yearSum((r) => r.storico);
+  const yearTotPrevis = yearSum((r) => !r.storico);
+  const yearTotAll = yearSum(() => true);
+
   // Applica l'ordine scelto dall'utente (doppio clic per riposizionare).
   const orderedCharts = [...charts].sort((a, b) => {
     const ia = chartOrder.indexOf(a.key), ib = chartOrder.indexOf(b.key);
@@ -214,50 +261,103 @@ export default function StatistichePage() {
     return ia - ib;
   });
 
-  // Riga filtro: mese (assente su Annuale, che ragiona per anno) + toggle grafici (solo Mensile)
-  // + badge "Ricavi calcolati" (assente nel Previsionale, che ha una regola fissa) a sinistra,
-  // selettore report Mensile/Previsionale/Annuale a destra. Compare DOPO le card/i grafici di
-  // ogni report e PRIMA del relativo registro/tabella, non prima di tutto.
-  // "Ricavi calcolati" è un badge/select (non più 3 pulsanti) — decide come una prenotazione
-  // conta nel periodo scelto: "per notte" la spalma sulle notti dentro il periodo (competenza),
-  // "per data di arrivo" la conta tutta nel mese di arrivo, "all'incasso" conta solo ciò che è
-  // stato davvero pagato. Cambia i numeri di Ricavi/ADR/RevPAR nelle card sopra.
+  // Riga filtro: mese (assente su Annuale, che ragiona per anno) + toggle grafici a sinistra,
+  // badge "Ricavi calcolati" (influenza le KPI card, non la tabella giorno/mese che usa una
+  // regola fissa — vedi nota sotto la tabella), selettore report Mensile/Annuale a destra.
   const FilterRow = ({ showMonth }: { showMonth: boolean }) => (
     <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
-      {showMonth && (<>
+      {showMonth ? (<>
         <span className="text-sm font-semibold text-txt">{t("Mese")}</span>
         <select value={repMonth} onChange={(e) => setRepMonth(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm capitalize text-txt outline-none focus:border-focus">
           {monthOptions.map((mk) => <option key={mk} value={mk} className="capitalize">{monthLabelOf(mk)}</option>)}
         </select>
-        {report === "produzione" && <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>}
-      </>)}
-      {report === "annuale" && (<>
+        <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
+      </>) : (<>
         <span className="text-sm font-semibold text-txt">{t("Anno")}</span>
         <select value={annualYear} onChange={(e) => setAnnualYear(Number(e.target.value))} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
           {yearOptions.map((yr) => <option key={yr} value={yr}>{yr}</option>)}
         </select>
       </>)}
-      {report !== "previsionale" && (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-wash py-1 pl-3 pr-1 text-xs font-medium text-dim" title={t("Come viene attribuito il ricavo di una prenotazione al periodo scelto")}>
-          {t("Ricavi")}:
-          <select value={basis} onChange={(e) => setBasis(e.target.value as "notte" | "arrivo" | "incasso")} className="rounded-full border-none bg-transparent py-0.5 pl-1 pr-5 text-xs font-semibold text-txt outline-none">
-            <option value="notte">{t("Per notte (competenza)")}</option>
-            <option value="arrivo">{t("Per data di arrivo")}</option>
-            <option value="incasso">{t("All'incasso")}</option>
-          </select>
-        </span>
-      )}
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-wash py-1 pl-3 pr-1 text-xs font-medium text-dim" title={t("Come viene attribuito il ricavo di una prenotazione al periodo scelto (solo le KPI card, non la tabella)")}>
+        {t("Ricavi")}:
+        <select value={basis} onChange={(e) => setBasis(e.target.value as "notte" | "arrivo" | "incasso")} className="rounded-full border-none bg-transparent py-0.5 pl-1 pr-5 text-xs font-semibold text-txt outline-none">
+          <option value="notte">{t("Per notte (competenza)")}</option>
+          <option value="arrivo">{t("Per data di arrivo")}</option>
+          <option value="incasso">{t("All'incasso")}</option>
+        </select>
+      </span>
       <div className="ml-auto inline-flex rounded-lg bg-wash p-0.5 text-sm">
-        {([["produzione", t("Mensile")], ["previsionale", t("Previsionale")], ["annuale", t("Annuale")]] as const).map(([k, lab]) => (
+        {([["produzione", t("Mensile")], ["annuale", t("Annuale")]] as const).map(([k, lab]) => (
           <button key={k} onClick={() => setReport(k)} className={`rounded-md px-4 py-1.5 font-semibold transition ${report === k ? "bg-focus text-white shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
         ))}
       </div>
     </div>
   );
 
+  // Vista tabella condivisa da Mensile (giorni del mese) e Annuale (mesi dell'anno): stesse
+  // colonne, stesso ordine, "madre" = quella che prima era il Previsionale.
+  type RepRow = { iso: string; label: string; storico: boolean; highlight?: boolean; camere: number; occ: number; arrivi: number; partenze: number; ospiti: number; adr: number; lordo: number; commissioni: number };
+  type RepTotal = { camere: number; occ: number; arrivi: number; partenze: number; ospiti: number; adr: number; lordo: number; commissioni: number; netto: number };
+  const RepTableView = ({ periodLabel, rows, totStorico, totPrevis, totAll }: { periodLabel: string; rows: RepRow[]; totStorico: RepTotal; totPrevis: RepTotal; totAll: RepTotal }) => (
+    <div className="max-h-[60vh] overflow-auto rounded-xl border border-line bg-surface shadow-sm">
+      <table className="w-full min-w-[1000px] table-fixed text-sm">
+        <RepCols />
+        <thead className="sticky top-0 z-20">
+          <tr className="bg-wash text-left text-xs uppercase tracking-wide text-faint shadow-[0_1px_0_var(--line)]">
+            <th className="px-3 py-2 font-semibold">{periodLabel}</th>
+            <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
+            <th className="px-3 py-2 text-right font-semibold">{t("Camere")}</th>
+            <th className="px-3 py-2 text-right font-semibold">{t("Occup.")}</th>
+            <th className="px-3 py-2 text-right font-semibold">{t("Arrivi")}</th>
+            <th className="px-3 py-2 text-right font-semibold">{t("Part.")}</th>
+            <th className="px-3 py-2 text-right font-semibold">{t("Ospiti")}</th>
+            <th className="px-3 py-2 text-right font-semibold">ADR</th>
+            <th className="px-3 py-2 text-right font-semibold">Revenue</th>
+            <th className="px-3 py-2 text-right font-semibold">{t("Commiss.")}</th>
+            <th className="px-3 py-2 text-right font-semibold">{t("Netto")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.iso} className={`border-b border-line last:border-0 ${r.highlight ? "bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)]" : r.storico ? "" : "bg-[color:color-mix(in_srgb,var(--ok)_4%,transparent)]"}`}>
+              <td className="truncate px-3 py-2 font-medium capitalize text-txt">{r.label}{r.highlight && <span className="ml-1.5 rounded-full bg-focus px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">{t("oggi")}</span>}</td>
+              <td className="px-3 py-2"><span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={r.storico ? { backgroundColor: "color-mix(in srgb, var(--faint) 20%, transparent)", color: "var(--dim)" } : { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{r.storico ? t("Storico") : t("Previsione")}</span></td>
+              <td className="px-3 py-2 text-right font-mono text-dim">{r.camere}{scopedUnits.length ? `/${scopedUnits.length}` : ""}</td>
+              <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(r.occ * 100)}%</td>
+              <td className="px-3 py-2 text-right font-mono text-dim">{r.arrivi || ""}</td>
+              <td className="px-3 py-2 text-right font-mono text-dim">{r.partenze || ""}</td>
+              <td className="px-3 py-2 text-right font-mono text-dim">{r.ospiti || ""}</td>
+              <td className="px-3 py-2 text-right font-mono text-dim">{r.camere ? eur(r.adr) : "—"}</td>
+              <td className="px-3 py-2 text-right font-mono text-txt">{eur(r.lordo)}</td>
+              <td className="px-3 py-2 text-right font-mono" style={{ color: r.commissioni > 0 ? "var(--warn)" : "var(--faint)" }}>{r.commissioni ? `−${eur(r.commissioni)}` : "—"}</td>
+              <td className="px-3 py-2 text-right font-mono font-semibold" style={{ color: "var(--ok)" }}>{eur(r.lordo - r.commissioni)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot className="sticky bottom-0 z-20 bg-surface shadow-[0_-1px_0_var(--line)]">
+          <tr><td colSpan={11} className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "var(--focus)" }}>{t("Totali")}</td></tr>
+          {([["Somma storico", totStorico, "var(--dim)"], ["Somma previsione", totPrevis, "var(--ok)"], ["Totale", totAll, "var(--txt)"]] as const).map(([lab, tt, col], i) => (
+            <tr key={lab} className={`border-t border-line ${i === 2 ? "bg-wash font-bold" : "bg-surface font-medium"}`}>
+              <td className="truncate px-3 py-2" colSpan={2} style={{ color: col }}>{t(lab)}</td>
+              <td className="px-3 py-2 text-right font-mono text-dim">{tt.camere}</td>
+              <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(tt.occ * 100)}%</td>
+              <td className="px-3 py-2 text-right font-mono text-dim">{tt.arrivi}</td>
+              <td className="px-3 py-2 text-right font-mono text-dim">{tt.partenze}</td>
+              <td className="px-3 py-2 text-right font-mono text-dim">{tt.ospiti}</td>
+              <td className="px-3 py-2 text-right font-mono text-dim">{tt.camere ? eur(tt.adr) : "—"}</td>
+              <td className="px-3 py-2 text-right font-mono text-txt">{eur(tt.lordo)}</td>
+              <td className="px-3 py-2 text-right font-mono" style={{ color: "var(--warn)" }}>{tt.commissioni ? `−${eur(tt.commissioni)}` : "—"}</td>
+              <td className="px-3 py-2 text-right font-mono text-[color:var(--ok)]">{eur(tt.netto)}</td>
+            </tr>
+          ))}
+        </tfoot>
+      </table>
+    </div>
+  );
+
   return (
     <div>
-      <PageHeader title={t("Statistiche")} subtitle={t("Tre report: riepilogo del mese, previsionale e annuale")} />
+      <PageHeader title={t("Statistiche")} subtitle={t("Due report: mensile (con previsionale) e annuale")} />
 
       {report === "produzione" && (<>
       {/* KPI del mese selezionato con confronto sul mese precedente */}
@@ -291,183 +391,23 @@ export default function StatistichePage() {
 
       <FilterRow showMonth />
 
-      {/* Elenco prenotazioni del mese — stessa struttura del Previsionale (unico scroll,
-          intestazione e totali fissi) e stesso livello di dettaglio (stato, ospiti, ADR,
-          commissioni, netto per riga), non solo arrivo/importo. */}
+      {/* Registro giorno per giorno del mese — stesse colonne/ordine della tabella Annuale
+          ("madre" ex-Previsionale, ora unita qui): storico + previsione, non un elenco prenotazioni. */}
       <div className="mt-6">
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
-          <h2 className="font-display text-lg font-bold text-txt">{t("Prenotazioni del mese")}</h2>
-          <span className="text-sm capitalize text-dim">· {monthLabelOf(repMonth)} · {monthArr.length} {monthArr.length === 1 ? t("prenotazione") : t("prenotazioni")}</span>
-        </div>
-        {monthArr.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-faint">{t("Nessuna prenotazione con arrivo in questo mese.")}</div>
-        ) : (() => {
-          const showStruct = activeStructureId === "all";
-          const rows = [...monthArr].sort((a, b) => (a.checkIn < b.checkIn ? -1 : a.checkIn > b.checkIn ? 1 : 0)).map((b) => {
-            const isBlocked = b.channel === "blocked";
-            const nn = nights(b.checkIn, b.checkOut);
-            const lordo = isBlocked ? 0 : (b.total ?? 0);
-            const pct = isBlocked ? 0 : (b.commissionPct ?? CHANNELS[b.channel].commission * 100);
-            const commissioni = isBlocked ? 0 : Math.round((lordo * pct) / 100);
-            return {
-              b, isBlocked, nn, lordo, commissioni, netto: lordo - commissioni,
-              adr: nn ? lordo / nn : 0,
-              ospitiN: (b.adults ?? 0) + (b.children ?? 0),
-              guest: guests.find((g) => g.id === b.guestId),
-              unit: units.find((u) => u.id === b.unitId),
-              struct: structures.find((s) => s.id === b.structureId),
-            };
-          });
-          const tot = rows.reduce((a, r) => ({ nn: a.nn + r.nn, ospiti: a.ospiti + r.ospitiN, lordo: a.lordo + r.lordo, commissioni: a.commissioni + r.commissioni }), { nn: 0, ospiti: 0, lordo: 0, commissioni: 0 });
-          const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
-            confirmed: { label: t("Confermata"), bg: "color-mix(in srgb, var(--ok) 16%, transparent)", fg: "var(--ok)" },
-            tentative: { label: t("In attesa"), bg: "color-mix(in srgb, var(--warn) 16%, transparent)", fg: "var(--warn)" },
-            no_show: { label: t("No-show"), bg: "color-mix(in srgb, var(--err) 16%, transparent)", fg: "var(--err)" },
-          };
-          return (
-            <div className="max-h-[60vh] overflow-auto rounded-xl border border-line bg-surface shadow-sm">
-              <table className="w-full min-w-[1180px] table-fixed text-sm">
-                <thead className="sticky top-0 z-20">
-                  <tr className="bg-wash text-left text-xs uppercase tracking-wide text-faint shadow-[0_1px_0_var(--line)]">
-                    <th className="px-3 py-2 font-semibold">{t("Arrivo")}</th>
-                    <th className="px-3 py-2 text-right font-semibold">{t("Notti")}</th>
-                    <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
-                    <th className="px-3 py-2 font-semibold">{t("Ospite")}</th>
-                    {showStruct && <th className="px-3 py-2 font-semibold">{t("Struttura")}</th>}
-                    <th className="px-3 py-2 font-semibold">{t("Camera")}</th>
-                    <th className="px-3 py-2 font-semibold">{t("Canale")}</th>
-                    <th className="px-3 py-2 text-right font-semibold">{t("Ospiti")}</th>
-                    <th className="px-3 py-2 text-right font-semibold">ADR</th>
-                    <th className="px-3 py-2 text-right font-semibold">{t("Lordo")}</th>
-                    <th className="px-3 py-2 text-right font-semibold">{t("Commiss.")}</th>
-                    <th className="px-3 py-2 text-right font-semibold">{t("Netto")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map(({ b, isBlocked, nn, lordo, commissioni, netto, adr, ospitiN, guest, unit, struct }) => {
-                    const st = STATUS[b.status];
-                    return (
-                      <tr key={b.id} className="border-b border-line last:border-0 hover:bg-wash">
-                        <td className="truncate px-3 py-2 font-medium capitalize text-txt">{fmtDay(b.checkIn)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-dim">{nn}</td>
-                        <td className="px-3 py-2">{isBlocked ? <span className="text-faint">—</span> : st && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: st.bg, color: st.fg }}>{st.label}</span>}</td>
-                        <td className="truncate px-3 py-2 text-txt">{isBlocked ? <span className="text-faint">{t("Fuori servizio")}</span> : (guest?.fullName || t("Senza nome"))}</td>
-                        {showStruct && <td className="truncate px-3 py-2 text-dim">{struct?.name ?? "—"}</td>}
-                        <td className="truncate px-3 py-2 text-dim">{unit?.name ?? "—"}</td>
-                        <td className="px-3 py-2 text-dim">{isBlocked ? "—" : CHANNELS[b.channel as Channel]?.label ?? b.channel}</td>
-                        <td className="px-3 py-2 text-right font-mono text-dim">{isBlocked ? "" : ospitiN || ""}</td>
-                        <td className="px-3 py-2 text-right font-mono text-dim">{isBlocked ? "—" : eur(adr)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-txt">{isBlocked ? "—" : eur(lordo)}</td>
-                        <td className="px-3 py-2 text-right font-mono" style={{ color: commissioni > 0 ? "var(--warn)" : "var(--faint)" }}>{commissioni ? `−${eur(commissioni)}` : "—"}</td>
-                        <td className="px-3 py-2 text-right font-mono font-semibold" style={{ color: "var(--ok)" }}>{isBlocked ? "—" : eur(netto)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot className="sticky bottom-0 z-20 bg-surface shadow-[0_-1px_0_var(--line)]">
-                  <tr>
-                    <td colSpan={showStruct ? 12 : 11} className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "var(--focus)" }}>{t("Totali")}</td>
-                  </tr>
-                  <tr className="border-t border-line bg-surface font-bold">
-                    <td className="truncate px-3 py-2 text-txt" colSpan={showStruct ? 5 : 4}>{t("Totale")} {monthLabelOf(repMonth)}</td>
-                    <td className="px-3 py-2 text-dim"></td>
-                    <td className="px-3 py-2 text-dim"></td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{tot.ospiti}</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{tot.nn ? eur(tot.lordo / tot.nn) : "—"}</td>
-                    <td className="px-3 py-2 text-right font-mono text-txt">{eur(tot.lordo)}</td>
-                    <td className="px-3 py-2 text-right font-mono" style={{ color: "var(--warn)" }}>{tot.commissioni ? `−${eur(tot.commissioni)}` : "—"}</td>
-                    <td className="px-3 py-2 text-right font-mono text-[color:var(--ok)]">{eur(tot.lordo - tot.commissioni)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          );
-        })()}
-      </div>
-      </>)}
-
-      {/* Report previsionale (stile Octorate): giorno per giorno, storico + previsione */}
-      {report === "previsionale" && (
-      <div>
-        <div className="mb-3 flex flex-wrap items-baseline gap-2">
-          <h2 className="font-display text-lg font-bold text-txt">{t("Report previsionale")}</h2>
+          <h2 className="font-display text-lg font-bold text-txt">{t("Registro del mese")}</h2>
           <span className="text-sm capitalize text-dim">· {monthLabelOf(repMonth)}</span>
         </div>
-
-        {/* KPI del mese selezionato (storico + previsione insieme) */}
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <KpiD label={t("Notti vendute")} value={String(totAll.camere)} d={null} cmp="" />
-          <KpiD label={t("Occupazione")} value={`${Math.round(totAll.occ * 100)}%`} d={null} cmp="" />
-          <KpiD label="ADR" value={eur(totAll.adr)} d={null} cmp="" />
-          <KpiD label={t("Ricavi lordi")} value={eur(totAll.lordo)} d={null} cmp="" />
-          <KpiD label={t("Netto")} value={eur(totAll.netto)} d={null} cmp="" />
-        </div>
-
-        <FilterRow showMonth />
-
-        {/* Un'unica tabella con UN solo contenitore di scroll (orizzontale+verticale): intestazione
-            sticky in alto e riga totali sticky in fondo, così solo le righe giorno scorrono in mezzo. */}
-        <div className="max-h-[60vh] overflow-auto rounded-xl border border-line bg-surface shadow-sm">
-          <table className="w-full min-w-[1000px] table-fixed text-sm">
-            <RepCols />
-            <thead className="sticky top-0 z-20">
-              <tr className="bg-wash text-left text-xs uppercase tracking-wide text-faint shadow-[0_1px_0_var(--line)]">
-                <th className="px-3 py-2 font-semibold">{t("Giorno")}</th>
-                <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
-                <th className="px-3 py-2 text-right font-semibold">{t("Camere")}</th>
-                <th className="px-3 py-2 text-right font-semibold">{t("Occup.")}</th>
-                <th className="px-3 py-2 text-right font-semibold">{t("Arrivi")}</th>
-                <th className="px-3 py-2 text-right font-semibold">{t("Part.")}</th>
-                <th className="px-3 py-2 text-right font-semibold">{t("Ospiti")}</th>
-                <th className="px-3 py-2 text-right font-semibold">ADR</th>
-                <th className="px-3 py-2 text-right font-semibold">Revenue</th>
-                <th className="px-3 py-2 text-right font-semibold">{t("Commiss.")}</th>
-                <th className="px-3 py-2 text-right font-semibold">{t("Netto")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rep.map((r) => {
-                const isToday = r.iso === todayISO;
-                return (
-                  <tr key={r.iso} className={`border-b border-line last:border-0 ${isToday ? "bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)]" : r.storico ? "" : "bg-[color:color-mix(in_srgb,var(--ok)_4%,transparent)]"}`}>
-                    <td className="truncate px-3 py-2 font-medium capitalize text-txt">{repDayLabel(r.iso)}{isToday && <span className="ml-1.5 rounded-full bg-focus px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">{t("oggi")}</span>}</td>
-                    <td className="px-3 py-2"><span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={r.storico ? { backgroundColor: "color-mix(in srgb, var(--faint) 20%, transparent)", color: "var(--dim)" } : { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{r.storico ? t("Storico") : t("Previsione")}</span></td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{r.camere}/{scopedUnits.length}</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(r.occ * 100)}%</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{r.arrivi || ""}</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{r.partenze || ""}</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{r.ospiti || ""}</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{r.camere ? eur(r.adr) : "—"}</td>
-                    <td className="px-3 py-2 text-right font-mono text-txt">{eur(r.lordo)}</td>
-                    <td className="px-3 py-2 text-right font-mono" style={{ color: r.commissioni > 0 ? "var(--warn)" : "var(--faint)" }}>{r.commissioni ? `−${eur(r.commissioni)}` : "—"}</td>
-                    <td className="px-3 py-2 text-right font-mono font-semibold" style={{ color: "var(--ok)" }}>{eur(r.lordo - r.commissioni)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            {/* Totali: sticky in fondo, sempre visibili mentre le righe sopra scorrono. */}
-            <tfoot className="sticky bottom-0 z-20 bg-surface shadow-[0_-1px_0_var(--line)]">
-              <tr><td colSpan={11} className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "var(--focus)" }}>{t("Totali")}</td></tr>
-              {([["Somma storico", totStorico, "var(--dim)"], ["Somma previsione", totPrevis, "var(--ok)"], ["Totale", totAll, "var(--txt)"]] as const).map(([lab, tt, col], i) => (
-                <tr key={lab} className={`border-t border-line ${i === 2 ? "bg-wash font-bold" : "bg-surface font-medium"}`}>
-                  <td className="truncate px-3 py-2" colSpan={2} style={{ color: col }}>{t(lab)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-dim">{tt.camere}</td>
-                  <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(tt.occ * 100)}%</td>
-                  <td className="px-3 py-2 text-right font-mono text-dim">{tt.arrivi}</td>
-                  <td className="px-3 py-2 text-right font-mono text-dim">{tt.partenze}</td>
-                  <td className="px-3 py-2 text-right font-mono text-dim">{tt.ospiti}</td>
-                  <td className="px-3 py-2 text-right font-mono text-dim">{tt.camere ? eur(tt.adr) : "—"}</td>
-                  <td className="px-3 py-2 text-right font-mono text-txt">{eur(tt.lordo)}</td>
-                  <td className="px-3 py-2 text-right font-mono" style={{ color: "var(--warn)" }}>{tt.commissioni ? `−${eur(tt.commissioni)}` : "—"}</td>
-                  <td className="px-3 py-2 text-right font-mono text-[color:var(--ok)]">{eur(tt.netto)}</td>
-                </tr>
-              ))}
-            </tfoot>
-          </table>
-        </div>
-        <p className="mt-2 text-xs text-faint"><b className="text-dim">{t("Storico")}</b> {t("= giorni già passati")} · <b className="text-dim">{t("Previsione")}</b> {t("= giorni futuri")}. {t("Tutte le prenotazioni prese e confermate valgono come ricavo pieno (come se tutto fosse incassato). Gli incassi effettivi sono nella sezione")} <b className="text-dim">{t("Incassi")}</b>.</p>
+        <RepTableView
+          periodLabel={t("Giorno")}
+          rows={rep.map((r) => ({ ...r, highlight: r.iso === todayISO, label: repDayLabel(r.iso) }))}
+          totStorico={totStorico}
+          totPrevis={totPrevis}
+          totAll={totAll}
+        />
+        <p className="mt-2 text-xs text-faint"><b className="text-dim">{t("Storico")}</b> {t("= giorni già passati")} · <b className="text-dim">{t("Previsione")}</b> {t("= giorni futuri")}. {t("Tutte le prenotazioni prese e confermate valgono come ricavo pieno (come se tutto fosse incassato), indipendentemente dal selettore \"Ricavi\" qui sopra che riguarda solo le KPI card. Gli incassi effettivi sono nella sezione")} <b className="text-dim">{t("Incassi")}</b>.</p>
       </div>
-      )}
+      </>)}
 
       {/* Report annuale: 12 mesi dell'anno scelto + totali con confronto sull'anno precedente */}
       {report === "annuale" && (
@@ -488,51 +428,19 @@ export default function StatistichePage() {
 
         <div className="mt-6">
           <FilterRow showMonth={false} />
-          <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-wash text-left text-xs uppercase tracking-wide text-faint">
-                  <th className="px-3 py-2 font-semibold">{t("Mese")}</th>
-                  <th className="px-3 py-2 text-right font-semibold">{t("Arrivi")}</th>
-                  <th className="px-3 py-2 text-right font-semibold">{t("Occup.")}</th>
-                  <th className="px-3 py-2 text-right font-semibold">{t("Notti")}</th>
-                  <th className="px-3 py-2 text-right font-semibold">ADR</th>
-                  <th className="px-3 py-2 text-right font-semibold">RevPAR</th>
-                  <th className="px-3 py-2 text-right font-semibold">{t("Ricavi")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {annCur.months.map((m) => (
-                  <tr key={m.i} className="border-b border-line last:border-0">
-                    <td className="px-3 py-2 font-medium capitalize text-txt">{m.label}</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{m.count || ""}</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(m.occ * 100)}%</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{m.roomNights || ""}</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{m.roomNights ? eur(m.adr) : "—"}</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{eur(m.revpar)}</td>
-                    <td className="px-3 py-2 text-right font-mono text-txt">{eur(m.revenue)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tbody>
-                <tr className="border-t-2 border-line bg-wash font-bold">
-                  <td className="px-3 py-2 text-txt">{t("Totale")} {annualYear}</td>
-                  <td className="px-3 py-2 text-right font-mono text-dim">{annCur.arrivals}</td>
-                  <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(annCur.occ * 100)}%</td>
-                  <td className="px-3 py-2 text-right font-mono text-dim">{annCur.roomNights}</td>
-                  <td className="px-3 py-2 text-right font-mono text-dim">{annCur.roomNights ? eur(annCur.adr) : "—"}</td>
-                  <td className="px-3 py-2 text-right font-mono text-dim">{eur(annCur.revpar)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-[color:var(--ok)]">{eur(annCur.revenue)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <RepTableView
+            periodLabel={t("Mese")}
+            rows={yearRep}
+            totStorico={yearTotStorico}
+            totPrevis={yearTotPrevis}
+            totAll={yearTotAll}
+          />
           <div className="mt-4 rounded-xl border border-line bg-surface p-4 shadow-sm">
             <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{t("Ricavi per mese")} · {annualYear}</div>
             <ColumnChart bars={annualBars} format={(n) => eur(n)} height={220} barWidth={36} allLabels />
           </div>
         </div>
-        <p className="mt-3 text-xs text-faint">{t("Ricavi calcolati")}: <b className="text-dim">{basis === "notte" ? t("per notte (competenza)") : basis === "arrivo" ? t("per data di arrivo") : t("all'incasso")}</b>. {t("Confronto sull'anno")} {annualYear - 1}.</p>
+        <p className="mt-3 text-xs text-faint"><b className="text-dim">{t("Storico")}</b> {t("= mesi già conclusi")} · <b className="text-dim">{t("Previsione")}</b> {t("= mesi futuri")}. {t("La tabella usa sempre il ricavo per notte (competenza), indipendentemente dal selettore \"Ricavi\" qui sopra che riguarda solo le KPI card:")} <b className="text-dim">{basis === "notte" ? t("per notte (competenza)") : basis === "arrivo" ? t("per data di arrivo") : t("all'incasso")}</b>. {t("Confronto sull'anno")} {annualYear - 1}.</p>
       </div>
       )}
     </div>
