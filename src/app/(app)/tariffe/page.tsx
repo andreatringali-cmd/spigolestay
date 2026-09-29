@@ -254,7 +254,6 @@ export default function TariffePage() {
             <a href="/piani-tariffari" className="whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-focus hover:bg-wash">{t("Gestisci piani")} →</a>
           </div>
         </div>
-        <p className="mb-2 text-xs text-dim">{t("Cosa vedrebbe l'ospite, giorno per giorno, con il piano scelto.")}</p>
         {/* Legenda */}
         <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-faint">
           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded border border-line bg-wash" /> {t("weekend")}</span>
