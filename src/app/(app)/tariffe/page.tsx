@@ -291,7 +291,6 @@ export default function TariffePage() {
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-xs text-faint">{t("Il prezzo applica il piano selezionato al prezzo del giorno (base + regole, oppure la tariffa forzata dal calendario). Imposti i prezzi specifici per data dal")} <b className="text-focus">{t("Calendario")}</b>.</p>
       </section>
     </div>
   );
