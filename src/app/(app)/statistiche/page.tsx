@@ -214,41 +214,45 @@ export default function StatistichePage() {
     return ia - ib;
   });
 
-  return (
-    <div>
-      <PageHeader title={t("Statistiche")} subtitle={t("Tre report: riepilogo del mese, previsionale e annuale")} />
-
-      {/* Riga report: selettore Produzione/Previsionale/Annuale + base di attribuzione ricavi.
-          Un'unica card, coerente con le altre righe-filtro dell'app, invece di due pillole sciolte. */}
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-2 shadow-sm">
-        <div className="inline-flex rounded-lg bg-wash p-0.5 text-sm">
-          {([["produzione", t("Mensile")], ["previsionale", t("Previsionale")], ["annuale", t("Annuale")]] as const).map(([k, lab]) => (
-            <button key={k} onClick={() => setReport(k)} className={`rounded-md px-4 py-1.5 font-semibold transition ${report === k ? "bg-focus text-white shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
-          ))}
-        </div>
-        {report !== "previsionale" && (
-          <div className="ml-auto flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-dim">{t("Ricavi calcolati")}:</span>
-            <div className="inline-flex rounded-lg bg-wash p-0.5">
-              {([["notte", t("Per notte (competenza)")], ["arrivo", t("Per data di arrivo")], ["incasso", t("All'incasso")]] as const).map(([k, lab]) => (
-                <button key={k} onClick={() => setBasis(k)} className={`rounded-md px-2.5 py-1 font-semibold transition ${basis === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Riga filtro unica: mese (guida KPI e report) + toggle grafici — non nel report annuale.
-          Spostata SOPRA i contenuti (KPI/grafici/elenco/tabella): è un filtro, deve precedere
-          ciò che filtra, non seguirlo. */}
-      <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm ${report === "annuale" ? "hidden" : ""}`}>
+  // Riga filtro: mese (assente su Annuale, che ragiona per anno) + toggle grafici (solo Mensile)
+  // a sinistra, selettore report Mensile/Previsionale/Annuale a destra. Compare DOPO le card/i
+  // grafici di ogni report e PRIMA del relativo registro/tabella, non prima di tutto.
+  const FilterRow = ({ showMonth }: { showMonth: boolean }) => (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
+      {showMonth && (<>
         <span className="text-sm font-semibold text-txt">{t("Mese")}</span>
         <select value={repMonth} onChange={(e) => setRepMonth(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm capitalize text-txt outline-none focus:border-focus">
           {monthOptions.map((mk) => <option key={mk} value={mk} className="capitalize">{monthLabelOf(mk)}</option>)}
         </select>
         {report === "produzione" && <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>}
-        <span className="ml-auto text-[11px] text-faint">{t("Card e report seguono il mese scelto")}</span>
+      </>)}
+      <div className="ml-auto inline-flex rounded-lg bg-wash p-0.5 text-sm">
+        {([["produzione", t("Mensile")], ["previsionale", t("Previsionale")], ["annuale", t("Annuale")]] as const).map(([k, lab]) => (
+          <button key={k} onClick={() => setReport(k)} className={`rounded-md px-4 py-1.5 font-semibold transition ${report === k ? "bg-focus text-white shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
+        ))}
       </div>
+    </div>
+  );
+
+  // Base di attribuzione ricavi: decide come una prenotazione conta nel periodo scelto —
+  // "per notte" la spalma sulle notti effettivamente dentro il periodo (competenza), "per data
+  // di arrivo" la conta tutta nel mese di arrivo, "all'incasso" conta solo ciò che è stato
+  // davvero pagato. Cambia i numeri di Ricavi/ADR/RevPAR qui sopra, non nel Previsionale
+  // (che ha una sua regola fissa, spiegata nella nota sotto la sua tabella).
+  const RicaviRow = () => (
+    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2 text-xs shadow-sm">
+      <span className="text-dim">{t("Ricavi calcolati")}:</span>
+      <div className="inline-flex rounded-lg bg-wash p-0.5">
+        {([["notte", t("Per notte (competenza)")], ["arrivo", t("Per data di arrivo")], ["incasso", t("All'incasso")]] as const).map(([k, lab]) => (
+          <button key={k} onClick={() => setBasis(k)} className={`rounded-md px-2.5 py-1 font-semibold transition ${basis === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <PageHeader title={t("Statistiche")} subtitle={t("Tre report: riepilogo del mese, previsionale e annuale")} />
 
       {report === "produzione" && (<>
       {/* KPI del mese selezionato con confronto sul mese precedente */}
@@ -261,7 +265,9 @@ export default function StatistichePage() {
       </div>
       <p className="mt-2 text-xs text-faint">{t("Valori riferiti a")} <b className="text-dim">{R.label.toLowerCase()}</b>{prev ? ` · ${t("confronto con")} ${R.cmp}` : ""}. {t("Complessivo storico: ricavi")} {eur(totalRevenue)} · ADR {eur(adr)} · {totalNights} {t("notti")}.</p>
 
-      <div className="mt-6">
+      <div className="mt-3"><RicaviRow /></div>
+
+      <div className="mt-3">
         {chartsOn && (
         <ScrollStrip
           gap="gap-3"
@@ -279,6 +285,8 @@ export default function StatistichePage() {
         />
         )}
       </div>
+
+      <FilterRow showMonth />
 
       {/* Elenco prenotazioni del mese — stessa struttura del Previsionale (unico scroll,
           intestazione e totali fissi) e stesso livello di dettaglio (stato, ospiti, ADR,
@@ -395,6 +403,8 @@ export default function StatistichePage() {
           </div>
         </div>
 
+        <FilterRow showMonth />
+
         {/* Un'unica tabella con UN solo contenitore di scroll (orizzontale+verticale): intestazione
             sticky in alto e riga totali sticky in fondo, così solo le righe giorno scorrono in mezzo. */}
         <div className="max-h-[60vh] overflow-auto rounded-xl border border-line bg-surface shadow-sm">
@@ -478,7 +488,10 @@ export default function StatistichePage() {
           <KpiD label={t("Ricavi")} value={eur(annCur.revenue)} d={delta(annCur.revenue, annPrev.revenue)} cmp={String(annualYear - 1)} />
         </div>
 
-        <div className="mt-6">
+        <div className="mt-3"><RicaviRow /></div>
+
+        <div className="mt-3">
+          <FilterRow showMonth={false} />
           <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
             <table className="w-full text-sm">
               <thead>
