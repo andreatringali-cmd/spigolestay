@@ -77,16 +77,16 @@ export default function TariffeDerivatePage() {
       <PageHeader
         title={t("Tariffe derivate")}
         subtitle={t("Tariffe collegate a una tipologia (es. uso singola, non rimborsabile). Seguono il prezzo della madre con uno scarto e condividono le stesse camere.")}
-        actions={activeStructureId === "all" ? (
-          <select value={localS} onChange={(e) => setLocalS(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+      />
+
+      {/* Barra: struttura + vista Tabella / Mappa + legenda */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm">
+        {activeStructureId === "all" && (
+          <select value={localS} onChange={(e) => setLocalS(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
             <option value="all">{t("Tutte le strutture")}</option>
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-        ) : null}
-      />
-
-      {/* Barra: vista Tabella / Mappa + legenda */}
-      <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm">
+        )}
         <div className="inline-flex overflow-hidden rounded-lg border border-line">
           <button onClick={() => setView("map")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${view === "map" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="3" width="6" height="5" rx="1" /><rect x="3" y="16" width="6" height="5" rx="1" /><rect x="15" y="16" width="6" height="5" rx="1" /><path d="M12 8v4M12 12H6v4M12 12h6v4" /></svg>{t("Mappa")}
