@@ -215,8 +215,13 @@ export default function StatistichePage() {
   });
 
   // Riga filtro: mese (assente su Annuale, che ragiona per anno) + toggle grafici (solo Mensile)
-  // a sinistra, selettore report Mensile/Previsionale/Annuale a destra. Compare DOPO le card/i
-  // grafici di ogni report e PRIMA del relativo registro/tabella, non prima di tutto.
+  // + badge "Ricavi calcolati" (assente nel Previsionale, che ha una regola fissa) a sinistra,
+  // selettore report Mensile/Previsionale/Annuale a destra. Compare DOPO le card/i grafici di
+  // ogni report e PRIMA del relativo registro/tabella, non prima di tutto.
+  // "Ricavi calcolati" è un badge/select (non più 3 pulsanti) — decide come una prenotazione
+  // conta nel periodo scelto: "per notte" la spalma sulle notti dentro il periodo (competenza),
+  // "per data di arrivo" la conta tutta nel mese di arrivo, "all'incasso" conta solo ciò che è
+  // stato davvero pagato. Cambia i numeri di Ricavi/ADR/RevPAR nelle card sopra.
   const FilterRow = ({ showMonth }: { showMonth: boolean }) => (
     <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
       {showMonth && (<>
@@ -226,25 +231,19 @@ export default function StatistichePage() {
         </select>
         {report === "produzione" && <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>}
       </>)}
+      {report !== "previsionale" && (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-wash py-1 pl-3 pr-1 text-xs font-medium text-dim" title={t("Come viene attribuito il ricavo di una prenotazione al periodo scelto")}>
+          {t("Ricavi")}:
+          <select value={basis} onChange={(e) => setBasis(e.target.value as "notte" | "arrivo" | "incasso")} className="rounded-full border-none bg-transparent py-0.5 pl-1 pr-5 text-xs font-semibold text-txt outline-none">
+            <option value="notte">{t("Per notte (competenza)")}</option>
+            <option value="arrivo">{t("Per data di arrivo")}</option>
+            <option value="incasso">{t("All'incasso")}</option>
+          </select>
+        </span>
+      )}
       <div className="ml-auto inline-flex rounded-lg bg-wash p-0.5 text-sm">
         {([["produzione", t("Mensile")], ["previsionale", t("Previsionale")], ["annuale", t("Annuale")]] as const).map(([k, lab]) => (
           <button key={k} onClick={() => setReport(k)} className={`rounded-md px-4 py-1.5 font-semibold transition ${report === k ? "bg-focus text-white shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
-        ))}
-      </div>
-    </div>
-  );
-
-  // Base di attribuzione ricavi: decide come una prenotazione conta nel periodo scelto —
-  // "per notte" la spalma sulle notti effettivamente dentro il periodo (competenza), "per data
-  // di arrivo" la conta tutta nel mese di arrivo, "all'incasso" conta solo ciò che è stato
-  // davvero pagato. Cambia i numeri di Ricavi/ADR/RevPAR qui sopra, non nel Previsionale
-  // (che ha una sua regola fissa, spiegata nella nota sotto la sua tabella).
-  const RicaviRow = () => (
-    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2 text-xs shadow-sm">
-      <span className="text-dim">{t("Ricavi calcolati")}:</span>
-      <div className="inline-flex rounded-lg bg-wash p-0.5">
-        {([["notte", t("Per notte (competenza)")], ["arrivo", t("Per data di arrivo")], ["incasso", t("All'incasso")]] as const).map(([k, lab]) => (
-          <button key={k} onClick={() => setBasis(k)} className={`rounded-md px-2.5 py-1 font-semibold transition ${basis === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{lab}</button>
         ))}
       </div>
     </div>
@@ -265,9 +264,7 @@ export default function StatistichePage() {
       </div>
       <p className="mt-2 text-xs text-faint">{t("Valori riferiti a")} <b className="text-dim">{R.label.toLowerCase()}</b>{prev ? ` · ${t("confronto con")} ${R.cmp}` : ""}. {t("Complessivo storico: ricavi")} {eur(totalRevenue)} · ADR {eur(adr)} · {totalNights} {t("notti")}.</p>
 
-      <div className="mt-3"><RicaviRow /></div>
-
-      <div className="mt-3">
+      <div className="mt-6">
         {chartsOn && (
         <ScrollStrip
           gap="gap-3"
@@ -391,16 +388,13 @@ export default function StatistichePage() {
           <span className="text-sm capitalize text-dim">· {monthLabelOf(repMonth)}</span>
         </div>
 
-        {/* Grafici giorno per giorno: stesso periodo della tabella sotto, grigio = storico, colore = previsione. */}
-        <div className="mb-4 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{t("Netto per giorno")}</div>
-            <ColumnChart bars={rep.map((r) => ({ label: String(new Date(r.iso).getDate()), value: r.lordo - r.commissioni, highlight: r.iso === todayISO, color: r.storico ? "var(--dim)" : "var(--ok)" }))} format={(n) => eur(n)} height={140} />
-          </div>
-          <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{t("Occupazione per giorno")}</div>
-            <ColumnChart bars={rep.map((r) => ({ label: String(new Date(r.iso).getDate()), value: Math.round(r.occ * 100), highlight: r.iso === todayISO, color: r.storico ? "var(--dim)" : "var(--focus)" }))} format={(n) => `${n}%`} height={140} />
-          </div>
+        {/* KPI del mese selezionato (storico + previsione insieme) */}
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <KpiD label={t("Notti vendute")} value={String(totAll.camere)} d={null} cmp="" />
+          <KpiD label={t("Occupazione")} value={`${Math.round(totAll.occ * 100)}%`} d={null} cmp="" />
+          <KpiD label="ADR" value={eur(totAll.adr)} d={null} cmp="" />
+          <KpiD label={t("Ricavi lordi")} value={eur(totAll.lordo)} d={null} cmp="" />
+          <KpiD label={t("Netto")} value={eur(totAll.netto)} d={null} cmp="" />
         </div>
 
         <FilterRow showMonth />
@@ -488,9 +482,7 @@ export default function StatistichePage() {
           <KpiD label={t("Ricavi")} value={eur(annCur.revenue)} d={delta(annCur.revenue, annPrev.revenue)} cmp={String(annualYear - 1)} />
         </div>
 
-        <div className="mt-3"><RicaviRow /></div>
-
-        <div className="mt-3">
+        <div className="mt-6">
           <FilterRow showMonth={false} />
           <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
             <table className="w-full text-sm">
