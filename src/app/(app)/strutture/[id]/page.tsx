@@ -589,6 +589,13 @@ export default function StrutturaSchedaPage() {
               )}
               <p className="mt-1.5 text-[11px] text-faint">{t("Voce unica: vale per tutte le strutture. Mostrata all'ospite alla prenotazione diretta.")}</p>
             </div>
+            <div className="mb-2 rounded-lg border border-line bg-paper p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <label className={lbl}>{t("Suggerisci altre mie strutture quando sono al completo")}</label>
+                <Toggle on={f.crossSuggestEnabled !== false} onClick={() => set("crossSuggestEnabled", f.crossSuggestEnabled === false ? true : false)} />
+              </div>
+              <p className="mt-1.5 text-[11px] text-faint">{t("Se un ospite cerca disponibilità qui e questa struttura è al completo per quelle date, il motore di prenotazione pubblico può suggerire un'altra tua struttura pubblicata (stesso account Xenora) che ha disponibilità, con un link diretto. Nessun dato viene condiviso con terzi: funziona solo tra le tue strutture.")}</p>
+            </div>
             <p className="mt-3 text-[11px] text-faint">{t("I servizi extra si gestiscono in «Upselling & extra»; l'ospite li sceglie durante la prenotazione.")}</p>
           </Card>
 

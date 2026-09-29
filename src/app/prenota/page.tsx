@@ -11,7 +11,7 @@ import { cityTaxOf } from "@/lib/booking";
 import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } from "@/lib/rate-plans";
 import { amenityIcon } from "@/lib/amenities";
 import { loadPromos } from "@/lib/promos";
-import { loadPublicSite, lsGet, isPublicMode, publicSlug } from "@/lib/publicdata";
+import { loadPublicSite, lsGet, isPublicMode, publicSlug, findAvailableSibling, type SiblingSuggestion } from "@/lib/publicdata";
 
 // ---- pricing helpers --------------------------------------------------------
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
@@ -142,6 +142,52 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     return Math.max(0, Math.round(raw * (1 + plan.adjPct / 100)));
   };
   const stayPrice = (rt: RoomType, plan: Plan) => { let t = 0; for (let i = 0; i < nights; i++) t += dayPrice(rt, addDays(checkIn, i), plan); return t; };
+
+  // Risultati calcolati una volta sola per ogni tipologia "madre" cercata: usati sia per
+  // il rendering sia per capire se la struttura è COMPLETAMENTE al completo per le
+  // date/ospiti scelti (nessuna tipologia prenotabile) — serve al suggerimento di rete
+  // tra strutture dello stesso proprietario, più sotto.
+  const pax = adults + children;
+  const roomResults = useMemo(() => {
+    if (!searched) return [] as { rt: RoomType; free: number; hasDeriv: boolean; cheapest: number; sellable: { v: RoomType; offers: { p: Plan; price: number }[] }[]; tooSmall: boolean; noRate: boolean; bookable: boolean }[];
+    return masters.map((rt) => {
+      const free = availUnitsFor(rt).length;
+      // Varianti = madre + tariffe derivate; ognuna con i suoi piani applicabili.
+      const variants = [rt, ...descendantsOf(rt.id)].map((v) => ({
+        v,
+        fits: (v.maxOccupancy ?? v.beds) >= pax,
+        offers: plans.filter((p) => planApplies(p, { roomTypeId: v.id, checkIn, nights })).map((p) => ({ p, price: stayPrice(v, p) })).filter((x) => x.price > 0),
+      })).filter((x) => x.offers.length > 0);
+      const sellable = variants.filter((x) => x.fits);
+      const hasDeriv = variants.length > 1;
+      const cheapest = sellable.reduce((min, x) => Math.min(min, ...x.offers.map((o) => o.price)), Infinity);
+      const tooSmall = variants.length > 0 && sellable.length === 0; // esistono tariffe ma nessuna adatta agli ospiti
+      const noRate = variants.length === 0;
+      const bookable = free > 0 && !tooSmall && !noRate && sellable.length > 0;
+      return { rt, free, hasDeriv, cheapest, sellable, tooSmall, noRate, bookable };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searched, masters, pax, checkIn, checkOut, nights, plans, roomTypes, units, bookings]);
+
+  // Nessuna tipologia prenotabile per le date/ospiti scelti → la struttura è "al completo".
+  const allSoldOut = searched && roomResults.every((r) => !r.bookable);
+
+  // Suggerimento di rete tra strutture dello STESSO proprietario (stesso account Xenora):
+  // se questa struttura è al completo, cerca un'ALTRA struttura pubblicata dallo stesso
+  // proprietario con disponibilità VERA per le stesse date/ospiti, e la propone
+  // all'ospite invece di lasciarlo senza alternative. Solo sui siti pubblici
+  // (Xenosite/embed) e solo se l'host non l'ha disattivato nelle Impostazioni struttura.
+  // V1: nessuna condivisione con account diversi da questo.
+  const [sibling, setSibling] = useState<SiblingSuggestion | null>(null);
+  useEffect(() => {
+    setSibling(null);
+    const slug = publicSlug();
+    if (!allSoldOut || !isPublicMode() || !slug) return;
+    if (structure?.crossSuggestEnabled === false) return;
+    let alive = true;
+    findAvailableSibling({ currentSlug: slug, currentStructureId: structureId, checkIn, checkOut, guests: pax }).then((s) => { if (alive) setSibling(s); });
+    return () => { alive = false; };
+  }, [allSoldOut, checkIn, checkOut, pax, structureId, structure?.crossSuggestEnabled]);
 
   const selRt = sel ? types.find((t) => t.id === sel.rtId) : null;
   const selPlan = sel ? plans.find((p) => p.id === sel.planId) ?? plans[0] : null;
@@ -421,20 +467,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
             </div>
             )}
             <div className="flex flex-col gap-3">
-              {(searched ? masters : []).map((rt) => {
-                const free = availUnitsFor(rt).length;
-                const pax = adults + children;
-                // Varianti = madre + tariffe derivate; ognuna con i suoi piani applicabili.
-                const variants = [rt, ...descendantsOf(rt.id)].map((v) => ({
-                  v,
-                  fits: (v.maxOccupancy ?? v.beds) >= pax,
-                  offers: plans.filter((p) => planApplies(p, { roomTypeId: v.id, checkIn, nights })).map((p) => ({ p, price: stayPrice(v, p) })).filter((x) => x.price > 0),
-                })).filter((x) => x.offers.length > 0);
-                const sellable = variants.filter((x) => x.fits);
-                const hasDeriv = variants.length > 1;
-                const cheapest = sellable.reduce((min, x) => Math.min(min, ...x.offers.map((o) => o.price)), Infinity);
-                const tooSmall = variants.length > 0 && sellable.length === 0; // esistono tariffe ma nessuna adatta agli ospiti
-                const noRate = variants.length === 0;
+              {roomResults.map(({ rt, free, hasDeriv, cheapest, sellable, tooSmall, noRate }) => {
                 return (
                   <div key={rt.id} id={`rt-${rt.id}`} className={`${box} overflow-hidden`}>
                     <div className="flex flex-col gap-3 p-4 sm:flex-row">
@@ -493,6 +526,27 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                 );
               })}
               {types.length === 0 && <div className={`${box} p-6 text-center text-sm text-faint`}>Nessuna camera configurata per questa struttura.</div>}
+              {allSoldOut && sibling && (
+                <div className={`${box} overflow-hidden`} style={{ borderColor: "var(--focus)", borderWidth: 2 }}>
+                  <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-lg" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)" }}>🏠</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-txt">{structure?.name ?? "Questa struttura"} è al completo per queste date</div>
+                      <div className="mt-0.5 text-sm text-dim">
+                        Ma <b className="text-txt">{sibling.name}</b>{sibling.zone ? ` (${sibling.zone})` : sibling.city ? ` (${sibling.city})` : ""}, un&apos;altra struttura dello stesso gestore, ha disponibilità per le stesse date.
+                      </div>
+                    </div>
+                    <a
+                      href={`/prenota?site=${encodeURIComponent(sibling.slug)}&ci=${checkIn}&co=${checkOut}&ad=${adults}${children ? `&ch=${children}&ages=${childAges.join(",")}` : ""}`}
+                      target={embed ? "_top" : undefined}
+                      rel={embed ? "noreferrer" : undefined}
+                      className="shrink-0 rounded-lg bg-focus px-4 py-2 text-center text-sm font-semibold text-white hover:opacity-90"
+                    >
+                      Vedi disponibilità →
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}

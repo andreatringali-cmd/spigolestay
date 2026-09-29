@@ -149,3 +149,85 @@ export function buildPublishData(structureId: string): Record<string, string> | 
   }
   return out;
 }
+
+// ---- Rete di passaggio tra strutture dello STESSO proprietario --------------
+//
+// Quando un ospite cerca disponibilità su un Xenosite pubblico e la struttura
+// è al completo per quelle date, cerchiamo tra le ALTRE strutture pubblicate
+// dallo stesso account Xenora (public_sites.user_id — lo stesso identificativo
+// che lega già le strutture "in comune" nel picker interno) una che abbia
+// disponibilità VERA (camera libera + capienza sufficiente). Se la troviamo,
+// il motore di prenotazione mostra un link diretto.
+//
+// V1, volutamente: SOLO strutture dello stesso proprietario. Nessuna
+// condivisione dati con account diversi, nessun consenso da chiedere (è la
+// stessa attività) e nessun meccanismo di invito tra tenant — quello è fuori
+// scope (idea futura V2).
+export interface SiblingSuggestion {
+  slug: string;
+  name: string;
+  zone?: string;
+  city?: string;
+}
+
+// Risolve, seguendo l'eventuale catena di derivazione (tariffe derivate
+// condividono le camere fisiche della tipologia madre), l'id della tipologia
+// "radice" a cui sono collegate le unità fisiche — stessa logica di
+// rootType() nel motore di prenotazione (src/app/prenota/page.tsx).
+function siblingRootId(rt: { id: string; deriveFrom?: string }, all: { id: string; deriveFrom?: string }[]): string {
+  let cur = rt;
+  const seen = new Set<string>();
+  while (cur.deriveFrom && !seen.has(cur.id)) {
+    seen.add(cur.id);
+    const parent = all.find((x) => x.id === cur.deriveFrom);
+    if (!parent) break;
+    cur = parent;
+  }
+  return cur.id;
+}
+
+export async function findAvailableSibling(opts: {
+  currentSlug: string;
+  currentStructureId?: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+}): Promise<SiblingSuggestion | null> {
+  if (!supabase) return null;
+  try {
+    const { data: mine } = await supabase.from("public_sites").select("user_id,structure_id").eq("slug", opts.currentSlug).maybeSingle();
+    const ownerId = mine?.user_id as string | undefined;
+    if (!ownerId) return null;
+    const myStructureId = opts.currentStructureId || (mine?.structure_id as string | undefined);
+    const { data: rows } = await supabase.from("public_sites").select("slug,structure_id,structure_name,data").eq("user_id", ownerId);
+    if (!rows || rows.length < 2) return null; // serve almeno un'ALTRA struttura pubblicata
+
+    for (const row of rows) {
+      if (!row.slug || row.structure_id === myStructureId) continue; // salta la struttura corrente
+      const raw = row.data as Record<string, string> | null;
+      if (!raw || !raw[DATA_KEY]) continue;
+      let blob: {
+        structures?: Array<{ name?: string; zone?: string; city?: string; crossSuggestEnabled?: boolean }>;
+        roomTypes?: Array<{ id: string; deriveFrom?: string; salesClosed?: boolean; maxOccupancy?: number; beds?: number }>;
+        units?: Array<{ id: string; roomTypeId: string; outOfService?: boolean }>;
+        bookings?: Array<{ unitId?: string | null; status?: string; channel?: string; checkIn: string; checkOut: string }>;
+      };
+      try { blob = JSON.parse(raw[DATA_KEY]); } catch { continue; }
+      const structure = (blob.structures ?? [])[0];
+      if (!structure) continue;
+      const roomTypes = blob.roomTypes ?? [];
+      const units = blob.units ?? [];
+      const bookings = blob.bookings ?? [];
+      const hasFree = roomTypes.some((rt) => {
+        if (rt.salesClosed) return false;
+        if ((rt.maxOccupancy ?? rt.beds ?? 0) < opts.guests) return false;
+        const rootId = siblingRootId(rt, roomTypes);
+        return units.some((u) => u.roomTypeId === rootId && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.unitId === u.id && b.checkIn < opts.checkOut && b.checkOut > opts.checkIn));
+      });
+      if (hasFree) {
+        return { slug: row.slug as string, name: (row.structure_name as string) || structure.name || "Un'altra struttura", zone: structure.zone, city: structure.city };
+      }
+    }
+    return null;
+  } catch { return null; }
+}

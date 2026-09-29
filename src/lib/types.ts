@@ -104,6 +104,7 @@ export interface Structure {
   // Booking engine
   extras?: ExtraService[]; // servizi extra / upsell
   depositPct?: number;     // % acconto richiesto alla prenotazione diretta
+  crossSuggestEnabled?: boolean; // se questa struttura è al completo, suggerisce all'ospite un'altra struttura dello stesso proprietario con disponibilità (assente/true = attivo)
 }
 
 export interface ExtraService {
