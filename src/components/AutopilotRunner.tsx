@@ -8,9 +8,10 @@ import { useData } from "@/lib/store";
 import { toISO } from "@/lib/dates";
 import { italianHolidays, italianBridges } from "@/lib/holidays";
 import { computeSuggestions, loadAutopilot, saveAutopilot, toOverrideMap, highDemandMap } from "@/lib/autopilot";
+import { summarizeAppliedSuggestions } from "@/lib/autopilot-explain";
 
 export default function AutopilotRunner() {
-  const { bookings, roomTypes, units, events, rateOverrides, setDayRates, structures } = useData();
+  const { bookings, roomTypes, units, events, rateOverrides, setDayRates, structures, addActivity } = useData();
   const done = useRef(false);
 
   useEffect(() => {
@@ -27,7 +28,10 @@ export default function AutopilotRunner() {
     const hd = highDemandMap(events ?? [], holidays, bridges, today, cfg.horizonDays);
 
     const sugg = computeSuggestions(bookings, roomTypes, units, rateOverrides, cfg, today, "all", hd);
-    if (sugg.length) setDayRates(toOverrideMap(sugg));
+    if (sugg.length) {
+      setDayRates(toOverrideMap(sugg));
+      addActivity("rate", `Autopilot: ${sugg.length} tariffe aggiornate automaticamente. ${summarizeAppliedSuggestions(sugg)}`);
+    }
     saveAutopilot({ ...cfg, lastRun: today });
     done.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps

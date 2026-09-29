@@ -13,12 +13,13 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useToast } from "@/components/ToastProvider";
 import { italianHolidays, italianBridges } from "@/lib/holidays";
 import { computeSuggestions, loadAutopilot, saveAutopilot, toOverrideMap, highDemandMap, type AutopilotCfg, type Suggestion } from "@/lib/autopilot";
+import { explainSuggestion, explainSuggestionCompact, summarizeAppliedSuggestions } from "@/lib/autopilot-explain";
 import { fetchCityPulse, computeMarketSignal, MARKET_WINDOW, type MarketPulse } from "@/lib/market";
 
 const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
 
 export default function RevenueAutopilotPage() {
-  const { bookings, roomTypes, units, events, rateOverrides, setDayRates, structures, activeStructureId, getStructure } = useData();
+  const { bookings, roomTypes, units, events, rateOverrides, setDayRates, structures, activeStructureId, getStructure, addActivity } = useData();
   const { user } = useAuth();
   const toast = useToast();
   const todayISO = toISO(new Date());
@@ -72,7 +73,11 @@ export default function RevenueAutopilotPage() {
   useEffect(() => {
     if (!cfg.on || auto.current) return;
     if (!roomTypes.length) return; // attendi l'idratazione dello store
-    if (suggestions.length) { setDayRates(toOverrideMap(suggestions)); toast(`Autopilot: applicati ${suggestions.length} aggiustamenti prezzo.`, "success"); }
+    if (suggestions.length) {
+      setDayRates(toOverrideMap(suggestions));
+      toast(`Autopilot: applicati ${suggestions.length} aggiustamenti prezzo.`, "success");
+      addActivity("rate", `Autopilot: ${suggestions.length} tariffe aggiornate automaticamente. ${summarizeAppliedSuggestions(suggestions)}`);
+    }
     auto.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg.on, roomTypes.length, suggestions.length]);
@@ -81,8 +86,13 @@ export default function RevenueAutopilotPage() {
   const down = suggestions.filter((s) => s.suggested < s.current);
   const netDelta = suggestions.reduce((a, s) => a + (s.suggested - s.current), 0);
 
-  const applyOne = (s: Suggestion) => { setDayRates({ [s.key]: s.suggested }); toast(`${s.typeName} · ${fmtDay(s.iso)}: ${eur(s.suggested)}`, "success"); };
-  const applyAll = () => { if (!suggestions.length) return; setDayRates(toOverrideMap(suggestions)); toast(`Applicati ${suggestions.length} aggiustamenti.`, "success"); };
+  const applyOne = (s: Suggestion) => { setDayRates({ [s.key]: s.suggested }); toast(`${s.typeName} · ${fmtDay(s.iso)}: ${eur(s.suggested)}`, "success"); addActivity("rate", explainSuggestion(s)); };
+  const applyAll = () => {
+    if (!suggestions.length) return;
+    setDayRates(toOverrideMap(suggestions));
+    toast(`Applicati ${suggestions.length} aggiustamenti.`, "success");
+    addActivity("rate", `Applicati manualmente ${suggestions.length} aggiustamenti prezzo. ${summarizeAppliedSuggestions(suggestions)}`);
+  };
 
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
@@ -148,7 +158,7 @@ export default function RevenueAutopilotPage() {
                     <td className="px-2 py-2 text-center font-mono text-dim">{s.occ}%</td>
                     <td className="whitespace-nowrap px-2 py-2 text-right font-mono text-dim">{eur(s.current)}</td>
                     <td className="whitespace-nowrap px-2 py-2 text-right font-mono font-bold" style={{ color: s.suggested >= s.current ? "var(--ok)" : "var(--warn)" }}>{eur(s.suggested)} <span className="text-[10px]">({s.deltaPct > 0 ? "+" : ""}{s.deltaPct}%)</span></td>
-                    <td className="px-2 py-2 text-[11px] text-faint">{s.reasons.join(" · ")}</td>
+                    <td className="px-2 py-2 text-[11px] text-faint">{explainSuggestionCompact(s)}</td>
                     <td className="px-2 py-2 text-right"><button onClick={() => applyOne(s)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">Applica</button></td>
                   </tr>
                 ))}

@@ -4,7 +4,7 @@
 // (rateForDay) e applica moltiplicatori entro i limiti (guardrail). Se l'autopilot
 // è attivo, i suggerimenti si applicano da soli scrivendo gli override del calendario.
 import type { Booking, RoomType, Unit } from "./types";
-import { rateForDay, loadWeekendPct } from "./pricing";
+import { rateForDay, loadWeekendPct, isWeekendISO } from "./pricing";
 import { shiftISO } from "./dates";
 import { zoneMultiplier, type MarketSignal } from "./market";
 
@@ -34,12 +34,26 @@ export function loadAutopilot(): AutopilotCfg {
 }
 export function saveAutopilot(cfg: AutopilotCfg) { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch {} }
 
+// Segnali REALI (nessun dato inventato) usati per generare la spiegazione in linguaggio
+// naturale di una proposta (vedi lib/autopilot-explain.ts). Rispecchiano esattamente le
+// condizioni che hanno pesato sul moltiplicatore, così la frase non può "raccontare"
+// qualcosa che il motore non ha davvero calcolato.
+export interface SuggestionSignals {
+  occBand?: "alta" | "media-alta" | "bassa"; // fascia di occupazione che ha innescato una variazione
+  weekend: boolean;                          // il giorno è sabato/domenica (maggiorazione weekend del motore prezzi)
+  lastMinute: boolean;                       // pochi giorni al check-in e tipologia ancora scarica
+  gap: boolean;                              // giorno più libero dei vicini (buco tra prenotazioni)
+  highDemandLabel?: string;                  // festivo / ponte / evento reale applicato quel giorno
+  zoneReasons: string[];                     // motivazioni del benchmark "Rete città" (solo se dati reali di zona presenti)
+}
+
 export interface Suggestion {
   key: string;          // `${typeId}|${iso}`
   typeId: string; typeName: string; structureId: string; iso: string;
   base: number; current: number; suggested: number; deltaPct: number;
   occ: number;          // occupazione 0..100 della tipologia in quel giorno
   reasons: string[];
+  signals: SuggestionSignals;
 }
 
 const activeOn = (b: Booking, iso: string) => b.status !== "cancelled" && b.channel !== "blocked" && b.checkIn <= iso && iso < b.checkOut;
@@ -74,17 +88,21 @@ export function computeSuggestions(
       const occPrev = typeOccupancy(typeUnitIds, bookings, shiftISO(iso, -1));
 
       let mult = 1; const reasons: string[] = [];
+      let occBand: SuggestionSignals["occBand"];
       // Occupazione
-      if (occ >= 85) { mult *= 1.12; reasons.push(`Occupazione ${occ}%: alza`); }
-      else if (occ >= 70) { mult *= 1.06; reasons.push(`Occupazione ${occ}%: alza leggero`); }
-      else if (occ <= 30) { mult *= 0.92; reasons.push(`Occupazione ${occ}%: abbassa per riempire`); }
+      if (occ >= 85) { mult *= 1.12; reasons.push(`Occupazione ${occ}%: alza`); occBand = "alta"; }
+      else if (occ >= 70) { mult *= 1.06; reasons.push(`Occupazione ${occ}%: alza leggero`); occBand = "media-alta"; }
+      else if (occ <= 30) { mult *= 0.92; reasons.push(`Occupazione ${occ}%: abbassa per riempire`); occBand = "bassa"; }
       // Last-minute (prossimi 3 giorni ancora scarichi)
-      if (d <= 3 && occ < 50) { mult *= 0.93; reasons.push("Last-minute scarico"); }
+      const lastMinute = d <= 3 && occ < 50;
+      if (lastMinute) { mult *= 0.93; reasons.push("Last-minute scarico"); }
       // Buco tra prenotazioni (giorno più libero dei vicini)
-      if (occ < 100 && occPrev > occ && occNext > occ) { mult *= 0.90; reasons.push("Buco tra prenotazioni"); }
+      const gap = occ < 100 && occPrev > occ && occNext > occ;
+      if (gap) { mult *= 0.90; reasons.push("Buco tra prenotazioni"); }
       // Alta richiesta: festivo / ponte / evento locale → alza (se non già scarico)
       const hd = highDemand?.get(iso);
-      if (hd && occ >= 25) { mult *= 1.10; reasons.push(hd); }
+      const highDemandLabel = hd && occ >= 25 ? hd : undefined;
+      if (highDemandLabel) { mult *= 1.10; reasons.push(highDemandLabel); }
       // Benchmark di zona (Rete città): attivo SOLO con dati reali di zona; stessa logica di Revenue/Nèttare.
       const z = zoneMultiplier(signal, occ / 100);
       if (z.mult !== 1) { mult *= z.mult; reasons.push(...z.reasons); }
@@ -99,7 +117,8 @@ export function computeSuggestions(
       const deltaPct = current > 0 ? Math.round(((suggested - current) / current) * 100) : 0;
       if (Math.abs(deltaPct) < 3 || suggested === current) continue; // ignora variazioni trascurabili
 
-      out.push({ key: `${rt.id}|${iso}`, typeId: rt.id, typeName: rt.name, structureId: rt.structureId, iso, base, current, suggested, deltaPct, occ, reasons });
+      const signals: SuggestionSignals = { occBand, weekend: isWeekendISO(iso), lastMinute, gap, highDemandLabel, zoneReasons: z.reasons };
+      out.push({ key: `${rt.id}|${iso}`, typeId: rt.id, typeName: rt.name, structureId: rt.structureId, iso, base, current, suggested, deltaPct, occ, reasons, signals });
     }
   }
   // Prima i cambiamenti più grandi (in valore assoluto).
