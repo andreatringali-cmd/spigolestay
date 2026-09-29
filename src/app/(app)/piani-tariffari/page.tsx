@@ -104,16 +104,16 @@ export default function PianiTariffariPage() {
       <PageHeader
         title={t("Piani tariffari")}
         subtitle={t("La stessa camera, più modi di venderla. Ogni piano parte dal prezzo del giorno e applica uno scarto. Lo scegli quando crei un preventivo o una prenotazione.")}
-        actions={activeStructureId === "all" ? (
-          <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+      />
+
+      {/* Barra: struttura + vista + legenda + aggiungi */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm">
+        {activeStructureId === "all" && (
+          <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
             <option value="all">{t("Tutte le strutture")}</option>
             {structures.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
           </select>
-        ) : null}
-      />
-
-      {/* Barra: vista + legenda + aggiungi */}
-      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm">
+        )}
         <div className="inline-flex overflow-hidden rounded-lg border border-line">
           <button onClick={() => setView2("list")} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition ${view === "list" ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h18M3 12h18M3 19h18" /></svg>{t("Elenco")}
