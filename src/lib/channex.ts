@@ -239,6 +239,18 @@ export async function listBookingRevisions(opts: { propertyId?: string; bookingI
   return { ok: true as const, status: res.status, rows };
 }
 
+// ── Collegamento canali OTA (self-service) ──
+// Channex espone un "one-time token" da scambiare per aprire, in un iframe, la SUA interfaccia di
+// collegamento/mappatura canali (Booking.com, Airbnb, Expedia, ...): è l'unico modo per collegare
+// davvero un'OTA (credenziali/OAuth gestiti da Channex, non replicabili lato nostro). Il token dura
+// 15 minuti e si usa una sola volta. Vedi src/app/(app)/canali/page.tsx per l'uso.
+export async function createChannelOneTimeToken(propertyId: string, username: string) {
+  return channex<{ data: { token: string } }>("/auth/one_time_token", {
+    method: "POST",
+    body: JSON.stringify({ property_id: propertyId, username }),
+  });
+}
+
 export async function createRatePlan(propertyId: string, roomTypeId: string, opts: { title?: string; occupancy: number; rate: number; currency?: string }) {
   return channex<Created>("/rate_plans", {
     method: "POST",

@@ -39,6 +39,10 @@ export default function CanaliPage() {
   // Sincronizzazione reale verso Channex (staging): crea property + camere + tariffe da Xenora.
   const [chxMap, setChxMap] = useState<Record<string, { propertyId: string; rooms?: Record<string, { roomTypeId: string; ratePlanId?: string }>; at: string }>>({});
   const [chxSync, setChxSync] = useState<{ running: boolean; msg?: string; ok?: boolean }>({ running: false });
+  // Collegamento reale delle OTA (Booking.com, Airbnb, Expedia, ...): si apre in un pannello DENTRO
+  // Xenora l'interfaccia dedicata (autenticazioni/credenziali OTA non replicabili lato nostro),
+  // tramite un token valido una sola volta e 15 minuti — niente riferimenti al fornitore in vista.
+  const [channelPanel, setChannelPanel] = useState<{ open: boolean; url?: string; loading?: boolean; error?: string }>({ open: false });
   const [impSync, setImpSync] = useState<{ running: boolean; msg?: string; ok?: boolean }>({ running: false });
   // Importa le prenotazioni OTA in entrata dal feed Channex (2-way).
   const importOta = async () => {
@@ -140,6 +144,18 @@ export default function CanaliPage() {
     }
   };
 
+  const openChannelManager = async () => {
+    setChannelPanel({ open: true, loading: true });
+    try {
+      const j = await apiPost<{ ok: boolean; token?: string; propertyId?: string; base?: string; error?: string }>("channex/channel-token", { structureId: effStructure });
+      if (!j.ok || !j.token || !j.base) { setChannelPanel({ open: true, error: j.error || "Impossibile aprire il collegamento canali." }); return; }
+      const url = `${j.base}/auth/exchange?oauth_session_key=${encodeURIComponent(j.token)}&app_mode=headless&redirect_to=/channels&property_id=${encodeURIComponent(j.propertyId || "")}`;
+      setChannelPanel({ open: true, url });
+    } catch (e) {
+      setChannelPanel({ open: true, error: e instanceof Error ? e.message : "Errore di rete" });
+    }
+  };
+
   // NB: l'invio di disponibilità e prezzi a Channex è ora AUTOMATICO (vedi ChannexAutoSync,
   // montato nell'AppShell): parte da solo a ogni modifica di prenotazioni, camere (anche fuori
   // servizio) o prezzi. Niente più pulsante manuale.
@@ -180,6 +196,7 @@ export default function CanaliPage() {
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {chxMap[effStructure] ? (
               <>
+                <button onClick={openChannelManager} disabled={channelPanel.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{channelPanel.loading ? t("Apro…") : "+ " + t("Collega un canale")}</button>
                 <button onClick={importOta} disabled={impSync.running} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40" title={t("Le prenotazioni arrivano da sole; usa questo solo per forzare un controllo immediato.")}>{impSync.running ? t("Controllo…") : "↓ " + t("Controlla prenotazioni ora")}</button>
               </>
             ) : (
@@ -191,6 +208,30 @@ export default function CanaliPage() {
           </div>
         </div>
       </Card>
+
+      {/* Pannello "Collega un canale": incorpora l'interfaccia di collegamento OTA (Booking.com,
+         Airbnb, Expedia, ...) DENTRO Xenora, dentro la nostra intestazione — niente rimando a un
+         sito esterno. Le credenziali/l'autorizzazione con ogni OTA restano gestite dal motore
+         dietro le quinte (non replicabili lato nostro), il resto è nostro. */}
+      {channelPanel.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button aria-label={t("Chiudi")} onClick={() => setChannelPanel({ open: false })} className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
+          <div className="relative flex h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
+            <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
+              <div>
+                <h2 className="font-display text-base font-bold text-txt">{t("Collega i tuoi canali")}</h2>
+                <p className="text-[11px] text-dim">{t("Autorizza Booking.com, Airbnb, Expedia e gli altri portali che usi")}</p>
+              </div>
+              <button onClick={() => setChannelPanel({ open: false })} className="grid h-8 w-8 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt">✕</button>
+            </div>
+            <div className="relative flex-1 bg-wash">
+              {channelPanel.loading && <div className="absolute inset-0 flex items-center justify-center text-sm text-dim">{t("Preparo il collegamento…")}</div>}
+              {channelPanel.error && <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm" style={{ color: "var(--err)" }}>⚠ {channelPanel.error}</div>}
+              {channelPanel.url && <iframe src={channelPanel.url} className="h-full w-full border-0" title={t("Collega i tuoi canali")} />}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sincronizzazione iCal reale (sola lettura) — prima del registro sincronizzazioni */}
       <div className="mt-6">
