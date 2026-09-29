@@ -13,6 +13,8 @@ import { eur } from "@/lib/format";
 import { CHANNELS, type Channel } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
 import { type Promo, loadPromos, promoMailto } from "@/lib/promos";
+import Icon from "@/components/Icon";
+import { exportExcel } from "@/lib/export";
 
 const avColor = (n: string) => AV_COLORS[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 const fmtD = (iso: string) => { try { return parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" }); } catch { return iso; } };
@@ -140,6 +142,28 @@ export default function OspitiPage() {
     const lines = guestSorted.map((r) => [r.guest.fullName, r.guest.email ?? "", r.guest.phone ?? "", r.guest.country ?? "", r.stays, r.nightsTot, r.spent, r.last ? fmtD(r.last) : "", r.topCh ? CHANNELS[r.topCh].label : "", (r.guest.tags ?? []).join("|")].map((x) => `"${String(x).replace(/"/g, '""')}"`).join(","));
     const blob = new Blob([["﻿" + head.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `ospiti-${seg}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  };
+
+  // Esportazione Excel del registro ospiti con colonne a scelta (stesso segmento visibile).
+  const EXPORT_COLUMNS: { key: string; label: string; get: (r: (typeof guestSorted)[number]) => string | number }[] = [
+    { key: "nome", label: t("Nome"), get: (r) => r.guest.fullName },
+    { key: "email", label: t("Email"), get: (r) => r.guest.email ?? "" },
+    { key: "telefono", label: t("Telefono"), get: (r) => r.guest.phone ?? "" },
+    { key: "paese", label: t("Paese"), get: (r) => r.guest.country ?? "" },
+    { key: "prenotazioni", label: t("Prenotazioni"), get: (r) => r.stays },
+    { key: "notti", label: t("Notti"), get: (r) => r.nightsTot },
+    { key: "speso", label: t("Speso"), get: (r) => r.spent },
+    { key: "ultimo", label: t("Ultimo soggiorno"), get: (r) => (r.last ? fmtD(r.last) : "") },
+    { key: "canale", label: t("Canale"), get: (r) => (r.topCh ? CHANNELS[r.topCh].label : "") },
+    { key: "tag", label: "Tag", get: (r) => (r.guest.tags ?? []).join(", ") },
+  ];
+  const [exportPick, setExportPick] = useState(false);
+  const [exportCols, setExportCols] = useState<Set<string>>(new Set(EXPORT_COLUMNS.map((c) => c.key)));
+  const toggleExportCol = (k: string) => setExportCols((p) => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n; });
+  const doExportExcel = () => {
+    const cols = EXPORT_COLUMNS.filter((c) => exportCols.has(c.key));
+    exportExcel(`ospiti-${seg}`, cols.map((c) => c.label), guestSorted.map((r) => cols.map((c) => c.get(r))));
+    setExportPick(false);
   };
 
   // Selezione multipla → invio promo
@@ -281,8 +305,9 @@ export default function OspitiPage() {
       <div className="mb-4 grid grid-cols-2 items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm sm:grid-cols-4">
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca per nome, email o paese…")} className="col-span-2 w-full sm:col-span-1" />
         <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 sm:col-span-3">
-          <button onClick={() => router.push("/promozioni")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">✉ {t("Promozioni")}</button>
           <button onClick={() => router.push("/ospiti/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ {t("Nuovo ospite")}</button>
+          <button onClick={() => setExportPick(true)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash"><Icon name="fileText" size={14} /> {t("Esporta")}</button>
+          <button onClick={() => router.push("/promozioni")} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash"><Icon name="tag" size={14} /> {t("Promozioni")}</button>
         </div>
       </div>
 
@@ -312,6 +337,31 @@ export default function OspitiPage() {
 
       <Register title={t("Registro ospiti")} list={guestSorted} empty={t("Nessun ospite in questo segmento.")} open={openReg.ospiti} onToggle={() => setOpenReg((v) => ({ ...v, ospiti: !v.ospiti }))} />
       <Register title={t("Registro newsletter")} list={nlSorted} empty={t("Nessun iscritto alla newsletter.")} lead onClear={clearNewsletter} open={openReg.nl} onToggle={() => setOpenReg((v) => ({ ...v, nl: !v.nl }))} />
+
+      {exportPick && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button aria-label="Chiudi" onClick={() => setExportPick(false)} className="absolute inset-0 bg-black/40" />
+          <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="mb-1 flex items-center justify-between"><span className="font-display text-lg font-bold text-txt">{t("Esporta ospiti in Excel")}</span><button onClick={() => setExportPick(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-3 text-xs text-dim">{guestSorted.length} {t("ospiti nel segmento corrente")} · {t("scegli le colonne")}</div>
+            <div className="mb-4 grid grid-cols-2 gap-2">
+              {EXPORT_COLUMNS.map((c) => (
+                <label key={c.key} className="flex items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-sm text-txt hover:bg-wash">
+                  <input type="checkbox" checked={exportCols.has(c.key)} onChange={() => toggleExportCol(c.key)} className="h-4 w-4 accent-[color:var(--focus)]" />
+                  {c.label}
+                </label>
+              ))}
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex gap-2 text-xs">
+                <button onClick={() => setExportCols(new Set(EXPORT_COLUMNS.map((c) => c.key)))} className="font-semibold text-focus hover:underline">{t("Tutte")}</button>
+                <button onClick={() => setExportCols(new Set())} className="font-semibold text-dim hover:underline">{t("Nessuna")}</button>
+              </div>
+              <button onClick={doExportExcel} disabled={exportCols.size === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">⬇ {t("Esporta")}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pickPromo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
