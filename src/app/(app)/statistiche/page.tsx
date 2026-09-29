@@ -493,9 +493,11 @@ export default function StatistichePage() {
               <thead>
                 <tr className="bg-wash text-left text-xs uppercase tracking-wide text-faint">
                   <th className="px-3 py-2 font-semibold">{t("Mese")}</th>
+                  <th className="px-3 py-2 text-right font-semibold">{t("Arrivi")}</th>
                   <th className="px-3 py-2 text-right font-semibold">{t("Occup.")}</th>
                   <th className="px-3 py-2 text-right font-semibold">{t("Notti")}</th>
                   <th className="px-3 py-2 text-right font-semibold">ADR</th>
+                  <th className="px-3 py-2 text-right font-semibold">RevPAR</th>
                   <th className="px-3 py-2 text-right font-semibold">{t("Ricavi")}</th>
                 </tr>
               </thead>
@@ -503,9 +505,11 @@ export default function StatistichePage() {
                 {annCur.months.map((m) => (
                   <tr key={m.i} className="border-b border-line last:border-0">
                     <td className="px-3 py-2 font-medium capitalize text-txt">{m.label}</td>
+                    <td className="px-3 py-2 text-right font-mono text-dim">{m.count || ""}</td>
                     <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(m.occ * 100)}%</td>
                     <td className="px-3 py-2 text-right font-mono text-dim">{m.roomNights || ""}</td>
                     <td className="px-3 py-2 text-right font-mono text-dim">{m.roomNights ? eur(m.adr) : "—"}</td>
+                    <td className="px-3 py-2 text-right font-mono text-dim">{eur(m.revpar)}</td>
                     <td className="px-3 py-2 text-right font-mono text-txt">{eur(m.revenue)}</td>
                   </tr>
                 ))}
@@ -513,9 +517,11 @@ export default function StatistichePage() {
               <tbody>
                 <tr className="border-t-2 border-line bg-wash font-bold">
                   <td className="px-3 py-2 text-txt">{t("Totale")} {annualYear}</td>
+                  <td className="px-3 py-2 text-right font-mono text-dim">{annCur.arrivals}</td>
                   <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(annCur.occ * 100)}%</td>
                   <td className="px-3 py-2 text-right font-mono text-dim">{annCur.roomNights}</td>
                   <td className="px-3 py-2 text-right font-mono text-dim">{annCur.roomNights ? eur(annCur.adr) : "—"}</td>
+                  <td className="px-3 py-2 text-right font-mono text-dim">{eur(annCur.revpar)}</td>
                   <td className="px-3 py-2 text-right font-mono text-[color:var(--ok)]">{eur(annCur.revenue)}</td>
                 </tr>
               </tbody>
