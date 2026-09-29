@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { CHANNELS, type Channel } from "@/lib/types";
@@ -96,6 +97,31 @@ export default function Dashboard() {
   const [focus, setFocus] = useState<null | "attive" | "inhouse" | "arrivi" | "partenze">(null);
   const toggleFocus = (f: "attive" | "inhouse" | "arrivi" | "partenze") => setFocus((cur) => (cur === f ? null : f));
   const sFilter = activeStructureId; // struttura attiva (globale, dalla barra in alto)
+
+  // Badge "Sei in regola" — controllo REALE (non un valore finto) degli adempimenti PA del
+  // periodo corrente: schedine Alloggiati pronte ma non ancora inviate (arrivo già avvenuto),
+  // invii Alloggiati falliti di recente, movimenti ISTAT ancora da chiudere/inviare.
+  const [paCompliance, setPaCompliance] = useState<{ pending: number; loading: boolean }>({ pending: 0, loading: true });
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!supabase) { if (alive) setPaCompliance({ pending: 0, loading: false }); return; }
+      const ids = sFilter === "all" ? structures.map((s) => s.id) : [sFilter];
+      if (!ids.length) { if (alive) setPaCompliance({ pending: 0, loading: false }); return; }
+      const monthAgo = toISO(addDays(today, -30));
+      try {
+        const [schedQ, errQ, istatQ] = await Promise.all([
+          supabase.from("alloggiati_schedine").select("id", { count: "exact", head: true }).eq("stato", "pronta").lte("arrival", todayISO).in("structure_id", ids),
+          supabase.from("alloggiati_submissions").select("id", { count: "exact", head: true }).eq("stato", "error").gte("created_at", monthAgo).in("structure_id", ids),
+          supabase.from("istat_rows").select("id", { count: "exact", head: true }).eq("stato", "pending").lte("arrival", todayISO).in("structure_id", ids),
+        ]);
+        if (!alive) return;
+        setPaCompliance({ pending: (schedQ.count ?? 0) + (errQ.count ?? 0) + (istatQ.count ?? 0), loading: false });
+      } catch { if (alive) setPaCompliance({ pending: 0, loading: false }); }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sFilter, structures.length, todayISO]);
 
   // Checklist del giorno (spunte salvate nel browser).
   const [todoDone, setTodoDone] = useState<Set<string>>(new Set());
@@ -359,7 +385,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader title={t("Dashboard")} subtitle={`${t("Riferito a")} ${parseISO(date).toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}`} actions={<WeatherWidget compact />} />
+      <PageHeader title={t("Dashboard")} subtitle={`${t("Riferito a")} ${parseISO(date).toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}`} actions={<><ComplianceBadge pending={paCompliance.pending} loading={paCompliance.loading} /><WeatherWidget compact /></>} />
 
       {/* KPI stato attuale — cliccabili per filtrare i movimenti sotto */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -643,6 +669,25 @@ export default function Dashboard() {
       </div>
 
     </div>
+  );
+}
+
+// Badge "Sei in regola" (verde) / avviso adempimenti PA in sospeso (ambra) — link a /adempimenti.
+// `pending` arriva da un controllo reale su Supabase (schedine Alloggiati + ISTAT), non da un valore finto.
+function ComplianceBadge({ pending, loading }: { pending: number; loading: boolean }) {
+  const { t } = useLang();
+  if (loading) return null;
+  const ok = pending === 0;
+  return (
+    <Link
+      href="/adempimenti"
+      className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition hover:opacity-90"
+      style={{ backgroundColor: ok ? "color-mix(in srgb, var(--ok) 14%, transparent)" : "color-mix(in srgb, var(--warn) 14%, transparent)", color: ok ? "var(--ok)" : "var(--warn)" }}
+      title={ok ? t("Nessuna schedina Alloggiati o movimento ISTAT in sospeso.") : t("Ci sono schedine Alloggiati o movimenti ISTAT in sospeso/falliti: apri Adempimenti.")}
+    >
+      <Icon name={ok ? "id" : "alertTriangle"} size={13} />
+      {ok ? t("Sei in regola") : `${pending} ${t("adempimenti PA in sospeso")}`}
+    </Link>
   );
 }
 
