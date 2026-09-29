@@ -405,7 +405,6 @@ export default function StatistichePage() {
         <KpiD label="RevPAR" value={eur(cur.revpar)} d={prev ? delta(cur.revpar, prev.revpar) : null} cmp={R.cmp} />
         <KpiD label={t("Ricavi")} value={eur(cur.revenue)} d={prev ? delta(cur.revenue, prev.revenue) : null} cmp={R.cmp} />
       </div>
-      <p className="mt-2 text-xs text-faint">{t("Valori riferiti a")} <b className="text-dim">{R.label.toLowerCase()}</b>{prev ? ` · ${t("confronto con")} ${R.cmp}` : ""}. {t("Complessivo storico: ricavi")} {eur(totalRevenue)} · ADR {eur(adr)} · {totalNights} {t("notti")}.</p>
 
       <div className="mt-6">
         {chartsOn && (
@@ -451,7 +450,6 @@ export default function StatistichePage() {
       <div>
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <h2 className="font-display text-lg font-bold text-txt">{t("Report annuale")}</h2>
-          <span className="text-sm capitalize text-dim">· {annualYear}</span>
         </div>
 
         {/* KPI anno con confronto sull'anno precedente */}
