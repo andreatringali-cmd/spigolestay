@@ -267,6 +267,54 @@ export default function StatistichePage() {
         />
         )}
       </div>
+
+      {/* Elenco prenotazioni del mese — mancava sotto i KPI/grafici, solo aggregati. */}
+      <div className="mt-6">
+        <div className="mb-3 flex flex-wrap items-baseline gap-2">
+          <h2 className="font-display text-lg font-bold text-txt">{t("Prenotazioni del mese")}</h2>
+          <span className="text-sm capitalize text-dim">· {monthLabelOf(repMonth)} · {monthArr.length} {monthArr.length === 1 ? t("prenotazione") : t("prenotazioni")}</span>
+        </div>
+        {monthArr.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-faint">{t("Nessuna prenotazione con arrivo in questo mese.")}</div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+            <div className="max-h-[54vh] overflow-y-auto">
+              <table className="w-full min-w-[720px] table-fixed text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-wash text-left text-xs uppercase tracking-wide text-faint shadow-[0_1px_0_var(--line)]">
+                    <th className="px-3 py-2 font-semibold">{t("Arrivo")}</th>
+                    <th className="px-3 py-2 text-right font-semibold">{t("Notti")}</th>
+                    <th className="px-3 py-2 font-semibold">{t("Ospite")}</th>
+                    {activeStructureId === "all" && <th className="px-3 py-2 font-semibold">{t("Struttura")}</th>}
+                    <th className="px-3 py-2 font-semibold">{t("Camera")}</th>
+                    <th className="px-3 py-2 font-semibold">{t("Canale")}</th>
+                    <th className="px-3 py-2 text-right font-semibold">{t("Importo")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...monthArr].sort((a, b) => (a.checkIn < b.checkIn ? -1 : a.checkIn > b.checkIn ? 1 : 0)).map((b) => {
+                    const guest = guests.find((g) => g.id === b.guestId);
+                    const unit = units.find((u) => u.id === b.unitId);
+                    const struct = structures.find((s) => s.id === b.structureId);
+                    const isBlocked = b.channel === "blocked";
+                    return (
+                      <tr key={b.id} className="border-b border-line last:border-0 hover:bg-wash">
+                        <td className="truncate px-3 py-2 font-medium capitalize text-txt">{fmtDay(b.checkIn)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-dim">{nights(b.checkIn, b.checkOut)}</td>
+                        <td className="truncate px-3 py-2 text-txt">{isBlocked ? <span className="text-faint">{t("Fuori servizio")}</span> : (guest?.fullName || t("Senza nome"))}</td>
+                        {activeStructureId === "all" && <td className="truncate px-3 py-2 text-dim">{struct?.name ?? "—"}</td>}
+                        <td className="truncate px-3 py-2 text-dim">{unit?.name ?? "—"}</td>
+                        <td className="px-3 py-2 text-dim">{isBlocked ? "—" : CHANNELS[b.channel as Channel]?.label ?? b.channel}</td>
+                        <td className="px-3 py-2 text-right font-mono font-semibold text-txt">{isBlocked ? "—" : eur(b.total ?? 0)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
       </>)}
 
       {/* Riga filtro unica: mese (guida KPI e report) + toggle grafici — non nel report annuale */}
@@ -287,71 +335,65 @@ export default function StatistichePage() {
           <span className="text-sm capitalize text-dim">· {monthLabelOf(repMonth)}</span>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
-          <div style={{ minWidth: 1000 }}>
-            {/* Corpo scorrevole con intestazione fissa */}
-            <div className="max-h-[54vh] overflow-y-auto">
-              <table className="w-full table-fixed text-sm">
-                <RepCols />
-                <thead className="sticky top-0 z-10">
-                  <tr className="bg-wash text-left text-xs uppercase tracking-wide text-faint shadow-[0_1px_0_var(--line)]">
-                    <th className="px-3 py-2 font-semibold">{t("Giorno")}</th>
-                    <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
-                    <th className="px-3 py-2 text-right font-semibold">{t("Camere")}</th>
-                    <th className="px-3 py-2 text-right font-semibold">{t("Occup.")}</th>
-                    <th className="px-3 py-2 text-right font-semibold">{t("Arrivi")}</th>
-                    <th className="px-3 py-2 text-right font-semibold">{t("Part.")}</th>
-                    <th className="px-3 py-2 text-right font-semibold">{t("Ospiti")}</th>
-                    <th className="px-3 py-2 text-right font-semibold">ADR</th>
-                    <th className="px-3 py-2 text-right font-semibold">Revenue</th>
-                    <th className="px-3 py-2 text-right font-semibold">{t("Commiss.")}</th>
-                    <th className="px-3 py-2 text-right font-semibold">{t("Netto")}</th>
+        {/* Un'unica tabella con UN solo contenitore di scroll (orizzontale+verticale): intestazione
+            sticky in alto e riga totali sticky in fondo, così solo le righe giorno scorrono in mezzo. */}
+        <div className="max-h-[60vh] overflow-auto rounded-xl border border-line bg-surface shadow-sm">
+          <table className="w-full min-w-[1000px] table-fixed text-sm">
+            <RepCols />
+            <thead className="sticky top-0 z-20">
+              <tr className="bg-wash text-left text-xs uppercase tracking-wide text-faint shadow-[0_1px_0_var(--line)]">
+                <th className="px-3 py-2 font-semibold">{t("Giorno")}</th>
+                <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t("Camere")}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t("Occup.")}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t("Arrivi")}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t("Part.")}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t("Ospiti")}</th>
+                <th className="px-3 py-2 text-right font-semibold">ADR</th>
+                <th className="px-3 py-2 text-right font-semibold">Revenue</th>
+                <th className="px-3 py-2 text-right font-semibold">{t("Commiss.")}</th>
+                <th className="px-3 py-2 text-right font-semibold">{t("Netto")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rep.map((r) => {
+                const isToday = r.iso === todayISO;
+                return (
+                  <tr key={r.iso} className={`border-b border-line last:border-0 ${isToday ? "bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)]" : r.storico ? "" : "bg-[color:color-mix(in_srgb,var(--ok)_4%,transparent)]"}`}>
+                    <td className="truncate px-3 py-2 font-medium capitalize text-txt">{repDayLabel(r.iso)}{isToday && <span className="ml-1.5 rounded-full bg-focus px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">{t("oggi")}</span>}</td>
+                    <td className="px-3 py-2"><span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={r.storico ? { backgroundColor: "color-mix(in srgb, var(--faint) 20%, transparent)", color: "var(--dim)" } : { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{r.storico ? t("Storico") : t("Previsione")}</span></td>
+                    <td className="px-3 py-2 text-right font-mono text-dim">{r.camere}/{scopedUnits.length}</td>
+                    <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(r.occ * 100)}%</td>
+                    <td className="px-3 py-2 text-right font-mono text-dim">{r.arrivi || ""}</td>
+                    <td className="px-3 py-2 text-right font-mono text-dim">{r.partenze || ""}</td>
+                    <td className="px-3 py-2 text-right font-mono text-dim">{r.ospiti || ""}</td>
+                    <td className="px-3 py-2 text-right font-mono text-dim">{r.camere ? eur(r.adr) : "—"}</td>
+                    <td className="px-3 py-2 text-right font-mono text-txt">{eur(r.lordo)}</td>
+                    <td className="px-3 py-2 text-right font-mono" style={{ color: r.commissioni > 0 ? "var(--warn)" : "var(--faint)" }}>{r.commissioni ? `−${eur(r.commissioni)}` : "—"}</td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold" style={{ color: "var(--ok)" }}>{eur(r.lordo - r.commissioni)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {rep.map((r) => {
-                    const isToday = r.iso === todayISO;
-                    return (
-                      <tr key={r.iso} className={`border-b border-line last:border-0 ${isToday ? "bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)]" : r.storico ? "" : "bg-[color:color-mix(in_srgb,var(--ok)_4%,transparent)]"}`}>
-                        <td className="truncate px-3 py-2 font-medium capitalize text-txt">{repDayLabel(r.iso)}{isToday && <span className="ml-1.5 rounded-full bg-focus px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">{t("oggi")}</span>}</td>
-                        <td className="px-3 py-2"><span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={r.storico ? { backgroundColor: "color-mix(in srgb, var(--faint) 20%, transparent)", color: "var(--dim)" } : { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{r.storico ? t("Storico") : t("Previsione")}</span></td>
-                        <td className="px-3 py-2 text-right font-mono text-dim">{r.camere}/{scopedUnits.length}</td>
-                        <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(r.occ * 100)}%</td>
-                        <td className="px-3 py-2 text-right font-mono text-dim">{r.arrivi || ""}</td>
-                        <td className="px-3 py-2 text-right font-mono text-dim">{r.partenze || ""}</td>
-                        <td className="px-3 py-2 text-right font-mono text-dim">{r.ospiti || ""}</td>
-                        <td className="px-3 py-2 text-right font-mono text-dim">{r.camere ? eur(r.adr) : "—"}</td>
-                        <td className="px-3 py-2 text-right font-mono text-txt">{eur(r.lordo)}</td>
-                        <td className="px-3 py-2 text-right font-mono" style={{ color: r.commissioni > 0 ? "var(--warn)" : "var(--faint)" }}>{r.commissioni ? `−${eur(r.commissioni)}` : "—"}</td>
-                        <td className="px-3 py-2 text-right font-mono font-semibold" style={{ color: "var(--ok)" }}>{eur(r.lordo - r.commissioni)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {/* Totali sempre visibili */}
-            <table className="w-full table-fixed border-t-2 border-line text-sm">
-              <RepCols />
-              <tbody>
-                <tr><td colSpan={11} className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "var(--focus)" }}>{t("Totali")}</td></tr>
-                {([["Somma storico", totStorico, "var(--dim)"], ["Somma previsione", totPrevis, "var(--ok)"], ["Totale", totAll, "var(--txt)"]] as const).map(([lab, tt, col], i) => (
-                  <tr key={lab} className={`border-t border-line ${i === 2 ? "bg-wash font-bold" : "font-medium"}`}>
-                    <td className="truncate px-3 py-2" colSpan={2} style={{ color: col }}>{t(lab)}</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{tt.camere}</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(tt.occ * 100)}%</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{tt.arrivi}</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{tt.partenze}</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{tt.ospiti}</td>
-                    <td className="px-3 py-2 text-right font-mono text-dim">{tt.camere ? eur(tt.adr) : "—"}</td>
-                    <td className="px-3 py-2 text-right font-mono text-txt">{eur(tt.lordo)}</td>
-                    <td className="px-3 py-2 text-right font-mono" style={{ color: "var(--warn)" }}>{tt.commissioni ? `−${eur(tt.commissioni)}` : "—"}</td>
-                    <td className="px-3 py-2 text-right font-mono text-[color:var(--ok)]">{eur(tt.netto)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                );
+              })}
+            </tbody>
+            {/* Totali: sticky in fondo, sempre visibili mentre le righe sopra scorrono. */}
+            <tfoot className="sticky bottom-0 z-20 bg-surface shadow-[0_-1px_0_var(--line)]">
+              <tr><td colSpan={11} className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "var(--focus)" }}>{t("Totali")}</td></tr>
+              {([["Somma storico", totStorico, "var(--dim)"], ["Somma previsione", totPrevis, "var(--ok)"], ["Totale", totAll, "var(--txt)"]] as const).map(([lab, tt, col], i) => (
+                <tr key={lab} className={`border-t border-line ${i === 2 ? "bg-wash font-bold" : "bg-surface font-medium"}`}>
+                  <td className="truncate px-3 py-2" colSpan={2} style={{ color: col }}>{t(lab)}</td>
+                  <td className="px-3 py-2 text-right font-mono text-dim">{tt.camere}</td>
+                  <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(tt.occ * 100)}%</td>
+                  <td className="px-3 py-2 text-right font-mono text-dim">{tt.arrivi}</td>
+                  <td className="px-3 py-2 text-right font-mono text-dim">{tt.partenze}</td>
+                  <td className="px-3 py-2 text-right font-mono text-dim">{tt.ospiti}</td>
+                  <td className="px-3 py-2 text-right font-mono text-dim">{tt.camere ? eur(tt.adr) : "—"}</td>
+                  <td className="px-3 py-2 text-right font-mono text-txt">{eur(tt.lordo)}</td>
+                  <td className="px-3 py-2 text-right font-mono" style={{ color: "var(--warn)" }}>{tt.commissioni ? `−${eur(tt.commissioni)}` : "—"}</td>
+                  <td className="px-3 py-2 text-right font-mono text-[color:var(--ok)]">{eur(tt.netto)}</td>
+                </tr>
+              ))}
+            </tfoot>
+          </table>
         </div>
         <p className="mt-2 text-xs text-faint"><b className="text-dim">{t("Storico")}</b> {t("= giorni già passati")} · <b className="text-dim">{t("Previsione")}</b> {t("= giorni futuri")}. {t("Tutte le prenotazioni prese e confermate valgono come ricavo pieno (come se tutto fosse incassato). Gli incassi effettivi sono nella sezione")} <b className="text-dim">{t("Incassi")}</b>.</p>
       </div>
@@ -377,10 +419,6 @@ export default function StatistichePage() {
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{t("Ricavi per mese")} · {annualYear}</div>
-            <ColumnChart bars={annualBars} format={(n) => eur(n)} />
-          </div>
           <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
             <table className="w-full text-sm">
               <thead>
@@ -413,6 +451,12 @@ export default function StatistichePage() {
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div className="flex h-full flex-col rounded-xl border border-line bg-surface p-4 shadow-sm">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{t("Ricavi per mese")} · {annualYear}</div>
+            <div className="flex flex-1 items-center">
+              <ColumnChart bars={annualBars} format={(n) => eur(n)} height={280} />
+            </div>
           </div>
         </div>
         <p className="mt-3 text-xs text-faint">{t("Ricavi calcolati")}: <b className="text-dim">{basis === "notte" ? t("per notte (competenza)") : basis === "arrivo" ? t("per data di arrivo") : t("all'incasso")}</b>. {t("Confronto sull'anno")} {annualYear - 1}.</p>
