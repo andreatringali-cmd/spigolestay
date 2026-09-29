@@ -190,7 +190,7 @@ export default function MetaSearchPage() {
                     <span className="inline-flex items-center gap-1 rounded-lg bg-wash px-2 py-1 text-dim">{c.model === "cpc" ? "€" : ""}<input type="number" step={c.model === "cpc" ? 0.05 : 1} min={0} value={c.value} onChange={(e) => patch(m.key, { value: Number(e.target.value) })} className="w-14 bg-transparent text-center font-semibold text-txt outline-none" />{c.model === "cpc" ? `/${t("clic")}` : "%"}</span>
                   </div>
                 )}
-                <button onClick={() => patch(m.key, { on: !c.on })} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${c.on ? "text-white" : "border border-line text-dim hover:bg-wash"}`} style={c.on ? { backgroundColor: "var(--ok)" } : undefined}>{c.on ? t("Collegato") : t("Collega")}</button>
+                <button onClick={() => patch(m.key, { on: !c.on })} title={t("Solo la tua lista: la connessione vera si fa al passo 3, sulla piattaforma del comparatore")} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${c.on ? "text-white" : "border border-line text-dim hover:bg-wash"}`} style={c.on ? { backgroundColor: "var(--ok)" } : undefined}>{c.on ? t("Attivo") : t("Attiva")}</button>
               </div>
             );
           })}
@@ -312,7 +312,7 @@ export default function MetaSearchPage() {
       {/* Quanto guadagni vendendo diretto */}
       <SectionTitle>{t("Quanto guadagni vendendo diretto")}</SectionTitle>
       <div className="mb-3 mt-2 grid gap-3 sm:grid-cols-3">
-        <StatCard label={t("Comparatori collegati")} value={<>{connected}<span className="text-sm font-normal text-faint">/{META.length}</span></>} />
+        <StatCard label={t("Comparatori attivi")} value={<>{connected}<span className="text-sm font-normal text-faint">/{META.length}</span></>} />
         <Card className="!p-4">
           <div className="text-xs text-dim">{t("Commissione media OTA")}</div>
           <div className="mt-1 flex items-center gap-1"><input type="number" min={0} max={40} value={avgComm} onChange={(e) => saveComm(Number(e.target.value))} className="w-16 rounded-lg border border-line bg-surface px-2 py-1 font-mono text-lg font-bold text-txt outline-none focus:border-focus" /><span className="text-dim">%</span></div>
