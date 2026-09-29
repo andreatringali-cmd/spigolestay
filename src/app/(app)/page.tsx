@@ -387,8 +387,6 @@ export default function Dashboard() {
     <div>
       <PageHeader title={t("Dashboard")} subtitle={`${t("Riferito a")} ${parseISO(date).toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}`} actions={<WeatherWidget compact />} />
 
-      <ComplianceBanner pending={paCompliance.pending} loading={paCompliance.loading} />
-
       {/* KPI stato attuale — cliccabili per filtrare i movimenti sotto */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label={t("Prenotazioni attive")} value={String(activeSel)} color="var(--focus)" onClick={() => toggleFocus("attive")} active={focus === "attive"} />
@@ -451,6 +449,9 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <ComplianceBanner pending={paCompliance.pending} loading={paCompliance.loading} />
+
       <div className={`grid gap-4 ${gridCols}`}>
         {showInhouse && (
           <Card>
