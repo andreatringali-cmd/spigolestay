@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { loadPromos } from "@/lib/promos";
+import { getSiteConfigRaw } from "@/lib/publicdata";
 
 export default function BookingEngineHub() {
   const router = useRouter();
@@ -14,12 +15,17 @@ export default function BookingEngineHub() {
   const [promoCount, setPromoCount] = useState(0);
   const [tagline, setTagline] = useState("");
 
+  const sid = activeStructureId !== "all" ? activeStructureId : structures[0]?.id;
+
   useEffect(() => {
     try { setPromoCount(loadPromos().filter((p) => p.discountPct && p.code).length); } catch {}
-    try { const r = localStorage.getItem("spigolestay:sito"); if (r) setTagline(JSON.parse(r).tagline || ""); } catch {}
-  }, []);
-
-  const sid = activeStructureId !== "all" ? activeStructureId : structures[0]?.id;
+    try {
+      // Config del mini-sito SCOPED per struttura (vedi src/lib/publicdata.ts): il
+      // tagline mostrato qui deve seguire la struttura attiva, non una chiave globale.
+      const r = sid ? getSiteConfigRaw(sid, structures[0]?.id) : null;
+      setTagline(r ? JSON.parse(r).tagline || "" : "");
+    } catch {}
+  }, [sid, structures]);
   const types = useMemo(() => roomTypes.filter((rt) => rt.structureId === sid && !rt.deriveFrom), [roomTypes, sid]);
   const maxOcc = Math.max(0, ...types.map((rt) => rt.maxOccupancy ?? rt.beds ?? 0));
   const childrenOk = types.some((rt) => rt.childrenAllowed !== false);

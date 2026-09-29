@@ -8,7 +8,7 @@ import { getImages } from "@/lib/images";
 import { loadPromos } from "@/lib/promos";
 import { eur } from "@/lib/format";
 import { amenityIcon } from "@/lib/amenities";
-import { isPublicMode, publicSlug, lsGet, DATA_KEY } from "@/lib/publicdata";
+import { isPublicMode, publicSlug, lsGet, DATA_KEY, getSiteConfigRaw } from "@/lib/publicdata";
 
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
 const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return toISO(d); };
@@ -108,10 +108,26 @@ export function Site() {
     }
     setNlDone(true); setNl({ firstName: "", lastName: "", email: "", phone: "" });
   };
-  const cfg = useMemo<Cfg>(() => { try { const r = lsGet("spigolestay:sito"); if (r) return { ...DEFCFG, ...JSON.parse(r) }; } catch {} return DEFCFG; }, []);
   const [sid, setSid] = useState(() => { try { return new URLSearchParams(window.location.search).get("s") || structures[0]?.id || ""; } catch { return structures[0]?.id ?? ""; } });
   // Lo store carica i dati dopo il mount: aggancia la prima struttura appena disponibile.
   useEffect(() => { if ((!sid || !structures.some((s) => s.id === sid)) && structures[0]) setSid(structures[0].id); }, [structures, sid]);
+  // Config del mini-sito: in modalità pubblica (SNAP attivo, visitatore reale) lo
+  // snapshot pubblicato è già isolato per struttura, quindi leggiamo la chiave
+  // logica "spigolestay:sito" come sempre. Fuori dalla modalità pubblica (preview
+  // del proprietario, sid dal parametro ?s=) usiamo invece la chiave SCOPED per
+  // struttura, altrimenti la preview mostrerebbe/mescolerebbe la config sbagliata.
+  const cfg = useMemo<Cfg>(() => {
+    try {
+      if (isPublicMode()) {
+        const r = lsGet("spigolestay:sito");
+        if (r) return { ...DEFCFG, ...JSON.parse(r) };
+      } else if (sid) {
+        const r = getSiteConfigRaw(sid, structures[0]?.id);
+        if (r) return { ...DEFCFG, ...JSON.parse(r) };
+      }
+    } catch {}
+    return DEFCFG;
+  }, [sid, structures]);
   const structure = getStructure(sid);
   const waRaw = structure?.whatsapp || structure?.phone || "";
   const waNum = waRaw.replace(/\D/g, "");

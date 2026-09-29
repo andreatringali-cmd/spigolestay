@@ -42,6 +42,45 @@ export const RESERVED_SLUGS = new Set<string>([
   "favicon.ico", "robots.txt", "sitemap.xml", "_next", "static", "public", "assets", "index",
 ]);
 
+// ---- Config Xenosite: chiave scoped per struttura + migrazione ---------------
+//
+// FIX bug "il sottotitolo sparisce": prima di questo fix TUTTE le strutture
+// condividevano un'unica chiave globale "spigolestay:sito" per la config del
+// mini-sito (tagline/accent/sezioni/hero…). Configurare la struttura B
+// sovrascriveva silenziosamente la config della struttura A nella stessa
+// chiave. Ora ogni struttura ha la propria chiave `spigolestay:sito:<id>`.
+export function siteConfigKey(structureId: string): string {
+  return `spigolestay:sito:${structureId}`;
+}
+
+// Migrazione UNA TANTUM dalla vecchia chiave globale: se la struttura non ha
+// ancora una chiave scoped propria, ma esiste ancora la vecchia chiave globale
+// "spigolestay:sito", ne copiamo il contenuto nella chiave scoped — ma SOLO
+// per la PRIMA struttura dell'account (structures[0].id, cioè `firstStructureId`).
+// Euristica: la prima struttura è la più probabile "originale"/più vecchia,
+// quindi la candidata più ragionevole per aver prodotto il valore legacy.
+// Non è garantito: se l'utente aveva configurato per ultimo il sottotitolo di
+// un'ALTRA struttura (non la prima), quel valore resta comunque intatto nella
+// vecchia chiave globale (mai cancellata) ma non viene assegnato in automatico
+// a nessuna struttura — l'utente dovrà reimpostarlo per quella struttura.
+// Le altre strutture (senza chiave propria, diverse dalla prima) partono da un
+// oggetto vuoto/DEF, per non ereditare per sbaglio la config di un'altra struttura.
+export function getSiteConfigRaw(structureId: string, firstStructureId: string | undefined): string | null {
+  const key = siteConfigKey(structureId);
+  try {
+    const scoped = localStorage.getItem(key);
+    if (scoped != null) return scoped;
+    if (firstStructureId && structureId === firstStructureId) {
+      const legacy = localStorage.getItem("spigolestay:sito");
+      if (legacy != null) {
+        try { localStorage.setItem(key, legacy); } catch {}
+        return legacy;
+      }
+    }
+  } catch {}
+  return null;
+}
+
 // Trasforma un nome struttura in slug URL-safe.
 export function slugify(name: string): string {
   return (name || "")
@@ -144,8 +183,16 @@ export function buildPublishData(structureId: string): Record<string, string> | 
   });
 
   // Chiavi ausiliarie: copiate così come sono (foto/promo/piani/regole/config).
+  // "spigolestay:sito" è però SCOPED per struttura (vedi getSiteConfigRaw sopra):
+  // leggiamo la chiave specifica di questa struttura, ma la scriviamo nello
+  // snapshot pubblicato con la stessa chiave logica "spigolestay:sito", perché
+  // lo snapshot pubblicato è già isolato per struttura (non serve scoping lì).
+  const firstStructureId = (blob.structures ?? [])[0]?.id as string | undefined;
   for (const k of AUX_KEYS) {
-    try { const v = localStorage.getItem(k); if (v != null) out[k] = v; } catch {}
+    try {
+      const v = k === "spigolestay:sito" ? getSiteConfigRaw(structureId, firstStructureId) : localStorage.getItem(k);
+      if (v != null) out[k] = v;
+    } catch {}
   }
   return out;
 }

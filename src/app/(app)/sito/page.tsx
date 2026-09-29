@@ -8,7 +8,7 @@ import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
-import { buildPublishData, slugify, RESERVED_SLUGS } from "@/lib/publicdata";
+import { buildPublishData, slugify, RESERVED_SLUGS, siteConfigKey, getSiteConfigRaw } from "@/lib/publicdata";
 
 interface Cfg { nome: string; dominio: string; tagline: string; accent: string; heroBg?: string; googleUrl?: string; hero: boolean; chisiamo: boolean; camere: boolean; servizi: boolean; info: boolean; galleria: boolean; offerte: boolean; newsletter: boolean; recensioni: boolean; mappa: boolean; contatti: boolean; lang: string[] }
 const DEF: Cfg = { nome: "", dominio: "", tagline: "", accent: "#4F46E5", heroBg: "", googleUrl: "", hero: true, chisiamo: true, camere: true, servizi: true, info: true, galleria: true, offerte: true, newsletter: true, recensioni: true, mappa: true, contatti: true, lang: ["it", "en"] };
@@ -27,14 +27,11 @@ const SEZIONI: { key: keyof Cfg; label: string }[] = [
   { key: "mappa", label: "Mappa e dintorni" },
   { key: "contatti", label: "Contatti" },
 ];
-const KEY = "spigolestay:sito";
-
 export default function SitoPage() {
   const { t } = useLang();
   const { structures, roomTypes, units, activeStructureId } = useData();
   const [c, setC] = useState<Cfg>(DEF);
   const [sid, setSid] = useState("");
-  useEffect(() => { try { const r = localStorage.getItem(KEY); if (r) setC({ ...DEF, ...JSON.parse(r) }); } catch {} }, []);
   // Se in alto è selezionata UNA struttura, il mini-sito segue quella (menu nascosto).
   // Se è selezionato "Tutte", resta il menu a tendina per scegliere quale configurare.
   useEffect(() => {
@@ -44,8 +41,21 @@ export default function SitoPage() {
       setSid(structures[0].id);
     }
   }, [structures, activeStructureId, sid]);
+  // Config SCOPED per struttura: va ricaricata ogni volta che cambia `sid`,
+  // non solo al mount (altrimenti si vede/scrive la config di un'altra struttura).
+  useEffect(() => {
+    if (!sid) return;
+    try {
+      const r = getSiteConfigRaw(sid, structures[0]?.id);
+      setC(r ? { ...DEF, ...JSON.parse(r) } : DEF);
+    } catch { setC(DEF); }
+  }, [sid, structures]);
   const showStructPicker = activeStructureId === "all" && structures.length > 1;
-  const set = (patch: Partial<Cfg>) => setC((p) => { const n = { ...p, ...patch }; try { localStorage.setItem(KEY, JSON.stringify(n)); } catch {} return n; });
+  const set = (patch: Partial<Cfg>) => setC((p) => {
+    const n = { ...p, ...patch };
+    if (sid) { try { localStorage.setItem(siteConfigKey(sid), JSON.stringify(n)); } catch {} }
+    return n;
+  });
   const toggleLang = (l: string) => set({ lang: c.lang.includes(l) ? c.lang.filter((x) => x !== l) : [...c.lang, l] });
   // Nome e link presi dalla struttura (fonte di verità = scheda struttura).
   const struct = structures.find((s) => s.id === sid);
