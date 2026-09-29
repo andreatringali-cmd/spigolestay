@@ -231,6 +231,12 @@ export default function StatistichePage() {
         </select>
         {report === "produzione" && <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>}
       </>)}
+      {report === "annuale" && (<>
+        <span className="text-sm font-semibold text-txt">{t("Anno")}</span>
+        <select value={annualYear} onChange={(e) => setAnnualYear(Number(e.target.value))} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+          {yearOptions.map((yr) => <option key={yr} value={yr}>{yr}</option>)}
+        </select>
+      </>)}
       {report !== "previsionale" && (
         <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-wash py-1 pl-3 pr-1 text-xs font-medium text-dim" title={t("Come viene attribuito il ricavo di una prenotazione al periodo scelto")}>
           {t("Ricavi")}:
@@ -468,9 +474,7 @@ export default function StatistichePage() {
       <div>
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <h2 className="font-display text-lg font-bold text-txt">{t("Report annuale")}</h2>
-          <select value={annualYear} onChange={(e) => setAnnualYear(Number(e.target.value))} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
-            {yearOptions.map((yr) => <option key={yr} value={yr}>{yr}</option>)}
-          </select>
+          <span className="text-sm capitalize text-dim">· {annualYear}</span>
         </div>
 
         {/* KPI anno con confronto sull'anno precedente */}
