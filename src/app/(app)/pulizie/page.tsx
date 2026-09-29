@@ -815,10 +815,12 @@ function RoomCard({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle
   // Camera fuori servizio → card tratteggiata.
   if (r.oos) {
     return (
-      <div className="flex h-full min-h-[148px] flex-col rounded-lg border border-dashed border-line bg-[color:color-mix(in_srgb,var(--faint)_7%,var(--surface))] p-2.5">
+      <div className="flex h-full min-h-[148px] flex-col overflow-hidden rounded-lg border border-dashed border-line bg-[color:color-mix(in_srgb,var(--faint)_7%,var(--surface))] p-2.5">
+        {/* Richiamo alle strisce del Calendario, ma soft: solo un filo in cima, non tutta la card. */}
+        <div className="-m-2.5 mb-2.5 h-1.5 shrink-0" style={{ backgroundImage: "repeating-linear-gradient(45deg, color-mix(in srgb, var(--faint) 35%, transparent) 0 6px, transparent 6px 12px)" }} />
         <div className="text-[13px] font-bold text-txt">{r.unit.name}</div>
         <div className="flex flex-1 flex-col items-center justify-center gap-2 text-dim">
-          <span className="grid h-9 w-9 place-items-center rounded-full" style={{ backgroundColor: "color-mix(in srgb, var(--faint) 18%, transparent)" }}>
+          <span className="grid h-9 w-9 place-items-center rounded-full" style={{ backgroundImage: "repeating-linear-gradient(45deg, color-mix(in srgb, var(--faint) 30%, transparent) 0 4px, color-mix(in srgb, var(--faint) 12%, transparent) 4px 8px)" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-6 6a2 2 0 1 0 2.8 2.8l6-6a4 4 0 0 0 5.4-5.4l-2.3 2.3-2.1-2.1z" /></svg>
           </span>
           <span className="text-[11px] font-semibold uppercase tracking-wide">{t("Fuori servizio")}</span>
