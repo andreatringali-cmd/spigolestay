@@ -209,14 +209,19 @@ export default function PuliziePage() {
   const keyOf = (unitId: string) => `${unitId}:${date}`;
 
   const active = bookings.filter((b) => b.status !== "cancelled" && (activeStructureId === "all" || b.structureId === activeStructureId));
+  // "Fuori servizio" impostato dal Calendario per un periodo crea una prenotazione con
+  // channel "blocked" (non un vero ospite): va escluso dal calcolo arrivo/partenza/riassetto,
+  // altrimenti il suo checkIn/checkOut vengono letti come un vero arrivo/partenza.
+  const activeGuests = active.filter((b) => b.channel !== "blocked");
+  const blockedNow = active.filter((b) => b.channel === "blocked" && b.checkIn <= date && date < b.checkOut);
   const scopedStructures = structures.filter((s) =>
     activeStructureId === "all" ? structFilter === "all" || s.id === structFilter : s.id === activeStructureId
   );
 
   const planFor = (unitId: string) => {
-    const dep = active.find((b) => b.unitId === unitId && b.checkOut === date);
-    const arr = active.find((b) => b.unitId === unitId && b.checkIn === date);
-    const stay = active.find((b) => b.unitId === unitId && b.checkIn < date && date < b.checkOut);
+    const dep = activeGuests.find((b) => b.unitId === unitId && b.checkOut === date);
+    const arr = activeGuests.find((b) => b.unitId === unitId && b.checkIn === date);
+    const stay = activeGuests.find((b) => b.unitId === unitId && b.checkIn < date && date < b.checkOut);
     let action: ActionKey = "niente";
     if (dep && arr) action = "turnover";
     else if (dep) action = "partenza";
@@ -236,7 +241,7 @@ export default function PuliziePage() {
       ...tps.flatMap((rt) => sortUnitsByName(su.filter((u) => u.roomTypeId === rt.id))),
       ...sortUnitsByName(su.filter((u) => !tps.some((rt) => rt.id === u.roomTypeId))),
     ];
-    return ordered.map((u) => ({ unit: u, structure: s, typeName: roomTypes.find((x) => x.id === u.roomTypeId)?.name ?? "", typeColor: colorOfType(u.roomTypeId), oos: !!u.outOfService, ...planFor(u.id) }));
+    return ordered.map((u) => ({ unit: u, structure: s, typeName: roomTypes.find((x) => x.id === u.roomTypeId)?.name ?? "", typeColor: colorOfType(u.roomTypeId), oos: !!u.outOfService || blockedNow.some((b) => b.unitId === u.id), ...planFor(u.id) }));
   });
   type Room = (typeof rooms)[number];
 
