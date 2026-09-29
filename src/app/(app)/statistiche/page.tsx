@@ -28,10 +28,13 @@ export default function StatistichePage() {
   const [chartOrder, setChartOrder] = useState<string[]>([]);
   useEffect(() => { try { const r = localStorage.getItem("spigolestay:statscharts"); if (r) setChartOrder(JSON.parse(r)); } catch {} }, []);
   const persistChartOrder = (keys: string[]) => { setChartOrder(keys); try { localStorage.setItem("spigolestay:statscharts", JSON.stringify(keys)); } catch {} };
-  // Mostra/nascondi grafici (un click, tutti o nessuno)
+  // Mostra/nascondi grafici (un click, tutti o nessuno) — indipendente per Mensile e Annuale.
   const [chartsOn, setChartsOn] = useState(true);
   useEffect(() => { try { const r = localStorage.getItem("spigolestay:statscharts:on"); if (r !== null) setChartsOn(r === "1"); } catch {} }, []);
   const toggleCharts = () => setChartsOn((v) => { const n = !v; try { localStorage.setItem("spigolestay:statscharts:on", n ? "1" : "0"); } catch {} return n; });
+  const [chartsOnY, setChartsOnY] = useState(true);
+  useEffect(() => { try { const r = localStorage.getItem("spigolestay:statscharts:on:annuale"); if (r !== null) setChartsOnY(r === "1"); } catch {} }, []);
+  const toggleChartsY = () => setChartsOnY((v) => { const n = !v; try { localStorage.setItem("spigolestay:statscharts:on:annuale", n ? "1" : "0"); } catch {} return n; });
   // Report attivo: i tanti report di Octorate condensati in 2 (Mensile, Annuale). Mensile e
   // Previsionale erano diventati sostanzialmente uguali (stessa tabella giorno per giorno, stesse
   // colonne) quindi sono stati uniti in un'unica scheda — KPI+grafici+tabella insieme.
@@ -301,7 +304,6 @@ export default function StatistichePage() {
         <select value={repMonth} onChange={(e) => setRepMonth(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm capitalize text-txt outline-none focus:border-focus">
           {monthOptions.map((mk) => <option key={mk} value={mk} className="capitalize">{monthLabelOf(mk)}</option>)}
         </select>
-        <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
       </>) : (<>
         <span className="text-sm font-semibold text-txt">{t("Anno")}</span>
         <select value={annualYear} onChange={(e) => setAnnualYear(Number(e.target.value))} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
@@ -316,10 +318,15 @@ export default function StatistichePage() {
           <option value="incasso">{t("All'incasso")}</option>
         </select>
       </span>
-      <div className="ml-auto inline-flex rounded-lg bg-wash p-0.5 text-sm">
-        {([["produzione", t("Mensile")], ["annuale", t("Annuale")]] as const).map(([k, lab]) => (
-          <button key={k} onClick={() => setReport(k)} className={`rounded-md px-4 py-1.5 font-semibold transition ${report === k ? "bg-focus text-white shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
-        ))}
+      <div className="ml-auto flex items-center gap-2">
+        {(() => { const on = showMonth ? chartsOn : chartsOnY; const tog = showMonth ? toggleCharts : toggleChartsY; return (
+          <button onClick={tog} title={on ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
+        ); })()}
+        <div className="inline-flex rounded-lg bg-wash p-0.5 text-sm">
+          {([["produzione", t("Mensile")], ["annuale", t("Annuale")]] as const).map(([k, lab]) => (
+            <button key={k} onClick={() => setReport(k)} className={`rounded-md px-4 py-1.5 font-semibold transition ${report === k ? "bg-focus text-white shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -458,6 +465,7 @@ export default function StatistichePage() {
 
         {/* Grafici dell'anno — stessi del Mensile, scalati sull'anno scelto invece che sul mese. */}
         <div className="mt-6">
+          {chartsOnY && (
           <ScrollStrip
             gap="gap-3"
             items={chartsY.map((c) => { const wide = (c as { wide?: boolean }).wide; return {
@@ -471,6 +479,7 @@ export default function StatistichePage() {
               ),
             }; })}
           />
+          )}
         </div>
 
         <div className="mt-6">
