@@ -238,6 +238,18 @@ export default function StatistichePage() {
         )}
       </div>
 
+      {/* Riga filtro unica: mese (guida KPI e report) + toggle grafici — non nel report annuale.
+          Spostata SOPRA i contenuti (KPI/grafici/elenco/tabella): è un filtro, deve precedere
+          ciò che filtra, non seguirlo. */}
+      <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm ${report === "annuale" ? "hidden" : ""}`}>
+        <span className="text-sm font-semibold text-txt">{t("Mese")}</span>
+        <select value={repMonth} onChange={(e) => setRepMonth(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm capitalize text-txt outline-none focus:border-focus">
+          {monthOptions.map((mk) => <option key={mk} value={mk} className="capitalize">{monthLabelOf(mk)}</option>)}
+        </select>
+        {report === "produzione" && <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>}
+        <span className="ml-auto text-[11px] text-faint">{t("Card e report seguono il mese scelto")}</span>
+      </div>
+
       {report === "produzione" && (<>
       {/* KPI del mese selezionato con confronto sul mese precedente */}
       <div className="mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -268,7 +280,9 @@ export default function StatistichePage() {
         )}
       </div>
 
-      {/* Elenco prenotazioni del mese — mancava sotto i KPI/grafici, solo aggregati. */}
+      {/* Elenco prenotazioni del mese — stessa struttura del Previsionale (unico scroll,
+          intestazione e totali fissi) e stesso livello di dettaglio (stato, ospiti, ADR,
+          commissioni, netto per riga), non solo arrivo/importo. */}
       <div className="mt-6">
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
           <h2 className="font-display text-lg font-bold text-txt">{t("Prenotazioni del mese")}</h2>
@@ -276,56 +290,90 @@ export default function StatistichePage() {
         </div>
         {monthArr.length === 0 ? (
           <div className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-faint">{t("Nessuna prenotazione con arrivo in questo mese.")}</div>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
-            <div className="max-h-[54vh] overflow-y-auto">
-              <table className="w-full min-w-[720px] table-fixed text-sm">
-                <thead className="sticky top-0 z-10">
+        ) : (() => {
+          const showStruct = activeStructureId === "all";
+          const rows = [...monthArr].sort((a, b) => (a.checkIn < b.checkIn ? -1 : a.checkIn > b.checkIn ? 1 : 0)).map((b) => {
+            const isBlocked = b.channel === "blocked";
+            const nn = nights(b.checkIn, b.checkOut);
+            const lordo = isBlocked ? 0 : (b.total ?? 0);
+            const pct = isBlocked ? 0 : (b.commissionPct ?? CHANNELS[b.channel].commission * 100);
+            const commissioni = isBlocked ? 0 : Math.round((lordo * pct) / 100);
+            return {
+              b, isBlocked, nn, lordo, commissioni, netto: lordo - commissioni,
+              adr: nn ? lordo / nn : 0,
+              ospitiN: (b.adults ?? 0) + (b.children ?? 0),
+              guest: guests.find((g) => g.id === b.guestId),
+              unit: units.find((u) => u.id === b.unitId),
+              struct: structures.find((s) => s.id === b.structureId),
+            };
+          });
+          const tot = rows.reduce((a, r) => ({ nn: a.nn + r.nn, ospiti: a.ospiti + r.ospitiN, lordo: a.lordo + r.lordo, commissioni: a.commissioni + r.commissioni }), { nn: 0, ospiti: 0, lordo: 0, commissioni: 0 });
+          const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
+            confirmed: { label: t("Confermata"), bg: "color-mix(in srgb, var(--ok) 16%, transparent)", fg: "var(--ok)" },
+            tentative: { label: t("In attesa"), bg: "color-mix(in srgb, var(--warn) 16%, transparent)", fg: "var(--warn)" },
+            no_show: { label: t("No-show"), bg: "color-mix(in srgb, var(--err) 16%, transparent)", fg: "var(--err)" },
+          };
+          return (
+            <div className="max-h-[60vh] overflow-auto rounded-xl border border-line bg-surface shadow-sm">
+              <table className="w-full min-w-[1180px] table-fixed text-sm">
+                <thead className="sticky top-0 z-20">
                   <tr className="bg-wash text-left text-xs uppercase tracking-wide text-faint shadow-[0_1px_0_var(--line)]">
                     <th className="px-3 py-2 font-semibold">{t("Arrivo")}</th>
                     <th className="px-3 py-2 text-right font-semibold">{t("Notti")}</th>
+                    <th className="px-3 py-2 font-semibold">{t("Stato")}</th>
                     <th className="px-3 py-2 font-semibold">{t("Ospite")}</th>
-                    {activeStructureId === "all" && <th className="px-3 py-2 font-semibold">{t("Struttura")}</th>}
+                    {showStruct && <th className="px-3 py-2 font-semibold">{t("Struttura")}</th>}
                     <th className="px-3 py-2 font-semibold">{t("Camera")}</th>
                     <th className="px-3 py-2 font-semibold">{t("Canale")}</th>
-                    <th className="px-3 py-2 text-right font-semibold">{t("Importo")}</th>
+                    <th className="px-3 py-2 text-right font-semibold">{t("Ospiti")}</th>
+                    <th className="px-3 py-2 text-right font-semibold">ADR</th>
+                    <th className="px-3 py-2 text-right font-semibold">{t("Lordo")}</th>
+                    <th className="px-3 py-2 text-right font-semibold">{t("Commiss.")}</th>
+                    <th className="px-3 py-2 text-right font-semibold">{t("Netto")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...monthArr].sort((a, b) => (a.checkIn < b.checkIn ? -1 : a.checkIn > b.checkIn ? 1 : 0)).map((b) => {
-                    const guest = guests.find((g) => g.id === b.guestId);
-                    const unit = units.find((u) => u.id === b.unitId);
-                    const struct = structures.find((s) => s.id === b.structureId);
-                    const isBlocked = b.channel === "blocked";
+                  {rows.map(({ b, isBlocked, nn, lordo, commissioni, netto, adr, ospitiN, guest, unit, struct }) => {
+                    const st = STATUS[b.status];
                     return (
                       <tr key={b.id} className="border-b border-line last:border-0 hover:bg-wash">
                         <td className="truncate px-3 py-2 font-medium capitalize text-txt">{fmtDay(b.checkIn)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-dim">{nights(b.checkIn, b.checkOut)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-dim">{nn}</td>
+                        <td className="px-3 py-2">{isBlocked ? <span className="text-faint">—</span> : st && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{ backgroundColor: st.bg, color: st.fg }}>{st.label}</span>}</td>
                         <td className="truncate px-3 py-2 text-txt">{isBlocked ? <span className="text-faint">{t("Fuori servizio")}</span> : (guest?.fullName || t("Senza nome"))}</td>
-                        {activeStructureId === "all" && <td className="truncate px-3 py-2 text-dim">{struct?.name ?? "—"}</td>}
+                        {showStruct && <td className="truncate px-3 py-2 text-dim">{struct?.name ?? "—"}</td>}
                         <td className="truncate px-3 py-2 text-dim">{unit?.name ?? "—"}</td>
                         <td className="px-3 py-2 text-dim">{isBlocked ? "—" : CHANNELS[b.channel as Channel]?.label ?? b.channel}</td>
-                        <td className="px-3 py-2 text-right font-mono font-semibold text-txt">{isBlocked ? "—" : eur(b.total ?? 0)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-dim">{isBlocked ? "" : ospitiN || ""}</td>
+                        <td className="px-3 py-2 text-right font-mono text-dim">{isBlocked ? "—" : eur(adr)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-txt">{isBlocked ? "—" : eur(lordo)}</td>
+                        <td className="px-3 py-2 text-right font-mono" style={{ color: commissioni > 0 ? "var(--warn)" : "var(--faint)" }}>{commissioni ? `−${eur(commissioni)}` : "—"}</td>
+                        <td className="px-3 py-2 text-right font-mono font-semibold" style={{ color: "var(--ok)" }}>{isBlocked ? "—" : eur(netto)}</td>
                       </tr>
                     );
                   })}
                 </tbody>
+                <tfoot className="sticky bottom-0 z-20 bg-surface shadow-[0_-1px_0_var(--line)]">
+                  <tr>
+                    <td colSpan={showStruct ? 12 : 11} className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "var(--focus)" }}>{t("Totali")}</td>
+                  </tr>
+                  <tr className="border-t border-line bg-surface font-bold">
+                    <td className="truncate px-3 py-2 text-txt" colSpan={showStruct ? 5 : 4}>{t("Totale")} {monthLabelOf(repMonth)}</td>
+                    <td className="px-3 py-2 text-dim"></td>
+                    <td className="px-3 py-2 text-dim"></td>
+                    <td className="px-3 py-2 text-right font-mono text-dim">{tot.ospiti}</td>
+                    <td className="px-3 py-2 text-right font-mono text-dim">{tot.nn ? eur(tot.lordo / tot.nn) : "—"}</td>
+                    <td className="px-3 py-2 text-right font-mono text-txt">{eur(tot.lordo)}</td>
+                    <td className="px-3 py-2 text-right font-mono" style={{ color: "var(--warn)" }}>{tot.commissioni ? `−${eur(tot.commissioni)}` : "—"}</td>
+                    <td className="px-3 py-2 text-right font-mono text-[color:var(--ok)]">{eur(tot.lordo - tot.commissioni)}</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
       </>)}
-
-      {/* Riga filtro unica: mese (guida KPI e report) + toggle grafici — non nel report annuale */}
-      <div className={`mt-4 mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm ${report === "annuale" ? "hidden" : ""}`}>
-        <span className="text-sm font-semibold text-txt">{t("Mese")}</span>
-        <select value={repMonth} onChange={(e) => setRepMonth(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm capitalize text-txt outline-none focus:border-focus">
-          {monthOptions.map((mk) => <option key={mk} value={mk} className="capitalize">{monthLabelOf(mk)}</option>)}
-        </select>
-        <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
-        <span className="ml-auto text-[11px] text-faint">{t("Card e report seguono il mese scelto")}</span>
-      </div>
 
       {/* Report previsionale (stile Octorate): giorno per giorno, storico + previsione */}
       {report === "previsionale" && (
@@ -333,6 +381,18 @@ export default function StatistichePage() {
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
           <h2 className="font-display text-lg font-bold text-txt">{t("Report previsionale")}</h2>
           <span className="text-sm capitalize text-dim">· {monthLabelOf(repMonth)}</span>
+        </div>
+
+        {/* Grafici giorno per giorno: stesso periodo della tabella sotto, grigio = storico, colore = previsione. */}
+        <div className="mb-4 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{t("Netto per giorno")}</div>
+            <ColumnChart bars={rep.map((r) => ({ label: String(new Date(r.iso).getDate()), value: r.lordo - r.commissioni, highlight: r.iso === todayISO, color: r.storico ? "var(--dim)" : "var(--ok)" }))} format={(n) => eur(n)} height={140} />
+          </div>
+          <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{t("Occupazione per giorno")}</div>
+            <ColumnChart bars={rep.map((r) => ({ label: String(new Date(r.iso).getDate()), value: Math.round(r.occ * 100), highlight: r.iso === todayISO, color: r.storico ? "var(--dim)" : "var(--focus)" }))} format={(n) => `${n}%`} height={140} />
+          </div>
         </div>
 
         {/* Un'unica tabella con UN solo contenitore di scroll (orizzontale+verticale): intestazione
@@ -418,7 +478,7 @@ export default function StatistichePage() {
           <KpiD label={t("Ricavi")} value={eur(annCur.revenue)} d={delta(annCur.revenue, annPrev.revenue)} cmp={String(annualYear - 1)} />
         </div>
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <div className="mt-6">
           <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
             <table className="w-full text-sm">
               <thead>
@@ -452,11 +512,9 @@ export default function StatistichePage() {
               </tbody>
             </table>
           </div>
-          <div className="flex h-full flex-col rounded-xl border border-line bg-surface p-4 shadow-sm">
+          <div className="mt-4 rounded-xl border border-line bg-surface p-4 shadow-sm">
             <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{t("Ricavi per mese")} · {annualYear}</div>
-            <div className="flex flex-1 items-center">
-              <ColumnChart bars={annualBars} format={(n) => eur(n)} height={280} />
-            </div>
+            <ColumnChart bars={annualBars} format={(n) => eur(n)} height={220} barWidth={36} allLabels />
           </div>
         </div>
         <p className="mt-3 text-xs text-faint">{t("Ricavi calcolati")}: <b className="text-dim">{basis === "notte" ? t("per notte (competenza)") : basis === "arrivo" ? t("per data di arrivo") : t("all'incasso")}</b>. {t("Confronto sull'anno")} {annualYear - 1}.</p>
