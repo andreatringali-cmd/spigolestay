@@ -371,7 +371,7 @@ export default function StatistichePage() {
             </tr>
           ))}
         </tbody>
-        <tfoot className="sticky bottom-0 z-20 bg-surface shadow-[0_-1px_0_var(--line)]">
+        <tfoot className="bg-surface">
           <tr><td colSpan={11} className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "var(--focus)" }}>{t("Totali")}</td></tr>
           {([["Somma storico", totStorico, "var(--dim)"], ["Somma previsione", totPrevis, "var(--ok)"], ["Totale", totAll, "var(--txt)"]] as const).map(([lab, tt, col], i) => (
             <tr key={lab} className={`border-t border-line ${i === 2 ? "bg-wash font-bold" : "bg-surface font-medium"}`}>
