@@ -24,7 +24,7 @@ export const NAV: NavItem[] = [
 
   // Channel Manager: distribuzione sui portali + catena del prezzo (tariffe).
   { label: "Channel Manager", href: "/canali", group: "Channel Manager", icon: "share", perm: "canali", module: "cm" },
-  { label: "Meta Search", href: "/metasearch", group: "Channel Manager", icon: "search", perm: "canali", module: "meta" },
+  { label: "Meta Search (beta)", href: "/metasearch", group: "Channel Manager", icon: "search", perm: "canali", module: "meta" },
   { label: "Tariffe", href: "/tariffe", group: "Channel Manager", icon: "tag", perm: "tariffe", module: "pms" },
   { label: "Piani tariffari", href: "/piani-tariffari", group: "Channel Manager", icon: "receipt", perm: "tariffe", module: "pms" },
   { label: "Tariffe derivate", href: "/tariffe-derivate", group: "Channel Manager", icon: "copy", perm: "tariffe", module: "pms" },

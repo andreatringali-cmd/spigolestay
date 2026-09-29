@@ -131,7 +131,7 @@ export default function MetaSearchPage() {
   return (
     <div>
       <PageHeader
-        title="Meta Search"
+        title="Meta Search (beta)"
         subtitle={t("Porta le tue tariffe dirette sui comparatori: l'ospite prenota da te, senza commissione OTA")}
         actions={activeStructureId === "all" ? (
           <select value={localStructure} onChange={(e) => setLocalStructure(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
