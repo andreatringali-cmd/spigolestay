@@ -385,7 +385,9 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader title={t("Dashboard")} subtitle={`${t("Riferito a")} ${parseISO(date).toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}`} actions={<><ComplianceBadge pending={paCompliance.pending} loading={paCompliance.loading} /><WeatherWidget compact /></>} />
+      <PageHeader title={t("Dashboard")} subtitle={`${t("Riferito a")} ${parseISO(date).toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}`} actions={<WeatherWidget compact />} />
+
+      <ComplianceBanner pending={paCompliance.pending} loading={paCompliance.loading} />
 
       {/* KPI stato attuale — cliccabili per filtrare i movimenti sotto */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -672,21 +674,35 @@ export default function Dashboard() {
   );
 }
 
-// Badge "Sei in regola" (verde) / avviso adempimenti PA in sospeso (ambra) — link a /adempimenti.
+// Banner "Sei in regola" (verde) / avviso adempimenti PA in sospeso (ambra) — link a /adempimenti.
 // `pending` arriva da un controllo reale su Supabase (schedine Alloggiati + ISTAT), non da un valore finto.
-function ComplianceBadge({ pending, loading }: { pending: number; loading: boolean }) {
+// Card a piena larghezza (non più un badge minuscolo in testata) per dargli il peso visivo giusto.
+function ComplianceBanner({ pending, loading }: { pending: number; loading: boolean }) {
   const { t } = useLang();
   if (loading) return null;
   const ok = pending === 0;
+  const color = ok ? "var(--ok)" : "var(--warn)";
   return (
     <Link
       href="/adempimenti"
-      className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition hover:opacity-90"
-      style={{ backgroundColor: ok ? "color-mix(in srgb, var(--ok) 14%, transparent)" : "color-mix(in srgb, var(--warn) 14%, transparent)", color: ok ? "var(--ok)" : "var(--warn)" }}
-      title={ok ? t("Nessuna schedina Alloggiati o movimento ISTAT in sospeso.") : t("Ci sono schedine Alloggiati o movimenti ISTAT in sospeso/falliti: apri Adempimenti.")}
+      className="anim-in mb-4 flex items-center gap-3 rounded-xl border p-3.5 shadow-sm transition hover:-translate-y-0.5"
+      style={{
+        borderColor: `color-mix(in srgb, ${color} 30%, var(--line))`,
+        backgroundColor: `color-mix(in srgb, ${color} 6%, var(--surface))`,
+      }}
     >
-      <Icon name={ok ? "id" : "alertTriangle"} size={13} />
-      {ok ? t("Sei in regola") : `${pending} ${t("adempimenti PA in sospeso")}`}
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)`, color }}>
+        <Icon name={ok ? "id" : "alertTriangle"} size={19} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-bold" style={{ color }}>{ok ? t("Sei in regola con gli adempimenti") : t("Adempimenti PA in sospeso")}</div>
+        <div className="truncate text-xs text-dim">
+          {ok
+            ? t("Nessuna schedina Alloggiati o movimento ISTAT in attesa.")
+            : `${pending} ${t("tra schedine Alloggiati e movimenti ISTAT da controllare")}`}
+        </div>
+      </div>
+      <span className="shrink-0" style={{ color: "var(--faint)" }}><Icon name="chevron" size={16} /></span>
     </Link>
   );
 }
