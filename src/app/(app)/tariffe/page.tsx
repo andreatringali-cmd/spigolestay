@@ -98,17 +98,19 @@ export default function TariffePage() {
     return (
       <tr key={rt.id} className={`border-b border-line last:border-0 hover:bg-wash ${derived ? "bg-[color:color-mix(in_srgb,var(--focus)_4%,transparent)]" : ""}`}>
         <td className="px-3 py-2.5">
-          <div className={`flex flex-wrap items-center gap-1.5 ${derived ? "pl-7" : ""}`}>
-            {!derived && (kids.length > 0
-              ? <button onClick={() => toggleMaster(rt.id)} title={isOpen ? t("Comprimi") : t("Espandi")} className="shrink-0"><Chevron open={isOpen} /></button>
-              : <span className="inline-block w-3 shrink-0" />)}
-            <span className="h-5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: typeColor(rt) }} />
-            <span className="font-semibold text-txt">{rt.name}</span>
-            <Occ n={rt.maxOccupancy ?? rt.beds} />
-            {derived
-              ? <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>↳ {t("derivata")} {scarto(rt)}</span>
-              : <span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span>}
-            {effStructure === "all" && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--txt) 8%, transparent)", color: "var(--dim)" }}>{structureNameOf(rt.structureId)}</span>}
+          <div className={derived ? "pl-7" : ""}>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {!derived && (kids.length > 0
+                ? <button onClick={() => toggleMaster(rt.id)} title={isOpen ? t("Comprimi") : t("Espandi")} className="shrink-0"><Chevron open={isOpen} /></button>
+                : <span className="inline-block w-3 shrink-0" />)}
+              <span className="h-5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: typeColor(rt) }} />
+              <span className="font-semibold text-txt">{rt.name}</span>
+              <Occ n={rt.maxOccupancy ?? rt.beds} />
+              {derived
+                ? <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>↳ {t("derivata")} {scarto(rt)}</span>
+                : <span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span>}
+            </div>
+            {effStructure === "all" && <div className="mt-0.5 pl-[18px] text-[11px] text-faint">{structureNameOf(rt.structureId)}</div>}
           </div>
         </td>
         <td className="px-3 py-2.5">
@@ -143,11 +145,10 @@ export default function TariffePage() {
               : <span className="inline-block w-3 shrink-0" />)}
             <span className="h-6 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-medium text-txt">{rt.name}</span>
-                {effStructure === "all" && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--txt) 8%, transparent)", color: "var(--dim)" }}>{structureNameOf(rt.structureId)}</span>}
+              <div className="text-sm font-medium text-txt">{rt.name}</div>
+              <div className="text-[10px] text-faint">
+                {effStructure === "all" ? `${structureNameOf(rt.structureId)} · ` : ""}{t("base")} {eur(base)}{derived ? ` · ${t("der.")}` : ""}
               </div>
-              <div className="text-[10px] text-faint">{t("base")} {eur(base)}{derived ? ` · ${t("der.")}` : ""}</div>
             </div>
           </div>
         </td>
