@@ -114,7 +114,6 @@ export default function TariffePage() {
                 ? <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>↳ {t("derivata")} {scarto(rt)}</span>
                 : <span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span>}
             </div>
-            {effStructure === "all" && <div className="mt-0.5 pl-[18px] text-[11px] text-faint">{structureNameOf(rt.structureId)}</div>}
           </div>
         </td>
         <td className="px-3 py-2.5">
@@ -201,43 +200,61 @@ export default function TariffePage() {
         ))}
       </div>
 
-      {/* Prezzi base */}
+      {/* Prezzi base — un box per struttura quando la vista è "tutte le strutture", una tabella
+          sola quando ne è selezionata una: evita di dover leggere l'etichetta struttura riga per riga. */}
       <section className="mb-7">
         <SectionTitle>{t("Prezzi base")}</SectionTitle>
 
-        <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] table-fixed text-sm">
-              <colgroup>
-                <col style={{ width: "30%" }} />
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "12%" }} />
-                <col style={{ width: "12%" }} />
-                <col style={{ width: "14%" }} />
-                <col style={{ width: "14%" }} />
-              </colgroup>
-              <thead>
-                <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
-                  <th className="px-3 py-2.5 font-semibold">{t("Tipologia")}</th>
-                  <th className="px-3 py-2.5 font-semibold">{t("Prezzo base")}</th>
-                  <th className="px-3 py-2.5 text-center font-semibold">{t("Ospiti")}</th>
-                  <th className="px-3 py-2.5 text-center font-semibold">{t("Notti min.")}</th>
-                  <th className="px-3 py-2.5 font-semibold">{t("Vendite")}</th>
-                  <th className="px-3 py-2.5 text-right font-semibold">{t("Effettivo")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {roots.map((m) => (
-                  <Fragment key={m.id}>
-                    {baseRow(m)}
-                    {openMasters.has(m.id) && descendantsOf(m.id).map((k) => baseRow(k))}
-                  </Fragment>
-                ))}
-                {types.length === 0 && <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-faint">{t("Nessuna tipologia.")}</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        {(() => {
+          const baseTable = (rootsForBox: RoomType[]) => (
+            <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[680px] table-fixed text-sm">
+                  <colgroup>
+                    <col style={{ width: "30%" }} />
+                    <col style={{ width: "18%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "14%" }} />
+                    <col style={{ width: "14%" }} />
+                  </colgroup>
+                  <thead>
+                    <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+                      <th className="px-3 py-2.5 font-semibold">{t("Tipologia")}</th>
+                      <th className="px-3 py-2.5 font-semibold">{t("Prezzo base")}</th>
+                      <th className="px-3 py-2.5 text-center font-semibold">{t("Ospiti")}</th>
+                      <th className="px-3 py-2.5 text-center font-semibold">{t("Notti min.")}</th>
+                      <th className="px-3 py-2.5 font-semibold">{t("Vendite")}</th>
+                      <th className="px-3 py-2.5 text-right font-semibold">{t("Effettivo")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rootsForBox.map((m) => (
+                      <Fragment key={m.id}>
+                        {baseRow(m)}
+                        {openMasters.has(m.id) && descendantsOf(m.id).map((k) => baseRow(k))}
+                      </Fragment>
+                    ))}
+                    {rootsForBox.length === 0 && <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-faint">{t("Nessuna tipologia.")}</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+          if (effStructure !== "all") return baseTable(roots);
+          const structsWithTypes = structures.filter((st) => roots.some((r) => r.structureId === st.id));
+          if (structsWithTypes.length === 0) return baseTable([]);
+          return (
+            <div className="flex flex-col gap-4">
+              {structsWithTypes.map((st) => (
+                <div key={st.id}>
+                  <div className="mb-1.5 font-display text-sm font-bold text-txt">{st.name}</div>
+                  {baseTable(roots.filter((r) => r.structureId === st.id))}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Regola weekend */}
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm shadow-sm">
