@@ -812,18 +812,22 @@ function GuestLine({ dir, label, name, b, dog }: { dir: "in" | "out" | "stay"; l
 function RoomCard({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle, onIssue }: { r: any; k: string; done: boolean; doneAt?: string; hasIssue?: boolean; guestName: (id: string) => string; hasDog: (id: string) => boolean; note: React.ReactNode; onToggle: () => void; onIssue: () => void }) {
   const { t } = useLang();
   const a = ACT[r.action as ActionKey];
-  // Camera fuori servizio → card tratteggiata.
+  // Camera fuori servizio → stessa struttura delle altre card (fascia in testa con nome +
+  // badge a destra, stessa altezza), solo che la fascia è a righe invece che a tinta unita.
   if (r.oos) {
     return (
-      <div className="flex h-full min-h-[148px] flex-col overflow-hidden rounded-lg border border-dashed border-line bg-[color:color-mix(in_srgb,var(--faint)_7%,var(--surface))] p-2.5">
-        {/* Richiamo alle strisce del Calendario, ma soft: solo un filo in cima, non tutta la card. */}
-        <div className="-m-2.5 mb-2.5 h-1.5 shrink-0" style={{ backgroundImage: "repeating-linear-gradient(45deg, color-mix(in srgb, var(--faint) 35%, transparent) 0 6px, transparent 6px 12px)" }} />
-        <div className="text-[13px] font-bold text-txt">{r.unit.name}</div>
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-dim">
-          <span className="grid h-9 w-9 place-items-center rounded-full" style={{ backgroundImage: "repeating-linear-gradient(45deg, color-mix(in srgb, var(--faint) 30%, transparent) 0 4px, color-mix(in srgb, var(--faint) 12%, transparent) 4px 8px)" }}>
+      <div className="flex h-full min-h-[160px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+        <div className="flex items-center justify-between gap-2 px-3 py-2.5" style={{ backgroundImage: "repeating-linear-gradient(45deg, color-mix(in srgb, var(--faint) 40%, var(--surface)) 0 8px, color-mix(in srgb, var(--faint) 18%, var(--surface)) 8px 16px)" }}>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate font-display text-[15px] font-bold text-txt">{r.unit.name}</span>
+            {r.typeName && <span className="shrink-0 text-[10px] font-medium text-dim">· {r.typeName}</span>}
+          </span>
+          <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-dim shadow-sm">{t("Fuori servizio")}</span>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-3 py-2.5 text-dim">
+          <span className="grid h-9 w-9 place-items-center rounded-full" style={{ backgroundColor: "color-mix(in srgb, var(--faint) 18%, transparent)" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-6 6a2 2 0 1 0 2.8 2.8l6-6a4 4 0 0 0 5.4-5.4l-2.3 2.3-2.1-2.1z" /></svg>
           </span>
-          <span className="text-[11px] font-semibold uppercase tracking-wide">{t("Fuori servizio")}</span>
           {r.oosNote && <span className="px-1 text-center text-[11px] leading-snug text-dim">{r.oosNote}</span>}
         </div>
       </div>
