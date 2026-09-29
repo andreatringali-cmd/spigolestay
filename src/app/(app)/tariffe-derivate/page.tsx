@@ -100,7 +100,7 @@ export default function TariffeDerivatePage() {
         <span className="flex items-center gap-1.5"><span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span> {t("tipologia con camere proprie")}</span>
         <span className="flex items-center gap-1.5"><span className="text-focus"><Catena /></span> {t("derivata: condivide le camere della madre")}</span>
         <span className="flex items-center gap-1.5"><span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 15%, transparent)", color: "var(--err)" }}>−10%</span> {t("scarto sul prezzo della madre")}</span>
-        {scoped.length === 1 && (
+        {scoped.length === 1 && view === "table" && (
           <button onClick={() => setDerivModal({ structureId: scoped[0].id })} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Crea tariffa derivata")}</button>
         )}
       </div>
@@ -118,7 +118,7 @@ export default function TariffeDerivatePage() {
             <div key={s.id}>
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="font-display text-lg font-bold text-txt">{s.name}</div>
-                {scoped.length > 1 && <button onClick={() => setDerivModal({ structureId: s.id })} disabled={masters.length === 0} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">＋ {t("Crea tariffa derivata")}</button>}
+                {scoped.length > 1 && view === "table" && <button onClick={() => setDerivModal({ structureId: s.id })} disabled={masters.length === 0} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">＋ {t("Crea tariffa derivata")}</button>}
               </div>
 
               {types.length === 0 ? (
@@ -131,11 +131,23 @@ export default function TariffeDerivatePage() {
                   onEdit={(id) => setDerivModal({ structureId: s.id, editId: id })}
                   onOpenType={(id) => router.push(`/camere/tipologia/${id}`)}
                   onDelete={async (id, name) => { if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${name}"?`, danger: true, confirmLabel: t("Elimina") })) deleteRoomType(id); }}
+                  onCreate={() => setDerivModal({ structureId: s.id })}
+                  canCreate={masters.length > 0}
                 />
               ) : (
                 <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[920px] text-sm">
+                    <table className="w-full min-w-[920px] table-fixed text-sm">
+                      <colgroup>
+                        <col style={{ width: "26%" }} />
+                        <col style={{ width: "9%" }} />
+                        <col style={{ width: "9%" }} />
+                        <col style={{ width: "16%" }} />
+                        <col style={{ width: "12%" }} />
+                        <col style={{ width: "9%" }} />
+                        <col style={{ width: "12%" }} />
+                        <col style={{ width: "7%" }} />
+                      </colgroup>
                       <thead>
                         <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
                           <th className="px-3 py-2.5 font-semibold">{t("Nome")}</th>
@@ -234,13 +246,15 @@ export default function TariffeDerivatePage() {
 }
 
 // Vista Mappa: albero master → derivate con connettori etichettati con lo scarto (stile Octorate).
-function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
+function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete, onCreate, canCreate }: {
   types: RoomType[];
   sUnits: { roomTypeId: string }[];
   onAdd: (parentId: string) => void;
   onEdit: (id: string) => void;
   onOpenType: (id: string) => void;
   onDelete: (id: string, name: string) => void;
+  onCreate: () => void;
+  canCreate: boolean;
 }) {
   const { roomTypes } = useData();
   const { t } = useLang();
@@ -310,9 +324,14 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
   };
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-line bg-[color:color-mix(in_srgb,var(--focus)_3%,var(--surface))] shadow-sm">
-      <div className="flex min-w-max items-start gap-10 p-5">
-        {masters.map((rt) => <Node key={rt.id} rt={rt} />)}
+    <div className="overflow-hidden rounded-xl border border-line bg-[color:color-mix(in_srgb,var(--focus)_3%,var(--surface))] shadow-sm">
+      <div className="flex items-center justify-end border-b border-line bg-surface px-3 py-2">
+        <button onClick={onCreate} disabled={!canCreate} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">＋ {t("Crea tariffa derivata")}</button>
+      </div>
+      <div className="overflow-x-auto">
+        <div className="flex min-w-max items-start gap-10 p-5">
+          {masters.map((rt) => <Node key={rt.id} rt={rt} />)}
+        </div>
       </div>
     </div>
   );
