@@ -205,6 +205,36 @@ export default function StatistichePage() {
   const annPrev = yearMetrics(annualYear - 1);
   const annualBars = annCur.months.map((m) => ({ label: m.label, value: m.revenue, color: "var(--focus)" }));
 
+  // Grafici categoriali dell'Annuale — stessi del Mensile, ma sull'anno scelto invece che sul mese.
+  const yearFrom = `${annualYear}-01-01`;
+  const yearTo = toISO(new Date(annualYear + 1, 0, 1));
+  const yearArr = active.filter((b) => b.channel !== "blocked" && b.checkIn >= yearFrom && b.checkIn < yearTo);
+  const yearRevenue = yearArr.reduce((a, b) => a + (b.total ?? 0), 0);
+  const revenueByChannelY = channels.map((c) => ({ label: CHANNELS[c].label, value: yearArr.filter((b) => b.channel === c).reduce((a, b) => a + (b.total ?? 0), 0), color: chColor(c) })).filter((x) => x.value > 0);
+  const countryMapY: Record<string, number> = {};
+  yearArr.forEach((b) => { const c = guests.find((g) => g.id === b.guestId)?.country ?? "—"; countryMapY[c] = (countryMapY[c] || 0) + 1; });
+  const byCountryY = Object.entries(countryMapY).map(([k, v]) => ({ label: k, value: v, color: flagColor(k), fill: flagGradient(k) }));
+  const bucketsY: Record<string, number> = { "1 notte": 0, "2 notti": 0, "3 notti": 0, "4+ notti": 0 };
+  yearArr.forEach((b) => { const n = nights(b.checkIn, b.checkOut); if (n <= 1) bucketsY["1 notte"]++; else if (n === 2) bucketsY["2 notti"]++; else if (n === 3) bucketsY["3 notti"]++; else bucketsY["4+ notti"]++; });
+  const stayDistY = Object.entries(bucketsY).map(([k, v]) => ({ label: t(k), value: v, color: "var(--focus)" }));
+  const revByStructureY = scopedStructures.map((st) => ({ label: st.name, value: yearArr.filter((b) => b.structureId === st.id).reduce((a, b) => a + (b.total ?? 0), 0), color: "var(--ok)", fmt: eur }));
+  const priceByChannelY = channels.map((c) => ({
+    label: CHANNELS[c].label,
+    color: chColor(c),
+    values: active
+      .filter((b) => b.channel === c && b.checkIn >= yearFrom && b.checkIn < yearTo && b.total && nights(b.checkIn, b.checkOut) > 0)
+      .map((b) => Math.round((b.total ?? 0) / nights(b.checkIn, b.checkOut))),
+  })).filter((s) => s.values.length > 0);
+  const chartsY = [
+    { key: "y-occ-gauge", title: t("Occupazione dell'anno"), node: <Gauge value={Math.round(annCur.occ * 100)} unit="%" color="var(--ok)" /> },
+    { key: "y-price-ch", title: t("Prezzo a notte per canale"), wide: true, node: <DensityChart series={priceByChannelY} xLabel={t("Prezzo a notte (€)")} unit="€" /> },
+    { key: "y-rev-ch", title: t("Ricavi per canale (anno)"), wide: true, node: <Donut data={revenueByChannelY} center={`€ ${num(yearRevenue)}`} format={(n) => eur(n)} /> },
+    { key: "y-rev-month", title: t("Ricavi per mese"), wide: true, node: <ColumnChart bars={annualBars} format={(n) => eur(n)} allLabels /> },
+    { key: "y-country", title: t("Provenienza ospiti per paese"), node: <ColumnChart bars={byCountryY} labelColor="var(--txt)" allLabels /> },
+    { key: "y-stay", title: t("Durata del soggiorno"), node: <Bars items={stayDistY} /> },
+    { key: "y-rev-str", title: t("Ricavi per struttura"), perStructure: true, node: <Bars items={revByStructureY} /> },
+  ].filter((c) => !(singleStruct && c.perStructure));
+
   // Tabella Annuale con le STESSE colonne/regole del Previsionale (madre): accrual per notte,
   // indipendente dal selettore "Ricavi calcolati" — un mese al posto di un giorno, sommando lo
   // stesso calcolo giorno per giorno usato in `rep`, non i totali di `metrics()` (che seguono
@@ -426,6 +456,23 @@ export default function StatistichePage() {
           <KpiD label={t("Ricavi")} value={eur(annCur.revenue)} d={delta(annCur.revenue, annPrev.revenue)} cmp={String(annualYear - 1)} />
         </div>
 
+        {/* Grafici dell'anno — stessi del Mensile, scalati sull'anno scelto invece che sul mese. */}
+        <div className="mt-6">
+          <ScrollStrip
+            gap="gap-3"
+            items={chartsY.map((c) => { const wide = (c as { wide?: boolean }).wide; return {
+              key: c.key,
+              className: `flex flex-none snap-start flex-col ${wide ? "w-[520px] max-w-[92vw] lg:w-[calc((100%-3rem)*2/5+0.75rem)]" : "w-[260px] lg:w-[calc((100%-3rem)/5)]"}`,
+              node: (
+                <div className="flex h-full flex-col rounded-xl border border-line bg-surface p-4 shadow-sm">
+                  <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{c.title}</div>
+                  <div className="flex-1">{c.node}</div>
+                </div>
+              ),
+            }; })}
+          />
+        </div>
+
         <div className="mt-6">
           <FilterRow showMonth={false} />
           <RepTableView
@@ -435,10 +482,6 @@ export default function StatistichePage() {
             totPrevis={yearTotPrevis}
             totAll={yearTotAll}
           />
-          <div className="mt-4 rounded-xl border border-line bg-surface p-4 shadow-sm">
-            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{t("Ricavi per mese")} · {annualYear}</div>
-            <ColumnChart bars={annualBars} format={(n) => eur(n)} height={220} barWidth={36} allLabels />
-          </div>
         </div>
         <p className="mt-3 text-xs text-faint"><b className="text-dim">{t("Storico")}</b> {t("= mesi già conclusi")} · <b className="text-dim">{t("Previsione")}</b> {t("= mesi futuri")}. {t("La tabella usa sempre il ricavo per notte (competenza), indipendentemente dal selettore \"Ricavi\" qui sopra che riguarda solo le KPI card:")} <b className="text-dim">{basis === "notte" ? t("per notte (competenza)") : basis === "arrivo" ? t("per data di arrivo") : t("all'incasso")}</b>. {t("Confronto sull'anno")} {annualYear - 1}.</p>
       </div>
