@@ -338,13 +338,13 @@ export default function PuliziePage() {
   const details = (r: Room) => (
     <div className="flex flex-col gap-1 text-dim">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-        <span className="flex items-center gap-0.5 font-semibold" style={{ color: r.arr ? "var(--focus)" : "var(--faint)" }}><Icon name="login" size={12} /> {t("Arriva:")}</span>
+        <span className="flex items-center gap-0.5 font-semibold" style={{ color: r.arr ? "var(--ok)" : "var(--faint)" }}><Icon name="login" size={12} /> {t("Arriva:")}</span>
         {r.arr
           ? <><span className="font-medium text-txt">{guestName(r.arr.guestId)}</span><span className="text-faint">· {CHANNELS[r.arr.channel].label}</span>{pax(r.arr, "both")}</>
           : <span className="text-faint">{t("nessun arrivo")}</span>}
       </div>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-        <span className="flex items-center gap-0.5 font-semibold" style={{ color: r.dep ? "var(--warn)" : "var(--faint)" }}><Icon name="logout" size={12} /> {t("Parte:")}</span>
+        <span className="flex items-center gap-0.5 font-semibold" style={{ color: r.dep ? "var(--err)" : "var(--faint)" }}><Icon name="logout" size={12} /> {t("Parte:")}</span>
         {r.dep
           ? <><span className="font-medium text-txt">{guestName(r.dep.guestId)}</span>{pax(r.dep, "out")}</>
           : <span className="text-faint">{t("nessuna partenza")}</span>}
@@ -793,7 +793,7 @@ export default function PuliziePage() {
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function GuestLine({ dir, label, name, b, dog }: { dir: "in" | "out" | "stay"; label: string; name: string; b: Booking; dog: boolean }) {
   const { t } = useLang();
-  const col = dir === "in" ? "var(--focus)" : dir === "out" ? "var(--warn)" : "var(--ok)";
+  const col = dir === "in" ? "var(--ok)" : dir === "out" ? "var(--err)" : "var(--focus)";
   const icon = dir === "in" ? "login" : dir === "out" ? "logout" : "bed";
   return (
     <div className="flex items-center gap-1.5">
