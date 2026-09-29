@@ -47,7 +47,7 @@ export const NAV: NavItem[] = [
 
   // Report: analisi dei dati.
   { label: "Statistiche", href: "/statistiche", group: "Report", icon: "chart", perm: "statistiche", module: "pms" },
-  { label: "Provenienza viaggiatori", href: "/provenienza", group: "Report", icon: "chart", perm: "statistiche", module: "pms" },
+  { label: "Provenienza viaggiatori", href: "/provenienza", group: "Report", icon: "globe", perm: "statistiche", module: "pms" },
   { label: "Recensioni", href: "/recensioni", group: "Report", icon: "chat", perm: "webconcierge", module: "concierge" },
   { label: "Assistente ricavi", href: "/assistente-ricavi", group: "Report", icon: "sparkles", perm: "webconcierge", module: "concierge" },
 
