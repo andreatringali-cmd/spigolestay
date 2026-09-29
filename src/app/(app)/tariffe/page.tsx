@@ -73,6 +73,9 @@ export default function TariffePage() {
 
   // Scarto della derivata rispetto alla madre (mostrato come info nella lista prezzi base).
   const scarto = (rt: RoomType) => { const v = rt.deriveValue ?? 0; const sign = v >= 0 ? "+" : ""; return rt.deriveMode === "percent" ? `${sign}${v}%` : `${sign}${v} €`; };
+  // Nome struttura di una tipologia — mostrato in vista "tutte le strutture" per distinguere
+  // tipologie omonime (es. due "Deluxe" di strutture diverse) che altrimenti sono indistinguibili.
+  const structureNameOf = (structureId: string) => structures.find((st) => st.id === structureId)?.name ?? "—";
 
   // Albero: derivate annidate sotto la madre, a tendina.
   const childrenOf = (id: string) => types.filter((x) => x.deriveFrom === id);
@@ -105,6 +108,7 @@ export default function TariffePage() {
             {derived
               ? <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>↳ {t("derivata")} {scarto(rt)}</span>
               : <span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span>}
+            {effStructure === "all" && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--txt) 8%, transparent)", color: "var(--dim)" }}>{structureNameOf(rt.structureId)}</span>}
           </div>
         </td>
         <td className="px-3 py-2.5">
@@ -139,7 +143,10 @@ export default function TariffePage() {
               : <span className="inline-block w-3 shrink-0" />)}
             <span className="h-6 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
             <div>
-              <div className="text-sm font-medium text-txt">{rt.name}</div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-txt">{rt.name}</span>
+                {effStructure === "all" && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--txt) 8%, transparent)", color: "var(--dim)" }}>{structureNameOf(rt.structureId)}</span>}
+              </div>
               <div className="text-[10px] text-faint">{t("base")} {eur(base)}{derived ? ` · ${t("der.")}` : ""}</div>
             </div>
           </div>
