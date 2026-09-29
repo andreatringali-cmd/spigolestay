@@ -240,7 +240,7 @@ export default function TariffePage() {
 
         {types.some((rt) => rt.deriveFrom) && (
           <div className="mt-3 flex justify-end">
-            <a href="/tariffe-derivate" className="text-[11px] font-semibold text-focus hover:underline">{t("Tariffe derivate")} →</a>
+            <a href="/tariffe-derivate" className="whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-sm font-medium text-focus hover:bg-wash">{t("Tariffe derivate")} →</a>
           </div>
         )}
       </section>
@@ -250,8 +250,8 @@ export default function TariffePage() {
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
           <SectionTitle>{t("Anteprima prezzi")}</SectionTitle>
           <div className="flex items-center gap-2">
-            <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-txt outline-none focus:border-focus">{plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.adjPct >= 0 ? "+" : ""}{p.adjPct}%)</option>)}</select>
-            <a href="/piani-tariffari" className="whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-focus hover:bg-wash">{t("Gestisci piani")} →</a>
+            <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">{plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.adjPct >= 0 ? "+" : ""}{p.adjPct}%)</option>)}</select>
+            <a href="/piani-tariffari" className="whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-sm font-medium text-focus hover:bg-wash">{t("Gestisci piani")} →</a>
           </div>
         </div>
         {/* Legenda */}
