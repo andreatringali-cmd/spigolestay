@@ -117,7 +117,8 @@ export default function MetaSearchPage() {
   const landingUrl = !slug ? "" : dest === "official" && officialWebsite ? normalizeUrl(officialWebsite) : `${origin}/prenota?site=${slug}`;
   const copy = (id: string, text: string) => { try { navigator.clipboard?.writeText(text); setCopied(id); window.setTimeout(() => setCopied((c) => (c === id ? "" : c)), 1600); } catch {} };
 
-  const connected = META.filter((m) => getCfg(m.key).on).length;
+  const activeMetas = META.filter((m) => getCfg(m.key).on);
+  const connected = activeMetas.length;
   // Guadagno extra medio a notte = prezzo diretto × commissione OTA risparmiata.
   const avgExtra = types.length ? Math.round(types.reduce((a, rt) => a + effectiveBase(rt, roomTypes) * avgComm / 100, 0) / types.length) : 0;
 
@@ -182,12 +183,15 @@ export default function MetaSearchPage() {
                   <div className="mt-0.5 text-xs text-dim">{t(m.desc)}</div>
                 </div>
                 {c.on && (
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <select value={c.model} onChange={(e) => patch(m.key, { model: e.target.value as "cpc" | "commission" })} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs text-dim outline-none focus:border-focus">
-                      <option value="cpc">{t("Costo per clic")}</option>
-                      <option value="commission">{t("Commissione")}</option>
-                    </select>
-                    <span className="inline-flex items-center gap-1 rounded-lg bg-wash px-2 py-1 text-dim">{c.model === "cpc" ? "€" : ""}<input type="number" step={c.model === "cpc" ? 0.05 : 1} min={0} value={c.value} onChange={(e) => patch(m.key, { value: Number(e.target.value) })} className="w-14 bg-transparent text-center font-semibold text-txt outline-none" />{c.model === "cpc" ? `/${t("clic")}` : "%"}</span>
+                  <div className="text-xs">
+                    <div className="mb-1 text-[10px] text-faint" title={t("Non lo decide Xenora: è quello che Google/Trivago ti applicano davvero. Scrivilo qui solo per farti calcolare una stima di spesa.")}>{t("Quanto ti costa davvero (te lo dice il comparatore)")}</div>
+                    <div className="flex items-center gap-1.5">
+                      <select value={c.model} onChange={(e) => patch(m.key, { model: e.target.value as "cpc" | "commission" })} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs text-dim outline-none focus:border-focus">
+                        <option value="cpc">{t("Costo per clic")}</option>
+                        <option value="commission">{t("Commissione")}</option>
+                      </select>
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-wash px-2 py-1 text-dim">{c.model === "cpc" ? "€" : ""}<input type="number" step={c.model === "cpc" ? 0.05 : 1} min={0} value={c.value} onChange={(e) => patch(m.key, { value: Number(e.target.value) })} className="w-14 bg-transparent text-center font-semibold text-txt outline-none" />{c.model === "cpc" ? `/${t("clic")}` : "%"}</span>
+                    </div>
                   </div>
                 )}
                 <button onClick={() => patch(m.key, { on: !c.on })} title={t("Solo la tua lista: la connessione vera si fa al passo 3, sulla piattaforma del comparatore")} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${c.on ? "text-white" : "border border-line text-dim hover:bg-wash"}`} style={c.on ? { backgroundColor: "var(--ok)" } : undefined}>{c.on ? t("Attivo") : t("Attiva")}</button>
@@ -206,10 +210,14 @@ export default function MetaSearchPage() {
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-txt">{t("Dai questo indirizzo al comparatore")}</h2>
+              <h2 className="text-sm font-bold text-txt">{t("Dai questo indirizzo ai siti che hai attivato al passo 2")}</h2>
               <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white" style={{ backgroundColor: "var(--ok)" }}>{t("reale")}</span>
             </div>
-            <p className="text-xs text-dim">{t("Nessuna loro API key: gli dai questo indirizzo e leggono da soli prezzi e disponibilità.")}</p>
+            <p className="text-xs text-dim">
+              {activeMetas.length === 0
+                ? t("Non hai attivato nessun comparatore al passo 2: torna su e attivane almeno uno.")
+                : <>{t("Cioè")} {activeMetas.map((m, i) => <span key={m.key}><b className="text-txt">{m.name}</b>{i < activeMetas.length - 1 ? (i === activeMetas.length - 2 ? ` ${t("e")} ` : ", ") : ""}</span>)}. {t("Vai sul LORO sito (es. hotelcenter.google.com) e incolla questo indirizzo dove chiedono il feed prezzi — loro poi leggono da soli, nessuna API key.")}</>}
+            </p>
           </div>
         </div>
 
