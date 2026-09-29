@@ -120,17 +120,17 @@ export default function TariffePage() {
         <td className="px-3 py-2.5">
           {!derived
             ? <label className="flex items-center gap-1 text-xs text-dim">€<input type="number" min={0} value={rt.basePrice} onFocus={(e) => e.currentTarget.select()} onChange={(e) => { const v = e.target.value; updateRoomType(rt.id, { basePrice: v === "" ? 0 : Math.max(0, Number(v)) }); }} className={`${inp} w-24`} /></label>
-            : <span className="text-[11px] text-faint">{t("da")} {srcName}</span>}
+            : <span className="text-xs text-faint">{t("da")} {srcName}</span>}
         </td>
         <td className="px-3 py-2.5 text-center">
           {!derived
             ? <input type="number" min={1} value={occ} onFocus={(e) => e.currentTarget.select()} onChange={(e) => updateRoomType(rt.id, { maxOccupancy: Math.max(1, Number(e.target.value)) })} className={`${inp} w-14 py-1 text-center`} />
-            : <span className="text-[11px] text-faint" title={t("Stessa camera della madre: l'occupazione segue sempre la sua")}>{occ} <span className="text-faint">({t("da madre")})</span></span>}
+            : <span className="text-xs text-faint" title={t("Stessa camera della madre: l'occupazione segue sempre la sua")}>{occ} <span className="text-faint">({t("da madre")})</span></span>}
         </td>
         <td className="px-3 py-2.5 text-center"><input type="number" min={0} disabled={inheriting} value={minS} onFocus={(e) => e.currentTarget.select()} onChange={(e) => updateRoomType(rt.id, { minStay: Math.max(0, Number(e.target.value)) })} className={`${inp} w-14 py-1 text-center disabled:opacity-40`} /></td>
         <td className="px-3 py-2.5">
           <button disabled={inheriting} onClick={() => updateRoomType(rt.id, { salesClosed: !closed })} className="rounded-full px-2 py-0.5 text-[11px] font-semibold disabled:opacity-40" style={{ backgroundColor: `color-mix(in srgb, ${closed ? "var(--err)" : "var(--ok)"} 15%, transparent)`, color: closed ? "var(--err)" : "var(--ok)" }}>{closed ? t("Chiuse") : t("Aperte")}</button>
-          {inheriting && <span className="ml-1 text-[10px] text-faint">{t("da madre")}</span>}
+          {inheriting && <span className="ml-1 text-xs text-faint">{t("da madre")}</span>}
         </td>
         <td className="px-3 py-2.5 text-right"><span className="font-mono text-base font-bold text-txt">{eur(eff)}</span><span className="text-[10px] text-faint">/{t("notte")}</span></td>
       </tr>
