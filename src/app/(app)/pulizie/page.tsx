@@ -28,7 +28,7 @@ const ACT: Record<ActionKey, { label: string; color: string }> = {
   turnover: { label: "Partenza + Arrivo", color: "#7C3AED" },
   arrivo: { label: "Arrivo", color: "var(--ok)" },
   partenza: { label: "Partenza", color: "var(--err)" },
-  riassetto: { label: "Riassetto", color: "var(--warn)" },
+  riassetto: { label: "Riassetto", color: "#FB923C" },
   niente: { label: "Niente", color: "var(--faint)" },
 };
 
@@ -241,7 +241,19 @@ export default function PuliziePage() {
       ...tps.flatMap((rt) => sortUnitsByName(su.filter((u) => u.roomTypeId === rt.id))),
       ...sortUnitsByName(su.filter((u) => !tps.some((rt) => rt.id === u.roomTypeId))),
     ];
-    return ordered.map((u) => ({ unit: u, structure: s, typeName: roomTypes.find((x) => x.id === u.roomTypeId)?.name ?? "", typeColor: colorOfType(u.roomTypeId), oos: !!u.outOfService || blockedNow.some((b) => b.unitId === u.id), ...planFor(u.id) }));
+    return ordered.map((u) => {
+      const oosBlock = blockedNow.find((b) => b.unitId === u.id);
+      const plan = planFor(u.id);
+      // "Fuori servizio" vince solo se non c'è NULLA da fare quel giorno: se il blocco inizia
+      // lo stesso giorno di una partenza reale (es. l'ospite parte e poi la camera va fuori
+      // servizio per manutenzione), quel giorno resta "Partenza" — la pulizia serve comunque.
+      const isOosToday = (!!u.outOfService || !!oosBlock) && plan.action === "niente";
+      // oosFrom: il blocco copre oggi anche quando c'è un'azione reale (es. partenza lo stesso
+      // giorno in cui inizia il fuori servizio) — in quel caso mostriamo ENTRAMBE le cose,
+      // non solo una: l'azione del giorno (pulizia da fare) più l'avviso che poi la camera
+      // va fuori servizio.
+      return { unit: u, structure: s, typeName: roomTypes.find((x) => x.id === u.roomTypeId)?.name ?? "", typeColor: colorOfType(u.roomTypeId), oos: isOosToday, oosFrom: !isOosToday && !!oosBlock, oosNote: oosBlock?.note, ...plan };
+    });
   });
   type Room = (typeof rooms)[number];
 
@@ -339,6 +351,7 @@ export default function PuliziePage() {
       </div>
       {!r.arr && !r.dep && r.stay && <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5"><span className="font-semibold text-dim">{t("In soggiorno:")}</span><span className="font-medium text-txt">{guestName(r.stay.guestId)}</span>{pax(r.stay, "both")}</div>}
       {(r.arr ?? r.stay)?.note && <div className="flex items-start gap-1.5 rounded-lg px-2 py-1 text-[11px]" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)", color: "var(--txt)" }}><span>🗒</span><span><b className="text-focus">{t("Nota ospite:")}</b> {(r.arr ?? r.stay)!.note}</span></div>}
+      {r.oosFrom && <div className="flex items-start gap-1.5 rounded-lg px-2 py-1 text-[11px]" style={{ backgroundColor: "color-mix(in srgb, var(--faint) 16%, transparent)", color: "var(--dim)" }}><span>🔧</span><span><b className="text-dim">{t("Poi fuori servizio")}{r.oosNote ? `: ${r.oosNote}` : ""}</b></span></div>}
     </div>
   );
 
@@ -809,6 +822,7 @@ function RoomCard({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-6 6a2 2 0 1 0 2.8 2.8l6-6a4 4 0 0 0 5.4-5.4l-2.3 2.3-2.1-2.1z" /></svg>
           </span>
           <span className="text-[11px] font-semibold uppercase tracking-wide">{t("Fuori servizio")}</span>
+          {r.oosNote && <span className="px-1 text-center text-[11px] leading-snug text-dim">{r.oosNote}</span>}
         </div>
       </div>
     );
@@ -834,6 +848,11 @@ function RoomCard({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle
         {r.arr && <GuestLine dir="in" label={t("Arriva")} name={guestName(r.arr.guestId)} b={r.arr} dog={hasDog(r.arr.guestId)} />}
         {!r.dep && !r.arr && r.stay && <GuestLine dir="stay" label={t("In casa")} name={guestName(r.stay.guestId)} b={r.stay} dog={hasDog(r.stay.guestId)} />}
         {(r.arr ?? r.stay)?.note && <div className="flex items-start gap-1 rounded-lg px-1.5 py-1 text-[11px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)", color: "var(--txt)" }}><span>🗒</span><span><b className="text-focus">{t("Nota ospite:")}</b> {(r.arr ?? r.stay)!.note}</span></div>}
+        {r.oosFrom && (
+          <div className="flex items-start gap-1 rounded-lg px-1.5 py-1 text-[11px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--faint) 16%, transparent)", color: "var(--dim)" }}>
+            <span>🔧</span><span><b className="text-dim">{t("Poi fuori servizio")}{r.oosNote ? `: ${r.oosNote}` : ""}</b></span>
+          </div>
+        )}
       </div>
 
       {/* Note + azioni */}
