@@ -57,6 +57,8 @@ function MetaBadge({ m }: { m: (typeof META)[number] }) {
 type MetaCfg = { on: boolean; model: "cpc" | "commission"; value: number };
 const KEY = "spigolestay:metasearch:v2";
 const COMM_KEY = "spigolestay:metasearch:avgcomm";
+const DEST_KEY = "spigolestay:metasearch:dest";
+const normalizeUrl = (u: string) => (/^https?:\/\//i.test(u) ? u : `https://${u}`);
 
 const defCfg = (k: string): MetaCfg => ({ on: k === "google", model: "cpc", value: k === "google" ? 0.35 : 0.3 });
 
@@ -69,9 +71,17 @@ export default function MetaSearchPage() {
 
   const [cfg, setCfg] = useState<Record<string, MetaCfg>>({});
   const [avgComm, setAvgComm] = useState(15);
+  // Dove atterrano i click dai comparatori: il mini-sito Xenora (default) o il sito ufficiale
+  // della struttura, SE ha il widget di prenotazione incorporato lì (pagina "Widget").
+  const [dest, setDest] = useState<"xenora" | "official">("xenora");
   useEffect(() => {
-    try { const r = localStorage.getItem(KEY); if (r) setCfg(JSON.parse(r)); const c = localStorage.getItem(COMM_KEY); if (c) setAvgComm(JSON.parse(c)); } catch {}
+    try {
+      const r = localStorage.getItem(KEY); if (r) setCfg(JSON.parse(r));
+      const c = localStorage.getItem(COMM_KEY); if (c) setAvgComm(JSON.parse(c));
+      const d = localStorage.getItem(DEST_KEY); if (d === "official" || d === "xenora") setDest(d);
+    } catch {}
   }, []);
+  const saveDest = (v: "xenora" | "official") => { setDest(v); try { localStorage.setItem(DEST_KEY, v); } catch {} };
   const getCfg = (k: string): MetaCfg => cfg[k] ?? defCfg(k);
   const saveCfg = (next: Record<string, MetaCfg>) => { setCfg(next); try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {} };
   const patch = (k: string, p: Partial<MetaCfg>) => saveCfg({ ...cfg, [k]: { ...getCfg(k), ...p } });
@@ -103,7 +113,8 @@ export default function MetaSearchPage() {
 
   const feedBase = slug ? `${origin}/api/metasearch/feed/${slug}` : "";
   const feedUrl = feedBase ? feedBase + (fmt === "xml" ? "?format=xml" : "") : "";
-  const landingUrl = slug ? `${origin}/prenota?site=${slug}` : "";
+  const officialWebsite = selStructure?.website?.trim() || "";
+  const landingUrl = !slug ? "" : dest === "official" && officialWebsite ? normalizeUrl(officialWebsite) : `${origin}/prenota?site=${slug}`;
   const copy = (id: string, text: string) => { try { navigator.clipboard?.writeText(text); setCopied(id); window.setTimeout(() => setCopied((c) => (c === id ? "" : c)), 1600); } catch {} };
 
   const connected = META.filter((m) => getCfg(m.key).on).length;
@@ -175,6 +186,25 @@ export default function MetaSearchPage() {
                   <button onClick={() => copy("feed", feedUrl)} className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{copied === "feed" ? <span style={{ color: "var(--ok)" }}>✓ {t("Copiato")}</span> : t("Copia")}</button>
                   <a href={feedUrl} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Apri")} ↗</a>
                 </div>
+              </div>
+              {/* Destinazione dei click */}
+              <div>
+                <div className="mb-1.5 text-xs font-semibold text-txt">{t("Dove atterra chi clicca dal comparatore")}</div>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => saveDest("xenora")} className={`rounded-lg border px-3 py-2 text-left text-xs transition ${dest === "xenora" ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,var(--surface))]" : "border-line bg-surface hover:bg-wash"}`}>
+                    <div className={`font-semibold ${dest === "xenora" ? "text-focus" : "text-txt"}`}>{t("Mini-sito Xenora")}</div>
+                    <div className="text-faint">{t("Sempre pronto, nessuna configurazione extra.")}</div>
+                  </button>
+                  <button onClick={() => officialWebsite && saveDest("official")} disabled={!officialWebsite} title={officialWebsite ? undefined : t("Salva prima un sito web in Strutture")} className={`rounded-lg border px-3 py-2 text-left text-xs transition disabled:cursor-not-allowed disabled:opacity-40 ${dest === "official" ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,var(--surface))]" : "border-line bg-surface hover:bg-wash"}`}>
+                    <div className={`font-semibold ${dest === "official" ? "text-focus" : "text-txt"}`}>{t("Il tuo sito ufficiale")}</div>
+                    <div className="text-faint">{officialWebsite || t("Serve un sito salvato in Strutture")}</div>
+                  </button>
+                </div>
+                {dest === "official" && officialWebsite && (
+                  <p className="mt-1.5 rounded-lg border border-line bg-wash px-2.5 py-1.5 text-[11px] text-dim">
+                    {t("Funziona solo se hai incorporato il widget di prenotazione su questa pagina del tuo sito.")} <Link href="/widget" className="font-semibold text-focus hover:underline">{t("Vai a Widget")} →</Link>
+                  </p>
+                )}
               </div>
               {/* Landing URL */}
               <div>

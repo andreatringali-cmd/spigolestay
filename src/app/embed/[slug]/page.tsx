@@ -6,7 +6,7 @@
 // Route pubblica (fuori dal gruppo (app)): nessun login richiesto. Le
 // prenotazioni passano dallo stesso flusso pubblico (/api/stripe/book +
 // /api/public-booking) usato da /prenota.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { DataProvider } from "@/lib/store";
 import { Engine } from "../../prenota/page";
@@ -19,6 +19,7 @@ export default function EmbedPage() {
   // Colore accento opzionale (?accent=#RRGGBB da /embed.js): sovrascrive il
   // colore primario del motore (--focus). Se assente resta quello di Xenora.
   const [accent, setAccent] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try { const a = new URLSearchParams(window.location.search).get("accent"); if (a && /^#?[0-9a-fA-F]{3,8}$/.test(a)) setAccent(a.startsWith("#") ? a : `#${a}`); } catch {}
@@ -28,10 +29,24 @@ export default function EmbedPage() {
     return () => { alive = false; };
   }, [slug]);
 
+  // Comunica l'altezza reale del contenuto al genitore (embed.js), che ridimensiona
+  // l'iframe di conseguenza — il motore cambia altezza passando da elenco camere a
+  // checkout, quindi serve osservare i cambiamenti, non solo misurare al mount.
+  useEffect(() => {
+    if (!slug || typeof ResizeObserver === "undefined") return;
+    const el = rootRef.current;
+    if (!el) return;
+    const post = () => { try { window.parent.postMessage({ xenoraEmbedSite: slug, xenoraEmbedHeight: el.scrollHeight }, "*"); } catch {} };
+    const ro = new ResizeObserver(post);
+    ro.observe(el);
+    post();
+    return () => ro.disconnect();
+  }, [slug, state]);
+
   const accentStyle = accent ? ({ ["--focus" as string]: accent } as React.CSSProperties) : undefined;
 
   return (
-    <>
+    <div ref={rootRef}>
       {/* Sfondo trasparente: nell'iframe deve trasparire lo sfondo del sito ospite. */}
       <style>{`html,body{background:transparent!important}`}</style>
       {state === "loading" && (
@@ -54,6 +69,6 @@ export default function EmbedPage() {
           <DataProvider><Engine embed /></DataProvider>
         </div>
       )}
-    </>
+    </div>
   );
 }

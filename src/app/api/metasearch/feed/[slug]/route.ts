@@ -128,8 +128,18 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
   };
 
   const origin = req.nextUrl.origin;
+
+  // Destinazione dei click: mini-sito Xenora (default) oppure il sito ufficiale della struttura,
+  // se il proprietario lo ha scelto in Metasearch e ha salvato un indirizzo in Strutture. In quel
+  // caso il sito ufficiale deve avere il widget incorporato (pagina "Widget"): i parametri
+  // checkin/checkout/rt arrivano lì tramite embed.js, che li inoltra all'iframe del motore.
+  const dest = siteData["spigolestay:metasearch:dest"];
+  const rawWebsite = (structure as { website?: string } | undefined)?.website?.trim();
+  const officialBase = dest === "official" && rawWebsite ? (/^https?:\/\//i.test(rawWebsite) ? rawWebsite : `https://${rawWebsite}`) : null;
   const deepLink = (rtId: string, ci: string, co: string) =>
-    `${origin}/prenota?site=${encodeURIComponent(slug)}&checkin=${ci}&checkout=${co}&rt=${encodeURIComponent(rtId)}`;
+    officialBase
+      ? `${officialBase}${officialBase.includes("?") ? "&" : "?"}checkin=${ci}&checkout=${co}&rt=${encodeURIComponent(rtId)}`
+      : `${origin}/prenota?site=${encodeURIComponent(slug)}&checkin=${ci}&checkout=${co}&rt=${encodeURIComponent(rtId)}`;
 
   const today = toISO(new Date());
   type Rate = { date: string; checkout: string; roomTypeId: string; roomType: string; price: number; currency: string; available: number; deepLink: string };
@@ -152,7 +162,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
   }
 
   const generatedAt = new Date().toISOString();
-  const landing = `${origin}/prenota?site=${encodeURIComponent(slug)}`;
+  const landing = officialBase || `${origin}/prenota?site=${encodeURIComponent(slug)}`;
   const cacheHeaders = { "Cache-Control": "public, max-age=1800, s-maxage=1800, stale-while-revalidate=3600", ...CORS };
 
   if (format === "xml") {

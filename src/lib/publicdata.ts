@@ -25,6 +25,7 @@ export const AUX_KEYS = [
   "spigolestay:promos",     // offerte
   "spigolestay:rateplans",  // piani tariffari
   "spigolestay:pricerules", // regole prezzo (weekend…)
+  "spigolestay:metasearch:dest", // destinazione click Metasearch: mini-sito Xenora o sito ufficiale
 ];
 
 // Segmenti già usati dall'app al primo livello dell'URL: uno slug pubblico non può
