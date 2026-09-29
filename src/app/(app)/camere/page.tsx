@@ -158,6 +158,34 @@ export default function CamerePage() {
         actions={<WeatherWidget compact />}
       />
 
+      {/* Cambio struttura: box grandi e cliccabili invece di una tendina anonima, uno per
+          struttura + "Tutte", per dargli evidenza dato che qui condiziona tutta la pagina. */}
+      {activeStructureId === "all" && structures.length > 1 && (
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          <button
+            onClick={() => setLocalS("all")}
+            className={`rounded-xl border p-3 text-left shadow-sm transition ${localS === "all" ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,var(--surface))]" : "border-line bg-surface hover:bg-wash"}`}
+          >
+            <div className={`font-display text-sm font-bold ${localS === "all" ? "text-focus" : "text-txt"}`}>{t("Tutte le strutture")}</div>
+            <div className="mt-0.5 text-xs text-dim">{units.length} {t("camere")} · {structures.length} {t("strutture")}</div>
+          </button>
+          {structures.map((st) => {
+            const n = units.filter((u) => u.structureId === st.id).length;
+            const active = localS === st.id;
+            return (
+              <button
+                key={st.id}
+                onClick={() => setLocalS(st.id)}
+                className={`rounded-xl border p-3 text-left shadow-sm transition ${active ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,var(--surface))]" : "border-line bg-surface hover:bg-wash"}`}
+              >
+                <div className={`font-display text-sm font-bold ${active ? "text-focus" : "text-txt"}`}>{st.name}</div>
+                <div className="mt-0.5 text-xs text-dim">{n} {t("camere")}</div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {scoped.length === 0 && <Card><div className="py-8 text-center text-sm text-faint">{t("Nessuna struttura. Creane una in")} <Link href="/strutture" className="text-focus underline">{t("Strutture")}</Link>.</div></Card>}
 
       <div className="flex flex-col gap-5">
@@ -201,6 +229,15 @@ export default function CamerePage() {
                 </div>
               </div>
 
+              {/* Filtri camere: ricerca + azioni, in cima al blocco struttura. */}
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm">
+                <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="w-full flex-1 sm:w-auto" />
+                <div className="ml-auto flex items-center gap-2">
+                  <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
+                  <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
+                </div>
+              </div>
+
               {/* Statistiche */}
               <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {([["Camere", sUnits.length], ["Tipologie", types.filter((rt) => !rt.deriveFrom).length], ["Posti letto", beds], ["Fuori servizio", oos]] as [string, number][]).map(([k, v]) => (
@@ -237,22 +274,6 @@ export default function CamerePage() {
                   );
                 })}
                 {types.length === 0 && <div className="w-full rounded-xl border border-dashed border-line"><EmptyState title={t("Nessuna tipologia. Aggiungine una col pulsante “+ Tipologia”.")} /></div>}
-              </div>
-
-              {/* Filtri camere: struttura (solo se "tutte le strutture" è attivo in alto) + ricerca,
-                  poi le azioni. Riga unica, si avvolge su mobile. */}
-              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm">
-                {activeStructureId === "all" && (
-                  <select value={localS} onChange={(e) => setLocalS(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
-                    <option value="all">{t("Tutte le strutture")}</option>
-                    {structures.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
-                  </select>
-                )}
-                <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="w-full flex-1 sm:w-auto" />
-                <div className="ml-auto flex items-center gap-2">
-                  <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
-                  <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
-                </div>
               </div>
 
               {/* Camere — un box separato per ogni tipologia */}
