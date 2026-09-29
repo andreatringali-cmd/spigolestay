@@ -158,15 +158,6 @@ export default function CamerePage() {
         actions={<WeatherWidget compact />}
       />
 
-      {activeStructureId === "all" && (
-        <div className="mb-4 flex items-center gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm">
-          <select value={localS} onChange={(e) => setLocalS(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
-            <option value="all">{t("Tutte le strutture")}</option>
-            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </div>
-      )}
-
       {scoped.length === 0 && <Card><div className="py-8 text-center text-sm text-faint">{t("Nessuna struttura. Creane una in")} <Link href="/strutture" className="text-focus underline">{t("Strutture")}</Link>.</div></Card>}
 
       <div className="flex flex-col gap-5">
@@ -248,11 +239,17 @@ export default function CamerePage() {
                 {types.length === 0 && <div className="w-full rounded-xl border border-dashed border-line"><EmptyState title={t("Nessuna tipologia. Aggiungine una col pulsante “+ Tipologia”.")} /></div>}
               </div>
 
-              {/* Filtri camere: la ricerca sta nella STESSA griglia delle tipologie, così è larga
-                  esattamente quanto una card soprastante e vi si allinea; le azioni riempiono il resto. */}
-              <div className="mb-3 grid grid-cols-2 items-center gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm sm:grid-cols-4">
-                <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="col-span-2 w-full sm:col-span-1" />
-                <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-3">
+              {/* Filtri camere: struttura (solo se "tutte le strutture" è attivo in alto) + ricerca,
+                  poi le azioni. Riga unica, si avvolge su mobile. */}
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2 shadow-sm">
+                {activeStructureId === "all" && (
+                  <select value={localS} onChange={(e) => setLocalS(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+                    <option value="all">{t("Tutte le strutture")}</option>
+                    {structures.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+                  </select>
+                )}
+                <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca tipologia o camera…")} className="w-full flex-1 sm:w-auto" />
+                <div className="ml-auto flex items-center gap-2">
                   <button onClick={() => router.push(`/camere/tipologia/nuovo?s=${s.id}`)} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash">{t("+ Tipologia")}</button>
                   <button onClick={() => addRoom(s.id, sUnits.length)} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("+ Camera")}</button>
                 </div>
