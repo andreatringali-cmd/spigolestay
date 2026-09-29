@@ -101,7 +101,7 @@ export default function TariffePage() {
     const closed = inheriting ? effectiveClosed(rt, roomTypes) : !!rt.salesClosed;
     return (
       <tr key={rt.id} className={`border-b border-line last:border-0 hover:bg-wash ${derived ? "bg-[color:color-mix(in_srgb,var(--focus)_4%,transparent)]" : ""}`}>
-        <td className="px-3 py-2.5">
+        <td className="px-3 py-3">
           <div className={derived ? "pl-7" : ""}>
             <div className="flex flex-wrap items-center gap-1.5">
               {!derived && (kids.length > 0
@@ -111,27 +111,27 @@ export default function TariffePage() {
               <span className="font-semibold text-txt">{rt.name}</span>
               <Occ n={occ} />
               {derived
-                ? <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>↳ {t("derivata")} {scarto(rt)}</span>
-                : <span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span>}
+                ? <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>↳ {t("derivata")} {scarto(rt)}</span>
+                : <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-dim">master</span>}
             </div>
           </div>
         </td>
-        <td className="px-3 py-2.5">
+        <td className="px-3 py-3">
           {!derived
             ? <label className="flex items-center gap-1 text-xs text-dim">€<input type="number" min={0} value={rt.basePrice} onFocus={(e) => e.currentTarget.select()} onChange={(e) => { const v = e.target.value; updateRoomType(rt.id, { basePrice: v === "" ? 0 : Math.max(0, Number(v)) }); }} className={`${inp} w-24`} /></label>
             : <span className="text-xs text-faint">{t("da")} {srcName}</span>}
         </td>
-        <td className="px-3 py-2.5 text-center">
+        <td className="px-3 py-3 text-center">
           {!derived
             ? <input type="number" min={1} value={occ} onFocus={(e) => e.currentTarget.select()} onChange={(e) => updateRoomType(rt.id, { maxOccupancy: Math.max(1, Number(e.target.value)) })} className={`${inp} w-14 py-1 text-center`} />
             : <span className="text-xs text-faint" title={t("Stessa camera della madre: l'occupazione segue sempre la sua")}>{occ} <span className="text-faint">({t("da madre")})</span></span>}
         </td>
-        <td className="px-3 py-2.5 text-center"><input type="number" min={0} disabled={inheriting} value={minS} onFocus={(e) => e.currentTarget.select()} onChange={(e) => updateRoomType(rt.id, { minStay: Math.max(0, Number(e.target.value)) })} className={`${inp} w-14 py-1 text-center disabled:opacity-40`} /></td>
-        <td className="px-3 py-2.5">
+        <td className="px-3 py-3 text-center"><input type="number" min={0} disabled={inheriting} value={minS} onFocus={(e) => e.currentTarget.select()} onChange={(e) => updateRoomType(rt.id, { minStay: Math.max(0, Number(e.target.value)) })} className={`${inp} w-14 py-1 text-center disabled:opacity-40`} /></td>
+        <td className="px-3 py-3">
           <button disabled={inheriting} onClick={() => updateRoomType(rt.id, { salesClosed: !closed })} className="rounded-full px-2 py-0.5 text-[11px] font-semibold disabled:opacity-40" style={{ backgroundColor: `color-mix(in srgb, ${closed ? "var(--err)" : "var(--ok)"} 15%, transparent)`, color: closed ? "var(--err)" : "var(--ok)" }}>{closed ? t("Chiuse") : t("Aperte")}</button>
           {inheriting && <span className="ml-1 text-xs text-faint">{t("da madre")}</span>}
         </td>
-        <td className="px-3 py-2.5 text-right"><span className="font-mono text-base font-bold text-txt">{eur(eff)}</span><span className="text-[10px] text-faint">/{t("notte")}</span></td>
+        <td className="px-3 py-3 text-right"><span className="font-mono text-base font-bold text-txt">{eur(eff)}</span><span className="text-[10px] text-faint">/{t("notte")}</span></td>
       </tr>
     );
   };
@@ -145,7 +145,7 @@ export default function TariffePage() {
     const isOpen = openMasters.has(rt.id);
     return (
       <tr key={rt.id} className="group border-b border-line last:border-0">
-        <td className="sticky left-0 z-10 bg-surface px-3 py-2.5 group-hover:bg-wash">
+        <td className="sticky left-0 z-10 bg-surface px-3 py-3 group-hover:bg-wash">
           <div className={`flex items-center gap-2 ${derived ? "pl-6" : ""}`}>
             {!derived && (kids.length > 0
               ? <button onClick={() => toggleMaster(rt.id)} title={isOpen ? t("Comprimi") : t("Espandi")} className="shrink-0"><Chevron open={isOpen} /></button>
@@ -165,7 +165,7 @@ export default function TariffePage() {
           const isToday = iso === toISO(s);
           const we = isWeekend(d);
           return (
-            <td key={iso} className="px-2 py-2.5 text-center group-hover:bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
+            <td key={iso} className="px-2 py-3 text-center group-hover:bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
               {forced != null
                 ? <span className="inline-block rounded px-1.5 py-0.5 font-mono text-sm font-bold tabular-nums" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }} title={t("Tariffa forzata dal calendario")}>{dayPrice(rt, d)}</span>
                 : <span className="font-mono text-sm tabular-nums text-txt">{dayPrice(rt, d)}</span>}
@@ -189,20 +189,26 @@ export default function TariffePage() {
         ) : null}
       />
 
-      {/* Come nasce il prezzo — catena essenziale */}
-      <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border border-line bg-surface px-3 py-2.5 text-xs shadow-sm">
-        <span className="font-semibold uppercase tracking-wide text-faint">{t("Come nasce il prezzo")}</span>
-        {([t("Prezzo base"), t("Regola weekend"), t("Prezzo del giorno"), t("Piano tariffario")]).map((h, i, arr) => (
+      {/* Come nasce il prezzo — catena essenziale, un colore diverso per passaggio invece di
+          quattro pillole grigie identiche: si legge come un percorso, non come un elenco piatto. */}
+      <div className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border border-line bg-surface px-4 py-3.5 text-sm shadow-sm">
+        <span className="mr-1 font-semibold uppercase tracking-wide text-faint">{t("Come nasce il prezzo")}</span>
+        {([
+          [t("Prezzo base"), "#5B74E6"],
+          [t("Regola weekend"), "#C08A3A"],
+          [t("Prezzo del giorno"), "#4F8A5B"],
+          [t("Piano tariffario"), "#B3453A"],
+        ] as const).map(([h, col], i, arr) => (
           <span key={h} className="flex items-center gap-2">
-            <span className="rounded-full bg-wash px-2.5 py-1 font-medium text-txt">{h}</span>
-            {i < arr.length - 1 && <span style={{ color: "var(--focus)" }}>→</span>}
+            <span className="rounded-full px-3 py-1.5 font-semibold text-white shadow-sm" style={{ backgroundColor: col }}>{h}</span>
+            {i < arr.length - 1 && <span className="text-faint">→</span>}
           </span>
         ))}
       </div>
 
       {/* Prezzi base — un box per struttura quando la vista è "tutte le strutture", una tabella
           sola quando ne è selezionata una: evita di dover leggere l'etichetta struttura riga per riga. */}
-      <section className="mb-7">
+      <section className="mb-8">
         <SectionTitle>{t("Prezzi base")}</SectionTitle>
 
         {(() => {
@@ -220,12 +226,12 @@ export default function TariffePage() {
                   </colgroup>
                   <thead>
                     <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
-                      <th className="px-3 py-2.5 font-semibold">{t("Tipologia")}</th>
-                      <th className="px-3 py-2.5 font-semibold">{t("Prezzo base")}</th>
-                      <th className="px-3 py-2.5 text-center font-semibold">{t("Ospiti")}</th>
-                      <th className="px-3 py-2.5 text-center font-semibold">{t("Notti min.")}</th>
-                      <th className="px-3 py-2.5 font-semibold">{t("Vendite")}</th>
-                      <th className="px-3 py-2.5 text-right font-semibold">{t("Effettivo")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("Tipologia")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("Prezzo base")}</th>
+                      <th className="px-3 py-3 text-center font-semibold">{t("Ospiti")}</th>
+                      <th className="px-3 py-3 text-center font-semibold">{t("Notti min.")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("Vendite")}</th>
+                      <th className="px-3 py-3 text-right font-semibold">{t("Effettivo")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -245,10 +251,13 @@ export default function TariffePage() {
           const structsWithTypes = structures.filter((st) => roots.some((r) => r.structureId === st.id));
           if (structsWithTypes.length === 0) return baseTable([]);
           return (
-            <div className="flex flex-col gap-4">
-              {structsWithTypes.map((st) => (
+            <div className="flex flex-col gap-5">
+              {structsWithTypes.map((st, i) => (
                 <div key={st.id}>
-                  <div className="mb-1.5 font-display text-sm font-bold text-txt">{st.name}</div>
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: AV_COLORS[i % AV_COLORS.length] }} />
+                    <span className="font-display text-sm font-bold text-txt">{st.name}</span>
+                  </div>
                   {baseTable(roots.filter((r) => r.structureId === st.id))}
                 </div>
               ))}
@@ -257,19 +266,18 @@ export default function TariffePage() {
         })()}
 
         {/* Regola weekend */}
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm shadow-sm">
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-4 py-3 text-sm shadow-sm">
           <span className="font-semibold text-txt">📅 {t("Maggiorazione weekend")}</span>
           <span className="flex items-center gap-1"><input type="number" value={weekendPct} onFocus={(e) => e.currentTarget.select()} onChange={(e) => saveWeekend(Number(e.target.value))} className={`${inp} w-20`} /><span className="text-dim">%</span></span>
-          <span className="text-[11px] text-faint">{t("su ven/sab/dom, se non c'è un prezzo forzato dal calendario")}</span>
+          <span className="text-xs text-faint">{t("su ven/sab/dom, se non c'è un prezzo forzato dal calendario")}</span>
         </div>
-
       </section>
 
       {/* Anteprima prezzi */}
       <section>
         <SectionTitle>{t("Anteprima prezzi")}</SectionTitle>
         {/* Legenda + azioni: tutto in un'unica riga */}
-        <div className="mb-3 mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-xs shadow-sm">
+        <div className="mb-3 mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-3 text-xs shadow-sm">
           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded border border-line bg-wash" /> {t("weekend")}</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 22%, transparent)" }} /> {t("oggi")}</span>
           <span className="flex items-center gap-1.5"><span className="rounded px-1 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>€</span> {t("prezzo forzato dal calendario")}</span>
