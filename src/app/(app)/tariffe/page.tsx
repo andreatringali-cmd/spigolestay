@@ -91,7 +91,11 @@ export default function TariffePage() {
     const kids = childrenOf(rt.id);
     const isOpen = openMasters.has(rt.id);
     const eff = effectiveBase(rt, roomTypes);
-    const srcName = derived ? (types.find((x) => x.id === rt.deriveFrom)?.name ?? "?") : "";
+    const motherRt = derived ? types.find((x) => x.id === rt.deriveFrom) : undefined;
+    const srcName = derived ? (motherRt?.name ?? "?") : "";
+    // Una derivata condivide le camere FISICHE della madre (stessa stanza, prezzo diverso):
+    // l'occupazione massima non può essere diversa, quindi segue sempre quella della madre.
+    const occ = derived ? (motherRt?.maxOccupancy ?? motherRt?.beds ?? rt.beds) : (rt.maxOccupancy ?? rt.beds);
     const inheriting = derived && !!rt.deriveInherit;
     const minS = inheriting ? effectiveMinStay(rt, roomTypes) : (rt.minStay ?? 0);
     const closed = inheriting ? effectiveClosed(rt, roomTypes) : !!rt.salesClosed;
@@ -105,7 +109,7 @@ export default function TariffePage() {
                 : <span className="inline-block w-3 shrink-0" />)}
               <span className="h-5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: typeColor(rt) }} />
               <span className="font-semibold text-txt">{rt.name}</span>
-              <Occ n={rt.maxOccupancy ?? rt.beds} />
+              <Occ n={occ} />
               {derived
                 ? <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>↳ {t("derivata")} {scarto(rt)}</span>
                 : <span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span>}
@@ -118,7 +122,11 @@ export default function TariffePage() {
             ? <label className="flex items-center gap-1 text-xs text-dim">€<input type="number" min={0} value={rt.basePrice} onFocus={(e) => e.currentTarget.select()} onChange={(e) => { const v = e.target.value; updateRoomType(rt.id, { basePrice: v === "" ? 0 : Math.max(0, Number(v)) }); }} className={`${inp} w-24`} /></label>
             : <span className="text-[11px] text-faint">{t("da")} {srcName}</span>}
         </td>
-        <td className="px-3 py-2.5 text-center"><input type="number" min={1} value={rt.maxOccupancy ?? rt.beds} onFocus={(e) => e.currentTarget.select()} onChange={(e) => updateRoomType(rt.id, { maxOccupancy: Math.max(1, Number(e.target.value)) })} className={`${inp} w-14 py-1 text-center`} /></td>
+        <td className="px-3 py-2.5 text-center">
+          {!derived
+            ? <input type="number" min={1} value={occ} onFocus={(e) => e.currentTarget.select()} onChange={(e) => updateRoomType(rt.id, { maxOccupancy: Math.max(1, Number(e.target.value)) })} className={`${inp} w-14 py-1 text-center`} />
+            : <span className="text-[11px] text-faint" title={t("Stessa camera della madre: l'occupazione segue sempre la sua")}>{occ} <span className="text-faint">({t("da madre")})</span></span>}
+        </td>
         <td className="px-3 py-2.5 text-center"><input type="number" min={0} disabled={inheriting} value={minS} onFocus={(e) => e.currentTarget.select()} onChange={(e) => updateRoomType(rt.id, { minStay: Math.max(0, Number(e.target.value)) })} className={`${inp} w-14 py-1 text-center disabled:opacity-40`} /></td>
         <td className="px-3 py-2.5">
           <button disabled={inheriting} onClick={() => updateRoomType(rt.id, { salesClosed: !closed })} className="rounded-full px-2 py-0.5 text-[11px] font-semibold disabled:opacity-40" style={{ backgroundColor: `color-mix(in srgb, ${closed ? "var(--err)" : "var(--ok)"} 15%, transparent)`, color: closed ? "var(--err)" : "var(--ok)" }}>{closed ? t("Chiuse") : t("Aperte")}</button>
