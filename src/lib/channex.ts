@@ -72,6 +72,12 @@ export async function listChannels(propertyId: string) {
   return channex<{ data: { id: string; attributes?: { title?: string; channel?: string; status?: string; is_active?: boolean } }[] }>(`/channels?filter[property_id]=${encodeURIComponent(propertyId)}`);
 }
 
+// Attiva/disattiva un canale OTA già collegato. Su Channex `is_active` è READ-ONLY (verificato sulla
+// documentazione ufficiale): si cambia con due endpoint dedicati, non con un PUT sull'attributo.
+export async function setChannelActive(channelId: string, active: boolean) {
+  return channex<Created>(`/channels/${encodeURIComponent(channelId)}/${active ? "activate" : "deactivate"}`, { method: "POST", body: "{}" });
+}
+
 // ── Webhook (ricezione automatica prenotazioni in tempo reale) ──
 // Channex chiama il callback_url a ogni nuova prenotazione/modifica/cancellazione.
 export async function listWebhooks(propertyId: string) {

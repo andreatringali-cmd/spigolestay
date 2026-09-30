@@ -114,24 +114,46 @@ export default function CanaliPage() {
 
   // Stato REALE dei canali OTA (sostituisce il vecchio flag locale mai aggiornato): risponde alla
   // domanda "da dove vedo che sono collegato con Booking.com?" con i dati veri da Channex.
-  const [otaByStructure, setOtaByStructure] = useState<Record<string, { channel: string; title: string; active: boolean }[]> | null>(null);
+  const [otaByStructure, setOtaByStructure] = useState<Record<string, { id: string; channel: string; title: string; active: boolean }[]> | null>(null);
   const [otaOff, setOtaOff] = useState(false);
   const [otaErr, setOtaErr] = useState("");
   const [otaLoading, setOtaLoading] = useState(true);
   const loadOtaStatus = async () => {
     setOtaLoading(true); setOtaErr("");
     try {
-      const j = await apiPost<{ ok: boolean; byStructure?: Record<string, { channel: string; title: string; active: boolean }[]> }>("channex/status", {});
+      const j = await apiPost<{ ok: boolean; byStructure?: Record<string, { id: string; channel: string; title: string; active: boolean }[]> }>("channex/status", {});
       if (!j.ok) { setOtaOff(true); setOtaByStructure(null); } else { setOtaOff(false); setOtaByStructure(j.byStructure ?? {}); }
     } catch (e) { setOtaErr(e instanceof Error ? e.message : "errore di rete"); }
     setOtaLoading(false);
   };
   useEffect(() => { loadOtaStatus(); }, []);
   // "Tutte" raggruppa per struttura; una struttura specifica è un gruppo unico senza etichetta.
-  const otaGroups: { label?: string; list: { channel: string; title: string; active: boolean }[] }[] =
+  const otaGroups: { sid: string; label?: string; list: { id: string; channel: string; title: string; active: boolean }[] }[] =
     effStructure === "all"
-      ? structures.filter((s) => (otaByStructure?.[s.id]?.length ?? 0) > 0).map((s) => ({ label: s.name, list: otaByStructure![s.id] }))
-      : [{ list: otaByStructure?.[effStructure] ?? [] }];
+      ? structures.filter((s) => (otaByStructure?.[s.id]?.length ?? 0) > 0).map((s) => ({ sid: s.id, label: s.name, list: otaByStructure![s.id] }))
+      : [{ sid: effStructure, list: otaByStructure?.[effStructure] ?? [] }];
+  // Attiva/disattiva un canale OTA già collegato, senza lasciare Xenora. Aggiornamento ottimistico
+  // della lista, ripristinato se la chiamata a Channex fallisce.
+  const [togglingChannel, setTogglingChannel] = useState<string | null>(null);
+  const toggleChannel = async (sid: string, c: { id: string; channel: string; title: string; active: boolean }) => {
+    if (c.active) {
+      const label = CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title;
+      const ok = await ask({ message: `${t("Disattivare")} ${label}? ${t("La struttura non riceverà più prenotazioni da questo canale finché non lo riattivi.")}`, danger: true, confirmLabel: t("Disattiva") });
+      if (!ok) return;
+    }
+    setTogglingChannel(c.id);
+    const prev = otaByStructure;
+    setOtaByStructure((cur) => {
+      const next = { ...(cur ?? {}) };
+      next[sid] = (next[sid] ?? []).map((x) => (x.id === c.id ? { ...x, active: !c.active } : x));
+      return next;
+    });
+    try {
+      const j = await apiPost<{ ok: boolean; error?: string }>("channex/channel", { channelId: c.id, active: !c.active });
+      if (!j.ok) setOtaByStructure(prev);
+    } catch { setOtaByStructure(prev); }
+    setTogglingChannel(null);
+  };
   const syncToChannex = async () => {
     const sid = effStructure;
     const st = structures.find((s) => s.id === sid);
@@ -265,9 +287,10 @@ export default function CanaliPage() {
                   {g.label && <div className="mb-1.5 text-xs font-semibold text-dim">{g.label}</div>}
                   <div className="flex flex-wrap gap-2">
                     {g.list.map((c, i) => (
-                      <span key={c.channel + i} className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs font-medium text-txt">
+                      <span key={c.id || c.channel + i} className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs font-medium text-txt">
                         {CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title}
                         <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
+                        {c.id && <button onClick={() => toggleChannel(g.sid, c)} disabled={togglingChannel === c.id} className="rounded-full border border-line px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim hover:bg-wash hover:text-txt disabled:opacity-40">{togglingChannel === c.id ? "…" : c.active ? t("Disattiva") : t("Attiva")}</button>}
                       </span>
                     ))}
                   </div>

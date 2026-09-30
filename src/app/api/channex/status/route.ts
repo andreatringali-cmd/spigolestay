@@ -25,13 +25,14 @@ export async function POST(req: Request) {
   }
   const rows = [...(personalRows ?? []), ...orgRows];
 
-  const byStructure: Record<string, { channel: string; title: string; active: boolean }[]> = {};
+  const byStructure: Record<string, { id: string; channel: string; title: string; active: boolean }[]> = {};
   for (const r of rows) {
     const sid = r.structure_id as string;
     const pid = r.channex_property_id as string;
     if (!sid || !pid) continue;
     const res = await listChannels(pid);
     const list = (res.data?.data ?? []).map((c) => ({
+      id: c.id,
       channel: channelFromOta(c.attributes?.channel),
       title: c.attributes?.title || c.attributes?.channel || "Canale",
       active: c.attributes?.status === "active" || !!c.attributes?.is_active,
