@@ -18,7 +18,7 @@ import {
 import { eur } from "@/lib/format";
 import { apiPost } from "@/lib/invoicing/client";
 import { bookingPaidTotal, commissionOf } from "@/lib/booking";
-import { rateForDay, loadWeekendPct } from "@/lib/pricing";
+import { rateForDay, loadWeekendPct, isWeekendISO } from "@/lib/pricing";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import Icon from "@/components/Icon";
 import ChannelLogo from "@/components/ChannelLogo";
@@ -264,7 +264,7 @@ export default function CalendarGrid() {
   const [selHover, setSelHover] = useState<string | null>(null);
   const [pick, setPick] = useState<null | { unitId: string; structureId: string; roomTypeId: string; from: string; to: string }>(null);
   const [evDraft, setEvDraft] = useState<null | { id?: string; name: string; from: string; to: string; color: string }>(null);
-  const [rateEdit, setRateEdit] = useState<null | { typeId: string; typeIds?: string[]; from: string; to: string; mode: "fixed" | "percent"; value: number }>(null);
+  const [rateEdit, setRateEdit] = useState<null | { typeId: string; typeIds?: string[]; from: string; to: string; mode: "fixed" | "percent"; value: number; weekendBoost: boolean }>(null);
   const [availEdit, setAvailEdit] = useState<null | { typeId: string; from: string; to: string; closed: number; cta: boolean; ctd: boolean }>(null);
   const [availStr, setAvailStr] = useState<string | null>(null); // valore digitato manualmente nel campo camere (null = usa il derivato)
   // Chiusure vendita manuali per (tipologia, giorno): quante camere chiudere. Persistite.
@@ -295,7 +295,7 @@ export default function CalendarGrid() {
     setSel({ kind: "event", anchor: iso }); setSelHover(iso);
   };
   const clickRate = (typeId: string, iso: string, typeIds?: string[]) => {
-    if (sel?.kind === "rate" && sel.typeId === typeId && selLo && selHi) { const members = typeIds ?? [typeId]; setSel(null); setSelHover(null); setRateEdit({ typeId: members[0], typeIds: members, from: selLo, to: selHi, mode: "fixed", value: rateFor(members[0], selLo) }); return; }
+    if (sel?.kind === "rate" && sel.typeId === typeId && selLo && selHi) { const members = typeIds ?? [typeId]; setSel(null); setSelHover(null); setRateEdit({ typeId: members[0], typeIds: members, from: selLo, to: selHi, mode: "fixed", value: rateFor(members[0], selLo), weekendBoost: true }); return; }
     setSel({ kind: "rate", typeId, anchor: iso }); setSelHover(iso);
   };
   const clickAvail = (typeId: string, iso: string) => {
@@ -316,8 +316,13 @@ export default function CalendarGrid() {
     if (!rateEdit) return;
     const targets = rateEdit.typeIds ?? [rateEdit.typeId];
     const map: Record<string, number> = {};
+    const wknd = loadWeekendPct();
     for (const tid of targets) for (const iso of rangeIsos(rateEdit.from, rateEdit.to)) {
-      map[rateKey(tid, iso)] = rateEdit.mode === "fixed" ? Math.max(0, Math.round(rateEdit.value)) : Math.max(0, Math.round(rateFor(tid, iso) * (1 + rateEdit.value / 100)));
+      let v = rateEdit.mode === "fixed" ? Math.max(0, Math.round(rateEdit.value)) : Math.max(0, Math.round(rateFor(tid, iso) * (1 + rateEdit.value / 100)));
+      // Il valore impostato è per i feriali: sui giorni ven/sab/dom si tiene la maggiorazione
+      // weekend anche sopra un prezzo forzato, invece di appiattirla a un'unica tariffa fissa.
+      if (rateEdit.weekendBoost && isWeekendISO(iso)) v = Math.round(v * (1 + wknd / 100));
+      map[rateKey(tid, iso)] = v;
     }
     setDayRates(map);
     setRateEdit(null);
@@ -1615,9 +1620,22 @@ export default function CalendarGrid() {
                 <input type="number" value={rateEdit.value} onChange={(e) => setRateEdit({ ...rateEdit, value: Number(e.target.value) })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
               </label>
 
+              {isos.length > 1 && isos.some(isWeekendISO) && (
+                <label className="mt-3 flex items-start gap-2 text-xs text-dim">
+                  <input type="checkbox" className="mt-0.5" checked={rateEdit.weekendBoost} onChange={(e) => setRateEdit({ ...rateEdit, weekendBoost: e.target.checked })} />
+                  Applica comunque la maggiorazione weekend (+{loadWeekendPct()}%) su ven/sab/dom, invece di appiattirli allo stesso prezzo dei feriali
+                </label>
+              )}
+
               <div className="mt-3 rounded-lg border border-line bg-paper p-3 text-xs text-dim">
                 Applica a <b className="text-txt">{isos.length}</b> {isos.length === 1 ? "giorno" : "giorni"}.
                 {" "}Esempio {parseISO(sample).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}: <span className="font-mono">€{rateFor(rateEdit.typeId, sample)}</span> → <span className="font-mono font-bold text-[color:var(--focus)]">€{preview}</span>
+                {(() => {
+                  const wknd = isos.find(isWeekendISO);
+                  if (!wknd || wknd === sample || !rateEdit.weekendBoost) return null;
+                  const boosted = Math.round(preview * (1 + loadWeekendPct() / 100));
+                  return <> · {parseISO(wknd).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })} (weekend): <span className="font-mono font-bold text-[color:var(--focus)]">€{boosted}</span></>;
+                })()}
               </div>
 
               <div className="mt-4 flex items-center gap-2">
