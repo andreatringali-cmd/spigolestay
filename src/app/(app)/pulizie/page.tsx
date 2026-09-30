@@ -215,6 +215,11 @@ export default function PuliziePage() {
   const scopedStructures = structures.filter((s) =>
     activeStructureId === "all" ? structFilter === "all" || s.id === structFilter : s.id === activeStructureId
   );
+  // L'invio automatico è per singola struttura (destinatari/orario diversi per ciascuna):
+  // serve una struttura sola selezionata, non "tutte le strutture" senza filtro.
+  const autoShareStructure = activeStructureId !== "all"
+    ? structures.find((s) => s.id === activeStructureId)
+    : (structFilter !== "all" ? structures.find((s) => s.id === structFilter) : undefined);
 
   // Colore della tipologia: quello assegnato alla tipologia; in mancanza, una palette di riserva per posizione
   // (calcolato per struttura, come nella pagina Camere — non fa parte della logica condivisa col cron).
@@ -501,12 +506,17 @@ export default function PuliziePage() {
               <button onClick={() => { emailPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><MailIcon size={16} /> Email</button>
               <button onClick={() => { copyPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
               <div className="my-1 border-t border-line" />
-              <button onClick={() => { setAutoOpen(true); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="clock" size={15} /> {t("Invio automatico")}</button>
+              <button
+                onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
+                disabled={!autoShareStructure}
+                title={autoShareStructure ? undefined : t("Seleziona una singola struttura per configurare l'invio automatico")}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+              ><Icon name="clock" size={15} /> {t("Invio automatico")}</button>
             </div>
           </>)}
         </div>
       </div>
-      {autoOpen && <AutoShareSettings onClose={() => setAutoOpen(false)} />}
+      {autoOpen && autoShareStructure && <AutoShareSettings structureId={autoShareStructure.id} structureName={autoShareStructure.name} onClose={() => setAutoOpen(false)} />}
 
       {/* Segnalazioni aperte dalla signora */}
       {openIssues.length > 0 && (

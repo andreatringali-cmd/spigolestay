@@ -6,30 +6,32 @@ import { WhatsAppIcon, MailIcon } from "@/components/BrandIcons";
 import { apiPost } from "@/lib/invoicing/client";
 import { useLang } from "@/lib/i18n";
 
-const KEY = "spigolestay:pulizie:autoshare";
+const KEY_PREFIX = "spigolestay:pulizie:autoshare:";
 export interface AutoShareCfg { enabled: boolean; time: string; email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string }
 const DEFAULT_CFG: AutoShareCfg = { enabled: false, time: "08:00", email: true, emailTo: "", whatsapp: false, whatsappTo: "" };
 
-export function loadAutoShareCfg(): AutoShareCfg {
-  try { const raw = localStorage.getItem(KEY); if (raw) return { ...DEFAULT_CFG, ...JSON.parse(raw) }; } catch {}
+// Una configurazione per struttura (planning e destinatari diversi per ciascuna, es. persone
+// diverse che puliscono Spigolehouse e Spigolerooms) — non un'unica impostazione condivisa.
+export function loadAutoShareCfg(structureId: string): AutoShareCfg {
+  try { const raw = localStorage.getItem(KEY_PREFIX + structureId); if (raw) return { ...DEFAULT_CFG, ...JSON.parse(raw) }; } catch {}
   return DEFAULT_CFG;
 }
 
-export default function AutoShareSettings({ onClose }: { onClose: () => void }) {
+export default function AutoShareSettings({ structureId, structureName, onClose }: { structureId: string; structureName: string; onClose: () => void }) {
   const { t } = useLang();
   const [cfg, setCfg] = useState<AutoShareCfg>(DEFAULT_CFG);
   const [waStatus, setWaStatus] = useState<"checking" | "connected" | "off">("checking");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setCfg(loadAutoShareCfg());
+    setCfg(loadAutoShareCfg(structureId));
     apiPost<{ connected: boolean }>("whatsapp/settings", { action: "status" })
       .then((r) => setWaStatus(r.connected ? "connected" : "off"))
       .catch(() => setWaStatus("off"));
-  }, []);
+  }, [structureId]);
 
   const save = () => {
-    try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch {}
+    try { localStorage.setItem(KEY_PREFIX + structureId, JSON.stringify(cfg)); } catch {}
     setSaved(true);
     window.setTimeout(() => { setSaved(false); onClose(); }, 700);
   };
@@ -41,7 +43,7 @@ export default function AutoShareSettings({ onClose }: { onClose: () => void }) 
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[color:var(--focus)]/10 text-[color:var(--focus)]"><Icon name="clock" size={16} /></span>
           <div>
             <div className="text-sm font-bold text-txt">{t("Invio automatico")}</div>
-            <div className="text-[11px] text-faint">{t("Il planning pulizie di oggi, inviato da solo ogni giorno")}</div>
+            <div className="text-[11px] text-faint">{structureName}</div>
           </div>
         </div>
 
