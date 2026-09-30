@@ -32,11 +32,22 @@ export const effectiveClosed = (rt: RoomType, all: RoomType[]) => resolveInherit
 
 export const isWeekendISO = (iso: string) => isWeekend(parseISO(iso));
 
-// Maggiorazione weekend configurabile (regole prezzo in localStorage). Default 25%.
+// Maggiorazione weekend configurabile (regole prezzo in localStorage). Default 25%, attiva.
+// Se l'interruttore è spento (weekendOn: false), la % effettiva è 0: ogni chiamante la applica
+// già come "prezzo base × (1 + weekendPct/100)", quindi 0 la disattiva ovunque senza dover
+// insegnare a ciascun punto d'uso il concetto di interruttore.
 export function loadWeekendPct(): number {
   if (typeof localStorage === "undefined") return 25;
-  try { const r = localStorage.getItem("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {}
+  try {
+    const r = localStorage.getItem("spigolestay:pricerules");
+    if (r) { const v = JSON.parse(r); if (v.weekendOn === false) return 0; return v.weekendPct ?? 25; }
+  } catch {}
   return 25;
+}
+export function loadWeekendOn(): boolean {
+  if (typeof localStorage === "undefined") return true;
+  try { const r = localStorage.getItem("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendOn !== false; } catch {}
+  return true;
 }
 
 // TARIFFA UNICA per (tipologia, giorno): override calendario (per tipo o per giorno),

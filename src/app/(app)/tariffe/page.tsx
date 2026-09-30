@@ -4,7 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import { useData } from "@/lib/store";
 import { addDays, isWeekend, toISO, weekdayShort } from "@/lib/dates";
 import type { RoomType } from "@/lib/types";
-import { effectiveBase, effectiveMinStay, effectiveClosed } from "@/lib/pricing";
+import { effectiveBase, effectiveMinStay, effectiveClosed, loadWeekendOn } from "@/lib/pricing";
 import { AV_COLORS } from "@/lib/users";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
@@ -43,6 +43,7 @@ export default function TariffePage() {
   const { t } = useLang();
   const [plans, setPlans] = useState<RatePlan[]>(DEFAULT_PLANS);
   const [weekendPct, setWeekendPct] = useState(25);
+  const [weekendOn, setWeekendOnState] = useState(true);
   const [planId, setPlanId] = useState("flex");
   const [openMasters, setOpenMasters] = useState<Set<string>>(new Set()); // vuoto = derivate chiuse (a tendina)
   const toggleMaster = (id: string) => setOpenMasters((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -53,9 +54,11 @@ export default function TariffePage() {
       setPlans(arr);
       setPlanId((prev) => (arr.some((x) => x.id === prev) ? prev : arr[0]?.id ?? prev));
       const r = localStorage.getItem(RULES_KEY); if (r) setWeekendPct(JSON.parse(r).weekendPct ?? 25);
+      setWeekendOnState(loadWeekendOn());
     } catch {}
   }, []);
-  const saveWeekend = (v: number) => { setWeekendPct(v); try { localStorage.setItem(RULES_KEY, JSON.stringify({ weekendPct: v })); } catch {} };
+  const saveWeekend = (v: number) => { setWeekendPct(v); try { localStorage.setItem(RULES_KEY, JSON.stringify({ weekendPct: v, weekendOn })); } catch {} };
+  const setWeekendOn = (on: boolean) => { setWeekendOnState(on); try { localStorage.setItem(RULES_KEY, JSON.stringify({ weekendPct, weekendOn: on })); } catch {} };
 
   const start = new Date();
   const s = new Date(start.getFullYear(), start.getMonth(), start.getDate());
@@ -67,7 +70,7 @@ export default function TariffePage() {
   const dayPrice = (rt: RoomType, d: Date) => {
     const iso = toISO(d);
     const base = effectiveBase(rt, roomTypes);
-    const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(base * (isWeekend(d) ? 1 + weekendPct / 100 : 1));
+    const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(base * (isWeekend(d) && weekendOn ? 1 + weekendPct / 100 : 1));
     return Math.max(0, Math.round(raw * (1 + (activePlan?.adjPct ?? 0) / 100)));
   };
 
@@ -167,7 +170,7 @@ export default function TariffePage() {
           return (
             <td key={iso} className="px-2 py-2.5 text-center group-hover:bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
               {forced != null
-                ? <span className="inline-block rounded px-1.5 py-0.5 font-mono text-sm font-bold tabular-nums" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }} title={t("Tariffa forzata dal calendario")}>{dayPrice(rt, d)}</span>
+                ? <span className="font-mono text-sm font-bold tabular-nums text-txt" title={t("Tariffa forzata dal calendario")}>{dayPrice(rt, d)}<sup className="ml-0.5 text-[9px] font-bold not-italic" style={{ color: "var(--focus)" }}>€</sup></span>
                 : <span className="font-mono text-sm tabular-nums text-txt">{dayPrice(rt, d)}</span>}
             </td>
           );
@@ -267,9 +270,12 @@ export default function TariffePage() {
 
         {/* Regola weekend */}
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-sm shadow-sm">
-          <span className="font-semibold text-txt">📅 {t("Maggiorazione weekend")}</span>
-          <span className="flex items-center gap-1"><input type="number" value={weekendPct} onFocus={(e) => e.currentTarget.select()} onChange={(e) => saveWeekend(Number(e.target.value))} className={`${inp} w-20`} /><span className="text-dim">%</span></span>
-          <span className="text-xs text-faint">{t("su ven/sab/dom, se non c'è un prezzo forzato dal calendario")}</span>
+          <button type="button" onClick={() => setWeekendOn(!weekendOn)} aria-pressed={weekendOn} title={weekendOn ? t("Disattiva la maggiorazione weekend") : t("Attiva la maggiorazione weekend")} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: weekendOn ? "var(--ok)" : "var(--line)" }}>
+            <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: weekendOn ? "22px" : "2px" }} />
+          </button>
+          <span className={`font-semibold ${weekendOn ? "text-txt" : "text-faint"}`}>📅 {t("Maggiorazione weekend")}</span>
+          <span className="flex items-center gap-1"><input type="number" value={weekendPct} disabled={!weekendOn} onFocus={(e) => e.currentTarget.select()} onChange={(e) => saveWeekend(Number(e.target.value))} className={`${inp} w-20 disabled:opacity-40`} /><span className="text-dim">%</span></span>
+          <span className="text-xs text-faint">{weekendOn ? t("su ven/sab/dom, se non c'è un prezzo forzato dal calendario") : t("spenta: nessuna maggiorazione applicata nel weekend")}</span>
         </div>
       </section>
 
