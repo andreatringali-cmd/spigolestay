@@ -101,7 +101,7 @@ export default function TariffePage() {
     const closed = inheriting ? effectiveClosed(rt, roomTypes) : !!rt.salesClosed;
     return (
       <tr key={rt.id} className={`border-b border-line last:border-0 hover:bg-wash ${derived ? "bg-[color:color-mix(in_srgb,var(--focus)_4%,transparent)]" : ""}`}>
-        <td className="px-3 py-3">
+        <td className="px-3 py-2.5">
           <div className={derived ? "pl-7" : ""}>
             <div className="flex flex-wrap items-center gap-1.5">
               {!derived && (kids.length > 0
@@ -116,22 +116,22 @@ export default function TariffePage() {
             </div>
           </div>
         </td>
-        <td className="px-3 py-3">
+        <td className="px-3 py-2.5">
           {!derived
             ? <label className="flex items-center gap-1 text-xs text-dim">€<input type="number" min={0} value={rt.basePrice} onFocus={(e) => e.currentTarget.select()} onChange={(e) => { const v = e.target.value; updateRoomType(rt.id, { basePrice: v === "" ? 0 : Math.max(0, Number(v)) }); }} className={`${inp} w-24`} /></label>
             : <span className="text-xs text-faint">{t("da")} {srcName}</span>}
         </td>
-        <td className="px-3 py-3 text-center">
+        <td className="px-3 py-2.5 text-center">
           {!derived
             ? <input type="number" min={1} value={occ} onFocus={(e) => e.currentTarget.select()} onChange={(e) => updateRoomType(rt.id, { maxOccupancy: Math.max(1, Number(e.target.value)) })} className={`${inp} w-14 py-1 text-center`} />
             : <span className="text-xs text-faint" title={t("Stessa camera della madre: l'occupazione segue sempre la sua")}>{occ} <span className="text-faint">({t("da madre")})</span></span>}
         </td>
-        <td className="px-3 py-3 text-center"><input type="number" min={0} disabled={inheriting} value={minS} onFocus={(e) => e.currentTarget.select()} onChange={(e) => updateRoomType(rt.id, { minStay: Math.max(0, Number(e.target.value)) })} className={`${inp} w-14 py-1 text-center disabled:opacity-40`} /></td>
-        <td className="px-3 py-3">
+        <td className="px-3 py-2.5 text-center"><input type="number" min={0} disabled={inheriting} value={minS} onFocus={(e) => e.currentTarget.select()} onChange={(e) => updateRoomType(rt.id, { minStay: Math.max(0, Number(e.target.value)) })} className={`${inp} w-14 py-1 text-center disabled:opacity-40`} /></td>
+        <td className="px-3 py-2.5">
           <button disabled={inheriting} onClick={() => updateRoomType(rt.id, { salesClosed: !closed })} className="rounded-full px-2 py-0.5 text-[11px] font-semibold disabled:opacity-40" style={{ backgroundColor: `color-mix(in srgb, ${closed ? "var(--err)" : "var(--ok)"} 15%, transparent)`, color: closed ? "var(--err)" : "var(--ok)" }}>{closed ? t("Chiuse") : t("Aperte")}</button>
           {inheriting && <span className="ml-1 text-xs text-faint">{t("da madre")}</span>}
         </td>
-        <td className="px-3 py-3 text-right"><span className="font-mono text-base font-bold text-txt">{eur(eff)}</span><span className="text-[10px] text-faint">/{t("notte")}</span></td>
+        <td className="px-3 py-2.5 text-right"><span className="font-mono text-base font-bold text-txt">{eur(eff)}</span><span className="text-[10px] text-faint">/{t("notte")}</span></td>
       </tr>
     );
   };
@@ -145,7 +145,7 @@ export default function TariffePage() {
     const isOpen = openMasters.has(rt.id);
     return (
       <tr key={rt.id} className="group border-b border-line last:border-0">
-        <td className="sticky left-0 z-10 bg-surface px-3 py-3 group-hover:bg-wash">
+        <td className="sticky left-0 z-10 bg-surface px-3 py-2.5 group-hover:bg-wash">
           <div className={`flex items-center gap-2 ${derived ? "pl-6" : ""}`}>
             {!derived && (kids.length > 0
               ? <button onClick={() => toggleMaster(rt.id)} title={isOpen ? t("Comprimi") : t("Espandi")} className="shrink-0"><Chevron open={isOpen} /></button>
@@ -165,7 +165,7 @@ export default function TariffePage() {
           const isToday = iso === toISO(s);
           const we = isWeekend(d);
           return (
-            <td key={iso} className="px-2 py-3 text-center group-hover:bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
+            <td key={iso} className="px-2 py-2.5 text-center group-hover:bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
               {forced != null
                 ? <span className="inline-block rounded px-1.5 py-0.5 font-mono text-sm font-bold tabular-nums" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }} title={t("Tariffa forzata dal calendario")}>{dayPrice(rt, d)}</span>
                 : <span className="font-mono text-sm tabular-nums text-txt">{dayPrice(rt, d)}</span>}
@@ -191,7 +191,7 @@ export default function TariffePage() {
 
       {/* Come nasce il prezzo — catena essenziale, un colore diverso per passaggio invece di
           quattro pillole grigie identiche: si legge come un percorso, non come un elenco piatto. */}
-      <div className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border border-line bg-surface px-4 py-3.5 text-sm shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-xs shadow-sm">
         <span className="mr-1 font-semibold uppercase tracking-wide text-faint">{t("Come nasce il prezzo")}</span>
         {([
           [t("Prezzo base"), "#5B74E6"],
@@ -199,8 +199,8 @@ export default function TariffePage() {
           [t("Prezzo del giorno"), "#4F8A5B"],
           [t("Piano tariffario"), "#B3453A"],
         ] as const).map(([h, col], i, arr) => (
-          <span key={h} className="flex items-center gap-2">
-            <span className="rounded-full px-3 py-1.5 font-semibold text-white shadow-sm" style={{ backgroundColor: col }}>{h}</span>
+          <span key={h} className="flex items-center gap-1.5">
+            <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-white" style={{ backgroundColor: col }}>{h}</span>
             {i < arr.length - 1 && <span className="text-faint">→</span>}
           </span>
         ))}
@@ -208,7 +208,7 @@ export default function TariffePage() {
 
       {/* Prezzi base — un box per struttura quando la vista è "tutte le strutture", una tabella
           sola quando ne è selezionata una: evita di dover leggere l'etichetta struttura riga per riga. */}
-      <section className="mb-8">
+      <section className="mb-6">
         <SectionTitle>{t("Prezzi base")}</SectionTitle>
 
         {(() => {
@@ -226,12 +226,12 @@ export default function TariffePage() {
                   </colgroup>
                   <thead>
                     <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
-                      <th className="px-3 py-3 font-semibold">{t("Tipologia")}</th>
-                      <th className="px-3 py-3 font-semibold">{t("Prezzo base")}</th>
-                      <th className="px-3 py-3 text-center font-semibold">{t("Ospiti")}</th>
-                      <th className="px-3 py-3 text-center font-semibold">{t("Notti min.")}</th>
-                      <th className="px-3 py-3 font-semibold">{t("Vendite")}</th>
-                      <th className="px-3 py-3 text-right font-semibold">{t("Effettivo")}</th>
+                      <th className="px-3 py-2.5 font-semibold">{t("Tipologia")}</th>
+                      <th className="px-3 py-2.5 font-semibold">{t("Prezzo base")}</th>
+                      <th className="px-3 py-2.5 text-center font-semibold">{t("Ospiti")}</th>
+                      <th className="px-3 py-2.5 text-center font-semibold">{t("Notti min.")}</th>
+                      <th className="px-3 py-2.5 font-semibold">{t("Vendite")}</th>
+                      <th className="px-3 py-2.5 text-right font-semibold">{t("Effettivo")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -266,7 +266,7 @@ export default function TariffePage() {
         })()}
 
         {/* Regola weekend */}
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-4 py-3 text-sm shadow-sm">
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-sm shadow-sm">
           <span className="font-semibold text-txt">📅 {t("Maggiorazione weekend")}</span>
           <span className="flex items-center gap-1"><input type="number" value={weekendPct} onFocus={(e) => e.currentTarget.select()} onChange={(e) => saveWeekend(Number(e.target.value))} className={`${inp} w-20`} /><span className="text-dim">%</span></span>
           <span className="text-xs text-faint">{t("su ven/sab/dom, se non c'è un prezzo forzato dal calendario")}</span>
@@ -277,7 +277,7 @@ export default function TariffePage() {
       <section>
         <SectionTitle>{t("Anteprima prezzi")}</SectionTitle>
         {/* Legenda + azioni: tutto in un'unica riga */}
-        <div className="mb-3 mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-3 text-xs shadow-sm">
+        <div className="mb-2.5 mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs shadow-sm">
           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded border border-line bg-wash" /> {t("weekend")}</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 22%, transparent)" }} /> {t("oggi")}</span>
           <span className="flex items-center gap-1.5"><span className="rounded px-1 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>€</span> {t("prezzo forzato dal calendario")}</span>
