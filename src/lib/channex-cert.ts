@@ -22,6 +22,8 @@ import {
   pushRestrictions,
   ackBookingRevision,
   listBookingRevisions,
+  listWebhooks,
+  createWebhook,
   type AvailValue,
   type RestrictionRow,
   type ChannexResult,
@@ -156,6 +158,7 @@ export interface TestPropertySetup {
   doubleRoomTitle: string;
   doubleBarId: string | null;  // rate plan "Best Available Rate" della Double Room
   doubleBbId: string | null;   // rate plan "Bed & Breakfast Rate" della Double Room
+  webhookActive: boolean;      // true se il webhook di ricezione prenotazioni è registrato su questa property
   errors: string[];
 }
 
@@ -182,6 +185,7 @@ export async function setupTestProperty(): Promise<TestPropertySetup> {
     doubleRoomTitle: TEST_DOUBLE_TITLE,
     doubleBarId: null,
     doubleBbId: null,
+    webhookActive: false,
     errors,
   };
 
@@ -207,6 +211,27 @@ export async function setupTestProperty(): Promise<TestPropertySetup> {
     out.propertyId = pid;
   }
   const propertyId = out.propertyId;
+
+  // 1b) WEBHOOK — la property di test è separata dalla struttura reale, quindi NON è coperta
+  // dal webhook-setup del tenant (che registra solo le property in channex_map). Senza questo,
+  // Channex non ha nessun URL da chiamare per le prenotazioni sulla property di test: le uniche
+  // ACK arriverebbero dal cron/lista, che la certificazione boccia ("received_via_list").
+  // Idempotente: se il webhook per questo callback esiste già, non lo ricrea.
+  if (propertyId) {
+    try {
+      const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://xenora.it"}/api/channex/webhook`;
+      const existing = await listWebhooks(propertyId);
+      const hooks = existing.data?.data ?? [];
+      const already = hooks.some((h) => (h.attributes?.callback_url || "").replace(/\/$/, "") === callbackUrl.replace(/\/$/, ""));
+      if (already) {
+        out.webhookActive = true;
+      } else {
+        const created = await createWebhook(propertyId, callbackUrl);
+        out.webhookActive = created.ok;
+        if (!created.ok) errors.push(`Registrazione webhook fallita: ${created.error ?? created.status}`);
+      }
+    } catch (e) { errors.push(`Registrazione webhook fallita: ${(e as Error)?.message}`); }
+  }
 
   // 2) ROOM TYPE — Twin (count 8) e Double (count 1), occupancy adulti 2.
   //    Riusa quelli già presenti (match per title), crea solo i mancanti.

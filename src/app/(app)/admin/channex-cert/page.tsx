@@ -31,6 +31,7 @@ interface TestPropertySetup {
   doubleRoomTitle: string;
   doubleBarId: string | null;
   doubleBbId: string | null;
+  webhookActive: boolean;
   errors: string[];
 }
 
@@ -337,6 +338,11 @@ export default function ChannexCertPage() {
               </span>
               {setup.reused && <span className="text-[11px] text-faint">property esistente riusata</span>}
               <span className="text-[11px] text-faint">{setup.propertyTitle} · currency USD</span>
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={setup.webhookActive
+                ? { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }
+                : { backgroundColor: "color-mix(in srgb, var(--err) 16%, transparent)", color: "var(--err)" }}>
+                {setup.webhookActive ? "Webhook attivo" : "Webhook NON registrato"}
+              </span>
             </div>
 
             <div className="space-y-2">
