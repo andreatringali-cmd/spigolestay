@@ -128,6 +128,31 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const msgs = sel ? threads[sel] ?? [] : [];
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [sel, msgs.length]);
 
+  // Prenotazione arrivata da Booking.com/Airbnb/Expedia via Channex → id Channex per la chat
+  // unificata (SPERIMENTALE, vedi src/lib/channex.ts). extId è "channex:<booking_id>".
+  const chxExtId = current?.b?.extId;
+  const chxBookingId = chxExtId?.startsWith("channex:") ? chxExtId.slice("channex:".length) : undefined;
+  // Alla apertura della chat, importa i messaggi dell'ospite arrivati su Booking.com/Airbnb/Expedia
+  // (solo "guest": i nostri "property" sono già loggati localmente quando li inviamo). Fallisce in
+  // silenzio (es. Messages App non installata su Channex): non è un invio, solo lettura in background.
+  useEffect(() => {
+    if (!chxBookingId || !sel) return;
+    const gid = sel;
+    apiPost<{ ok: boolean; messages?: { id: string; message?: string; sender?: string }[] }>("channex/messages", { action: "list", bookingId: chxBookingId })
+      .then((r) => {
+        if (!r.ok || !r.messages) return;
+        const seenKey = `spigolestay:chxseen:${chxBookingId}`;
+        let seen: string[] = []; try { seen = JSON.parse(localStorage.getItem(seenKey) || "[]"); } catch {}
+        const seenSet = new Set(seen);
+        const nuovi = r.messages.filter((m) => m.sender === "guest" && m.id && !seenSet.has(m.id) && (m.message || "").trim());
+        if (nuovi.length) {
+          nuovi.forEach((m) => addTo(gid, "in", m.message || "", "Booking.com"));
+          try { localStorage.setItem(seenKey, JSON.stringify([...seen, ...nuovi.map((m) => m.id)].slice(-300))); } catch {}
+        }
+      })
+      .catch(() => {});
+  }, [chxBookingId, sel]);
+
   const addTo = (gid: string, dir: "out" | "in", text: string, via?: string) => { if (!text.trim()) return; setThreads((tt) => ({ ...tt, [gid]: [...(tt[gid] ?? []), { id: uid(), dir, text: text.trim(), ts: Date.now(), via }] })); playSound(dir === "out" ? "sent" : "received"); };
   const add = (dir: "out" | "in", text: string, via?: string) => { if (sel) addTo(sel, dir, text, via); };
 
@@ -169,6 +194,16 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     } catch { window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(t("Messaggio"))}&body=${encodeURIComponent(text)}`, "_blank"); }
   };
   const logIn = () => { const text = draft.trim() || window.prompt(t("Testo della risposta ricevuta dall'ospite:")) || ""; if (text.trim()) { add("in", text, "manuale"); setDraft(""); } };
+
+  // Invio SPERIMENTALE nel thread Booking.com/Airbnb/Expedia via Channex (Messages API).
+  // Richiede la Messages App attiva su Channex per la property: se non lo è, l'invio fallisce
+  // e lo segnaliamo con un alert — il testo resta in chat locale ma va verificato su Booking.com.
+  const sendChx = async () => {
+    if (!draft.trim() || !chxBookingId) return;
+    const text = draft; add("out", text, "Booking.com"); setDraft("");
+    try { await apiPost<{ ok: boolean }>("channex/messages", { action: "send", bookingId: chxBookingId, text }); }
+    catch (e) { window.alert(t("Non risulta inviato su Booking.com: ") + (e instanceof Error ? e.message : "errore") + ". " + t("Il messaggio resta qui in chat ma potrebbe NON essere arrivato all'ospite.")); }
+  };
 
   // Chiede a Claude una BOZZA di risposta nella lingua dell'ospite, basata sul thread + prenotazione.
   // La bozza precompila il campo risposta: l'operatore la modifica e invia col flusso esistente.
@@ -534,6 +569,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <button onClick={sendWa} disabled={!draft.trim()} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</button>
                   <button onClick={sendMail} disabled={!draft.trim() || !current.email} className="inline-flex items-center gap-1.5 rounded-full bg-focus px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40">✉ Email</button>
+                  {chxBookingId && <button onClick={sendChx} disabled={!draft.trim()} title={t("Sperimentale: invia nel thread messaggi di Booking.com/Airbnb/Expedia (Channex) — verifica il primo invio")} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#003580" }}>🏨 Booking.com <span className="text-[9px] font-normal opacity-75">beta</span></button>}
                   <button onClick={logIn} className="ml-auto rounded-full border border-line px-3 py-1.5 text-sm font-medium text-dim transition hover:bg-wash hover:text-txt" title={t("Registra una risposta arrivata dall'ospite")}>＋ {t("Risposta ricevuta")}</button>
                 </div>
               </div>

@@ -261,6 +261,30 @@ export async function listBookingRevisions(opts: { propertyId?: string; bookingI
   return { ok: true as const, status: res.status, rows };
 }
 
+// ── Messaggi ospite (Messages API: chat unificata Booking.com/Airbnb/Expedia) ──
+// Richiede che l'app "Messages" sia installata sulla property in Channex (dashboard →
+// Applications): senza, le chiamate rispondono 403. Non copre Expedia via EPS/Affiliate.
+// Si lavora per BOOKING (non per property/thread): usa l'id prenotazione Channex, lo
+// stesso salvato in extId (`channex:<booking_id>`) dalle prenotazioni importate.
+export interface ChxMessage { id: string; message?: string; sender?: "guest" | "property"; attachments?: string[]; inserted_at?: string }
+function flattenMessage(row: unknown): ChxMessage {
+  const r = row as { id?: string; attributes?: Record<string, unknown> } & Record<string, unknown>;
+  const a = (r.attributes ?? r) as Record<string, unknown>;
+  return { id: String(r.id ?? a.id ?? ""), ...(a as object) } as ChxMessage;
+}
+export async function listBookingMessages(channexBookingId: string) {
+  const res = await channex<{ data?: unknown[] }>(`/bookings/${encodeURIComponent(channexBookingId)}/messages`);
+  if (!res.ok) return { ok: false as const, status: res.status, error: res.error, messages: [] as ChxMessage[] };
+  const list = Array.isArray(res.data?.data) ? res.data!.data! : [];
+  return { ok: true as const, status: res.status, messages: list.map(flattenMessage) };
+}
+export async function sendBookingMessage(channexBookingId: string, text: string) {
+  return channex<{ data?: unknown }>(`/bookings/${encodeURIComponent(channexBookingId)}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ message: { message: text } }),
+  });
+}
+
 // ── Collegamento canali OTA (self-service) ──
 // Channex espone un "one-time token" da scambiare per aprire, in un iframe, la SUA interfaccia di
 // collegamento/mappatura canali (Booking.com, Airbnb, Expedia, ...): è l'unico modo per collegare
