@@ -1322,7 +1322,7 @@ export default function CalendarGrid() {
             <div className="relative" style={{ width: gridW, height: OCC_H + 14 }}>
               {/* Linea "oggi": solo sull'area del grafico, sotto la riga dei giorni (non sopra). */}
               {todayIdx >= 0 && (
-                <div className="pointer-events-none absolute inset-y-0 z-20" style={{ left: todayIdx * cellW, borderLeft: "2px solid var(--focus)" }} />
+                <div className="pointer-events-none absolute inset-y-0 z-20" style={{ left: todayIdx * cellW, borderLeft: "1px solid var(--focus)" }} />
               )}
               <svg width={gridW} height={OCC_H + 14} className="block" preserveAspectRatio="none">
                 <defs>
