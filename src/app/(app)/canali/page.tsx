@@ -10,6 +10,7 @@ import IcalSyncPanel from "@/components/IcalSyncPanel";
 import { apiPost } from "@/lib/invoicing/client";
 import { forceFullSync } from "@/components/ChannexAutoSync";
 import { CHANNELS } from "@/lib/types";
+import ChannelLogo from "@/components/ChannelLogo";
 
 interface LogEntry { id: string; ts: number; text: string; color: string }
 
@@ -186,6 +187,9 @@ export default function CanaliPage() {
     } catch (e) { setCorrMsg((cur) => ({ ...cur, [channelId]: { text: e instanceof Error ? e.message : "errore di rete", ok: false } })); }
     setCorrSaving(null);
   };
+  // Card "essenziali" (logo + nome + stato) nella lista canali: il dettaglio (attiva/disattiva,
+  // correzione prezzo) si apre al click, invece di stare tutto incollato nella card.
+  const [channelDetail, setChannelDetail] = useState<{ sid: string; c: { id: string; channel: string; title: string; active: boolean } } | null>(null);
 
   const syncToChannex = async () => {
     const sid = effStructure;
@@ -307,9 +311,6 @@ export default function CanaliPage() {
             <SectionTitle>{t("Canali OTA collegati")}</SectionTitle>
             <button onClick={loadOtaStatus} disabled={otaLoading} className="text-xs font-medium text-dim hover:text-txt disabled:opacity-40">{otaLoading ? t("Verifico…") : "⟳ " + t("Aggiorna")}</button>
           </div>
-          {!otaGroups.every((g) => g.list.length === 0) && (
-            <p className="mb-3 text-[11px] text-faint">{t("Correzione prezzo (rispetto al prezzo Xenora): si somma sopra eventuali promozioni attive su Booking.com stesso (Genius, offerte a tempo, ecc.) — non le sostituisce.")}</p>
-          )}
           {otaErr ? (
             <p className="text-sm" style={{ color: "var(--err)" }}>⚠ {otaErr}</p>
           ) : otaLoading && !otaByStructure ? (
@@ -317,38 +318,23 @@ export default function CanaliPage() {
           ) : otaGroups.every((g) => g.list.length === 0) ? (
             <p className="text-sm text-faint">{t("Nessun canale OTA collegato.")}</p>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               {otaGroups.filter((g) => g.list.length > 0).map((g, gi) => (
                 <div key={g.label ?? gi}>
-                  {g.label && <div className="mb-1.5 text-xs font-semibold text-dim">{g.label}</div>}
-                  <div className="flex flex-wrap gap-2">
-                    {g.list.map((c, i) => {
-                      const draft = c.id ? priceCorr[c.id] : undefined;
-                      const current = draft?.loaded && draft.value ? `${CORR_SIGN[draft.rule]}${draft.value}%` : t("nessuna");
-                      const msg = c.id ? corrMsg[c.id] : undefined;
-                      return (
-                        <div key={c.id || c.channel + i} className="flex flex-col gap-1.5 rounded-xl border border-line px-2.5 py-1.5">
-                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-txt">
-                            {CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title}
-                            <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
-                            {c.id && <button onClick={() => toggleChannel(g.sid, c)} disabled={togglingChannel === c.id} className="rounded-full border border-line px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim hover:bg-wash hover:text-txt disabled:opacity-40">{togglingChannel === c.id ? "…" : c.active ? t("Disattiva") : t("Attiva")}</button>}
-                          </span>
-                          {c.id && (
-                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-dim">
-                              <span>{t("Correzione prezzo")}: <b className="text-txt">{current}</b></span>
-                              <select value={draft?.rule ?? "increase_by_percent"} onChange={(e) => setPriceCorr((cur) => ({ ...cur, [c.id]: { rule: e.target.value as "increase_by_percent" | "decrease_by_percent", value: cur[c.id]?.value ?? "", loaded: true } }))} className="rounded border border-line bg-surface px-1 py-0.5 text-[11px] text-txt outline-none focus:border-focus">
-                                <option value="increase_by_percent">+</option>
-                                <option value="decrease_by_percent">−</option>
-                              </select>
-                              <input type="number" min={0} step="0.01" value={draft?.value ?? ""} onChange={(e) => setPriceCorr((cur) => ({ ...cur, [c.id]: { rule: cur[c.id]?.rule ?? "increase_by_percent", value: e.target.value, loaded: true } }))} placeholder="0" className="w-16 rounded border border-line bg-surface px-1.5 py-0.5 text-[11px] text-txt outline-none focus:border-focus" />
-                              <span>%</span>
-                              <button onClick={() => saveCorr(c.id)} disabled={corrSaving === c.id} className="rounded-full border border-line px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim hover:bg-wash hover:text-txt disabled:opacity-40">{corrSaving === c.id ? "…" : t("Salva")}</button>
-                              {msg && <span className="font-semibold" style={{ color: msg.ok === false ? "var(--err)" : msg.ok ? "var(--ok)" : "var(--dim)" }}>{msg.text}</span>}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                  {g.label && <div className="mb-2 text-xs font-semibold text-dim">{g.label}</div>}
+                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+                    {g.list.map((c, i) => (
+                      <button
+                        key={c.id || c.channel + i}
+                        onClick={() => setChannelDetail({ sid: g.sid, c })}
+                        className="flex flex-col items-center gap-2 rounded-xl border bg-surface px-3 py-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                        style={{ borderColor: c.active ? "color-mix(in srgb, var(--ok) 45%, var(--line))" : "color-mix(in srgb, var(--err) 40%, var(--line))" }}
+                      >
+                        <ChannelLogo channel={c.channel as keyof typeof CHANNELS} size={32} title={CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title} />
+                        <span className="text-xs font-semibold text-txt">{CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title}</span>
+                        <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -356,6 +342,54 @@ export default function CanaliPage() {
           )}
         </Card>
       )}
+
+      {/* Dettaglio canale: attiva/disattiva + correzione prezzo — Xenora scrive direttamente su
+         Channex (nessun passaggio manuale sul pannello Channex). */}
+      {channelDetail && (() => {
+        const { sid, c } = channelDetail;
+        const draft = c.id ? priceCorr[c.id] : undefined;
+        const current = draft?.loaded && draft.value ? `${CORR_SIGN[draft.rule]}${draft.value}%` : t("nessuna");
+        const msg = c.id ? corrMsg[c.id] : undefined;
+        const label = CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setChannelDetail(null); }}>
+            <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-xl">
+              <div className="mb-4 flex items-center gap-3">
+                <ChannelLogo channel={c.channel as keyof typeof CHANNELS} size={32} title={label} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-txt">{label}</div>
+                  <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
+                </div>
+                <button onClick={() => setChannelDetail(null)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt">✕</button>
+              </div>
+
+              {c.id && (
+                <button onClick={() => toggleChannel(sid, c)} disabled={togglingChannel === c.id} className="mb-4 w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">
+                  {togglingChannel === c.id ? "…" : c.active ? t("Disattiva canale") : t("Attiva canale")}
+                </button>
+              )}
+
+              {c.id && (
+                <div className="rounded-xl border border-line bg-paper p-3">
+                  <div className="mb-1.5 text-xs font-semibold text-txt">{t("Correzione prezzo")}</div>
+                  <p className="mb-2.5 text-[11px] text-faint">{t("Rispetto al prezzo Xenora: si somma sopra eventuali promozioni attive sul canale stesso (Genius, offerte a tempo, ecc.) — non le sostituisce.")}</p>
+                  <div className="mb-2 text-[11px] text-dim">{t("Attuale")}: <b className="text-txt">{current}</b></div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <select value={draft?.rule ?? "increase_by_percent"} onChange={(e) => setPriceCorr((cur) => ({ ...cur, [c.id]: { rule: e.target.value as "increase_by_percent" | "decrease_by_percent", value: cur[c.id]?.value ?? "", loaded: true } }))} className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
+                      <option value="increase_by_percent">+</option>
+                      <option value="decrease_by_percent">−</option>
+                    </select>
+                    <input type="number" min={0} step="0.01" value={draft?.value ?? ""} onChange={(e) => setPriceCorr((cur) => ({ ...cur, [c.id]: { rule: cur[c.id]?.rule ?? "increase_by_percent", value: e.target.value, loaded: true } }))} placeholder="0" className="w-20 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+                    <span className="text-sm text-dim">%</span>
+                    <button onClick={() => saveCorr(c.id)} disabled={corrSaving === c.id} className="ml-auto rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>{corrSaving === c.id ? "…" : t("Salva")}</button>
+                  </div>
+                  {msg && <div className="mt-2 text-xs font-semibold" style={{ color: msg.ok === false ? "var(--err)" : msg.ok ? "var(--ok)" : "var(--dim)" }}>{msg.text}</div>}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Pannello "Collega un canale": incorpora l'interfaccia di collegamento OTA (Booking.com,
          Airbnb, Expedia, ...) DENTRO Xenora, dentro la nostra intestazione — niente rimando a un

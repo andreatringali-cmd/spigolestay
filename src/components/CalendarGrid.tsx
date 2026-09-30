@@ -167,18 +167,20 @@ export default function CalendarGrid() {
   // Ultimo aggiornamento + stato connessione dei canali OTA (per legenda e spunte).
   const [lastRun, setLastRun] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
-  const [connMap, setConnMap] = useState<Record<string, boolean>>({ booking: true, airbnb: true });
+  // I canali REALMENTE aggiunti su Channex (chiave = channel normalizzato Xenora, valore = attivo
+  // o no) — usato per la legenda, che deve mostrare solo le OTA collegate al channel manager, non
+  // l'elenco completo di CHANNELS.
+  const [realChannels, setRealChannels] = useState<Record<string, boolean>>({});
   useEffect(() => {
     try {
       const raw = localStorage.getItem("spigolestay:canali:conn");
       const conn: Record<string, { connected?: boolean; lastSync?: string }> = raw ? JSON.parse(raw) : {};
-      if (raw) { const m: Record<string, boolean> = {}; Object.entries(conn).forEach(([k, v]) => { m[k] = !!v?.connected; }); setConnMap(m); }
       const syncs = Object.values(conn).map((c) => c?.lastSync).filter(Boolean).map((s) => new Date(s as string).getTime());
       const ts = syncs.length ? Math.max(...syncs) : Date.now();
       setLastRun(new Date(ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }));
     } catch {}
   }, []);
-  // Stato REALE da Channex (sovrascrive il flag locale sopra, ma solo per i canali che risponde davvero).
+  // Stato REALE da Channex: unica fonte per la legenda (niente più flag locale finto).
   useEffect(() => {
     (async () => {
       try {
@@ -187,7 +189,7 @@ export default function CalendarGrid() {
         const lists = activeStructureId === "all" ? Object.values(res.byStructure) : [res.byStructure[activeStructureId] ?? []];
         const real: Record<string, boolean> = {};
         lists.flat().forEach((c) => { real[c.channel] = !!real[c.channel] || c.active; });
-        if (Object.keys(real).length) setConnMap((prev) => ({ ...prev, ...real }));
+        if (Object.keys(real).length) setRealChannels(real);
       } catch {}
     })();
   }, [activeStructureId]);
@@ -213,9 +215,6 @@ export default function CalendarGrid() {
     setLastRun(new Date(now).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }));
     setSyncing(false);
   };
-  // true = collegato, false = non collegato, null = non applicabile (Diretta/Bloccato).
-  const chConnected = (c: string): boolean | null =>
-    c === "direct" ? null : c === "blocked" ? null : c === "expedia" ? (!!connMap.expedia || !!connMap.vrbo) : !!connMap[c];
   // Insights: simulatore what-if (± prezzo).
   const [whatIf, setWhatIf] = useState(0);
   // Selettore card Insights (mostra/nascondi, persistito) — all'apertura tutte nascoste, come Dashboard/Prenotazioni.
@@ -1012,15 +1011,14 @@ export default function CalendarGrid() {
         </div>
       </div>
 
-      {/* Legenda OTA — sopra la riga filtri (invertita) · ✓ = collegato, sfumato = non collegato */}
+      {/* Legenda OTA — solo i canali aggiunti su Channex; contorno verde = collegato, rosso = non collegato */}
       <div className="order-[-1] flex flex-wrap items-center gap-x-2.5 gap-y-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        {(Object.keys(CHANNELS) as (keyof typeof CHANNELS)[]).filter((c) => c !== "blocked").map((c) => {
-          const conn = chConnected(c);
+        {(Object.keys(realChannels) as (keyof typeof CHANNELS)[]).map((c) => {
+          const active = realChannels[c];
+          const label = CHANNELS[c]?.label ?? c;
           return (
-            <div key={c} className="flex items-center gap-1 text-xs text-dim" title={CHANNELS[c].label}>
-              <ChannelLogo channel={c} size={24} title={CHANNELS[c].label} />
-              {conn === true && <span title="Collegato" className="font-bold leading-none text-[color:var(--ok)]">✓</span>}
-              {conn === false && <span title="Canale non collegato" className="font-bold leading-none text-[color:var(--err)]">✗</span>}
+            <div key={c} title={`${label} · ${active ? "collegato" : "non collegato"}`} className="grid place-items-center rounded-full p-0.5" style={{ border: `2px solid ${active ? "var(--ok)" : "var(--err)"}` }}>
+              <ChannelLogo channel={c} size={24} title={label} />
             </div>
           );
         })}
