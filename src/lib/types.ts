@@ -1,5 +1,5 @@
-// Modello dati del prototipo Xenora (front-end, dati finti).
-// Rispecchia lo schema DB reale: strutture → tipologie → unità; prenotazioni; folio.
+// Modello dati di Xenora (front-end), sincronizzato con lo schema DB reale su Supabase.
+// Strutture → tipologie → unità; prenotazioni; folio.
 
 export type Channel = "booking" | "airbnb" | "expedia" | "hotelbeds" | "other" | "direct" | "blocked";
 
