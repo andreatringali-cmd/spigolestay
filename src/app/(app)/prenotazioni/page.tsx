@@ -186,6 +186,10 @@ export default function PrenotazioniPage() {
 
   // Riepiloghi sui risultati filtrati (card + mini-grafico).
   const revenue = filtered.reduce((a, b) => a + (b.total ?? 0), 0);
+  // Somma della stessa colonna "Totale" mostrata riga per riga (grand(b): soggiorno + pulizia +
+  // extra + tassa di soggiorno) — non "revenue", che è solo il soggiorno e quindi non torna
+  // con il totale di riga quando c'è una pulizia o una tassa di soggiorno diversa da zero.
+  const grandTot = filtered.reduce((a, b) => a + grand(b), 0);
   const commissionTot = filtered.reduce((a, b) => a + commissionOf(b), 0);
   const nettoTot = revenue - commissionTot;
   const nightsTot = filtered.reduce((a, b) => a + nights(b.checkIn, b.checkOut), 0);
@@ -258,7 +262,7 @@ export default function PrenotazioniPage() {
       filtered.map((b) => [
         bookingCode(b), b.bookedOn ?? "", getStructure(b.structureId)?.name ?? "", getUnit(b.unitId)?.name ?? t("Da assegnare"),
         CHANNELS[b.channel].label, guestName(b), b.adults + b.children,
-        b.checkIn, b.checkOut, nights(b.checkIn, b.checkOut), b.total ?? 0, commissionOf(b), nettoOf(b),
+        b.checkIn, b.checkOut, nights(b.checkIn, b.checkOut), grand(b), commissionOf(b), nettoOf(b),
       ])
     );
   };
@@ -456,7 +460,7 @@ export default function PrenotazioniPage() {
                 <td className="px-3 py-2.5 font-mono">{guestsTot}</td>
                 <td className="px-3 py-2.5" colSpan={2}></td>
                 <td className="px-3 py-2.5 font-mono">{nightsTot}</td>
-                <td className="px-3 py-2.5 font-mono">{eur(revenue)}</td>
+                <td className="px-3 py-2.5 font-mono">{eur(grandTot)}</td>
                 <td className="px-3 py-2.5 font-mono">{eur(commissionTot)}</td>
                 <td className="px-3 py-2.5 font-mono text-[color:var(--ok)]">{eur(nettoTot)}</td>
                 <td className="px-3 py-2.5"></td>
