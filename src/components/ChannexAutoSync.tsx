@@ -27,6 +27,17 @@ const FULLSYNC_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24h
 // localStorage, fuori dallo stato condiviso): serve a far scattare comunque la sincronizzazione.
 export const CHANNEX_DIRTY_EVENT = "spigolestay:channex-dirty";
 
+// Full sync manuale su richiesta (pulsante "Canali"): azzera il timestamp dell'ultimo full-sync
+// per la struttura così il prossimo giro di ChannexAutoSync invia SEMPRE la finestra intera
+// (needFull=true), non il delta — esattamente le 2 chiamate (availability+restrictions) richieste
+// da Channex per il test "Full sync on demand".
+export function forceFullSync(structureId: string) {
+  const lastFull = loadJSON<Record<string, number>>(LASTFULL_KEY, {});
+  delete lastFull[structureId];
+  saveJSON(LASTFULL_KEY, lastFull);
+  window.dispatchEvent(new Event(CHANNEX_DIRTY_EVENT));
+}
+
 // Snapshot per struttura: mappa chiave→valore (stringa) delle righe già inviate.
 // - disponibilità:  chiave `${property_id}|${room_type_id}|${date}` → valore = numero disponibilità
 // - restrizioni:    chiave `${property_id}|${rate_plan_id}|${date}` → valore = JSON canonico dei campi

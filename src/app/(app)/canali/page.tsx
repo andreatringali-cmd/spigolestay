@@ -8,6 +8,7 @@ import { useLang } from "@/lib/i18n";
 import Icon from "@/components/Icon";
 import IcalSyncPanel from "@/components/IcalSyncPanel";
 import { apiPost } from "@/lib/invoicing/client";
+import { forceFullSync } from "@/components/ChannexAutoSync";
 
 interface LogEntry { id: string; ts: number; text: string; color: string }
 
@@ -44,6 +45,15 @@ export default function CanaliPage() {
   // tramite un token valido una sola volta e 15 minuti — niente riferimenti al fornitore in vista.
   const [channelPanel, setChannelPanel] = useState<{ open: boolean; url?: string; loading?: boolean; error?: string }>({ open: false });
   const [impSync, setImpSync] = useState<{ running: boolean; msg?: string; ok?: boolean }>({ running: false });
+  // Full sync manuale: azzera il timestamp dell'ultimo full-sync e forza ChannexAutoSync a inviare
+  // subito l'intera finestra (2 chiamate: availability + restrictions), invece di aspettare le 24h.
+  const [fullSync, setFullSync] = useState<{ running: boolean; msg?: string }>({ running: false });
+  const doFullSync = () => {
+    if (effStructure === "all") return;
+    forceFullSync(effStructure);
+    setFullSync({ running: true, msg: t("Full sync in corso…") });
+    setTimeout(() => setFullSync({ running: false, msg: t("Full sync inviato (2 chiamate: disponibilità + restrizioni) ✓") }), 5000);
+  };
   // Importa le prenotazioni OTA in entrata dal feed Channex (2-way).
   const importOta = async () => {
     setImpSync({ running: true, msg: "Controllo nuove prenotazioni dalle OTA…" });
@@ -191,6 +201,7 @@ export default function CanaliPage() {
             </div>
             {chxSync.msg && <div className="mt-1 text-[11px] font-semibold" style={{ color: chxSync.ok === false ? "var(--err)" : chxSync.ok ? "var(--ok)" : "var(--dim)" }}>{chxSync.msg}</div>}
             {impSync.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: impSync.ok === false ? "var(--err)" : impSync.ok ? "var(--ok)" : "var(--dim)" }}>{impSync.msg}</div>}
+            {fullSync.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: "var(--dim)" }}>{fullSync.msg}</div>}
             {relink.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: relink.ok === false ? "var(--err)" : relink.ok ? "var(--ok)" : "var(--dim)" }}>{relink.msg}</div>}
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -198,6 +209,7 @@ export default function CanaliPage() {
               <>
                 <button onClick={openChannelManager} disabled={channelPanel.loading} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{channelPanel.loading ? t("Apro…") : "+ " + t("Collega un canale")}</button>
                 <button onClick={importOta} disabled={impSync.running} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40" title={t("Le prenotazioni arrivano da sole; usa questo solo per forzare un controllo immediato.")}>{impSync.running ? t("Controllo…") : "↓ " + t("Controlla prenotazioni ora")}</button>
+                <button onClick={doFullSync} disabled={fullSync.running} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40" title={t("Invia subito l'intera finestra di disponibilità e prezzi/restrizioni ai canali collegati, senza aspettare il ciclo automatico.")}>{fullSync.running ? t("Sincronizzo…") : "⟳ " + t("Full sync ora")}</button>
               </>
             ) : (
               <>
