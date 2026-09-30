@@ -191,6 +191,7 @@ export default function PrenotazioniPage() {
   // con il totale di riga quando c'è una pulizia o una tassa di soggiorno diversa da zero.
   const grandTot = filtered.reduce((a, b) => a + grand(b), 0);
   const commissionTot = filtered.reduce((a, b) => a + commissionOf(b), 0);
+  const commissionPctTot = revenue > 0 ? Math.round((commissionTot / revenue) * 1000) / 10 : 0; // % media pesata, come sui singoli canali
   const nettoTot = revenue - commissionTot;
   const nightsTot = filtered.reduce((a, b) => a + nights(b.checkIn, b.checkOut), 0);
   const guestsTot = filtered.reduce((a, b) => a + b.adults + b.children, 0);
@@ -461,7 +462,7 @@ export default function PrenotazioniPage() {
                 <td className="px-3 py-2.5" colSpan={2}></td>
                 <td className="px-3 py-2.5 font-mono">{nightsTot}</td>
                 <td className="px-3 py-2.5 font-mono">{eur(grandTot)}</td>
-                <td className="px-3 py-2.5 font-mono">{eur(commissionTot)}</td>
+                <td className="px-3 py-2.5 font-mono">{eur(commissionTot)} {commissionTot > 0 && <span className="text-faint">({commissionPctTot}%)</span>}</td>
                 <td className="px-3 py-2.5 font-mono text-[color:var(--ok)]">{eur(nettoTot)}</td>
                 <td className="px-3 py-2.5"></td>
               </tr>

@@ -70,7 +70,7 @@ export default function OspitiPage() {
       const nightsTot = list.reduce((a, b) => a + Math.max(0, nights(b.checkIn, b.checkOut)), 0);
       const spent = list.reduce((a, b) => a + (b.total ?? 0), 0);
       const avg = nightsTot > 0 ? Math.round(spent / nightsTot) : 0;
-      const comm = Math.round(list.reduce((a, b) => a + commissionOf(b), 0));
+      const comm = list.reduce((a, b) => a + commissionOf(b), 0);
       const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), "");
       const chCount: Record<string, number> = {};
       list.forEach((b) => { chCount[b.channel] = (chCount[b.channel] ?? 0) + 1; });
