@@ -158,34 +158,6 @@ export default function CamerePage() {
         actions={<WeatherWidget compact />}
       />
 
-      {/* Cambio struttura: box grandi e cliccabili invece di una tendina anonima, uno per
-          struttura + "Tutte", per dargli evidenza dato che qui condiziona tutta la pagina. */}
-      {activeStructureId === "all" && structures.length > 1 && (
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          <button
-            onClick={() => setLocalS("all")}
-            className={`rounded-xl border p-3 text-left shadow-sm transition ${localS === "all" ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,var(--surface))]" : "border-line bg-surface hover:bg-wash"}`}
-          >
-            <div className={`font-display text-sm font-bold ${localS === "all" ? "text-focus" : "text-txt"}`}>{t("Tutte le strutture")}</div>
-            <div className="mt-0.5 text-xs text-dim">{units.length} {t("camere")} · {structures.length} {t("strutture")}</div>
-          </button>
-          {structures.map((st) => {
-            const n = units.filter((u) => u.structureId === st.id).length;
-            const active = localS === st.id;
-            return (
-              <button
-                key={st.id}
-                onClick={() => setLocalS(st.id)}
-                className={`rounded-xl border p-3 text-left shadow-sm transition ${active ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,var(--surface))]" : "border-line bg-surface hover:bg-wash"}`}
-              >
-                <div className={`font-display text-sm font-bold ${active ? "text-focus" : "text-txt"}`}>{st.name}</div>
-                <div className="mt-0.5 text-xs text-dim">{n} {t("camere")}</div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {scoped.length === 0 && <Card><div className="py-8 text-center text-sm text-faint">{t("Nessuna struttura. Creane una in")} <Link href="/strutture" className="text-focus underline">{t("Strutture")}</Link>.</div></Card>}
 
       <div className="flex flex-col gap-5">
