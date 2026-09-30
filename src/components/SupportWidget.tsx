@@ -17,7 +17,7 @@ export default function SupportWidget() {
     const val = text.trim();
     if (!val) return;
     setMsgs((m) => [...m, { from: "user", text: val }]);
-    try { window.open(`mailto:amministrazione@xenoradigitalsolutions.com?subject=${encodeURIComponent("Assistenza Xenora")}&body=${encodeURIComponent(val)}`); } catch {}
+    try { window.location.href = `mailto:amministrazione@xenoradigitalsolutions.com?subject=${encodeURIComponent("Assistenza Xenora")}&body=${encodeURIComponent(val)}`; } catch {} // window.open("mailto:...") non apriva nulla in Chrome
     setMsgs((m) => [...m, { from: "bot", text: t("Ho aperto la tua email per inviarci il messaggio. Ti rispondiamo al più presto!") }]);
     setText("");
   };

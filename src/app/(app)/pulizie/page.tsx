@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
 import PageHelp from "@/components/PageHelp";
 import Icon from "@/components/Icon";
+import { WhatsAppIcon, MailIcon } from "@/components/BrandIcons";
 import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
 
@@ -189,7 +190,7 @@ export default function PuliziePage() {
   };
   const shareShop = () => window.open(`https://wa.me/?text=${encodeURIComponent(buildShopText())}`, "_blank", "noopener,noreferrer");
   const copyShop = async () => { try { await navigator.clipboard.writeText(buildShopText()); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} };
-  const emailShop = () => { window.open(`mailto:?subject=${encodeURIComponent(t("Lista della spesa"))}&body=${encodeURIComponent(buildShopText())}`); };
+  const emailShop = () => { window.location.href = `mailto:?subject=${encodeURIComponent(t("Lista della spesa"))}&body=${encodeURIComponent(buildShopText())}`; }; // window.open("mailto:...") non apriva nulla in Chrome
   const [shareOpen, setShareOpen] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (shareRef.current && !shareRef.current.contains(e.target as Node)) setShareOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
@@ -295,7 +296,7 @@ export default function PuliziePage() {
         const note = notes[keyOf(r.unit.id)]?.trim();
         const suffix = note ? ` [${note}]` : "";
         if (r.oos) {
-          lines.push(`• ${r.unit.name}: 🔧 ${t("Fuori servizio")}${r.oosNote ? ` — ${r.oosNote}` : ""}`);
+          lines.push(`• ${r.unit.name}: 🔧 ${t("Fuori servizio")}${r.oosNote ? ` — ${r.oosNote}` : ""}${suffix}`);
         } else if (r.action === "turnover" && r.dep && r.arr) {
           lines.push(`• ${r.unit.name}: ${t("PARTENZA + ARRIVO — parte")} ${guestName(r.dep.guestId)} (${r.dep.adults + r.dep.children} ${t("persone")}), ${t("poi arriva")} ${guestName(r.arr.guestId)} (${r.arr.adults + r.arr.children} ${t("persone")}, ${fmt(r.arr.checkIn)}→${fmt(r.arr.checkOut)})${suffix}`);
         } else {
@@ -311,7 +312,7 @@ export default function PuliziePage() {
     return lines.join("\n");
   };
   const shareWhatsApp = () => window.open(`https://wa.me/?text=${encodeURIComponent(buildPlanText())}`, "_blank", "noopener,noreferrer");
-  const emailPlan = () => window.open(`mailto:?subject=${encodeURIComponent(t("Planning pulizie"))}&body=${encodeURIComponent(buildPlanText())}`);
+  const emailPlan = () => { window.location.href = `mailto:?subject=${encodeURIComponent(t("Planning pulizie"))}&body=${encodeURIComponent(buildPlanText())}`; }; // window.open("mailto:...") non apriva nulla in Chrome
   const copyPlan = async () => { try { await navigator.clipboard.writeText(buildPlanText()); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} };
   const [planShare, setPlanShare] = useState(false);
 
@@ -423,8 +424,8 @@ export default function PuliziePage() {
                   <button disabled={empty} onClick={() => setShareOpen((v) => !v)} className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
                   {shareOpen && (
                     <div className="absolute right-0 z-30 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-lg">
-                      <button onClick={() => { shareShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="chat" size={15} /> WhatsApp</button>
-                      <button onClick={() => { emailShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="mail" size={15} /> Email</button>
+                      <button onClick={() => { shareShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><WhatsAppIcon size={16} /> WhatsApp</button>
+                      <button onClick={() => { emailShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><MailIcon size={16} /> Email</button>
                       <button onClick={() => { copyShop(); setShareOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
                     </div>
                   )}
@@ -571,8 +572,8 @@ export default function PuliziePage() {
           {planShare && (<>
             <button aria-label={t("Chiudi")} onClick={() => setPlanShare(false)} className="fixed inset-0 z-20 cursor-default" />
             <div className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
-              <button onClick={() => { shareWhatsApp(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="chat" size={15} /> WhatsApp</button>
-              <button onClick={() => { emailPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="mail" size={15} /> Email</button>
+              <button onClick={() => { shareWhatsApp(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><WhatsAppIcon size={16} /> WhatsApp</button>
+              <button onClick={() => { emailPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><MailIcon size={16} /> Email</button>
               <button onClick={() => { copyPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
             </div>
           </>)}
