@@ -185,10 +185,15 @@ export default function PrenotazioniPage() {
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkOut)}</td>
       <td className="px-3 py-2.5 font-mono text-dim">{nights(b.checkIn, b.checkOut)}</td>
-      <td className="px-3 py-2.5 font-mono font-semibold text-txt">{b.total ? eur(grand(b)) : "—"}</td>
+      <td className="px-3 py-2.5 font-mono font-semibold text-txt">
+        <span className="inline-flex items-center gap-1">
+          {b.total ? eur(grand(b)) : "—"}
+          {underprice?.flagged && <span title={underpriceReason(b, underprice)} className="font-sans text-sm font-extrabold leading-none" style={{ color: "var(--err)" }}>!</span>}
+        </span>
+      </td>
       <td className="px-3 py-2.5 font-mono text-dim">{commissionOf(b) ? <>{eur(commissionOf(b))} <span className="text-faint">({commissionPctOf(b)}%)</span></> : "—"}</td>
       <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{b.total ? eur(nettoOf(b)) : "—"}</td>
-      <td className="px-3 py-2.5"><div className="flex items-center gap-1.5"><StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--err)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} /><StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} />{underprice?.flagged && <StatusIcon icon="alertTriangle" color="var(--warn)" title={underpriceReason(b, underprice)} />}</div></td>
+      <td className="px-3 py-2.5"><div className="flex items-center gap-1.5"><StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--err)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} /><StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} /></div></td>
     </>);
   };
 
@@ -421,12 +426,14 @@ export default function PrenotazioniPage() {
               </div>
               <div className="mt-1 flex items-center justify-between gap-2">
                 <span className="truncate text-xs text-dim">{unitLabel(b) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>} · {b.adults + b.children} {t("osp.")}</span>
-                <span className="shrink-0 font-mono font-semibold text-txt">{b.total ? eur(b.total) : "—"}</span>
+                <span className="shrink-0 font-mono font-semibold text-txt">
+                  {b.total ? eur(b.total) : "—"}
+                  {underprice?.flagged && <span title={underpriceReason(b, underprice)} className="ml-1 font-sans text-sm font-extrabold leading-none" style={{ color: "var(--err)" }}>!</span>}
+                </span>
               </div>
               <div className="mt-2 flex items-center gap-1.5">
                 <StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--err)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} />
                 <StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} />
-                {underprice?.flagged && <StatusIcon icon="alertTriangle" color="var(--warn)" title={underpriceReason(b, underprice)} />}
                 {activeStructureId === "all" && <span className="ml-auto flex items-center gap-1 truncate text-[11px] text-faint"><span className="h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} />{getStructure(b.structureId)?.name}</span>}
               </div>
             </button>
