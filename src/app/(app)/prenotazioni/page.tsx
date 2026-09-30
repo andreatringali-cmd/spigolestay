@@ -7,7 +7,7 @@ import { bookingCode } from "@/lib/bookingCode";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { nights, parseISO, toISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
-import { bookingPaidTotal, commissionOf, commissionPctOf, nettoOf } from "@/lib/booking";
+import { bookingPaidTotal, cityTaxOf, commissionOf, commissionPctOf, nettoOf } from "@/lib/booking";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
@@ -21,7 +21,7 @@ import LineChart from "@/components/LineChart";
 import DateField from "@/components/DateField";
 import { flagColor, flagGradient } from "@/lib/flags";
 import Icon from "@/components/Icon";
-import ExportMenu from "@/components/ExportMenu";
+import ExportMenu, { type ExportField } from "@/components/ExportMenu";
 import ChannelLogo from "@/components/ChannelLogo";
 import WeatherWidget from "@/components/WeatherWidget";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -256,16 +256,44 @@ export default function PrenotazioniPage() {
   const showAllCharts = () => persistPren(new Set());
   const hideAllCharts = () => persistPren(new Set(charts.map((c) => c.key)));
 
-  const doExcel = () => {
-    exportExcel(
-      "prenotazioni",
-      [t("Codice"), t("Prenotata il"), t("Struttura"), t("Camera"), t("Canale"), t("Ospite"), t("N. ospiti"), t("Check-in"), t("Check-out"), t("Notti"), t("Totale €"), t("Commissioni €"), t("Netto €")],
-      filtered.map((b) => [
-        bookingCode(b), b.bookedOn ?? "", getStructure(b.structureId)?.name ?? "", getUnit(b.unitId)?.name ?? t("Da assegnare"),
-        CHANNELS[b.channel].label, guestName(b), b.adults + b.children,
-        b.checkIn, b.checkOut, nights(b.checkIn, b.checkOut), grand(b), commissionOf(b), nettoOf(b),
-      ])
-    );
+  const STATUS_LABEL: Record<string, string> = { confirmed: t("Confermata"), tentative: t("Opzione"), cancelled: t("Cancellata"), no_show: t("No-show") };
+  // Campi esportabili in Excel: colonne della tabella + dati che oggi si vedono solo aprendo la
+  // scheda della prenotazione (email, telefono, note, richieste ospite, incassi, tassa...).
+  const excelFields: (ExportField & { get: (b: typeof sorted[number]) => string | number })[] = [
+    { key: "code", label: "Codice", get: (b) => bookingCode(b) },
+    { key: "bookedOn", label: "Prenotata il", get: (b) => b.bookedOn ?? "" },
+    { key: "structure", label: "Struttura", get: (b) => getStructure(b.structureId)?.name ?? "" },
+    { key: "room", label: "Camera", get: (b) => getUnit(b.unitId)?.name ?? t("Da assegnare") },
+    { key: "channel", label: "Canale", get: (b) => CHANNELS[b.channel].label },
+    { key: "guest", label: "Ospite", get: (b) => guestName(b) },
+    { key: "email", label: "Email", get: (b) => guests.find((g) => g.id === b.guestId)?.email ?? "" },
+    { key: "phone", label: "Telefono", get: (b) => guests.find((g) => g.id === b.guestId)?.phone ?? "" },
+    { key: "adults", label: "Adulti", get: (b) => b.adults },
+    { key: "children", label: "Bambini", get: (b) => b.children },
+    { key: "checkIn", label: "Check-in", get: (b) => b.checkIn },
+    { key: "checkOut", label: "Check-out", get: (b) => b.checkOut },
+    { key: "nights", label: "Notti", get: (b) => nights(b.checkIn, b.checkOut) },
+    { key: "total", label: "Soggiorno €", default: false, get: (b) => b.total ?? 0 },
+    { key: "cleaning", label: "Pulizia €", default: false, get: (b) => b.cleaningFee ?? 0 },
+    { key: "cityTax", label: "Tassa di soggiorno €", default: false, get: (b) => cityTaxOf(getStructure(b.structureId), b.adults, nights(b.checkIn, b.checkOut), b.total ?? 0, b.cityTaxExempt) },
+    { key: "grandTotal", label: "Totale €", get: (b) => grand(b) },
+    { key: "commissionEur", label: "Commissione €", get: (b) => commissionOf(b) },
+    { key: "commissionPct", label: "Commissione %", default: false, get: (b) => commissionPctOf(b) },
+    { key: "netto", label: "Netto €", get: (b) => nettoOf(b) },
+    { key: "paid", label: "Incassato €", default: false, get: (b) => b.paid ?? 0 },
+    { key: "balance", label: "Saldo dovuto €", default: false, get: (b) => Math.max(0, grand(b) - (b.paid ?? 0)) },
+    { key: "parking", label: "Parcheggio", default: false, get: (b) => (b.parking ? t("Sì") : t("No")) },
+    { key: "deposit", label: "Caparra ricevuta", default: false, get: (b) => (b.depositPaid ? t("Sì") : t("No")) },
+    { key: "status", label: "Stato prenotazione", default: false, get: (b) => STATUS_LABEL[b.status] ?? b.status },
+    { key: "alloggiati", label: "Schedina alloggiati", default: false, get: (b) => (alloggiatiOk(b) ? t("Pronta") : t("Da completare")) },
+    { key: "payStatus", label: "Stato pagamento", default: false, get: (b) => t(PAY_META[payStatus(b)][1]) },
+    { key: "note", label: "Note", default: false, get: (b) => b.note ?? "" },
+    { key: "guestRequests", label: "Richieste ospite", default: false, get: (b) => b.guestRequests ?? "" },
+  ];
+  const doExcel = (selected?: string[]) => {
+    const keys = selected ?? excelFields.filter((f) => f.default !== false).map((f) => f.key);
+    const fields = excelFields.filter((f) => keys.includes(f.key));
+    exportExcel("prenotazioni", fields.map((f) => t(f.label)), filtered.map((b) => fields.map((f) => f.get(b))));
   };
 
   return (
@@ -324,7 +352,7 @@ export default function PrenotazioniPage() {
           {/* Toggle grafici: un click mostra tutti / nasconde tutti */}
           <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${shownCharts.length > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
           <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
-          <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
+          <ExportMenu onExcel={doExcel} onPdf={exportPdf} excelFields={excelFields} />
         </div>
         </div>
       </div>

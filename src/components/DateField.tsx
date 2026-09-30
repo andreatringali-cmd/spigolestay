@@ -31,7 +31,9 @@ export default function DateField({
     document.addEventListener("keydown", k);
     return () => { document.removeEventListener("mousedown", h); document.removeEventListener("keydown", k); };
   }, []);
-  useEffect(() => { if (open && value) setView(new Date(value + "T00:00")); }, [open, value]);
+  // All'apertura: mese del valore selezionato, o il mese di OGGI se il campo è vuoto — senza
+  // questo, un campo svuotato restava fermo sull'ultimo mese aperto (es. gennaio) invece che oggi.
+  useEffect(() => { if (open) setView(value ? new Date(value + "T00:00") : new Date()); }, [open, value]);
 
   const y = view.getFullYear(), m = view.getMonth();
   const startDow = (new Date(y, m, 1).getDay() + 6) % 7; // Lunedì = 0
