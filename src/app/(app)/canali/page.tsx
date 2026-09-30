@@ -9,8 +9,9 @@ import Icon from "@/components/Icon";
 import IcalSyncPanel from "@/components/IcalSyncPanel";
 import { apiPost } from "@/lib/invoicing/client";
 import { forceFullSync } from "@/components/ChannexAutoSync";
-import { CHANNELS } from "@/lib/types";
+import { CHANNELS, type Channel } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
+import { loadChannelColor, saveChannelColor, loadChannelCommissionPct, saveChannelCommissionPct } from "@/lib/channelOverrides";
 
 interface LogEntry { id: string; ts: number; text: string; color: string }
 
@@ -161,6 +162,9 @@ export default function CanaliPage() {
   // Channex precompila il modulo, così il Salva non rischia mai di azzerare una correzione esistente.
   const CORR_SIGN: Record<string, string> = { increase_by_percent: "+", decrease_by_percent: "−" };
   const [priceCorr, setPriceCorr] = useState<Record<string, { rule: "increase_by_percent" | "decrease_by_percent"; value: string; loaded: boolean }>>({});
+  // Bozza commissione predefinita per canale (colore invece si applica subito, senza bozza).
+  const [commDraft, setCommDraft] = useState<Record<string, string>>({});
+  const [commSaved, setCommSaved] = useState<string | null>(null);
   const [corrMsg, setCorrMsg] = useState<Record<string, { text: string; ok?: boolean }>>({});
   const [corrSaving, setCorrSaving] = useState<string | null>(null);
   const loadPriceCorr = async (channelId: string) => {
@@ -235,17 +239,21 @@ export default function CanaliPage() {
     }
   };
 
-  const openChannelManager = async () => {
+  const openChannelManager = async (redirectTo = "/channels") => {
     setChannelPanel({ open: true, loading: true });
     try {
       const j = await apiPost<{ ok: boolean; token?: string; propertyId?: string; base?: string; error?: string }>("channex/channel-token", { structureId: effStructure });
       if (!j.ok || !j.token || !j.base) { setChannelPanel({ open: true, error: j.error || "Impossibile aprire il collegamento canali." }); return; }
-      const url = `${j.base}/auth/exchange?oauth_session_key=${encodeURIComponent(j.token)}&app_mode=headless&redirect_to=/channels&property_id=${encodeURIComponent(j.propertyId || "")}`;
+      const url = `${j.base}/auth/exchange?oauth_session_key=${encodeURIComponent(j.token)}&app_mode=headless&redirect_to=${encodeURIComponent(redirectTo)}&property_id=${encodeURIComponent(j.propertyId || "")}`;
       setChannelPanel({ open: true, url });
     } catch (e) {
       setChannelPanel({ open: true, error: e instanceof Error ? e.message : "Errore di rete" });
     }
   };
+  // Mappatura camere: non replicata dentro Xenora (resta configurazione di Channex) — un click
+  // porta dritti alla pagina di QUEL canale su Channex, dentro lo stesso pannello SSO già usato
+  // per "Collega un canale", invece di rimandare genericamente all'elenco.
+  const openChannelMapping = (channelId: string) => openChannelManager(`/channels/${channelId}`);
 
   // NB: l'invio di disponibilità e prezzi a Channex è ora AUTOMATICO (vedi ChannexAutoSync,
   // montato nell'AppShell): parte da solo a ogni modifica di prenotazioni, camere (anche fuori
@@ -290,7 +298,7 @@ export default function CanaliPage() {
           <div className="flex flex-col gap-2 sm:w-auto sm:shrink-0 sm:flex-row sm:flex-wrap sm:items-center">
             {chxMap[effStructure] ? (
               <>
-                <button onClick={openChannelManager} disabled={channelPanel.loading} className="w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 sm:w-auto">{channelPanel.loading ? t("Apro…") : "+ " + t("Collega un canale")}</button>
+                <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 sm:w-auto">{channelPanel.loading ? t("Apro…") : "+ " + t("Collega un canale")}</button>
                 <button onClick={importOta} disabled={impSync.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 sm:w-auto" title={t("Le prenotazioni arrivano da sole; usa questo solo per forzare un controllo immediato.")}>{impSync.running ? t("Controllo…") : "↓ " + t("Controlla prenotazioni ora")}</button>
                 <button onClick={doFullSync} disabled={fullSync.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 sm:w-auto" title={t("Invia subito l'intera finestra di disponibilità e prezzi/restrizioni ai canali collegati, senza aspettare il ciclo automatico.")}>{fullSync.running ? t("Sincronizzo…") : "⟳ " + t("Full sync ora")}</button>
               </>
@@ -324,19 +332,47 @@ export default function CanaliPage() {
               {otaGroups.filter((g) => g.list.length > 0).map((g, gi) => (
                 <div key={g.label ?? gi}>
                   {g.label && <div className="mb-2 text-xs font-semibold text-dim">{g.label}</div>}
-                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-                    {g.list.map((c, i) => (
-                      <button
-                        key={c.id || c.channel + i}
-                        onClick={() => setChannelDetail({ sid: g.sid, c })}
-                        className="flex flex-col items-center gap-2 rounded-xl border bg-surface px-3 py-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                        style={{ borderColor: c.active ? "color-mix(in srgb, var(--ok) 45%, var(--line))" : "color-mix(in srgb, var(--err) 40%, var(--line))" }}
-                      >
-                        <ChannelLogo channel={c.channel as keyof typeof CHANNELS} size={32} title={CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title} />
-                        <span className="text-xs font-semibold text-txt">{CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title}</span>
-                        <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
-                      </button>
-                    ))}
+                  <div className="overflow-x-auto rounded-xl border border-line">
+                    <table className="w-full min-w-[560px] text-sm">
+                      <thead>
+                        <tr className="border-b border-line bg-wash text-left text-[10px] font-bold uppercase tracking-wide text-faint">
+                          <th className="px-3 py-2 font-bold">{t("Canale")}</th>
+                          <th className="px-3 py-2 font-bold">{t("Stato")}</th>
+                          <th className="px-3 py-2 font-bold">{t("Correzione prezzo")}</th>
+                          <th className="px-3 py-2 font-bold">{t("Commissione")}</th>
+                          <th className="px-3 py-2 font-bold text-right">{t("Azioni")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {g.list.map((c, i) => {
+                          const chKey = c.channel as Channel;
+                          const label = CHANNELS[chKey]?.label ?? c.title;
+                          const draft = c.id ? priceCorr[c.id] : undefined;
+                          const corr = draft?.loaded && draft.value ? `${CORR_SIGN[draft.rule]}${draft.value}%` : t("nessuna");
+                          const commPct = loadChannelCommissionPct(chKey) ?? (CHANNELS[chKey]?.commission ?? 0) * 100;
+                          const color = loadChannelColor(chKey) || `var(${CHANNELS[chKey]?.cssVar ?? ""})`;
+                          return (
+                            <tr key={c.id || c.channel + i} className="border-b border-line last:border-0 hover:bg-wash">
+                              <td className="px-3 py-2.5">
+                                <span className="flex items-center gap-2">
+                                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} title={t("Colore su calendario")} />
+                                  <ChannelLogo channel={chKey} size={22} title={label} />
+                                  <span className="font-semibold text-txt">{label}</span>
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
+                              </td>
+                              <td className="px-3 py-2.5 text-dim">{corr}</td>
+                              <td className="px-3 py-2.5 text-dim">{commPct}%</td>
+                              <td className="px-3 py-2.5 text-right">
+                                <button onClick={() => setChannelDetail({ sid: g.sid, c })} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-surface">{t("Modifica")}</button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               ))}
@@ -387,6 +423,40 @@ export default function CanaliPage() {
                   </div>
                   {msg && <div className="mt-2 text-xs font-semibold" style={{ color: msg.ok === false ? "var(--err)" : msg.ok ? "var(--ok)" : "var(--dim)" }}>{msg.text}</div>}
                 </div>
+              )}
+
+              {(() => {
+                const chKey = c.channel as Channel;
+                const savedColor = loadChannelColor(chKey);
+                const computedColor = typeof window !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue(CHANNELS[chKey]?.cssVar ?? "").trim() : "";
+                const pickerColor = savedColor || (/^#/.test(computedColor) ? computedColor : "#888888");
+                const commVal = commDraft[c.id] ?? String(loadChannelCommissionPct(chKey) ?? Math.round((CHANNELS[chKey]?.commission ?? 0) * 1000) / 10);
+                return (
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-line bg-paper p-3">
+                      <div className="mb-1.5 text-xs font-semibold text-txt">{t("Colore su calendario")}</div>
+                      <div className="flex items-center gap-2">
+                        <input type="color" value={pickerColor} onChange={(e) => saveChannelColor(chKey, e.target.value)} className="h-8 w-10 shrink-0 cursor-pointer rounded border border-line bg-transparent p-0.5" />
+                        <span className="text-[11px] text-faint">{t("Colora le prenotazioni di questo canale nel Calendario")}</span>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-line bg-paper p-3">
+                      <div className="mb-1.5 text-xs font-semibold text-txt">{t("Commissione predefinita")}</div>
+                      <div className="flex items-center gap-1.5">
+                        <input type="number" min={0} step="0.1" value={commVal} onChange={(e) => setCommDraft((cur) => ({ ...cur, [c.id]: e.target.value }))} className="w-16 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+                        <span className="text-sm text-dim">%</span>
+                        <button onClick={() => { const v = Number(commVal.replace(",", ".")); if (Number.isFinite(v) && v >= 0) { saveChannelCommissionPct(chKey, v); setCommSaved(c.id); window.setTimeout(() => setCommSaved(null), 1200); } }} className="ml-auto rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{commSaved === c.id ? t("Salvato ✓") : t("Salva")}</button>
+                      </div>
+                      <p className="mt-1.5 text-[11px] text-faint">{t("Usata quando una prenotazione non ha una commissione esatta comunicata dal canale.")}</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {c.id && (
+                <button onClick={() => openChannelMapping(c.id)} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">
+                  {t("Mappatura camere su Channex")} ↗
+                </button>
               )}
             </div>
           </div>

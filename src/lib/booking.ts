@@ -3,6 +3,7 @@
 //  Totale ospite = soggiorno (total) + pulizia (cleaningFee) + extra + tassa di soggiorno.
 import { nights } from "./dates";
 import { CHANNELS, type Channel, type Structure } from "./types";
+import { loadChannelCommissionPct } from "./channelOverrides";
 
 // Tassa di soggiorno. Due modalità:
 //  - "fixed":   € a persona per notte × persone × notti tassabili
@@ -69,7 +70,7 @@ export function bookingPaidTotal(b: BookingLike): number {
 type CommissionBookingLike = { total?: number; channel: Channel; commissionPct?: number; commissionAmount?: number | null };
 export function commissionPctOf(b: CommissionBookingLike): number {
   if (b.commissionAmount != null && b.total) return Math.round((b.commissionAmount / b.total) * 1000) / 10;
-  return b.commissionPct ?? CHANNELS[b.channel].commission * 100;
+  return b.commissionPct ?? loadChannelCommissionPct(b.channel) ?? CHANNELS[b.channel].commission * 100;
 }
 export function commissionOf(b: CommissionBookingLike): number {
   return b.commissionAmount ?? Math.round((b.total ?? 0) * commissionPctOf(b) / 100);
