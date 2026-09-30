@@ -302,11 +302,10 @@ export default function PrenotazioniPage() {
       <PageHeader title={t("Prenotazioni")} subtitle={t("In anteprima le prenotazioni in corso e future · seleziona un intervallo di date per vedere lo storico")} actions={<WeatherWidget compact />} />
 
       {/* Card riepilogo */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label={t("Prenotazioni")} value={String(filtered.length)} />
         <StatCard label={t("Notti totali")} value={String(nightsTot)} />
-        <StatCard label={t("ADR (prezzo medio/notte)")} value={eur(avgPrice)} />
-        <StatCard label={t("Netto medio/notte")} value={eur(nettoPerNight)} />
+        <StatCard label={t("ADR (prezzo medio/notte)")} value={<>{eur(avgPrice)} <span className="text-sm font-normal text-faint">({t("netto")} {eur(nettoPerNight)})</span></>} />
         <StatCard label={t("Ricavi")} value={eur(revenue)} />
       </div>
 
