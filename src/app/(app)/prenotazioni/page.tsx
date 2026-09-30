@@ -196,6 +196,7 @@ export default function PrenotazioniPage() {
   const nightsTot = filtered.reduce((a, b) => a + nights(b.checkIn, b.checkOut), 0);
   const guestsTot = filtered.reduce((a, b) => a + b.adults + b.children, 0);
   const avgPrice = nightsTot ? revenue / nightsTot : 0;
+  const nettoPerNight = nightsTot ? nettoTot / nightsTot : 0; // ricavo medio netto/notte (dopo commissione) — ADR resta sul lordo, standard di settore
 
   // Dati grafici (sui risultati filtrati)
   const chColor = (c: Channel) => `var(${CHANNELS[c].cssVar})`;
@@ -301,10 +302,11 @@ export default function PrenotazioniPage() {
       <PageHeader title={t("Prenotazioni")} subtitle={t("In anteprima le prenotazioni in corso e future · seleziona un intervallo di date per vedere lo storico")} actions={<WeatherWidget compact />} />
 
       {/* Card riepilogo */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label={t("Prenotazioni")} value={String(filtered.length)} />
         <StatCard label={t("Notti totali")} value={String(nightsTot)} />
         <StatCard label={t("ADR (prezzo medio/notte)")} value={eur(avgPrice)} />
+        <StatCard label={t("Netto medio/notte")} value={eur(nettoPerNight)} />
         <StatCard label={t("Ricavi")} value={eur(revenue)} />
       </div>
 
