@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { findBookingStore, findBookingStoreById } from "@/lib/manage-booking";
 import { buildWalletSaveUrl, googleWalletConfigured } from "@/lib/googleWallet";
+import { uploadPublicAsset, dataUrlToBytes } from "@/lib/email-assets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,12 +45,22 @@ export async function GET(req: Request) {
     const guestName = s(g.firstName) || s(g.fullName).split(" ")[0] || "";
     const address = [s(st.address), s(st.streetNumber)].filter(Boolean).join(" ") + (s(st.city) ? `, ${s(st.city)}` : "");
 
+    // Il logo della struttura è salvato come data URL (caricato dalla pagina Strutture): Google
+    // Wallet, come le email, richiede un URL pubblico https. Lo carichiamo su storage pubblico
+    // (stesso helper riusato dalle email) e riusiamo l'URL: hash-based, quindi upload ripetuti
+    // della stessa immagine riusano lo stesso file invece di duplicarlo.
+    let logoUrl = s(st.logo).startsWith("http") ? s(st.logo) : undefined;
+    if (!logoUrl && s(st.logo).startsWith("data:")) {
+      const parsed = dataUrlToBytes(s(st.logo));
+      if (parsed) logoUrl = (await uploadPublicAsset(parsed.bytes, parsed.ext, parsed.contentType)) ?? undefined;
+    }
+
     const url = buildWalletSaveUrl({
       bookingId: s(b.id) || bid,
       bookingCode: s(b.code) || s(b.id).slice(0, 8).toUpperCase(),
       structureName: s(st.name),
       structureColor: s(st.photoColor),
-      structureLogoUrl: s(st.logo).startsWith("http") ? s(st.logo) : undefined,
+      structureLogoUrl: logoUrl,
       roomTypeName: s(rt.name),
       unitName: unit ? s(unit.name) : "",
       checkIn: s(b.checkIn),
