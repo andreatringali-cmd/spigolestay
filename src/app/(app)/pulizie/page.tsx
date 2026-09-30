@@ -288,19 +288,22 @@ export default function PuliziePage() {
   const buildPlanText = () => {
     const lines: string[] = [`🧹 ${t("Pulizie di oggi")} — ${fmtLong(date)}`];
     for (const s of scopedStructures) {
-      const list = rooms.filter((r) => r.structure.id === s.id && !r.oos); // sempre tutte le camere, non solo quelle con qualcosa da fare
+      const list = rooms.filter((r) => r.structure.id === s.id); // sempre tutte le camere, comprese quelle fuori servizio/con un guasto
       if (!list.length) continue;
       lines.push("", `*${s.name}*`);
       for (const r of list) {
         const note = notes[keyOf(r.unit.id)]?.trim();
         const suffix = note ? ` [${note}]` : "";
-        if (r.action === "turnover" && r.dep && r.arr) {
+        if (r.oos) {
+          lines.push(`• ${r.unit.name}: 🔧 ${t("Fuori servizio")}${r.oosNote ? ` — ${r.oosNote}` : ""}`);
+        } else if (r.action === "turnover" && r.dep && r.arr) {
           lines.push(`• ${r.unit.name}: ${t("PARTENZA + ARRIVO — parte")} ${guestName(r.dep.guestId)} (${r.dep.adults + r.dep.children} ${t("persone")}), ${t("poi arriva")} ${guestName(r.arr.guestId)} (${r.arr.adults + r.arr.children} ${t("persone")}, ${fmt(r.arr.checkIn)}→${fmt(r.arr.checkOut)})${suffix}`);
         } else {
           const p = r.arr ?? r.dep ?? r.stay;
           const io = p ? ` (${fmt(p.checkIn)}→${fmt(p.checkOut)}, ${p.adults + p.children} ${t("persone")})` : "";
           const who = p ? ` — ${guestName(p.guestId)}` : "";
-          lines.push(`• ${r.unit.name}: ${t(ACT[r.action].label)}${who}${io}${suffix}`);
+          const oosNote = r.oosFrom && r.oosNote ? ` [🔧 ${r.oosNote}]` : "";
+          lines.push(`• ${r.unit.name}: ${t(ACT[r.action].label)}${who}${io}${suffix}${oosNote}`);
         }
       }
     }
