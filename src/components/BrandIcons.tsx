@@ -16,3 +16,12 @@ export function MailIcon({ size = 16 }: { size?: number }) {
     </svg>
   );
 }
+export function PdfIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" fill="#E5252A" />
+      <path d="M15 2v5h5" fill="#ffffff" opacity="0.35" />
+      <text x="12" y="17.5" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="#ffffff" fontFamily="Arial, sans-serif">PDF</text>
+    </svg>
+  );
+}

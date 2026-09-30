@@ -13,6 +13,8 @@ import Icon from "@/components/Icon";
 import { WhatsAppIcon, MailIcon } from "@/components/BrandIcons";
 import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
+import { computePuliziePlan, buildPuliziePlanText } from "@/lib/puliziePlan";
+import AutoShareSettings from "@/components/pulizie/AutoShareSettings";
 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
 const fmtShort = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
@@ -182,7 +184,7 @@ export default function PuliziePage() {
   const shopLine = (p: Prod) => `• ${p.name}${statusOf(p) === "low" ? ` (${t("in esaurimento")})` : ""}${p.supplier ? ` — ${p.supplier}` : ""}`;
   const buildShopText = () => {
     const struct = activeStructureId === "all" ? "" : (scopeStructures[0]?.name ?? "");
-    const lines = [`🛒 ${t("Lista della spesa")}`, `📅 ${fmtLong(date)}${struct ? ` · ${struct}` : ""}`];
+    const lines = [`*${t("Lista della spesa")}*`, `${fmtLong(date)}${struct ? ` · ${struct}` : ""}`];
     if (shopList.length === 0) { lines.push("", t("Tutto a posto.")); return lines.join("\n"); }
     if (activeStructureId === "all") { for (const s of scopeStructures) { const its = shopList.filter((p) => p.structureId === s.id); if (its.length) lines.push("", `*${s.name}*`, ...its.map(shopLine)); } }
     else lines.push("", ...shopList.map(shopLine));
@@ -210,111 +212,34 @@ export default function PuliziePage() {
   const keyOf = (unitId: string) => `${unitId}:${date}`;
 
   const active = bookings.filter((b) => b.status !== "cancelled" && (activeStructureId === "all" || b.structureId === activeStructureId));
-  // "Fuori servizio" impostato dal Calendario per un periodo crea una prenotazione con
-  // channel "blocked" (non un vero ospite): va escluso dal calcolo arrivo/partenza/riassetto,
-  // altrimenti il suo checkIn/checkOut vengono letti come un vero arrivo/partenza.
-  const activeGuests = active.filter((b) => b.channel !== "blocked");
-  const blockedNow = active.filter((b) => b.channel === "blocked" && b.checkIn <= date && date < b.checkOut);
   const scopedStructures = structures.filter((s) =>
     activeStructureId === "all" ? structFilter === "all" || s.id === structFilter : s.id === activeStructureId
   );
 
-  const planFor = (unitId: string) => {
-    const dep = activeGuests.find((b) => b.unitId === unitId && b.checkOut === date);
-    const arr = activeGuests.find((b) => b.unitId === unitId && b.checkIn === date);
-    const stay = activeGuests.find((b) => b.unitId === unitId && b.checkIn < date && date < b.checkOut);
-    let action: ActionKey = "niente";
-    if (dep && arr) action = "turnover";
-    else if (dep) action = "partenza";
-    else if (arr) action = "arrivo";
-    else if (stay) action = "riassetto";
-    return { action, dep, arr, stay };
+  // Colore della tipologia: quello assegnato alla tipologia; in mancanza, una palette di riserva per posizione
+  // (calcolato per struttura, come nella pagina Camere — non fa parte della logica condivisa col cron).
+  const colorOfType = (structureId: string, roomTypeId: string) => {
+    const tps = roomTypes.filter((rt) => rt.structureId === structureId);
+    const idx = tps.findIndex((rt) => rt.id === roomTypeId);
+    return tps[idx]?.color || STRUCT_COLORS[(idx < 0 ? 0 : idx) % STRUCT_COLORS.length];
   };
-
-  const rooms = scopedStructures.flatMap((s) => {
-    // Stesso ordine di Camere: prima raggruppate per tipologia (nell'ordine delle tipologie),
-    // poi dentro ogni tipologia per ordine manuale / numero.
-    const su = units.filter((u) => u.structureId === s.id);
-    const tps = roomTypes.filter((rt) => rt.structureId === s.id);
-    // Colore della tipologia: quello assegnato alla tipologia; in mancanza, una palette di riserva per posizione.
-    const colorOfType = (rtId: string) => { const idx = tps.findIndex((rt) => rt.id === rtId); return tps[idx]?.color || STRUCT_COLORS[(idx < 0 ? 0 : idx) % STRUCT_COLORS.length]; };
-    const ordered = [
-      ...tps.flatMap((rt) => sortUnitsByName(su.filter((u) => u.roomTypeId === rt.id))),
-      ...sortUnitsByName(su.filter((u) => !tps.some((rt) => rt.id === u.roomTypeId))),
-    ];
-    return ordered.map((u) => {
-      const oosBlock = blockedNow.find((b) => b.unitId === u.id);
-      const plan = planFor(u.id);
-      // "Fuori servizio" vince solo se non c'è NULLA da fare quel giorno: se il blocco inizia
-      // lo stesso giorno di una partenza reale (es. l'ospite parte e poi la camera va fuori
-      // servizio per manutenzione), quel giorno resta "Partenza" — la pulizia serve comunque.
-      const isOosToday = (!!u.outOfService || !!oosBlock) && plan.action === "niente";
-      // oosFrom: il blocco copre oggi anche quando c'è un'azione reale (es. partenza lo stesso
-      // giorno in cui inizia il fuori servizio) — in quel caso mostriamo ENTRAMBE le cose,
-      // non solo una: l'azione del giorno (pulizia da fare) più l'avviso che poi la camera
-      // va fuori servizio.
-      return { unit: u, structure: s, typeName: roomTypes.find((x) => x.id === u.roomTypeId)?.name ?? "", typeColor: colorOfType(u.roomTypeId), oos: isOosToday, oosFrom: !isOosToday && !!oosBlock, oosNote: oosBlock?.note, ...plan };
-    });
-  });
+  const { rooms: planRooms, toClean, counts, linen } = computePuliziePlan({ date, structures: scopedStructures, units, roomTypes, bookings: active });
+  const rooms = planRooms.map((r) => ({ ...r, typeColor: colorOfType(r.structure.id, r.unit.roomTypeId) }));
   type Room = (typeof rooms)[number];
-
-  const toClean = rooms.filter((r) => !r.oos && r.action !== "niente");
   const remaining = toClean.filter((r) => !done[keyOf(r.unit.id)]).length;
-  const counts = {
-    turnover: rooms.filter((r) => r.action === "turnover").length,
-    arrivo: rooms.filter((r) => r.action === "arrivo").length,
-    partenza: rooms.filter((r) => r.action === "partenza").length,
-    riassetto: rooms.filter((r) => r.action === "riassetto").length,
-  };
-
-  // Carico biancheria del giorno: cambi completi (partenza/arrivo/turnover) + asciugamani per ospite presente + tappetino bagno per ogni arrivo.
-  const linen = (() => {
-    let matr = 0, sing = 0, guests = 0, changeRooms = 0, mats = 0;
-    for (const r of toClean) {
-      const beds = roomTypes.find((x) => x.id === r.unit.roomTypeId)?.beds ?? 1;
-      if (r.action !== "riassetto") { changeRooms++; matr += beds >= 2 ? 1 : 0; sing += beds >= 2 ? beds - 2 : beds; }
-      if (r.arr) mats++; // un tappetino bagno pulito per ogni arrivo
-      const p = r.arr ?? r.stay ?? r.dep;
-      guests += p ? p.adults + p.children : 0;
-    }
-    return { changeRooms, matr, sing, federe: matr * 2 + sing, towels: guests, mats };
-  })();
 
   // Notifiche: avvisa quando la signora segnala un problema o completa tutte le pulizie.
   // Notifiche sempre attive: chiedo il permesso una volta all'avvio (nessun interruttore da gestire).
   useEffect(() => { try { if (typeof Notification !== "undefined" && Notification.permission === "default") Notification.requestPermission().catch(() => {}); } catch {} }, []);
   const notify = (title: string, body: string) => { try { if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(title, { body }); } catch {} };
 
-  // Testo del programma da condividere con la signora delle pulizie.
-  const buildPlanText = () => {
-    const lines: string[] = [`🧹 ${t("Pulizie di oggi")} — ${fmtLong(date)}`];
-    for (const s of scopedStructures) {
-      const list = rooms.filter((r) => r.structure.id === s.id); // sempre tutte le camere, comprese quelle fuori servizio/con un guasto
-      if (!list.length) continue;
-      lines.push("", `*${s.name}*`);
-      for (const r of list) {
-        const note = notes[keyOf(r.unit.id)]?.trim();
-        const suffix = note ? ` [${note}]` : "";
-        if (r.oos) {
-          lines.push(`• ${r.unit.name}: 🔧 ${t("Fuori servizio")}${r.oosNote ? ` — ${r.oosNote}` : ""}${suffix}`);
-        } else if (r.action === "turnover" && r.dep && r.arr) {
-          lines.push(`• ${r.unit.name}: ${t("PARTENZA + ARRIVO — parte")} ${guestName(r.dep.guestId)} (${r.dep.adults + r.dep.children} ${t("persone")}), ${t("poi arriva")} ${guestName(r.arr.guestId)} (${r.arr.adults + r.arr.children} ${t("persone")}, ${fmt(r.arr.checkIn)}→${fmt(r.arr.checkOut)})${suffix}`);
-        } else {
-          const p = r.arr ?? r.dep ?? r.stay;
-          const io = p ? ` (${fmt(p.checkIn)}→${fmt(p.checkOut)}, ${p.adults + p.children} ${t("persone")})` : "";
-          const who = p ? ` — ${guestName(p.guestId)}` : "";
-          const oosNote = r.oosFrom && r.oosNote ? ` [🔧 ${r.oosNote}]` : "";
-          lines.push(`• ${r.unit.name}: ${t(ACT[r.action].label)}${who}${io}${suffix}${oosNote}`);
-        }
-      }
-    }
-    if (lines.length === 1) lines.push("", t("Nessuna pulizia in programma."));
-    return lines.join("\n");
-  };
+  // Testo del programma da condividere con la signora delle pulizie (stessa logica del cron di invio automatico).
+  const buildPlanText = () => buildPuliziePlanText({ date, scopedStructures, rooms, guests, notes, t });
   const shareWhatsApp = () => window.open(`https://wa.me/?text=${encodeURIComponent(buildPlanText())}`, "_blank", "noopener,noreferrer");
   const emailPlan = () => { window.location.href = `mailto:?subject=${encodeURIComponent(t("Planning pulizie"))}&body=${encodeURIComponent(buildPlanText())}`; }; // window.open("mailto:...") non apriva nulla in Chrome
   const copyPlan = async () => { try { await navigator.clipboard.writeText(buildPlanText()); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} };
   const [planShare, setPlanShare] = useState(false);
+  const [autoOpen, setAutoOpen] = useState(false);
 
   const noteInput = (k: string) => (
     <input
@@ -575,10 +500,13 @@ export default function PuliziePage() {
               <button onClick={() => { shareWhatsApp(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><WhatsAppIcon size={16} /> WhatsApp</button>
               <button onClick={() => { emailPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><MailIcon size={16} /> Email</button>
               <button onClick={() => { copyPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
+              <div className="my-1 border-t border-line" />
+              <button onClick={() => { setAutoOpen(true); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="clock" size={15} /> {t("Invio automatico")}</button>
             </div>
           </>)}
         </div>
       </div>
+      {autoOpen && <AutoShareSettings onClose={() => setAutoOpen(false)} />}
 
       {/* Segnalazioni aperte dalla signora */}
       {openIssues.length > 0 && (

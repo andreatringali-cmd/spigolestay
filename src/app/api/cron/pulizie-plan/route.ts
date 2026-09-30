@@ -1,0 +1,131 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { sendWhatsapp } from "@/lib/whatsapp";
+import { computePuliziePlan, buildPuliziePlanText } from "@/lib/puliziePlan";
+import type { Booking, Unit, RoomType, Structure, Guest } from "@/lib/types";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CRON: invio automatico giornaliero del Planning pulizie (email/WhatsApp), a un
+// orario scelto dall'utente in Pulizie → Condividi → "Invio automatico".
+//
+// L'orario è salvato lato client nella chiave `spigolestay:pulizie:autoshare`,
+// sincronizzata come le altre chiavi "piatte" dentro app_state/org_state (vedi
+// authsync.tsx). Su piano Vercel Hobby i cron possono girare al massimo una
+// volta al giorno (vedi stesso limite in auto-messages): questo cron ha UN solo
+// orario fisso (vercel.json) e invia se quell'orario è >= all'orario scelto
+// dall'utente — l'orario configurato è quindi una soglia minima ("non prima di
+// ___"), non un istante esatto. Anti-duplicati: tabella `pulizie_share_log`
+// (unico per tenant+giorno), così un giorno riceve al massimo un invio.
+//
+// Auth: Bearer <CRON_SECRET> (Vercel Cron) oppure ?secret= per test manuale.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type Json = Record<string, unknown>;
+const DATA_KEY = "spigolestay:data:v1";
+const NOTES_KEY = "spigolestay:pulizie:notes";
+const CFG_KEY = "spigolestay:pulizie:autoshare";
+const s = (v: unknown) => (typeof v === "string" ? v : "");
+const arr = (x: unknown): Json[] => (Array.isArray(x) ? (x as Json[]) : []);
+
+interface AutoShareCfg { enabled: boolean; time: string; email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string }
+
+// Data (Y-M-D) e "HH:MM" adesso nel fuso Europe/Rome.
+function romeNowSlot(): { ymd: string; hm: string } {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
+  const g = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  const ymd = `${g("year")}-${g("month")}-${g("day")}`;
+  const hm = `${g("hour")}:${g("minute")}`;
+  return { ymd, hm };
+}
+
+export async function GET(req: Request) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return NextResponse.json({ ok: false, skipped: "no_secret" });
+  const url = new URL(req.url);
+  const authHeader = req.headers.get("authorization") || "";
+  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (bearer !== secret && (url.searchParams.get("secret") || "") !== secret) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+
+  const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supaUrl || !service) return NextResponse.json({ ok: false, skipped: "supabase_not_configured" });
+  const admin = createClient(supaUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
+
+  const origin = url.origin;
+  const { ymd: todayRome, hm: nowSlot } = romeNowSlot();
+
+  let accounts = 0, matched = 0, sent = 0, waSent = 0;
+  const errors: string[] = [];
+
+  const processRow = async (tenantId: string, blob: Record<string, string>) => {
+    let cfg: AutoShareCfg;
+    try { cfg = { enabled: false, time: "08:00", email: false, emailTo: "", whatsapp: false, whatsappTo: "", ...(JSON.parse(blob[CFG_KEY] || "{}") as Partial<AutoShareCfg>) }; } catch { return; }
+    if (!cfg.enabled || (!cfg.email && !cfg.whatsapp)) return;
+    accounts++;
+    if (nowSlot < (cfg.time || "08:00")) return; // non ancora arrivato l'orario scelto
+    matched++;
+
+    // Claim anti-duplicato: una sola riga per tenant+giorno; se già presente, salta.
+    const claim = await admin.from("pulizie_share_log").upsert({ tenant_id: tenantId, slot_date: todayRome }, { onConflict: "tenant_id,slot_date", ignoreDuplicates: true }).select("id");
+    if (claim.error) { errors.push(`claim ${tenantId.slice(0, 8)}: ${claim.error.message}`); return; }
+    if (!claim.data || claim.data.length === 0) return; // già inviato oggi
+
+    let data: Json = {};
+    try { data = JSON.parse(blob[DATA_KEY] || "{}") as Json; } catch { return; }
+    let notes: Record<string, string> = {};
+    try { notes = JSON.parse(blob[NOTES_KEY] || "{}") as Record<string, string>; } catch { notes = {}; }
+
+    const structures = arr(data.structures) as unknown as Structure[];
+    const units = arr(data.units) as unknown as Unit[];
+    const roomTypes = arr(data.roomTypes) as unknown as RoomType[];
+    const bookings = arr(data.bookings) as unknown as Booking[];
+    const guests = arr(data.guests) as unknown as Guest[];
+    if (!structures.length) return;
+
+    const { rooms } = computePuliziePlan({ date: todayRome, structures, units, roomTypes, bookings });
+    const text = buildPuliziePlanText({ date: todayRome, scopedStructures: structures, rooms, guests, notes });
+    const subject = `Planning pulizie · ${todayRome}`;
+
+    if (cfg.email && cfg.emailTo) {
+      try {
+        const r = await fetch(`${origin}/api/email`, {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ kind: "guest_message", to: cfg.emailTo, subject, text, booking: { structureName: s((structures[0] as unknown as Json)?.name), color: s((structures[0] as unknown as Json)?.photoColor), logo: s((structures[0] as unknown as Json)?.logo) } }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j?.ok) sent++;
+        else errors.push(`mail ${tenantId.slice(0, 8)}: ${j?.error || r.status}`);
+      } catch (e) { errors.push(`mail ${tenantId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); }
+    }
+    if (cfg.whatsapp && cfg.whatsappTo) {
+      try {
+        const w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, text });
+        if (w.ok) waSent++;
+        else errors.push(`wa ${tenantId.slice(0, 8)}: ${w.message}`);
+      } catch (e) { errors.push(`wa ${tenantId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); }
+    }
+  };
+
+  try {
+    const scan = async (table: "app_state" | "org_state", keyCol: "user_id" | "org_id") => {
+      const { data: rows } = await admin.from(table).select(`${keyCol}, data`).limit(5000);
+      for (const row of (rows ?? []) as Json[]) {
+        const tenantId = s(row[keyCol]);
+        const blob = ((row.data ?? {}) as Record<string, string>) || {};
+        if (!tenantId) continue;
+        try { await processRow(tenantId, blob); } catch (e) { errors.push(`row ${tenantId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); }
+      }
+    };
+    await scan("app_state", "user_id");
+    await scan("org_state", "org_id");
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "scan_failed", accounts, matched, sent }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, now: `${todayRome} ${nowSlot}`, accounts, matched, sent, waSent, ...(errors.length ? { errors: errors.slice(0, 50) } : {}) });
+}
