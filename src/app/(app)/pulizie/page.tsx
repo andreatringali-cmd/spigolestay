@@ -286,9 +286,9 @@ export default function PuliziePage() {
 
   // Testo del programma da condividere con la signora delle pulizie.
   const buildPlanText = () => {
-    const lines: string[] = [`🧹 ${t("Pulizie")} · ${fmtLong(date)}`];
+    const lines: string[] = [`🧹 ${t("Pulizie di oggi")} — ${fmtLong(date)}`];
     for (const s of scopedStructures) {
-      const list = rooms.filter((r) => r.structure.id === s.id && !r.oos && r.action !== "niente" && matchAction(r.action));
+      const list = rooms.filter((r) => r.structure.id === s.id && !r.oos); // sempre tutte le camere, non solo quelle con qualcosa da fare
       if (!list.length) continue;
       lines.push("", `*${s.name}*`);
       for (const r of list) {
