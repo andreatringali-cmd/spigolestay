@@ -7,6 +7,7 @@ import { useTheme } from "@/lib/theme";
 import { useLang } from "@/lib/i18n";
 import Icon from "@/components/Icon";
 import StyleChooser from "@/components/StyleChooser";
+import { apiPost } from "@/lib/invoicing/client";
 
 export default function ImpostazioniPage() {
   const { theme, setTheme } = useTheme();
@@ -17,6 +18,16 @@ export default function ImpostazioniPage() {
   useEffect(() => { try { const r = localStorage.getItem(NOTIF_KEY); if (r) setNotifs({ ...NOTIF_DEF, ...JSON.parse(r) }); } catch {} /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const setNotif = (k: keyof typeof NOTIF_DEF, v: boolean) => setNotifs((p) => { const n = { ...p, [k]: v }; try { localStorage.setItem(NOTIF_KEY, JSON.stringify(n)); } catch {} return n; });
   const ask = useConfirm();
+
+  // Sync Google Calendar: due feed iCal ("Aggiungi da URL") con prenotazioni e pulizie,
+  // aggiornati da soli — niente da fare dopo il primo collegamento.
+  const [calLinks, setCalLinks] = useState<{ bookingsUrl: string; pulizieUrl: string } | null>(null);
+  const [calErr, setCalErr] = useState("");
+  useEffect(() => {
+    apiPost<{ ok: boolean; bookingsUrl: string; pulizieUrl: string }>("calendar/links", {})
+      .then((j) => setCalLinks(j))
+      .catch((e) => setCalErr(e instanceof Error ? e.message : "Errore"));
+  }, []);
 
   // Backup: esporta/importa tutte le chiavi "spigolestay:*".
   const fileRef = useRef<HTMLInputElement>(null);
@@ -91,6 +102,18 @@ export default function ImpostazioniPage() {
       </Card>
 
       <Card className="mt-4">
+        <SectionTitle>{t("Sincronizza con Google Calendar")}</SectionTitle>
+        <p className="mb-3 text-xs text-dim">{t("Due calendari sempre aggiornati, uno per le prenotazioni e uno per le pulizie (utile da condividere con la signora). Copia il link, poi in Google Calendar vai su \"Aggiungi altri calendari\" → \"Da URL\" e incollalo: da quel momento si aggiorna da solo, senza fare nulla.")}</p>
+        {calErr && <p className="text-xs font-medium" style={{ color: "var(--err)" }}>{calErr}</p>}
+        {calLinks ? (
+          <div className="space-y-2">
+            <CalendarLinkRow label={t("Prenotazioni")} url={calLinks.bookingsUrl} />
+            <CalendarLinkRow label={t("Pulizie")} url={calLinks.pulizieUrl} />
+          </div>
+        ) : !calErr && <p className="text-xs text-dim">{t("Preparo i link…")}</p>}
+      </Card>
+
+      <Card className="mt-4">
         <SectionTitle>{t("Backup & dati")}</SectionTitle>
         <p className="mb-3 text-xs text-dim">{t("Esporta tutti i dati del gestionale (prenotazioni, cassa, tariffe, utenti, immagini…) in un file, o ripristinali da un backup. Utile per spostare i dati o metterli al sicuro.")}</p>
         <div className="flex flex-wrap gap-2">
@@ -116,6 +139,17 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
       <span className="text-sm text-dim">{label}</span>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-5 w-5 accent-[color:var(--focus)]" />
     </label>
+  );
+}
+function CalendarLinkRow({ label, url }: { label: string; url: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => { try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} };
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-24 shrink-0 text-sm font-medium text-txt">{label}</span>
+      <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-xs text-dim outline-none" />
+      <button onClick={copy} className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{copied ? "Copiato ✓" : "Copia"}</button>
+    </div>
   );
 }
 function ThemeBtn({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: string; label: string }) {
