@@ -196,7 +196,7 @@ export default function AbbonamentoPage() {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: planKey, email: user?.email, userId: user?.id }),
+        body: JSON.stringify({ plan: planKey, interval: annual ? "year" : "month", email: user?.email, userId: user?.id }),
       });
       if (res.status === 503) { choose(planKey); setNotice("Stripe non è ancora collegato: piano impostato in modalità demo. Aggiungi la chiave Stripe per i pagamenti reali."); return; }
       const d = await res.json().catch(() => ({}));
