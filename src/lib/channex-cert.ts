@@ -404,7 +404,7 @@ export async function runCertScenario(admin: SupabaseClient, tenantId: string, s
           restr.push(R(plans[pi], {
             date: isoFull(o),
             rate: RATE(80 + ((o * 3 + pi * 11) % 60) + (weekend ? 20 : 0)),
-            min_stay_arrival: 1, min_stay_through: 1,
+            min_stay_arrival: 1, min_stay_through: 1, max_stay: 30,
             stop_sell: false, closed_to_arrival: false, closed_to_departure: false,
           }));
         }

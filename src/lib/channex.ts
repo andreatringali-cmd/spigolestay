@@ -190,6 +190,16 @@ export async function ackBookingRevision(id: string) {
   return channex(`/booking_revisions/${encodeURIComponent(id)}/ack`, { method: "POST", body: "{}" });
 }
 
+// Legge UNA revision per ID (NON la lista/feed): è il flusso che Channex si aspetta alla
+// ricezione del webhook "booking" — il payload del webhook dà solo il revision_id, la PMS deve
+// chiamare GET /booking_revisions/:id per i dati completi, poi fare ack. Usare la lista/feed in
+// risposta a un webhook viene rilevato e respinto in certificazione ("received_via_list").
+export async function getBookingRevision(id: string): Promise<{ ok: boolean; status: number; error?: string; revision?: ChxRevision }> {
+  const res = await channex<{ data?: unknown }>(`/booking_revisions/${encodeURIComponent(id)}`);
+  if (!res.ok) return { ok: false, status: res.status, error: res.error };
+  return { ok: true, status: res.status, revision: flattenRevision(res.data?.data) };
+}
+
 // Elenco COMPLETO delle revision (ackate e non), opzionalmente filtrato per property o
 // per booking. A differenza del feed (solo non-ackate), qui restiamo di sola lettura e NON
 // facciamo ack: serve a raccogliere gli ID (booking + revision) per la certificazione (Test #11),

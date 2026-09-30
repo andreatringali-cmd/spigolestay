@@ -140,6 +140,53 @@ export async function importBookings(admin: SupabaseClient, opts: { propertyId?:
   return out;
 }
 
+// Importa UNA revision GIÀ OTTENUTA per ID (flusso webhook, vedi getBookingRevision in channex.ts):
+// nessuna chiamata a feed/lista. Channex in certificazione rileva e boccia l'uso della lista come
+// risposta a un webhook ("received_via_list"): questa funzione riusa la stessa logica di scrittura
+// di importBookings (applyToStore) così il comportamento di scrittura/ack resta identico.
+export async function importSingleRevision(admin: SupabaseClient, rev: ChxRevision): Promise<ImportSummary> {
+  const out: ImportSummary = { ok: true, feed: 1, imported: 0, cancelled: 0, acked: 0, skipped: 0, errors: [] };
+  const propertyId = rev.property_id;
+  const { data: map } = propertyId
+    ? await admin.from("channex_map").select("channex_property_id, tenant_id, structure_id, rooms, org_id").eq("channex_property_id", propertyId).maybeSingle()
+    : { data: null };
+
+  let ackIt = false;
+  if (map) {
+    const today = new Date().toISOString().slice(0, 10);
+    const dep = rev.departure_date || rev.arrival_date || "";
+    if (rev.status !== "cancelled" && /^\d{4}-\d{2}-\d{2}$/.test(dep) && dep < today) {
+      out.skipped++; ackIt = true; // soggiorno concluso: scarica comunque dal feed
+    } else {
+      const target: StoreTarget = map.org_id ? { kind: "org", id: map.org_id } : { kind: "user", id: map.tenant_id };
+      try {
+        const applied = await applyToStore(admin, target, [{ rev, map: map as ChannexMapRow }], out);
+        ackIt = applied.length > 0;
+      } catch (e) { out.errors.push((e as Error)?.message || "errore applyToStore"); }
+    }
+  } else if (propertyId) {
+    // Nessuna mappatura: ACK solo se è la property di test certificazione (come in importBookings).
+    try {
+      const lp = await listProperties();
+      const testPropId = lp.ok ? String((lp.data?.data ?? []).find((p) => String(p.attributes?.title ?? "").trim() === CERT_TEST_PROPERTY_TITLE)?.id ?? "") || null : null;
+      if (testPropId && propertyId === testPropId) ackIt = true; else out.skipped++;
+    } catch { out.skipped++; }
+  } else {
+    out.skipped++;
+  }
+
+  if (ackIt) {
+    const a = await ackBookingRevision(rev.id);
+    if (a.ok) out.acked++;
+    await admin.from("channex_bookings").upsert({
+      revision_id: rev.id, booking_id: rev.booking_id ?? null, tenant_id: (map as ChannexMapRow | null)?.tenant_id ?? null,
+      channex_property_id: propertyId ?? null, status: rev.status ?? null, ota_reservation_code: rev.ota_reservation_code ?? null,
+      imported_at: new Date().toISOString(),
+    }, { onConflict: "revision_id" });
+  }
+  return out;
+}
+
 // Store di destinazione: blob personale (app_state per user_id) o org condivisa (org_state per org_id).
 type StoreTarget = { kind: "user" | "org"; id: string };
 const storeTable = (t: StoreTarget) => (t.kind === "org" ? "org_state" : "app_state");
