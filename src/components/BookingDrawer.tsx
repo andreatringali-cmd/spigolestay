@@ -101,7 +101,7 @@ export default function BookingDrawer() {
       channel: booking.channel, status: booking.status,
       adults: booking.adults, children: booking.children,
       unitId: booking.unitId,
-      total: booking.total ?? 0, cleaningFee: booking.cleaningFee ?? 35,
+      total: booking.total ?? 0, cleaningFee: booking.cleaningFee ?? 0,
       commissionPct: booking.commissionPct ?? Math.round(CHANNELS[booking.channel].commission * 100),
       commissionAmount: booking.commissionAmount ?? null,
       paid: booking.paid ?? 0, code: booking.code ?? "",
