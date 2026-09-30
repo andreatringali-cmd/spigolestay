@@ -296,7 +296,7 @@ export default function OspitiPage() {
 
       {/* Ricerca + segmenti CRM + azioni, tutto in un'unica riga. */}
       <div className="mb-4 flex flex-wrap items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca per nome, email o paese…")} className="w-full flex-1 sm:w-auto" />
+        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca per nome, email o paese…")} className="w-full sm:w-56" />
         <div className="flex flex-wrap items-center gap-1.5">
           {SEGMENTS.map(([k, lab]) => (
             <button key={k} onClick={() => setSeg(k)} className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${seg === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{lab}</button>
