@@ -185,19 +185,10 @@ export default function PrenotazioniPage() {
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkOut)}</td>
       <td className="px-3 py-2.5 font-mono text-dim">{nights(b.checkIn, b.checkOut)}</td>
-      <td className="px-3 py-2.5 font-mono font-semibold text-txt">
-        <span className="inline-flex items-center gap-1.5">
-          {b.total ? eur(grand(b)) : "—"}
-          {underprice?.flagged && (
-            <span title={underpriceReason(b, underprice)} className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-md" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>
-              <Icon name="alertTriangle" size={12} />
-            </span>
-          )}
-        </span>
-      </td>
+      <td className="px-3 py-2.5 font-mono font-semibold text-txt">{b.total ? eur(grand(b)) : "—"}</td>
       <td className="px-3 py-2.5 font-mono text-dim">{commissionOf(b) ? <>{eur(commissionOf(b))} <span className="text-faint">({commissionPctOf(b)}%)</span></> : "—"}</td>
       <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{b.total ? eur(nettoOf(b)) : "—"}</td>
-      <td className="px-3 py-2.5"><div className="flex items-center gap-1.5"><StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--err)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} /><StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} /></div></td>
+      <td className="px-3 py-2.5"><div className="flex items-center gap-1.5"><StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--err)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} /><StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} />{underprice?.flagged && <StatusIcon icon="alertTriangle" color="var(--warn)" title={underpriceReason(b, underprice)} />}</div></td>
     </>);
   };
 
