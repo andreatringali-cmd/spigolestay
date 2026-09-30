@@ -7,7 +7,7 @@ import { bookingCode } from "@/lib/bookingCode";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { nights, parseISO, toISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
-import { bookingGrandTotal, commissionOf, commissionPctOf, nettoOf } from "@/lib/booking";
+import { bookingPaidTotal, commissionOf, commissionPctOf, nettoOf } from "@/lib/booking";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
@@ -162,7 +162,7 @@ export default function PrenotazioniPage() {
     return out;
   })();
   const gSum = (ms: typeof sorted, f: (b: typeof sorted[number]) => number) => ms.reduce((a, b) => a + f(b), 0);
-  const grand = (b: typeof sorted[number]) => bookingGrandTotal(b, getStructure(b.structureId)); // totale unico (soggiorno+pulizia+extra+tassa)
+  const grand = (b: typeof sorted[number]) => bookingPaidTotal(b); // quanto ha pagato l'ospite (soggiorno+pulizia+extra), SENZA tassa di soggiorno — torna con l'OTA
   // Celle di una riga prenotazione (riusate per righe singole e per le camere di un gruppo).
   const renderCells = (b: typeof sorted[number], indent = false) => {
     const ch = CHANNELS[b.channel]; const alOk = alloggiatiOk(b); const pay = payStatus(b);

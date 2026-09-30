@@ -11,7 +11,7 @@ import VoucherDoc from "@/components/pdf/VoucherDoc";
 import { buildGuestLink, buildGroupGuestLink, guideMessage, shortenGuideLink, shortenLink } from "@/lib/guestlink";
 import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
 import { nights, parseISO, shiftISO } from "@/lib/dates";
-import { cityTaxOf } from "@/lib/booking";
+import { cityTaxOf, commissionOf, commissionPctOf, nettoOf } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { invPost } from "@/lib/invoicing/client";
 import AdempimentiPanel from "@/components/booking/AdempimentiPanel";
@@ -166,10 +166,12 @@ export default function BookingDrawer() {
   const extrasList = booking.extras ?? [];
   const extrasV = extrasList.reduce((a, e) => a + (e.price || 0), 0);
   const taxV = cityTaxOf(structure, booking.adults, nView, accV, booking.cityTaxExempt);
-  const totalV = accV + cleanV + extrasV + taxV;
-  const commPctV = booking.commissionPct ?? Math.round(ch.commission * 100);
-  const commV = Math.round(accV * commPctV / 100);
-  const nettoV = accV - commV;
+  // "Totale ospite" = quanto pagato per il soggiorno (senza tassa di soggiorno, riscossa
+  // localmente e mai transitata dall'OTA): torna con l'importo che mostra Booking.com ecc.
+  const totalV = accV + cleanV + extrasV;
+  const commPctV = commissionPctOf(booking);
+  const commV = commissionOf(booking);
+  const nettoV = nettoOf(booking);
   const paidV = booking.paid ?? 0;
   const balanceV = Math.max(0, totalV - paidV);
 
@@ -752,7 +754,7 @@ export default function BookingDrawer() {
               value={form.commissionAmount ?? Math.round(form.total * form.commissionPct / 100)}
               onChange={(e) => { const raw = e.target.value; set({ commissionAmount: raw === "" ? null : Math.max(0, +raw) }); }} />
           </Field>
-          <Field label={`${t("Commissione")} (%)`}><input type="number" min={0} max={100} step={0.1} className={inputCls} value={form.commissionPct} onChange={(e) => set({ commissionPct: Math.max(0, Math.min(100, +e.target.value)), commissionAmount: null })} /></Field>
+          <Field label={`${t("Commissione")} (%)`}><input type="number" min={0} max={100} step={0.1} className={inputCls} value={commissionPctOf(form)} onChange={(e) => set({ commissionPct: Math.max(0, Math.min(100, +e.target.value)), commissionAmount: null })} /></Field>
           <div className="flex flex-col justify-end">
             <span className="mb-1 block text-xs font-medium text-dim">{t("Netto (soggiorno − commissione)")}</span>
             <div className="rounded-lg border border-line bg-wash px-2.5 py-1.5 text-sm font-mono font-semibold text-[color:var(--ok)]">{eur(form.total - (form.commissionAmount ?? Math.round(form.total * form.commissionPct / 100)))}</div>

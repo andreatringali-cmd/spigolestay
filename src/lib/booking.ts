@@ -53,10 +53,20 @@ export function bookingGrandTotal(b: BookingLike, structure: Structure | undefin
   return acc + clean + bookingExtrasTotal(b) + tax;
 }
 
+// Come bookingGrandTotal ma SENZA la tassa di soggiorno: è quanto l'ospite ha pagato per il
+// soggiorno in sé (soggiorno + pulizia + extra) — la cifra che si confronta con l'importo
+// mostrato dall'OTA (Booking.com ecc. non fanno transitare la tassa di soggiorno, riscossa
+// localmente). Usata nell'elenco Prenotazioni, dove "Totale" deve tornare con l'OTA.
+export function bookingPaidTotal(b: BookingLike): number {
+  const acc = b.total ?? 0;
+  if (!acc) return 0;
+  return acc + (b.cleaningFee ?? 0) + bookingExtrasTotal(b);
+}
+
 // Calcolo UNICO della commissione OTA, condiviso ovunque venga mostrata o sommata.
 // Se è nota la cifra esatta (commissionAmount, es. da Booking.com/Channex) ha sempre priorità
 // sul calcolo via percentuale, che resta una stima quando la cifra esatta non c'è.
-type CommissionBookingLike = { total?: number; channel: Channel; commissionPct?: number; commissionAmount?: number };
+type CommissionBookingLike = { total?: number; channel: Channel; commissionPct?: number; commissionAmount?: number | null };
 export function commissionPctOf(b: CommissionBookingLike): number {
   if (b.commissionAmount != null && b.total) return Math.round((b.commissionAmount / b.total) * 1000) / 10;
   return b.commissionPct ?? CHANNELS[b.channel].commission * 100;

@@ -17,7 +17,7 @@ import {
 } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { apiPost } from "@/lib/invoicing/client";
-import { bookingGrandTotal, commissionOf } from "@/lib/booking";
+import { bookingPaidTotal, commissionOf } from "@/lib/booking";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import Icon from "@/components/Icon";
@@ -758,7 +758,7 @@ export default function CalendarGrid() {
             const pax = b.adults + b.children;
             const wide = g.width > 88;
             const xwide = g.width > 148;
-            const gtot = b.total ? bookingGrandTotal(b, structures.find((s) => s.id === b.structureId)) : 0; // totale unico (soggiorno+pulizia+extra+tassa)
+            const gtot = b.total ? bookingPaidTotal(b) : 0; // quanto ha pagato l'ospite, senza tassa di soggiorno
             const extra = blocked ? "" : [wide && `${pax}p`, xwide && gtot ? `€${Math.round(gtot)}` : ""].filter(Boolean).join(" · ");
             const tentative = !blocked && b.status === "tentative";
             const sotto = barStyle === "sotto";
@@ -1278,10 +1278,6 @@ export default function CalendarGrid() {
       {vw.occ && (
       <div ref={occScrollRef} onScroll={() => syncScroll(occScrollRef.current, gridScrollRef.current)} className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <div className="relative" style={{ width: gridW + LABEL_W }}>
-          {/* Linea "oggi", su tutta l'altezza del pannello occupazione */}
-          {todayIdx >= 0 && (
-            <div className="pointer-events-none absolute inset-y-0 z-20" style={{ left: LABEL_W + todayIdx * cellW, borderLeft: "2px solid var(--focus)" }} />
-          )}
           {/* Fascia mese con frecce */}
           <div className="relative flex border-b border-line bg-wash">
             <div className="sticky left-0 z-20 shrink-0 border-r border-line bg-wash" style={{ width: LABEL_W }} />
@@ -1320,6 +1316,10 @@ export default function CalendarGrid() {
               <button onClick={() => router.push("/statistiche")} className="mt-1 inline-flex w-fit items-center gap-1 text-[11px] font-semibold text-focus transition hover:gap-1.5 hover:underline">Altre statistiche →</button>
             </div>
             <div className="relative" style={{ width: gridW, height: OCC_H + 14 }}>
+              {/* Linea "oggi": solo sull'area del grafico, sotto la riga dei giorni (non sopra). */}
+              {todayIdx >= 0 && (
+                <div className="pointer-events-none absolute inset-y-0 z-20" style={{ left: todayIdx * cellW, borderLeft: "2px solid var(--focus)" }} />
+              )}
               <svg width={gridW} height={OCC_H + 14} className="block" preserveAspectRatio="none">
                 <defs>
                   <linearGradient id="occGrad" x1="0" y1="0" x2="0" y2="1">
