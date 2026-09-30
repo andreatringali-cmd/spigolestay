@@ -246,6 +246,8 @@ export default function CamerePage() {
                 ))}
               </div>
 
+              {filtriRow()}
+
               {/* Tipologie */}
               <SectionTitle>{t("Tipologie")}</SectionTitle>
               <div className="mb-4 grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -276,8 +278,6 @@ export default function CamerePage() {
                 })}
                 {types.length === 0 && <div className="w-full rounded-xl border border-dashed border-line"><EmptyState title={t("Nessuna tipologia. Aggiungine una col pulsante “+ Tipologia”.")} /></div>}
               </div>
-
-              {filtriRow()}
 
               {/* Camere — un box separato per ogni tipologia */}
               <SectionTitle>{t("Camere")}</SectionTitle>

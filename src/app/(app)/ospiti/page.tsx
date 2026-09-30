@@ -136,13 +136,6 @@ export default function OspitiPage() {
   };
   const SEGMENTS: [string, string][] = [["all", t("Tutti")], ["repeat", t("Abituali")], ["vip", "VIP"], ["new", t("Nuovi")], ["ch:booking", "Booking"], ["ch:airbnb", "Airbnb"], ["ch:direct", t("Diretta")]];
   const selectSegment = () => setSel((prev) => { const n = new Set(prev); guestSorted.forEach((r) => n.add(r.guest.id)); return n; });
-  // Esporta il segmento corrente in CSV (per mailing/analisi esterne).
-  const exportSegment = () => {
-    const head = [t("Nome"), t("Email"), t("Telefono"), t("Paese"), t("Prenotazioni"), t("Notti"), t("Speso"), t("Ultimo soggiorno"), t("Canale"), "Tag"];
-    const lines = guestSorted.map((r) => [r.guest.fullName, r.guest.email ?? "", r.guest.phone ?? "", r.guest.country ?? "", r.stays, r.nightsTot, r.spent, r.last ? fmtD(r.last) : "", r.topCh ? CHANNELS[r.topCh].label : "", (r.guest.tags ?? []).join("|")].map((x) => `"${String(x).replace(/"/g, '""')}"`).join(","));
-    const blob = new Blob([["﻿" + head.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `ospiti-${seg}.csv`; a.click(); URL.revokeObjectURL(a.href);
-  };
 
   // Esportazione Excel del registro ospiti con colonne a scelta (stesso segmento visibile).
   const EXPORT_COLUMNS: { key: string; label: string; get: (r: (typeof guestSorted)[number]) => string | number }[] = [
@@ -301,13 +294,21 @@ export default function OspitiPage() {
         ))}
       </div>
 
-      {/* Stessa griglia dei riepiloghi sopra: ricerca larga quanto una card e allineata. */}
-      <div className="mb-4 grid grid-cols-2 items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm sm:grid-cols-4">
-        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca per nome, email o paese…")} className="col-span-2 w-full sm:col-span-1" />
-        <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 sm:col-span-3">
+      {/* Ricerca + segmenti CRM + azioni, tutto in un'unica riga. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm">
+        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca per nome, email o paese…")} className="w-full flex-1 sm:w-auto" />
+        <div className="flex flex-wrap items-center gap-1.5">
+          {SEGMENTS.map(([k, lab]) => (
+            <button key={k} onClick={() => setSeg(k)} className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${seg === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{lab}</button>
+          ))}
+          {seg !== "all" && guestSorted.length > 0 && (
+            <button onClick={selectSegment} className="rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash">{t("Seleziona segmento")} ({guestSorted.length})</button>
+          )}
+        </div>
+        <div className="ml-auto flex items-center gap-2">
           <button onClick={() => router.push("/ospiti/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ {t("Nuovo ospite")}</button>
-          <button onClick={() => setExportPick(true)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash"><Icon name="fileText" size={14} /> {t("Esporta")}</button>
           <button onClick={() => router.push("/promozioni")} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash"><Icon name="tag" size={14} /> {t("Promozioni")}</button>
+          <button onClick={() => setExportPick(true)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash"><Icon name="fileText" size={14} /> Excel</button>
         </div>
       </div>
 
@@ -321,19 +322,6 @@ export default function OspitiPage() {
           </div>
         </div>
       )}
-
-      {/* Segmenti CRM: filtra il registro ospiti e permette invii mirati */}
-      <div className="mb-3 flex flex-wrap items-center gap-1.5">
-        {SEGMENTS.map(([k, lab]) => (
-          <button key={k} onClick={() => setSeg(k)} className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${seg === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{lab}</button>
-        ))}
-        <div className="ml-auto flex items-center gap-1.5">
-          {guestSorted.length > 0 && <button onClick={exportSegment} className="rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash">⬇ CSV ({guestSorted.length})</button>}
-          {seg !== "all" && guestSorted.length > 0 && (
-            <button onClick={selectSegment} className="rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash">{t("Seleziona segmento")} ({guestSorted.length})</button>
-          )}
-        </div>
-      </div>
 
       <Register title={t("Registro ospiti")} list={guestSorted} empty={t("Nessun ospite in questo segmento.")} open={openReg.ospiti} onToggle={() => setOpenReg((v) => ({ ...v, ospiti: !v.ospiti }))} />
       <Register title={t("Registro newsletter")} list={nlSorted} empty={t("Nessun iscritto alla newsletter.")} lead onClear={clearNewsletter} open={openReg.nl} onToggle={() => setOpenReg((v) => ({ ...v, nl: !v.nl }))} />
