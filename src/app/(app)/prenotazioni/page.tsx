@@ -4,10 +4,12 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/store";
 import { bookingCode } from "@/lib/bookingCode";
-import { CHANNELS, type Channel } from "@/lib/types";
+import { CHANNELS, type BookingStatus, type Channel } from "@/lib/types";
 import { nights, parseISO, toISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { bookingPaidTotal, cityTaxOf, commissionOf, commissionPctOf, nettoOf } from "@/lib/booking";
+import { loadWeekendPct } from "@/lib/pricing";
+import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
@@ -31,7 +33,7 @@ const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2
 
 export default function PrenotazioniPage() {
   const { t } = useLang();
-  const { bookings, guests, units, roomTypes, structures, getUnit, getStructure, openBooking, openNewBooking, activeStructureId, deleteBookingGroup } = useData();
+  const { bookings, guests, units, roomTypes, structures, rateOverrides, getUnit, getStructure, openBooking, openNewBooking, activeStructureId, deleteBookingGroup } = useData();
   const ask = useConfirm();
   // Nome ospite: dal collegamento se presente, altrimenti dallo snapshot salvato sulla prenotazione
   // (es. dopo l'eliminazione dell'anagrafica ospite il guestId resta vuoto ma primaryGuest conserva i dati).
@@ -70,6 +72,11 @@ export default function PrenotazioniPage() {
     unpaid: ["var(--err)", "Da pagare"],
   };
   const PALETTE = ["#BE5D38", "#7A8450", "#C08A3A", "#957A66", "#4F8A5B", "#5B74E6", "#B3453A"];
+  // Allerta "prezzo sotto costo": confronta il prezzo registrato con la tariffa attesa del motore
+  // prezzi (src/lib/pricing.ts). Solo rilevamento/visualizzazione, calcolato al volo dai dati già
+  // caricati — nessuna modifica al prezzo della prenotazione.
+  const weekendPct = useMemo(() => loadWeekendPct(), []);
+  const underpriceOf = (b: { channel: Channel; status: BookingStatus; roomTypeId: string; checkIn: string; checkOut: string; total?: number }) => checkUnderpriced(b, roomTypes, rateOverrides, weekendPct);
 
   const [q, setQ] = useState("");
   const [channel, setChannel] = useState<string>("all");
@@ -166,6 +173,7 @@ export default function PrenotazioniPage() {
   // Celle di una riga prenotazione (riusate per righe singole e per le camere di un gruppo).
   const renderCells = (b: typeof sorted[number], indent = false) => {
     const ch = CHANNELS[b.channel]; const alOk = alloggiatiOk(b); const pay = payStatus(b);
+    const underprice = underpriceOf(b);
     return (<>
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{bookingCode(b)}</td>
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.bookedOn ? fmt(b.bookedOn) : "—"}</td>
@@ -177,7 +185,16 @@ export default function PrenotazioniPage() {
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkOut)}</td>
       <td className="px-3 py-2.5 font-mono text-dim">{nights(b.checkIn, b.checkOut)}</td>
-      <td className="px-3 py-2.5 font-mono font-semibold text-txt">{b.total ? eur(grand(b)) : "—"}</td>
+      <td className="px-3 py-2.5 font-mono font-semibold text-txt">
+        <span className="inline-flex items-center gap-1.5">
+          {b.total ? eur(grand(b)) : "—"}
+          {underprice?.flagged && (
+            <span title={underpriceReason(b, underprice)} className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-md" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>
+              <Icon name="alertTriangle" size={12} />
+            </span>
+          )}
+        </span>
+      </td>
       <td className="px-3 py-2.5 font-mono text-dim">{commissionOf(b) ? <>{eur(commissionOf(b))} <span className="text-faint">({commissionPctOf(b)}%)</span></> : "—"}</td>
       <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{b.total ? eur(nettoOf(b)) : "—"}</td>
       <td className="px-3 py-2.5"><div className="flex items-center gap-1.5"><StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--err)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} /><StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} /></div></td>
@@ -399,6 +416,7 @@ export default function PrenotazioniPage() {
           }
           const b = item.b;
           const ch = CHANNELS[b.channel]; const alOk = alloggiatiOk(b); const pay = payStatus(b);
+          const underprice = underpriceOf(b);
           return (
             <button key={b.id} onClick={() => openBooking(b.id)} className="block w-full rounded-xl border border-line bg-surface p-3 text-left shadow-sm active:bg-wash">
               <div className="flex items-center justify-between gap-2">
@@ -417,6 +435,7 @@ export default function PrenotazioniPage() {
               <div className="mt-2 flex items-center gap-1.5">
                 <StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--err)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} />
                 <StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} />
+                {underprice?.flagged && <StatusIcon icon="alertTriangle" color="var(--warn)" title={underpriceReason(b, underprice)} />}
                 {activeStructureId === "all" && <span className="ml-auto flex items-center gap-1 truncate text-[11px] text-faint"><span className="h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} />{getStructure(b.structureId)?.name}</span>}
               </div>
             </button>

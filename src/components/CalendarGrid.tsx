@@ -19,6 +19,7 @@ import { eur } from "@/lib/format";
 import { apiPost } from "@/lib/invoicing/client";
 import { bookingPaidTotal, commissionOf } from "@/lib/booking";
 import { rateForDay, loadWeekendPct, isWeekendISO } from "@/lib/pricing";
+import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import Icon from "@/components/Icon";
 import ChannelLogo from "@/components/ChannelLogo";
@@ -775,6 +776,7 @@ export default function CalendarGrid() {
             const noSched = !blocked && !schedinaOk(b.guestId);
             const turn = !blocked && isTurnover(b);
             const grp = !blocked && !!b.groupId;
+            const underprice = !blocked ? checkUnderpriced(b, roomTypes, rateOverrides, weekendPct) : null;
             const chLetter = ({ booking: "B", airbnb: "A", expedia: "E", other: "O", direct: "D", blocked: "" } as Record<string, string>)[b.channel] ?? "";
             const chChip = !blocked && chLetter ? (
               <span className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[3px] bg-white text-[8px] font-extrabold leading-none" style={{ color: `var(${meta.cssVar})` }} title={meta.label}>{chLetter}</span>
@@ -789,6 +791,7 @@ export default function CalendarGrid() {
                 {turn && <span title="Turnover · check-out e check-in stesso giorno" className="text-[10px] leading-none">⚡</span>}
                 {bday && <span title="Compleanno durante il soggiorno"><Icon name="cake" size={11} /></span>}
                 {noSched && <span title="Schedina alloggiati da completare" className="grid h-3.5 w-3.5 place-items-center rounded-full text-[9px] font-bold leading-none" style={{ backgroundColor: "rgba(255,255,255,.28)" }}>!</span>}
+                {underprice?.flagged && <span title={underpriceReason(b, underprice)} className="grid h-3.5 w-3.5 place-items-center rounded-full" style={{ backgroundColor: "#fff", color: "var(--warn)" }}><Icon name="alertTriangle" size={9} /></span>}
                 <span title={`Pagamento: ${pay === "paid" ? "saldato" : pay === "partial" ? "acconto" : "da incassare"}`} className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: PAY_DOT[pay], boxShadow: "0 0 0 1.5px rgba(255,255,255,.75)" }} />
               </span>
             ) : null;
@@ -797,7 +800,7 @@ export default function CalendarGrid() {
               <div
                 key={b.id}
                 onPointerDown={(e) => onBarPointerDown(e, b.id)}
-                title={`${blocked ? `Fuori servizio${b.note ? ` · ${b.note}` : ""}` : `${guestName(b.guestId)} · ${pax} ospiti${gtot ? ` · €${Math.round(gtot)}` : ""}`} · ${b.checkIn} → ${b.checkOut}${tentative ? " · opzione" : ""}`}
+                title={`${blocked ? `Fuori servizio${b.note ? ` · ${b.note}` : ""}` : `${guestName(b.guestId)} · ${pax} ospiti${gtot ? ` · €${Math.round(gtot)}` : ""}`} · ${b.checkIn} → ${b.checkOut}${tentative ? " · opzione" : ""}${underprice?.flagged ? ` · ⚠ ${underpriceReason(b, underprice)}` : ""}`}
                 className={`absolute overflow-hidden ${sotto ? "flex cursor-grab flex-col justify-end active:cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
                 style={{ left: g.left + 1, width: g.width - 2, top: lane * rowH + 1, height: rowH - 2, opacity: dragging ? 0.35 : tentative ? 0.72 : 1, pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
               >
@@ -811,6 +814,7 @@ export default function CalendarGrid() {
                           {b.movedFrom && <span title={`Spostata da ${b.movedFrom.structureName || "un'altra struttura"}`} className="font-bold" style={{ color: "var(--warn)" }}>⇄</span>}
                           {bday && <span title="Compleanno" style={{ color: "#DB2777" }}><Icon name="cake" size={10} /></span>}
                           {noSched && <span title="Schedina da completare" className="font-bold text-[color:var(--warn)]">!</span>}
+                          {underprice?.flagged && <span title={underpriceReason(b, underprice)} style={{ color: "var(--warn)" }}><Icon name="alertTriangle" size={10} /></span>}
                           <span title="Pagamento" className="h-2 w-2 rounded-full" style={{ backgroundColor: PAY_DOT[pay] }} />
                         </span>
                       )}
