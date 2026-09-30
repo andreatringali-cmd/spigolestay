@@ -596,6 +596,13 @@ export default function StrutturaSchedaPage() {
               </div>
               <p className="mt-1.5 text-[11px] text-faint">{t("Se un ospite cerca disponibilità qui e questa struttura è al completo per quelle date, il motore di prenotazione pubblico può suggerire un'altra tua struttura pubblicata (stesso account Xenora) che ha disponibilità, con un link diretto. Nessun dato viene condiviso con terzi: funziona solo tra le tue strutture.")}</p>
             </div>
+            <div className="mb-2 rounded-lg border border-line bg-paper p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <label className={lbl}>{t("Partecipa alla rete Xenora tra strutture diverse")}</label>
+                <Toggle on={f.networkOptIn === true} onClick={() => set("networkOptIn", f.networkOptIn === true ? false : true)} />
+              </div>
+              <p className="mt-1.5 text-[11px] text-faint">{t("Spento di default. Se lo attivi: quando questa struttura è al completo, il motore di prenotazione pubblico propone ai tuoi ospiti altre strutture Xenora della stessa città che hanno ANCH'ESSE attivato questa opzione e hanno disponibilità — e, viceversa, questa struttura può comparire tra i suggerimenti di quelle strutture quando sono loro ad essere al completo. Funziona solo tra strutture che hanno scelto entrambe di aderire: mai in automatico, mai con account che non l'hanno attivata. Nessun dato di ospiti, prezzi o prenotazioni viene condiviso: solo nome, città e link al sito pubblico.")}</p>
+            </div>
             <p className="mt-3 text-[11px] text-faint">{t("I servizi extra si gestiscono in «Upselling & extra»; l'ospite li sceglie durante la prenotazione.")}</p>
           </Card>
 

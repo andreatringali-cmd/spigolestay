@@ -11,7 +11,7 @@ import { cityTaxOf } from "@/lib/booking";
 import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } from "@/lib/rate-plans";
 import { amenityIcon } from "@/lib/amenities";
 import { loadPromos } from "@/lib/promos";
-import { loadPublicSite, lsGet, isPublicMode, publicSlug, findAvailableSibling, type SiblingSuggestion } from "@/lib/publicdata";
+import { loadPublicSite, lsGet, isPublicMode, publicSlug, findAvailableSibling, findNetworkSuggestions, type SiblingSuggestion } from "@/lib/publicdata";
 
 // ---- pricing helpers --------------------------------------------------------
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
@@ -177,17 +177,31 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   // proprietario con disponibilità VERA per le stesse date/ospiti, e la propone
   // all'ospite invece di lasciarlo senza alternative. Solo sui siti pubblici
   // (Xenosite/embed) e solo se l'host non l'ha disattivato nelle Impostazioni struttura.
-  // V1: nessuna condivisione con account diversi da questo.
   const [sibling, setSibling] = useState<SiblingSuggestion | null>(null);
+  // Rete di passaggio Xenora TRA ACCOUNT DIVERSI (V2): se non c'è un'alternativa dello
+  // stesso proprietario, e QUESTA struttura ha attivato esplicitamente `networkOptIn`,
+  // cerca strutture di ALTRI account nella stessa città che hanno anch'esse attivato
+  // l'opt-in e hanno disponibilità vera. Doppio opt-in: nessuna struttura mostra o
+  // compare in suggerimenti altrui senza averlo scelto esplicitamente (default OFF).
+  const [networkAlts, setNetworkAlts] = useState<SiblingSuggestion[]>([]);
   useEffect(() => {
     setSibling(null);
+    setNetworkAlts([]);
     const slug = publicSlug();
     if (!allSoldOut || !isPublicMode() || !slug) return;
-    if (structure?.crossSuggestEnabled === false) return;
     let alive = true;
-    findAvailableSibling({ currentSlug: slug, currentStructureId: structureId, checkIn, checkOut, guests: pax }).then((s) => { if (alive) setSibling(s); });
+    (async () => {
+      if (structure?.crossSuggestEnabled !== false) {
+        const s = await findAvailableSibling({ currentSlug: slug, currentStructureId: structureId, checkIn, checkOut, guests: pax });
+        if (!alive) return;
+        if (s) { setSibling(s); return; } // alternativa dello stesso gestore: priorità sulla rete tra account diversi
+      }
+      if (!alive || structure?.networkOptIn !== true) return;
+      const list = await findNetworkSuggestions({ currentSlug: slug, city: structure?.city, checkIn, checkOut, guests: pax });
+      if (alive) setNetworkAlts(list);
+    })();
     return () => { alive = false; };
-  }, [allSoldOut, checkIn, checkOut, pax, structureId, structure?.crossSuggestEnabled]);
+  }, [allSoldOut, checkIn, checkOut, pax, structureId, structure?.crossSuggestEnabled, structure?.networkOptIn, structure?.city]);
 
   const selRt = sel ? types.find((t) => t.id === sel.rtId) : null;
   const selPlan = sel ? plans.find((p) => p.id === sel.planId) ?? plans[0] : null;
@@ -544,6 +558,32 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                     >
                       Vedi disponibilità →
                     </a>
+                  </div>
+                </div>
+              )}
+              {allSoldOut && !sibling && networkAlts.length > 0 && (
+                <div className={`${box} overflow-hidden`} style={{ borderColor: "var(--focus)", borderWidth: 2 }}>
+                  <div className="flex items-start gap-3 p-4">
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-lg" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)" }}>🏠</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-txt">{structure?.name ?? "Questa struttura"} è al completo per queste date</div>
+                      <div className="mt-0.5 text-sm text-dim">Altre strutture su Xenora hanno disponibilità per le stesse date:</div>
+                      <div className="mt-3 flex flex-col gap-2">
+                        {networkAlts.map((alt) => (
+                          <div key={alt.slug} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-wash px-3 py-2">
+                            <span className="text-sm text-txt"><b>{alt.name}</b>{alt.zone ? ` (${alt.zone})` : alt.city ? ` (${alt.city})` : ""}</span>
+                            <a
+                              href={`/prenota?site=${encodeURIComponent(alt.slug)}&ci=${checkIn}&co=${checkOut}&ad=${adults}${children ? `&ch=${children}&ages=${childAges.join(",")}` : ""}`}
+                              target={embed ? "_top" : undefined}
+                              rel={embed ? "noreferrer" : undefined}
+                              className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-center text-xs font-semibold text-white hover:opacity-90"
+                            >
+                              Vedi disponibilità →
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

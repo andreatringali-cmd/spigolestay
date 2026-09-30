@@ -105,6 +105,15 @@ export interface Structure {
   extras?: ExtraService[]; // servizi extra / upsell
   depositPct?: number;     // % acconto richiesto alla prenotazione diretta
   crossSuggestEnabled?: boolean; // se questa struttura è al completo, suggerisce all'ospite un'altra struttura dello stesso proprietario con disponibilità (assente/true = attivo)
+  // Rete di passaggio Xenora TRA ACCOUNT DIVERSI — opt-in esplicito, default OFF
+  // (assente/false = spento: nessun dato lascia questo account). Se attivato:
+  //  (a) questa struttura può comparire come alternativa nel motore di prenotazione
+  //      di un'ALTRA struttura opted-in della stessa città quando quella è al completo;
+  //  (b) questa struttura mostra ai propri ospiti le alternative di altre strutture
+  //      opted-in quando è LEI stessa al completo.
+  // Attraversano il confine tenant SOLO nome, città/zona e slug pubblico: mai ospiti,
+  // prezzi, prenotazioni o dati fiscali.
+  networkOptIn?: boolean;
 }
 
 export interface ExtraService {

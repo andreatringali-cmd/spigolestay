@@ -279,3 +279,41 @@ export async function findAvailableSibling(opts: {
     return null;
   } catch { return null; }
 }
+
+// ---- Rete di passaggio Xenora TRA ACCOUNT DIVERSI (V2) -----------------------
+//
+// Estende l'idea sopra (V1, solo stesso proprietario) alle strutture di ALTRI
+// account Xenora, ma SOLO se entrambe le parti hanno attivato esplicitamente
+// `networkOptIn` (default OFF): la struttura al completo deve averlo attivato
+// per mostrare suggerimenti ai propri ospiti, e la struttura candidata deve
+// averlo attivato per poter comparire nei suggerimenti altrui. Nessuna delle
+// due condizioni è implicita nella pubblicazione dello Xenosite.
+//
+// Il confronto vero e proprio (parsing dei blob pubblicati, calcolo disponibilità)
+// avviene SERVER-SIDE in /api/xenorabook/network-suggestions: al browser del
+// proprietario/ospite arrivano solo i campi minimi (slug, nome, città/zona) delle
+// strutture che risultano libere — mai i blob completi (camere, prenotazioni…)
+// delle strutture di altri account.
+export async function findNetworkSuggestions(opts: {
+  currentSlug: string;
+  city?: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+}): Promise<SiblingSuggestion[]> {
+  const city = (opts.city || "").trim();
+  if (!city || !opts.currentSlug) return [];
+  try {
+    const qs = new URLSearchParams({
+      slug: opts.currentSlug,
+      city,
+      ci: opts.checkIn,
+      co: opts.checkOut,
+      guests: String(Math.max(1, opts.guests || 1)),
+    });
+    const res = await fetch(`/api/xenorabook/network-suggestions?${qs.toString()}`, { cache: "no-store" });
+    if (!res.ok) return [];
+    const j = await res.json();
+    return Array.isArray(j?.suggestions) ? (j.suggestions as SiblingSuggestion[]) : [];
+  } catch { return []; }
+}
