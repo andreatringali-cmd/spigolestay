@@ -207,54 +207,6 @@ export default function AssistentePage() {
     speak(full);
   }, [bookings, narrate, speak]);
 
-  // Briefing "distribuito": ogni numero è una tessera a sé. Set ricco di indicatori reali.
-  const tiles = useMemo(() => {
-    const inHouse = active.filter((b) => b.checkIn <= t && t < b.checkOut);
-    const cleanUnits = new Set<string>();
-    for (const b of active) { if (b.checkOut === t || b.checkIn === t || (b.checkIn < t && t < b.checkOut)) if (b.unitId) cleanUnits.add(b.unitId); }
-    const totUnits = units.filter((u) => !u.outOfService).length;
-    const occToday = active.filter((b) => b.checkIn <= t && t < b.checkOut && b.unitId).length;
-    const occPct = totUnits > 0 ? Math.round((occToday / totUnits) * 100) : 0;
-    const monthArr = active.filter((b) => monthOf(b.checkIn) === ym);
-    const next = active.filter((b) => b.checkIn > t).sort((a, b) => a.checkIn.localeCompare(b.checkIn))[0];
-    const nextLabel = next ? new Date(next.checkIn + "T00:00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "short" }) : "—";
-    const unpaid = active.filter((b) => { const tot = bookingGrandTotal(b, getStructure(b.structureId)); return tot > 0 && (b.paid ?? 0) < tot - 0.01; }).length;
-    const cityTaxDue = active.filter((b) => b.checkOut >= t && !b.cityTaxPaid).length;
-    const weekArr = active.filter((b) => b.checkIn > t && b.checkIn <= new Date(Date.parse(t) + 7 * 86400000).toISOString().slice(0, 10)).length;
-    // ── Serie giornaliere reali per i mini-grafici (stile HUD) ──
-    const dayISO = (off: number) => { const d = new Date(t + "T00:00:00"); d.setDate(d.getDate() + off); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-    const arrNext7 = Array.from({ length: 7 }, (_, i) => { const day = dayISO(i); return active.filter((b) => b.checkIn === day).length; });
-    const depNext7 = Array.from({ length: 7 }, (_, i) => { const day = dayISO(i); return active.filter((b) => b.checkOut === day).length; });
-    const inHouse7 = Array.from({ length: 7 }, (_, i) => { const day = dayISO(i); return active.filter((b) => b.checkIn <= day && day < b.checkOut && b.unitId).length; });
-    const occ14 = Array.from({ length: 14 }, (_, i) => { const day = dayISO(i); const occ = active.filter((b) => b.checkIn <= day && day < b.checkOut && b.unitId).length; return totUnits > 0 ? Math.round((occ / totUnits) * 100) : 0; });
-    const arrLast14 = Array.from({ length: 14 }, (_, i) => { const day = dayISO(i - 13); return active.filter((b) => b.checkIn === day).length; });
-    const revLast6mo = Array.from({ length: 6 }, (_, i) => { const d = new Date(t + "T00:00:00"); d.setMonth(d.getMonth() - (5 - i)); const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; return Math.round(active.filter((b) => monthOf(b.checkIn) === m).reduce((a, b) => a + bookingGrandTotal(b, getStructure(b.structureId)), 0)); });
-    // Toni derivati SOLO dai 4 colori semantici del tema (focus/ok/warn/err) via color-mix:
-    // niente esadecimali fissi → la tavolozza resta coerente con QUALSIASI palette scelta
-    // dall'utente in Impostazioni (comprese quelle più audaci come Terminale o Vino & Oro).
-    const teal = "color-mix(in srgb, var(--focus) 60%, var(--ok) 40%)";
-    const violet = "color-mix(in srgb, var(--focus) 55%, var(--err) 45%)";
-    const lime = "color-mix(in srgb, var(--ok) 70%, var(--warn) 30%)";
-    const amber = "color-mix(in srgb, var(--warn) 60%, var(--err) 40%)";
-    const soft = "color-mix(in srgb, var(--focus) 45%, var(--txt) 55%)";
-    return [
-      { label: "Arrivi oggi", value: String(answers.arrivalsToday.length), tone: "var(--ok)", q: "arrivi oggi", spark: arrNext7 },
-      { label: "Partenze oggi", value: String(answers.departuresToday.length), tone: "var(--warn)", q: "partenze", spark: depNext7 },
-      { label: "In casa ora", value: String(inHouse.length), tone: teal, q: "chi è in casa", spark: inHouse7 },
-      { label: "Check-in mancanti", value: String(answers.noCheckin.length), tone: "var(--focus)", q: "check-in mancanti" },
-      { label: "Camere da pulire", value: String(cleanUnits.size), tone: violet, q: "pulizie" },
-      { label: "Occupazione oggi", value: `${occPct}%`, tone: occPct >= 80 ? "var(--ok)" : occPct >= 40 ? "var(--warn)" : "var(--err)", q: "occupazione", spark: occ14 },
-      { label: "Arrivi 7 giorni", value: String(weekArr), tone: lime, q: "prossimi arrivi", spark: arrNext7 },
-      { label: "Prossimo arrivo", value: nextLabel, tone: soft, q: "prossimo arrivo" },
-      { label: "Prenotazioni mese", value: String(monthArr.length), tone: "var(--focus)", q: "prenotazioni del mese", spark: arrLast14 },
-      { label: "Da incassare", value: dueCents != null ? eur(dueCents / 100) : "—", tone: "var(--err)", q: "da incassare" },
-      { label: "Prenotazioni non saldate", value: String(unpaid), tone: "var(--warn)", q: "da incassare" },
-      { label: "Tassa soggiorno da incassare", value: String(cityTaxDue), tone: amber, q: "tassa di soggiorno" },
-      { label: "Incassato mese", value: answers.incassato.value ?? "—", tone: "var(--ok)", q: "incassato" },
-      { label: "Ricavo previsto", value: answers.ricavo.value ?? "—", tone: "var(--focus)", q: "ricavo", spark: revLast6mo },
-    ];
-  }, [answers, dueCents, active, t, ym, units, getStructure]);
-
   // ── Motore risposte (parole chiave) ──
   const answer = useCallback(async (text: string): Promise<Ans> => {
     const s = text.toLowerCase().trim();
@@ -534,35 +486,6 @@ export default function AssistentePage() {
           {ans.go && <button onClick={() => router.push(ans.go!.href)} className="mt-4 inline-flex rounded-full border border-line px-3.5 py-1.5 text-xs font-semibold text-txt transition hover:border-focus hover:bg-wash">{ans.go.label} →</button>}
         </div>
       )}
-
-      {/* ─────────── Panoramica di oggi: tessere dati reali (clic = domanda) ─────────── */}
-      <div className="mb-2 mt-8 flex items-center gap-2">
-        <div className="h-px flex-1" style={{ backgroundColor: "var(--line)" }} />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-faint">Panoramica di oggi</span>
-        <div className="h-px flex-1" style={{ backgroundColor: "var(--line)" }} />
-      </div>
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7">
-        {tiles.map((it) => (
-          <button
-            key={it.label}
-            type="button"
-            onClick={() => { if (it.q) { setQ(it.q); ask(it.q); } }}
-            className="group relative flex flex-col items-start overflow-hidden rounded-xl border border-line bg-surface px-3.5 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-          >
-            <span className="absolute inset-x-0 top-0 h-[2.5px] opacity-70 transition-opacity group-hover:opacity-100" style={{ backgroundColor: it.tone }} aria-hidden />
-            <span className="font-mono text-[9px] font-semibold uppercase leading-none tracking-[0.12em] text-faint">{it.label}</span>
-            <span className="mt-1.5 font-display text-xl font-bold leading-none tabular-nums" style={{ color: it.tone }}>{it.value}</span>
-            {it.spark && it.spark.length > 1 && (() => {
-              const max = Math.max(1, ...it.spark!); const n = it.spark!.length; const w = n * 4;
-              return (
-                <svg viewBox={`0 0 ${w} 16`} preserveAspectRatio="none" className="mt-2 h-3 w-full opacity-60 transition-opacity group-hover:opacity-100" aria-hidden>
-                  {it.spark!.map((v, k) => { const h = Math.max(1.2, (v / max) * 14); return <rect key={k} x={k * 4} y={16 - h} width={2.4} height={h} rx={1.2} fill={it.tone} opacity={0.28 + 0.6 * (v / max)} />; })}
-                </svg>
-              );
-            })()}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
