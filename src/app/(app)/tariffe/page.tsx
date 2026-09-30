@@ -167,11 +167,13 @@ export default function TariffePage() {
           const forced = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso];
           const isToday = iso === toISO(s);
           const we = isWeekend(d);
+          const dow = d.getDay(); // 0 = domenica, 6 = sabato
+          const numColor = dow === 6 ? "#E08A3A" : dow === 0 ? "var(--err)" : "var(--txt)";
           return (
             <td key={iso} className="px-2 py-2.5 text-center group-hover:bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
               {forced != null
-                ? <span className="font-mono text-sm font-bold tabular-nums text-txt" title={t("Tariffa forzata dal calendario")}>{dayPrice(rt, d)}<sup className="ml-0.5 text-[9px] font-bold not-italic" style={{ color: "var(--focus)" }}>€</sup></span>
-                : <span className="font-mono text-sm tabular-nums text-txt">{dayPrice(rt, d)}</span>}
+                ? <span className="font-mono text-sm font-bold tabular-nums" style={{ color: numColor }} title={t("Tariffa forzata dal calendario")}>{dayPrice(rt, d)}<sup className="ml-0.5 text-[9px] font-bold not-italic" style={{ color: "var(--focus)" }}>€</sup></span>
+                : <span className="font-mono text-sm tabular-nums" style={{ color: numColor }}>{dayPrice(rt, d)}</span>}
             </td>
           );
         })}
@@ -268,15 +270,20 @@ export default function TariffePage() {
           );
         })()}
 
-        {/* Regola weekend */}
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-sm shadow-sm">
-          <button type="button" onClick={() => setWeekendOn(!weekendOn)} aria-pressed={weekendOn} title={weekendOn ? t("Disattiva la maggiorazione weekend") : t("Attiva la maggiorazione weekend")} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: weekendOn ? "var(--ok)" : "var(--line)" }}>
-            <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: weekendOn ? "22px" : "2px" }} />
-          </button>
-          <span className={`font-semibold ${weekendOn ? "text-txt" : "text-faint"}`}>📅 {t("Maggiorazione weekend")}</span>
-          <span className="flex items-center gap-1"><input type="number" value={weekendPct} disabled={!weekendOn} onFocus={(e) => e.currentTarget.select()} onChange={(e) => saveWeekend(Number(e.target.value))} className={`${inp} w-20 disabled:opacity-40`} /><span className="text-dim">%</span></span>
-          <span className="text-xs text-faint">{weekendOn ? t("su ven/sab/dom, se non c'è un prezzo forzato dal calendario") : t("spenta: nessuna maggiorazione applicata nel weekend")}</span>
-        </div>
+      </section>
+
+      {/* Maggiorazione weekend */}
+      <section className="mb-6">
+        <SectionTitle>{t("Maggiorazione weekend")}</SectionTitle>
+        <Card>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="flex items-center gap-1"><input type="number" value={weekendPct} disabled={!weekendOn} onFocus={(e) => e.currentTarget.select()} onChange={(e) => saveWeekend(Number(e.target.value))} className={`${inp} w-20 disabled:opacity-40`} /><span className="text-dim">%</span></span>
+            <span className="text-xs text-faint">{weekendOn ? t("su ven/sab/dom, se non c'è un prezzo forzato dal calendario") : t("spenta: nessuna maggiorazione applicata nel weekend")}</span>
+            <button type="button" onClick={() => setWeekendOn(!weekendOn)} aria-pressed={weekendOn} title={weekendOn ? t("Disattiva la maggiorazione weekend") : t("Attiva la maggiorazione weekend")} className="relative ml-auto h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: weekendOn ? "var(--ok)" : "var(--line)" }}>
+              <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: weekendOn ? "22px" : "2px" }} />
+            </button>
+          </div>
+        </Card>
       </section>
 
       {/* Anteprima prezzi */}
@@ -288,9 +295,7 @@ export default function TariffePage() {
           <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 22%, transparent)" }} /> {t("oggi")}</span>
           <span className="flex items-center gap-1.5"><span className="rounded px-1 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 16%, transparent)", color: "var(--focus)" }}>€</span> {t("prezzo forzato dal calendario")}</span>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            {types.some((rt) => rt.deriveFrom) && <a href="/tariffe-derivate" className="whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-sm font-medium text-focus hover:bg-wash">{t("Tariffe derivate")} →</a>}
             <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">{plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.adjPct >= 0 ? "+" : ""}{p.adjPct}%)</option>)}</select>
-            <a href="/piani-tariffari" className="whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-sm font-medium text-focus hover:bg-wash">{t("Gestisci piani")} →</a>
           </div>
         </div>
         <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
