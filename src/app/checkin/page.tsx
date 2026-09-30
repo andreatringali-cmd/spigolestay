@@ -96,6 +96,18 @@ function Engine() {
   const [submitErr, setSubmitErr] = useState("");
   const [done, setDone] = useState(false);
   const [paidNow, setPaidNow] = useState(false);
+  // "Aggiungi a Google Wallet": pulsante pubblico dopo il check-in, gated lato server
+  // (GOOGLE_WALLET_* su Vercel). Se non configurato mostra un messaggio, mai un errore.
+  const [walletState, setWalletState] = useState<"idle" | "loading" | "unavailable">("idle");
+  const addToWallet = async () => {
+    setWalletState("loading");
+    try {
+      const r = await fetch(`/api/wallet/pass?slug=${encodeURIComponent(params.slug)}&b=${encodeURIComponent(params.b)}`);
+      const j = await r.json().catch(() => ({}));
+      if (j?.ok && j.url) { window.open(j.url, "_blank"); setWalletState("idle"); return; }
+    } catch {}
+    setWalletState("unavailable");
+  };
   const onPhoto = async (file: File | undefined, set: (v: string) => void, extract = false) => {
     if (!file || !file.type.startsWith("image/")) return;
     try { const dl = await downscaleImage(file, 900, 0.72); set(dl); if (extract) void extractDoc(dl); } catch {}
@@ -350,6 +362,9 @@ function Engine() {
             {st?.phone && <div className="flex gap-2"><span>📞</span><a href={`tel:${st.phone}`} className="text-focus hover:underline">{st.phone}</a></div>}
           </div>
           <a href={`https://spigole-guest-guide.vercel.app${(st?.name ?? "").toLowerCase().includes("central perk") ? "/?p=centralperk" : ""}`} target="_blank" rel="noreferrer" className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90">Apri la guida dell&apos;ospite →</a>
+          {walletState === "unavailable"
+            ? <p className="mt-2 text-center text-xs text-faint">Aggiungi a Google Wallet: disponibile a breve.</p>
+            : <button type="button" onClick={addToWallet} disabled={walletState === "loading"} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-surface py-2.5 text-sm font-semibold text-txt hover:opacity-90 disabled:opacity-50">{walletState === "loading" ? "Preparo il pass…" : "🔖 Aggiungi a Google Wallet"}</button>}
         </div>
       </div>
     </div>
