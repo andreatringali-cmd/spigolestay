@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { channexEnabled, listBookingRevisions } from "@/lib/channex";
+import { channexEnabled, listBookingRevisions, listProperties, listRoomTypesFor, listRatePlansForRoomType } from "@/lib/channex";
 import { runCertScenario, setupTestProperty, resolveCertContext, SCENARIO_IDS, type ScenarioId } from "@/lib/channex-cert";
 import { importBookings } from "@/lib/channex-inbound";
 
@@ -87,6 +87,36 @@ export async function POST(req: Request) {
   if (body?.action === "ack-bookings") {
     const r = await importBookings(admin);
     return NextResponse.json({ ok: r.ok, acked: r.acked, feed: r.feed, error: r.errors?.[0] }, { status: 200 });
+  }
+
+  // Azione DIAGNOSTICA (sola lettura): elenca TUTTE le property su Channex il cui titolo contiene
+  // "Test Property" o "Xenora", con tutte le tipologie/piani tariffari di ciascuna — serve a scoprire
+  // eventuali DOPPIONI della property di certificazione (stesso titolo, ID diversi) che spiegherebbero
+  // un mismatch tra la property su cui girano gli scenari e quella controllata da Channex.
+  if (body?.action === "list-test-properties") {
+    const listed = await listProperties();
+    if (!listed.ok) return NextResponse.json({ ok: false, error: listed.error || `Errore ${listed.status}` }, { status: 200 });
+    const rows = (listed.data?.data ?? []) as { id: string; attributes?: { title?: string } }[];
+    const candidates = rows.filter((p) => /test property|xenora/i.test(String(p.attributes?.title ?? "")));
+    const out = [];
+    for (const p of candidates) {
+      const propertyId = String(p.id);
+      const title = String(p.attributes?.title ?? "");
+      const rtRes = await listRoomTypesFor(propertyId);
+      const roomRows = (rtRes.ok ? (rtRes.data?.data ?? []) : []) as { id: string; attributes?: { title?: string } }[];
+      const roomTypes = [];
+      for (const rt of roomRows) {
+        const rpRes = await listRatePlansForRoomType(String(rt.id));
+        const rpRows = (rpRes.ok ? (rpRes.data?.data ?? []) : []) as { id: string; attributes?: { title?: string } }[];
+        roomTypes.push({
+          roomTypeId: String(rt.id),
+          roomTitle: String(rt.attributes?.title ?? ""),
+          ratePlans: rpRows.map((rp) => ({ ratePlanId: String(rp.id), ratePlanTitle: String(rp.attributes?.title ?? "") })),
+        });
+      }
+      out.push({ propertyId, title, roomTypes });
+    }
+    return NextResponse.json({ ok: true, allProperties: rows.map((p) => ({ id: String(p.id), title: String(p.attributes?.title ?? "") })), candidates: out }, { status: 200 });
   }
 
   const scenario = String(body?.scenario || "") as ScenarioId;
