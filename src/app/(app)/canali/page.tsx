@@ -9,6 +9,7 @@ import Icon from "@/components/Icon";
 import IcalSyncPanel from "@/components/IcalSyncPanel";
 import { apiPost } from "@/lib/invoicing/client";
 import { forceFullSync } from "@/components/ChannexAutoSync";
+import { CHANNELS } from "@/lib/types";
 
 interface LogEntry { id: string; ts: number; text: string; color: string }
 
@@ -110,6 +111,27 @@ export default function CanaliPage() {
     } catch (e) { setRelink({ running: false, ok: false, msg: manual ? (e instanceof Error ? e.message : "errore") : undefined }); }
   };
   useEffect(() => { if (relinkDone.current) return; relinkDone.current = true; doRelink(false); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  // Stato REALE dei canali OTA (sostituisce il vecchio flag locale mai aggiornato): risponde alla
+  // domanda "da dove vedo che sono collegato con Booking.com?" con i dati veri da Channex.
+  const [otaByStructure, setOtaByStructure] = useState<Record<string, { channel: string; title: string; active: boolean }[]> | null>(null);
+  const [otaOff, setOtaOff] = useState(false);
+  const [otaErr, setOtaErr] = useState("");
+  const [otaLoading, setOtaLoading] = useState(true);
+  const loadOtaStatus = async () => {
+    setOtaLoading(true); setOtaErr("");
+    try {
+      const j = await apiPost<{ ok: boolean; byStructure?: Record<string, { channel: string; title: string; active: boolean }[]> }>("channex/status", {});
+      if (!j.ok) { setOtaOff(true); setOtaByStructure(null); } else { setOtaOff(false); setOtaByStructure(j.byStructure ?? {}); }
+    } catch (e) { setOtaErr(e instanceof Error ? e.message : "errore di rete"); }
+    setOtaLoading(false);
+  };
+  useEffect(() => { loadOtaStatus(); }, []);
+  // "Tutte" raggruppa per struttura; una struttura specifica è un gruppo unico senza etichetta.
+  const otaGroups: { label?: string; list: { channel: string; title: string; active: boolean }[] }[] =
+    effStructure === "all"
+      ? structures.filter((s) => (otaByStructure?.[s.id]?.length ?? 0) > 0).map((s) => ({ label: s.name, list: otaByStructure![s.id] }))
+      : [{ list: otaByStructure?.[effStructure] ?? [] }];
   const syncToChannex = async () => {
     const sid = effStructure;
     const st = structures.find((s) => s.id === sid);
@@ -220,6 +242,41 @@ export default function CanaliPage() {
           </div>
         </div>
       </Card>
+
+      {/* Risponde direttamente a "da dove vedo che sono collegato con Booking.com?": stato REALE
+         da Channex per canale, non il vecchio flag locale mai aggiornato. Nascosta se Channex non
+         è configurato (nessun errore da mostrare a chi non usa affatto questa integrazione). */}
+      {!otaOff && (
+        <Card className="mb-5">
+          <div className="mb-3 flex items-center justify-between">
+            <SectionTitle>{t("Canali OTA collegati")}</SectionTitle>
+            <button onClick={loadOtaStatus} disabled={otaLoading} className="text-xs font-medium text-dim hover:text-txt disabled:opacity-40">{otaLoading ? t("Verifico…") : "⟳ " + t("Aggiorna")}</button>
+          </div>
+          {otaErr ? (
+            <p className="text-sm" style={{ color: "var(--err)" }}>⚠ {otaErr}</p>
+          ) : otaLoading && !otaByStructure ? (
+            <p className="text-sm text-faint">{t("Verifico…")}</p>
+          ) : otaGroups.every((g) => g.list.length === 0) ? (
+            <p className="text-sm text-faint">{t("Nessun canale OTA collegato.")}</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {otaGroups.filter((g) => g.list.length > 0).map((g, gi) => (
+                <div key={g.label ?? gi}>
+                  {g.label && <div className="mb-1.5 text-xs font-semibold text-dim">{g.label}</div>}
+                  <div className="flex flex-wrap gap-2">
+                    {g.list.map((c, i) => (
+                      <span key={c.channel + i} className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs font-medium text-txt">
+                        {CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title}
+                        <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Pannello "Collega un canale": incorpora l'interfaccia di collegamento OTA (Booking.com,
          Airbnb, Expedia, ...) DENTRO Xenora, dentro la nostra intestazione — niente rimando a un

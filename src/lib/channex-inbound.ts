@@ -33,7 +33,7 @@ export async function saveChannexMap(admin: SupabaseClient, tenantId: string, st
 }
 
 // OTA → canale Xenora.
-function channelFromOta(ota?: string): string {
+export function channelFromOta(ota?: string): string {
   const s = (ota || "").toLowerCase();
   if (!s) return "direct";
   if (s.includes("book")) return "booking";

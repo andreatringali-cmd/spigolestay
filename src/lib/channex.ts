@@ -66,6 +66,12 @@ export async function listRatePlansForRoomType(roomTypeId: string) {
   return channex<{ data: { id: string; attributes?: { title?: string } }[] }>(`/rate_plans?filter[room_type_id]=${encodeURIComponent(roomTypeId)}`);
 }
 
+// Canali OTA collegati a una property (Booking.com, Airbnb, …) con stato Active/Inactive —
+// usato per mostrare davvero "sei collegato" invece di un flag locale scollegato da Channex.
+export async function listChannels(propertyId: string) {
+  return channex<{ data: { id: string; attributes?: { title?: string; channel?: string; status?: string; is_active?: boolean } }[] }>(`/channels?filter[property_id]=${encodeURIComponent(propertyId)}`);
+}
+
 // ── Webhook (ricezione automatica prenotazioni in tempo reale) ──
 // Channex chiama il callback_url a ogni nuova prenotazione/modifica/cancellazione.
 export async function listWebhooks(propertyId: string) {

@@ -177,6 +177,19 @@ export default function CalendarGrid() {
       setLastRun(new Date(ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }));
     } catch {}
   }, []);
+  // Stato REALE da Channex (sovrascrive il flag locale sopra, ma solo per i canali che risponde davvero).
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiPost<{ ok: boolean; byStructure?: Record<string, { channel: string; title: string; active: boolean }[]> }>("channex/status", {});
+        if (!res?.ok || !res.byStructure) return;
+        const lists = activeStructureId === "all" ? Object.values(res.byStructure) : [res.byStructure[activeStructureId] ?? []];
+        const real: Record<string, boolean> = {};
+        lists.flat().forEach((c) => { real[c.channel] = !!real[c.channel] || c.active; });
+        if (Object.keys(real).length) setConnMap((prev) => ({ ...prev, ...real }));
+      } catch {}
+    })();
+  }, [activeStructureId]);
   // Sincronizzazione REALE con Channex: invia subito disponibilità/prezzi (via l'evento che
   // ChannexAutoSync ascolta) e controlla le nuove prenotazioni OTA dal feed. Aggiorna l'orario.
   const syncNow = async () => {
