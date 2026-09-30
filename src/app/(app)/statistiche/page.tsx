@@ -359,7 +359,7 @@ export default function StatistichePage() {
           {rows.map((r) => (
             <tr key={r.iso} className={`border-b border-line last:border-0 ${r.highlight ? "bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)]" : r.storico ? "" : "bg-[color:color-mix(in_srgb,var(--ok)_4%,transparent)]"}`}>
               <td className="truncate px-3 py-2 font-medium capitalize text-txt">{r.label}{r.highlight && <span className="ml-1.5 rounded-full bg-focus px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">{t("oggi")}</span>}</td>
-              <td className="px-3 py-2"><span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={r.storico ? { backgroundColor: "color-mix(in srgb, var(--faint) 20%, transparent)", color: "var(--dim)" } : { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{r.storico ? t("Storico") : t("Previsione")}</span></td>
+              <td className="px-3 py-2"><span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={r.storico ? { backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" } : { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>{r.storico ? t("Storico") : t("Previsione")}</span></td>
               <td className="px-3 py-2 text-right font-mono text-dim">{r.camere}{scopedUnits.length ? `/${scopedUnits.length}` : ""}</td>
               <td className="px-3 py-2 text-right font-mono text-dim">{Math.round(r.occ * 100)}%</td>
               <td className="px-3 py-2 text-right font-mono text-dim">{r.arrivi || ""}</td>
