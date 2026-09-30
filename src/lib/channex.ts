@@ -78,6 +78,24 @@ export async function setChannelActive(channelId: string, active: boolean) {
   return channex<Created>(`/channels/${encodeURIComponent(channelId)}/${active ? "activate" : "deactivate"}`, { method: "POST", body: "{}" });
 }
 
+export interface ChxChannelDetail {
+  id: string;
+  attributes?: { title?: string; channel?: string; status?: string; is_active?: boolean; settings?: { derived_option?: { rate?: [string, string][] } } };
+}
+// Dettaglio completo di un canale (include settings.derived_option, non presente nella lista).
+export async function getChannel(channelId: string) {
+  return channex<{ data: ChxChannelDetail }>(`/channels/${encodeURIComponent(channelId)}`);
+}
+
+// Correzione di prezzo derivata a livello di CONNESSIONE canale (non per singola mappatura tariffa):
+// Channex applica in ordine gli step [regola, valore] al prezzo Xenora prima di mandarlo all'OTA.
+export async function setChannelPriceCorrection(channelId: string, steps: [string, string][]) {
+  return channex<Created>(`/channels/${encodeURIComponent(channelId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ channel: { settings: { derived_option: { rate: steps } } } }),
+  });
+}
+
 // ── Webhook (ricezione automatica prenotazioni in tempo reale) ──
 // Channex chiama il callback_url a ogni nuova prenotazione/modifica/cancellazione.
 export async function listWebhooks(propertyId: string) {

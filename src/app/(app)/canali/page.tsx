@@ -154,6 +154,39 @@ export default function CanaliPage() {
     } catch { setOtaByStructure(prev); }
     setTogglingChannel(null);
   };
+  // Correzione di prezzo (derived_option) a livello di connessione canale — sostituisce l'apertura
+  // manuale della dashboard Channex per lo stesso identico bisogno che ha spinto Andrea ad
+  // aggiustare Booking.com a mano. Un solo step per ora (+/- percentuale); il valore letto da
+  // Channex precompila il modulo, così il Salva non rischia mai di azzerare una correzione esistente.
+  const CORR_SIGN: Record<string, string> = { increase_by_percent: "+", decrease_by_percent: "−" };
+  const [priceCorr, setPriceCorr] = useState<Record<string, { rule: "increase_by_percent" | "decrease_by_percent"; value: string; loaded: boolean }>>({});
+  const [corrMsg, setCorrMsg] = useState<Record<string, { text: string; ok?: boolean }>>({});
+  const [corrSaving, setCorrSaving] = useState<string | null>(null);
+  const loadPriceCorr = async (channelId: string) => {
+    try {
+      const j = await apiPost<{ ok: boolean; rule?: string | null; value?: string | null }>("channex/price-correction", { channelId, action: "get" });
+      const rule = j.rule === "increase_by_percent" || j.rule === "decrease_by_percent" ? j.rule : "increase_by_percent";
+      setPriceCorr((cur) => ({ ...cur, [channelId]: { rule, value: j.value ?? "", loaded: true } }));
+    } catch { setPriceCorr((cur) => ({ ...cur, [channelId]: cur[channelId] ?? { rule: "increase_by_percent", value: "", loaded: true } })); }
+  };
+  useEffect(() => {
+    if (!otaByStructure) return;
+    const ids = Object.values(otaByStructure).flat().map((c) => c.id).filter(Boolean);
+    for (const id of ids) if (!priceCorr[id]) loadPriceCorr(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otaByStructure]);
+  const saveCorr = async (channelId: string) => {
+    const draft = priceCorr[channelId];
+    if (!draft) return;
+    setCorrSaving(channelId); setCorrMsg((cur) => ({ ...cur, [channelId]: { text: t("Salvo…") } }));
+    try {
+      const j = await apiPost<{ ok: boolean; error?: string }>("channex/price-correction", { channelId, action: "set", rule: draft.rule, value: draft.value });
+      if (j.ok) setCorrMsg((cur) => ({ ...cur, [channelId]: { text: t("Salvato ✓"), ok: true } }));
+      else setCorrMsg((cur) => ({ ...cur, [channelId]: { text: j.error || t("Salvataggio non riuscito"), ok: false } }));
+    } catch (e) { setCorrMsg((cur) => ({ ...cur, [channelId]: { text: e instanceof Error ? e.message : "errore di rete", ok: false } })); }
+    setCorrSaving(null);
+  };
+
   const syncToChannex = async () => {
     const sid = effStructure;
     const st = structures.find((s) => s.id === sid);
@@ -274,6 +307,9 @@ export default function CanaliPage() {
             <SectionTitle>{t("Canali OTA collegati")}</SectionTitle>
             <button onClick={loadOtaStatus} disabled={otaLoading} className="text-xs font-medium text-dim hover:text-txt disabled:opacity-40">{otaLoading ? t("Verifico…") : "⟳ " + t("Aggiorna")}</button>
           </div>
+          {!otaGroups.every((g) => g.list.length === 0) && (
+            <p className="mb-3 text-[11px] text-faint">{t("Correzione prezzo (rispetto al prezzo Xenora): si somma sopra eventuali promozioni attive su Booking.com stesso (Genius, offerte a tempo, ecc.) — non le sostituisce.")}</p>
+          )}
           {otaErr ? (
             <p className="text-sm" style={{ color: "var(--err)" }}>⚠ {otaErr}</p>
           ) : otaLoading && !otaByStructure ? (
@@ -286,13 +322,33 @@ export default function CanaliPage() {
                 <div key={g.label ?? gi}>
                   {g.label && <div className="mb-1.5 text-xs font-semibold text-dim">{g.label}</div>}
                   <div className="flex flex-wrap gap-2">
-                    {g.list.map((c, i) => (
-                      <span key={c.id || c.channel + i} className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs font-medium text-txt">
-                        {CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title}
-                        <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
-                        {c.id && <button onClick={() => toggleChannel(g.sid, c)} disabled={togglingChannel === c.id} className="rounded-full border border-line px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim hover:bg-wash hover:text-txt disabled:opacity-40">{togglingChannel === c.id ? "…" : c.active ? t("Disattiva") : t("Attiva")}</button>}
-                      </span>
-                    ))}
+                    {g.list.map((c, i) => {
+                      const draft = c.id ? priceCorr[c.id] : undefined;
+                      const current = draft?.loaded && draft.value ? `${CORR_SIGN[draft.rule]}${draft.value}%` : t("nessuna");
+                      const msg = c.id ? corrMsg[c.id] : undefined;
+                      return (
+                        <div key={c.id || c.channel + i} className="flex flex-col gap-1.5 rounded-xl border border-line px-2.5 py-1.5">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-txt">
+                            {CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title}
+                            <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
+                            {c.id && <button onClick={() => toggleChannel(g.sid, c)} disabled={togglingChannel === c.id} className="rounded-full border border-line px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim hover:bg-wash hover:text-txt disabled:opacity-40">{togglingChannel === c.id ? "…" : c.active ? t("Disattiva") : t("Attiva")}</button>}
+                          </span>
+                          {c.id && (
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-dim">
+                              <span>{t("Correzione prezzo")}: <b className="text-txt">{current}</b></span>
+                              <select value={draft?.rule ?? "increase_by_percent"} onChange={(e) => setPriceCorr((cur) => ({ ...cur, [c.id]: { rule: e.target.value as "increase_by_percent" | "decrease_by_percent", value: cur[c.id]?.value ?? "", loaded: true } }))} className="rounded border border-line bg-surface px-1 py-0.5 text-[11px] text-txt outline-none focus:border-focus">
+                                <option value="increase_by_percent">+</option>
+                                <option value="decrease_by_percent">−</option>
+                              </select>
+                              <input type="number" min={0} step="0.01" value={draft?.value ?? ""} onChange={(e) => setPriceCorr((cur) => ({ ...cur, [c.id]: { rule: cur[c.id]?.rule ?? "increase_by_percent", value: e.target.value, loaded: true } }))} placeholder="0" className="w-16 rounded border border-line bg-surface px-1.5 py-0.5 text-[11px] text-txt outline-none focus:border-focus" />
+                              <span>%</span>
+                              <button onClick={() => saveCorr(c.id)} disabled={corrSaving === c.id} className="rounded-full border border-line px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim hover:bg-wash hover:text-txt disabled:opacity-40">{corrSaving === c.id ? "…" : t("Salva")}</button>
+                              {msg && <span className="font-semibold" style={{ color: msg.ok === false ? "var(--err)" : msg.ok ? "var(--ok)" : "var(--dim)" }}>{msg.text}</span>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
