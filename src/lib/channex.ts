@@ -275,3 +275,15 @@ export async function createRatePlan(propertyId: string, roomTypeId: string, opt
     } }),
   });
 }
+
+// Corregge l'occupazione (adulti max) di un piano tariffario già creato — serve quando la
+// tipologia camera viene modificata in Xenora DOPO il collegamento a Channex (es. capienza
+// sbagliata al primo sync). Non tocca prezzo/titolo, solo l'occupancy dell'opzione primaria.
+export async function updateRatePlanOccupancy(ratePlanId: string, occupancy: number) {
+  return channex<Created>(`/rate_plans/${encodeURIComponent(ratePlanId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ rate_plan: {
+      options: [{ occupancy: Math.max(1, occupancy), is_primary: true }],
+    } }),
+  });
+}
