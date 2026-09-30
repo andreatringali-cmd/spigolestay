@@ -11,6 +11,7 @@ import EmptyState from "@/components/EmptyState";
 import { nights, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { CHANNELS, type Channel } from "@/lib/types";
+import { commissionOf } from "@/lib/booking";
 import ChannelLogo from "@/components/ChannelLogo";
 import { type Promo, loadPromos, promoMailto } from "@/lib/promos";
 import Icon from "@/components/Icon";
@@ -69,7 +70,7 @@ export default function OspitiPage() {
       const nightsTot = list.reduce((a, b) => a + Math.max(0, nights(b.checkIn, b.checkOut)), 0);
       const spent = list.reduce((a, b) => a + (b.total ?? 0), 0);
       const avg = nightsTot > 0 ? Math.round(spent / nightsTot) : 0;
-      const comm = Math.round(list.reduce((a, b) => a + (b.total ?? 0) * ((b.commissionPct ?? Math.round((CHANNELS[b.channel]?.commission ?? 0) * 100)) / 100), 0));
+      const comm = Math.round(list.reduce((a, b) => a + commissionOf(b), 0));
       const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), "");
       const chCount: Record<string, number> = {};
       list.forEach((b) => { chCount[b.channel] = (chCount[b.channel] ?? 0) + 1; });

@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel } from "@/lib/types";
+import { commissionOf } from "@/lib/booking";
 import { toISO, addDays, nights, parseISO } from "@/lib/dates";
 import { eur, num } from "@/lib/format";
 import { PageHeader, StatCard } from "@/components/ui";
@@ -142,7 +143,7 @@ export default function StatistichePage() {
       const occBks = bks.filter((b) => b.checkIn <= iso && iso < b.checkOut);
       const camere = occBks.filter((b) => b.unitId).length;
       const lordo = Math.round(occBks.reduce((a, b) => a + (b.total ? b.total / nights(b.checkIn, b.checkOut) : 0), 0));
-      const commissioni = Math.round(occBks.reduce((a, b) => { const nightly = b.total ? b.total / nights(b.checkIn, b.checkOut) : 0; const pct = b.commissionPct ?? CHANNELS[b.channel].commission * 100; return a + (nightly * pct) / 100; }, 0));
+      const commissioni = Math.round(occBks.reduce((a, b) => a + commissionOf(b) / nights(b.checkIn, b.checkOut), 0));
       const ospiti = occBks.reduce((a, b) => a + b.adults + b.children, 0);
       const arrivi = bks.filter((b) => b.checkIn === iso).length;
       const partenze = bks.filter((b) => b.checkOut === iso).length;
@@ -257,7 +258,7 @@ export default function StatistichePage() {
       const occBks = bks.filter((b) => b.checkIn <= iso && iso < b.checkOut);
       const camere = occBks.filter((b) => b.unitId).length;
       const lordo = occBks.reduce((a, b) => a + (b.total ? b.total / nights(b.checkIn, b.checkOut) : 0), 0);
-      const commissioni = occBks.reduce((a, b) => { const nightly = b.total ? b.total / nights(b.checkIn, b.checkOut) : 0; const pct = b.commissionPct ?? CHANNELS[b.channel].commission * 100; return a + (nightly * pct) / 100; }, 0);
+      const commissioni = occBks.reduce((a, b) => a + commissionOf(b) / nights(b.checkIn, b.checkOut), 0);
       const ospiti = occBks.reduce((a, b) => a + b.adults + b.children, 0);
       const arrivi = bks.filter((b) => b.checkIn === iso).length;
       const partenze = bks.filter((b) => b.checkOut === iso).length;

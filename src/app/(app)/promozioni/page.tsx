@@ -7,7 +7,8 @@ import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import Icon from "@/components/Icon";
 import ScrollStrip from "@/components/ScrollStrip";
 import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, DEFAULT_PROMOS } from "@/lib/promos";
-import { CHANNELS, GUEST_TAGS, type Channel } from "@/lib/types";
+import { GUEST_TAGS, type Channel } from "@/lib/types";
+import { commissionOf } from "@/lib/booking";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import VarLegend, { PROMO_VARS } from "@/components/VarLegend";
@@ -125,7 +126,7 @@ export default function PromozioniPage() {
   // Commissioni pagate alle OTA sullo storico: quanto potresti risparmiare riportando questi ospiti al diretto.
   const otaCommission = useMemo(() => bookings
     .filter((b) => b.status !== "cancelled" && isOta(b.channel))
-    .reduce((a, b) => a + (b.total ?? 0) * (b.commissionPct != null ? b.commissionPct / 100 : (CHANNELS[b.channel]?.commission ?? 0.15)), 0), [bookings]);
+    .reduce((a, b) => a + commissionOf(b), 0), [bookings]);
 
   const usedThisYear = logs.filter((l) => new Date(l.date).getFullYear() === new Date().getFullYear()).length;
   const limitReached = usedThisYear >= 4;

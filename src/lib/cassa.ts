@@ -4,6 +4,7 @@
 import { supabase } from "./supabase";
 import { CHANNELS } from "./types";
 import type { Booking, Guest, Structure } from "./types";
+import { commissionOf } from "./booking";
 
 export type Kind = "in" | "out";
 export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string }
@@ -55,13 +56,11 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
     if (active !== "all" && b.structureId !== active) continue;
     const g = guests.find((x) => x.id === b.guestId);
     const st = getStructure(b.structureId);
-    const total = b.total ?? 0;
     // Incasso automatico = quanto realmente incassato sulla prenotazione (fonte di
     // verità = prenotazione), non l'intero totale: così la cassa/chiusura riflette il reale.
     const incassato = b.paid ?? 0;
     if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: b.checkIn, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: b.channel === "direct" ? "contanti" : "banca", auto: true, ref: b.id });
-    const pct = b.commissionPct ?? CHANNELS[b.channel].commission;
-    const comm = Math.round(total * pct);
+    const comm = commissionOf(b);
     if (comm > 0) out.push({ id: `auto-comm-${b.id}`, date: b.checkIn, kind: "out", cat: "commissioni", desc: `Commissione ${CHANNELS[b.channel].label} · ${g?.fullName ?? "Ospite"}`, amount: comm, conto: "banca", auto: true, ref: b.id });
   }
   return out;

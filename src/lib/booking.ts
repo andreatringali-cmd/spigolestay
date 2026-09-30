@@ -2,7 +2,7 @@
 // così il numero mostrato coincide ovunque.
 //  Totale ospite = soggiorno (total) + pulizia (cleaningFee) + extra + tassa di soggiorno.
 import { nights } from "./dates";
-import type { Structure } from "./types";
+import { CHANNELS, type Channel, type Structure } from "./types";
 
 // Tassa di soggiorno. Due modalità:
 //  - "fixed":   € a persona per notte × persone × notti tassabili
@@ -51,4 +51,19 @@ export function bookingGrandTotal(b: BookingLike, structure: Structure | undefin
   const clean = b.cleaningFee ?? 0;
   const tax = cityTaxOf(structure, cityTaxPayers(structure, b), nights(b.checkIn, b.checkOut), acc, b.cityTaxExempt);
   return acc + clean + bookingExtrasTotal(b) + tax;
+}
+
+// Calcolo UNICO della commissione OTA, condiviso ovunque venga mostrata o sommata.
+// Se è nota la cifra esatta (commissionAmount, es. da Booking.com/Channex) ha sempre priorità
+// sul calcolo via percentuale, che resta una stima quando la cifra esatta non c'è.
+type CommissionBookingLike = { total?: number; channel: Channel; commissionPct?: number; commissionAmount?: number };
+export function commissionPctOf(b: CommissionBookingLike): number {
+  if (b.commissionAmount != null && b.total) return Math.round((b.commissionAmount / b.total) * 1000) / 10;
+  return b.commissionPct ?? CHANNELS[b.channel].commission * 100;
+}
+export function commissionOf(b: CommissionBookingLike): number {
+  return b.commissionAmount ?? Math.round((b.total ?? 0) * commissionPctOf(b) / 100);
+}
+export function nettoOf(b: CommissionBookingLike): number {
+  return (b.total ?? 0) - commissionOf(b);
 }

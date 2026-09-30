@@ -306,6 +306,7 @@ export interface Booking {
   parking?: boolean; // l'ospite ha prenotato il parcheggio (seleziona i codici "con parcheggio" nella guida)
   paid?: number; // € già incassati (acconto/saldo)
   commissionPct?: number; // % di commissione OTA specifica di questa prenotazione
+  commissionAmount?: number; // € commissione esatta (con centesimi), es. da un'OTA — se presente ha priorità sul calcolo via %
   // Carta virtuale OTA (VCC): SOLO METADATI, MAI il numero carta o il CVV. Il numero completo
   // viene inviato da Channex esclusivamente ai partner certificati PCI DSS; Xenora non lo è e
   // NON lo riceve/salva. Qui teniamo solo importo, valuta, quando è addebitabile e la scadenza,

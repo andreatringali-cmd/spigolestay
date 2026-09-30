@@ -7,7 +7,7 @@ import { bookingCode } from "@/lib/bookingCode";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { nights, parseISO, toISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
-import { bookingGrandTotal } from "@/lib/booking";
+import { bookingGrandTotal, commissionOf, commissionPctOf, nettoOf } from "@/lib/booking";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
@@ -118,11 +118,6 @@ export default function PrenotazioniPage() {
 
   const structuresToShow = structures.filter((s) => activeStructureId === "all" || s.id === activeStructureId);
   const clearFilters = () => { setQ(""); setChannel("all"); setLoc("all"); setFrom(""); setTo(""); };
-
-  // % commissione: quella specifica della prenotazione, altrimenti il default del canale.
-  const commissionPctOf = (b: { channel: Channel; commissionPct?: number }) => b.commissionPct ?? CHANNELS[b.channel].commission * 100;
-  const commissionOf = (b: { total?: number; channel: Channel; commissionPct?: number }) => Math.round((b.total ?? 0) * commissionPctOf(b) / 100);
-  const nettoOf = (b: { total?: number; channel: Channel; commissionPct?: number }) => (b.total ?? 0) - commissionOf(b);
 
   // Ordinamento tabella
   const sortVal = (b: (typeof filtered)[number], key: string): string | number => {

@@ -243,11 +243,13 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
 
       const channel = channelFromOta(r.ota_name);
       const groupId = uid();
-      // Commissione OTA reale, se il canale la manda (importo € → % sul totale prenotazione).
-      // Se assente, si lascia undefined e vale la % di default del canale (vedi CHANNELS).
+      // Commissione OTA reale, se il canale la manda: si salva la cifra ESATTA (con centesimi) in
+      // commissionAmount, così non si perde precisione arrotondando a una % (vedi commissionOf in
+      // @/lib/booking). Se assente, si lascia undefined e vale la % di default del canale (CHANNELS).
       const commAmt = num(r.ota_commission ?? r.commission, NaN);
       const bookingTotal = num(r.amount, NaN);
-      const commissionPct = (Number.isFinite(commAmt) && commAmt > 0 && Number.isFinite(bookingTotal) && bookingTotal > 0)
+      const commissionAmount = (Number.isFinite(commAmt) && commAmt > 0) ? Math.round(commAmt * 100) / 100 : undefined;
+      const commissionPct = (commissionAmount == null && Number.isFinite(commAmt) && commAmt > 0 && Number.isFinite(bookingTotal) && bookingTotal > 0)
         ? Math.round((commAmt / bookingTotal) * 1000) / 10
         : undefined;
       // Carta virtuale OTA: SOLO metadati (mai numero/CVV). Se una revision precedente aveva
@@ -274,6 +276,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           guestId, channel, status: "confirmed", checkIn: ci, checkOut: co, bookedOn: new Date().toISOString().slice(0, 10),
           adults: Math.max(1, num(room.occupancy?.adults, 1)), children: num(room.occupancy?.children, 0),
           total: total || undefined, cleaningFee: 0, paid: 0, cityTaxPaid: false,
+          ...(commissionAmount != null ? { commissionAmount } : {}),
           ...(commissionPct != null ? { commissionPct } : {}),
           ...(otaCard && idx === 0 ? { otaCard } : {}), // la VCC copre la prenotazione: la attacchiamo alla prima camera
           extId: stableKey, code: r.ota_reservation_code || undefined, source: "channex",

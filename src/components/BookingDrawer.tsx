@@ -49,7 +49,8 @@ interface Form {
   channel: Channel; status: BookingStatus;
   adults: number; children: number;
   unitId: string | null;
-  total: number; cleaningFee: number; commissionPct: number; paid: number;
+  total: number; cleaningFee: number; commissionPct: number; commissionAmount: number | null; paid: number;
+  code: string;
   cityTaxExempt: boolean; cityTaxPaid: boolean; depositPaid: boolean; parking: boolean;
   note: string;
   lastName: string; firstName: string; email: string; phone: string; country: string;
@@ -102,7 +103,8 @@ export default function BookingDrawer() {
       unitId: booking.unitId,
       total: booking.total ?? 0, cleaningFee: booking.cleaningFee ?? 35,
       commissionPct: booking.commissionPct ?? Math.round(CHANNELS[booking.channel].commission * 100),
-      paid: booking.paid ?? 0,
+      commissionAmount: booking.commissionAmount ?? null,
+      paid: booking.paid ?? 0, code: booking.code ?? "",
       cityTaxExempt: !!booking.cityTaxExempt, cityTaxPaid: !!booking.cityTaxPaid, depositPaid: !!booking.depositPaid, parking: !!booking.parking,
       note: booking.note ?? "",
       lastName: g?.lastName ?? (g?.fullName ? g.fullName.split(" ").slice(1).join(" ") : ""),
@@ -675,9 +677,10 @@ export default function BookingDrawer() {
     updateBooking(booking.id, {
       checkIn: form.checkIn, checkOut: form.checkOut, channel: form.channel, status: form.status,
       adults: form.adults, children: form.children, unitId: form.unitId,
-      total: form.total, cleaningFee: form.cleaningFee, commissionPct: form.commissionPct, paid: form.paid,
+      total: form.total, cleaningFee: form.cleaningFee, commissionPct: form.commissionPct,
+      commissionAmount: form.commissionAmount ?? undefined, paid: form.paid,
       cityTaxExempt: form.cityTaxExempt, cityTaxPaid: form.cityTaxPaid, depositPaid: form.depositPaid, parking: form.parking,
-      note: form.note.trim() || undefined,
+      note: form.note.trim() || undefined, code: form.code.trim() || undefined,
     });
     updateGuest(booking.guestId, {
       firstName: form.firstName.trim() || undefined, lastName: form.lastName.trim() || undefined, fullName: `${form.firstName} ${form.lastName}`.trim() || undefined, email: form.email.trim() || undefined,
@@ -745,14 +748,18 @@ export default function BookingDrawer() {
         </div>
         <div className="grid grid-cols-3 gap-2">
           <Field label={`${t("Commissione")} (€)`}>
-            <input type="number" min={0} step={1} className={inputCls} value={Math.round(form.total * form.commissionPct / 100)} onChange={(e) => { const eurVal = Math.max(0, +e.target.value); const pct = form.total > 0 ? (eurVal / form.total) * 100 : 0; set({ commissionPct: Math.round(pct * 10) / 10 }); }} />
+            <input type="number" min={0} step={0.01} className={inputCls}
+              value={form.commissionAmount ?? Math.round(form.total * form.commissionPct / 100)}
+              onChange={(e) => { const raw = e.target.value; set({ commissionAmount: raw === "" ? null : Math.max(0, +raw) }); }} />
           </Field>
-          <Field label={`${t("Commissione")} (%)`}><input type="number" min={0} max={100} step={0.1} className={inputCls} value={form.commissionPct} onChange={(e) => set({ commissionPct: Math.max(0, Math.min(100, +e.target.value)) })} /></Field>
+          <Field label={`${t("Commissione")} (%)`}><input type="number" min={0} max={100} step={0.1} className={inputCls} value={form.commissionPct} onChange={(e) => set({ commissionPct: Math.max(0, Math.min(100, +e.target.value)), commissionAmount: null })} /></Field>
           <div className="flex flex-col justify-end">
             <span className="mb-1 block text-xs font-medium text-dim">{t("Netto (soggiorno − commissione)")}</span>
-            <div className="rounded-lg border border-line bg-wash px-2.5 py-1.5 text-sm font-mono font-semibold text-[color:var(--ok)]">{eur(form.total - Math.round(form.total * form.commissionPct / 100))}</div>
+            <div className="rounded-lg border border-line bg-wash px-2.5 py-1.5 text-sm font-mono font-semibold text-[color:var(--ok)]">{eur(form.total - (form.commissionAmount ?? Math.round(form.total * form.commissionPct / 100)))}</div>
           </div>
         </div>
+        <p className="text-[11px] text-faint">{t("Se conosci la cifra esatta (es. da Booking.com) inseriscila in €: avrà sempre la priorità sulla %. Modificando la % l'importo esatto viene rimosso.")}</p>
+        <Field label={t("Numero prenotazione (OTA)")}><input className={inputCls} value={form.code} onChange={(e) => set({ code: e.target.value })} placeholder={t("es. 6400788454")} /></Field>
         <div className="rounded-lg border border-line bg-paper p-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-txt">{t("Tassa di soggiorno")}</span>

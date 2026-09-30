@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel } from "@/lib/types";
+import { commissionOf } from "@/lib/booking";
 import { PageHeader, Card, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
@@ -126,7 +127,7 @@ export default function FatturePassivePage() {
     const start = `${otaMonth}-01`;
     const end = `${otaMonth}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
     const list = bookings.filter((b) => b.channel === otaChannel && b.status !== "cancelled" && (b.checkOut || "") >= start && (b.checkOut || "") <= end);
-    const sum = list.reduce((a, b) => a + (b.total ?? 0) * (b.commissionPct ?? CHANNELS[b.channel].commission), 0);
+    const sum = list.reduce((a, b) => a + commissionOf(b), 0);
     return { sum: Math.round(sum * 100) / 100, count: list.length, end };
   }, [bookings, otaChannel, otaMonth]);
 
