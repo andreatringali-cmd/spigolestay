@@ -66,7 +66,7 @@ export default function TariffeDerivatePage() {
   const ask = useConfirm();
   const [localS, setLocalS] = useState("all");
   const [view, setView] = useState<"table" | "map">("map");
-  const [derivModal, setDerivModal] = useState<null | { structureId: string; parentId?: string; editId?: string }>(null);
+  const [derivModal, setDerivModal] = useState<null | { structureIds: string[]; parentId?: string; editId?: string }>(null);
   const [derivOpen, setDerivOpen] = useState<Set<string>>(new Set()); // vuoto = tutte chiuse all'apertura
   const toggleDeriv = (id: string) => setDerivOpen((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
@@ -100,9 +100,11 @@ export default function TariffeDerivatePage() {
         <span className="flex items-center gap-1.5"><span className="rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-dim">master</span> {t("tipologia con camere proprie")}</span>
         <span className="flex items-center gap-1.5"><span className="text-focus"><Catena /></span> {t("derivata: condivide le camere della madre")}</span>
         <span className="flex items-center gap-1.5"><span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "color-mix(in srgb, var(--err) 15%, transparent)", color: "var(--err)" }}>−10%</span> {t("scarto sul prezzo della madre")}</span>
-        {scoped.length === 1 && view === "table" && (
-          <button onClick={() => setDerivModal({ structureId: scoped[0].id })} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Crea tariffa derivata")}</button>
-        )}
+        <button
+          onClick={() => setDerivModal({ structureIds: scoped.map((s) => s.id) })}
+          disabled={!scoped.some((s) => roomTypes.some((rt) => rt.structureId === s.id && !rt.deriveFrom))}
+          className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"
+        >＋ {t("Crea tariffa derivata")}</button>
       </div>
 
       {scoped.length === 0 && <Card><div className="py-8 text-center text-sm text-faint">{t("Nessuna struttura. Creane una in")} <Link href="/strutture" className="text-focus underline">{t("Strutture")}</Link>.</div></Card>}
@@ -116,10 +118,7 @@ export default function TariffeDerivatePage() {
           const hasAnyDeriv = types.some((rt) => rt.deriveFrom);
           return (
             <div key={s.id}>
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="font-display text-lg font-bold text-txt">{s.name}</div>
-                {scoped.length > 1 && view === "table" && <button onClick={() => setDerivModal({ structureId: s.id })} disabled={masters.length === 0} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">＋ {t("Crea tariffa derivata")}</button>}
-              </div>
+              <div className="mb-2 font-display text-lg font-bold text-txt">{s.name}</div>
 
               {types.length === 0 ? (
                 <Card><div className="py-6 text-center text-sm text-faint">{t("Nessuna tipologia in questa struttura. Creane una in")} <Link href="/camere" className="text-focus underline">{t("Camere")}</Link>.</div></Card>
@@ -127,12 +126,10 @@ export default function TariffeDerivatePage() {
                 <DerivMap
                   types={types}
                   sUnits={sUnits}
-                  onAdd={(pid) => setDerivModal({ structureId: s.id, parentId: pid })}
-                  onEdit={(id) => setDerivModal({ structureId: s.id, editId: id })}
+                  onAdd={(pid) => setDerivModal({ structureIds: [s.id], parentId: pid })}
+                  onEdit={(id) => setDerivModal({ structureIds: [s.id], editId: id })}
                   onOpenType={(id) => router.push(`/camere/tipologia/${id}`)}
                   onDelete={async (id, name) => { if (await ask({ title: t("Elimina tariffa derivata"), message: `${t("Eliminare")} "${name}"?`, danger: true, confirmLabel: t("Elimina") })) deleteRoomType(id); }}
-                  onCreate={() => setDerivModal({ structureId: s.id })}
-                  canCreate={masters.length > 0}
                 />
               ) : (
                 <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
@@ -194,12 +191,12 @@ export default function TariffeDerivatePage() {
                                   : <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)", color: "var(--ok)" }}>{t("In vendita")}</span>}</td>
                                 <td className="px-3 py-2.5">
                                   <div className="flex items-center justify-end gap-1.5">
-                                    <button onClick={(e) => { e.stopPropagation(); setDerivModal({ structureId: s.id, parentId: rt.id }); }} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-wash">＋ {t("Derivata")}</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setDerivModal({ structureIds: [s.id], parentId: rt.id }); }} className="rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-wash">＋ {t("Derivata")}</button>
                                   </div>
                                 </td>
                               </tr>
                               {open && kids.map((k) => { const kMin = effectiveMinStay(k, roomTypes); const kClosed = effectiveClosed(k, roomTypes); return (
-                                <tr key={k.id} onClick={() => setDerivModal({ structureId: s.id, editId: k.id })} className="cursor-pointer border-b border-line bg-[color:color-mix(in_srgb,var(--focus)_4%,transparent)] last:border-0 hover:bg-[color:color-mix(in_srgb,var(--focus)_9%,transparent)]">
+                                <tr key={k.id} onClick={() => setDerivModal({ structureIds: [s.id], editId: k.id })} className="cursor-pointer border-b border-line bg-[color:color-mix(in_srgb,var(--focus)_4%,transparent)] last:border-0 hover:bg-[color:color-mix(in_srgb,var(--focus)_9%,transparent)]">
                                   <td className="px-3 py-2.5">
                                     <div className="flex min-w-0 items-center gap-2 pl-6">
                                       <span className="shrink-0 text-focus" title={t("Condivide le camere della tipologia madre")}><Catena /></span>
@@ -240,21 +237,19 @@ export default function TariffeDerivatePage() {
         })}
       </div>
 
-      {derivModal && <DerivataModal structureId={derivModal.structureId} parentId={derivModal.parentId} editId={derivModal.editId} onClose={() => setDerivModal(null)} />}
+      {derivModal && <DerivataModal structureIds={derivModal.structureIds} parentId={derivModal.parentId} editId={derivModal.editId} onClose={() => setDerivModal(null)} />}
     </div>
   );
 }
 
 // Vista Mappa: albero master → derivate con connettori etichettati con lo scarto (stile Octorate).
-function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete, onCreate, canCreate }: {
+function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
   types: RoomType[];
   sUnits: { roomTypeId: string }[];
   onAdd: (parentId: string) => void;
   onEdit: (id: string) => void;
   onOpenType: (id: string) => void;
   onDelete: (id: string, name: string) => void;
-  onCreate: () => void;
-  canCreate: boolean;
 }) {
   const { roomTypes } = useData();
   const { t } = useLang();
@@ -325,9 +320,6 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete, onCreate
 
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-[color:color-mix(in_srgb,var(--focus)_3%,var(--surface))] shadow-sm">
-      <div className="flex items-center justify-end border-b border-line bg-surface px-3 py-2">
-        <button onClick={onCreate} disabled={!canCreate} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40">＋ {t("Crea tariffa derivata")}</button>
-      </div>
       <div className="overflow-x-auto">
         <div className="flex min-w-max items-start gap-10 p-5">
           {masters.map((rt) => <Node key={rt.id} rt={rt} />)}
@@ -337,12 +329,14 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete, onCreate
   );
 }
 
-function DerivataModal({ structureId, parentId, editId, onClose }: { structureId: string; parentId?: string; editId?: string; onClose: () => void }) {
-  const { roomTypes, addRoomType, updateRoomType, deleteRoomType, addActivity } = useData();
+function DerivataModal({ structureIds, parentId, editId, onClose }: { structureIds: string[]; parentId?: string; editId?: string; onClose: () => void }) {
+  const { structures, roomTypes, addRoomType, updateRoomType, deleteRoomType, addActivity } = useData();
   const { t } = useLang();
   const ask = useConfirm();
-  const types = roomTypes.filter((rt) => rt.structureId === structureId);
+  const multi = structureIds.length > 1;
+  const types = roomTypes.filter((rt) => structureIds.includes(rt.structureId));
   const editing = editId ? types.find((x) => x.id === editId) : undefined;
+  const structureNameOf = (id: string) => structures.find((s) => s.id === id)?.name ?? "";
   const [planNames, setPlanNames] = useState<string[]>(DEFAULT_PLAN_NAMES);
   useEffect(() => { setPlanNames(loadPlanNames()); }, []);
 
@@ -398,7 +392,7 @@ function DerivataModal({ structureId, parentId, editId, onClose }: { structureId
     };
     if (editing) { updateRoomType(editing.id, patch); addActivity("config", `Tariffa derivata modificata — ${finalName}`); }
     else {
-      const id = addRoomType({ structureId, name: finalName, beds: parent.beds, basePrice: parent.basePrice });
+      const id = addRoomType({ structureId: parent.structureId, name: finalName, beds: parent.beds, basePrice: parent.basePrice });
       updateRoomType(id, patch);
       addActivity("config", `Tariffa derivata creata — ${finalName}`);
     }
@@ -415,7 +409,7 @@ function DerivataModal({ structureId, parentId, editId, onClose }: { structureId
             <label className={`${lbl} col-span-2`}>{t("Nome")}<input value={name} onChange={(e) => setName(e.target.value)} placeholder={suggestedName} className={`${inp} mt-1`} /></label>
             <label className={`${lbl} col-span-2`}>{t("Basato su")} <span className="font-normal text-faint">({t("tipologia madre")})</span>
               <select value={basedOn} onChange={(e) => setBasedOn(e.target.value)} className={`${inp} mt-1`}>
-                {parentOptions.map((p) => <option key={p.id} value={p.id}>{p.name} — {eur(effectiveBase(p, roomTypes))}</option>)}
+                {parentOptions.map((p) => <option key={p.id} value={p.id}>{multi ? `${structureNameOf(p.structureId)} — ` : ""}{p.name} — {eur(effectiveBase(p, roomTypes))}</option>)}
               </select>
             </label>
             <label className={lbl}>{t("Adulti")}<input type="number" min={1} value={adults} onFocus={(e) => e.currentTarget.select()} onChange={(e) => setAdults(num(e.target.value, 1))} className={`${inp} mt-1`} /></label>
