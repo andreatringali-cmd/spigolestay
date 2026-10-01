@@ -167,6 +167,8 @@ export default function PreventiviPage() {
   useEffect(() => { try { const r = JSON.parse(localStorage.getItem("spigolestay:paysettings") || "{}"); if (r.holder) setPayHolder(r.holder); if (r.iban) setPayIban(r.iban); if (typeof r.extra === "string") setPayExtra(r.extra); } catch {} }, []);
   useEffect(() => { try { localStorage.setItem("spigolestay:paysettings", JSON.stringify({ holder: payHolder, iban: payIban, extra: payExtra })); } catch {} }, [payHolder, payIban, payExtra]);
   const [saved, setSaved] = useState<Preventivo[]>([]);
+  // Archivio filtrato per la struttura attiva (selettore in alto) — "tutte" mostra ogni preventivo.
+  const scopedSaved = activeStructureId === "all" ? saved : saved.filter((p) => p.structureId === activeStructureId);
   const loaded = useRef(false);
   useEffect(() => { if (!loaded.current) return; try { localStorage.setItem("spigolestay:preventivi", JSON.stringify(saved)); } catch {} }, [saved]);
   useEffect(() => { try { const raw = localStorage.getItem("spigolestay:preventivi"); if (raw) setSaved(JSON.parse(raw)); } catch {} }, []);
@@ -661,7 +663,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
       {/* Sezioni: Nuovo preventivo · Archivio */}
       <div className="mb-4 inline-flex rounded-lg border border-line bg-surface p-0.5">
         <button onClick={() => setTab("nuovo")} className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === "nuovo" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Nuovo preventivo")}</button>
-        <button onClick={() => setTab("archivio")} className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === "archivio" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Archivio")} {saved.length > 0 ? `(${saved.length})` : ""}</button>
+        <button onClick={() => setTab("archivio")} className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === "archivio" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Archivio")} {scopedSaved.length > 0 ? `(${scopedSaved.length})` : ""}</button>
       </div>
 
       {tab === "nuovo" && (
@@ -868,12 +870,12 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
       )}
 
       {/* Archivio */}
-      {tab === "archivio" && saved.length === 0 && (
+      {tab === "archivio" && scopedSaved.length === 0 && (
         <Card><EmptyState title={t("Nessun preventivo in archivio.")} sub={t("Crea e invia un preventivo per ritrovarlo qui.")} /></Card>
       )}
-      {tab === "archivio" && saved.length > 0 && (
+      {tab === "archivio" && scopedSaved.length > 0 && (
         <div>
-          <SectionTitle>{t("Preventivi salvati")} ({saved.length})</SectionTitle>
+          <SectionTitle>{t("Preventivi salvati")} ({scopedSaved.length})</SectionTitle>
           <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
             <table className="w-full min-w-[860px] text-sm">
               <thead>
@@ -891,7 +893,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                 </tr>
               </thead>
               <tbody>
-                {saved.map((p) => (
+                {scopedSaved.map((p) => (
                   <tr key={p.id} className="border-b border-line last:border-0">
                     <td className="px-3 py-2.5 font-mono font-semibold text-txt">{p.number ? `${p.number}/${new Date(p.createdAt).getFullYear()}` : "—"}</td>
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(p.createdAt)}</td>
