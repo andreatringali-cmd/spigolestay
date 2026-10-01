@@ -168,7 +168,7 @@ export default function TariffePage() {
           const isToday = iso === toISO(s);
           const we = isWeekend(d);
           return (
-            <td key={iso} className="px-2 py-2.5 text-center group-hover:bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
+            <td key={iso} className="border-l border-line px-2 py-2.5 text-center group-hover:bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
               {forced != null
                 ? <span className="font-mono text-sm font-bold tabular-nums text-txt" title={t("Tariffa forzata dal calendario")}>{dayPrice(rt, d)}<span className="ml-0.5">€</span></span>
                 : <span className="font-mono text-sm tabular-nums text-txt">{dayPrice(rt, d)}<span className="ml-0.5 text-dim">€</span></span>}
@@ -300,8 +300,8 @@ export default function TariffePage() {
           <table className="w-full min-w-[900px] border-collapse text-sm">
             <thead>
               {/* Fascia mese — stesso stile a due righe del Calendario principale */}
-              <tr className="border-b border-line bg-wash">
-                <th className="sticky left-0 z-10 bg-wash" />
+              <tr className="bg-wash">
+                <th className="sticky left-0 z-10 border-b border-line bg-wash" />
                 {(() => {
                   const segs: { key: string; label: string; count: number }[] = [];
                   for (const d of days) {
@@ -311,7 +311,7 @@ export default function TariffePage() {
                     else segs.push({ key: label, label, count: 1 });
                   }
                   return segs.map((seg) => (
-                    <th key={seg.key} colSpan={seg.count} className="border-l border-line px-2 py-1 text-center text-[11px] font-bold uppercase tracking-wide capitalize text-dim">{seg.label}</th>
+                    <th key={seg.key} colSpan={seg.count} className="border-b border-l border-line px-2 py-1 text-center text-[11px] font-bold uppercase tracking-wide capitalize text-dim">{seg.label}</th>
                   ));
                 })()}
               </tr>
@@ -322,7 +322,7 @@ export default function TariffePage() {
                   const we = isWeekend(d);
                   const dow = d.getDay(); // 0 = domenica, 6 = sabato
                   return (
-                    <th key={toISO(d)} className="px-2 py-2 text-center text-xs font-medium" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
+                    <th key={toISO(d)} className="border-l border-line px-2 py-2 text-center text-xs font-medium" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
                       <div className="font-semibold" style={{ color: dow === 6 ? "#E08A3A" : dow === 0 ? "var(--err)" : we ? "var(--dim)" : "var(--faint)" }}>{weekdayShort(d)}</div>
                       <div className="font-mono font-semibold text-txt">{d.getDate()}</div>
                     </th>
