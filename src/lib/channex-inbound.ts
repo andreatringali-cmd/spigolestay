@@ -8,6 +8,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { bookingRevisionsFeed, ackBookingRevision, listProperties, type ChxRevision } from "@/lib/channex";
 import { upsertGcalEvent, deleteGcalEvent, gcalEventId } from "@/lib/googleCalendarSync";
+import { CHANNELS, type Channel } from "@/lib/types";
+import { parseNotifPrefs } from "@/lib/notifPrefs";
 
 // Property di test della certificazione: le sue prenotazioni non sono in channex_map (non è una
 // struttura reale), ma vanno comunque ACKate dal flusso di import automatico — che è quello che
@@ -226,7 +228,10 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
     const bookings = (Array.isArray(data.bookings) ? data.bookings : []) as Booking[];
     const guests = (Array.isArray(data.guests) ? data.guests : []) as (Json & { id: string; email?: string; fullName?: string })[];
     const units = (Array.isArray(data.units) ? data.units : []) as Unit[];
-    const structuresArr = (Array.isArray(data.structures) ? data.structures : []) as (Json & { id: string; gcalId?: string })[];
+    const structuresArr = (Array.isArray(data.structures) ? data.structures : []) as (Json & { id: string; gcalId?: string; email?: string })[];
+    // Preferenze di notifica (Impostazioni → Notifiche), sincronizzate nello stesso blob con la
+    // chiave "spigolestay:notifs" (stessa forma di localStorage, vedi notifPrefs.ts).
+    const notifs = parseNotifPrefs(blob["spigolestay:notifs"]);
     const applied: { rev: ChxRevision }[] = [];
     // Sync in tempo reale col Google Calendar REALE dell'utente (se la struttura ha un gcalId
     // configurato) — fire-and-forget, non deve mai far fallire l'import OTA (vedi googleCalendarSync.ts).
@@ -239,6 +244,33 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       const code = typeof b.code === "string" ? b.code : "";
       const summary = [guest?.fullName || "Ospite OTA", code && `· ${code}`].filter(Boolean).join(" ");
       void upsertGcalEvent({ calendarId, eventId, summary, startDate: b.checkIn, endDateExclusive: b.checkOut });
+    };
+
+    // Notifica email alla struttura per prenotazioni/cancellazioni arrivate dalle OTA via Channex
+    // (rispetta i toggle newBooking/cancel E "ota" di Impostazioni → Notifiche). Fire-and-forget,
+    // non deve mai far fallire l'import — stesso principio di syncGcalServer.
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || "https://xenora.it";
+    const notifyOwnerServer = (ev: "newBooking" | "cancel", b: Booking) => {
+      if (!notifs[ev] || !notifs.ota) return;
+      const st = structuresArr.find((s) => s.id === b.structureId);
+      const to = st?.email?.trim();
+      if (!to) return;
+      const guest = guests.find((g) => g.id === b.guestId);
+      const guestName = guest?.fullName || "Ospite";
+      const code = typeof b.code === "string" ? b.code : "";
+      const chLabel = CHANNELS[b.channel as Channel]?.label ?? String(b.channel ?? "");
+      const subject = ev === "newBooking" ? `Nuova prenotazione OTA · ${guestName}` : `Prenotazione OTA cancellata · ${guestName}`;
+      const lines = [
+        guestName,
+        code && `Codice: ${code}`,
+        `${b.checkIn} → ${b.checkOut}`,
+        `Canale: ${chLabel}`,
+        typeof b.total === "number" ? `Totale: € ${b.total}` : "",
+      ].filter(Boolean) as string[];
+      void fetch(`${origin}/api/email`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "notify", to, subject, text: lines.join("\n") }),
+      }).catch(() => {});
     };
 
     for (const { rev: r, map } of items) {
@@ -261,7 +293,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         // updatedAt DEVE avanzare: la fusione client/server è last-write-wins su questo campo
         // (vedi authsync.tsx) — senza, al sync successivo del browser la copia locale ancora
         // "confirmed" (stesso updatedAt di prima) vince a parità e la cancellazione sparisce.
-        prevIdx.forEach((i) => { bookings[i].status = "cancelled"; bookings[i].updatedAt = Date.now(); syncGcalServer(bookings[i], "delete"); });
+        prevIdx.forEach((i) => { bookings[i].status = "cancelled"; bookings[i].updatedAt = Date.now(); syncGcalServer(bookings[i], "delete"); notifyOwnerServer("cancel", bookings[i]); });
         applied.push({ rev: r }); out.cancelled++;
         if (prevIdx.length) pushActivity(data, "cancel", `Cancellazione OTA${cancelledGuestName ? " — " + cancelledGuestName : ""} (Channex)`);
         console.log(`[channex inbound] CANCELLAZIONE booking_id=${bidLog} → ${prevIdx.length} prenotazione/i marcata/e cancelled (ack)`);
@@ -326,6 +358,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           updatedAt: Date.now(), // senza, qualunque modifica successiva (es. una cancellazione) rischia di sparire al sync (vedi sopra)
         } as Booking);
         syncGcalServer(bookings[bookings.length - 1], "upsert");
+        if (!isUpdate) notifyOwnerServer("newBooking", bookings[bookings.length - 1]);
         added++;
       });
       if (added > 0) {

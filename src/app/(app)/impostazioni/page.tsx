@@ -9,6 +9,7 @@ import Icon from "@/components/Icon";
 import StyleChooser from "@/components/StyleChooser";
 import { apiPost } from "@/lib/invoicing/client";
 import { useData } from "@/lib/store";
+import { NOTIF_DEF, loadNotifPrefs } from "@/lib/notifPrefs";
 
 // Errore comune: incollare il link di embed/pubblico del calendario invece del semplice ID
 // (es. "https://calendar.google.com/calendar/embed?src=xxx%40group.calendar.google.com&ctz=...").
@@ -31,9 +32,8 @@ export default function ImpostazioniPage() {
   const { theme, setTheme } = useTheme();
   const { t, lang, setLang } = useLang();
   const NOTIF_KEY = "spigolestay:notifs";
-  const NOTIF_DEF = { newBooking: true, cancel: true, checkin: true, payment: false, review: true, message: true, cleaning: false, ota: true };
   const [notifs, setNotifs] = useState(NOTIF_DEF);
-  useEffect(() => { try { const r = localStorage.getItem(NOTIF_KEY); if (r) setNotifs({ ...NOTIF_DEF, ...JSON.parse(r) }); } catch {} /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => { setNotifs(loadNotifPrefs()); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const setNotif = (k: keyof typeof NOTIF_DEF, v: boolean) => setNotifs((p) => { const n = { ...p, [k]: v }; try { localStorage.setItem(NOTIF_KEY, JSON.stringify(n)); } catch {} return n; });
   const ask = useConfirm();
 
@@ -152,6 +152,7 @@ export default function ImpostazioniPage() {
         <p className="mb-3 text-xs text-dim">{t("Scegli di cosa vuoi essere avvisato.")}</p>
         <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
           <Toggle label={t("Nuove prenotazioni")} checked={notifs.newBooking} onChange={(v) => setNotif("newBooking", v)} />
+          <Toggle label={t("Modifiche prenotazione")} checked={notifs.modified} onChange={(v) => setNotif("modified", v)} />
           <Toggle label={t("Cancellazioni")} checked={notifs.cancel} onChange={(v) => setNotif("cancel", v)} />
           <Toggle label={t("Prenotazioni dalle OTA")} checked={notifs.ota} onChange={(v) => setNotif("ota", v)} />
           <Toggle label={t("Check-in di oggi")} checked={notifs.checkin} onChange={(v) => setNotif("checkin", v)} />

@@ -412,6 +412,21 @@ export async function POST(req: Request) {
       const data = await send(body.to, subject, html, body.replyTo, attachments, brand?.name);
       return NextResponse.json({ ok: true, id: data?.id });
     }
+    if (body.kind === "notify") {
+      // Notifica interna alla struttura (nuova prenotazione/modifica/cancellazione/pagamento):
+      // email semplice non brandizzata, niente PDF/allegati, niente risoluzione logo.
+      if (!body.to) return NextResponse.json({ ok: false, error: "Email destinatario mancante" }, { status: 400 });
+      const subject = body.subject || "Notifica";
+      const accent = body.accent || "#4F46E5";
+      const cta = body.ctaUrl
+        ? `<div style="margin:22px 0 6px;">
+             <a href="${esc(body.ctaUrl)}" style="display:block;text-align:center;background:${accent};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:10px;">${esc(body.ctaLabel || "Apri →")}</a>
+           </div>`
+        : "";
+      const html = shell(subject, accent, `<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#1f2430;">${esc(body.text || "")}</div>${cta}`);
+      const data = await send(body.to, subject, html, undefined, undefined, "Xenora");
+      return NextResponse.json({ ok: true, id: data?.id });
+    }
     if (body.kind === "sub_receipt") {
       // Ricevuta pagamento abbonamento all'ABBONATO. Il webbook la invoca SOLO con SUB_INVOICING_LIVE attivo.
       const to = body.to;

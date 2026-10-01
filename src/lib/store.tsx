@@ -5,10 +5,12 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Structure, RoomType, Unit, Guest, Booking, Channel, CalEvent, DirectReview } from "./types";
+import { CHANNELS } from "./types";
 import { playSound } from "./sound";
 import { loadUsers } from "./users";
 import { isPublicMode, lsGet, DATA_KEY } from "./publicdata";
 import { apiPost } from "./invoicing/client";
+import { loadNotifPrefs } from "./notifPrefs";
 
 export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "rateplan" | "quote" | "payment" | "login" | "auth" | "message" | "config";
 export interface Activity {
@@ -167,6 +169,40 @@ export function DataProvider({ children }: { children: ReactNode }) {
     apiPost("calendar/sync-event", {
       action: "upsert", bookingId: b.id, calendarId, summary, description,
       startDate: b.checkIn, endDateExclusive: b.checkOut,
+    }).catch(() => {});
+  };
+
+  // Notifica via email alla struttura (non all'ospite) per nuove prenotazioni, modifiche,
+  // cancellazioni e pagamenti ricevuti — rispetta i toggle di Impostazioni → Notifiche.
+  // Fire-and-forget come syncGcal: non deve mai bloccare né far fallire l'azione locale.
+  const notifyOwner = (ev: "newBooking" | "modified" | "cancel" | "payment", b: Booking, extra?: { amount?: number }) => {
+    if (b.channel === "blocked") return; // "fuori servizio" non sono prenotazioni ospiti
+    const prefs = loadNotifPrefs();
+    if (!prefs[ev]) return;
+    const st = structures.find((s) => s.id === b.structureId);
+    const to = st?.email?.trim();
+    if (!to) return;
+    const g = guests.find((x) => x.id === b.guestId);
+    const unit = units.find((u) => u.id === b.unitId);
+    const rt = roomTypes.find((r) => r.id === (unit?.roomTypeId ?? b.roomTypeId));
+    const roomLabel = [rt?.name, unit?.name].filter(Boolean).join(" · ");
+    const guestName = g?.fullName || "Ospite";
+    const chLabel = CHANNELS[b.channel]?.label ?? b.channel;
+    const subject = ev === "newBooking" ? `Nuova prenotazione · ${guestName}`
+      : ev === "cancel" ? `Prenotazione cancellata · ${guestName}`
+      : ev === "payment" ? `Pagamento ricevuto · ${guestName}`
+      : `Prenotazione modificata · ${guestName}`;
+    const lines = [
+      guestName,
+      roomLabel,
+      `${b.checkIn} → ${b.checkOut}`,
+      `Canale: ${chLabel}`,
+      typeof b.total === "number" ? `Totale: € ${b.total}` : "",
+      ev === "payment" && extra?.amount ? `Incasso registrato: € ${extra.amount}` : "",
+    ].filter(Boolean);
+    fetch("/api/email", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "notify", to, subject, text: lines.join("\n"), accent: st?.photoColor }),
     }).catch(() => {});
   };
 
@@ -463,7 +499,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const gName = guests.find((g) => g.id === b.guestId)?.fullName;
         if (b.channel === "blocked") logAct("block", `Fuori servizio${b.note ? " — " + b.note : ""}`);
         else logAct("booking", `Nuova prenotazione${gName ? " — " + gName : ""} · ${b.channel}`);
-        if (rec.status !== "cancelled") syncGcal(rec, "upsert");
+        if (rec.status !== "cancelled") { syncGcal(rec, "upsert"); notifyOwner("newBooking", rec); }
         return rec;
       },
       updateBooking: (id, patch) => {
@@ -477,7 +513,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const gName = guests.find((g) => g.id === (patch.guestId ?? before?.guestId))?.fullName;
         if (patch.status === "cancelled" && before?.status !== "cancelled") {
           logAct("cancel", `Prenotazione annullata${gName ? " — " + gName : ""}`);
-          if (updated) syncGcal(updated, "delete");
+          if (updated) { syncGcal(updated, "delete"); notifyOwner("cancel", updated); }
           return;
         }
         if (updated) syncGcal(updated, updated.status === "cancelled" ? "delete" : "upsert");
@@ -494,6 +530,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
             if (changed.includes("adults") || changed.includes("children")) labels.push("ospiti");
             const detail = labels.length ? ` (${labels.join(", ")})` : "";
             logAct("booking", `Prenotazione modificata${gName ? " — " + gName : ""}${detail}`);
+          }
+          // Notifica proprietario: pagamento ha priorità su "modificata" per lo stesso aggiornamento
+          // (es. un salvataggio che tocca solo "paid" non deve generare anche un'email di modifica).
+          if (updated) {
+            const paidDelta = patch.paid != null && patch.paid !== before.paid ? patch.paid - (before.paid ?? 0) : 0;
+            if (patch.paid != null && patch.paid !== before.paid && paidDelta > 0) {
+              notifyOwner("payment", updated, { amount: paidDelta });
+            } else if (changed.length) {
+              notifyOwner("modified", updated);
+            }
           }
         }
       },
@@ -518,7 +564,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }));
         // Se è cambiata struttura, l'evento sul vecchio calendario (se diverso) va tolto.
         if (moved && crossed && cur) syncGcal(cur, "delete");
-        if (moved) syncGcal(moved, "upsert");
+        if (moved) { syncGcal(moved, "upsert"); notifyOwner("modified", moved); }
         logAct("move", crossed ? `Prenotazione spostata a ${structures.find((s) => s.id === target!.structureId)?.name ?? "altra struttura"}` : "Prenotazione spostata di camera");
       },
       deleteBooking: (id) => {
@@ -528,7 +574,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setBookings((prev) => prev.filter((b) => b.id !== id));
         setSelectedBookingId((s) => (s === id ? null : s));
         logAct("cancel", `Cancellazione${gName ? " — " + gName : ""}`);
-        if (b) syncGcal(b, "delete");
+        if (b) { syncGcal(b, "delete"); notifyOwner("cancel", b); }
       },
 
       deleteBookingGroup: (groupId) => {
@@ -540,7 +586,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setBookings((prev) => prev.filter((b) => !ids.has(b.id)));
         setSelectedBookingId((s) => (s && ids.has(s) ? null : s));
         logAct("cancel", `Cancellazione gruppo (${members.length} camere)${gName ? " — " + gName : ""}`);
-        members.forEach((m) => syncGcal(m, "delete"));
+        members.forEach((m) => { syncGcal(m, "delete"); notifyOwner("cancel", m); });
       },
 
       addEvent: (e) => { setEvents((prev) => [...prev, { id: uid(), ...e, updatedAt: Date.now() }]); logAct("event", `Evento: ${e.name}`); },
