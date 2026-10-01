@@ -68,7 +68,12 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const router = useRouter();
   const [threads, setThreads] = useState<Threads>({});
   const [ready, setReady] = useState(false);
-  useEffect(() => { try { const r = localStorage.getItem(KEY); if (r) setThreads(JSON.parse(r)); } catch {} setReady(true); }, []);
+  const loadThreads = () => { try { const r = localStorage.getItem(KEY); if (r) setThreads(JSON.parse(r)); } catch {} };
+  useEffect(() => { loadThreads(); setReady(true); }, []);
+  // Il sync automatico di authsync.tsx (ogni 4s, o al ritorno sulla scheda) scrive i messaggi
+  // arrivati via webhook nel localStorage e avvisa con questo evento: senza ri-leggere qui, la
+  // pagina restava ferma alla prima apertura e un nuovo messaggio compariva solo ricaricando.
+  useEffect(() => { const h = () => loadThreads(); window.addEventListener("spigolestay:datasync", h); return () => window.removeEventListener("spigolestay:datasync", h); }, []);
   useEffect(() => { if (!ready) return; try { localStorage.setItem(KEY, JSON.stringify(threads)); window.dispatchEvent(new Event("spigolestay:threads")); } catch {} }, [threads, ready]);
 
   // Modelli salvati + registro invii (condivisi con la pagina Modelli & automazioni).
