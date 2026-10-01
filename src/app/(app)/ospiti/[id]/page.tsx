@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import type { Guest } from "@/lib/types";
@@ -62,15 +62,24 @@ export default function OspiteSchedaPage() {
   const setLocalPhoneVal = (v: string) => { setLocalPhone(v); set("phone", combinePhone(dial, v)); };
   // All'apertura normalizza un numero già salvato senza prefisso (così il link WhatsApp funziona).
   useEffect(() => { const p = parsePhone(existing?.phone); const c = combinePhone(p.dial, p.local); if (c && c !== existing?.phone) set("phone", c); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
-  // Se i dati arrivano DOPO il primo render (store non ancora idratato), la scheda partiva vuota.
-  // Quando l'ospite compare (o si cambia ospite), ricarico il form dai suoi dati — senza sovrascrivere
-  // le modifiche in corso sullo stesso ospite (g.id === existing.id).
+  // Se i dati arrivano DOPO il primo render (store non ancora idratato, o sync in corso — es.
+  // self check-in appena completato dall'ospite), la scheda ricarica dai dati freschi. Il
+  // guard precedente confrontava solo g.id === existing.id: siccome g parte già inizializzato
+  // con l'id di existing al primo render, quel confronto era SEMPRE vero da subito e il form
+  // non si aggiornava mai più, anche quando existing cambiava davvero (bug: i dati del check-in
+  // online restavano invisibili sulla scheda ospite finché non si editava a mano). Ora si
+  // ricarica ogni volta che arriva una versione più recente (updatedAt diverso), senza
+  // sovrascrivere modifiche in corso sulla STESSA versione già caricata.
+  const loadedVersionRef = useRef("");
   useEffect(() => {
-    if (isNew || !existing || g.id === existing.id) return;
+    if (isNew || !existing) return;
+    const version = `${existing.id}:${existing.updatedAt ?? 0}`;
+    if (loadedVersionRef.current === version) return;
+    loadedVersionRef.current = version;
     setG(existing);
     const p = parsePhone(existing.phone); setDial(p.dial); setLocalPhone(p.local);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [existing?.id, isNew]);
+  }, [existing, isNew]);
   const toggleTag = (t: string) => setG((p) => { const cur = p.tags ?? []; return { ...p, tags: cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t] }; });
 
   const list = existing ? bookings.filter((b) => b.guestId === existing.id).sort((a, b) => (a.checkIn < b.checkIn ? 1 : -1)) : [];
