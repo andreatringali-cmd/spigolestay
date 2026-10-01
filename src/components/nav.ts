@@ -81,7 +81,10 @@ export const NAV: NavItem[] = [
   { label: "Fatture", href: "/abbonamento/fatture", group: "Il mio abbonamento", icon: "receipt", perm: "abbonamento", module: "pms" },
   { label: "Back-office", href: "/admin", group: "Il mio abbonamento", icon: "grid", perm: "abbonamento", module: "pms", ownerOnly: true },
   { label: "Accessi (invito)", href: "/admin/accessi", group: "Il mio abbonamento", icon: "lock", perm: "abbonamento", module: "pms", ownerOnly: true },
-  { label: "Certificazione Channex", href: "/admin/channex-cert", group: "Il mio abbonamento", icon: "share", perm: "abbonamento", module: "pms", ownerOnly: true },
+  // "Certificazione Channex" (/admin/channex-cert) rimossa dalla sidebar: la produzione Channex
+  // è già attiva (CHANNEX_API_URL punta a produzione, prenotazioni OTA reali in arrivo), quindi
+  // la certificazione è già superata. La pagina resta raggiungibile via URL diretto se dovesse
+  // servire di nuovo (es. per certificare un nuovo canale).
 ];
 
 // Colore accento per categoria (palette terra: terracotta, oliva, ocra, tortora + accenti).

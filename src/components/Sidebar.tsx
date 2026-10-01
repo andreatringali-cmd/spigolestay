@@ -54,7 +54,7 @@ export default function Sidebar({
         {/* Header */}
         <div className="flex h-14 items-center gap-2.5 border-b border-line px-3">
           {!collapsed && (
-            <Image src="/xenora-logo.png" alt="Xenora" width={132} height={38} priority className="object-contain" style={{ height: 26, width: "auto" }} />
+            <Image src="/xenora-logo.png" alt="Xenora" width={132} height={38} priority className="xenora-sidebar-logo object-contain dark:brightness-0 dark:invert" style={{ height: 26, width: "auto" }} />
           )}
           <button
             onClick={onToggleCollapse}
