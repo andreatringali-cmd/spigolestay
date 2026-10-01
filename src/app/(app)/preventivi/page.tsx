@@ -667,7 +667,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
       </div>
 
       {tab === "nuovo" && (
-      <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* Form */}
         <Card>
           <SectionTitle>{t("Dati preventivo")}</SectionTitle>
