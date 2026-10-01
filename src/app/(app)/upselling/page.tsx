@@ -111,7 +111,7 @@ export default function UpsellingPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* Catalogo (unico, dalla scheda struttura) */}
         <Card className="flex flex-col">
           <SectionTitle>Catalogo extra ({catExtras.length})</SectionTitle>
