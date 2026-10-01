@@ -199,7 +199,7 @@ export interface ChxRevision {
   // Commissione OTA reale (quando il canale la manda): il campo varia per OTA, quindi accettiamo
   // più nomi possibili. Non tutti gli OTA lo espongono → resta opzionale (fallback: % di default).
   ota_commission?: string | number; commission?: string | number;
-  customer?: { name?: string; surname?: string; mail?: string; email?: string; phone?: string };
+  customer?: { name?: string; surname?: string; mail?: string; email?: string; phone?: string; country?: string };
   rooms?: ChxRoom[];
 }
 // Normalizza una riga JSON:API (id + attributes) in ChxRevision piatta.

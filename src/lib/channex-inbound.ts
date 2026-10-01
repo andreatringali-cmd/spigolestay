@@ -252,7 +252,9 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       const email = (c.mail || c.email || "").trim();
       const fullName = `${c.name || ""} ${c.surname || ""}`.trim() || email || "Ospite OTA";
       let guestId = email ? guests.find((g) => (g.email || "").toLowerCase() === email.toLowerCase())?.id ?? "" : "";
-      if (!guestId) { guestId = uid(); guests.push({ id: guestId, firstName: c.name || undefined, lastName: c.surname || undefined, fullName, email: email || undefined, phone: c.phone || undefined } as Json & { id: string }); }
+      // Channex manda il paese dell'ospite in customer.country (codice tipo "NL", "GB") — campo
+      // diverso dalla "Cittadinanza" del self check-in (quella è per la schedina Alloggiati Web).
+      if (!guestId) { guestId = uid(); guests.push({ id: guestId, firstName: c.name || undefined, lastName: c.surname || undefined, fullName, email: email || undefined, phone: c.phone || undefined, country: c.country || undefined } as Json & { id: string }); }
 
       const channel = channelFromOta(r.ota_name);
       const groupId = uid();
