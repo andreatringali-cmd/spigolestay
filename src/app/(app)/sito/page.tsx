@@ -77,6 +77,7 @@ export default function SitoPage() {
   const [pubBusy, setPubBusy] = useState(false);
   const [pubMsg, setPubMsg] = useState("");
   const [pubCopied, setPubCopied] = useState(false);
+  const [pubCopiedDirect, setPubCopiedDirect] = useState(false);
   const publicUrl = slug ? `${publicBase}/${slug}` : "";
 
   // L'indirizzo è SEMPRE derivato dal nome della struttura (non modificabile).
@@ -225,6 +226,20 @@ export default function SitoPage() {
               <button onClick={openPreview} className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Anteprima")} ↗</button>
               <button onClick={publish} disabled={pubBusy || !slug} className="shrink-0 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{pubBusy ? t("Pubblico…") : publishedSlug ? (isDirtySlug ? t("Cambia indirizzo") : t("Aggiorna")) : t("Pubblica")}</button>
             </div>
+            {publishedSlug && (
+              <div className="mt-3 border-t border-line pt-3">
+                <span className="text-xs font-bold text-txt">{t("Link diretto per il pulsante \"Prenota\"")}</span>
+                <p className="mb-2 mt-0.5 text-xs text-dim">{t("Va dritto al modulo di prenotazione, senza passare dal mini-sito — da mettere al posto del vecchio link a Octorate sul tuo sito ufficiale.")}</p>
+                <div className="flex flex-wrap items-stretch gap-2">
+                  <div className="flex min-w-0 flex-1 items-center rounded-lg border border-line bg-wash px-3 py-2 text-sm">
+                    <span className="truncate"><span className="text-faint">{PUBLIC_HOST}/prenota?site=</span><span className="font-semibold text-txt">{publishedSlug}</span></span>
+                  </div>
+                  <button onClick={() => { const url = `${publicBase}/prenota?site=${publishedSlug}`; navigator.clipboard?.writeText(url); setPubCopiedDirect(true); window.setTimeout(() => setPubCopiedDirect(false), 1500); }} title={t("Copia link")} aria-label={t("Copia link")} className="grid shrink-0 place-items-center rounded-lg border border-line px-3 text-txt hover:bg-wash">
+                    {pubCopiedDirect ? <span className="text-sm font-semibold text-[color:var(--ok)]">✓</span> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>}
+                  </button>
+                </div>
+              </div>
+            )}
             {publishedSlug && <div className="mt-2 flex items-center gap-2"><button onClick={unpublish} disabled={pubBusy} className="rounded-lg px-2.5 py-1 text-xs font-semibold text-faint hover:text-[color:var(--err)] disabled:opacity-50">{t("Rimuovi dal pubblico")}</button></div>}
             {pubMsg && <p className="mt-2 text-[12px] font-medium text-dim">{pubMsg}</p>}
           </div>
