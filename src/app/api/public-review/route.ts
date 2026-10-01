@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { parseNotifPrefs } from "@/lib/notifPrefs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,6 +93,29 @@ export async function POST(req: Request) {
       const { error: wErr2 } = await admin.from("app_state").update({ data: blob2, updated_at: new Date().toISOString() }).eq("user_id", ownerId);
       if (wErr2) return NextResponse.json({ error: "write_error", message: wErr2.message }, { status: 500 });
     }
+
+    // Notifica email al gestore (se ha l'interruttore "Nuove recensioni" attivo e una email
+    // sulla struttura) — fire-and-forget, non deve mai far fallire la pubblicazione della
+    // recensione. Stesso kind:"notify" già usato per prenotazioni/pagamenti.
+    try {
+      const notifs = parseNotifPrefs(blob["spigolestay:notifs"]);
+      if (notifs.review) {
+        const structuresArr = (Array.isArray(data.structures) ? data.structures : []) as { id: string; name?: string; email?: string; photoColor?: string }[];
+        const st = structuresArr.find((s) => s.id === sid);
+        if (st?.email) {
+          const origin = process.env.NEXT_PUBLIC_SITE_URL || "https://xenora.it";
+          const stars = Math.round(rating / 2);
+          fetch(`${origin}/api/email`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              kind: "notify", to: st.email, accent: st.photoColor,
+              subject: `Nuova recensione · ${guest} · ${st.name || "Xenora"}`,
+              text: `${guest}\n${"★".repeat(stars)}${"☆".repeat(5 - stars)} (${rating}/10)\n\n${text || "(nessun testo)"}`,
+            }),
+          }).catch(() => {});
+        }
+      }
+    } catch {}
 
     return NextResponse.json({ ok: true });
   } catch (e) {
