@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
 import PageHelp from "@/components/PageHelp";
 import Icon from "@/components/Icon";
-import { WhatsAppIcon, MailIcon } from "@/components/BrandIcons";
+import { WhatsAppIcon, MailIcon, PdfIcon } from "@/components/BrandIcons";
 import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
 import { computePuliziePlan, buildPuliziePlanText } from "@/lib/puliziePlan";
@@ -243,6 +243,30 @@ export default function PuliziePage() {
   const shareWhatsApp = () => window.open(`https://wa.me/?text=${encodeURIComponent(buildPlanText())}`, "_blank", "noopener,noreferrer");
   const emailPlan = () => { window.location.href = `mailto:?subject=${encodeURIComponent(t("Planning pulizie"))}&body=${encodeURIComponent(buildPlanText())}`; }; // window.open("mailto:...") non apriva nulla in Chrome
   const copyPlan = async () => { try { await navigator.clipboard.writeText(buildPlanText()); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} };
+  // PDF scaricabile del planning — un vero file (non window.print()), da stampare o mandare
+  // alla signora delle pulizie. Testo semplice: è un foglio di lavoro, non un documento di marca.
+  const downloadPlanPdf = async () => {
+    const { jsPDF } = await import("jspdf");
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const marginX = 48;
+    const pageH = doc.internal.pageSize.getHeight();
+    const pageW = doc.internal.pageSize.getWidth();
+    const maxW = pageW - marginX * 2;
+    let y = 56;
+    for (const raw of buildPlanText().split("\n")) {
+      const bold = raw.startsWith("*") && raw.endsWith("*") && raw.length > 1;
+      const text = bold ? raw.slice(1, -1) : raw;
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.setFontSize(bold ? 13 : 11);
+      const wrapped = text ? doc.splitTextToSize(text, maxW) : [""];
+      for (const w of wrapped) {
+        if (y > pageH - 48) { doc.addPage(); y = 56; }
+        doc.text(w, marginX, y);
+        y += bold ? 20 : 16;
+      }
+    }
+    doc.save(`planning-pulizie-${date}.pdf`);
+  };
   const [planShare, setPlanShare] = useState(false);
   const [autoOpen, setAutoOpen] = useState(false);
 
@@ -505,6 +529,7 @@ export default function PuliziePage() {
               <button onClick={() => { shareWhatsApp(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><WhatsAppIcon size={16} /> WhatsApp</button>
               <button onClick={() => { emailPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><MailIcon size={16} /> Email</button>
               <button onClick={() => { copyPlan(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><Icon name="copy" size={15} /> {t("Copia")}</button>
+              <button onClick={() => { downloadPlanPdf(); setPlanShare(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-txt hover:bg-wash"><PdfIcon size={16} /> PDF</button>
               <div className="my-1 border-t border-line" />
               <button
                 onClick={() => { if (autoShareStructure) { setAutoOpen(true); setPlanShare(false); } }}
