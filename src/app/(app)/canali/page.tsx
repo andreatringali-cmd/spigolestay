@@ -277,7 +277,7 @@ export default function CanaliPage() {
       {/* Stato distribuzione canali. Channex è il motore dietro le quinte e resta INVISIBILE
          all'utente: niente nome fornitore, "staging" o ID tecnici — solo lo stato. */}
       <Card className="mb-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: chxMap[effStructure] ? "var(--ok)" : "var(--focus)" }}><Icon name="share" size={16} /></span>
             <div className="min-w-0 flex-1">
@@ -295,17 +295,17 @@ export default function CanaliPage() {
               {relink.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: relink.ok === false ? "var(--err)" : relink.ok ? "var(--ok)" : "var(--dim)" }}>{relink.msg}</div>}
             </div>
           </div>
-          <div className="flex flex-col gap-2 sm:w-auto sm:shrink-0 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex flex-col gap-2 lg:w-auto lg:shrink-0 lg:flex-row lg:flex-wrap lg:items-center">
             {chxMap[effStructure] ? (
               <>
-                <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 sm:w-auto">{channelPanel.loading ? t("Apro…") : "+ " + t("Collega un canale")}</button>
-                <button onClick={importOta} disabled={impSync.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 sm:w-auto" title={t("Le prenotazioni arrivano da sole; usa questo solo per forzare un controllo immediato.")}>{impSync.running ? t("Controllo…") : "↓ " + t("Controlla prenotazioni ora")}</button>
-                <button onClick={doFullSync} disabled={fullSync.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 sm:w-auto" title={t("Invia subito l'intera finestra di disponibilità e prezzi/restrizioni ai canali collegati, senza aspettare il ciclo automatico.")}>{fullSync.running ? t("Sincronizzo…") : "⟳ " + t("Full sync ora")}</button>
+                <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 lg:w-auto">{channelPanel.loading ? t("Apro…") : "+ " + t("Collega un canale")}</button>
+                <button onClick={importOta} disabled={impSync.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 lg:w-auto" title={t("Le prenotazioni arrivano da sole; usa questo solo per forzare un controllo immediato.")}>{impSync.running ? t("Controllo…") : "↓ " + t("Controlla prenotazioni ora")}</button>
+                <button onClick={doFullSync} disabled={fullSync.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 lg:w-auto" title={t("Invia subito l'intera finestra di disponibilità e prezzi/restrizioni ai canali collegati, senza aspettare il ciclo automatico.")}>{fullSync.running ? t("Sincronizzo…") : "⟳ " + t("Full sync ora")}</button>
               </>
             ) : (
               <>
-                <button onClick={() => doRelink(true)} disabled={relink.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 sm:w-auto">{relink.running ? t("Ripristino…") : "⟳ " + t("Ripristina")}</button>
-                <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 sm:w-auto">{chxSync.running ? t("Attivo…") : t("Attiva distribuzione")}</button>
+                <button onClick={() => doRelink(true)} disabled={relink.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 lg:w-auto">{relink.running ? t("Ripristino…") : "⟳ " + t("Ripristina")}</button>
+                <button onClick={syncToChannex} disabled={chxSync.running || effStructure === "all"} className="w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 lg:w-auto">{chxSync.running ? t("Attivo…") : t("Attiva distribuzione")}</button>
               </>
             )}
           </div>
