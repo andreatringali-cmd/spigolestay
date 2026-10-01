@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { toISO, shiftISO, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
@@ -10,15 +10,12 @@ import Icon from "@/components/Icon";
 const isWeekend = (iso: string) => { const d = new Date(iso).getDay(); return d === 5 || d === 6 || d === 0; };
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
 
-// Eventi locali di Siracusa che spingono la domanda (relativi a oggi per la demo).
-const EVENTS: { off: number; name: string; impact: "alto" | "medio" }[] = [
-  { off: 3, name: "Weekend a Ortigia", impact: "medio" },
-  { off: 9, name: "Concerto al Teatro Greco", impact: "alto" },
-  { off: 16, name: "Navi da crociera in porto", impact: "medio" },
-  { off: 24, name: "Festa patronale", impact: "alto" },
-  { off: 33, name: "Sagra enogastronomica", impact: "medio" },
-  { off: 45, name: "Ponte / festività", impact: "alto" },
-];
+// Eventi locali: li aggiunge il gestore a mano (sagre, concerti, crociere…) — nessuna fonte
+// esterna/automatica. Un'unica lista condivisa (gli eventi riguardano la città, non una singola
+// struttura), con la data vera invece di un offset da "oggi".
+interface LocalEvent { id: string; name: string; date: string; impact: "alto" | "medio" }
+const EVENTS_KEY = "spigolestay:localevents";
+const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now() + Math.random()));
 
 export default function AssistenteRicaviPage() {
   const { roomTypes, units, bookings, rateOverrides, setDayRates, activeStructureId, structures } = useData();
@@ -30,7 +27,20 @@ export default function AssistenteRicaviPage() {
   const scopeTypes = roomTypes.filter((rt) => activeStructureId === "all" || rt.structureId === activeStructureId);
   const baseRate = scopeTypes.length ? Math.round(scopeTypes.reduce((a, rt) => a + rt.basePrice, 0) / scopeTypes.length) : 100;
 
-  const events = useMemo(() => EVENTS.map((e) => ({ ...e, iso: shiftISO(today, e.off) })), [today]);
+  const [myEvents, setMyEvents] = useState<LocalEvent[]>([]);
+  useEffect(() => { try { const r = localStorage.getItem(EVENTS_KEY); if (r) setMyEvents(JSON.parse(r)); } catch {} }, []);
+  const persistEvents = (next: LocalEvent[]) => { setMyEvents(next); try { localStorage.setItem(EVENTS_KEY, JSON.stringify(next)); } catch {} };
+  const [newEvName, setNewEvName] = useState("");
+  const [newEvDate, setNewEvDate] = useState("");
+  const [newEvImpact, setNewEvImpact] = useState<"alto" | "medio">("medio");
+  const addEvent = () => {
+    if (!newEvName.trim() || !newEvDate) return;
+    persistEvents([...myEvents, { id: uid(), name: newEvName.trim(), date: newEvDate, impact: newEvImpact }].sort((a, b) => a.date.localeCompare(b.date)));
+    setNewEvName(""); setNewEvDate(""); setNewEvImpact("medio");
+  };
+  const removeEvent = (id: string) => persistEvents(myEvents.filter((e) => e.id !== id));
+
+  const events = useMemo(() => myEvents.map((e) => ({ ...e, iso: e.date })), [myEvents]);
   const eventOf = (iso: string) => events.find((e) => e.iso === iso);
 
   const occOn = (iso: string) => bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId) && b.checkIn <= iso && iso < b.checkOut).length;
@@ -70,14 +80,48 @@ export default function AssistenteRicaviPage() {
       {/* Eventi locali */}
       <Card className="mb-4">
         <SectionTitle>Eventi che spingono la domanda · {activeStructureId === "all" ? "tutte le strutture" : structures.find((s) => s.id === activeStructureId)?.name}</SectionTitle>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <input
+            value={newEvName}
+            onChange={(e) => setNewEvName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") addEvent(); }}
+            placeholder="Nome evento (sagra, concerto…)"
+            className="min-w-[180px] flex-1 rounded-lg border border-line bg-paper px-2 py-1 text-sm text-txt outline-none focus:border-focus"
+          />
+          <input
+            type="date"
+            value={newEvDate}
+            onChange={(e) => setNewEvDate(e.target.value)}
+            className="rounded-lg border border-line bg-paper px-2 py-1 text-sm text-txt outline-none focus:border-focus"
+          />
+          <select
+            value={newEvImpact}
+            onChange={(e) => setNewEvImpact(e.target.value as "alto" | "medio")}
+            className="rounded-lg border border-line bg-paper px-2 py-1 text-sm text-txt outline-none focus:border-focus"
+          >
+            <option value="medio">Impatto medio</option>
+            <option value="alto">Impatto alto</option>
+          </select>
+          <button
+            onClick={addEvent}
+            disabled={!newEvName.trim() || !newEvDate}
+            className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"
+          >
+            Aggiungi
+          </button>
+        </div>
         <div className="flex flex-wrap gap-2">
           {events.map((e) => (
-            <div key={e.iso} className="flex items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5">
+            <div key={e.id} className="flex items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-1.5">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: e.impact === "alto" ? "var(--err)" : "var(--warn)" }} />
               <span className="text-sm font-medium text-txt">{e.name}</span>
               <span className="text-[11px] text-faint">{fmt(e.iso)}</span>
+              <button onClick={() => removeEvent(e.id)} aria-label="Rimuovi evento" className="ml-1 text-xs text-faint hover:text-[color:var(--err)]">✕</button>
             </div>
           ))}
+          {!events.length && (
+            <p className="text-sm text-faint">Nessun evento aggiunto. Aggiungi sagre, concerti o eventi locali che possono alzare la domanda.</p>
+          )}
         </div>
       </Card>
 
@@ -91,7 +135,7 @@ export default function AssistenteRicaviPage() {
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <table className="w-full min-w-[720px] text-sm">
           <thead><tr className="border-b border-line bg-wash text-left text-[11px] uppercase tracking-wide text-faint">
-            <th className="px-3 py-2 font-semibold">Giorno</th><th className="px-3 py-2 text-right font-semibold">Occup.</th><th className="px-3 py-2 text-right font-semibold">Libere</th><th className="px-3 py-2 text-right font-semibold">Attuale</th><th className="px-3 py-2 text-right font-semibold">Consigliato</th><th className="px-3 py-2 font-semibold">Motivo</th><th className="px-3 py-2"></th>
+            <th className="whitespace-nowrap px-3 py-2 font-semibold">Giorno</th><th className="whitespace-nowrap px-3 py-2 text-right font-semibold">Occup.</th><th className="whitespace-nowrap px-3 py-2 text-right font-semibold">Libere</th><th className="whitespace-nowrap px-3 py-2 text-right font-semibold">Attuale</th><th className="whitespace-nowrap py-2 pl-3 pr-6 text-right font-semibold">Consigliato</th><th className="w-full py-2 pl-6 pr-3 font-semibold">Motivo</th><th className="whitespace-nowrap px-3 py-2"></th>
           </tr></thead>
           <tbody>
             {days.map((d) => {
@@ -102,8 +146,8 @@ export default function AssistenteRicaviPage() {
                   <td className="px-3 py-2 text-right font-mono text-txt">{d.occPct}%</td>
                   <td className="px-3 py-2 text-right font-mono text-dim">{d.free}</td>
                   <td className="px-3 py-2 text-right font-mono text-dim">{eur(d.current)}</td>
-                  <td className="px-3 py-2 text-right font-mono font-bold" style={{ color: up ? "var(--ok)" : down ? "var(--err)" : "var(--txt)" }}>{eur(d.rate)} {d.delta !== 0 && <span className="text-[10px]">({up ? "+" : ""}{d.delta})</span>}</td>
-                  <td className="px-3 py-2"><div className="flex flex-wrap gap-1">{d.reasons.map((r, i) => <span key={i} className="rounded-full bg-wash px-2 py-0.5 text-[10px] text-dim">{r}</span>)}{!d.reasons.length && <span className="text-[11px] text-faint">—</span>}</div></td>
+                  <td className="py-2 pl-3 pr-6 text-right font-mono font-bold" style={{ color: up ? "var(--ok)" : down ? "var(--err)" : "var(--txt)" }}>{eur(d.rate)} {d.delta !== 0 && <span className="text-[10px]">({up ? "+" : ""}{d.delta})</span>}</td>
+                  <td className="py-2 pl-6 pr-3"><div className="flex flex-wrap gap-1">{d.reasons.map((r, i) => <span key={i} className="rounded-full bg-wash px-2 py-0.5 text-[10px] text-dim">{r}</span>)}{!d.reasons.length && <span className="text-[11px] text-faint">—</span>}</div></td>
                   <td className="px-3 py-2 text-right">{d.delta !== 0 ? <button onClick={() => applyOne(d)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash">Applica</button> : null}</td>
                 </tr>
               );
