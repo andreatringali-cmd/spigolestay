@@ -109,13 +109,23 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
 
   // Ospiti con almeno una prenotazione (nella struttura attiva), ordinati per struttura poi alfabetico.
   const people = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; phone?: string; email?: string; struct: string; lastCheckIn: string; b: Booking }>();
+    const map = new Map<string, { id: string; name: string; phone?: string; email?: string; struct: string; lastCheckIn: string; b?: Booking }>();
     for (const b of bookings) {
       if (b.channel === "blocked" || b.status === "cancelled") continue;
       if (activeStructureId !== "all" && b.structureId !== activeStructureId) continue;
       const g = guests.find((x) => x.id === b.guestId); if (!g) continue;
       const cur = map.get(g.id);
       if (!cur || b.checkIn > cur.lastCheckIn) map.set(g.id, { id: g.id, name: g.fullName, phone: g.phone, email: g.email, struct: getStructure(b.structureId)?.name ?? "", lastCheckIn: b.checkIn, b });
+    }
+    // Chi scrive senza avere (ancora) una prenotazione: un numero WhatsApp nuovo, o un ospite che
+    // ha scritto prima di prenotare. Senza questo, il messaggio arriva ed è salvato ma resta
+    // invisibile in lista — l'ospite deve poter scrivere chiunque, non solo chi ha già prenotato.
+    for (const key of Object.keys(threads)) {
+      if (map.has(key) || !(threads[key]?.length)) continue;
+      const g = guests.find((x) => x.id === key);
+      if (g) { map.set(key, { id: g.id, name: g.fullName || g.phone || t("Nuovo contatto"), phone: g.phone, email: g.email, struct: "", lastCheckIn: "" }); continue; }
+      const phone = key.startsWith("wa:") ? key.slice(3) : key;
+      map.set(key, { id: key, name: phone, phone, struct: "", lastCheckIn: "" });
     }
     let arr = [...map.values()];
     if (q.trim()) { const s = q.toLowerCase(); arr = arr.filter((p) => p.name.toLowerCase().includes(s) || (threads[p.id] ?? []).some((m) => m.text.toLowerCase().includes(s))); }
@@ -375,7 +385,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
             const needsReply = !!last && last.dir === "in";
             const showHeader = activeStructureId === "all" && (i === 0 || people[i - 1].struct !== p.struct);
             const isSelected = sel === p.id;
-            const sub = last ? preview(last, t) : `${fmtD(p.b.checkIn)} → ${fmtD(p.b.checkOut)} · ${CHANNELS[p.b.channel]?.label ?? ""}`;
+            const sub = last ? preview(last, t) : (p.b ? `${fmtD(p.b.checkIn)} → ${fmtD(p.b.checkOut)} · ${CHANNELS[p.b.channel]?.label ?? ""}` : t("Nessuna prenotazione"));
             return (
               <div key={p.id}>
                 {showHeader && <div className="sticky top-0 z-10 border-b border-line bg-wash px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">{p.struct || "—"}</div>}
@@ -384,7 +394,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                   <button onClick={() => setSel(p.id)} className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3.5 text-left">
                     <span className="relative shrink-0">
                       <span className="grid h-11 w-11 place-items-center rounded-full text-sm font-bold text-white shadow-sm ring-1 ring-black/5" style={{ backgroundColor: avatarColor(p.name) }}>{initials(p.name)}</span>
-                      <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-surface p-[2px] shadow-sm ring-1 ring-line"><ChannelLogo channel={p.b.channel} size={12} /></span>
+                      {p.b && <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-surface p-[2px] shadow-sm ring-1 ring-line"><ChannelLogo channel={p.b.channel} size={12} /></span>}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2">
