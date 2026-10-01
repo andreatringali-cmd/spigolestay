@@ -13,8 +13,10 @@ import Icon from "@/components/Icon";
 import { WhatsAppIcon, MailIcon, PdfIcon } from "@/components/BrandIcons";
 import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
-import { computePuliziePlan, buildPuliziePlanText } from "@/lib/puliziePlan";
+import { computePuliziePlan, buildPuliziePlanText, ACT_LABEL, fmtLongIT, type PlanRoom } from "@/lib/puliziePlan";
 import AutoShareSettings from "@/components/pulizie/AutoShareSettings";
+import PulizieDoc, { type PulizieRow } from "@/components/pdf/PulizieDoc";
+import { captureA4ToPdfBlob } from "@/lib/pdf-capture";
 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
 const fmtShort = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
@@ -243,29 +245,54 @@ export default function PuliziePage() {
   const shareWhatsApp = () => window.open(`https://wa.me/?text=${encodeURIComponent(buildPlanText())}`, "_blank", "noopener,noreferrer");
   const emailPlan = () => { window.location.href = `mailto:?subject=${encodeURIComponent(t("Planning pulizie"))}&body=${encodeURIComponent(buildPlanText())}`; }; // window.open("mailto:...") non apriva nulla in Chrome
   const copyPlan = async () => { try { await navigator.clipboard.writeText(buildPlanText()); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} };
-  // PDF scaricabile del planning — un vero file (non window.print()), da stampare o mandare
-  // alla signora delle pulizie. Testo semplice: è un foglio di lavoro, non un documento di marca.
-  const downloadPlanPdf = async () => {
-    const { jsPDF } = await import("jspdf");
-    const doc = new jsPDF({ unit: "pt", format: "a4" });
-    const marginX = 48;
-    const pageH = doc.internal.pageSize.getHeight();
-    const pageW = doc.internal.pageSize.getWidth();
-    const maxW = pageW - marginX * 2;
-    let y = 56;
-    for (const raw of buildPlanText().split("\n")) {
-      const bold = raw.startsWith("*") && raw.endsWith("*") && raw.length > 1;
-      const text = bold ? raw.slice(1, -1) : raw;
-      doc.setFont("helvetica", bold ? "bold" : "normal");
-      doc.setFontSize(bold ? 13 : 11);
-      const wrapped = text ? doc.splitTextToSize(text, maxW) : [""];
-      for (const w of wrapped) {
-        if (y > pageH - 48) { doc.addPage(); y = 56; }
-        doc.text(w, marginX, y);
-        y += bold ? 20 : 16;
+  // PDF scaricabile del planning, con la grafica "Minimale" scelta (vedi PulizieDoc) — una
+  // pagina A4 per struttura, catturata dall'anteprima reale fuori schermo (stessa tecnica del
+  // voucher/preventivi: il PDF è una fotocopia esatta, mai un disegno ricostruito a parte).
+  const pdfRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const pdfDocsData = scopedStructures.map((s, i) => {
+    const sRooms = rooms.filter((r) => r.structure.id === s.id);
+    const sToClean = toClean.filter((r) => r.structure.id === s.id);
+    const rowOf = (r: PlanRoom): PulizieRow => {
+      if (r.oos) return { camera: r.unit.name, azione: t("Fuori servizio"), ospite: "—", note: r.oosNote ?? "", danger: true };
+      if (r.action === "turnover" && r.dep && r.arr) {
+        return { camera: r.unit.name, azione: t(ACT_LABEL.turnover), ospite: `${guestName(r.dep.guestId)} → ${guestName(r.arr.guestId)}`, note: notes[keyOf(r.unit.id)] ?? "" };
       }
+      const p = r.arr ?? r.dep ?? r.stay;
+      const ospite = p ? `${guestName(p.guestId)}${r.action === "riassetto" ? ` (${t("occupata")})` : ""}` : t("Vuota");
+      return { camera: r.unit.name, azione: t(ACT_LABEL[r.action]), ospite, note: notes[keyOf(r.unit.id)] ?? (r.oosFrom && r.oosNote ? r.oosNote : ""), dim: r.action === "niente" };
+    };
+    // Biancheria SOLO per questa struttura (la funzione condivisa calcola su tutte quelle filtrate).
+    let matr = 0, sing = 0, guestsN = 0, changeRooms = 0, mats = 0;
+    for (const r of sToClean) {
+      const beds = roomTypes.find((x) => x.id === r.unit.roomTypeId)?.beds ?? 1;
+      if (r.action !== "riassetto") { changeRooms++; matr += beds >= 2 ? 1 : 0; sing += beds >= 2 ? beds - 2 : beds; }
+      if (r.arr) mats++;
+      const p = r.arr ?? r.stay ?? r.dep;
+      guestsN += p ? p.adults + p.children : 0;
     }
-    doc.save(`planning-pulizie-${date}.pdf`);
+    const federe = matr * 2 + sing;
+    const biancheriaLine = changeRooms > 0
+      ? `${t("Biancheria")}: ${changeRooms} ${changeRooms === 1 ? t("cambio completo") : t("cambi completi")}${matr ? ` (${matr} ${t("matrimoniali")})` : ""}${guestsN ? ` · ${guestsN} ${t("asciugamani")}` : ""}`
+      : t("Nessun cambio biancheria oggi");
+    void federe; void mats;
+    return {
+      structure: s,
+      camere: sRooms.filter((r) => !!r.unit).length,
+      daPulire: sToClean.length,
+      arrivi: sRooms.filter((r) => r.action === "arrivo" || r.action === "turnover").length,
+      fuoriServizio: sRooms.filter((r) => r.oos).length,
+      rows: sRooms.map(rowOf),
+      biancheriaLine,
+      pageIndex: i + 1,
+    };
+  });
+  const downloadPlanPdf = async () => {
+    const els = pdfDocsData.map((d) => pdfRefs.current[d.structure.id]).filter((el): el is HTMLDivElement => !!el);
+    if (!els.length) return;
+    const blob = await captureA4ToPdfBlob(els);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `planning-pulizie-${date}.pdf`; a.click();
+    URL.revokeObjectURL(url);
   };
   const [planShare, setPlanShare] = useState(false);
   const [autoOpen, setAutoOpen] = useState(false);
@@ -753,6 +780,23 @@ export default function PuliziePage() {
           </div>
         </div>
       )}
+
+      {/* Contenitore fuori schermo (MAI display:none, altrimenti html2canvas non cattura): una
+          pagina A4 per struttura, sempre montata così il ref è pronto al click su "PDF". */}
+      <div aria-hidden="true" style={{ position: "fixed", left: -10000, top: 0, width: 794, zIndex: -1, pointerEvents: "none" }}>
+        {pdfDocsData.map((d) => (
+          <div key={d.structure.id} ref={(el) => { pdfRefs.current[d.structure.id] = el; }}>
+            <PulizieDoc
+              structureName={d.structure.name} structureCity={d.structure.city}
+              dateLabel={fmtLongIT(date).replace(/^./, (c) => c.toUpperCase())}
+              camere={d.camere} daPulire={d.daPulire} arrivi={d.arrivi} fuoriServizio={d.fuoriServizio}
+              rows={d.rows} biancheriaLine={d.biancheriaLine}
+              generatedLabel={`${t("generato da Xenora il")} ${fmtLongIT(toISO(new Date()))}`}
+              pageIndex={d.pageIndex} pageTotal={pdfDocsData.length}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
