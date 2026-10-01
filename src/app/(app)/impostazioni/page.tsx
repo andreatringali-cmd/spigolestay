@@ -10,6 +10,7 @@ import StyleChooser from "@/components/StyleChooser";
 import { apiPost } from "@/lib/invoicing/client";
 import { useData } from "@/lib/store";
 import { NOTIF_DEF, loadNotifPrefs } from "@/lib/notifPrefs";
+import { AI_CONCIERGE_DEF, AI_CONCIERGE_KEY, loadAiConciergePrefs } from "@/lib/aiConcierge";
 
 // Errore comune: incollare il link di embed/pubblico del calendario invece del semplice ID
 // (es. "https://calendar.google.com/calendar/embed?src=xxx%40group.calendar.google.com&ctz=...").
@@ -60,22 +61,33 @@ export default function ImpostazioniPage() {
 
   // Verifica SENZA scrivere nulla, appena incollato l'ID — invece di scoprire un errore solo al
   // primo "Sincronizza ora" (che oltretutto scrive davvero sul calendario). Messaggi mirati sugli
-  // errori più comuni: 403 = condivisione mancante/sbagliata, 404 = ID calendario sbagliato.
+  // errori più comuni: 403 = condivisione mancante/sbagliata (si ricollega al passo 2 della guida),
+  // 404 = ID calendario sbagliato (si ricollega al passo 3). L'ultimo ID che ha superato la verifica
+  // viene salvato su gcalVerifiedId così il badge "✓ Collegato e verificato" resta visibile anche
+  // dopo un refresh, finché l'ID salvato non cambia.
   const [gcalVerifying, setGcalVerifying] = useState(false);
-  const [gcalVerifyMsg, setGcalVerifyMsg] = useState<{ text: string; err?: boolean } | null>(null);
+  const [gcalVerifyMsg, setGcalVerifyMsg] = useState<{ text: string; err?: boolean; hint?: string } | null>(null);
   const verifyGcal = async () => {
     const calendarId = extractCalendarId(gcalIdInput);
     if (!calendarId) return;
     setGcalVerifying(true); setGcalVerifyMsg(null);
     try {
       const r = await apiPost<{ ok: boolean; summary?: string; error?: string }>("calendar/sync-event", { action: "verify", calendarId });
-      if (r.ok) setGcalVerifyMsg({ text: `✓ ${t("Collegato")}${r.summary ? ` — "${r.summary}"` : ""}` });
-      else if (r.error === "http_403") setGcalVerifyMsg({ text: t("Permesso negato: hai condiviso questo calendario con l'indirizzo del service account?"), err: true });
-      else if (r.error === "http_404") setGcalVerifyMsg({ text: t("Calendario non trovato: controlla di aver incollato l'ID giusto (non l'URL)."), err: true });
+      if (r.ok) {
+        setGcalVerifyMsg({ text: `${t("Collegato e verificato")}${r.summary ? ` — "${r.summary}"` : ""}` });
+        if (gcalStructId) updateStructure(gcalStructId, { gcalVerifiedId: calendarId });
+      }
+      else if (r.error === "http_403") setGcalVerifyMsg({ text: t("Permesso negato: questo calendario non risulta condiviso con l'indirizzo del service account (o non col ruolo giusto)."), err: true, hint: t("Ripeti il passo 2 qui sopra: condividi di nuovo il calendario con quell'email, scegliendo il ruolo \"Apportare modifiche agli eventi\".") });
+      else if (r.error === "http_404") setGcalVerifyMsg({ text: t("Calendario non trovato: l'ID inserito non è corretto."), err: true, hint: t("Ricontrolla il passo 3 qui sopra: riapri le impostazioni del calendario giusto su Google e ricopia l'ID (va bene anche l'intero link).") });
       else setGcalVerifyMsg({ text: `${t("Errore")}: ${r.error || t("sconosciuto")}`, err: true });
     } catch (e) { setGcalVerifyMsg({ text: e instanceof Error ? e.message : t("Errore di rete"), err: true }); }
     finally { setGcalVerifying(false); }
   };
+  // Vero solo se l'ID attualmente scritto nel campo È quello salvato per la struttura E quello
+  // che ha superato l'ultima verifica: se l'utente tocca il campo o salva un ID diverso, sparisce
+  // finché non lo riverifica, così non mente mai sullo stato reale.
+  const verifiedId = gcalStruct?.gcalVerifiedId;
+  const isVerifiedCurrent = !!verifiedId && verifiedId === extractCalendarId(gcalIdInput) && verifiedId === extractCalendarId(gcalStruct?.gcalId ?? "");
 
   // La sync scrive solo le prenotazioni create/modificate/cancellate DA ORA IN POI (vedi
   // store.tsx): collegare un calendario a una struttura che ha già prenotazioni non le fa
@@ -189,18 +201,32 @@ export default function ImpostazioniPage() {
         ) : (
           <>
             <p className="mb-3 text-xs text-dim">{t("Xenora scrive/cancella gli eventi sul tuo calendario appena succede qualcosa — nuove prenotazioni, modifiche, cancellazioni — tutto istantaneo, senza passare da un link da ricontrollare.")}</p>
-            <ol className="mb-3 list-decimal space-y-1.5 pl-4 text-xs text-dim">
-              <li>{t("Su Google Calendar crea (o scegli) il calendario da usare per una struttura.")}</li>
-              <li>
-                {t("Condividilo con questo indirizzo, permesso \"Apportare modifiche agli eventi\":")}
-                {gcalInfo?.serviceAccountEmail && (
-                  <div className="mt-1 flex items-center gap-2">
-                    <code className="truncate rounded-lg border border-line bg-wash px-2 py-1 text-[11px] text-txt">{gcalInfo.serviceAccountEmail}</code>
-                    <button onClick={copyServiceEmail} className="shrink-0 rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-txt hover:bg-wash">{gcalCopied ? "✓" : t("Copia")}</button>
-                  </div>
-                )}
+            <ol className="mb-4 space-y-3 text-xs text-dim">
+              <li className="flex gap-2.5">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-wash text-[11px] font-bold text-txt">1</span>
+                <span className="pt-0.5">{t("Vai su")} <strong className="font-semibold text-txt">calendar.google.com</strong> {t("e crea un nuovo calendario (oppure usa uno che hai già).")}</span>
               </li>
-              <li>{t("Nelle impostazioni di quel calendario (su Google) copia l'\"ID calendario\" e incollalo qui sotto, per la struttura giusta — poi premi \"Verifica\" prima di salvare, per sapere subito se è tutto a posto.")}</li>
+              <li className="flex gap-2.5">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-wash text-[11px] font-bold text-txt">2</span>
+                <span className="pt-0.5">
+                  {t("Clicca sui tre puntini accanto al nome del calendario → \"Impostazioni e condivisione\" → \"Aggiungi persone e gruppi\" → incolla questa email:")}
+                  {gcalInfo?.serviceAccountEmail && (
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <code className="truncate rounded-lg border border-line bg-wash px-2 py-1.5 text-[11px] text-txt">{gcalInfo.serviceAccountEmail}</code>
+                      <button onClick={copyServiceEmail} className="shrink-0 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-white hover:opacity-90">{gcalCopied ? `✓ ${t("Copiata")}` : t("Copia")}</button>
+                    </div>
+                  )}
+                  <div className="mt-1.5">{t("→ scegli il ruolo \"Apportare modifiche agli eventi\" → Invia.")}</div>
+                </span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-wash text-[11px] font-bold text-txt">3</span>
+                <span className="pt-0.5">{t("Torna su Google Calendar, riapri di nuovo le impostazioni di quel calendario, scorri fino a \"Integra calendario\" e copia l'\"ID calendario\" — va bene anche incollare l'intero link, qui sotto lo sistemiamo da soli.")}</span>
+              </li>
+              <li className="flex gap-2.5">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-wash text-[11px] font-bold text-txt">4</span>
+                <span className="pt-0.5">{t("Incolla qui sotto e premi \"Verifica\": ti diciamo subito se è tutto a posto, prima di \"Salva\".")}</span>
+              </li>
             </ol>
             {activeStructureId === "all" && structures.length > 1 && (
               <label className="mb-2 block text-xs font-medium text-dim">{t("Struttura")}
@@ -216,10 +242,19 @@ export default function ImpostazioniPage() {
                 <button onClick={saveGcalId} disabled={!gcalStructId} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
               </div>
             </label>
-            {gcalVerifyMsg && <p className="mt-1.5 text-xs font-medium" style={{ color: gcalVerifyMsg.err ? "var(--err)" : "var(--ok)" }}>{gcalVerifyMsg.text}</p>}
+            {gcalVerifyMsg && (
+              <div className="mt-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: gcalVerifyMsg.err ? "color-mix(in srgb, var(--err) 14%, transparent)" : "color-mix(in srgb, var(--ok) 14%, transparent)", color: gcalVerifyMsg.err ? "var(--err)" : "var(--ok)" }}>
+                <div>{gcalVerifyMsg.err ? "⚠ " : "✓ "}{gcalVerifyMsg.text}</div>
+                {gcalVerifyMsg.hint && <div className="mt-1 font-normal opacity-90">{gcalVerifyMsg.hint}</div>}
+              </div>
+            )}
             {gcalStruct?.gcalId && (
               <>
-                <p className="mt-2 text-xs font-medium" style={{ color: "var(--ok)" }}>✓ {t("Attivo per")} {gcalStruct.name}</p>
+                {isVerifiedCurrent ? (
+                  <p className="mt-2 text-xs font-semibold" style={{ color: "var(--ok)" }}>✓ {t("Collegato e verificato per")} {gcalStruct.name}</p>
+                ) : (
+                  <p className="mt-2 text-xs font-semibold" style={{ color: "var(--warn)" }}>{t("Salvato per")} {gcalStruct.name} — {t("premi \"Verifica\" per controllare che funzioni")}</p>
+                )}
                 <p className="mt-2 text-xs text-dim">{t("Attiva da ora in poi: le prenotazioni già esistenti non compaiono da sole finché non cambiano. Per scriverle subito tutte una volta sola:")}</p>
                 <button onClick={syncExistingNow} disabled={gcalSyncing} className="mt-1.5 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-50">{gcalSyncing ? t("Sincronizzo…") : t("Sincronizza ora le prenotazioni esistenti")}</button>
                 {gcalSyncMsg && <p className="mt-1.5 text-xs font-medium" style={{ color: gcalSyncMsg.err ? "var(--err)" : "var(--ok)" }}>{gcalSyncMsg.text}</p>}
