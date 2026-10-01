@@ -53,6 +53,7 @@ export const NAV: NavItem[] = [
 
   // Amministrazione: fisco e cassa.
   { label: "Documenti fiscali", href: "/documenti", group: "Amministrazione", icon: "receipt", perm: "webconcierge", module: "concierge" },
+  { label: "Fascicolo fiscale", href: "/fascicolo-fiscale", group: "Amministrazione", icon: "receipt", perm: "cassa", module: "pms" },
   { label: "Fatture passive", href: "/fatture-passive", group: "Amministrazione", icon: "receipt", perm: "cassa", module: "pms" },
   { label: "Registro bollo", href: "/registro-bollo", group: "Amministrazione", icon: "receipt", perm: "cassa", module: "pms" },
   { label: "Incassi", href: "/pagamenti", group: "Amministrazione", icon: "card", perm: "pagamenti", module: "pms" },
