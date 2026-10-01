@@ -156,14 +156,14 @@ export default function ImpostazioniPage() {
               </li>
               <li>{t("Nelle impostazioni di quel calendario (su Google) copia l'\"ID calendario\" e incollalo qui sotto, per la struttura giusta.")}</li>
             </ol>
-            {structures.length > 1 && (
+            {activeStructureId === "all" && structures.length > 1 && (
               <label className="mb-2 block text-xs font-medium text-dim">{t("Struttura")}
                 <select value={gcalStructId} onChange={(e) => setGcalStructId(e.target.value)} className={`mt-1 ${inp}`}>
                   {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </label>
             )}
-            <label className="block text-xs font-medium text-dim">{t("ID calendario Google")}
+            <label className="block text-xs font-medium text-dim">{t("ID calendario Google")} {activeStructureId !== "all" && gcalStruct ? `· ${gcalStruct.name}` : ""}
               <div className="mt-1 flex items-center gap-2">
                 <input value={gcalIdInput} onChange={(e) => setGcalIdInput(e.target.value)} placeholder="es. abc123@group.calendar.google.com" className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
                 <button onClick={saveGcalId} disabled={!gcalStructId} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
