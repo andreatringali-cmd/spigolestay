@@ -753,7 +753,7 @@ export default function CalendarGrid() {
               </span>
             </div>
           )}
-          {!unit.outOfService && uBookings.map((b) => {
+          {!unit.outOfService && laneSource.map((b) => {
             const g = geom(b.checkIn, b.checkOut);
             if (!g) return null;
             const meta = CHANNELS[b.channel];
