@@ -83,7 +83,7 @@ export default function PrenotazioniPage() {
   const [loc, setLoc] = useState<string>("all"); // "all" | "str:<id>" | "unit:<id>"
   const [from, setFrom] = useState(() => `${new Date().getFullYear()}-01-01`); // default: anno solare corrente
   const [to, setTo] = useState(() => `${new Date().getFullYear()}-12-31`);
-  const [dateField, setDateField] = useState<"arrivo" | "prenotazione">("arrivo");
+  const [dateField, setDateField] = useState<"arrivo" | "prenotazione" | "incasa">("arrivo");
   const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "checkIn", dir: "asc" });
   const toggleSort = (key: string) => setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
   // Selettore grafici (icona prima di "Nuova")
@@ -115,6 +115,15 @@ export default function PrenotazioniPage() {
       if (channel !== "all" && b.channel !== channel) return false;
       if (loc.startsWith("str:") && b.structureId !== loc.slice(4)) return false;
       if (loc.startsWith("unit:") && b.unitId !== loc.slice(5)) return false;
+      // "In casa": la prenotazione occupa la camera in una qualunque data dell'intervallo
+      // [from,to] (arrivata prima e non ancora partita), non un confronto su una singola data —
+      // è la stessa logica di "chi occupa quel giorno" usata nel Registro di Statistiche, così le
+      // due viste mostrano le stesse prenotazioni per lo stesso periodo.
+      if (dateField === "incasa") {
+        if (from && b.checkOut <= from) return false;
+        if (to && b.checkIn > to) return false;
+        return true;
+      }
       const df = dateField === "arrivo" ? b.checkIn : (b.bookedOn ?? "");
       if (from && (!df || df < from)) return false;
       if (to && (!df || df > to)) return false;
@@ -349,9 +358,10 @@ export default function PrenotazioniPage() {
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca nome o codice…")} className="w-full" />
         <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
         <div className="flex items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
-          <Select value={dateField} onChange={(v) => setDateField(v as "arrivo" | "prenotazione")} label={t("Tipo data")}>
+          <Select value={dateField} onChange={(v) => setDateField(v as "arrivo" | "prenotazione" | "incasa")} label={t("Tipo data")}>
             <option value="arrivo">{t("Arrivo / check-in")}</option>
             <option value="prenotazione">{t("Data prenotazione")}</option>
+            <option value="incasa">{t("In casa (occupazione)")}</option>
           </Select>
           <DateField value={from} onChange={setFrom} title={t("Dal")} placeholder={t("Dal")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
           <span className="text-xs text-faint">→</span>
