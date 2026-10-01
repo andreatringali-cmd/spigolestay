@@ -252,14 +252,22 @@ export default function PuliziePage() {
   const pdfDocsData = scopedStructures.map((s, i) => {
     const sRooms = rooms.filter((r) => r.structure.id === s.id);
     const sToClean = toClean.filter((r) => r.structure.id === s.id);
+    const pax = (b: { adults: number; children: number }) => b.adults + b.children;
+    const persone = (n: number) => `${n} ${n === 1 ? t("persona") : t("persone")}`;
     const rowOf = (r: PlanRoom): PulizieRow => {
       if (r.oos) return { camera: r.unit.name, azione: t("Fuori servizio"), ospite: "—", note: r.oosNote ?? "", danger: true };
       if (r.action === "turnover" && r.dep && r.arr) {
-        return { camera: r.unit.name, azione: t(ACT_LABEL.turnover), ospite: `${guestName(r.dep.guestId)} → ${guestName(r.arr.guestId)}`, note: notes[keyOf(r.unit.id)] ?? "" };
+        return {
+          camera: r.unit.name, azione: t(ACT_LABEL.turnover),
+          ospite: `${guestName(r.dep.guestId)} → ${guestName(r.arr.guestId)}`,
+          subline: `${t("parte")} ${fmt(r.dep.checkIn)}→${fmt(r.dep.checkOut)} (${persone(pax(r.dep))}) · ${t("arriva")} ${fmt(r.arr.checkIn)}→${fmt(r.arr.checkOut)} (${persone(pax(r.arr))})`,
+          note: notes[keyOf(r.unit.id)] ?? "",
+        };
       }
       const p = r.arr ?? r.dep ?? r.stay;
       const ospite = p ? `${guestName(p.guestId)}${r.action === "riassetto" ? ` (${t("occupata")})` : ""}` : t("Vuota");
-      return { camera: r.unit.name, azione: t(ACT_LABEL[r.action]), ospite, note: notes[keyOf(r.unit.id)] ?? (r.oosFrom && r.oosNote ? r.oosNote : ""), dim: r.action === "niente" };
+      const subline = p ? `${fmt(p.checkIn)} → ${fmt(p.checkOut)} · ${persone(pax(p))}` : undefined;
+      return { camera: r.unit.name, azione: t(ACT_LABEL[r.action]), ospite, subline, note: notes[keyOf(r.unit.id)] ?? (r.oosFrom && r.oosNote ? r.oosNote : ""), dim: r.action === "niente" };
     };
     // Biancheria SOLO per questa struttura (la funzione condivisa calcola su tutte quelle filtrate).
     let matr = 0, sing = 0, guestsN = 0, changeRooms = 0, mats = 0;

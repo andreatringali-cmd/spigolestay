@@ -6,6 +6,7 @@ export interface PulizieRow {
   camera: string;
   azione: string;
   ospite: string;
+  subline?: string; // check-in → check-out e persone, sotto il nome ospite
   note: string;
   dim?: boolean; // riga "Niente/vuota": tutto in grigio
   danger?: boolean; // riga "Fuori servizio": camera/azione/nota in rosso
@@ -76,7 +77,10 @@ export default function PulizieDoc(p: PulizieDocProps) {
               <tr key={i} style={last ? undefined : { borderBottom: `1px solid ${LINE}` }}>
                 <td style={{ padding: "14px 8px 14px 0", fontWeight: 600, color: main }}>{r.camera}</td>
                 <td style={{ padding: "14px 8px", color: main }}>{r.azione}</td>
-                <td style={{ padding: "14px 8px", color: r.dim || r.danger ? FAINT : INK }}>{r.ospite}</td>
+                <td style={{ padding: "14px 8px", color: r.dim || r.danger ? FAINT : INK }}>
+                  <div>{r.ospite}</div>
+                  {r.subline && <div style={{ marginTop: 2, fontSize: 11, color: FAINT }}>{r.subline}</div>}
+                </td>
                 <td style={{ padding: "14px 0 14px 8px", color: r.danger ? DANGER : "#77705F" }}>{r.note || "—"}</td>
               </tr>
             );
