@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
-import { upsertGcalEvent, deleteGcalEvent, gcalEventId } from "@/lib/googleCalendarSync";
+import { upsertGcalEvent, deleteGcalEvent, gcalEventId, verifyGcalAccess } from "@/lib/googleCalendarSync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,8 +13,13 @@ export async function POST(req: Request) {
   if (isResponse(auth)) return auth;
   const body = await req.json().catch(() => ({}));
   const { action, bookingId, calendarId } = body as { action?: string; bookingId?: string; calendarId?: string };
-  if (!bookingId || typeof bookingId !== "string") return NextResponse.json({ ok: false, error: "missing_booking_id" }, { status: 400 });
   if (!calendarId || typeof calendarId !== "string") return NextResponse.json({ ok: false, error: "missing_calendar_id" }, { status: 400 });
+
+  // Verifica sola lettura (nessun evento coinvolto): per dare un riscontro immediato quando si
+  // incolla l'ID calendario in Impostazioni, prima ancora di salvare o sincronizzare davvero.
+  if (action === "verify") return NextResponse.json(await verifyGcalAccess(calendarId));
+
+  if (!bookingId || typeof bookingId !== "string") return NextResponse.json({ ok: false, error: "missing_booking_id" }, { status: 400 });
   const eventId = gcalEventId(bookingId);
 
   if (action === "delete") {

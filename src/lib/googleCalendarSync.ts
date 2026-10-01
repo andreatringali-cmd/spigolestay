@@ -134,3 +134,22 @@ export async function deleteGcalEvent(calendarId: string, eventId: string): Prom
     return { ok: false, error: `http_${r.status}` };
   } catch { return { ok: false, error: "fetch_failed" }; }
 }
+
+// Verifica il collegamento SENZA scrivere nulla: un errore qui (403 = non condiviso col service
+// account, 404 = ID calendario sbagliato) si capisce subito, invece di scoprirlo solo al primo
+// "Sincronizza ora" (che oltretutto scrive davvero sul calendario). events.list con maxResults=1
+// basta (coperto dallo scope calendar.events) e la risposta include il nome del calendario
+// (summary) anche se lo scope non dà accesso ai metadati del calendario in sé.
+export async function verifyGcalAccess(calendarId: string): Promise<{ ok: boolean; summary?: string; error?: string }> {
+  if (!gcalSyncConfigured()) return { ok: false, error: "not_configured" };
+  const cid = calendarId.trim();
+  if (!cid) return { ok: false, error: "missing_calendar_id" };
+  const token = await getAccessToken();
+  if (!token) return { ok: false, error: "auth_failed" };
+  try {
+    const r = await callCalendar(`calendars/${encodeURIComponent(cid)}/events?maxResults=1`, "GET", token);
+    if (!r.ok) return { ok: false, error: `http_${r.status}` };
+    const j = (await r.json().catch(() => null)) as { summary?: string } | null;
+    return { ok: true, summary: j?.summary };
+  } catch { return { ok: false, error: "fetch_failed" }; }
+}

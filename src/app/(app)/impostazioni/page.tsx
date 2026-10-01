@@ -58,6 +58,25 @@ export default function ImpostazioniPage() {
   const saveGcalId = () => { if (gcalStructId) updateStructure(gcalStructId, { gcalId: extractCalendarId(gcalIdInput) || undefined, updatedAt: Date.now() }); };
   const copyServiceEmail = () => { if (gcalInfo?.serviceAccountEmail) { navigator.clipboard?.writeText(gcalInfo.serviceAccountEmail); setGcalCopied(true); setTimeout(() => setGcalCopied(false), 1500); } };
 
+  // Verifica SENZA scrivere nulla, appena incollato l'ID — invece di scoprire un errore solo al
+  // primo "Sincronizza ora" (che oltretutto scrive davvero sul calendario). Messaggi mirati sugli
+  // errori più comuni: 403 = condivisione mancante/sbagliata, 404 = ID calendario sbagliato.
+  const [gcalVerifying, setGcalVerifying] = useState(false);
+  const [gcalVerifyMsg, setGcalVerifyMsg] = useState<{ text: string; err?: boolean } | null>(null);
+  const verifyGcal = async () => {
+    const calendarId = extractCalendarId(gcalIdInput);
+    if (!calendarId) return;
+    setGcalVerifying(true); setGcalVerifyMsg(null);
+    try {
+      const r = await apiPost<{ ok: boolean; summary?: string; error?: string }>("calendar/sync-event", { action: "verify", calendarId });
+      if (r.ok) setGcalVerifyMsg({ text: `✓ ${t("Collegato")}${r.summary ? ` — "${r.summary}"` : ""}` });
+      else if (r.error === "http_403") setGcalVerifyMsg({ text: t("Permesso negato: hai condiviso questo calendario con l'indirizzo del service account?"), err: true });
+      else if (r.error === "http_404") setGcalVerifyMsg({ text: t("Calendario non trovato: controlla di aver incollato l'ID giusto (non l'URL)."), err: true });
+      else setGcalVerifyMsg({ text: `${t("Errore")}: ${r.error || t("sconosciuto")}`, err: true });
+    } catch (e) { setGcalVerifyMsg({ text: e instanceof Error ? e.message : t("Errore di rete"), err: true }); }
+    finally { setGcalVerifying(false); }
+  };
+
   // La sync scrive solo le prenotazioni create/modificate/cancellate DA ORA IN POI (vedi
   // store.tsx): collegare un calendario a una struttura che ha già prenotazioni non le fa
   // comparire da sole. Questo pulsante fa una tantum il "riporto" di quelle esistenti.
@@ -181,7 +200,7 @@ export default function ImpostazioniPage() {
                   </div>
                 )}
               </li>
-              <li>{t("Nelle impostazioni di quel calendario (su Google) copia l'\"ID calendario\" e incollalo qui sotto, per la struttura giusta.")}</li>
+              <li>{t("Nelle impostazioni di quel calendario (su Google) copia l'\"ID calendario\" e incollalo qui sotto, per la struttura giusta — poi premi \"Verifica\" prima di salvare, per sapere subito se è tutto a posto.")}</li>
             </ol>
             {activeStructureId === "all" && structures.length > 1 && (
               <label className="mb-2 block text-xs font-medium text-dim">{t("Struttura")}
@@ -192,10 +211,12 @@ export default function ImpostazioniPage() {
             )}
             <label className="block text-xs font-medium text-dim">{t("ID calendario Google")} {activeStructureId !== "all" && gcalStruct ? `· ${gcalStruct.name}` : ""}
               <div className="mt-1 flex items-center gap-2">
-                <input value={gcalIdInput} onChange={(e) => setGcalIdInput(e.target.value)} placeholder="es. abc123@group.calendar.google.com" className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+                <input value={gcalIdInput} onChange={(e) => { setGcalIdInput(e.target.value); setGcalVerifyMsg(null); }} placeholder="es. abc123@group.calendar.google.com" className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+                <button onClick={verifyGcal} disabled={!gcalIdInput.trim() || gcalVerifying} className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{gcalVerifying ? t("Verifico…") : t("Verifica")}</button>
                 <button onClick={saveGcalId} disabled={!gcalStructId} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
               </div>
             </label>
+            {gcalVerifyMsg && <p className="mt-1.5 text-xs font-medium" style={{ color: gcalVerifyMsg.err ? "var(--err)" : "var(--ok)" }}>{gcalVerifyMsg.text}</p>}
             {gcalStruct?.gcalId && (
               <>
                 <p className="mt-2 text-xs font-medium" style={{ color: "var(--ok)" }}>✓ {t("Attivo per")} {gcalStruct.name}</p>
