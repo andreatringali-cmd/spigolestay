@@ -39,7 +39,7 @@ export default function ProvenienzaPage() {
         <div key={k} className="flex items-center gap-2 text-sm">
           <span className="w-28 shrink-0 truncate text-dim">{k}</span>
           <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full bg-focus" style={{ width: `${max ? (v.presenze / max) * 100 : 0}%` }} /></div>
-          <span className="w-24 shrink-0 text-right font-mono text-xs text-dim">{v.arrivi} arr · {v.presenze} pres</span>
+          <span className="w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs text-dim">{v.arrivi} arr · {v.presenze} pres</span>
         </div>
       ))}
     </div>

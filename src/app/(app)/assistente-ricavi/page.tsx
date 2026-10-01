@@ -17,6 +17,12 @@ interface LocalEvent { id: string; name: string; date: string; impact: "alto" | 
 const EVENTS_KEY = "spigolestay:localevents";
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now() + Math.random()));
 
+// Un colore diverso per tipo di motivo, così in colonna "Motivo" si distinguono a colpo d'occhio
+// invece di essere tutti lo stesso pallino grigio.
+const REASON_COLOR: Record<"weekend" | "event" | "demand" | "lastminute", string> = {
+  weekend: "#C08A3A", event: "#8B5CF6", demand: "#4F8A5B", lastminute: "#B3453A",
+};
+
 export default function AssistenteRicaviPage() {
   const { roomTypes, units, bookings, rateOverrides, setDayRates, activeStructureId, structures } = useData();
   const today = toISO(new Date());
@@ -50,11 +56,11 @@ export default function AssistenteRicaviPage() {
     const free = Math.max(0, scopeUnits.length - occOn(iso));
     const occPct = scopeUnits.length ? Math.round((occOn(iso) / scopeUnits.length) * 100) : 0;
     const ev = eventOf(iso);
-    let factor = 1; const reasons: string[] = [];
-    if (isWeekend(iso)) { factor += weekendPct / 100 * 0.8; reasons.push("Weekend"); }
-    if (ev) { factor += ev.impact === "alto" ? 0.3 : 0.15; reasons.push(ev.name); }
-    if (occPct >= 80) { factor += 0.15; reasons.push("Alta domanda"); }
-    else if (occPct <= 30 && daysFrom(iso) <= 5) { factor -= 0.12; reasons.push("Last-minute"); }
+    let factor = 1; const reasons: { text: string; kind: "weekend" | "event" | "demand" | "lastminute" }[] = [];
+    if (isWeekend(iso)) { factor += weekendPct / 100 * 0.8; reasons.push({ text: "Weekend", kind: "weekend" }); }
+    if (ev) { factor += ev.impact === "alto" ? 0.3 : 0.15; reasons.push({ text: ev.name, kind: "event" }); }
+    if (occPct >= 80) { factor += 0.15; reasons.push({ text: "Alta domanda", kind: "demand" }); }
+    else if (occPct <= 30 && daysFrom(iso) <= 5) { factor -= 0.12; reasons.push({ text: "Last-minute", kind: "lastminute" }); }
     const current = rateOverrides[iso] ?? Math.round(baseRate * (isWeekend(iso) ? 1 + weekendPct / 100 : 1));
     const rate = Math.max(0, Math.round(baseRate * factor));
     return { iso, occPct, free, rate, current, reasons, delta: rate - current };
@@ -147,7 +153,7 @@ export default function AssistenteRicaviPage() {
                   <td className="px-3 py-2 text-right font-mono text-dim">{d.free}</td>
                   <td className="px-3 py-2 text-right font-mono text-dim">{eur(d.current)}</td>
                   <td className="px-3 py-2 text-right font-mono font-bold" style={{ color: up ? "var(--ok)" : down ? "var(--err)" : "var(--txt)" }}>{eur(d.rate)} {d.delta !== 0 && <span className="text-[10px]">({up ? "+" : ""}{d.delta})</span>}</td>
-                  <td className="border-l border-line px-3 py-2"><div className="flex flex-wrap gap-1">{d.reasons.map((r, i) => <span key={i} className="rounded-full bg-wash px-2 py-0.5 text-[10px] text-dim">{r}</span>)}{!d.reasons.length && <span className="text-[11px] text-faint">—</span>}</div></td>
+                  <td className="border-l border-line px-3 py-2"><div className="flex flex-wrap gap-1">{d.reasons.map((r, i) => { const col = REASON_COLOR[r.kind]; return <span key={i} className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `color-mix(in srgb, ${col} 16%, transparent)`, color: col }}>{r.text}</span>; })}{!d.reasons.length && <span className="text-[11px] text-faint">—</span>}</div></td>
                   <td className="px-3 py-2 text-right">{d.delta !== 0 ? <button onClick={() => applyOne(d)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash">Applica</button> : null}</td>
                 </tr>
               );

@@ -158,7 +158,10 @@ export default function Dashboard() {
   const isAutoKey = (k: string) => (k.startsWith("planning:") ? false : !!autoMap[k.split(":")[1] ?? ""]);
 
   const multi = structures.length > 1;
-  const active = bookings.filter((b) => b.status !== "cancelled");
+  // "blocked" = camera fuori servizio, non una prenotazione: va escluso qui come lo è già ovunque
+  // altrove nel gestionale (Prenotazioni, Calendario, Statistiche…), altrimenti un blocco con
+  // inizio oggi viene contato come un arrivo/partenza/presenza reale nelle KPI sopra.
+  const active = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked");
   const scoped = sFilter === "all" ? active : active.filter((b) => b.structureId === sFilter);
   const scopedUnits = (sFilter === "all" ? units : units.filter((u) => u.structureId === sFilter)).filter((u) => !u.outOfService);
 
