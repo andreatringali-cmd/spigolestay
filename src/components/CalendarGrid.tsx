@@ -1030,6 +1030,17 @@ export default function CalendarGrid() {
 
       {/* Legenda OTA — solo i canali aggiunti su Channex; contorno verde = collegato, rosso = non collegato */}
       <div className="order-[-1] flex flex-wrap items-center gap-x-2.5 gap-y-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
+        {/* Sito ufficiale e mini sito Xenora: SEMPRE presenti, verdi se c'è/è pubblicato, rossi se no. */}
+        <div title={siteStruct ? `Sito ufficiale collegato · ${siteStruct.name}` : "Nessun sito ufficiale impostato"} className="grid h-[26px] w-[26px] shrink-0 place-items-center overflow-hidden rounded-full border-2" style={{ borderColor: siteStruct ? "var(--ok)" : "var(--err)" }}>
+          {siteStruct ? (
+            siteStruct.logo
+              ? <img src={siteStruct.logo} alt="" className="h-full w-full object-cover" />
+              : <span className="grid h-full w-full place-items-center text-[10px] font-bold text-white" style={{ backgroundColor: siteStruct.photoColor ?? "var(--focus)" }}>{(siteStruct.name || "?")[0]?.toUpperCase()}</span>
+          ) : <Icon name="globe" size={14} />}
+        </div>
+        <div title={miniSiteStruct ? `Mini sito Xenora pubblicato · ${miniSiteStruct.name}` : "Mini sito Xenora non ancora pubblicato"} className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full border-2 p-1" style={{ borderColor: miniSiteStruct ? "var(--ok)" : "var(--err)" }}>
+          <Image src="/xenora-mark.png" alt="" width={18} height={18} className="h-full w-full object-contain" style={{ opacity: miniSiteStruct ? 1 : 0.45 }} />
+        </div>
         {(Object.keys(realChannels) as (keyof typeof CHANNELS)[]).map((c) => {
           const active = realChannels[c];
           const label = CHANNELS[c]?.label ?? c;
@@ -1039,18 +1050,6 @@ export default function CalendarGrid() {
             </div>
           );
         })}
-        {siteStruct && (
-          <div title={`Sito ufficiale collegato · ${siteStruct.name}`} className="grid h-[26px] w-[26px] place-items-center overflow-hidden rounded-full border-2" style={{ borderColor: "var(--ok)" }}>
-            {siteStruct.logo
-              ? <img src={siteStruct.logo} alt="" className="h-full w-full object-cover" />
-              : <span className="grid h-full w-full place-items-center text-[10px] font-bold text-white" style={{ backgroundColor: siteStruct.photoColor ?? "var(--focus)" }}>{(siteStruct.name || "?")[0]?.toUpperCase()}</span>}
-          </div>
-        )}
-        {miniSiteStruct && (
-          <div title={`Mini sito Xenora pubblicato · ${miniSiteStruct.name}`} className="grid h-[26px] w-[26px] place-items-center rounded-full border-2 p-1" style={{ borderColor: "var(--ok)" }}>
-            <Image src="/xenora-mark.png" alt="" width={18} height={18} className="h-full w-full object-contain" />
-          </div>
-        )}
         <div className="ml-auto flex items-center gap-3">
           {lastRun && <span className="text-xs text-faint" title="Data e ora dell'ultima sincronizzazione">Ultimo processo · {lastRun}</span>}
           <button onClick={syncNow} disabled={syncing} title={syncing ? "Sincronizzazione in corso…" : "Sincronizza ora con i canali collegati"} className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt disabled:opacity-60">

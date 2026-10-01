@@ -135,7 +135,7 @@ export default function AssistenteRicaviPage() {
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <table className="w-full min-w-[720px] text-sm">
           <thead><tr className="border-b border-line bg-wash text-left text-[11px] uppercase tracking-wide text-faint">
-            <th className="whitespace-nowrap px-3 py-2 font-semibold">Giorno</th><th className="whitespace-nowrap px-3 py-2 text-right font-semibold">Occup.</th><th className="whitespace-nowrap px-3 py-2 text-right font-semibold">Libere</th><th className="whitespace-nowrap px-3 py-2 text-right font-semibold">Attuale</th><th className="whitespace-nowrap py-2 pl-3 pr-6 text-right font-semibold">Consigliato</th><th className="w-full py-2 pl-6 pr-3 font-semibold">Motivo</th><th className="whitespace-nowrap px-3 py-2"></th>
+            <th className="px-3 py-2 font-semibold">Giorno</th><th className="px-3 py-2 text-right font-semibold">Occup.</th><th className="px-3 py-2 text-right font-semibold">Libere</th><th className="px-3 py-2 text-right font-semibold">Attuale</th><th className="px-3 py-2 text-right font-semibold">Consigliato</th><th className="border-l border-line px-3 py-2 font-semibold">Motivo</th><th className="px-3 py-2"></th>
           </tr></thead>
           <tbody>
             {days.map((d) => {
@@ -146,8 +146,8 @@ export default function AssistenteRicaviPage() {
                   <td className="px-3 py-2 text-right font-mono text-txt">{d.occPct}%</td>
                   <td className="px-3 py-2 text-right font-mono text-dim">{d.free}</td>
                   <td className="px-3 py-2 text-right font-mono text-dim">{eur(d.current)}</td>
-                  <td className="py-2 pl-3 pr-6 text-right font-mono font-bold" style={{ color: up ? "var(--ok)" : down ? "var(--err)" : "var(--txt)" }}>{eur(d.rate)} {d.delta !== 0 && <span className="text-[10px]">({up ? "+" : ""}{d.delta})</span>}</td>
-                  <td className="py-2 pl-6 pr-3"><div className="flex flex-wrap gap-1">{d.reasons.map((r, i) => <span key={i} className="rounded-full bg-wash px-2 py-0.5 text-[10px] text-dim">{r}</span>)}{!d.reasons.length && <span className="text-[11px] text-faint">—</span>}</div></td>
+                  <td className="px-3 py-2 text-right font-mono font-bold" style={{ color: up ? "var(--ok)" : down ? "var(--err)" : "var(--txt)" }}>{eur(d.rate)} {d.delta !== 0 && <span className="text-[10px]">({up ? "+" : ""}{d.delta})</span>}</td>
+                  <td className="border-l border-line px-3 py-2"><div className="flex flex-wrap gap-1">{d.reasons.map((r, i) => <span key={i} className="rounded-full bg-wash px-2 py-0.5 text-[10px] text-dim">{r}</span>)}{!d.reasons.length && <span className="text-[11px] text-faint">—</span>}</div></td>
                   <td className="px-3 py-2 text-right">{d.delta !== 0 ? <button onClick={() => applyOne(d)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash">Applica</button> : null}</td>
                 </tr>
               );
