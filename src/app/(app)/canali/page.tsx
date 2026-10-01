@@ -194,6 +194,7 @@ export default function CanaliPage() {
   // Card "essenziali" (logo + nome + stato) nella lista canali: il dettaglio (attiva/disattiva,
   // correzione prezzo) si apre al click, invece di stare tutto incollato nella card.
   const [channelDetail, setChannelDetail] = useState<{ sid: string; c: { id: string; channel: string; title: string; active: boolean } } | null>(null);
+  const [channelSearch, setChannelSearch] = useState("");
 
   const syncToChannex = async () => {
     const sid = effStructure;
@@ -301,7 +302,6 @@ export default function CanaliPage() {
           <div className="flex flex-col gap-2 lg:w-auto lg:shrink-0 lg:flex-row lg:flex-wrap lg:items-center">
             {chxMap[effStructure] ? (
               <>
-                <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="w-full rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 lg:w-auto">{channelPanel.loading ? t("Apro…") : "+ " + t("Collega un canale")}</button>
                 <button onClick={importOta} disabled={impSync.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 lg:w-auto" title={t("Le prenotazioni arrivano da sole; usa questo solo per forzare un controllo immediato.")}>{impSync.running ? t("Controllo…") : "↓ " + t("Controlla prenotazioni ora")}</button>
                 <button onClick={doFullSync} disabled={fullSync.running} className="w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40 lg:w-auto" title={t("Invia subito l'intera finestra di disponibilità e prezzi/restrizioni ai canali collegati, senza aspettare il ciclo automatico.")}>{fullSync.running ? t("Sincronizzo…") : "⟳ " + t("Full sync ora")}</button>
               </>
@@ -324,6 +324,13 @@ export default function CanaliPage() {
             <SectionTitle>{t("Canali OTA collegati")}</SectionTitle>
             <button onClick={loadOtaStatus} disabled={otaLoading} className="text-xs font-medium text-dim hover:text-txt disabled:opacity-40">{otaLoading ? t("Verifico…") : "⟳ " + t("Aggiorna")}</button>
           </div>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><Icon name="search" size={14} /></span>
+              <input value={channelSearch} onChange={(e) => setChannelSearch(e.target.value)} placeholder={t("Cerca canale…")} className="w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
+            </div>
+            <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{channelPanel.loading ? t("Apro…") : "+ " + t("Aggiungi")}</button>
+          </div>
           {otaErr ? (
             <p className="text-sm" style={{ color: "var(--err)" }}>⚠ {otaErr}</p>
           ) : otaLoading && !otaByStructure ? (
@@ -340,6 +347,7 @@ export default function CanaliPage() {
                       <thead>
                         <tr className="border-b border-line bg-wash text-left text-[10px] font-bold uppercase tracking-wide text-faint">
                           <th className="px-3 py-2 font-bold">{t("Canale")}</th>
+                          <th className="px-3 py-2 font-bold">{t("Colore")}</th>
                           <th className="px-3 py-2 font-bold">{t("Stato")}</th>
                           <th className="px-3 py-2 font-bold">{t("Correzione prezzo")}</th>
                           <th className="px-3 py-2 font-bold">{t("Commissione")}</th>
@@ -347,7 +355,12 @@ export default function CanaliPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {g.list.map((c, i) => {
+                        {g.list.filter((c) => {
+                          const q = channelSearch.trim().toLowerCase();
+                          if (!q) return true;
+                          const label = CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title;
+                          return label.toLowerCase().includes(q);
+                        }).map((c, i) => {
                           const chKey = c.channel as Channel;
                           const label = CHANNELS[chKey]?.label ?? c.title;
                           const draft = c.id ? priceCorr[c.id] : undefined;
@@ -358,10 +371,12 @@ export default function CanaliPage() {
                             <tr key={c.id || c.channel + i} className="border-b border-line last:border-0 hover:bg-wash">
                               <td className="px-3 py-2.5">
                                 <span className="flex items-center gap-2">
-                                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} title={t("Colore su calendario")} />
                                   <ChannelLogo channel={chKey} size={22} title={label} />
                                   <span className="font-semibold text-txt">{label}</span>
                                 </span>
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <button onClick={() => setChannelDetail({ sid: g.sid, c })} title={t("Colore su calendario")} className="h-5 w-5 rounded-full border border-line" style={{ backgroundColor: color }} />
                               </td>
                               <td className="px-3 py-2.5">
                                 <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
