@@ -123,6 +123,16 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sFilter, structures.length, todayISO]);
 
+  // Check-in online non completato per gli arrivi di oggi: la query sopra conta solo le schedine
+  // già "pronte" (cioè già compilate), quindi un arrivo che deve ancora fare il check-in online
+  // risultava "tutto a posto" qui pur comparendo come "da fare" in /adempimenti (Passo 1). Stessa
+  // condizione usata lì (primaryDoneOf), calcolata lato client sugli arrivi di oggi.
+  const checkinPending = bookings.filter((b) =>
+    b.checkIn === todayISO && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked" &&
+    (sFilter === "all" || b.structureId === sFilter) &&
+    !(b.webCheckin === true || !!(b.primaryGuest?.lastName && b.primaryGuest?.docNumber))
+  ).length;
+
   // Checklist del giorno (spunte salvate nel browser).
   const [todoDone, setTodoDone] = useState<Set<string>>(new Set());
   useEffect(() => { try { const raw = localStorage.getItem("spigolestay:todo:v1"); if (raw) setTodoDone(new Set(JSON.parse(raw))); } catch {} }, []);
@@ -450,7 +460,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <ComplianceBanner pending={paCompliance.pending} loading={paCompliance.loading} />
+      <ComplianceBanner pending={paCompliance.pending + checkinPending} checkinPending={checkinPending} loading={paCompliance.loading} />
 
       <div className={`grid gap-4 ${gridCols}`}>
         {showInhouse && (
@@ -678,7 +688,7 @@ export default function Dashboard() {
 // Banner "Sei in regola" (verde) / avviso adempimenti PA in sospeso (ambra) — link a /adempimenti.
 // `pending` arriva da un controllo reale su Supabase (schedine Alloggiati + ISTAT), non da un valore finto.
 // Card a piena larghezza (non più un badge minuscolo in testata) per dargli il peso visivo giusto.
-function ComplianceBanner({ pending, loading }: { pending: number; loading: boolean }) {
+function ComplianceBanner({ pending, checkinPending, loading }: { pending: number; checkinPending: number; loading: boolean }) {
   const { t } = useLang();
   if (loading) return null;
   const ok = pending === 0;
@@ -700,7 +710,9 @@ function ComplianceBanner({ pending, loading }: { pending: number; loading: bool
         <div className="truncate text-xs text-dim">
           {ok
             ? t("Nessuna schedina Alloggiati o movimento ISTAT in attesa.")
-            : `${pending} ${t("tra schedine Alloggiati e movimenti ISTAT da controllare")}`}
+            : checkinPending
+              ? `${checkinPending} ${t("check-in online da completare")}${pending - checkinPending > 0 ? ` · ${pending - checkinPending} ${t("tra schedine e ISTAT")}` : ""}`
+              : `${pending} ${t("tra schedine Alloggiati e movimenti ISTAT da controllare")}`}
         </div>
       </div>
       <span className="shrink-0" style={{ color: "var(--faint)" }}><Icon name="chevron" size={16} /></span>
