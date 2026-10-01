@@ -12,6 +12,11 @@ import { eur } from "@/lib/format";
 import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
 import { apiPost } from "@/lib/invoicing/client";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/authsync";
+
+// Email del titolare Xenora: vede la nota di setup una tantum del webhook WhatsApp
+// (l'accesso vero resta comunque verificato lato server).
+const OWNER_EMAILS = ["spigolehouse@gmail.com", "andreatringali.spi@gmail.com"];
 
 
 interface Msg { id: string; dir: "out" | "in"; text: string; ts: number; via?: string }
@@ -55,6 +60,11 @@ const CHECKIN_MSG: Record<Lang, (u: string) => string> = {
 export default function ConversazioniPanel({ onManageTemplates }: { onManageTemplates?: () => void }) {
   const { bookings, guests, getStructure, getUnit, getRoomType, activeStructureId } = useData();
   const { t } = useLang();
+  const { user } = useAuth();
+  const isOwner = !!user?.email && OWNER_EMAILS.includes(user.email.toLowerCase());
+  const [webhookCopied, setWebhookCopied] = useState(false);
+  const WEBHOOK_URL = "https://xenora.it/api/whatsapp/webhook";
+  const copyWebhookUrl = () => { try { navigator.clipboard?.writeText(WEBHOOK_URL); setWebhookCopied(true); setTimeout(() => setWebhookCopied(false), 1500); } catch {} };
   const router = useRouter();
   const [threads, setThreads] = useState<Threads>({});
   const [ready, setReady] = useState(false);
@@ -594,6 +604,16 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
         <button onClick={waSave} disabled={!!waBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{waBusy === "save" ? t("Salvo…") : t("Salva")}</button>
         <button onClick={waTest} disabled={!!waBusy || !wa.connected} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{waBusy === "test" ? t("Test…") : t("Test")}</button>
       </div>
+      {isOwner && (
+        <div className="mt-3 rounded-lg border border-dashed border-line bg-wash p-3">
+          <p className="mb-1.5 text-[11px] font-semibold text-dim">{t("Per sviluppatore · una tantum")}</p>
+          <p className="mb-2 text-[11px] text-faint">{t("Setup unico per tutta Xenora (non per singola struttura), da fare una volta sola su Meta Developer Console, nell'app Meta di Xenora: WhatsApp → Configurazione → Webhook. Incolla l'URL qui sotto come \"Callback URL\" insieme al \"Verify token\" (una stringa a tua scelta, da impostare anche come variabile d'ambiente WHATSAPP_WEBHOOK_VERIFY_TOKEN su Vercel — deve essere identica nei due posti), poi iscriviti al campo \"messages\".")}</p>
+          <div className="flex items-center gap-2">
+            <code className="truncate rounded-lg border border-line bg-paper px-2 py-1 text-[11px] text-txt">{WEBHOOK_URL}</code>
+            <button onClick={copyWebhookUrl} className="shrink-0 rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-txt hover:bg-wash">{webhookCopied ? "✓" : t("Copia")}</button>
+          </div>
+        </div>
+      )}
     </div>
     </>
   );
