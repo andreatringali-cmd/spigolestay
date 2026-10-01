@@ -12,6 +12,8 @@ import { buildGuestLink, buildGroupGuestLink, guideMessage, shortenGuideLink, sh
 import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
 import { nights, parseISO, shiftISO } from "@/lib/dates";
 import { cityTaxOf, commissionOf, commissionPctOf, nettoOf } from "@/lib/booking";
+import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
+import { loadWeekendPct } from "@/lib/pricing";
 import { eur } from "@/lib/format";
 import { invPost } from "@/lib/invoicing/client";
 import AdempimentiPanel from "@/components/booking/AdempimentiPanel";
@@ -60,10 +62,11 @@ const inputCls = "w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 te
 
 export default function BookingDrawer() {
   const {
-    selectedBookingId, closeBooking, bookings, units,
+    selectedBookingId, closeBooking, bookings, units, roomTypes, rateOverrides,
     getGuest, getUnit, getStructure, getRoomType,
     updateBooking, updateGuest, deleteBooking, deleteBookingGroup,
   } = useData();
+  const weekendPct = loadWeekendPct();
 
   const router = useRouter();
   const ask = useConfirm();
@@ -133,6 +136,10 @@ export default function BookingDrawer() {
   }, [selectedBookingId]);
 
   if (!booking) return null;
+
+  // Stesso controllo "sotto costo" già mostrato su Calendario e Prenotazioni (lib/priceAlert):
+  // mancava qui, nella scheda di dettaglio — unico posto a non segnalarlo finora.
+  const underprice = booking.channel !== "blocked" ? checkUnderpriced(booking, roomTypes, rateOverrides, weekendPct) : null;
 
   const guest = getGuest(booking.guestId);
   // ── Memoria ospite (CRM): riconosci chi torna, con preferenze e VIP ──
@@ -322,7 +329,13 @@ export default function BookingDrawer() {
         <div><div className="text-[11px] font-medium text-dim">{t("Check-out")}</div><div className="text-sm text-txt">{fmtDate(booking.checkOut)}</div></div>
       </div>
       <div className="rounded-xl bg-wash px-3 py-2.5">
-        <div className="flex items-baseline justify-between gap-4"><span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span><span className="font-mono text-lg font-bold tabular-nums text-txt">{eur(totalV)}</span></div>
+        <div className="flex items-baseline justify-between gap-4">
+          <span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span>
+          <span className="inline-flex items-center gap-1.5">
+            {underprice?.flagged && <span title={underpriceReason(booking, underprice)} className="font-sans text-base font-extrabold leading-none" style={{ color: "var(--err)" }}>!</span>}
+            <span className="font-mono text-lg font-bold tabular-nums text-txt">{eur(totalV)}</span>
+          </span>
+        </div>
         <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Incassato")}</span><span className="font-mono text-sm font-semibold tabular-nums" style={{ color: "var(--ok)" }}>{eur(Math.max(0, totalV - balanceV))}</span></div>
         <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Saldo dovuto")}</span><span className="font-mono text-sm font-bold tabular-nums" style={{ color: balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span></div>
         {booking.nightlyRates && (
