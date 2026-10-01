@@ -55,7 +55,11 @@ export default function IstatPage() {
   // Movimento sempre allineato alle prenotazioni; gli arrivi futuri non sono "da inviare".
   const activeBookingIds = new Set(bookings.filter((b) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked").map((b) => b.id));
   const todayIso = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
-  const rowsVisible = rows.filter((r) => (r.stato === "sent" || !r.booking_id || activeBookingIds.has(r.booking_id)) && (r.stato === "sent" || (r.arrival || "") <= todayIso));
+  const isFuture = (arrivalISO?: string) => (arrivalISO || "") > todayIso;
+  // rowsAll: tutto il movimento attivo, navigabile (anche arrivi futuri, es. self check-in in anticipo).
+  // rowsVisible: solo ciò che è davvero "da inviare oggi" — resta il gate per chiudiGiornata/dayPending.
+  const rowsAll = rows.filter((r) => r.stato === "sent" || !r.booking_id || activeBookingIds.has(r.booking_id));
+  const rowsVisible = rowsAll.filter((r) => r.stato === "sent" || !isFuture(r.arrival));
   const pending = rowsVisible.filter((r) => r.stato === "pending").length;
   const nightsBetween = (ci?: string, co?: string) => { if (!ci || !co) return 0; const a = new Date(ci + "T00:00"), b = new Date(co + "T00:00"); return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86400000)); };
   // Chiusura giornaliera (stile Turist@t): situazione del giorno selezionato (default oggi).
@@ -90,7 +94,7 @@ export default function IstatPage() {
   const exportCsv = () => {
     const esc = (v: unknown) => { const s = String(v ?? ""); return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
     const head = ["Data arrivo", "Tipo", "Permanenza (notti)", "Camera", "Età", "Sesso", "Cittadinanza", "Luogo di nascita", "Luogo di residenza"];
-    const src = filterDate ? rowsVisible.filter((r) => (r.arrival || "") === filterDate) : rowsVisible;
+    const src = filterDate ? rowsAll.filter((r) => (r.arrival || "") === filterDate) : rowsAll;
     const out: string[][] = [];
     for (const r of src) {
       const b = r.booking_id ? bookingById.get(r.booking_id) : undefined;
@@ -166,7 +170,7 @@ export default function IstatPage() {
         <button onClick={() => setFilterDate("")} className={`${fieldCls} hover:bg-wash ${filterDate ? "" : "opacity-40"}`} title="Mostra tutto il movimento">Tutte</button>
         <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
         <Link href="/istat/archivio" className={`${fieldCls} font-semibold hover:bg-wash`} title="Archivio invii: storico delle chiusure giornaliere">📁 Archivio</Link>
-        <button onClick={exportCsv} disabled={rowsVisible.length === 0} className={`${fieldCls} font-semibold hover:bg-wash disabled:opacity-50`} title="Scarica il movimento in CSV (dettaglio per ospite)">⬇ Scarica CSV</button>
+        <button onClick={exportCsv} disabled={rowsAll.length === 0} className={`${fieldCls} font-semibold hover:bg-wash disabled:opacity-50`} title="Scarica il movimento in CSV (dettaglio per ospite)">⬇ Scarica CSV</button>
         <button onClick={() => setConfirmClose(true)} disabled={!!busy || dayPending === 0} className="ml-auto rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50" title="Chiudi e invia il movimento del giorno al portale regionale">{busy === "close" ? "Invio…" : `Chiudi giornata (${dayPending})`}</button>
         <button type="button" onClick={() => setSettingsOpen(true)} title="Impostazioni ISTAT" aria-label="Impostazioni ISTAT" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
@@ -198,7 +202,7 @@ export default function IstatPage() {
             )}
             {(() => {
               // Vista giornaliera (come Turist@t): mostra arrivi, partenze e presenti del giorno.
-              const listShown = filterDate ? rowsVisible.filter((r) => r.arrival === filterDate || r.departure === filterDate || ((r.arrival || "") < filterDate && filterDate < (r.departure || ""))) : rowsVisible;
+              const listShown = filterDate ? rowsAll.filter((r) => r.arrival === filterDate || r.departure === filterDate || ((r.arrival || "") < filterDate && filterDate < (r.departure || ""))) : rowsAll;
               if (!listShown.length && filterDate) return (
                 <div className="flex flex-col items-center gap-2 py-8 text-center">
                   <p className="text-sm text-faint">Il {new Date(filterDate).toLocaleDateString("it-IT")} non ci sono ospiti in movimento (nessun arrivo, partenza o presenza).</p>
@@ -209,7 +213,7 @@ export default function IstatPage() {
               const structName = structures.find((z) => z.id === sid)?.name ?? "";
               const ROLE = (r: Row): { l: string; c: string } | null => !filterDate ? null : r.arrival === filterDate ? { l: "Arrivo", c: "var(--ok)" } : r.departure === filterDate ? { l: "Partenza", c: "var(--dim)" } : { l: "Presente", c: "var(--focus)" };
               return listShown.map((r) => {
-                const st = STA(r.stato);
+                const st = r.stato !== "sent" && isFuture(r.arrival) ? { l: "In preparazione", c: "var(--dim)" } : STA(r.stato);
                 const role = ROLE(r);
                 const bk = r.booking_id ? bookingById.get(r.booking_id) : undefined;
                 const nn = nightsBetween(r.arrival, r.departure);
@@ -255,7 +259,7 @@ export default function IstatPage() {
                 );
               });
             })()}
-            {rowsVisible.length === 0 && <EmptyState title="Nessun movimento" sub="Il movimento si genera dagli arrivi delle prenotazioni." />}
+            {rowsAll.length === 0 && <EmptyState title="Nessun movimento" sub="Il movimento si genera dagli arrivi delle prenotazioni." />}
           </>}
         </div>
         <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3 text-sm">

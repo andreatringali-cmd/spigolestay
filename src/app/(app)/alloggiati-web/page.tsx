@@ -86,7 +86,10 @@ export default function AlloggiatiWebPage() {
   const toValidate = visibleSched.filter((x) => !isFuture(x.arrival) && x.stato !== "inviata" && !(x.stato === "pronta" && bookingComplete(x.booking_id))).length;
   const effStato = (x: { stato: string; booking_id: string | null }) => (x.stato === "pronta" && !bookingComplete(x.booking_id) ? "da_validare" : x.stato);
   const sentCount = visibleSched.filter((x) => x.stato === "inviata").length;
-  const listSched = visibleSched.filter((x) => x.stato === "inviata" || !isFuture(x.arrival));
+  // Lista navigabile: mostra anche gli arrivi futuri (etichettati "in preparazione" più sotto),
+  // così chi fa il self check-in in anticipo vede subito la schedina compilata. readyCount/toValidate
+  // sopra restano gli unici a decidere cosa è "pronto da inviare oggi".
+  const listSched = visibleSched;
   const errCount = listSched.filter((x) => x.stato !== "inviata" && ((x.errors?.length ?? 0) > 0 || (x.stato === "pronta" && !bookingComplete(x.booking_id)) || x.stato === "da_validare")).length;
   // Termine legale ≈ arrivo + 24h (assunto arrivo 14:00) → countdown vivo.
   const deadlineDT = (arrivalISO: string) => { const d = new Date(arrivalISO + "T14:00:00"); d.setDate(d.getDate() + 1); return d; };
