@@ -10,6 +10,23 @@ import StyleChooser from "@/components/StyleChooser";
 import { apiPost } from "@/lib/invoicing/client";
 import { useData } from "@/lib/store";
 
+// Errore comune: incollare il link di embed/pubblico del calendario invece del semplice ID
+// (es. "https://calendar.google.com/calendar/embed?src=xxx%40group.calendar.google.com&ctz=...").
+// L'ID vero è nel parametro src/cid, URL-decodificato: lo estraiamo da soli così non serve
+// insegnare all'utente la differenza tra i due campi sulla pagina di Google.
+function extractCalendarId(raw: string): string {
+  const v = raw.trim();
+  if (!v) return v;
+  try {
+    if (/^https?:\/\//i.test(v)) {
+      const u = new URL(v);
+      const src = u.searchParams.get("src") || u.searchParams.get("cid");
+      if (src) return src;
+    }
+  } catch {}
+  return v;
+}
+
 export default function ImpostazioniPage() {
   const { theme, setTheme } = useTheme();
   const { t, lang, setLang } = useLang();
@@ -36,9 +53,9 @@ export default function ImpostazioniPage() {
   }, [structures, activeStructureId, gcalStructId]);
   const gcalStruct = structures.find((s) => s.id === gcalStructId);
   const [gcalIdInput, setGcalIdInput] = useState("");
-  useEffect(() => { setGcalIdInput(gcalStruct?.gcalId ?? ""); }, [gcalStruct?.gcalId, gcalStructId]);
+  useEffect(() => { setGcalIdInput(extractCalendarId(gcalStruct?.gcalId ?? "")); }, [gcalStruct?.gcalId, gcalStructId]);
   const [gcalCopied, setGcalCopied] = useState(false);
-  const saveGcalId = () => { if (gcalStructId) updateStructure(gcalStructId, { gcalId: gcalIdInput.trim() || undefined, updatedAt: Date.now() }); };
+  const saveGcalId = () => { if (gcalStructId) updateStructure(gcalStructId, { gcalId: extractCalendarId(gcalIdInput) || undefined, updatedAt: Date.now() }); };
   const copyServiceEmail = () => { if (gcalInfo?.serviceAccountEmail) { navigator.clipboard?.writeText(gcalInfo.serviceAccountEmail); setGcalCopied(true); setTimeout(() => setGcalCopied(false), 1500); } };
 
   // Backup: esporta/importa tutte le chiavi "spigolestay:*".
