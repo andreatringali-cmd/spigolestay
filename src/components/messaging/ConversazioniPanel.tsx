@@ -18,6 +18,26 @@ import { useAuth } from "@/lib/authsync";
 // (l'accesso vero resta comunque verificato lato server).
 const OWNER_EMAILS = ["spigolehouse@gmail.com", "andreatringali.spi@gmail.com"];
 
+// WhatsApp Embedded Signup (Meta): collegamento automatico via popup, in alternativa
+// all'inserimento manuale di ID numero + token. Richiede due env pubbliche (vedi
+// commento in src/app/api/whatsapp/embedded-signup/route.ts per i passaggi su Meta):
+// NEXT_PUBLIC_META_APP_ID (App ID Meta di Xenora) e NEXT_PUBLIC_META_WA_CONFIG_ID
+// (Configuration ID della "Facebook Login for Business" dedicata al WhatsApp Signup).
+// Se mancano, il pulsante resta nascosto e si usa solo il collegamento manuale.
+const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || "";
+const WA_CONFIG_ID = process.env.NEXT_PUBLIC_META_WA_CONFIG_ID || "";
+const WA_EMBEDDED_AVAILABLE = !!META_APP_ID && !!WA_CONFIG_ID;
+
+declare global {
+  interface Window {
+    FB?: {
+      init: (opts: { appId: string; autoLogAppEvents?: boolean; xfbml?: boolean; version: string }) => void;
+      login: (cb: (response: { authResponse?: { code?: string } }) => void, opts: Record<string, unknown>) => void;
+    };
+    fbAsyncInit?: () => void;
+  }
+}
+
 
 interface Msg { id: string; dir: "out" | "in"; text: string; ts: number; via?: string }
 type Threads = Record<string, Msg[]>;
@@ -114,7 +134,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
 
   // Ospiti con almeno una prenotazione (nella struttura attiva), ordinati per struttura poi alfabetico.
   const people = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; phone?: string; email?: string; struct: string; lastCheckIn: string; b?: Booking }>();
+    const map = new Map<string, { id: string; name: string; phone?: string; email?: string; struct: string; lastCheckIn: string; b?: Booking; isReturning?: boolean; lastPastStay?: { date: string; structName: string } }>();
     for (const b of bookings) {
       if (b.channel === "blocked" || b.status === "cancelled") continue;
       if (activeStructureId !== "all" && b.structureId !== activeStructureId) continue;
@@ -125,10 +145,30 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     // Chi scrive senza avere (ancora) una prenotazione: un numero WhatsApp nuovo, o un ospite che
     // ha scritto prima di prenotare. Senza questo, il messaggio arriva ed è salvato ma resta
     // invisibile in lista — l'ospite deve poter scrivere chiunque, non solo chi ha già prenotato.
+    const today = new Date().toISOString().slice(0, 10);
+    // Per chi non ha (ancora) una prenotazione attiva, distingue un ospite già soggiornato in
+    // passato (da valorizzare come cliente di ritorno) da un contatto mai visto prima.
+    const pastStayOf = (guestId: string) => {
+      let best: Booking | undefined;
+      for (const b of bookings) {
+        if (b.guestId !== guestId || b.status === "cancelled" || b.status === "no_show") continue;
+        if (b.checkOut >= today) continue; // non è passata
+        if (!best || b.checkIn > best.checkIn) best = b;
+      }
+      return best;
+    };
     for (const key of Object.keys(threads)) {
       if (map.has(key) || !(threads[key]?.length)) continue;
       const g = guests.find((x) => x.id === key);
-      if (g) { map.set(key, { id: g.id, name: g.fullName || g.phone || t("Nuovo contatto"), phone: g.phone, email: g.email, struct: "", lastCheckIn: "" }); continue; }
+      if (g) {
+        const past = pastStayOf(g.id);
+        map.set(key, {
+          id: g.id, name: g.fullName || g.phone || t("Nuovo contatto"), phone: g.phone, email: g.email, struct: "", lastCheckIn: "",
+          isReturning: !!past,
+          lastPastStay: past ? { date: past.checkIn, structName: getStructure(past.structureId)?.name ?? "" } : undefined,
+        });
+        continue;
+      }
       const phone = key.startsWith("wa:") ? key.slice(3) : key;
       map.set(key, { id: key, name: phone, phone, struct: "", lastCheckIn: "" });
     }
@@ -197,6 +237,69 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     setWaBusy("test");
     try { const r = await apiPost<{ ok: boolean; message?: string }>("whatsapp/settings", { action: "test" }); window.alert(r.message || (r.ok ? "OK" : "Errore")); }
     catch (e) { window.alert(e instanceof Error ? e.message : "Errore"); } finally { setWaBusy(""); }
+  };
+
+  // WhatsApp Embedded Signup: popup Meta che restituisce un `code` (via FB.login) e,
+  // separatamente, waba_id/phone_number_id (via postMessage "WA_EMBEDDED_SIGNUP").
+  // Il resto (scambio token, register, subscribed_apps) lo fa il server, vedi
+  // src/app/api/whatsapp/embedded-signup/route.ts.
+  const [showManualWa, setShowManualWa] = useState(!WA_EMBEDDED_AVAILABLE);
+  const [waEmbedBusy, setWaEmbedBusy] = useState(false);
+  const [fbReady, setFbReady] = useState(false);
+  const waIdsRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
+
+  useEffect(() => {
+    if (!WA_EMBEDDED_AVAILABLE) return;
+    if (window.FB) { setFbReady(true); return; }
+    window.fbAsyncInit = () => { window.FB?.init({ appId: META_APP_ID, autoLogAppEvents: true, xfbml: true, version: "v21.0" }); setFbReady(true); };
+    if (!document.getElementById("facebook-jssdk")) {
+      const s = document.createElement("script");
+      s.id = "facebook-jssdk"; s.src = "https://connect.facebook.net/it_IT/sdk.js"; s.async = true; s.defer = true;
+      document.body.appendChild(s);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!WA_EMBEDDED_AVAILABLE) return;
+    const handler = (event: MessageEvent) => {
+      if (typeof event.origin !== "string" || !event.origin.endsWith(".facebook.com")) return;
+      try {
+        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        if (data?.type === "WA_EMBEDDED_SIGNUP" && data?.event === "FINISH") {
+          waIdsRef.current = { wabaId: data?.data?.waba_id, phoneNumberId: data?.data?.phone_number_id };
+        }
+      } catch {}
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
+  const waFinishEmbedded = async (code: string) => {
+    // I due canali (callback di FB.login e postMessage) possono arrivare in ordine diverso:
+    // attendo brevemente che arrivino anche waba_id/phone_number_id.
+    for (let tries = 0; (!waIdsRef.current.wabaId || !waIdsRef.current.phoneNumberId) && tries < 10; tries++) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    const { wabaId, phoneNumberId } = waIdsRef.current;
+    if (!wabaId || !phoneNumberId) { window.alert(t("Non ho ricevuto i dati del numero da Meta. Riprova.")); setWaEmbedBusy(false); return; }
+    try {
+      const r = await apiPost<{ ok: boolean; message?: string }>("whatsapp/embedded-signup", { code, wabaId, phoneNumberId });
+      window.alert(r.message || (r.ok ? "OK" : "Errore"));
+      const st = await apiPost<{ connected: boolean; phoneId: string }>("whatsapp/settings", { action: "status" });
+      setWa({ connected: !!st.connected, phoneId: st.phoneId || "" });
+    } catch (e) { window.alert(e instanceof Error ? e.message : "Errore collegamento"); }
+    finally { setWaEmbedBusy(false); waIdsRef.current = {}; }
+  };
+
+  const waEmbedStart = () => {
+    if (!window.FB) { window.alert(t("SDK Meta non pronto, riprova tra qualche secondo.")); return; }
+    waIdsRef.current = {};
+    setWaEmbedBusy(true);
+    window.FB.login((response) => {
+      const code = response?.authResponse?.code;
+      if (!code) { setWaEmbedBusy(false); return; } // popup chiuso/annullato dall'utente
+      waFinishEmbedded(code);
+    }, { config_id: WA_CONFIG_ID, response_type: "code", override_default_response_type: true, extras: { setup: {} } });
   };
 
   const digits = (current?.phone ?? "").replace(/\D/g, "");
@@ -308,6 +411,13 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     const url = await shortenLink(checkinUrlFor(current.b));
     setDraft((d) => `${d.trim()}${d.trim() ? "\n\n" : ""}${CHECKIN_MSG[lg](url)}`);
   };
+  // Proposta rapida di sconto fedeltà per gli ospiti di ritorno senza prenotazione attiva.
+  const insertLoyaltyOffer = () => {
+    if (!current) return;
+    const nome = current.name.split(" ")[0];
+    const msg = `Ciao ${nome}, che piacere risentirti! Per il tuo prossimo soggiorno da noi hai uno sconto fedeltà del 10% — scrivimi pure le date che preferisci.`;
+    setDraft((d) => `${d.trim()}${d.trim() ? "\n\n" : ""}${msg}`);
+  };
 
   // ── Coda invii automatici (calcolata sulle prenotazioni reali) ──
   const bookingsWithGuest = useMemo(() => bookings
@@ -390,7 +500,11 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
             const needsReply = !!last && last.dir === "in";
             const showHeader = activeStructureId === "all" && (i === 0 || people[i - 1].struct !== p.struct);
             const isSelected = sel === p.id;
-            const sub = last ? preview(last, t) : (p.b ? `${fmtD(p.b.checkIn)} → ${fmtD(p.b.checkOut)} · ${CHANNELS[p.b.channel]?.label ?? ""}` : t("Nessuna prenotazione"));
+            const sub = last
+              ? preview(last, t)
+              : (p.b
+                ? `${fmtD(p.b.checkIn)} → ${fmtD(p.b.checkOut)} · ${CHANNELS[p.b.channel]?.label ?? ""}`
+                : (p.isReturning && p.lastPastStay ? `↩ ${t("Ospite di ritorno")} · ${t("ultimo soggiorno")} ${fmtD(p.lastPastStay.date)}` : t("Nessuna prenotazione")));
             return (
               <div key={p.id}>
                 {showHeader && <div className="sticky top-0 z-10 border-b border-line bg-wash px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">{p.struct || "—"}</div>}
@@ -486,6 +600,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-sm font-semibold text-txt">{current.name}</span>
                   <span className="truncate text-[11px] text-faint">{[current.b ? (CHANNELS[current.b.channel]?.label ?? current.b.channel) : null, current.phone, current.email].filter(Boolean).join(" · ") || t("nessun contatto")}</span>
+                  {!current.b && current.isReturning && current.lastPastStay && (
+                    <span className="truncate text-[11px] font-medium" style={{ color: "var(--focus)" }}>↩ {t("Ospite di ritorno")} · {t("ultimo soggiorno")} {fmtD(current.lastPastStay.date)}{current.lastPastStay.structName ? ` · ${current.lastPastStay.structName}` : ""}</span>
+                  )}
                 </div>
                 <button onClick={() => toggleArch(current.id)} title={isArch(current.id) ? t("Ripristina") : t("Archivia")} className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim transition hover:bg-wash">{isArch(current.id) ? `⬆ ${t("Ripristina")}` : `🗄 ${t("Archivia")}`}</button>
               </div>
@@ -532,6 +649,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 // Ultimo di un gruppo consecutivo dello stesso mittente → mostra coda + orario.
                 const groupEnd = !next || next.dir !== m.dir || new Date(next.ts).toDateString() !== new Date(m.ts).toDateString();
                 const hhmm = new Date(m.ts).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+                // Messaggio generato in automatico dal Concierge AI (webhook WhatsApp, Impostazioni →
+                // Concierge AI): va sempre riconoscibile a colpo d'occhio rispetto a ciò che scrive l'host.
+                const isAiReply = out && m.via === "🤖 Concierge AI";
                 return (
                   <div key={m.id}>
                     {showDay && <div className="my-4 flex justify-center"><span className="rounded-full border border-line bg-surface px-3 py-1 text-[10px] font-semibold capitalize text-dim shadow-sm">{dayLabel(m.ts, t)}</span></div>}
@@ -546,6 +666,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                               ? <span className="absolute -right-1 bottom-0 h-3 w-3 [clip-path:polygon(0_0,0_100%,100%_100%)]" style={{ backgroundColor: "var(--focus)" }} />
                               : <span className="absolute -left-1 bottom-0 h-3 w-3 border-b border-l border-line bg-surface [clip-path:polygon(100%_0,0_100%,100%_100%)]" />
                           )}
+                          {isAiReply && <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold">🤖 {t("Risposta automatica")}</div>}
                           <div className="whitespace-pre-wrap break-words">{m.text}</div>
                         </div>
                         {groupEnd && <div className="mt-1 px-1 text-[10px] text-faint">{hhmm}{m.via ? ` · ${m.via}` : ""}</div>}
@@ -582,6 +703,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 </select>
                 <button onClick={insertGuide} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition hover:bg-wash hover:text-txt">📖 {t("Guida ospiti")}</button>
                 {current.b && <button onClick={insertCheckin} title={t("Invia il link per il check-in online (compila la schedina alloggiati)")} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition hover:bg-wash hover:text-txt">📝 {t("Check-in online")}</button>}
+                {!current.b && current.isReturning && <button onClick={insertLoyaltyOffer} title={t("Inserisce una proposta di sconto fedeltà per il prossimo soggiorno")} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition hover:bg-wash hover:text-txt">🎁 {t("Proponi sconto fedeltà")}</button>}
                 {aiUnavailable ? (
                   <span className="rounded-full border border-dashed border-line px-3 py-1 text-xs font-medium text-faint" title={t("La risposta assistita dall'AI sarà attivata a breve")}>✨ {t("Bozza con AI")} · {t("disponibile a breve")}</span>
                 ) : (
@@ -613,12 +735,30 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
         </div>
         <span className="text-[11px] text-faint">{t("Invio reale dall'app (Cloud API di Meta). Senza collegamento resta l'invio via wa.me.")}</span>
       </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
-        <input value={wa.phoneId} onChange={(e) => setWa((w) => ({ ...w, phoneId: e.target.value }))} placeholder={t("Phone Number ID")} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-        <input type="password" value={waTok} onChange={(e) => setWaTok(e.target.value)} placeholder={wa.connected ? t("Token (salvato — vuoto = non cambiare)") : t("Token Meta")} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
-        <button onClick={waSave} disabled={!!waBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{waBusy === "save" ? t("Salvo…") : t("Salva")}</button>
-        <button onClick={waTest} disabled={!!waBusy || !wa.connected} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{waBusy === "test" ? t("Test…") : t("Test")}</button>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {WA_EMBEDDED_AVAILABLE ? (
+          <button onClick={waEmbedStart} disabled={waEmbedBusy || !fbReady} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+            {waEmbedBusy ? t("Collegamento…") : t("Collega con Meta")}
+          </button>
+        ) : (
+          <span className="text-[11px] text-faint">{t("Configurazione in corso: usa il collegamento manuale.")}</span>
+        )}
+        {WA_EMBEDDED_AVAILABLE && (
+          <button onClick={() => setShowManualWa((v) => !v)} className="text-[11px] font-medium text-dim underline-offset-2 hover:underline">
+            {showManualWa ? t("nascondi collegamento manuale") : t("oppure inserisci manualmente")}
+          </button>
+        )}
       </div>
+
+      {showManualWa && (
+        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+          <input value={wa.phoneId} onChange={(e) => setWa((w) => ({ ...w, phoneId: e.target.value }))} placeholder={t("Phone Number ID")} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+          <input type="password" value={waTok} onChange={(e) => setWaTok(e.target.value)} placeholder={wa.connected ? t("Token (salvato — vuoto = non cambiare)") : t("Token Meta")} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+          <button onClick={waSave} disabled={!!waBusy} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{waBusy === "save" ? t("Salvo…") : t("Salva")}</button>
+          <button onClick={waTest} disabled={!!waBusy || !wa.connected} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{waBusy === "test" ? t("Test…") : t("Test")}</button>
+        </div>
+      )}
       {isOwner && (
         <div className="mt-3 rounded-lg border border-dashed border-line bg-wash p-3">
           <p className="mb-1.5 text-[11px] font-semibold text-dim">{t("Per sviluppatore · una tantum")}</p>
