@@ -167,13 +167,11 @@ export default function TariffePage() {
           const forced = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso];
           const isToday = iso === toISO(s);
           const we = isWeekend(d);
-          const dow = d.getDay(); // 0 = domenica, 6 = sabato
-          const numColor = dow === 6 ? "#E08A3A" : dow === 0 ? "var(--err)" : "var(--txt)";
           return (
             <td key={iso} className="px-2 py-2.5 text-center group-hover:bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
               {forced != null
-                ? <span className="font-mono text-sm font-bold tabular-nums" style={{ color: numColor }} title={t("Tariffa forzata dal calendario")}>{dayPrice(rt, d)}<sup className="ml-0.5 text-[9px] font-bold not-italic" style={{ color: "var(--focus)" }}>€</sup></span>
-                : <span className="font-mono text-sm tabular-nums" style={{ color: numColor }}>{dayPrice(rt, d)}</span>}
+                ? <span className="font-mono text-sm font-bold tabular-nums text-txt" title={t("Tariffa forzata dal calendario")}>{dayPrice(rt, d)}<span className="ml-0.5" style={{ color: "var(--focus)" }}>€</span></span>
+                : <span className="font-mono text-sm tabular-nums text-txt">{dayPrice(rt, d)}<span className="ml-0.5 text-dim">€</span></span>}
             </td>
           );
         })}
