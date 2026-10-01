@@ -218,7 +218,6 @@ export default function OspiteSchedaPage() {
               <label className={lbl}>{t("Tipo documento")}<select value={g.docType ?? ""} onChange={(e) => set("docType", e.target.value)} className={`${inp} mt-1`}><option value="">—</option>{DOC_TYPES.map((d) => <option key={d} value={d}>{d}</option>)}</select></label>
               <label className={lbl}>{t("Numero")}<input value={g.docNumber ?? ""} onChange={(e) => set("docNumber", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Luogo di rilascio")}<input value={g.docPlace ?? ""} onChange={(e) => set("docPlace", e.target.value)} className={`${inp} mt-1`} /></label>
-              <label className={lbl}>{t("Scadenza")}<input type="date" value={g.docExpiry ?? ""} onChange={(e) => set("docExpiry", e.target.value)} className={`${inp} mt-1`} /></label>
             </div>
             {(g.docPhotoFront || g.docPhotoBack) ? (
               <div className="mt-3">

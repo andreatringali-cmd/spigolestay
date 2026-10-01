@@ -67,8 +67,7 @@ async function applyIncoming(admin: SupabaseClient<any>, tenantId: string, fromD
 
     let write = admin.from("app_state").update({ data: blob, updated_at: new Date().toISOString() }).eq("user_id", tenantId);
     if (rev !== null) write = write.eq("rev", rev);
-    const { data: updated, error: writeErr } = await write.select("rev");
-    console.log("[whatsapp webhook] attempt", attempt, "key", key, "rowFound", !!row, "rev", rev, "updatedRows", updated?.length ?? 0, "writeErr", writeErr?.message); // DEBUG temporaneo
+    const { data: updated } = await write.select("rev");
     if (updated && updated.length > 0) return { ok: true, guestName: guest?.fullName, notifPrefsRaw: blob["spigolestay:notifs"], structures: data.structures };
     // Conflitto di rev: un altro processo ha scritto nel mentre, riprova una volta.
   }
@@ -83,7 +82,6 @@ export async function POST(req: Request) {
   const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
   const body = await req.json().catch(() => null) as { entry?: { changes?: { value?: { metadata?: { phone_number_id?: string }; messages?: WaMessage[] } }[] }[] } | null;
-  console.log("[whatsapp webhook] payload", JSON.stringify(body)); // DEBUG temporaneo, da rimuovere
 
   try {
     for (const entry of body?.entry ?? []) {
