@@ -19,7 +19,7 @@ const LOG_KEY = "spigolestay:canali:log";
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `x-${Math.floor(performance.now() * 1000)}`);
 
 export default function CanaliPage() {
-  const { structures, roomTypes, units, activeStructureId } = useData();
+  const { structures, roomTypes, units, bookings, activeStructureId } = useData();
   const ask = useConfirm();
   const { t } = useLang();
   const relTime = (ts: number) => {
@@ -324,6 +324,7 @@ export default function CanaliPage() {
               <input value={channelSearch} onChange={(e) => setChannelSearch(e.target.value)} placeholder={t("Cerca canale…")} className="w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
             </div>
             <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{channelPanel.loading ? t("Apro…") : "+ " + t("Aggiungi")}</button>
+            <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{t("Impostazioni generali")} ↗</button>
             <button onClick={loadOtaStatus} disabled={otaLoading} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{otaLoading ? t("Verifico…") : "⟳ " + t("Aggiorna")}</button>
           </div>
           <Card className="mb-5">
@@ -413,20 +414,16 @@ export default function CanaliPage() {
                   <div className="text-sm font-bold text-txt">{label}</div>
                   <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
                 </div>
+                {c.id && <button onClick={() => toggleChannel(sid, c)} disabled={togglingChannel === c.id} className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">{togglingChannel === c.id ? "…" : c.active ? t("Disattiva") : t("Attiva")}</button>}
                 <button onClick={() => setChannelDetail(null)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt">✕</button>
               </div>
 
               {c.id && (
-                <button onClick={() => toggleChannel(sid, c)} disabled={togglingChannel === c.id} className="mb-4 w-full rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">
-                  {togglingChannel === c.id ? "…" : c.active ? t("Disattiva canale") : t("Attiva canale")}
-                </button>
-              )}
-
-              {c.id && (
                 <div className="rounded-xl border border-line bg-paper p-3">
-                  <div className="mb-1.5 text-xs font-semibold text-txt">{t("Correzione prezzo")}</div>
-                  <p className="mb-2.5 text-[11px] text-faint">{t("Rispetto al prezzo Xenora: si somma sopra eventuali promozioni attive sul canale stesso (Genius, offerte a tempo, ecc.) — non le sostituisce.")}</p>
-                  <div className="mb-2 text-[11px] text-dim">{t("Attuale")}: <b className="text-txt">{current}</b></div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-1 text-xs font-semibold text-txt">{t("Correzione prezzo")}<span title={t("Rispetto al prezzo Xenora: si somma sopra eventuali promozioni attive sul canale stesso (Genius, offerte a tempo, ecc.) — non le sostituisce.")} className="grid h-3.5 w-3.5 cursor-help place-items-center rounded-full bg-wash text-[9px] font-bold text-faint">?</span></span>
+                    <span className="text-xs text-dim">{t("Attuale")} <b className="text-txt">{current}</b></span>
+                  </div>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <select value={draft?.rule ?? "increase_by_percent"} onChange={(e) => setPriceCorr((cur) => ({ ...cur, [c.id]: { rule: e.target.value as "increase_by_percent" | "decrease_by_percent", value: cur[c.id]?.value ?? "", loaded: true } }))} className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
                       <option value="increase_by_percent">+</option>
@@ -446,23 +443,29 @@ export default function CanaliPage() {
                 const computedColor = typeof window !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue(CHANNELS[chKey]?.cssVar ?? "").trim() : "";
                 const pickerColor = savedColor || (/^#/.test(computedColor) ? computedColor : "#888888");
                 const commVal = commDraft[c.id] ?? String(loadChannelCommissionPct(chKey) ?? Math.round((CHANNELS[chKey]?.commission ?? 0) * 1000) / 10);
+                // Suggerimento basato sui dati reali: media della commissione ESATTA (non stimata)
+                // comunicata dal canale sulle ultime prenotazioni — così la predefinita si imposta
+                // su un numero osservato, non a intuito.
+                const realComm = bookings.filter((b) => b.channel === chKey && b.status !== "cancelled" && b.commissionAmount != null && b.total).slice(-10);
+                const realAvgPct = realComm.length ? Math.round((realComm.reduce((a, b) => a + (b.commissionAmount! / b.total!) * 100, 0) / realComm.length) * 10) / 10 : null;
                 return (
                   <div className="mt-3 grid grid-cols-2 gap-3">
                     <div className="rounded-xl border border-line bg-paper p-3">
-                      <div className="mb-1.5 text-xs font-semibold text-txt">{t("Colore su calendario")}</div>
-                      <div className="flex items-center gap-2">
-                        <input type="color" value={pickerColor} onChange={(e) => saveChannelColor(chKey, e.target.value)} className="h-8 w-10 shrink-0 cursor-pointer rounded border border-line bg-transparent p-0.5" />
-                        <span className="text-[11px] text-faint">{t("Colora le prenotazioni di questo canale nel Calendario")}</span>
-                      </div>
+                      <div className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-txt">{t("Colore")}<span title={t("Colora le prenotazioni di questo canale nel Calendario")} className="grid h-3.5 w-3.5 cursor-help place-items-center rounded-full bg-wash text-[9px] font-bold text-faint">?</span></div>
+                      <input type="color" value={pickerColor} onChange={(e) => saveChannelColor(chKey, e.target.value)} className="h-8 w-full cursor-pointer rounded border border-line bg-transparent p-0.5" />
                     </div>
                     <div className="rounded-xl border border-line bg-paper p-3">
-                      <div className="mb-1.5 text-xs font-semibold text-txt">{t("Commissione predefinita")}</div>
+                      <div className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-txt">{t("Commissione")}<span title={t("Usata quando una prenotazione non ha una commissione esatta comunicata dal canale.")} className="grid h-3.5 w-3.5 cursor-help place-items-center rounded-full bg-wash text-[9px] font-bold text-faint">?</span></div>
                       <div className="flex items-center gap-1.5">
-                        <input type="number" min={0} step="0.1" value={commVal} onChange={(e) => setCommDraft((cur) => ({ ...cur, [c.id]: e.target.value }))} className="w-16 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+                        <input type="number" min={0} step="0.1" value={commVal} onChange={(e) => setCommDraft((cur) => ({ ...cur, [c.id]: e.target.value }))} className="w-14 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
                         <span className="text-sm text-dim">%</span>
-                        <button onClick={() => { const v = Number(commVal.replace(",", ".")); if (Number.isFinite(v) && v >= 0) { saveChannelCommissionPct(chKey, v); setCommSaved(c.id); window.setTimeout(() => setCommSaved(null), 1200); } }} className="ml-auto rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{commSaved === c.id ? t("Salvato ✓") : t("Salva")}</button>
+                        <button onClick={() => { const v = Number(commVal.replace(",", ".")); if (Number.isFinite(v) && v >= 0) { saveChannelCommissionPct(chKey, v); setCommSaved(c.id); window.setTimeout(() => setCommSaved(null), 1200); } }} className="shrink-0 rounded-lg border border-line px-2 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{commSaved === c.id ? "✓" : t("Salva")}</button>
                       </div>
-                      <p className="mt-1.5 text-[11px] text-faint">{t("Usata quando una prenotazione non ha una commissione esatta comunicata dal canale.")}</p>
+                      {realAvgPct != null && (
+                        <button onClick={() => setCommDraft((cur) => ({ ...cur, [c.id]: String(realAvgPct) }))} className="mt-1.5 text-left text-[11px] text-dim hover:text-focus">
+                          {t("Media reale")} <b className="text-txt">{realAvgPct}%</b> · {realComm.length} {t("prenotazioni")} — {t("usa")}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
