@@ -324,7 +324,7 @@ export default function TariffePage() {
                   return (
                     <th key={toISO(d)} className="border-l border-line px-2 py-2 text-center text-xs font-medium" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
                       <div className="font-semibold" style={{ color: dow === 6 ? "#E08A3A" : dow === 0 ? "var(--err)" : we ? "var(--dim)" : "var(--faint)" }}>{weekdayShort(d)}</div>
-                      <div className="font-mono font-semibold text-txt">{d.getDate()}</div>
+                      <div className="font-mono font-semibold" style={{ color: dow === 6 ? "#E08A3A" : dow === 0 ? "var(--err)" : "var(--txt)" }}>{d.getDate()}</div>
                     </th>
                   );
                 })}
