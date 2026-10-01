@@ -590,7 +590,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 {aiErr && <span className="text-[11px] text-[color:var(--err)]">{t("Non sono riuscito a generare la bozza. Riprova.")}</span>}
               </div>
               <div className="rounded-2xl border border-line bg-paper p-2 transition focus-within:border-focus focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--focus)_18%,transparent)]">
-                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder={t("Scrivi un messaggio…")} className="w-full resize-none bg-transparent px-1.5 py-1 text-sm text-txt outline-none placeholder:text-faint" />
+                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendWa(); } }} rows={2} placeholder={t("Scrivi un messaggio… (Invio per inviare, Shift+Invio per andare a capo)")} className="w-full resize-none bg-transparent px-1.5 py-1 text-sm text-txt outline-none placeholder:text-faint" />
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <button onClick={sendWa} disabled={!draft.trim()} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</button>
                   <button onClick={sendMail} disabled={!draft.trim() || !current.email} className="inline-flex items-center gap-1.5 rounded-full bg-focus px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40">✉ Email</button>
