@@ -82,6 +82,7 @@ export async function POST(req: Request) {
   const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
   const body = await req.json().catch(() => null) as { entry?: { changes?: { value?: { metadata?: { phone_number_id?: string }; messages?: WaMessage[] } }[] }[] } | null;
+  console.log("[whatsapp webhook] payload", JSON.stringify(body)); // DEBUG temporaneo, da rimuovere
 
   try {
     for (const entry of body?.entry ?? []) {
