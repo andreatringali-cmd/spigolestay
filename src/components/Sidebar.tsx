@@ -54,7 +54,15 @@ export default function Sidebar({
         {/* Header */}
         <div className="flex h-14 items-center gap-2.5 border-b border-line px-3">
           {!collapsed && (
-            <Image src="/xenora-logo.png" alt="Xenora" width={132} height={38} priority className="object-contain" style={{ height: 26, width: "auto" }} />
+            // Farfalla sempre colorata (immagine a parte) + testo "enora" vero: così il testo può
+            // diventare bianco su rail scuri (tema Grafite, sempre scuro) o in dark mode, senza
+            // toccare il colore della farfalla. var(--txt) basta da sola: dentro l'<aside> il tema
+            // Grafite la ridefinisce già chiara (vedi rails in appstyle.ts), e in dark mode ogni
+            // palette ridefinisce --txt chiaro a livello globale.
+            <div className="flex items-center gap-1" role="img" aria-label="Xenora">
+              <Image src="/xenora-mark.png" alt="" width={28} height={28} priority className="object-contain" style={{ height: 26, width: "auto" }} />
+              <span aria-hidden="true" className="font-display text-xl font-bold leading-none" style={{ color: "var(--txt)" }}>enora</span>
+            </div>
           )}
           <button
             onClick={onToggleCollapse}
