@@ -253,7 +253,10 @@ export default function CanaliPage() {
   // Mappatura camere: non replicata dentro Xenora (resta configurazione di Channex) — un click
   // porta dritti alla pagina di QUEL canale su Channex, dentro lo stesso pannello SSO già usato
   // per "Collega un canale", invece di rimandare genericamente all'elenco.
-  const openChannelMapping = (channelId: string) => openChannelManager(`/channels/${channelId}`);
+  // NB: non conosciamo ancora il percorso reale della pagina di mappatura di UN canale
+  // nell'app Channex (il tentativo /channels/{id} non ci è arrivato) — finché non lo
+  // confermiamo, meglio l'elenco canali generico (che funziona) che un link rotto.
+  const openChannelMapping = () => openChannelManager("/channels");
 
   // NB: l'invio di disponibilità e prezzi a Channex è ora AUTOMATICO (vedi ChannexAutoSync,
   // montato nell'AppShell): parte da solo a ogni modifica di prenotazioni, camere (anche fuori
@@ -454,7 +457,7 @@ export default function CanaliPage() {
               })()}
 
               {c.id && (
-                <button onClick={() => openChannelMapping(c.id)} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">
+                <button onClick={() => openChannelMapping()} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">
                   {t("Mappatura camere su Channex")} ↗
                 </button>
               )}
