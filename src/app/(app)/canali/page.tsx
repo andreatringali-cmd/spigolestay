@@ -319,18 +319,17 @@ export default function CanaliPage() {
          da Channex per canale, non il vecchio flag locale mai aggiornato. Nascosta se Channex non
          è configurato (nessun errore da mostrare a chi non usa affatto questa integrazione). */}
       {!otaOff && (
-        <Card className="mb-5">
-          <div className="mb-3 flex items-center justify-between">
-            <SectionTitle>{t("Canali OTA collegati")}</SectionTitle>
-            <button onClick={loadOtaStatus} disabled={otaLoading} className="text-xs font-medium text-dim hover:text-txt disabled:opacity-40">{otaLoading ? t("Verifico…") : "⟳ " + t("Aggiorna")}</button>
-          </div>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
+        <>
+          <SectionTitle>{t("Canali OTA collegati")}</SectionTitle>
+          <div className="mb-3 mt-1 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
             <div className="relative min-w-0 flex-1">
               <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><Icon name="search" size={14} /></span>
               <input value={channelSearch} onChange={(e) => setChannelSearch(e.target.value)} placeholder={t("Cerca canale…")} className="w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
             </div>
             <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{channelPanel.loading ? t("Apro…") : "+ " + t("Aggiungi")}</button>
+            <button onClick={loadOtaStatus} disabled={otaLoading} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{otaLoading ? t("Verifico…") : "⟳ " + t("Aggiorna")}</button>
           </div>
+          <Card className="mb-5">
           {otaErr ? (
             <p className="text-sm" style={{ color: "var(--err)" }}>⚠ {otaErr}</p>
           ) : otaLoading && !otaByStructure ? (
@@ -396,7 +395,8 @@ export default function CanaliPage() {
               ))}
             </div>
           )}
-        </Card>
+          </Card>
+        </>
       )}
 
       {/* Dettaglio canale: attiva/disattiva + correzione prezzo — Xenora scrive direttamente su
