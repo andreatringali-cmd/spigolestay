@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type DragEvent as RDragEvent, type MouseEvent as RMouseEvent } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 import { CHANNELS, EVENT_COLORS, type Unit } from "@/lib/types";
 import {
   addDays,
@@ -193,6 +195,21 @@ export default function CalendarGrid() {
       } catch {}
     })();
   }, [activeStructureId]);
+  // Mini sito Xenora pubblicato: quali strutture (tra quelle visibili) hanno uno slug in
+  // public_sites — stessa fonte usata da Widget/Xenosite. Nessun flag locale: letto dal DB.
+  const [publishedStructIds, setPublishedStructIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const ids = (activeStructureId === "all" ? structures : structures.filter((s) => s.id === activeStructureId)).map((s) => s.id);
+    if (!ids.length || !supabase) { setPublishedStructIds(new Set()); return; }
+    let alive = true;
+    supabase.from("public_sites").select("structure_id").in("structure_id", ids)
+      .then(({ data }) => { if (alive) setPublishedStructIds(new Set((data ?? []).map((r) => r.structure_id as string))); });
+    return () => { alive = false; };
+  }, [activeStructureId, structures]);
+  // Sito ufficiale (esterno) = campo "Sito web" compilato sulla struttura; mostriamo il SUO
+  // logo come badge (nessun logo = iniziale colorata, stesso fallback usato per Channex/email).
+  const siteStruct = (activeStructureId === "all" ? structures : structures.filter((s) => s.id === activeStructureId)).find((s) => (s.website || "").trim());
+  const miniSiteStruct = (activeStructureId === "all" ? structures : structures.filter((s) => s.id === activeStructureId)).find((s) => publishedStructIds.has(s.id));
   // Sincronizzazione REALE con Channex: invia subito disponibilità/prezzi (via l'evento che
   // ChannexAutoSync ascolta) e controlla le nuove prenotazioni OTA dal feed. Aggiorna l'orario.
   const syncNow = async () => {
@@ -1022,6 +1039,18 @@ export default function CalendarGrid() {
             </div>
           );
         })}
+        {siteStruct && (
+          <div title={`Sito ufficiale collegato · ${siteStruct.name}`} className="grid h-[26px] w-[26px] place-items-center overflow-hidden rounded-full border-2" style={{ borderColor: "var(--ok)" }}>
+            {siteStruct.logo
+              ? <img src={siteStruct.logo} alt="" className="h-full w-full object-cover" />
+              : <span className="grid h-full w-full place-items-center text-[10px] font-bold text-white" style={{ backgroundColor: siteStruct.photoColor ?? "var(--focus)" }}>{(siteStruct.name || "?")[0]?.toUpperCase()}</span>}
+          </div>
+        )}
+        {miniSiteStruct && (
+          <div title={`Mini sito Xenora pubblicato · ${miniSiteStruct.name}`} className="grid h-[26px] w-[26px] place-items-center rounded-full border-2 p-1" style={{ borderColor: "var(--ok)" }}>
+            <Image src="/xenora-mark.png" alt="" width={18} height={18} className="h-full w-full object-contain" />
+          </div>
+        )}
         <div className="ml-auto flex items-center gap-3">
           {lastRun && <span className="text-xs text-faint" title="Data e ora dell'ultima sincronizzazione">Ultimo processo · {lastRun}</span>}
           <button onClick={syncNow} disabled={syncing} title={syncing ? "Sincronizzazione in corso…" : "Sincronizza ora con i canali collegati"} className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt disabled:opacity-60">
