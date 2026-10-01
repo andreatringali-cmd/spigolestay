@@ -235,7 +235,10 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       const bidLog = r.booking_id || r.id;
       if (r.status === "cancelled") {
         const cancelledGuestName = prevIdx.length ? guests.find((g) => g.id === bookings[prevIdx[0]].guestId)?.fullName : undefined;
-        prevIdx.forEach((i) => { bookings[i].status = "cancelled"; });
+        // updatedAt DEVE avanzare: la fusione client/server è last-write-wins su questo campo
+        // (vedi authsync.tsx) — senza, al sync successivo del browser la copia locale ancora
+        // "confirmed" (stesso updatedAt di prima) vince a parità e la cancellazione sparisce.
+        prevIdx.forEach((i) => { bookings[i].status = "cancelled"; bookings[i].updatedAt = Date.now(); });
         applied.push({ rev: r }); out.cancelled++;
         if (prevIdx.length) pushActivity(data, "cancel", `Cancellazione OTA${cancelledGuestName ? " — " + cancelledGuestName : ""} (Channex)`);
         console.log(`[channex inbound] CANCELLAZIONE booking_id=${bidLog} → ${prevIdx.length} prenotazione/i marcata/e cancelled (ack)`);
@@ -296,6 +299,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           ...(otaCard && idx === 0 ? { otaCard } : {}), // la VCC copre la prenotazione: la attacchiamo alla prima camera
           extId: stableKey, code: r.ota_reservation_code || undefined, source: "channex",
           note: `Prenotazione ${channel.toUpperCase()} via Channex${r.ota_reservation_code ? ` · ${r.ota_reservation_code}` : ""}`,
+          updatedAt: Date.now(), // senza, qualunque modifica successiva (es. una cancellazione) rischia di sparire al sync (vedi sopra)
         } as Booking);
         added++;
       });
