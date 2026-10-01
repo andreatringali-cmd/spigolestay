@@ -81,8 +81,8 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const today = toISO(new Date());
   // Accetta sia gli alias brevi (?ci/?co, mini-sito) sia quelli lunghi (?checkin/?checkout,
   // deep link dei comparatori Meta Search).
-  const [checkIn, setCheckIn] = useState(() => qp("ci") || qp("checkin") || addDays(today, 7));
-  const [checkOut, setCheckOut] = useState(() => qp("co") || qp("checkout") || addDays(today, 8));
+  const [checkIn, setCheckIn] = useState(() => qp("ci") || qp("checkin") || today);
+  const [checkOut, setCheckOut] = useState(() => qp("co") || qp("checkout") || addDays(today, 1));
   // Le camere compaiono SOLO dopo "Verifica disponibilità" (come Octorate). Se il link porta
   // già date esplicite (?ci&co o ?checkin&checkout) o una tipologia (?rt, deep link
   // metasearch), mostra subito i risultati.
