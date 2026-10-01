@@ -20,19 +20,8 @@ export default function ImpostazioniPage() {
   const setNotif = (k: keyof typeof NOTIF_DEF, v: boolean) => setNotifs((p) => { const n = { ...p, [k]: v }; try { localStorage.setItem(NOTIF_KEY, JSON.stringify(n)); } catch {} return n; });
   const ask = useConfirm();
 
-  // Sync Google Calendar: due feed iCal ("Aggiungi da URL") con prenotazioni e pulizie,
-  // aggiornati da soli — niente da fare dopo il primo collegamento.
-  const [calLinks, setCalLinks] = useState<{ bookingsUrl: string; pulizieUrl: string } | null>(null);
-  const [calErr, setCalErr] = useState("");
-  useEffect(() => {
-    apiPost<{ ok: boolean; bookingsUrl: string; pulizieUrl: string }>("calendar/links", {})
-      .then((j) => setCalLinks(j))
-      .catch((e) => setCalErr(e instanceof Error ? e.message : "Errore"));
-  }, []);
-
-  // Sync in TEMPO REALE (alternativa al feed sopra): Xenora scrive/cancella direttamente gli
-  // eventi sul calendario Google che l'utente condivide col service account — niente ritardo
-  // di Google nel ricontrollare il feed (vedi googleCalendarSync.ts).
+  // Sync Google Calendar in TEMPO REALE: Xenora scrive/cancella direttamente gli eventi sul
+  // calendario Google che l'utente condivide col service account (vedi googleCalendarSync.ts).
   const { structures, updateStructure, activeStructureId } = useData();
   const [gcalInfo, setGcalInfo] = useState<{ configured: boolean; serviceAccountEmail: string | null } | null>(null);
   useEffect(() => {
@@ -126,23 +115,11 @@ export default function ImpostazioniPage() {
 
       <Card className="mt-4">
         <SectionTitle>{t("Sincronizza con Google Calendar")}</SectionTitle>
-        <p className="mb-3 text-xs text-dim">{t("Due calendari sempre aggiornati, uno per le prenotazioni e uno per le pulizie (utile da condividere con la signora). Copia il link, poi in Google Calendar vai su \"Aggiungi altri calendari\" → \"Da URL\" e incollalo: da quel momento si aggiorna da solo, senza fare nulla.")}</p>
-        {calErr && <p className="text-xs font-medium" style={{ color: "var(--err)" }}>{calErr}</p>}
-        {calLinks ? (
-          <div className="space-y-2">
-            <CalendarLinkRow label={t("Prenotazioni")} url={calLinks.bookingsUrl} />
-            <CalendarLinkRow label={t("Pulizie")} url={calLinks.pulizieUrl} />
-          </div>
-        ) : !calErr && <p className="text-xs text-dim">{t("Preparo i link…")}</p>}
-      </Card>
-
-      <Card className="mt-4">
-        <SectionTitle>{t("Sync in tempo reale (anche le cancellazioni)")}</SectionTitle>
         {gcalInfo && !gcalInfo.configured ? (
           <p className="text-xs text-dim">{t("Funzione non ancora attiva lato server.")}</p>
         ) : (
           <>
-            <p className="mb-3 text-xs text-dim">{t("Il link sopra si aggiorna da solo ma con qualche ora di ritardo (lo decide Google). Con questa invece Xenora scrive/cancella gli eventi sul tuo calendario appena succede qualcosa — cancellazioni comprese, istantanee.")}</p>
+            <p className="mb-3 text-xs text-dim">{t("Xenora scrive/cancella gli eventi sul tuo calendario appena succede qualcosa — nuove prenotazioni, modifiche, cancellazioni — tutto istantaneo, senza passare da un link da ricontrollare.")}</p>
             <ol className="mb-3 list-decimal space-y-1.5 pl-4 text-xs text-dim">
               <li>{t("Su Google Calendar crea (o scegli) il calendario da usare per una struttura.")}</li>
               <li>
@@ -200,17 +177,6 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
       <span className="text-sm text-dim">{label}</span>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-5 w-5 accent-[color:var(--focus)]" />
     </label>
-  );
-}
-function CalendarLinkRow({ label, url }: { label: string; url: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => { try { await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} };
-  return (
-    <div className="flex items-center gap-2">
-      <span className="w-24 shrink-0 text-sm font-medium text-txt">{label}</span>
-      <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-xs text-dim outline-none" />
-      <button onClick={copy} className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{copied ? "Copiato ✓" : "Copia"}</button>
-    </div>
   );
 }
 function ThemeBtn({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: string; label: string }) {
