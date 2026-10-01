@@ -56,6 +56,24 @@ export async function POST(req: Request) {
   // Nessuna regola/valore → azzera la correzione (array vuoto = nessuno step, prezzo Xenora invariato).
   const steps: [string, string][] = rule && Number.isFinite(num) && num > 0 ? [[rule, num.toFixed(2)]] : [];
   const res = await setChannelPriceCorrection(channelId, steps);
-  if (!res.ok) return NextResponse.json({ ok: false, error: res.error || "Salvataggio non riuscito" }, { status: 200 });
+  if (!res.ok) return NextResponse.json({ ok: false, error: friendlyChannexError(res.error) }, { status: 200 });
   return NextResponse.json({ ok: true });
+}
+
+// Channex a volte risponde con un errore di validazione sulla connessione del canale stesso
+// (es. "hotel_id is required" quando manca un campo nella configurazione di Booking.com/Airbnb
+// su Channex), non sulla correzione prezzo che stiamo scrivendo: il messaggio grezzo (JSON) è
+// incomprensibile per l'utente, qui lo traduciamo in qualcosa di azionabile.
+function friendlyChannexError(raw?: string): string {
+  if (!raw) return "Salvataggio non riuscito";
+  try {
+    const j = JSON.parse(raw) as { details?: Record<string, string[]>; message?: string };
+    const fields = j.details ? Object.entries(j.details).map(([k, v]) => `${k}: ${v.join(", ")}`).join("; ") : "";
+    if (/hotel_id/i.test(fields) || /hotel_id/i.test(raw)) {
+      return "Channex segnala che manca il campo \"Hotel Id\" nella configurazione di questo canale (impostazioni della connessione, non la correzione prezzo). Controllalo su Channex prima di riprovare.";
+    }
+    if (fields) return `Channex: ${fields}`;
+    if (j.message) return `Channex: ${j.message}`;
+  } catch { /* non era JSON, mostra il testo così com'è */ }
+  return raw.length > 200 ? "Salvataggio non riuscito (errore Channex non leggibile)." : raw;
 }
