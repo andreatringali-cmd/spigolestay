@@ -299,18 +299,32 @@ export default function TariffePage() {
         <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
           <table className="w-full min-w-[900px] border-collapse text-sm">
             <thead>
+              {/* Fascia mese — stesso stile a due righe del Calendario principale */}
+              <tr className="border-b border-line bg-wash">
+                <th className="sticky left-0 z-10 bg-wash" />
+                {(() => {
+                  const segs: { key: string; label: string; count: number }[] = [];
+                  for (const d of days) {
+                    const label = d.toLocaleDateString("it-IT", { month: "long", year: "numeric" });
+                    const last = segs[segs.length - 1];
+                    if (last && last.key === label) last.count++;
+                    else segs.push({ key: label, label, count: 1 });
+                  }
+                  return segs.map((seg) => (
+                    <th key={seg.key} colSpan={seg.count} className="border-l border-line px-2 py-1 text-center text-[11px] font-bold uppercase tracking-wide capitalize text-dim">{seg.label}</th>
+                  ));
+                })()}
+              </tr>
               <tr className="border-b border-line">
                 <th className="sticky left-0 z-10 bg-wash px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-faint">{t("Tipologia")}</th>
                 {days.map((d) => {
                   const isToday = toISO(d) === toISO(s);
                   const we = isWeekend(d);
                   const dow = d.getDay(); // 0 = domenica, 6 = sabato
-                  const first = d.getDate() === 1 || toISO(d) === toISO(days[0]);
                   return (
                     <th key={toISO(d)} className="px-2 py-2 text-center text-xs font-medium" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
                       <div className="font-semibold" style={{ color: dow === 6 ? "#E08A3A" : dow === 0 ? "var(--err)" : we ? "var(--dim)" : "var(--faint)" }}>{weekdayShort(d)}</div>
                       <div className="font-mono font-semibold text-txt">{d.getDate()}</div>
-                      {first && <div className="text-[9px] uppercase text-faint">{d.toLocaleDateString("it-IT", { month: "short" })}</div>}
                     </th>
                   );
                 })}
