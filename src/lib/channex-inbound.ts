@@ -7,6 +7,7 @@
 // ============================================================
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { bookingRevisionsFeed, ackBookingRevision, listProperties, type ChxRevision } from "@/lib/channex";
+import { upsertGcalEvent, deleteGcalEvent, gcalEventId } from "@/lib/googleCalendarSync";
 
 // Property di test della certificazione: le sue prenotazioni non sono in channex_map (non è una
 // struttura reale), ma vanno comunque ACKate dal flusso di import automatico — che è quello che
@@ -216,7 +217,20 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
     const bookings = (Array.isArray(data.bookings) ? data.bookings : []) as Booking[];
     const guests = (Array.isArray(data.guests) ? data.guests : []) as (Json & { id: string; email?: string; fullName?: string })[];
     const units = (Array.isArray(data.units) ? data.units : []) as Unit[];
+    const structuresArr = (Array.isArray(data.structures) ? data.structures : []) as (Json & { id: string; gcalId?: string })[];
     const applied: { rev: ChxRevision }[] = [];
+    // Sync in tempo reale col Google Calendar REALE dell'utente (se la struttura ha un gcalId
+    // configurato) — fire-and-forget, non deve mai far fallire l'import OTA (vedi googleCalendarSync.ts).
+    const syncGcalServer = (b: Booking, action: "upsert" | "delete") => {
+      const calendarId = structuresArr.find((s) => s.id === b.structureId)?.gcalId?.trim();
+      if (!calendarId) return;
+      const eventId = gcalEventId(b.id);
+      if (action === "delete") { void deleteGcalEvent(calendarId, eventId); return; }
+      const guest = guests.find((g) => g.id === b.guestId);
+      const code = typeof b.code === "string" ? b.code : "";
+      const summary = [guest?.fullName || "Ospite OTA", code && `· ${code}`].filter(Boolean).join(" ");
+      void upsertGcalEvent({ calendarId, eventId, summary, startDate: b.checkIn, endDateExclusive: b.checkOut });
+    };
 
     for (const { rev: r, map } of items) {
       // Chiave STABILE della prenotazione: SEMPRE booking_id quando presente (Channex lo
@@ -238,7 +252,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         // updatedAt DEVE avanzare: la fusione client/server è last-write-wins su questo campo
         // (vedi authsync.tsx) — senza, al sync successivo del browser la copia locale ancora
         // "confirmed" (stesso updatedAt di prima) vince a parità e la cancellazione sparisce.
-        prevIdx.forEach((i) => { bookings[i].status = "cancelled"; bookings[i].updatedAt = Date.now(); });
+        prevIdx.forEach((i) => { bookings[i].status = "cancelled"; bookings[i].updatedAt = Date.now(); syncGcalServer(bookings[i], "delete"); });
         applied.push({ rev: r }); out.cancelled++;
         if (prevIdx.length) pushActivity(data, "cancel", `Cancellazione OTA${cancelledGuestName ? " — " + cancelledGuestName : ""} (Channex)`);
         console.log(`[channex inbound] CANCELLAZIONE booking_id=${bidLog} → ${prevIdx.length} prenotazione/i marcata/e cancelled (ack)`);
@@ -301,9 +315,14 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           note: `Prenotazione ${channel.toUpperCase()} via Channex${r.ota_reservation_code ? ` · ${r.ota_reservation_code}` : ""}`,
           updatedAt: Date.now(), // senza, qualunque modifica successiva (es. una cancellazione) rischia di sparire al sync (vedi sopra)
         } as Booking);
+        syncGcalServer(bookings[bookings.length - 1], "upsert");
         added++;
       });
       if (added > 0) {
+        // Una modifica ricrea le righe con id NUOVI (vedi sopra): l'evento Calendar della/e
+        // vecchia/e riga/e (id diverso) va tolto esplicitamente, altrimenti resta un doppione
+        // "fantasma" sul calendario reale dell'utente.
+        if (isUpdate) removed.forEach((old) => syncGcalServer(old, "delete"));
         applied.push({ rev: r }); out.imported++;
         pushActivity(data, "booking", `Prenotazione OTA ${isUpdate ? "aggiornata" : "importata"} — ${fullName} · ${channel.toUpperCase()} (Channex)`);
         console.log(`[channex inbound] ${isUpdate ? "MODIFICA" : "NUOVA"} booking_id=${bidLog} → ${added} camera/e ${isUpdate ? "aggiornata/e" : "creata/e"} (ack)`);

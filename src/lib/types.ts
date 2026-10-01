@@ -52,6 +52,7 @@ export interface Structure {
   linkedin?: string;       // URL profilo LinkedIn
   tiktok?: string;         // URL profilo TikTok
   googlePlaceId?: string;  // Google Place ID (per le recensioni Google, anche sul sito pubblico)
+  gcalId?: string;         // ID calendario Google condiviso col service account: scrittura in tempo reale (vedi googleCalendarSync.ts)
   // Indirizzo / ubicazione
   streetNumber?: string;
   postalCode?: string;     // CAP

@@ -8,6 +8,7 @@ import type { Structure, RoomType, Unit, Guest, Booking, Channel, CalEvent, Dire
 import { playSound } from "./sound";
 import { loadUsers } from "./users";
 import { isPublicMode, lsGet, DATA_KEY } from "./publicdata";
+import { apiPost } from "./invoicing/client";
 
 export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "rateplan" | "quote" | "payment" | "login" | "auth" | "message" | "config";
 export interface Activity {
@@ -143,6 +144,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const logAct = (type: ActivityType, text: string) => {
     setActivities((prev) => [{ id: uid(), ts: Date.now(), type, text, by: currentActor() }, ...prev].slice(0, 500));
     playSound(type === "booking" ? "booking" : type === "cancel" ? "cancel" : "notify");
+  };
+
+  // Sync in tempo reale col Google Calendar REALE dell'utente (se la struttura ha un gcalId
+  // configurato in Impostazioni) — fire-and-forget: non blocca né fa fallire l'operazione
+  // locale se Google non risponde o la funzione non è configurata lato server (vedi
+  // googleCalendarSync.ts). Le prenotazioni "fuori servizio" (blocked) non vengono sincronizzate.
+  const syncGcal = (b: Booking, action: "upsert" | "delete") => {
+    if (b.channel === "blocked") return;
+    const calendarId = structures.find((s) => s.id === b.structureId)?.gcalId?.trim();
+    if (!calendarId) return;
+    if (action === "delete") {
+      apiPost("calendar/sync-event", { action: "delete", bookingId: b.id, calendarId }).catch(() => {});
+      return;
+    }
+    const g = guests.find((x) => x.id === b.guestId);
+    const unit = units.find((u) => u.id === b.unitId);
+    const rt = roomTypes.find((r) => r.id === (unit?.roomTypeId ?? b.roomTypeId));
+    const roomLabel = [rt?.name, unit?.name].filter(Boolean).join(" · ");
+    const summary = [g?.fullName || "Ospite", roomLabel].filter(Boolean).join(" — ");
+    const description = [b.code && `Codice: ${b.code}`, b.channel && `Canale: ${b.channel}`].filter(Boolean).join(" · ");
+    apiPost("calendar/sync-event", {
+      action: "upsert", bookingId: b.id, calendarId, summary, description,
+      startDate: b.checkIn, endDateExclusive: b.checkOut,
+    }).catch(() => {});
   };
 
   // Persistenza nel browser (prototipo) — così i dati sopravvivono al refresh.
@@ -438,6 +463,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const gName = guests.find((g) => g.id === b.guestId)?.fullName;
         if (b.channel === "blocked") logAct("block", `Fuori servizio${b.note ? " — " + b.note : ""}`);
         else logAct("booking", `Nuova prenotazione${gName ? " — " + gName : ""} · ${b.channel}`);
+        if (rec.status !== "cancelled") syncGcal(rec, "upsert");
         return rec;
       },
       updateBooking: (id, patch) => {
@@ -446,12 +472,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
         // registro, con un confronto prima/dopo per non loggare nulla quando il valore non cambia
         // davvero (es. una re-sync che riscrive gli stessi dati non deve generare rumore).
         const before = bookings.find((b) => b.id === id);
+        const updated: Booking | undefined = before ? { ...before, ...patch, updatedAt: Date.now() } : undefined;
         setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch, updatedAt: Date.now() } : b)));
         const gName = guests.find((g) => g.id === (patch.guestId ?? before?.guestId))?.fullName;
         if (patch.status === "cancelled" && before?.status !== "cancelled") {
           logAct("cancel", `Prenotazione annullata${gName ? " — " + gName : ""}`);
+          if (updated) syncGcal(updated, "delete");
           return;
         }
+        if (updated) syncGcal(updated, updated.status === "cancelled" ? "delete" : "upsert");
         if (before) {
           const FIELDS: (keyof Booking)[] = ["checkIn", "checkOut", "unitId", "roomTypeId", "adults", "children", "total", "channel", "status", "guestId"];
           const changed = FIELDS.filter((f) => f in patch && patch[f] !== before[f]);
@@ -472,6 +501,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const target = units.find((u) => u.id === to.unitId);
         const cur = bookings.find((b) => b.id === id);
         const crossed = !!(target && cur && target.structureId !== cur.structureId);
+        let moved: Booking | undefined;
         setBookings((prev) => prev.map((b) => {
           if (b.id !== id) return b;
           const next: Booking = { ...b, unitId: to.unitId, checkIn: to.checkIn, checkOut: to.checkOut, updatedAt: Date.now() };
@@ -483,8 +513,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
             if (b.movedFrom?.structureId === target.structureId) delete next.movedFrom;
             else if (!b.movedFrom) next.movedFrom = { structureId: b.structureId, structureName: structures.find((s) => s.id === b.structureId)?.name ?? "", at: new Date().toISOString() };
           }
+          moved = next;
           return next;
         }));
+        // Se è cambiata struttura, l'evento sul vecchio calendario (se diverso) va tolto.
+        if (moved && crossed && cur) syncGcal(cur, "delete");
+        if (moved) syncGcal(moved, "upsert");
         logAct("move", crossed ? `Prenotazione spostata a ${structures.find((s) => s.id === target!.structureId)?.name ?? "altra struttura"}` : "Prenotazione spostata di camera");
       },
       deleteBooking: (id) => {
@@ -494,6 +528,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setBookings((prev) => prev.filter((b) => b.id !== id));
         setSelectedBookingId((s) => (s === id ? null : s));
         logAct("cancel", `Cancellazione${gName ? " — " + gName : ""}`);
+        if (b) syncGcal(b, "delete");
       },
 
       deleteBookingGroup: (groupId) => {
@@ -505,6 +540,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setBookings((prev) => prev.filter((b) => !ids.has(b.id)));
         setSelectedBookingId((s) => (s && ids.has(s) ? null : s));
         logAct("cancel", `Cancellazione gruppo (${members.length} camere)${gName ? " — " + gName : ""}`);
+        members.forEach((m) => syncGcal(m, "delete"));
       },
 
       addEvent: (e) => { setEvents((prev) => [...prev, { id: uid(), ...e, updatedAt: Date.now() }]); logAct("event", `Evento: ${e.name}`); },
