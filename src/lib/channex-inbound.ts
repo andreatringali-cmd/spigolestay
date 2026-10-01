@@ -79,6 +79,15 @@ function otaCardFrom(r: ChxRevision): OtaCard | undefined {
   return { present: true, currency, balance, effectiveDate, expirationDate };
 }
 const sumDays = (days?: Record<string, string>) => days ? Object.values(days).reduce((a, v) => a + num(v), 0) : 0;
+// Dettaglio notte-per-notte mandato da Channex (es. Booking.com lo manda sempre): data ISO ->
+// importo di quella notte. Lo teniamo accanto al totale invece di buttarlo via, così si può
+// vedere nella scheda prenotazione quanto ha pagato l'ospite per ogni singola notte.
+const nightlyRatesOf = (days?: Record<string, string>): Record<string, number> | undefined => {
+  if (!days) return undefined;
+  const out: Record<string, number> = {};
+  for (const [iso, v] of Object.entries(days)) { if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) out[iso] = num(v); }
+  return Object.keys(out).length ? out : undefined;
+};
 
 export interface ImportSummary { ok: boolean; feed: number; imported: number; cancelled: number; acked: number; skipped: number; errors: string[] }
 
@@ -303,11 +312,12 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         const ofType = units.filter((u) => u.roomTypeId === roomTypeId && !u.outOfService);
         const free = ofType.find((u) => !bookings.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)));
         const total = Math.round(sumDays(room.days) || (idx === 0 ? num(r.amount) : 0));
+        const nightlyRates = nightlyRatesOf(room.days);
         bookings.push({
           id: uid(), groupId, structureId: map.structure_id, roomTypeId, unitId: (free ?? ofType[0])?.id ?? null,
           guestId, channel, status: "confirmed", checkIn: ci, checkOut: co, bookedOn: new Date().toISOString().slice(0, 10),
           adults: Math.max(1, num(room.occupancy?.adults, 1)), children: num(room.occupancy?.children, 0),
-          total: total || undefined, cleaningFee: 0, paid: 0, cityTaxPaid: false,
+          total: total || undefined, ...(nightlyRates ? { nightlyRates } : {}), cleaningFee: 0, paid: 0, cityTaxPaid: false,
           ...(commissionAmount != null ? { commissionAmount } : {}),
           ...(commissionPct != null ? { commissionPct } : {}),
           ...(otaCard && idx === 0 ? { otaCard } : {}), // la VCC copre la prenotazione: la attacchiamo alla prima camera

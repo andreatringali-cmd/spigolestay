@@ -1,7 +1,7 @@
 // Calcolo UNICO del totale di una prenotazione, condiviso tra elenco, scheda e calendario,
 // così il numero mostrato coincide ovunque.
 //  Totale ospite = soggiorno (total) + pulizia (cleaningFee) + extra + tassa di soggiorno.
-import { nights } from "./dates";
+import { nights, shiftISO } from "./dates";
 import { CHANNELS, type Channel, type Structure } from "./types";
 import { loadChannelCommissionPct } from "./channelOverrides";
 
@@ -77,4 +77,31 @@ export function commissionOf(b: CommissionBookingLike): number {
 }
 export function nettoOf(b: CommissionBookingLike): number {
   return (b.total ?? 0) - commissionOf(b);
+}
+
+type NightlyBookingLike = { total?: number; checkIn: string; checkOut: string; nightlyRates?: Record<string, number> };
+
+// Ricavo REALE di una prenotazione nell'intervallo [from, to): usa il dettaglio notte-per-notte
+// mandato dall'OTA (nightlyRates, es. Booking.com lo manda sempre) sommando solo le notti dentro
+// l'intervallo, invece di stimarlo dividendo il totale in parti uguali sulle notti (impreciso se
+// il prezzo cambia tra feriali/weekend). Le prenotazioni senza quel dettaglio (dirette, manuali,
+// altre OTA) restano sulla stima proporzionale, l'unica cosa possibile per loro.
+export function revenueInRange(b: NightlyBookingLike, from: string, to: string): number {
+  const s = b.checkIn > from ? b.checkIn : from;
+  const e = b.checkOut < to ? b.checkOut : to;
+  if (e <= s) return 0;
+  if (b.nightlyRates) {
+    let sum = 0;
+    for (let d = s; d < e; d = shiftISO(d, 1)) sum += b.nightlyRates[d] ?? 0;
+    return sum;
+  }
+  const totalNights = Math.max(1, nights(b.checkIn, b.checkOut));
+  let spanNights = 0;
+  for (let d = s; d < e; d = shiftISO(d, 1)) spanNights++;
+  return (b.total ?? 0) * (spanNights / totalNights);
+}
+
+// Come revenueInRange ma per UN singolo giorno (comodo per i grafici "per notte"/ADR).
+export function nightlyRevenue(b: NightlyBookingLike, iso: string): number {
+  return revenueInRange(b, iso, shiftISO(iso, 1));
 }

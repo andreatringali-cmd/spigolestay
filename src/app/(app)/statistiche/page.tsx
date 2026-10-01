@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { CHANNELS, type Channel } from "@/lib/types";
-import { commissionOf } from "@/lib/booking";
+import { commissionOf, revenueInRange, nightlyRevenue } from "@/lib/booking";
 import { toISO, addDays, nights, parseISO } from "@/lib/dates";
 import { eur, num } from "@/lib/format";
 import { PageHeader, StatCard } from "@/components/ui";
@@ -86,7 +86,7 @@ export default function StatistichePage() {
       const e2 = b.checkOut < to ? b.checkOut : to;
       const nInP = Math.max(0, Math.round((new Date(e2).getTime() - new Date(s2).getTime()) / 86400000));
       if (nInP > 0 && b.unitId) roomNights += nInP; // occupazione: sempre per notte (misura fisica)
-      if (basis === "notte") { if (nInP > 0) revenue += (b.total ?? 0) * (nInP / Math.max(1, nights(b.checkIn, b.checkOut))); }
+      if (basis === "notte") { if (nInP > 0) revenue += revenueInRange(b, from, to); }
       else if (b.checkIn >= from && b.checkIn < to) revenue += basis === "incasso" ? (b.paid ?? 0) : (b.total ?? 0);
     }
     const arrivals = active.filter((b) => b.checkIn >= from && b.checkIn < to).length;
@@ -142,7 +142,7 @@ export default function StatistichePage() {
       const iso = `${repMonth}-${pad2(d)}`;
       const occBks = bks.filter((b) => b.checkIn <= iso && iso < b.checkOut);
       const camere = occBks.filter((b) => b.unitId).length;
-      const lordo = Math.round(occBks.reduce((a, b) => a + (b.total ? b.total / nights(b.checkIn, b.checkOut) : 0), 0));
+      const lordo = Math.round(occBks.reduce((a, b) => a + nightlyRevenue(b, iso), 0));
       const commissioni = Math.round(occBks.reduce((a, b) => a + commissionOf(b) / nights(b.checkIn, b.checkOut), 0));
       const ospiti = occBks.reduce((a, b) => a + b.adults + b.children, 0);
       const arrivi = bks.filter((b) => b.checkIn === iso).length;
@@ -257,7 +257,7 @@ export default function StatistichePage() {
       const iso = toISO(date);
       const occBks = bks.filter((b) => b.checkIn <= iso && iso < b.checkOut);
       const camere = occBks.filter((b) => b.unitId).length;
-      const lordo = occBks.reduce((a, b) => a + (b.total ? b.total / nights(b.checkIn, b.checkOut) : 0), 0);
+      const lordo = occBks.reduce((a, b) => a + nightlyRevenue(b, iso), 0);
       const commissioni = occBks.reduce((a, b) => a + commissionOf(b) / nights(b.checkIn, b.checkOut), 0);
       const ospiti = occBks.reduce((a, b) => a + b.adults + b.children, 0);
       const arrivi = bks.filter((b) => b.checkIn === iso).length;

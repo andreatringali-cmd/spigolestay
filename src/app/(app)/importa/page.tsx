@@ -94,6 +94,9 @@ export default function ImportaPage() {
   useEffect(() => {
     if ((!structureId || !structures.some((s) => s.id === structureId)) && structures[0]) setStructureId(structures[0].id);
   }, [structures, structureId]);
+  // Segui il selettore struttura globale (in alto a destra): se è selezionata una struttura
+  // specifica, non ha senso farne scegliere un'altra qui dentro.
+  useEffect(() => { if (activeStructureId !== "all") setStructureId(activeStructureId); }, [activeStructureId]);
 
   const headers = rows[0] ?? [];
   const dataRows = useMemo(() => rows.slice(1).filter((r) => r.some((c) => (c || "").trim())), [rows]);
@@ -339,7 +342,7 @@ export default function ImportaPage() {
       ) : (
         <div className="flex flex-col gap-4">
           <Card>
-            <SectionTitle>{t("1. Struttura e file")}</SectionTitle>
+            <SectionTitle>{t("1. Struttura e file")}{activeStructureId !== "all" ? ` · ${structures.find((s) => s.id === structureId)?.name ?? ""}` : ""}</SectionTitle>
             <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line bg-wash/50 p-3">
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-txt">{t("Non sai da dove partire?")}</div>
@@ -351,12 +354,14 @@ export default function ImportaPage() {
               <p className="text-sm text-dim">{t("Prima crea una struttura e le camere, poi torna qui a importare.")}</p>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
-                <label><span className="mb-1 block text-xs font-medium text-dim">{t("Struttura di destinazione")}</span>
-                  <select value={structureId} onChange={(e) => setStructureId(e.target.value)} className={sel}>
-                    {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </label>
-                <label><span className="mb-1 block text-xs font-medium text-dim">{t("File CSV o ICS")}</span>
+                {activeStructureId === "all" && (
+                  <label><span className="mb-1 block text-xs font-medium text-dim">{t("Struttura di destinazione")}</span>
+                    <select value={structureId} onChange={(e) => setStructureId(e.target.value)} className={sel}>
+                      {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </label>
+                )}
+                <label className={activeStructureId === "all" ? "" : "sm:col-span-2"}><span className="mb-1 block text-xs font-medium text-dim">{t("File CSV o ICS")}</span>
                   <input type="file" accept=".csv,.ics,text/csv,text/calendar,text/plain" onChange={(e) => onFile(e.target.files?.[0])} className="block w-full text-sm text-dim file:mr-3 file:rounded-lg file:border-0 file:bg-focus file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:opacity-90" />
                 </label>
                 <label className="sm:col-span-2"><span className="mb-1 block text-xs font-medium text-dim">{t("…oppure incolla un URL iCal (.ics)")}</span>

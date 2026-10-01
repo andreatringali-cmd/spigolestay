@@ -307,6 +307,7 @@ export interface Booking {
   cribs?: number; // culle/lettini richiesti
   guestRequests?: string; // note/richieste lasciate dall'ospite dal link di gestione (self check-in)
   total?: number; // € (soggiorno, per il prototipo)
+  nightlyRates?: Record<string, number>; // data ISO -> prezzo di quella notte, da OTA (es. Booking.com manda il dettaglio notte per notte)
   note?: string;
   extId?: string; // id esterno (es. UID iCal/Octorate) per import idempotente
   cleaningFee?: number; // € pulizia finale

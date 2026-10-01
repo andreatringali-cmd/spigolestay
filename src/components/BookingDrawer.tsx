@@ -325,6 +325,19 @@ export default function BookingDrawer() {
         <div className="flex items-baseline justify-between gap-4"><span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span><span className="font-mono text-lg font-bold tabular-nums text-txt">{eur(totalV)}</span></div>
         <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Incassato")}</span><span className="font-mono text-sm font-semibold tabular-nums" style={{ color: "var(--ok)" }}>{eur(Math.max(0, totalV - balanceV))}</span></div>
         <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Saldo dovuto")}</span><span className="font-mono text-sm font-bold tabular-nums" style={{ color: balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span></div>
+        {booking.nightlyRates && (
+          <details className="mt-2 border-t border-line pt-2">
+            <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Dettaglio notte per notte")} ({t("da")} {CHANNELS[booking.channel]?.label ?? booking.channel})</summary>
+            <div className="mt-1.5 space-y-0.5">
+              {Array.from({ length: nights(booking.checkIn, booking.checkOut) }, (_, i) => shiftISO(booking.checkIn, i)).map((iso) => (
+                <div key={iso} className="flex items-baseline justify-between gap-4 text-xs">
+                  <span className="text-dim">{parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" })}</span>
+                  <span className="font-mono font-medium tabular-nums text-txt">{eur(booking.nightlyRates?.[iso] ?? 0)}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
       </div>
       {balanceV > 0 && (
         qa === "incasso"

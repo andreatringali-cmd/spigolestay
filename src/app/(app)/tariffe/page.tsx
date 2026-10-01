@@ -170,7 +170,7 @@ export default function TariffePage() {
           return (
             <td key={iso} className="border-l border-line px-2 py-2.5 text-center group-hover:bg-[color:color-mix(in_srgb,var(--focus)_5%,transparent)]" style={isToday ? { backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : we ? { backgroundColor: "var(--wash)" } : undefined}>
               {forced != null
-                ? <span className="font-mono text-sm font-bold tabular-nums text-txt" title={t("Tariffa forzata dal calendario")}>{dayPrice(rt, d)}<span className="ml-0.5">€</span></span>
+                ? <span className="font-mono text-sm tabular-nums text-txt" title={t("Tariffa forzata dal calendario")}>{dayPrice(rt, d)}<span className="ml-0.5">€</span></span>
                 : <span className="font-mono text-sm tabular-nums text-txt">{dayPrice(rt, d)}<span className="ml-0.5 text-dim">€</span></span>}
             </td>
           );
