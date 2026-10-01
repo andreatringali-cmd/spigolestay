@@ -34,6 +34,15 @@ const MANUAL_KEY = "spigolestay:reviews:manual";
 
 type ManualReview = NormalizedReview; // stessa forma; source ≠ "google"
 
+// Recensioni Booking.com/Airbnb/Expedia reali via Channex (Reviews Collection API) — stessa forma
+// restituita da /api/channex/reviews (vedi src/app/api/channex/reviews/route.ts).
+interface ChxReviewRow {
+  id: string; reviewId: string; guest: string; date: string; rating: number; text: string;
+  source: "booking" | "airbnb" | "expedia" | "other"; bucket: "pos" | "neu" | "neg";
+  isReplied: boolean; reply: string | null;
+}
+interface ChxStructureReviews { reviews: ChxReviewRow[]; notInstalled?: boolean; error?: string }
+
 const bucketOf = (r10: number): "pos" | "neu" | "neg" => (r10 >= 8 ? "pos" : r10 >= 6 ? "neu" : "neg");
 
 interface GoogleState {
@@ -62,6 +71,19 @@ export default function RecensioniPage() {
 
   const [google, setGoogle] = useState<GoogleState>({ loading: false, configured: null, reviews: [] });
   const [manual, setManual] = useState<ManualReview[]>([]);
+
+  // Recensioni Channex (Booking.com/Airbnb/Expedia reali) per struttura, caricate una volta:
+  // la route aggrega già tutte le property del tenant, non serve rifetchare al cambio struttura.
+  const [chx, setChx] = useState<{ off: boolean; byStructure: Record<string, ChxStructureReviews> }>({ off: false, byStructure: {} });
+  const [chxReplyBusy, setChxReplyBusy] = useState<Record<string, boolean>>({});
+  const [chxReplyErr, setChxReplyErr] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let alive = true;
+    apiPost<{ ok: boolean; byStructure?: Record<string, ChxStructureReviews> }>("channex/reviews", { action: "list" })
+      .then((j) => { if (!alive) return; setChx({ off: !j.ok, byStructure: j.byStructure ?? {} }); })
+      .catch(() => { if (!alive) return; setChx({ off: true, byStructure: {} }); });
+    return () => { alive = false; };
+  }, []);
 
   // --- Richiesta recensione post check-out -------------------------------------------------
   const [reqWindow, setReqWindow] = useState<number>(30); // finestra giorni dei check-out recenti
@@ -197,20 +219,82 @@ export default function RecensioniPage() {
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   }, [directReviews, selStructureId]);
 
-  // Insieme completo delle recensioni mostrate (Google reali + dirette reali + manuali).
+  // Recensioni Channex (Booking.com/Airbnb/Expedia reali) della struttura selezionata.
+  const chxRowsSel: ChxReviewRow[] = chx.byStructure[selStructureId]?.reviews ?? [];
+  const chxList: NormalizedReview[] = useMemo(() => {
+    return chxRowsSel
+      .filter((r) => r.source === "booking" || r.source === "airbnb" || r.source === "expedia")
+      .map((r) => ({ id: r.id, guest: r.guest, date: r.date, rating: r.rating, text: r.text, source: r.source as SourceKey, bucket: r.bucket }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chx.byStructure, selStructureId]);
+  // Stato Channex per una fonte OTA (null per Google/Diretta/Tripadvisor, non coperte da Channex):
+  // "mapped" = la struttura ha una property Channex collegata; "notInstalled" = manca l'app
+  // "Messages & Reviews" lato Channex (vedi channex.ts isReviewsNotInstalled).
+  const chxSourceInfo = (k: SourceKey): { mapped: boolean; notInstalled: boolean } | null => {
+    if (k !== "booking" && k !== "airbnb" && k !== "expedia") return null;
+    const c = chx.byStructure[selStructureId];
+    if (!c) return { mapped: false, notInstalled: false };
+    return { mapped: true, notInstalled: !!c.notInstalled };
+  };
+  // Nota mostrata nella card della fonte: reale se Channex è collegato, altrimenti il testo
+  // originale "collegamento partner in arrivo · manuale".
+  const noteFor = (s: typeof SOURCES[number]): string => {
+    const info = chxSourceInfo(s.k);
+    if (!info) return s.note;
+    if (info.notInstalled) return 'Channex è collegato, ma l\'app "Messages & Reviews" non è ancora installata per questa struttura (Channex → Applications). Nel frattempo: inserimento manuale.';
+    if (info.mapped) return "Recensioni reali importate automaticamente via Channex.";
+    return s.note;
+  };
+  const chxBadgeOn = (k: SourceKey) => { const info = chxSourceInfo(k); return !!info?.mapped && !info.notInstalled; };
+
+  // Insieme completo delle recensioni mostrate (Google reali + Channex reali + dirette reali + manuali).
   type Review = NormalizedReview;
   const reviews: Review[] = useMemo(() => {
     const g = placeId && google.configured ? google.reviews : [];
-    return [...g, ...directList, ...manualReviews];
-  }, [google.reviews, google.configured, placeId, directList, manualReviews]);
+    return [...g, ...chxList, ...directList, ...manualReviews];
+  }, [google.reviews, google.configured, placeId, chxList, directList, manualReviews]);
 
   const connectedSources = useMemo(() => {
     const set = new Set<SourceKey>();
     if (googleConnected) set.add("google");
+    for (const r of chxList) set.add(r.source as SourceKey);
     for (const r of directList) set.add(r.source as SourceKey);
     for (const r of manualReviews) set.add(r.source as SourceKey);
     return SOURCES.filter((s) => set.has(s.k)).map((s) => s.k);
-  }, [googleConnected, directList, manualReviews]);
+  }, [googleConnected, chxList, directList, manualReviews]);
+
+  // Precarica nel pannello risposte le risposte GIÀ pubblicate su Channex (Booking/Airbnb/Expedia),
+  // così compaiono come "La tua risposta" invece di un form vuoto.
+  useEffect(() => {
+    const withReply = chxRowsSel.filter((r) => r.reply && r.reply.trim());
+    if (!withReply.length) return;
+    setReplies((prev) => {
+      let changed = false; const n = { ...prev };
+      for (const r of withReply) if (n[r.id] === undefined) { n[r.id] = r.reply!; changed = true; }
+      return changed ? n : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chx.byStructure, selStructureId]);
+
+  // Pubblica DAVVERO una risposta su Booking.com/Airbnb/Expedia tramite Channex (POST /reviews/:id/reply).
+  // Se l'app "Messages & Reviews" non è installata su Channex, l'errore spiega cosa fare invece di fallire muto.
+  const publishChxReply = async (r: Review) => {
+    const t = (draft[r.id] ?? "").trim();
+    const row = chxRowsSel.find((x) => x.id === r.id);
+    if (!t || !row) return;
+    setChxReplyBusy((b) => ({ ...b, [r.id]: true }));
+    setChxReplyErr((e) => ({ ...e, [r.id]: "" }));
+    try {
+      const j = await apiPost<{ ok: boolean; error?: string }>("channex/reviews", { action: "reply", structureId: selStructureId, reviewId: row.reviewId, text: t });
+      if (j.ok) persistReplies({ ...replies, [r.id]: t });
+      else setChxReplyErr((e) => ({ ...e, [r.id]: j.error || "Invio non riuscito" }));
+    } catch (e) {
+      setChxReplyErr((e2) => ({ ...e2, [r.id]: e instanceof Error ? e.message : "errore di rete" }));
+    } finally {
+      setChxReplyBusy((b) => ({ ...b, [r.id]: false }));
+    }
+  };
+  const isChx = (r: Review) => r.id.startsWith("chx-");
 
   // Precarica nel pannello risposte le risposte GIÀ pubblicate sulle recensioni dirette,
   // così compaiono come "La tua risposta" (fonte di verità = campo reply della recensione).
@@ -548,14 +632,15 @@ export default function RecensioniPage() {
         {SOURCES.map((s) => {
           const on = connectedSources.includes(s.k);
           const isGoogle = s.k === "google";
+          const showConnectedBadge = isGoogle || chxBadgeOn(s.k);
           return (
             <button key={s.k} onClick={() => (isGoogle ? setCfgOpen(true) : setSrcCfg(s.k))} className="group relative flex items-center gap-3 rounded-xl border p-3 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[color:var(--focus)] hover:bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus)] active:translate-y-0" style={{ borderColor: on ? s.color : "var(--line)" }} title="Apri impostazioni">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white transition-transform duration-200 group-hover:scale-110" style={{ backgroundColor: s.color }}>{s.label[0]}</span>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-txt">{s.label}</div>
-                <div className="truncate text-[11px] text-faint">{s.note}</div>
+                <div className="truncate text-[11px] text-faint">{noteFor(s)}</div>
               </div>
-              {isGoogle ? (
+              {showConnectedBadge ? (
                 <span className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition group-hover:opacity-0" style={on ? { backgroundColor: "var(--ok)", color: "#fff" } : { border: "1px solid var(--line)", color: "var(--dim)" }}>{on ? "Collegato" : "Configura"}</span>
               ) : (
                 <span className="shrink-0 rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-faint transition group-hover:opacity-0">Impostazioni</span>
@@ -584,7 +669,11 @@ export default function RecensioniPage() {
             <div className="mt-3 rounded-lg border border-line bg-wash p-3 text-[13px] text-dim">
               {srcCfg === "direct"
                 ? "Gli ospiti lasciano le recensioni dal tuo mini-sito (Xenosite): le trovi qui sotto la fonte «Diretta». Sono dati tuoi, quindi puoi rispondere e — con «Pubblica risposta» — la risposta compare davvero sul mini-sito. Puoi anche aggiungerne una a mano."
-                : `${SRC[srcCfg].label} non espone un'API pubblica self-service per le recensioni: il collegamento avverrà tramite connettore partner (in arrivo). Nel frattempo puoi inserire le recensioni a mano — restano salvate e rientrano in media, distribuzione e risposte AI.`}
+                : chxSourceInfo(srcCfg)?.notInstalled
+                ? `Channex è collegato, ma l'app "Messages & Reviews" non è ancora installata su Channex per questa struttura (dashboard Channex → Applications). Una volta installata, le recensioni ${SRC[srcCfg].label} arriveranno qui in automatico. Nel frattempo puoi inserirle a mano.`
+                : chxSourceInfo(srcCfg)?.mapped
+                ? `${SRC[srcCfg].label} è collegato automaticamente via Channex: le recensioni reali vengono importate qui sotto, e puoi rispondere direttamente da qui (la risposta viene inviata davvero su ${SRC[srcCfg].label}). Puoi comunque aggiungerne una a mano per i casi non coperti dall'importazione.`
+                : `${SRC[srcCfg].label} non espone un'API pubblica self-service per le recensioni: il collegamento avverrà tramite connettore partner (in arrivo, oppure configurando Channex). Nel frattempo puoi inserire le recensioni a mano — restano salvate e rientrano in media, distribuzione e risposte AI.`}
             </div>
 
             {srcCfg === "direct" ? (
@@ -592,7 +681,7 @@ export default function RecensioniPage() {
             ) : (
               <>
                 <button onClick={() => { setMForm((f) => ({ ...f, source: srcCfg })); setShowManual(true); setSrcCfg(null); }} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90">＋ Aggiungi recensione {SRC[srcCfg].label} a mano</button>
-                <p className="mt-2 text-center text-[11px] text-faint">Il connettore automatico {SRC[srcCfg].label} arriverà con le integrazioni partner.</p>
+                {!chxSourceInfo(srcCfg)?.mapped && <p className="mt-2 text-center text-[11px] text-faint">Il connettore automatico {SRC[srcCfg].label} arriva collegando Channex (pagina Canali), oppure con le integrazioni partner.</p>}
               </>
             )}
           </div>
@@ -659,6 +748,7 @@ export default function RecensioniPage() {
               <span className="text-sm" style={{ color: color(r.bucket) }}>{star(r.rating)}</span>
               <span className="font-mono text-sm text-dim">{r.rating}/10</span>
               {r.id.startsWith("manual-") && <span className="rounded-full border border-line px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">manuale</span>}
+              {isChx(r) && <span className="rounded-full border border-line px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint" title="Importata automaticamente da Channex">via Channex</span>}
               <span className="ml-auto text-xs text-faint">{fmt(r.date)}</span>
               {r.id.startsWith("manual-") && <button onClick={() => removeManual(r.id)} className="text-faint hover:text-[color:var(--err)]" title="Elimina recensione manuale"><Icon name="trash" size={14} /></button>}
             </div>
@@ -668,21 +758,25 @@ export default function RecensioniPage() {
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   {r.source === "google" && <button onClick={() => publishOnGoogle(r.id)} className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-surface" title="Copia la risposta e apri la gestione recensioni di Google">📋 Copia e rispondi su Google →</button>}
                   {r.source === "direct" && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title="La risposta è pubblicata sul tuo mini-sito">✓ Pubblicata sul mini-sito</span>}
+                  {isChx(r) && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title={`La risposta è stata inviata su ${SRC[r.source as SourceKey]?.label} tramite Channex`}>✓ Pubblicata su {SRC[r.source as SourceKey]?.label}</span>}
                   <button onClick={() => removeReply(r)} className="text-[11px] text-faint hover:text-[color:var(--err)]">Rimuovi</button>
                 </div>
               </div>
             ) : (
               <div className="mt-2">
                 <textarea value={draft[r.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [r.id]: e.target.value }))} rows={2} placeholder="Scrivi una risposta…" className="w-full resize-y rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" />
-                <div className="mt-1.5 flex flex-wrap gap-2">
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
                   <button onClick={() => aiReply(r)} disabled={!!aiBusy[r.id]} className="flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-50"><Icon name="sparkles" size={13} /> {aiBusy[r.id] ? "Scrivo…" : "Suggerisci risposta AI"}</button>
-                  {r.source === "google" ? (
+                  {isChx(r) ? (
+                    <button onClick={() => publishChxReply(r)} disabled={!(draft[r.id] ?? "").trim() || !!chxReplyBusy[r.id]} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title={`Invia la risposta su ${SRC[r.source as SourceKey]?.label} tramite Channex`}>{chxReplyBusy[r.id] ? "Invio…" : "Pubblica risposta"}</button>
+                  ) : r.source === "google" ? (
                     <button onClick={() => publishGoogleFromDraft(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="inline-flex items-center gap-1 rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title="Copia la risposta e apri la gestione recensioni di Google (Google non consente la pubblicazione via API)">📋 Copia e rispondi su Google →</button>
                   ) : r.source === "direct" ? (
                     <button onClick={() => publishDirect(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title="Pubblica la risposta sul tuo mini-sito">Pubblica risposta</button>
                   ) : (
                     <button onClick={() => saveLocalReply(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title="Salva la risposta (solo in locale, per tua memoria)">Salva risposta</button>
                   )}
+                  {isChx(r) && chxReplyErr[r.id] && <span className="text-[11px] text-[color:var(--err)]">{chxReplyErr[r.id]}</span>}
                 </div>
               </div>
             )}
@@ -700,7 +794,7 @@ export default function RecensioniPage() {
         {reviews.length > 0 && shown.length === 0 && <Card className="py-8 text-center text-sm text-faint">Nessuna recensione per questa fonte.</Card>}
       </div>
 
-      <p className="mt-3 text-[11px] text-faint">Google è collegato via Google Places API (recensioni reali, ~5 più recenti). Le recensioni <strong>Dirette</strong> le lasciano gli ospiti dal tuo mini-sito e qui puoi rispondere e pubblicare davvero la risposta. Le altre fonti (Booking, Airbnb, Expedia, Tripadvisor) avranno il collegamento partner: nel frattempo puoi inserirle a mano.</p>
+      <p className="mt-3 text-[11px] text-faint">Google è collegato via Google Places API (recensioni reali, ~5 più recenti). Le recensioni <strong>Dirette</strong> le lasciano gli ospiti dal tuo mini-sito e qui puoi rispondere e pubblicare davvero la risposta. <strong>Booking.com, Airbnb ed Expedia</strong> si importano automaticamente quando Channex è collegato (serve l&apos;app &quot;Messages &amp; Reviews&quot; installata su Channex); <strong>Tripadvisor</strong> non è coperto e resta a inserimento manuale.</p>
     </div>
   );
 }

@@ -303,6 +303,62 @@ export async function sendBookingMessage(channexBookingId: string, text: string)
   });
 }
 
+// ── Recensioni (Reviews Collection API: Booking.com/Airbnb/Expedia unificate) ──
+// Richiede la STESSA app "Messages & Reviews" installata per property in Channex (dashboard →
+// Applications) già richiesta sopra dai Messaggi: "Add the Messages & Reviews app to the
+// property, then the API and UI for reviews will be available" (doc ufficiale Channex). Senza,
+// le chiamate rispondono 403 con un messaggio tipo "Property is not have installed Messages
+// Application" — lo intercettiamo in isReviewsNotInstalled() per mostrare un avviso chiaro
+// invece di un elenco vuoto o un crash. Non copre Tripadvisor (resta a inserimento manuale).
+export interface ChxReviewScore { category?: string; score?: number }
+export interface ChxReview {
+  id: string;
+  content?: string;
+  guest_name?: string;
+  overall_score?: number; // 0..10
+  scores?: ChxReviewScore[];
+  ota?: string; // "AirBNB" | "BookingCom" | "Expedia"
+  ota_reservation_id?: string;
+  received_at?: string;
+  inserted_at?: string;
+  is_replied?: boolean;
+  reply?: string | null;
+  is_hidden?: boolean; // Airbnb
+  tags?: string[]; // Airbnb
+}
+function flattenReview(row: unknown): ChxReview {
+  const r = row as { id?: string; attributes?: Record<string, unknown> } & Record<string, unknown>;
+  const a = (r.attributes ?? r) as Record<string, unknown>;
+  return { id: String(r.id ?? a.id ?? ""), ...(a as object) } as ChxReview;
+}
+// true se l'errore indica che l'app "Messages & Reviews" non è installata su questa property
+// (403 dedicato) — distinto da un errore di rete/altro, per mostrare un avviso azionabile.
+export function isReviewsNotInstalled(status: number, error?: string): boolean {
+  if (status === 403) return true;
+  return /messages application|not have installed/i.test(error || "");
+}
+export async function listReviews(propertyId: string) {
+  const res = await channex<{ data?: unknown[] }>(`/reviews?filter[property_id]=${encodeURIComponent(propertyId)}`);
+  if (!res.ok) return { ok: false as const, status: res.status, error: res.error, reviews: [] as ChxReview[] };
+  const list = Array.isArray(res.data?.data) ? res.data!.data! : [];
+  return { ok: true as const, status: res.status, reviews: list.map(flattenReview) };
+}
+export interface ChxPropertyScore { overall_score?: number; count?: number; scores?: Record<string, { count?: number; score?: number }> }
+export async function getPropertyScores(propertyId: string) {
+  const res = await channex<{ data?: unknown }>(`/scores/${encodeURIComponent(propertyId)}`);
+  if (!res.ok) return { ok: false as const, status: res.status, error: res.error, score: undefined as ChxPropertyScore | undefined };
+  const row = res.data?.data as { attributes?: Record<string, unknown> } | undefined;
+  return { ok: true as const, status: res.status, score: (row?.attributes ?? row) as ChxPropertyScore | undefined };
+}
+// Risponde a una recensione (Booking.com/Airbnb/Expedia) via Channex. Corpo verificato sulla
+// documentazione ufficiale: { reply: { reply: "testo" } } (il campo interno si chiama "reply").
+export async function replyToReview(reviewId: string, text: string) {
+  return channex<{ data?: unknown }>(`/reviews/${encodeURIComponent(reviewId)}/reply`, {
+    method: "POST",
+    body: JSON.stringify({ reply: { reply: text } }),
+  });
+}
+
 // ── Collegamento canali OTA (self-service) ──
 // Channex espone un "one-time token" da scambiare per aprire, in un iframe, la SUA interfaccia di
 // collegamento/mappatura canali (Booking.com, Airbnb, Expedia, ...): è l'unico modo per collegare
