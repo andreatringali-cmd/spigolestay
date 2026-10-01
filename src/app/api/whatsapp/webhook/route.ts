@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { parseNotifPrefs } from "@/lib/notifPrefs";
+import { AI_CONCIERGE_KEY, parseAiConciergePrefs } from "@/lib/aiConcierge";
+import { getConciergeReply } from "@/lib/ai/guest-concierge";
+import { sendWhatsapp } from "@/lib/whatsapp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,7 +60,7 @@ async function applyIncoming(admin: SupabaseClient<any>, tenantId: string, fromD
     let threads: Record<string, Msg[]> = {};
     try { threads = JSON.parse(blob[THREADS_KEY] || "{}"); } catch { threads = {}; }
 
-    const guests = (Array.isArray(data.guests) ? data.guests : []) as { id: string; fullName?: string; phone?: string }[];
+    const guests = (Array.isArray(data.guests) ? data.guests : []) as { id: string; fullName?: string; phone?: string; language?: string }[];
     // Confronto sulle ultime 9 cifre: i numeri salvati a mano spesso hanno/non hanno prefisso internazionale.
     const guest = guests.find((g) => { const d = (g.phone || "").replace(/\D/g, ""); return d.length >= 6 && d.slice(-9) === fromDigits.slice(-9); });
     const key = guest?.id || `wa:${fromDigits}`;
@@ -68,10 +72,119 @@ async function applyIncoming(admin: SupabaseClient<any>, tenantId: string, fromD
     let write = admin.from("app_state").update({ data: blob, updated_at: new Date().toISOString() }).eq("user_id", tenantId);
     if (rev !== null) write = write.eq("rev", rev);
     const { data: updated } = await write.select("rev");
-    if (updated && updated.length > 0) return { ok: true, guestName: guest?.fullName, notifPrefsRaw: blob["spigolestay:notifs"], structures: data.structures };
+    if (updated && updated.length > 0) {
+      return {
+        ok: true,
+        guestName: guest?.fullName,
+        notifPrefsRaw: blob["spigolestay:notifs"],
+        aiConciergeRaw: blob[AI_CONCIERGE_KEY],
+        structures: data.structures,
+        bookings: data.bookings,
+        units: data.units,
+        roomTypes: data.roomTypes,
+        guest,
+        threadKey: key,
+        priorMessages: list,
+      };
+    }
     // Conflitto di rev: un altro processo ha scritto nel mentre, riprova una volta.
   }
   return { ok: false };
+}
+
+interface StLite { id: string; name?: string; address?: string; checkInFrom?: string; checkInTo?: string; checkOutBy?: string; accessInfo?: string; services?: string[] }
+interface UnitLite { id: string; structureId: string; roomTypeId: string; accessInfo?: string }
+interface RoomTypeLite { id: string; amenities?: string[] }
+interface BookingLite { id: string; structureId: string; unitId: string | null; roomTypeId: string; guestId: string; checkIn: string; checkOut: string; status?: string; channel?: string }
+
+// Concierge AI — risposta AUTOMATICA via WhatsApp a domande di routine semplicissime (orario
+// check-in/check-out, wifi, parcheggio, indicazioni stradali), SOLO se l'host ha attivato il
+// toggle "Concierge AI" in Impostazioni (src/lib/aiConcierge.ts, default SPENTO) e l'AI è sicura
+// della risposta (src/lib/ai/guest-concierge.ts). Fire-and-forget: non deve MAI ritardare né far
+// fallire il salvataggio del messaggio dell'ospite in applyIncoming(), che è già completato quando
+// questa funzione viene chiamata. Chiamata solo per messaggi NUOVI (vedi guardia su notifPrefsRaw
+// nel POST qui sotto), quindi un retry di Meta sullo stesso messaggio non genera una doppia risposta.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: {
+  aiConciergeRaw?: string;
+  fromDigits: string;
+  text: string;
+  guestName?: string;
+  guest?: { id: string; fullName?: string; language?: string };
+  structures?: unknown;
+  bookings?: unknown;
+  units?: unknown;
+  roomTypes?: unknown;
+  threadKey: string;
+  priorMessages: Msg[];
+}) {
+  try {
+    const prefs = parseAiConciergePrefs(info.aiConciergeRaw);
+    if (!prefs.enabled) return; // interruttore spento (default): nessuna risposta automatica
+
+    const structures = (Array.isArray(info.structures) ? info.structures : []) as StLite[];
+    const bookingsArr = (Array.isArray(info.bookings) ? info.bookings : []) as BookingLite[];
+    const units = (Array.isArray(info.units) ? info.units : []) as UnitLite[];
+    const roomTypes = (Array.isArray(info.roomTypes) ? info.roomTypes : []) as RoomTypeLite[];
+
+    // Risale alla struttura: prenotazione più recente dell'ospite (se esiste), altrimenti — solo
+    // se il gestore ha UNA sola struttura — quella, per non rischiare di citare dati sbagliati.
+    let st: StLite | undefined;
+    let unit: UnitLite | undefined;
+    let roomType: RoomTypeLite | undefined;
+    if (info.guest?.id) {
+      const myBookings = bookingsArr.filter((b) => b.guestId === info.guest!.id && b.status !== "cancelled").sort((a, b) => (a.checkIn < b.checkIn ? 1 : -1));
+      const b = myBookings[0];
+      if (b) {
+        st = structures.find((s) => s.id === b.structureId);
+        unit = units.find((u) => u.id === b.unitId) || undefined;
+        roomType = roomTypes.find((r) => r.id === b.roomTypeId) || undefined;
+      }
+    }
+    if (!st && structures.length === 1) st = structures[0];
+    if (!st) return; // nessun contesto struttura affidabile → nessuna risposta automatica
+
+    const accessInfo = [unit?.accessInfo, st.accessInfo].filter(Boolean).join(" · ") || undefined;
+    const hasParking = (st.services ?? []).some((s) => /parcheggi/i.test(s)) || (roomType?.amenities ?? []).some((a) => /parcheggi/i.test(a)) || undefined;
+    const transcript = (info.priorMessages || []).slice(-8).filter((m) => m.text?.trim())
+      .map((m) => `${m.dir === "out" ? "Struttura" : "Ospite"}: ${m.text.replace(/\s+/g, " ").trim()}`).join("\n") || undefined;
+
+    const outcome = await getConciergeReply({
+      guestName: info.guestName,
+      lang: info.guest?.language,
+      structureName: st.name,
+      address: st.address,
+      checkInFrom: st.checkInFrom,
+      checkInTo: st.checkInTo,
+      checkOutBy: st.checkOutBy,
+      accessInfo,
+      hasParking,
+      transcript,
+      lastGuestMessage: info.text,
+    });
+    if (!outcome.ok || !outcome.result.canAnswer || !outcome.result.reply) return;
+
+    const sent = await sendWhatsapp(admin, tenantId, { to: info.fromDigits, text: outcome.result.reply });
+    if (!sent.ok) return;
+
+    // Stesso pattern rev-lock + retry di applyIncoming, per appendere la risposta AI al thread.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const { data: row } = await admin.from("app_state").select("data, rev").eq("user_id", tenantId).maybeSingle();
+      const blob = ((row?.data ?? {}) as Record<string, string>) || {};
+      const rev = typeof (row as { rev?: number } | null)?.rev === "number" ? (row as { rev: number }).rev : null;
+      let threads: Record<string, Msg[]> = {};
+      try { threads = JSON.parse(blob[THREADS_KEY] || "{}"); } catch { threads = {}; }
+      const list = threads[info.threadKey] ?? [];
+      threads[info.threadKey] = [...list, { id: randomUUID(), dir: "out", text: outcome.result.reply, ts: Date.now(), via: "🤖 Concierge AI" }];
+      blob[THREADS_KEY] = JSON.stringify(threads);
+
+      let write = admin.from("app_state").update({ data: blob, updated_at: new Date().toISOString() }).eq("user_id", tenantId);
+      if (rev !== null) write = write.eq("rev", rev);
+      const { data: updated } = await write.select("rev");
+      if (updated && updated.length > 0) return;
+      // Conflitto di rev: un altro processo (es. l'host che risponde nel mentre) ha scritto, riprova una volta.
+    }
+  } catch (e) { console.error("[whatsapp webhook concierge]", e); }
 }
 
 export async function POST(req: Request) {
@@ -118,6 +231,22 @@ export async function POST(req: Request) {
                 }
               }
             } catch {}
+
+            // Concierge AI — SOLO per messaggi davvero nuovi (notifPrefsRaw è assente sui retry di
+            // Meta/duplicati, vedi applyIncoming). Fire-and-forget: non blocca la risposta 200 al webhook.
+            tryAutoReply(admin, tenantId, {
+              aiConciergeRaw: res.aiConciergeRaw as string | undefined,
+              fromDigits,
+              text,
+              guestName: res.guestName,
+              guest: res.guest as { id: string; fullName?: string; language?: string } | undefined,
+              structures: res.structures,
+              bookings: res.bookings,
+              units: res.units,
+              roomTypes: res.roomTypes,
+              threadKey: res.threadKey as string,
+              priorMessages: (res.priorMessages as Msg[]) || [],
+            }).catch(() => {});
           }
         }
       }

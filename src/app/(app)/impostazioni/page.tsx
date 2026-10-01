@@ -36,6 +36,10 @@ export default function ImpostazioniPage() {
   const [notifs, setNotifs] = useState(NOTIF_DEF);
   useEffect(() => { setNotifs(loadNotifPrefs()); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const setNotif = (k: keyof typeof NOTIF_DEF, v: boolean) => setNotifs((p) => { const n = { ...p, [k]: v }; try { localStorage.setItem(NOTIF_KEY, JSON.stringify(n)); } catch {} return n; });
+  // Concierge AI (risposta automatica WhatsApp alle domande semplici) — default SPENTO, vedi src/lib/aiConcierge.ts.
+  const [aiConcierge, setAiConciergeState] = useState(AI_CONCIERGE_DEF);
+  useEffect(() => { setAiConciergeState(loadAiConciergePrefs()); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  const setAiConciergeEnabled = (v: boolean) => setAiConciergeState((p) => { const n = { ...p, enabled: v }; try { localStorage.setItem(AI_CONCIERGE_KEY, JSON.stringify(n)); } catch {} return n; });
   const ask = useConfirm();
 
   // Sync Google Calendar in TEMPO REALE: Xenora scrive/cancella direttamente gli eventi sul
@@ -192,6 +196,13 @@ export default function ImpostazioniPage() {
           <Toggle label={t("Messaggi degli ospiti")} checked={notifs.message} onChange={(v) => setNotif("message", v)} />
           <Toggle label={t("Promemoria pulizie")} checked={notifs.cleaning} onChange={(v) => setNotif("cleaning", v)} />
         </div>
+      </Card>
+
+      {/* Concierge AI — risposta automatica WhatsApp alle domande semplici, default SPENTO */}
+      <Card className="mt-4">
+        <SectionTitle>{t("Concierge AI 🤖")}</SectionTitle>
+        <p className="mb-3 text-xs text-dim">{t("Se attivo, risponde IN AUTOMATICO su WhatsApp solo alle domande semplici (orario check-in, wifi, parcheggio, indicazioni stradali) quando è sicura della risposta: per tutto il resto — reclami, richieste economiche o qualunque dubbio — lascia il messaggio a te, come oggi.")}</p>
+        <Toggle label={t("Risposta automatica alle domande semplici")} checked={aiConcierge.enabled} onChange={setAiConciergeEnabled} />
       </Card>
 
       <Card className="mt-4">
