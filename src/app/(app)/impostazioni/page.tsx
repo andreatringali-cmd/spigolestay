@@ -39,7 +39,7 @@ export default function ImpostazioniPage() {
 
   // Sync Google Calendar in TEMPO REALE: Xenora scrive/cancella direttamente gli eventi sul
   // calendario Google che l'utente condivide col service account (vedi googleCalendarSync.ts).
-  const { structures, updateStructure, activeStructureId } = useData();
+  const { structures, updateStructure, activeStructureId, bookings, guests, units, roomTypes } = useData();
   const [gcalInfo, setGcalInfo] = useState<{ configured: boolean; serviceAccountEmail: string | null } | null>(null);
   useEffect(() => {
     apiPost<{ ok: boolean; configured: boolean; serviceAccountEmail: string | null }>("calendar/gcal-info", {})
@@ -57,6 +57,38 @@ export default function ImpostazioniPage() {
   const [gcalCopied, setGcalCopied] = useState(false);
   const saveGcalId = () => { if (gcalStructId) updateStructure(gcalStructId, { gcalId: extractCalendarId(gcalIdInput) || undefined, updatedAt: Date.now() }); };
   const copyServiceEmail = () => { if (gcalInfo?.serviceAccountEmail) { navigator.clipboard?.writeText(gcalInfo.serviceAccountEmail); setGcalCopied(true); setTimeout(() => setGcalCopied(false), 1500); } };
+
+  // La sync scrive solo le prenotazioni create/modificate/cancellate DA ORA IN POI (vedi
+  // store.tsx): collegare un calendario a una struttura che ha già prenotazioni non le fa
+  // comparire da sole. Questo pulsante fa una tantum il "riporto" di quelle esistenti.
+  const [gcalSyncing, setGcalSyncing] = useState(false);
+  const [gcalSyncMsg, setGcalSyncMsg] = useState<{ text: string; err?: boolean } | null>(null);
+  const syncExistingNow = async () => {
+    const calendarId = extractCalendarId(gcalIdInput);
+    if (!gcalStructId || !calendarId) return;
+    const toSync = bookings.filter((b) => b.structureId === gcalStructId && b.status !== "cancelled" && b.channel !== "blocked");
+    setGcalSyncing(true); setGcalSyncMsg(null);
+    let ok = 0; let firstError = "";
+    for (const b of toSync) {
+      const g = guests.find((x) => x.id === b.guestId);
+      const unit = units.find((u) => u.id === b.unitId);
+      const rt = roomTypes.find((r) => r.id === (unit?.roomTypeId ?? b.roomTypeId));
+      const roomLabel = [rt?.name, unit?.name].filter(Boolean).join(" · ");
+      const summary = [g?.fullName || "Ospite", roomLabel].filter(Boolean).join(" — ");
+      const description = [b.code && `Codice: ${b.code}`, b.channel && `Canale: ${b.channel}`].filter(Boolean).join(" · ");
+      try {
+        const r = await apiPost<{ ok: boolean; error?: string }>("calendar/sync-event", {
+          action: "upsert", bookingId: b.id, calendarId, summary, description,
+          startDate: b.checkIn, endDateExclusive: b.checkOut,
+        });
+        if (r.ok) ok++; else if (!firstError) firstError = r.error || "errore sconosciuto";
+      } catch (e) { if (!firstError) firstError = e instanceof Error ? e.message : "errore sconosciuto"; }
+    }
+    setGcalSyncing(false);
+    if (!toSync.length) setGcalSyncMsg({ text: t("Nessuna prenotazione da sincronizzare per questa struttura.") });
+    else if (ok === toSync.length) setGcalSyncMsg({ text: `${t("Fatto")}: ${ok}/${toSync.length} ${t("prenotazioni scritte sul calendario.")}` });
+    else setGcalSyncMsg({ text: `${ok}/${toSync.length} ${t("scritte")} — ${t("errore")}: ${firstError}`, err: true });
+  };
 
   // Backup: esporta/importa tutte le chiavi "spigolestay:*".
   const fileRef = useRef<HTMLInputElement>(null);
@@ -163,7 +195,14 @@ export default function ImpostazioniPage() {
                 <button onClick={saveGcalId} disabled={!gcalStructId} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Salva")}</button>
               </div>
             </label>
-            {gcalStruct?.gcalId && <p className="mt-2 text-xs font-medium" style={{ color: "var(--ok)" }}>✓ {t("Attivo per")} {gcalStruct.name}</p>}
+            {gcalStruct?.gcalId && (
+              <>
+                <p className="mt-2 text-xs font-medium" style={{ color: "var(--ok)" }}>✓ {t("Attivo per")} {gcalStruct.name}</p>
+                <p className="mt-2 text-xs text-dim">{t("Attiva da ora in poi: le prenotazioni già esistenti non compaiono da sole finché non cambiano. Per scriverle subito tutte una volta sola:")}</p>
+                <button onClick={syncExistingNow} disabled={gcalSyncing} className="mt-1.5 rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-50">{gcalSyncing ? t("Sincronizzo…") : t("Sincronizza ora le prenotazioni esistenti")}</button>
+                {gcalSyncMsg && <p className="mt-1.5 text-xs font-medium" style={{ color: gcalSyncMsg.err ? "var(--err)" : "var(--ok)" }}>{gcalSyncMsg.text}</p>}
+              </>
+            )}
           </>
         )}
       </Card>
