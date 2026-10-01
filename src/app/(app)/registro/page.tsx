@@ -15,9 +15,11 @@ const META: Record<ActivityType, { label: string; color: string }> = {
   move: { label: "Spostamento", color: "#5E7C8B" },
   event: { label: "Evento", color: "#7C4DD6" },
   rate: { label: "Tariffe", color: "#C08A3A" },
+  rateplan: { label: "Piano tariffario", color: "#B8860B" },
   quote: { label: "Preventivo", color: "#2C8A8A" },
   payment: { label: "Pagamento", color: "#4F46E5" },
   login: { label: "Accesso", color: "#957A66" },
+  auth: { label: "Sicurezza account", color: "#957A66" },
   message: { label: "Messaggio", color: "#25A0A0" },
   config: { label: "Configurazione", color: "#5E7C8B" },
 };

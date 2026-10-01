@@ -65,7 +65,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 export default function PianiTariffariPage() {
-  const { structures, roomTypes, activeStructureId } = useData();
+  const { structures, roomTypes, activeStructureId, addActivity } = useData();
   const [localStructure, setLocalStructure] = useState<string>("all");
   const effStructure = activeStructureId !== "all" ? activeStructureId : localStructure;
   const ask = useConfirm();
@@ -89,9 +89,26 @@ export default function PianiTariffariPage() {
   }, []);
   const savePlans = (next: RatePlan[]) => { setPlans(next); try { localStorage.setItem(PLANS_KEY, JSON.stringify(next)); } catch {} };
   const setView2 = (v: "list" | "cards") => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch {} };
-  const upsert = (p: RatePlan) => savePlans(plans.some((x) => x.id === p.id) ? plans.map((x) => (x.id === p.id ? p : x)) : [...plans, p]);
-  const setPlan = (id: string, patch: Partial<RatePlan>) => savePlans(plans.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-  const delPlan = async (id: string) => { if (!(await ask({ message: t("Eliminare questo piano tariffario?"), danger: true, confirmLabel: t("Elimina") }))) return; savePlans(plans.filter((p) => p.id !== id)); };
+  // Unico punto di scrittura dei piani tariffari (qui finiscono sia la creazione sia ogni
+  // modifica dal modale): registriamo qui, una volta sola, "creato" o "modificato".
+  const upsert = (p: RatePlan) => {
+    const isNew = !plans.some((x) => x.id === p.id);
+    savePlans(isNew ? [...plans, p] : plans.map((x) => (x.id === p.id ? p : x)));
+    addActivity("rateplan", `Piano tariffario ${isNew ? "creato" : "modificato"} — ${p.name}`);
+  };
+  const setPlan = (id: string, patch: Partial<RatePlan>) => {
+    savePlans(plans.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+    if ("enabled" in patch) {
+      const p = plans.find((x) => x.id === id);
+      if (p) addActivity("rateplan", `Piano tariffario ${patch.enabled ? "attivato" : "sospeso"} — ${p.name}`);
+    }
+  };
+  const delPlan = async (id: string) => {
+    if (!(await ask({ message: t("Eliminare questo piano tariffario?"), danger: true, confirmLabel: t("Elimina") }))) return;
+    const p = plans.find((x) => x.id === id);
+    savePlans(plans.filter((p) => p.id !== id));
+    if (p) addActivity("rateplan", `Piano tariffario eliminato — ${p.name}`);
+  };
   const addPlan = () => { const p: RatePlan = { id: uid(), name: t("Nuovo piano"), adjPct: 0, refundable: true, board: "Solo pernottamento", minStay: 1, enabled: true, deposit: "none" }; upsert(p); setEditId(p.id); };
 
   const types = roomTypes.filter((rt) => effStructure === "all" || rt.structureId === effStructure);

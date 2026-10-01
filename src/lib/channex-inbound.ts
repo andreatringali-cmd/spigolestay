@@ -20,6 +20,17 @@ type Unit = { id: string; roomTypeId: string; structureId?: string; outOfService
 const overlaps = (b: { checkIn: string; checkOut: string }, ci: string, co: string) => b.checkIn < co && b.checkOut > ci;
 const uid = () => (globalThis.crypto?.randomUUID?.() ?? `x_${Date.now()}_${Math.random().toString(36).slice(2)}`);
 
+// Registro attività: questo import gira SERVER-SIDE (nessun accesso al DataProvider del client),
+// ma scrive nello stesso blob (data.activities) che il client legge/salva in store.tsx — stessa
+// forma di Activity, stesso limite di 500 voci. Così le prenotazioni in entrata automatiche da
+// Channex (il caso "prenotazioni in entrata" che addBooking lato client non può vedere) compaiono
+// comunque nel Registro attività dell'app alla prossima apertura/sync.
+type InboundActivity = { id: string; ts: number; type: string; text: string };
+function pushActivity(data: Json, type: string, text: string) {
+  const prev = (Array.isArray(data.activities) ? data.activities : []) as InboundActivity[];
+  data.activities = [{ id: uid(), ts: Date.now(), type, text }, ...prev].slice(0, 500);
+}
+
 export interface ChannexMapRow { channex_property_id: string; tenant_id: string; structure_id: string; rooms: Record<string, string>; org_id?: string | null }
 
 // Salva/aggiorna la mappatura Channex↔Xenora per una struttura (chiamata dopo il sync/relink).
@@ -223,8 +234,10 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       const prevIdx = bookings.map((b, i) => (b.extId && candidates.has(b.extId) ? i : -1)).filter((i) => i >= 0);
       const bidLog = r.booking_id || r.id;
       if (r.status === "cancelled") {
+        const cancelledGuestName = prevIdx.length ? guests.find((g) => g.id === bookings[prevIdx[0]].guestId)?.fullName : undefined;
         prevIdx.forEach((i) => { bookings[i].status = "cancelled"; });
         applied.push({ rev: r }); out.cancelled++;
+        if (prevIdx.length) pushActivity(data, "cancel", `Cancellazione OTA${cancelledGuestName ? " — " + cancelledGuestName : ""} (Channex)`);
         console.log(`[channex inbound] CANCELLAZIONE booking_id=${bidLog} → ${prevIdx.length} prenotazione/i marcata/e cancelled (ack)`);
         continue;
       }
@@ -286,6 +299,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       });
       if (added > 0) {
         applied.push({ rev: r }); out.imported++;
+        pushActivity(data, "booking", `Prenotazione OTA ${isUpdate ? "aggiornata" : "importata"} — ${fullName} · ${channel.toUpperCase()} (Channex)`);
         console.log(`[channex inbound] ${isUpdate ? "MODIFICA" : "NUOVA"} booking_id=${bidLog} → ${added} camera/e ${isUpdate ? "aggiornata/e" : "creata/e"} (ack)`);
       } else {
         // Nessuna camera mappata: NON ackare (la revision resta nel feed finché non mappi).

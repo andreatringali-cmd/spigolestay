@@ -7,13 +7,13 @@ import { useLang } from "@/lib/i18n";
 
 const TYPE_COLOR: Record<ActivityType, string> = {
   booking: "var(--ok)", cancel: "var(--err)", block: "var(--faint)", move: "var(--focus)",
-  event: "#7C3AED", rate: "var(--warn)", quote: "var(--focus)", payment: "var(--ok)",
-  login: "#957A66", message: "#25A0A0", config: "#5E7C8B",
+  event: "#7C3AED", rate: "var(--warn)", rateplan: "#B8860B", quote: "var(--focus)", payment: "var(--ok)",
+  login: "#957A66", auth: "#957A66", message: "#25A0A0", config: "#5E7C8B",
 };
 const TYPE_LABEL: Record<ActivityType, string> = {
   booking: "Prenotazione", cancel: "Cancellazione", block: "Fuori servizio", move: "Spostamento",
-  event: "Evento", rate: "Tariffe", quote: "Preventivo", payment: "Pagamento",
-  login: "Accesso", message: "Messaggio", config: "Configurazione",
+  event: "Evento", rate: "Tariffe", rateplan: "Piano tariffario", quote: "Preventivo", payment: "Pagamento",
+  login: "Accesso", auth: "Sicurezza account", message: "Messaggio", config: "Configurazione",
 };
 
 function relTime(ts: number, t: (s: string) => string): string {

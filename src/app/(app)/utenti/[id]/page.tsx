@@ -53,7 +53,7 @@ export default function UserSchedaPage() {
   const { t } = useLang();
   const params = useParams<{ id: string }>();
   const isNew = params.id === "nuovo";
-  const { structures } = useData();
+  const { structures, addActivity } = useData();
   const ask = useConfirm();
 
   const [u, setU] = useState<User>(() => {
@@ -88,6 +88,8 @@ export default function UserSchedaPage() {
       const { error: e2 } = await supabase.auth.updateUser({ password: newPw });
       if (e2) { setPwMsg({ ok: false, text: e2.message }); return; }
       resetPwFields(); setPwOpen(false); setPwMsg({ ok: true, text: t("Password aggiornata ✅") });
+      const who = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.username || authUser.email;
+      addActivity("auth", `Password cambiata — ${who}`);
     } catch { setPwMsg({ ok: false, text: t("Si è verificato un problema. Riprova.") }); }
     finally { setPwBusy(false); }
   };
@@ -98,6 +100,10 @@ export default function UserSchedaPage() {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(target, { redirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined });
       setPwMsg(error ? { ok: false, text: error.message } : { ok: true, text: `${t("Email di reset inviata a")} ${target}.` });
+      if (!error) {
+        const who = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.username || target;
+        addActivity("auth", `Email di reset password inviata — ${who}`);
+      }
     } finally { setPwBusy(false); }
   };
 

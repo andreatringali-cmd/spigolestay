@@ -9,7 +9,7 @@ import { playSound } from "./sound";
 import { loadUsers } from "./users";
 import { isPublicMode, lsGet, DATA_KEY } from "./publicdata";
 
-export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "quote" | "payment" | "login" | "message" | "config";
+export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "rateplan" | "quote" | "payment" | "login" | "auth" | "message" | "config";
 export interface Activity {
   id: string;
   ts: number; // epoch ms
@@ -331,7 +331,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return prev.map((s) => ({ ...s, order: orderById.get(s.id) ?? s.order, updatedAt: now }));
       }),
       addRoomType: (rt) => { const id = uid(); setRoomTypes((prev) => [...prev, { id, ...rt, updatedAt: Date.now() }]); logAct("config", `Tipologia creata — ${rt.name}`); return id; },
-      updateRoomType: (id, patch) => setRoomTypes((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch, updatedAt: Date.now() } : x))),
+      updateRoomType: (id, patch) => {
+        // Punto centrale di scrittura delle tariffe base/restrizioni: logga qui, una volta sola,
+        // qualunque sia la pagina che chiama updateRoomType (Tariffe, Tipologia…), confrontando
+        // il valore precedente con quello nuovo così non si registra nulla se non è cambiato nulla.
+        const before = roomTypes.find((x) => x.id === id);
+        setRoomTypes((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch, updatedAt: Date.now() } : x)));
+        if (before) {
+          if ("basePrice" in patch && typeof patch.basePrice === "number" && patch.basePrice !== before.basePrice)
+            logAct("rate", `Tariffa base modificata — ${before.name}: €${before.basePrice} → €${patch.basePrice}`);
+          if ("minStay" in patch && typeof patch.minStay === "number" && patch.minStay !== before.minStay)
+            logAct("rate", `Soggiorno minimo modificato — ${before.name}: ${patch.minStay} nott${patch.minStay === 1 ? "e" : "i"}`);
+          if ("salesClosed" in patch && patch.salesClosed !== before.salesClosed)
+            logAct("rate", `Vendite ${patch.salesClosed ? "chiuse" : "riaperte"} — ${before.name}`);
+        }
+      },
       addUnit: (u) => { const id = uid(); setUnits((prev) => [...prev, { id, ...u, updatedAt: Date.now() }]); logAct("config", `Camera aggiunta — ${u.name}`); return id; },
       updateUnit: (id, patch) => setUnits((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch, updatedAt: Date.now() } : x))),
       setUnitRoomType: (unitId, roomTypeId) =>
@@ -427,8 +441,32 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return rec;
       },
       updateBooking: (id, patch) => {
+        // Punto centrale di scrittura delle prenotazioni: qualunque pagina chiami updateBooking
+        // (scheda prenotazione, pagamenti, sync iCal/Channex…) la modifica finisce comunque nel
+        // registro, con un confronto prima/dopo per non loggare nulla quando il valore non cambia
+        // davvero (es. una re-sync che riscrive gli stessi dati non deve generare rumore).
+        const before = bookings.find((b) => b.id === id);
         setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch, updatedAt: Date.now() } : b)));
-        if (patch.status === "cancelled") logAct("cancel", "Prenotazione annullata");
+        const gName = guests.find((g) => g.id === (patch.guestId ?? before?.guestId))?.fullName;
+        if (patch.status === "cancelled" && before?.status !== "cancelled") {
+          logAct("cancel", `Prenotazione annullata${gName ? " — " + gName : ""}`);
+          return;
+        }
+        if (before) {
+          const FIELDS: (keyof Booking)[] = ["checkIn", "checkOut", "unitId", "roomTypeId", "adults", "children", "total", "channel", "status", "guestId"];
+          const changed = FIELDS.filter((f) => f in patch && patch[f] !== before[f]);
+          if (changed.length) {
+            const labels: string[] = [];
+            if (changed.includes("checkIn") || changed.includes("checkOut")) labels.push("date");
+            if (changed.includes("unitId") || changed.includes("roomTypeId")) labels.push("camera");
+            if (changed.includes("total")) labels.push("tariffa");
+            if (changed.includes("channel")) labels.push("canale");
+            if (changed.includes("status")) labels.push("stato");
+            if (changed.includes("adults") || changed.includes("children")) labels.push("ospiti");
+            const detail = labels.length ? ` (${labels.join(", ")})` : "";
+            logAct("booking", `Prenotazione modificata${gName ? " — " + gName : ""}${detail}`);
+          }
+        }
       },
       moveBooking: (id, to) => {
         const target = units.find((u) => u.id === to.unitId);
