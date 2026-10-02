@@ -3,10 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
+import { useAccess } from "@/lib/access";
 import Icon from "./Icon";
 
 export default function StructureSwitcher() {
-  const { structures, activeStructureId, setActiveStructure } = useData();
+  const { structures: allStructures, activeStructureId, setActiveStructure } = useData();
+  // Utente staff con restrizione: solo le strutture consentite e niente vista "Tutte" (null = nessuna restrizione).
+  const { allowedStructureIds } = useAccess();
+  const structures = allowedStructureIds ? allStructures.filter((s) => allowedStructureIds.includes(s.id)) : allStructures;
   const { t } = useLang();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -40,8 +44,8 @@ export default function StructureSwitcher() {
 
       {open && (
         <div className="absolute right-0 z-50 mt-1.5 w-72 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
-          <Item active={activeStructureId === "all"} onClick={() => pick("all")} name={t("Tutte le strutture")} />
-          <div className="my-1 border-t border-line" />
+          {!allowedStructureIds && <Item active={activeStructureId === "all"} onClick={() => pick("all")} name={t("Tutte le strutture")} />}
+          {!allowedStructureIds && <div className="my-1 border-t border-line" />}
           {structures.map((s) => (
             <Item key={s.id} active={activeStructureId === s.id} onClick={() => pick(s.id)} name={s.name} sub={s.city} />
           ))}

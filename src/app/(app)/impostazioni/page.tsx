@@ -56,6 +56,8 @@ export default function ImpostazioniPage() {
     if (gcalStructId && structures.some((s) => s.id === gcalStructId)) return;
     setGcalStructId(activeStructureId !== "all" ? activeStructureId : structures[0]?.id ?? "");
   }, [structures, activeStructureId, gcalStructId]);
+  // Segui la struttura attiva del selettore globale (con "Tutte" resta la scelta locale).
+  useEffect(() => { if (activeStructureId !== "all") setGcalStructId(activeStructureId); }, [activeStructureId]);
   const gcalStruct = structures.find((s) => s.id === gcalStructId);
   const [gcalIdInput, setGcalIdInput] = useState("");
   useEffect(() => { setGcalIdInput(extractCalendarId(gcalStruct?.gcalId ?? "")); }, [gcalStruct?.gcalId, gcalStructId]);

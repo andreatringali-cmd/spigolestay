@@ -207,6 +207,21 @@ export function loadUsers(): User[] {
   try { const r = localStorage.getItem(USERS_KEY); if (r) { const list = JSON.parse(r); if (Array.isArray(list) && list.length) return (list as User[]).filter((u) => !DEMO_USER_IDS.has(u.id)); } } catch {}
   return DEFAULT_USERS.filter((u) => !DEMO_USER_IDS.has(u.id));
 }
+// Strutture accessibili a un utente: null = TUTTE (nessuna restrizione).
+// Regole prudenti (lato client): il titolare (modello "owner") e chiunque non abbia una restrizione esplicita
+// (allStructures !== false) vede tutto; se l'elenco scelto non contiene nessuna struttura esistente (o le contiene
+// tutte) non c'è restrizione: nessun utente resta mai senza strutture visibili. L'enforcement vero è lato server (da progettare).
+export function allowedStructureIds(u: User | null | undefined, allIds: string[]): string[] | null {
+  if (!u || u.templateKey === "owner" || u.allStructures !== false) return null;
+  const ids = (u.structureIds ?? []).filter((id) => allIds.includes(id));
+  return ids.length === 0 || ids.length >= allIds.length ? null : ids;
+}
+// L'utente `u` ha accesso alla struttura `structureId`? ("all" = vista complessiva: vero per chi ha una struttura qualsiasi)
+export function userHasStructure(u: User, structureId: string, allIds: string[]): boolean {
+  if (!structureId || structureId === "all") return true;
+  const a = allowedStructureIds(u, allIds);
+  return a === null || a.includes(structureId);
+}
 export function saveUsers(list: User[]) { try { localStorage.setItem(USERS_KEY, JSON.stringify(list)); } catch {} }
 export function newUserId() { return typeof crypto !== "undefined" && "randomUUID" in crypto ? `u-${crypto.randomUUID().slice(0, 8)}` : `u-${Math.floor(performance.now() * 1000)}`; }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useData } from "@/lib/store";
+import { inScope } from "@/lib/scope";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import { CHANNELS, type Channel, type Booking } from "@/lib/types";
 import { toISO, parseISO, addDays, nights } from "@/lib/dates";
@@ -37,7 +38,7 @@ const ACT: Record<ActionKey, { label: string; color: string }> = {
   niente: { label: "Niente", color: "var(--faint)" },
 };
 
-interface Issue { id: string; unitId: string; unitName: string; structureName: string; date: string; type: string; note: string; photo?: string; createdAt: string; resolved?: boolean; resolvedAt?: string; updatedAt?: number; _deleted?: boolean }
+interface Issue { id: string; unitId: string; unitName: string; structureName: string; structureId?: string; date: string; type: string; note: string; photo?: string; createdAt: string; resolved?: boolean; resolvedAt?: string; updatedAt?: number; _deleted?: boolean }
 const ISSUE_TYPES: { key: string; label: string; icon: string; color: string }[] = [
   { key: "guasto", label: "Guasto / manutenzione", icon: "settings", color: "var(--err)" },
   { key: "danno", label: "Danno / macchia", icon: "logout", color: "var(--warn)" },
@@ -82,15 +83,17 @@ export default function PuliziePage() {
   const persistIssues = (next: Issue[]) => { setIssues(next); try { localStorage.setItem("spigolestay:pulizie:issues", JSON.stringify(next)); } catch {} };
   const [issueDraft, setIssueDraft] = useState<null | { unitId: string; unitName: string; structureName: string; type: string; note: string; photo?: string }>(null);
   const [showResolved, setShowResolved] = useState(false);
-  const saveIssue = () => { if (!issueDraft || !issueDraft.note.trim()) return; const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()); persistIssues([{ id, unitId: issueDraft.unitId, unitName: issueDraft.unitName, structureName: issueDraft.structureName, date, type: issueDraft.type, note: issueDraft.note.trim(), photo: issueDraft.photo, createdAt: new Date().toISOString(), resolved: false, updatedAt: Date.now() }, ...issues]); playSound("done"); notify(`⚠ Segnalazione · ${issueDraft.unitName}`, `${issueMeta(issueDraft.type).label}: ${issueDraft.note.trim()}`); setIssueDraft(null); };
+  const saveIssue = () => { if (!issueDraft || !issueDraft.note.trim()) return; const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()); persistIssues([{ id, unitId: issueDraft.unitId, unitName: issueDraft.unitName, structureName: issueDraft.structureName, structureId: units.find((u) => u.id === issueDraft.unitId)?.structureId, date, type: issueDraft.type, note: issueDraft.note.trim(), photo: issueDraft.photo, createdAt: new Date().toISOString(), resolved: false, updatedAt: Date.now() }, ...issues]); playSound("done"); notify(`⚠ Segnalazione · ${issueDraft.unitName}`, `${issueMeta(issueDraft.type).label}: ${issueDraft.note.trim()}`); setIssueDraft(null); };
   const resolveIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, resolved: true, resolvedAt: new Date().toISOString(), updatedAt: Date.now() } : i)));
   const reopenIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, resolved: false, resolvedAt: undefined, updatedAt: Date.now() } : i)));
   // Cancellazione = soft-delete (tombstone _deleted + updatedAt): la fusione LWW per id fa
   // vincere la cancellazione recente, così una segnalazione eliminata non risorge da un'altra copia.
   const deleteIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, _deleted: true, updatedAt: Date.now() } : i)));
   const onIssuePhoto = (file: File | undefined) => { if (!file) return; const reader = new FileReader(); reader.onload = () => setIssueDraft((d) => (d ? { ...d, photo: reader.result as string } : d)); reader.readAsDataURL(file); };
-  const openIssues = issues.filter((i) => !i.resolved && !i._deleted);
-  const resolvedIssues = issues.filter((i) => i.resolved && !i._deleted).sort((a, b) => (b.resolvedAt ?? b.createdAt).localeCompare(a.resolvedAt ?? a.createdAt));
+  // Le segnalazioni seguono la struttura selezionata; per quelle vecchie (senza structureId) la struttura si deriva dalla camera.
+  const issueInScope = (i: Issue) => inScope(i.structureId ?? units.find((u) => u.id === i.unitId)?.structureId, activeStructureId);
+  const openIssues = issues.filter((i) => !i.resolved && !i._deleted && issueInScope(i));
+  const resolvedIssues = issues.filter((i) => i.resolved && !i._deleted && issueInScope(i)).sort((a, b) => (b.resolvedAt ?? b.createdAt).localeCompare(a.resolvedAt ?? a.createdAt));
   const roomHasIssue = (unitId: string) => openIssues.some((i) => i.unitId === unitId && i.date === date);
 
   // Scorte / lista della spesa (prodotti ricorrenti).
@@ -468,7 +471,7 @@ export default function PuliziePage() {
 
           {/* Inventario prodotti — riga 2 col sinistra (order 2 mobile / 3 desktop) */}
           <div className="order-2 rounded-xl border border-line bg-surface p-3 shadow-sm lg:order-3 lg:flex lg:h-[34rem] lg:flex-col">
-            <div className="mb-2 flex items-center gap-2 text-sm font-bold text-txt"><Icon name="grid" size={16} /> {t("Prodotti")} <span className="text-faint">· {stockFiltered.length}/{stockLive.length}</span></div>
+            <div className="mb-2 flex items-center gap-2 text-sm font-bold text-txt"><Icon name="grid" size={16} /> {t("Prodotti")} <span className="text-faint">· {stockFiltered.length}/{stockScoped.length}</span></div>
             <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
               {stockFiltered.length === 0 && <div className="py-4 text-center text-xs text-faint">{t("Nessun prodotto trovato.")}</div>}
               {activeStructureId === "all" ? (

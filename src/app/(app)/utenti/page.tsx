@@ -4,20 +4,23 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { PageHeader } from "@/components/ui";
-import { loadUsers, PERM_TEMPLATES, initials, type User } from "@/lib/users";
+import { loadUsers, PERM_TEMPLATES, initials, userHasStructure, type User } from "@/lib/users";
 import { useLang } from "@/lib/i18n";
 import { useAccess } from "@/lib/access";
 
 export default function UtentiPage() {
   const router = useRouter();
   const { t } = useLang();
-  const { structures } = useData();
+  const { structures, activeStructureId } = useData();
   const { moduleOn } = useAccess();
   const canMulti = moduleOn("team"); // il multiutente è nei piani superiori
   const [users, setUsers] = useState<User[]>([]);
   useEffect(() => { setUsers(loadUsers()); }, []);
 
   const templateLabel = (k: string) => (k === "custom" ? t("Personalizzato") : t(PERM_TEMPLATES.find((t) => t.key === k)?.label ?? "—"));
+  // Con una struttura selezionata: solo gli utenti che vi hanno accesso (chi ha accesso a tutte le strutture compare ovunque).
+  const allIds = structures.map((s) => s.id);
+  const shownUsers = users.filter((u) => userHasStructure(u, activeStructureId, allIds));
   const structLabel = (u: User) => (u.allStructures ? t("Tutte le strutture") : u.structureIds.length ? u.structureIds.map((id) => structures.find((s) => s.id === id)?.name).filter(Boolean).join(", ") : t("Nessuna"));
 
   return (
@@ -46,7 +49,8 @@ export default function UtentiPage() {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
+            {shownUsers.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-sm text-dim">{t("Nessun utente ha accesso a questa struttura.")}</td></tr>}
+            {shownUsers.map((u) => (
               <tr key={u.id} onClick={() => router.push(`/utenti/${u.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-2.5">

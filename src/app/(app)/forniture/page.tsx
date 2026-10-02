@@ -45,26 +45,40 @@ export default function ForniturePage() {
   const [busy, setBusy] = useState(false);
   const [catFilter, setCatFilter] = useState<string>("");
 
-  const structId = activeStructureId !== "all" ? activeStructureId : (localStruct || structures[0]?.id || "");
+  // Con "Tutte le strutture" serve sceglierne una (checkout/riordino/scorte sono per singola struttura): niente ripiego silenzioso sulla prima.
+  const structId = activeStructureId !== "all" ? activeStructureId : localStruct;
 
   useEffect(() => {
     (async () => {
       if (!supabase) return;
-      const [cRes, pRes, ruRes, stRes] = await Promise.all([
+      const [cRes, pRes] = await Promise.all([
         supabase.from("supply_categories").select("*").order("sort_order"),
         supabase.from("supply_products").select("*"),
-        supabase.from("supply_reorder_rules").select("product_id, enabled, safety_stock, horizon_days"),
-        supabase.from("supply_stock_levels").select("product_id, qty_on_hand"),
       ]);
       setCats((cRes.data as Category[]) ?? []);
       setProds((pRes.data as Product[]) ?? []);
-      const rr: Record<string, Rule> = {}; for (const r of (ruRes.data ?? []) as Rule[]) rr[r.product_id] = r; setRules(rr);
-      const ss: Record<string, number> = {}; for (const s of (stRes.data ?? []) as Stock[]) ss[s.product_id] = Number(s.qty_on_hand) || 0; setStock(ss);
     })();
     loadOrders();
     setCart(getCart());
     return onCartChange(() => setCart(getCart()));
   }, []);
+
+  // Regole di riordino e scorte sono PER STRUTTURA: si ricaricano al cambio della struttura selezionata.
+  useEffect(() => {
+    let alive = true;
+    setRules({}); setStock({});
+    (async () => {
+      if (!supabase || !structId) return;
+      const [ruRes, stRes] = await Promise.all([
+        supabase.from("supply_reorder_rules").select("product_id, enabled, safety_stock, horizon_days").eq("structure_id", structId),
+        supabase.from("supply_stock_levels").select("product_id, qty_on_hand").eq("structure_id", structId),
+      ]);
+      if (!alive) return;
+      const rr: Record<string, Rule> = {}; for (const r of (ruRes.data ?? []) as Rule[]) rr[r.product_id] = r; setRules(rr);
+      const ss: Record<string, number> = {}; for (const s of (stRes.data ?? []) as Stock[]) ss[s.product_id] = Number(s.qty_on_hand) || 0; setStock(ss);
+    })();
+    return () => { alive = false; };
+  }, [structId]);
 
   const loadOrders = async () => {
     try {
@@ -161,7 +175,7 @@ export default function ForniturePage() {
         </div>
         {activeStructureId === "all" && (
           <select value={localStruct} onChange={(e) => setLocalStruct(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt">
-            <option value="">Struttura…</option>
+            <option value="">Scegli la struttura…</option>
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         )}
@@ -238,6 +252,7 @@ export default function ForniturePage() {
 
       {tab === "riordino" && (
         <div>
+          {!structId && <div className="mb-3 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-dim">Scegli una struttura dal menu accanto alle schede: regole di riordino e scorte sono separate per struttura.</div>}
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <label className="text-sm text-dim">Orizzonte</label>
             <select value={horizon} onChange={(e) => setHorizon(parseInt(e.target.value))} className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt">
@@ -289,8 +304,8 @@ export default function ForniturePage() {
               <th className="px-3 py-2">Stato</th><th className="px-3 py-2 text-right">Totale</th>
             </tr></thead>
             <tbody>
-              {orders.length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-center text-sm text-dim">Nessun ordine.</td></tr>}
-              {orders.map((o) => (
+              {orders.filter((o) => activeStructureId === "all" || o.structure_id === activeStructureId).length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-center text-sm text-dim">Nessun ordine.</td></tr>}
+              {orders.filter((o) => activeStructureId === "all" || o.structure_id === activeStructureId).map((o) => (
                 <tr key={o.id} className="border-b border-line/60">
                   <td className="px-3 py-2 text-xs">{new Date(o.created_at).toLocaleDateString("it-IT")}</td>
                   <td className="px-3 py-2 text-xs">{structures.find((s) => s.id === o.structure_id)?.name ?? "—"}</td>

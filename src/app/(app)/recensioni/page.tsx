@@ -32,7 +32,7 @@ const MANUAL_SOURCES = SOURCES.filter((s) => s.k !== "google" && s.k !== "direct
 const PLACEID_KEY = (structureId: string) => `spigolestay:reviews:placeid:${structureId}`;
 const MANUAL_KEY = "spigolestay:reviews:manual";
 
-type ManualReview = NormalizedReview; // stessa forma; source ≠ "google"
+type ManualReview = NormalizedReview & { structureId?: string }; // stessa forma; source ≠ "google"; structureId assente = valida per tutte le strutture (retro-compat.)
 
 // Recensioni Booking.com/Airbnb/Expedia reali via Channex (Reviews Collection API) — stessa forma
 // restituita da /api/channex/reviews (vedi src/app/api/channex/reviews/route.ts).
@@ -206,9 +206,9 @@ export default function RecensioniPage() {
   const googleConnected = Boolean(placeId) && google.configured === true && !google.error;
   const keyMissing = google.configured === false;
 
-  // Recensioni manuali della struttura selezionata (le salviamo con structureId nel campo id? no:
-  // le teniamo globali ma filtriamo per struttura via prefisso). Per semplicità: manuali globali.
-  const manualReviews = manual;
+  // Recensioni manuali della struttura selezionata: quelle senza structureId (inserite prima
+  // dell'indipendenza per struttura) restano visibili in tutte, le nuove portano la propria struttura.
+  const manualReviews = useMemo(() => manual.filter((m) => !m.structureId || m.structureId === selStructureId), [manual, selStructureId]);
 
   // Recensioni DIRETTE REALI della struttura selezionata (dal blob sincronizzato / store),
   // normalizzate nella stessa forma delle altre così entrano in media/distribuzione/filtri/lista.
@@ -330,6 +330,7 @@ export default function RecensioniPage() {
       text,
       source: mForm.source,
       bucket: bucketOf(r10),
+      ...(selStructureId ? { structureId: selStructureId } : {}),
     };
     persistManual([rev, ...manual]);
     setShowManual(false);
@@ -477,9 +478,10 @@ export default function RecensioniPage() {
 
   const undoRequested = (bookingId: string) => updateBooking(bookingId, { reviewRequestedAt: undefined, reviewRequestChannel: undefined });
 
+  const cityName = (structures.find((s) => s.id === selStructureId)?.city || "").trim();
   const suggest = (r: { guest: string; bucket: string }) => {
     const first = r.guest.split(" ")[0];
-    if (r.bucket === "pos") return `Grazie di cuore ${first}! Siamo felicissimi che il soggiorno sia stato all'altezza. Ti aspettiamo di nuovo a Siracusa — alla prossima con una sorpresa riservata a chi torna. 🌊`;
+    if (r.bucket === "pos") return `Grazie di cuore ${first}! Siamo felicissimi che il soggiorno sia stato all'altezza. Ti aspettiamo di nuovo${cityName ? " a " + cityName : ""} — alla prossima con una sorpresa riservata a chi torna. 🌊`;
     if (r.bucket === "neu") return `Grazie ${first} per il feedback prezioso. Abbiamo preso nota dei punti da migliorare e ci stiamo già lavorando. Ci farebbe piacere riaverti per mostrarti i progressi!`;
     return `Ci dispiace ${first}, non è lo standard che vogliamo offrire. Grazie per la segnalazione: interverremo subito. Se vorrai darci un'altra occasione, ti riserveremo un'attenzione speciale.`;
   };
@@ -489,6 +491,17 @@ export default function RecensioniPage() {
   return (
     <div>
       <PageHeader title="Recensioni & reputazione" subtitle="Recensioni Google reali e OTA in un posto, con risposte suggerite dall'AI" />
+
+      {/* Con "Tutte le strutture" le recensioni sono per singola struttura: scelta esplicita invece di ripiegare in silenzio sulla prima */}
+      {activeStructureId === "all" && structures.length > 1 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-xs font-semibold text-faint">Recensioni di</span>
+          <select value={selStructureId} onChange={(e) => setSelStructureId(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
+            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <span className="text-[11px] text-faint">Le recensioni sono separate per struttura; scegli quale vedere.</span>
+        </div>
+      )}
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Media" value={<>{avg.toFixed(1)}<span className="text-xs text-faint">/10</span></>} />

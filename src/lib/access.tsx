@@ -6,7 +6,8 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { loadUsers, saveUsers, type User, type PermLevel } from "./users";
+import { loadUsers, saveUsers, allowedStructureIds, type User, type PermLevel } from "./users";
+import { useData } from "./store";
 import { TIERS } from "./plans";
 import { supabase } from "./supabase";
 import { coManagerPerms } from "./comanager";
@@ -25,6 +26,7 @@ interface AccessValue {
   can: (perm?: string) => boolean;       // permesso ≠ "none"
   level: (perm?: string) => PermLevel;   // livello del permesso
   moduleOn: (m?: string) => boolean;     // modulo attivo
+  allowedStructureIds: string[] | null;  // strutture consentite all'utente corrente (null = tutte)
 }
 
 const Ctx = createContext<AccessValue | null>(null);
@@ -32,6 +34,7 @@ const CUR_KEY = "spigolestay:currentuser";
 
 export function AccessProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { structures, activeStructureId, setActiveStructure } = useData();
   const [users, setUsers] = useState<User[]>([]);
   const [userId, setUid] = useState<string>("");
   const [modules, setModules] = useState<Record<string, boolean>>({});
@@ -128,8 +131,21 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   const ORD: Record<string, number> = { none: 0, view: 1, edit: 2 };
   const minLvl = (a: PermLevel, b: PermLevel): PermLevel => (ORD[a] <= ORD[b] ? a : b);
 
+  // Utente staff con restrizione ESPLICITA sulle strutture (mai il titolare): vede solo quelle consentite.
+  // I permessi dell'utente sono uguali su tutte le sue strutture, quindi non c'è un livello diverso per struttura.
+  const allowedIds = allowedStructureIds(user, structures.map((s) => s.id));
+  const allowedKey = allowedIds ? allowedIds.join("|") : "";
+  // Se la struttura attiva non è consentita (o è "Tutte", che mostrerebbe anche quelle non consentite),
+  // passa alla prima consentita. Con restrizione nulla non succede nulla.
+  useEffect(() => {
+    if (!allowedIds) return;
+    if (activeStructureId === "all" || !allowedIds.includes(activeStructureId)) setActiveStructure(allowedIds[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowedKey, activeStructureId]);
+
   const level = (perm?: string): PermLevel => {
     if (!perm) return "edit";
+    if (allowedIds && activeStructureId !== "all" && !allowedIds.includes(activeStructureId)) return "none"; // struttura non consentita
     const own: PermLevel = user ? ((user.perms?.[perm] as PermLevel) ?? "none") : "edit";
     if (restriction) {
       if (restriction.paused) return "none";                              // accesso in pausa dal proprietario
@@ -152,7 +168,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     return false;
   };
 
-  return <Ctx.Provider value={{ user, users, setUserId, modules, can, level, moduleOn }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, users, setUserId, modules, can, level, moduleOn, allowedStructureIds: allowedIds }}>{children}</Ctx.Provider>;
 }
 
 export function useAccess(): AccessValue {

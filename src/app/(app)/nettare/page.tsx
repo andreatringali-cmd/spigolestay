@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/store";
+import { scopeFilter } from "@/lib/scope";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { toISO, shiftISO, nights } from "@/lib/dates";
@@ -30,10 +31,13 @@ export default function NettarePage() {
   const { structures, roomTypes, units, bookings, events, rateOverrides, activeStructureId, setDayRates } = useData();
   const { user } = useAuth();
 
+  // Con "Tutte le strutture" Nèttare lavora comunque su UNA struttura per volta: scelta esplicita (selettore locale).
+  const [localSid, setLocalSid] = useState("");
+  const effSid = activeStructureId !== "all" ? activeStructureId : localSid;
   const struct = useMemo(() => {
-    const active = structures.find((s) => s.id === activeStructureId && (s.city || "").trim());
-    return active || structures.find((s) => s.id === activeStructureId) || structures.find((s) => (s.city || "").trim()) || structures[0];
-  }, [structures, activeStructureId]);
+    const active = structures.find((s) => s.id === effSid && (s.city || "").trim());
+    return active || structures.find((s) => s.id === effSid) || structures.find((s) => (s.city || "").trim()) || structures[0];
+  }, [structures, effSid]);
   const city = (struct?.city || "").trim();
   const today = toISO(new Date());
 
@@ -51,10 +55,24 @@ export default function NettarePage() {
   const [panel, setPanel] = useState<string | null>(null);
 
   useEffect(() => {
-    try { const r = localStorage.getItem(STRAT_KEY); if (r) setStrat(normalizeStrategy(JSON.parse(r))); } catch {}
     try { const r = localStorage.getItem(MODS_KEY); if (r) setMods(JSON.parse(r)); } catch {}
   }, []);
-  const upd = (p: Partial<Strategy>) => setStrat((s) => { const n = { ...s, ...p }; try { localStorage.setItem(STRAT_KEY, JSON.stringify(n)); } catch {} return n; });
+  // La strategia è PER STRUTTURA (chiave spigolestay:nettare:strategy:<id>). Se la struttura non ne ha ancora una,
+  // parte da una COPIA della vecchia strategia globale (la chiave vecchia non viene toccata né spostata).
+  const stratSid = struct?.id;
+  useEffect(() => {
+    if (!stratSid) return;
+    let next: Strategy = DEFAULT_STRAT;
+    try {
+      const own = localStorage.getItem(STRAT_KEY + ":" + stratSid);
+      const legacy = localStorage.getItem(STRAT_KEY);
+      const raw = own ?? legacy;
+      if (raw) next = normalizeStrategy(JSON.parse(raw));
+    } catch {}
+    setStrat(next);
+    setScope("general");
+  }, [stratSid]);
+  const upd = (p: Partial<Strategy>) => setStrat((s) => { const n = { ...s, ...p }; try { if (stratSid) localStorage.setItem(STRAT_KEY + ":" + stratSid, JSON.stringify(n)); } catch {} return n; });
   const saveMods = (next: Record<string, Mod>) => { setMods(next); try { localStorage.setItem(MODS_KEY, JSON.stringify(next)); } catch {} };
 
   const sUnits = useMemo(() => units.filter((u) => u.structureId === struct?.id && !u.outOfService), [units, struct?.id]);
@@ -64,6 +82,8 @@ export default function NettarePage() {
     if (!sTypes.length) return undefined;
     return [...sTypes].sort((a, b) => sUnits.filter((u) => u.roomTypeId === b.id).length - sUnits.filter((u) => u.roomTypeId === a.id).length)[0];
   }, [sTypes, sUnits]);
+  // Eventi del calendario: quelli della struttura + quelli generali (senza structureId).
+  const sEvents = useMemo(() => scopeFilter(events, struct?.id ?? "all"), [events, struct?.id]);
   const sBookings = useMemo(() => bookings.filter((b) => b.structureId === struct?.id && b.status !== "cancelled" && b.channel !== "blocked"), [bookings, struct?.id]);
 
   const my = useMemo(() => {
@@ -97,8 +117,8 @@ export default function NettarePage() {
 
   const res = useMemo(() => {
     if (!struct || sRooms === 0) return { days: [], cells: {} as Record<string, Cell> };
-    return runNettare({ strat, dates: allDates, today, roomTypes: sTypes, allRoomTypes: roomTypes, units: sUnits, bookings: sBookings, events, holidays, bridges, market, structBase: basePrice, mods });
-  }, [struct, sRooms, strat, allDates, today, sTypes, roomTypes, sUnits, sBookings, events, holidays, bridges, market, basePrice, mods]);
+    return runNettare({ strat, dates: allDates, today, roomTypes: sTypes, allRoomTypes: roomTypes, units: sUnits, bookings: sBookings, events: sEvents, holidays, bridges, market, structBase: basePrice, mods });
+  }, [struct, sRooms, strat, allDates, today, sTypes, roomTypes, sUnits, sBookings, sEvents, holidays, bridges, market, basePrice, mods]);
   const dayMap = useMemo(() => Object.fromEntries(res.days.map((d) => [d.date, d])), [res.days]);
 
   const next30 = useMemo(() => Array.from({ length: FUTURE }, (_, i) => shiftISO(today, i)), [today]);
@@ -173,6 +193,15 @@ export default function NettarePage() {
     <div>
       <style>{`:root{--chart-1:#2F6BB0;--chart-2:#C9751A}.dark{--chart-1:#6FA3DC;--chart-2:#D98A3A}`}</style>
       <PageHeader title="Nèttare" subtitle={`${t("Prezzi dinamici")}${city ? ` · ${city}` : ""}`} />
+      {activeStructureId === "all" && structures.length > 1 && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-xs font-semibold text-faint">{t("Struttura")}</span>
+          <select value={struct?.id ?? ""} onChange={(e) => setLocalSid(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
+            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <span className="text-[11px] text-faint">{t("La strategia di prezzo è separata per struttura.")}</span>
+        </div>
+      )}
 
       {/* Riepilogo Nèttare */}
       <div className="mt-4 rounded-2xl border border-line p-5" style={{ background: "var(--surface)", boxShadow: "0 1px 2px rgba(0,0,0,.04), 0 14px 34px -22px rgba(0,0,0,.16)" }}>

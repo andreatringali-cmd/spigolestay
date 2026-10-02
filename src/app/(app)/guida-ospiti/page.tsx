@@ -386,6 +386,8 @@ export default function GuidaOspitiPage() {
   const [sid, setSid] = useState(activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""));
   // La struttura si sceglie dal selettore globale in alto (StructureSwitcher): qui la seguiamo.
   useEffect(() => { if (activeStructureId !== "all") setSid(activeStructureId); }, [activeStructureId]);
+  // Se le strutture arrivano dopo il primo render (sid ancora vuoto o non più valido) ripiega sulla prima.
+  useEffect(() => { if ((!sid || !structures.some((s) => s.id === sid)) && structures.length) setSid(activeStructureId !== "all" ? activeStructureId : structures[0].id); }, [structures, sid, activeStructureId]);
   const [all, setAll] = useState<Record<string, Guide>>({});
   const [previewKey, setPreviewKey] = useState(0);
   const [savedTick, setSavedTick] = useState(false);
@@ -828,12 +830,17 @@ export default function GuidaOspitiPage() {
       {/* Riga filtri: a sinistra la struttura che stai modificando, a destra i controlli dell'anteprima */}
       <div className="mb-4 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <label className="flex items-center gap-1.5 text-xs font-semibold text-dim">
-            <span className="text-faint">🏠 Struttura:</span>
-            <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-txt outline-none focus:border-focus">
-              {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </label>
+          {/* Con una struttura selezionata in alto la guida segue quella (niente selettore disallineato); con "Tutte" si sceglie qui. */}
+          {activeStructureId === "all" ? (
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-dim">
+              <span className="text-faint">🏠 Struttura:</span>
+              <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-txt outline-none focus:border-focus">
+                {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </label>
+          ) : (
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-dim"><span className="text-faint">🏠 Struttura:</span> <span className="text-txt">{struct?.name ?? ""}</span></span>
+          )}
           <div className="flex flex-wrap items-center gap-2">
           <button onClick={refresh} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">↻ Aggiorna</button>
           <select value={pvLang} onChange={(e) => setPvLang(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-dim outline-none focus:border-focus">

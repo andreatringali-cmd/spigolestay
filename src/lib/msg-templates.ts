@@ -13,6 +13,7 @@ export interface MsgTemplateSeed {
   days: number;
   time: string;
   active: boolean;
+  structureIds?: string[]; // assente/vuoto = vale per tutte le strutture
 }
 
 export const DEFAULT_TEMPLATES: MsgTemplateSeed[] = [

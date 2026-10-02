@@ -32,7 +32,10 @@ type Ans = { title: string; value?: string; detail?: string; speech?: string; li
 
 export default function AssistentePage() {
   const router = useRouter();
-  const { bookings, roomTypes, units, getGuest, getStructure, getUnit } = useData();
+  const { bookings: allBookings, roomTypes, units: allUnits, getGuest, getStructure, getUnit, activeStructureId } = useData();
+  // Tutto ciò che l'assistente conta/elenca segue la struttura selezionata (con "Tutte" resta tutto l'account).
+  const bookings = useMemo(() => (activeStructureId === "all" ? allBookings : allBookings.filter((b) => b.structureId === activeStructureId)), [allBookings, activeStructureId]);
+  const units = useMemo(() => (activeStructureId === "all" ? allUnits : allUnits.filter((u) => u.structureId === activeStructureId)), [allUnits, activeStructureId]);
   const { user } = useAuth();
   const [q, setQ] = useState("");
   const [sent, setSent] = useState(""); // solo visualizzazione: eco della domanda come "bolla utente"
@@ -128,15 +131,18 @@ export default function AssistentePage() {
   useEffect(() => {
     if (!supabase) return;
     (async () => {
+      // Documenti della struttura selezionata (+ quelli senza struttura assegnata); con "Tutte" nessun filtro.
+      let dq = supabase.from("documents").select("id, total_cents").in("stato", ["emessa", "inviata_intermediario", "consegnata"]);
+      if (activeStructureId !== "all") dq = dq.or(`structure_id.eq.${activeStructureId},structure_id.is.null`);
       const [d, p] = await Promise.all([
-        supabase.from("documents").select("id, total_cents").in("stato", ["emessa", "inviata_intermediario", "consegnata"]),
+        dq,
         supabase.from("document_payments").select("document_id, amount_cents"),
       ]);
       const paid = new Map<string, number>(); for (const x of (p.data ?? []) as { document_id: string; amount_cents: number }[]) paid.set(x.document_id, (paid.get(x.document_id) ?? 0) + x.amount_cents);
       const residuo = ((d.data ?? []) as { id: string; total_cents: number }[]).reduce((a, r) => a + Math.max(0, r.total_cents - (paid.get(r.id) ?? 0)), 0);
       setDueCents(residuo);
     })();
-  }, []);
+  }, [activeStructureId]);
 
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Buongiorno" : hour < 18 ? "Buon pomeriggio" : "Buonasera";
@@ -282,12 +288,14 @@ export default function AssistentePage() {
     if (/ricav|fatturat|guadagn|incasso previst/.test(s)) return answers.ricavo;
     if (/prossim|futur/.test(s)) return answers.prossimo;
     if (/fornitor|passiv|da pagare/.test(s) && supabase) {
-      const { data } = await supabase.from("purchase_documents").select("total_cents, paid").eq("paid", false);
+      let pq = supabase.from("purchase_documents").select("total_cents, paid").eq("paid", false);
+      if (activeStructureId !== "all") pq = pq.or(`structure_id.eq.${activeStructureId},structure_id.is.null`);
+      const { data } = await pq;
       const tot = ((data ?? []) as { total_cents: number }[]).reduce((a, r) => a + r.total_cents, 0);
       return { title: "Fatture fornitori da pagare", value: eur(tot / 100), detail: `${(data ?? []).length} fatture non pagate.`, go: { label: "Fatture passive", href: "/fatture-passive" } };
     }
     return { title: "Non ho capito", value: "🤔", detail: "Prova con: chi arriva oggi, partenze, check-in, ricavo del mese, da incassare — oppure dimmi il nome di un ospite." };
-  }, [answers, active, dueCents, firstName, getGuest, narrate, subOf, units, t]);
+  }, [answers, active, dueCents, firstName, getGuest, narrate, subOf, units, t, activeStructureId]);
 
   const ask = useCallback(async (text: string) => {
     if (!text.trim()) return;

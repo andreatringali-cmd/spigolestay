@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
+import { useData } from "@/lib/store";
 import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
 import VarLegend, { MSG_VARS } from "@/components/VarLegend";
 
@@ -22,8 +23,8 @@ const PHASE_LABEL: Record<Trigger, string> = { before_arrival: "Prima dell'arriv
 // Ordine cronologico interno alla fase: "giorni prima" più alti = più presto; "giorni dopo" più alti = più tardi.
 const chronoKey = (tp: MsgTemplate) => (tp.trigger === "before_arrival" ? -tp.days : tp.trigger === "after_arrival" || tp.trigger === "after_checkout" ? tp.days : 0);
 
-interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; trigger: Trigger; days: number; time: string; active: boolean; srcId?: string; order?: number; waTemplate?: string }
-const emptyTpl = (): MsgTemplate => ({ id: (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random())), name: "", texts: { it: "", en: "", fr: "", de: "", es: "" }, trigger: "manual", days: 1, time: "10:00", active: true });
+interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; trigger: Trigger; days: number; time: string; active: boolean; srcId?: string; order?: number; waTemplate?: string; structureIds?: string[] /* assente/vuoto = vale per tutte le strutture */ }
+const emptyTpl = (structureIds?: string[]): MsgTemplate => ({ ...(structureIds?.length ? { structureIds } : {}), id: (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random())), name: "", texts: { it: "", en: "", fr: "", de: "", es: "" }, trigger: "manual", days: 1, time: "10:00", active: true });
 const triggerDesc = (tpl: MsgTemplate, tr: (s: string) => string) => {
   if (tpl.trigger === "manual") return tr("Invio manuale");
   if (tpl.trigger === "on_arrival") return `${tr("Il giorno del check-in")} · ${tpl.time}`;
@@ -36,6 +37,7 @@ const triggerDesc = (tpl: MsgTemplate, tr: (s: string) => string) => {
 export default function ModelliPanel() {
   const ask = useConfirm();
   const { t } = useLang();
+  const { structures, activeStructureId } = useData();
   const [templates, setTemplates] = useState<MsgTemplate[]>([]);
   const [ready, setReady] = useState(false);
   const [search, setSearch] = useState("");
@@ -65,6 +67,8 @@ export default function ModelliPanel() {
       (a.time ?? "").localeCompare(b.time ?? "") ||
       a.name.localeCompare(b.name, "it", { sensitivity: "base" })
     )
+    // Con una struttura selezionata: i modelli di quella struttura + quelli validi per tutte (senza structureIds).
+    .filter((tp) => activeStructureId === "all" || !tp.structureIds?.length || tp.structureIds.includes(activeStructureId))
     .filter((tp) =>
       (search.trim() === "" || tp.name.toLowerCase().includes(search.trim().toLowerCase())) &&
       (flt === "all" || (flt === "auto" ? isAuto(tp) : !isAuto(tp)))
@@ -95,7 +99,7 @@ export default function ModelliPanel() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5"><span className="font-display text-base font-bold text-txt">{tpl.name}</span>{tpl.srcId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase text-focus" title={t("Collegato a un'attività del «Da fare oggi»")}>{t("Da fare oggi")}</span>}</div>
-                      <div className="mt-0.5 text-xs text-dim">{triggerDesc(tpl, t)}</div>
+                      <div className="mt-0.5 text-xs text-dim">{triggerDesc(tpl, t)}{tpl.structureIds?.length ? ` · ${tpl.structureIds.map((id) => structures.find((s) => s.id === id)?.name).filter(Boolean).join(", ")}` : ""}</div>
                     </div>
                     {(() => {
                       const auto = tpl.trigger !== "manual";
@@ -116,7 +120,7 @@ export default function ModelliPanel() {
         ))}
         {/* Card "aggiungi" tratteggiata, stessa dimensione dei modelli */}
         <div className="grid gap-3 md:grid-cols-2">
-          <button onClick={() => { setEditing(emptyTpl()); setEditLang("it"); }} className="flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line text-dim transition hover:border-focus hover:text-focus" style={{ background: "var(--surface)" }}>
+          <button onClick={() => { setEditing(emptyTpl(activeStructureId !== "all" ? [activeStructureId] : undefined)); setEditLang("it"); }} className="flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line text-dim transition hover:border-focus hover:text-focus" style={{ background: "var(--surface)" }}>
             <span className="grid h-11 w-11 place-items-center rounded-full border-2 border-current text-2xl font-light leading-none">+</span>
             <span className="text-sm font-semibold">{t("Nuovo modello")}</span>
           </button>
@@ -136,6 +140,19 @@ export default function ModelliPanel() {
               <label className="block flex-1 text-xs font-medium text-dim">{t("Nome modello")} *<input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" placeholder={t("Es. Benvenuto pre-arrivo")} /></label>
               <label className="block w-20 text-xs font-medium text-dim" title={t("Numero d'ordine: più basso = più in alto nella lista")}>{t("Ordine")}<input type="number" min={0} value={editing.order ?? ""} onChange={(e) => setEditing({ ...editing, order: e.target.value === "" ? undefined : Number(e.target.value) })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" placeholder="—" /></label>
             </div>
+
+            {structures.length > 1 && (
+              <div className="mt-3 text-xs font-medium text-dim">{t("Strutture")} <span className="font-normal text-faint">{t("(nessuna selezionata = tutte le strutture)")}</span>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {structures.map((s) => {
+                    const on = !!editing.structureIds?.includes(s.id);
+                    return (
+                      <button key={s.id} type="button" onClick={() => { const cur = editing.structureIds ?? []; const next = on ? cur.filter((x) => x !== s.id) : [...cur, s.id]; setEditing({ ...editing, structureIds: next.length ? next : undefined }); }} className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition ${on ? "border-focus bg-focus text-white" : "border-line text-dim hover:bg-wash"}`}>{s.name}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="mt-4">
               <div className="mb-1.5 flex items-center gap-1">

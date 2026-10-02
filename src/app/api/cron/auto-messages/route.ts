@@ -29,7 +29,7 @@ const s = (v: unknown) => (typeof v === "string" ? v : "");
 const num = (v: unknown) => (typeof v === "number" ? v : 0);
 
 type Trigger = "manual" | "before_arrival" | "on_arrival" | "after_arrival" | "on_checkout" | "after_checkout";
-interface Tpl { id: string; name: string; texts: Record<string, string>; trigger: Trigger; days: number; time: string; active: boolean; waTemplate?: string }
+interface Tpl { id: string; name: string; texts: Record<string, string>; trigger: Trigger; days: number; time: string; active: boolean; waTemplate?: string; structureIds?: string[] }
 
 // Data (Y-M-D) e minuti-del-giorno "adesso" nel fuso Europe/Rome.
 function romeNow(): { ymd: string; minutes: number } {
@@ -124,6 +124,8 @@ export async function GET(req: Request) {
       };
 
       for (const tp of tpls) {
+        // Modello legato a specifiche strutture: vale solo per le loro prenotazioni (assente/vuoto = tutte).
+        if (tp.structureIds?.length && !tp.structureIds.includes(s(b.structureId))) continue;
         const slot = slotDate(tp, checkIn, checkOut);
         if (!slot || slot !== todayRome) continue;
         candidates++;
