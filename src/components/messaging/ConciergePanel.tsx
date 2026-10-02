@@ -5,6 +5,7 @@ import { Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
 import { useData } from "@/lib/store";
 import type { Structure } from "@/lib/types";
+import ConciergeKb from "./ConciergeKb";
 
 interface FAQ { id: string; topic: string; keywords: string; answer: string }
 const LANGS: [string, string][] = [["it", "🇮🇹"], ["en", "🇬🇧"], ["fr", "🇫🇷"], ["de", "🇩🇪"], ["es", "🇪🇸"]];
@@ -99,6 +100,8 @@ export default function ConciergePanel() {
           <span className="text-[11px] text-faint">La base di conoscenza è separata per struttura.</span>
         </div>
       )}
+      {sid && <ConciergeKb sid={sid} />}
+      <SectionTitle>Prove rapide e FAQ locali</SectionTitle>
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       {/* Chat demo */}
       <Card className="order-2 flex flex-col">
@@ -127,7 +130,7 @@ export default function ConciergePanel() {
       {/* Knowledge base */}
       <Card className="order-1 flex flex-col">
         <div className="mb-2 flex items-center justify-between">
-          <SectionTitle>Base di conoscenza ({faq.length})</SectionTitle>
+          <SectionTitle>FAQ locali ({faq.length})</SectionTitle>
           <button onClick={addFaq} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash">+ Argomento</button>
         </div>
         <div className="flex-1 space-y-2 overflow-y-auto" style={{ maxHeight: 460 }}>
