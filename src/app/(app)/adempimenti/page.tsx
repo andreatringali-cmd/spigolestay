@@ -161,7 +161,8 @@ export default function AdempimentiPage() {
   const istat = useMemo(() => istatAll.filter((s) => inScope(s.structure_id)), [istatAll, inScope]);
   const docs = useMemo(() => docsAll.filter((d) => inScope(d.structure_id)), [docsAll, inScope]);
   const [pays, setPays] = useState<{ document_id: string; amount_cents: number }[]>([]);
-  const [passive, setPassive] = useState<{ id: string; supplier_name: string | null; due_date: string | null; total_cents: number; paid: boolean }[]>([]);
+  const [passiveAll, setPassive] = useState<{ id: string; structure_id: string | null; supplier_name: string | null; due_date: string | null; total_cents: number; paid: boolean }[]>([]);
+  const passive = useMemo(() => passiveAll.filter((p) => inScope(p.structure_id)), [passiveAll, inScope]); // fatture fornitori: solo della struttura attiva
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []); // countdown vivo
   // WhatsApp Cloud API collegato? Se sì, il pulsante invia DIRETTO; altrimenti apre wa.me.
@@ -176,11 +177,11 @@ export default function AdempimentiPage() {
       supabase.from("istat_rows").select("id, arrival, stato, booking_id, structure_id").in("stato", ["pending", "sent"]),
       supabase.from("documents").select("id, structure_id, number_label, stato, total_cents, counterpart").in("stato", ["scartata", "emessa", "inviata_intermediario", "consegnata"]),
       supabase.from("document_payments").select("document_id, amount_cents"),
-      supabase.from("purchase_documents").select("id, supplier_name, due_date, total_cents, paid"),
+      supabase.from("purchase_documents").select("id, structure_id, supplier_name, due_date, total_cents, paid"),
     ]);
     setSched((a.data ?? []) as typeof schedAll); setIstat((i.data ?? []) as typeof istatAll);
     setDocs((d.data ?? []) as typeof docsAll); setPays((p.data ?? []) as typeof pays);
-    setPassive((pv.data ?? []) as typeof passive);
+    setPassive((pv.data ?? []) as typeof passiveAll);
   }, []);
   useEffect(() => { loadData(); }, [loadData]);
   // Ricarica schedine/documenti al rientro sulla pagina o dopo una sincronizzazione dati,

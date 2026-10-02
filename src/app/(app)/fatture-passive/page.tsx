@@ -39,17 +39,22 @@ const numv = (v: string | number) => { const n = Number(String(v).replace(",", "
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const YEARS = (() => { const y = new Date().getFullYear(); return [y, y - 1, y - 2]; })();
 
-interface Doc { id: string; supplier_id: string | null; supplier_name: string | null; doc_number: string | null; doc_date: string | null; doc_type: string; category: string | null; taxable_cents: number; vat_cents: number; total_cents: number; due_date: string | null; paid: boolean; paid_at: string | null; payment_method: string | null; notes: string | null; selfinvoice_number: string | null; selfinvoice_status: string | null }
+interface Doc { id: string; structure_id: string | null; supplier_id: string | null; supplier_name: string | null; doc_number: string | null; doc_date: string | null; doc_type: string; category: string | null; taxable_cents: number; vat_cents: number; total_cents: number; due_date: string | null; paid: boolean; paid_at: string | null; payment_method: string | null; notes: string | null; selfinvoice_number: string | null; selfinvoice_status: string | null }
 interface Supplier { id: string; name: string; vat: string | null; category: string | null }
 
-const emptyForm = () => ({ id: "" as string, supplierName: "", supplierId: null as string | null, supplierCountry: "", doc_number: "", doc_date: todayISO(), doc_type: "fattura", category: "", taxableEur: "", vatEur: "", due_date: "", paid: false, paid_at: "", payment_method: "Bonifico bancario", notes: "" });
+// structureId: "" = da scegliere, "common" = comune a tutte le strutture (salvato come null), altrimenti id struttura.
+const emptyForm = (structureId = "") => ({ id: "" as string, structureId, supplierName: "", supplierId: null as string | null, supplierCountry: "", doc_number: "", doc_date: todayISO(), doc_type: "fattura", category: "", taxableEur: "", vatEur: "", due_date: "", paid: false, paid_at: "", payment_method: "Bonifico bancario", notes: "" });
 const monthNow = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 const prevMonth = () => { const d = new Date(); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 
 export default function FatturePassivePage() {
   const { user } = useAuth();
   const ask = useConfirm();
-  const { bookings } = useData();
+  const { bookings: allBookings, structures, activeStructureId } = useData();
+  const single = activeStructureId !== "all";
+  // Le commissioni OTA tracciate (autofattura) valgono solo per la struttura attiva.
+  const bookings = useMemo(() => (single ? allBookings.filter((b) => b.structureId === activeStructureId) : allBookings), [allBookings, single, activeStructureId]);
+  const structName = (id: string | null) => (id ? structures.find((s) => s.id === id)?.name ?? "—" : "Comune");
   // Modale "Autofattura OTA": #2 da commissioni tracciate, #3 import CSV.
   const [ota, setOta] = useState(false);
   const [otaMonth, setOtaMonth] = useState(prevMonth());
@@ -91,6 +96,7 @@ export default function FatturePassivePage() {
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return docs.filter((r) => {
+      if (single && r.structure_id !== activeStructureId) return false; // senza struttura: visibili solo con "Tutte"
       if (year !== "all" && (r.doc_date ?? "").slice(0, 4) !== String(year)) return false;
       if (tipo !== "all" && r.doc_type !== tipo) return false;
       if (pay === "paid" && !r.paid) return false;
@@ -99,12 +105,13 @@ export default function FatturePassivePage() {
       if (term && !`${r.supplier_name ?? ""} ${r.doc_number ?? ""} ${r.category ?? ""}`.toLowerCase().includes(term)) return false;
       return true;
     });
-  }, [docs, q, year, tipo, pay, scad, t]);
+  }, [docs, q, year, tipo, pay, scad, t, single, activeStructureId]);
 
   const totals = useMemo(() => filtered.reduce((a, r) => ({ imp: a.imp + r.taxable_cents, iva: a.iva + r.vat_cents, tot: a.tot + r.total_cents, unpaid: a.unpaid + (r.paid ? 0 : r.total_cents) }), { imp: 0, iva: 0, tot: 0, unpaid: 0 }), [filtered]);
 
-  const openNew = () => { setEdit(emptyForm()); setAf({}); setAfMsg(""); };
-  const openEdit = (r: Doc) => { setEdit({ id: r.id, supplierName: r.supplier_name ?? "", supplierId: r.supplier_id, supplierCountry: "", doc_number: r.doc_number ?? "", doc_date: r.doc_date ?? todayISO(), doc_type: r.doc_type, category: r.category ?? "", taxableEur: String(cents(r.taxable_cents)), vatEur: String(cents(r.vat_cents)), due_date: r.due_date ?? "", paid: r.paid, paid_at: r.paid_at ?? "", payment_method: r.payment_method ?? "Bonifico bancario", notes: r.notes ?? "" }); setAf({ number: r.selfinvoice_number ?? undefined, status: r.selfinvoice_status ?? undefined }); setAfMsg(""); };
+  const defStructure = single ? activeStructureId : structures.length === 1 ? structures[0].id : "";
+  const openNew = () => { setEdit(emptyForm(defStructure)); setAf({}); setAfMsg(""); };
+  const openEdit = (r: Doc) => { setEdit({ id: r.id, structureId: r.structure_id ?? "common", supplierName: r.supplier_name ?? "", supplierId: r.supplier_id, supplierCountry: "", doc_number: r.doc_number ?? "", doc_date: r.doc_date ?? todayISO(), doc_type: r.doc_type, category: r.category ?? "", taxableEur: String(cents(r.taxable_cents)), vatEur: String(cents(r.vat_cents)), due_date: r.due_date ?? "", paid: r.paid, paid_at: r.paid_at ?? "", payment_method: r.payment_method ?? "Bonifico bancario", notes: r.notes ?? "" }); setAf({ number: r.selfinvoice_number ?? undefined, status: r.selfinvoice_status ?? undefined }); setAfMsg(""); };
 
   // Genera (ed eventualmente invia) l'autofattura TD17 reverse charge.
   const genAutofattura = async () => {
@@ -133,7 +140,7 @@ export default function FatturePassivePage() {
 
   const precompileCommissions = () => {
     const meta = OTA_META[otaChannel] ?? OTA_META.other;
-    setEdit({ ...emptyForm(), supplierName: meta.name, supplierCountry: meta.country, category: "OTA / commissioni", doc_date: otaCommission.end, taxableEur: otaCommission.sum.toFixed(2), notes: `Commissioni ${CHANNELS[otaChannel].label} ${otaMonth} (${otaCommission.count} prenotazioni) — imponibile per autofattura reverse charge. Verifica con la fattura del portale.` });
+    setEdit({ ...emptyForm(defStructure), supplierName: meta.name, supplierCountry: meta.country, category: "OTA / commissioni", doc_date: otaCommission.end, taxableEur: otaCommission.sum.toFixed(2), notes: `Commissioni ${CHANNELS[otaChannel].label} ${otaMonth} (${otaCommission.count} prenotazioni) — imponibile per autofattura reverse charge. Verifica con la fattura del portale.` });
     setAf({}); setAfMsg(""); setOta(false);
   };
 
@@ -155,12 +162,13 @@ export default function FatturePassivePage() {
   const precompileCsv = () => {
     if (csvTotal == null) return;
     const meta = OTA_META[otaChannel] ?? OTA_META.booking;
-    setEdit({ ...emptyForm(), supplierName: meta.name, supplierCountry: meta.country, category: "OTA / commissioni", doc_date: otaCommission.end, taxableEur: csvTotal.toFixed(2), notes: `Import CSV commissioni ${CHANNELS[otaChannel].label} ${otaMonth}` });
+    setEdit({ ...emptyForm(defStructure), supplierName: meta.name, supplierCountry: meta.country, category: "OTA / commissioni", doc_date: otaCommission.end, taxableEur: csvTotal.toFixed(2), notes: `Import CSV commissioni ${CHANNELS[otaChannel].label} ${otaMonth}` });
     setAf({}); setAfMsg(""); setOta(false); setCsvTotal(null); setCsvInfo("");
   };
 
   const save = async () => {
     if (!supabase || !user || !edit) return;
+    if (!edit.structureId && structures.length > 1) { setErr("Scegli la struttura a cui appartiene la fattura (o «Comune a tutte»)."); return; }
     setSaving(true); setErr("");
     // Fornitore: usa quello scelto o crea/riusa per nome.
     let supplierId = edit.supplierId;
@@ -173,7 +181,7 @@ export default function FatturePassivePage() {
     const taxable = Math.round(numv(edit.taxableEur) * 100);
     const vat = Math.round(numv(edit.vatEur) * 100);
     const row = {
-      tenant_id: user.id, supplier_id: supplierId, supplier_name: nameTrim || null, doc_number: edit.doc_number || null,
+      tenant_id: user.id, structure_id: edit.structureId && edit.structureId !== "common" ? edit.structureId : null, supplier_id: supplierId, supplier_name: nameTrim || null, doc_number: edit.doc_number || null,
       doc_date: edit.doc_date || null, doc_type: edit.doc_type, category: edit.category || null,
       taxable_cents: taxable, vat_cents: vat, total_cents: taxable + vat, due_date: edit.due_date || null,
       paid: edit.paid, paid_at: edit.paid ? (edit.paid_at || todayISO()) : null, payment_method: edit.payment_method || null,
@@ -193,8 +201,8 @@ export default function FatturePassivePage() {
   const togglePaid = async (r: Doc) => { if (!supabase) return; await supabase.from("purchase_documents").update({ paid: !r.paid, paid_at: !r.paid ? todayISO() : null }).eq("id", r.id); await load(); };
 
   const exportCsv = () => {
-    const head = ["Data", "Fornitore", "Numero", "Tipo", "Categoria", "Imponibile", "IVA", "Totale", "Scadenza", "Pagata"];
-    const lines = filtered.map((r) => [r.doc_date ?? "", r.supplier_name ?? "", r.doc_number ?? "", TIPI[r.doc_type], r.category ?? "", cents(r.taxable_cents).toFixed(2), cents(r.vat_cents).toFixed(2), cents(r.total_cents).toFixed(2), r.due_date ?? "", r.paid ? "sì" : "no"].map((x) => `"${String(x).replace(/"/g, '""')}"`).join(","));
+    const head = ["Data", "Struttura", "Fornitore", "Numero", "Tipo", "Categoria", "Imponibile", "IVA", "Totale", "Scadenza", "Pagata"];
+    const lines = filtered.map((r) => [r.doc_date ?? "", structName(r.structure_id), r.supplier_name ?? "", r.doc_number ?? "", TIPI[r.doc_type], r.category ?? "", cents(r.taxable_cents).toFixed(2), cents(r.vat_cents).toFixed(2), cents(r.total_cents).toFixed(2), r.due_date ?? "", r.paid ? "sì" : "no"].map((x) => `"${String(x).replace(/"/g, '""')}"`).join(","));
     const blob = new Blob([[head.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `fatture-passive-${year}.csv`; a.click(); URL.revokeObjectURL(a.href);
   };
@@ -238,7 +246,7 @@ export default function FatturePassivePage() {
         <table className="w-full min-w-[860px] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
-              <th className="px-3 py-2 font-semibold">Data</th><th className="px-3 py-2 font-semibold">Fornitore</th><th className="px-3 py-2 font-semibold">Numero</th><th className="px-3 py-2 font-semibold">Tipo</th><th className="px-3 py-2 font-semibold">Categoria</th><th className="px-3 py-2 text-right font-semibold">Imponibile</th><th className="px-3 py-2 text-right font-semibold">IVA</th><th className="px-3 py-2 text-right font-semibold">Totale</th><th className="px-3 py-2 font-semibold">Scadenza</th><th className="px-3 py-2 font-semibold">Stato</th>
+              <th className="px-3 py-2 font-semibold">Data</th>{!single && <th className="px-3 py-2 font-semibold">Struttura</th>}<th className="px-3 py-2 font-semibold">Fornitore</th><th className="px-3 py-2 font-semibold">Numero</th><th className="px-3 py-2 font-semibold">Tipo</th><th className="px-3 py-2 font-semibold">Categoria</th><th className="px-3 py-2 text-right font-semibold">Imponibile</th><th className="px-3 py-2 text-right font-semibold">IVA</th><th className="px-3 py-2 text-right font-semibold">Totale</th><th className="px-3 py-2 font-semibold">Scadenza</th><th className="px-3 py-2 font-semibold">Stato</th>
             </tr>
           </thead>
           <tbody>
@@ -247,6 +255,7 @@ export default function FatturePassivePage() {
               return (
                 <tr key={r.id} onClick={() => openEdit(r)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                   <td className="whitespace-nowrap px-3 py-2.5 text-dim">{r.doc_date ? new Date(r.doc_date).toLocaleDateString("it-IT") : "—"}</td>
+                  {!single && <td className="px-3 py-2.5 text-dim">{structName(r.structure_id)}</td>}
                   <td className="px-3 py-2.5 font-medium text-txt">{r.supplier_name || "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs text-dim">{r.doc_number || "—"}</td>
                   <td className="px-3 py-2.5 text-dim">{TIPI[r.doc_type]}</td>
@@ -261,8 +270,8 @@ export default function FatturePassivePage() {
                 </tr>
               );
             })}
-            {!loading && filtered.length === 0 && <tr><td colSpan={10}><EmptyState title="Nessuna fattura passiva" sub="Registra la prima con “+ Nuova fattura”." /></td></tr>}
-            {loading && <tr><td colSpan={10} className="px-3 py-10 text-center text-sm text-faint">Caricamento…</td></tr>}
+            {!loading && filtered.length === 0 && <tr><td colSpan={11}><EmptyState title="Nessuna fattura passiva" sub="Registra la prima con “+ Nuova fattura”." /></td></tr>}
+            {loading && <tr><td colSpan={11} className="px-3 py-10 text-center text-sm text-faint">Caricamento…</td></tr>}
           </tbody>
         </table>
       </div>
@@ -306,6 +315,17 @@ export default function FatturePassivePage() {
           <div className="relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">{edit.id ? "Modifica fattura passiva" : "Nuova fattura passiva"}</span><button onClick={() => setEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <div className="grid gap-2 sm:grid-cols-2">
+              {single ? (
+                <div className="sm:col-span-2"><span className={lbl}>Struttura</span><div className="mt-1 rounded-lg border border-line bg-wash px-3 py-2 text-sm text-txt">{structName(activeStructureId)}</div></div>
+              ) : (
+                <label className={`${lbl} sm:col-span-2`}>Struttura
+                  <select value={edit.structureId} onChange={(e) => setEdit({ ...edit, structureId: e.target.value })} className={inp}>
+                    <option value="">— scegli —</option>
+                    {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    <option value="common">Comune a tutte le strutture</option>
+                  </select>
+                </label>
+              )}
               <label className={`${lbl} sm:col-span-2`}>Fornitore
                 <input list="sup-list" value={edit.supplierName} onChange={(e) => setEdit({ ...edit, supplierName: e.target.value, supplierId: null })} className={inp} placeholder="Nome fornitore" />
                 <datalist id="sup-list">{suppliers.map((s) => <option key={s.id} value={s.name} />)}</datalist>

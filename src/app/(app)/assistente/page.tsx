@@ -289,7 +289,7 @@ export default function AssistentePage() {
     if (/prossim|futur/.test(s)) return answers.prossimo;
     if (/fornitor|passiv|da pagare/.test(s) && supabase) {
       let pq = supabase.from("purchase_documents").select("total_cents, paid").eq("paid", false);
-      if (activeStructureId !== "all") pq = pq.or(`structure_id.eq.${activeStructureId},structure_id.is.null`);
+      if (activeStructureId !== "all") pq = pq.eq("structure_id", activeStructureId); // senza struttura: solo con "Tutte"
       const { data } = await pq;
       const tot = ((data ?? []) as { total_cents: number }[]).reduce((a, r) => a + r.total_cents, 0);
       return { title: "Fatture fornitori da pagare", value: eur(tot / 100), detail: `${(data ?? []).length} fatture non pagate.`, go: { label: "Fatture passive", href: "/fatture-passive" } };
