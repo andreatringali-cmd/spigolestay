@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { parseNotifPrefs } from "@/lib/notifPrefs";
 import { AI_CONCIERGE_KEY, parseAiConciergePrefs } from "@/lib/aiConcierge";
-import { getConciergeReply } from "@/lib/ai/guest-concierge";
+import { conciergeAnswer, resolveStructureId, type BookingLite } from "@/lib/concierge-engine";
 import { sendWhatsapp } from "@/lib/whatsapp";
 
 export const runtime = "nodejs";
@@ -81,6 +81,7 @@ async function applyIncoming(admin: SupabaseClient<any>, tenantId: string, fromD
         guestName: guest?.fullName,
         notifPrefsRaw: blob["spigolestay:notifs"],
         aiConciergeRaw: blob[AI_CONCIERGE_KEY],
+        roomAccessRaw: blob["spigolestay:roomaccess"],
         conciergeFaqRaw: Object.fromEntries(Object.keys(blob).filter((k) => k.startsWith("spigolestay:concierge")).map((k) => [k, blob[k]])) as Record<string, string>,
         structures: data.structures,
         bookings: data.bookings,
@@ -131,11 +132,6 @@ async function applyStatuses(admin: SupabaseClient<any>, tenantId: string, statu
   }
 }
 
-interface StLite { id: string; name?: string; address?: string; checkInFrom?: string; checkInTo?: string; checkOutBy?: string; accessInfo?: string; services?: string[] }
-interface UnitLite { id: string; structureId: string; roomTypeId: string; accessInfo?: string }
-interface RoomTypeLite { id: string; amenities?: string[] }
-interface BookingLite { id: string; structureId: string; unitId: string | null; roomTypeId: string; guestId: string; checkIn: string; checkOut: string; status?: string; channel?: string }
-
 // Concierge AI — risposta AUTOMATICA via WhatsApp a domande di routine semplicissime (orario
 // check-in/check-out, wifi, parcheggio, indicazioni stradali), SOLO se l'host ha attivato il
 // toggle "Concierge AI" in Impostazioni (src/lib/aiConcierge.ts, default SPENTO) e l'AI è sicura
@@ -147,6 +143,7 @@ interface BookingLite { id: string; structureId: string; unitId: string | null; 
 async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: {
   aiConciergeRaw?: string;
   conciergeFaqRaw?: Record<string, string>;
+  roomAccessRaw?: string;
   fromDigits: string;
   text: string;
   guestName?: string;
@@ -162,63 +159,25 @@ async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: 
     const prefs = parseAiConciergePrefs(info.aiConciergeRaw);
     if (!prefs.enabled) return; // interruttore spento (default): nessuna risposta automatica
 
-    const structures = (Array.isArray(info.structures) ? info.structures : []) as StLite[];
+    const structures = (Array.isArray(info.structures) ? info.structures : []) as { id: string }[];
     const bookingsArr = (Array.isArray(info.bookings) ? info.bookings : []) as BookingLite[];
-    const units = (Array.isArray(info.units) ? info.units : []) as UnitLite[];
-    const roomTypes = (Array.isArray(info.roomTypes) ? info.roomTypes : []) as RoomTypeLite[];
+    // Struttura di riferimento: prenotazione dell'ospite, poi struttura unica, poi quella predefinita in Impostazioni.
+    const structureId = resolveStructureId(structures, bookingsArr, info.guest?.id, prefs.defaultStructureId);
+    if (!structureId) return; // nessun contesto struttura affidabile → nessuna risposta automatica
 
-    // Risale alla struttura: prenotazione più recente dell'ospite (se esiste), altrimenti — solo
-    // se il gestore ha UNA sola struttura — quella, per non rischiare di citare dati sbagliati.
-    let st: StLite | undefined;
-    let unit: UnitLite | undefined;
-    let roomType: RoomTypeLite | undefined;
-    if (info.guest?.id) {
-      const myBookings = bookingsArr.filter((b) => b.guestId === info.guest!.id && b.status !== "cancelled").sort((a, b) => (a.checkIn < b.checkIn ? 1 : -1));
-      const b = myBookings[0];
-      if (b) {
-        st = structures.find((s) => s.id === b.structureId);
-        unit = units.find((u) => u.id === b.unitId) || undefined;
-        roomType = roomTypes.find((r) => r.id === b.roomTypeId) || undefined;
-      }
-    }
-    if (!st && structures.length === 1) st = structures[0];
-    if (!st && prefs.defaultStructureId) st = structures.find((s) => s.id === prefs.defaultStructureId);
-    if (!st) return; // nessun contesto struttura affidabile → nessuna risposta automatica
-
-    const accessInfo = [unit?.accessInfo, st.accessInfo].filter(Boolean).join(" · ") || undefined;
-    const hasParking = (st.services ?? []).some((s) => /parcheggi/i.test(s)) || (roomType?.amenities ?? []).some((a) => /parcheggi/i.test(a)) || undefined;
     const transcript = (info.priorMessages || []).slice(-8).filter((m) => m.text?.trim())
       .map((m) => `${m.dir === "out" ? "Struttura" : "Ospite"}: ${m.text.replace(/\s+/g, " ").trim()}`).join("\n") || undefined;
 
-    // Risposte scritte dal gestore (Messaggi → Concierge), per struttura; si ignorano i segnaposto
-    // "chiedi al gestore" dei testi di partenza, che non sono informazioni vere.
-    let faq: { topic: string; answer: string }[] = [];
-    try {
-      const raw = info.conciergeFaqRaw?.["spigolestay:concierge:" + st.id] ?? info.conciergeFaqRaw?.["spigolestay:concierge"];
-      const list = raw ? (JSON.parse(raw) as { topic?: string; answer?: string }[]) : [];
-      faq = list
-        .filter((f) => f?.topic && f?.answer && !/chiedi (pure )?al gestore|da concordare con il gestore|modificabile qui|giro la tua domanda/i.test(f.answer))
-        .map((f) => ({ topic: String(f.topic).slice(0, 80), answer: String(f.answer).slice(0, 600) }))
-        .slice(0, 40);
-    } catch { faq = []; }
-
-    const outcome = await getConciergeReply({
-      faq,
-      guestName: info.guestName,
-      lang: info.guest?.language,
-      structureName: st.name,
-      address: st.address,
-      checkInFrom: st.checkInFrom,
-      checkInTo: st.checkInTo,
-      checkOutBy: st.checkOutBy,
-      accessInfo,
-      hasParking,
-      transcript,
-      lastGuestMessage: info.text,
+    const result = await conciergeAnswer({
+      admin, tenantId,
+      data: { structures: info.structures, bookings: info.bookings, units: info.units, roomTypes: info.roomTypes },
+      roomAccessRaw: info.roomAccessRaw, conciergeFaqRaw: info.conciergeFaqRaw,
+      structureId, guest: info.guest, guestName: info.guestName, message: info.text, transcript,
     });
-    if (!outcome.ok || !outcome.result.canAnswer || !outcome.result.reply) return;
+    if (!result.answered || !result.reply) return;
+    const reply = result.reply;
 
-    const sent = await sendWhatsapp(admin, tenantId, { to: info.fromDigits, text: outcome.result.reply });
+    const sent = await sendWhatsapp(admin, tenantId, { to: info.fromDigits, text: reply });
     if (!sent.ok) return;
 
     // Stesso pattern rev-lock + retry di applyIncoming, per appendere la risposta AI al thread.
@@ -229,7 +188,7 @@ async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: 
       let threads: Record<string, Msg[]> = {};
       try { threads = JSON.parse(blob[THREADS_KEY] || "{}"); } catch { threads = {}; }
       const list = threads[info.threadKey] ?? [];
-      threads[info.threadKey] = [...list, { id: randomUUID(), dir: "out", text: outcome.result.reply, ts: Date.now(), via: "🤖 Concierge AI", ...(sent.id ? { wid: sent.id, st: "sent" as const } : {}) }];
+      threads[info.threadKey] = [...list, { id: randomUUID(), dir: "out", text: reply, ts: Date.now(), via: "🤖 Concierge AI", ...(sent.id ? { wid: sent.id, st: "sent" as const } : {}) }];
       blob[THREADS_KEY] = JSON.stringify(threads);
 
       let write = admin.from("app_state").update({ data: blob, updated_at: new Date().toISOString() }).eq("user_id", tenantId);
@@ -294,6 +253,7 @@ export async function POST(req: Request) {
             tryAutoReply(admin, tenantId, {
               aiConciergeRaw: res.aiConciergeRaw as string | undefined,
               conciergeFaqRaw: res.conciergeFaqRaw as Record<string, string> | undefined,
+              roomAccessRaw: res.roomAccessRaw as string | undefined,
               fromDigits,
               text,
               guestName: res.guestName,

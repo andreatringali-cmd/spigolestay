@@ -27,6 +27,7 @@ export interface ConciergeContext {
   accessInfo?: string; // istruzioni/codici di accesso (possono contenere la rete/password wifi)
   hasParking?: boolean;
   faq?: { topic: string; answer: string }[]; // risposte scritte dal gestore (Messaggi → Concierge)
+  hasBooking?: boolean; // l'interlocutore ha una prenotazione in corso o futura (false = contatto sconosciuto)
   transcript?: string; // breve contesto della conversazione (facoltativo)
   lastGuestMessage: string;
 }
@@ -58,6 +59,9 @@ export async function getConciergeReply(ctx: ConciergeContext): Promise<Concierg
     ...(ctx.faq ?? []).map((f) => `- Informazione scritta dal gestore su "${f.topic}": ${f.answer}`),
   ].filter(Boolean).join("\n") || "(nessun dato strutturato disponibile)";
 
+  const noBookingRule = ctx.hasBooking === false
+    ? "\n- L'interlocutore NON risulta avere una prenotazione in corso: non rivelare MAI password Wi-Fi, codici o istruzioni di accesso e non dare dati riservati; rispondi solo con informazioni pubbliche (zona, orari, servizi) oppure canAnswer = false."
+    : "";
   const prompt = `Sei il concierge automatico di "${ctx.structureName || "una struttura ricettiva"}": rispondi via WhatsApp SENZA revisione umana, quindi devi essere prudentissimo.
 Puoi rispondere automaticamente SOLO a queste domande di routine, se hai i dati per farlo con certezza:
 - checkin_time: orario di check-in e/o check-out
@@ -70,7 +74,7 @@ Regole FERREE:
 - canAnswer = true SOLO se sei sicuro al 100% E tutti i dati necessari sono esplicitamente presenti qui sotto in "Dati disponibili".
 - NON INVENTARE MAI alcun dato (orari, indirizzo, password wifi, istruzioni) assente dai "Dati disponibili": se manca anche un solo dato richiesto dalla domanda, canAnswer = false.
 - Se il messaggio dell'ospite non è chiaramente una delle domande ammesse, canAnswer = false e topic = "other".
-- In caso di qualunque dubbio, canAnswer = false.
+- In caso di qualunque dubbio, canAnswer = false.${noBookingRule}
 - "reply" va scritto in ${langName}, tono cordiale e professionale, breve (1-3 frasi), rivolgendoti all'ospite per nome se disponibile. Nessun preambolo, nessuna firma. Se canAnswer è false, reply può restare vuoto ("").
 Dati disponibili:
 ${facts}
