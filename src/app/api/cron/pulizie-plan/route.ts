@@ -109,7 +109,10 @@ export async function GET(req: Request) {
       }
       if (cfg.whatsapp && cfg.whatsappTo) {
         try {
-          const w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, text });
+          let w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, text });
+          // Fuori dalla finestra di 24h il testo libero viene rifiutato da Meta: ripiego sul modello approvato
+          // (corpo con 3 variabili: {{1}} struttura, {{2}} data, {{3}} planning in una riga).
+          if (!w.ok) w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, templateName: process.env.WHATSAPP_PULIZIE_TEMPLATE || "planning_pulizie", lang: "it", params: [s((st as unknown as Json).name), todayRome, text] });
           if (w.ok) waSent++;
           else errors.push(`wa ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${w.message}`);
         } catch (e) { errors.push(`wa ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); }

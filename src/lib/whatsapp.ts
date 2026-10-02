@@ -47,7 +47,7 @@ export async function whatsappTest(admin: SupabaseClient, tenantId: string): Pro
   } catch (e) { return { ok: false, message: (e as Error)?.message ?? "Errore di connessione." }; }
 }
 
-export interface SendArgs { to: string; text?: string; templateName?: string; lang?: string }
+export interface SendArgs { to: string; text?: string; templateName?: string; lang?: string; params?: string[] }
 export async function sendWhatsapp(admin: SupabaseClient, tenantId: string, args: SendArgs): Promise<{ ok: boolean; message: string; id?: string }> {
   const cfg = await readCfg(admin, tenantId);
   if (!cfg) return { ok: false, message: "WhatsApp non collegato." };
@@ -57,7 +57,11 @@ export async function sendWhatsapp(admin: SupabaseClient, tenantId: string, args
   const body: Record<string, unknown> = { messaging_product: "whatsapp", to };
   if (args.templateName) {
     body.type = "template";
-    body.template = { name: args.templateName, language: { code: args.lang || "it" } };
+    body.template = {
+      name: args.templateName, language: { code: args.lang || "it" },
+      // Variabili del corpo del modello ({{1}}, {{2}}…): niente a capo né tab (regola di Meta).
+      ...(args.params?.length ? { components: [{ type: "body", parameters: args.params.map((t) => ({ type: "text", text: t.replace(/[\r\n\t]+/g, " · ").replace(/ {2,}/g, " ").trim().slice(0, 900) || "-" })) }] } : {}),
+    };
   } else {
     body.type = "text";
     // preview_url: senza, la Cloud API NON genera l'anteprima (foto + descrizione) dei link nel testo.
