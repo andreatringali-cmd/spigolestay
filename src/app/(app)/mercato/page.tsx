@@ -8,6 +8,7 @@ import { toISO, shiftISO, nights } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { PageHeader, Card } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
+import { yoyCompare } from "@/lib/revenue-yoy";
 
 const WINDOW = 90;
 const THRESHOLD = 3;
@@ -40,6 +41,7 @@ export default function MercatoPage() {
   const [pulse, setPulse] = useState<Pulse | null>(null);
   const [breakdown, setBreakdown] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
+  const [netErr, setNetErr] = useState<string | null>(null); // errore dei servizi della rete (mai silenzioso)
 
   const sUnits = useMemo(() => units.filter((u) => u.structureId === struct?.id && !u.outOfService), [units, struct?.id]);
   const sRooms = sUnits.length;
@@ -107,32 +109,44 @@ export default function MercatoPage() {
     };
   }, [struct, sRooms, bookings, guests]);
 
+  // Confronto anno su anno DELLA TUA struttura (dalle tue prenotazioni reali, 52 settimane prima).
+  const yoyPast = useMemo(() => (struct ? yoyCompare(bookings, units, struct.id, shiftISO(toISO(new Date()), -(WINDOW - 1)), WINDOW, toISO(new Date())) : null), [struct, bookings, units]);
+  const yoyNext = useMemo(() => (struct ? yoyCompare(bookings, units, struct.id, toISO(new Date()), 30, toISO(new Date())) : null), [struct, bookings, units]);
+
   const dailyForUpload = useMemo(() => myDaily.map((r) => ({ date: r.date, rooms_total: r.rooms_total, rooms_sold: r.rooms_sold, revenue: r.revenue })), [myDaily]);
 
   const refresh = useCallback(async () => {
     if (!supabase || !user?.id || !struct?.id || !city || consentsFor !== struct.id) return;
-    setLoading(true);
+    setLoading(true); setNetErr(null);
+    const st = { failed: false }; // oggetto (non variabile riassegnata) per restare compatibile con la memoizzazione
     try {
       const anyShare = consents.occupancy || consents.adr || consents.demand || consents.channels;
-      await supabase.from("market_share").upsert({ user_id: user.id, structure_id: struct.id, city, share_occupancy: consents.occupancy, share_adr: consents.adr, share_demand: consents.demand, share_channels: consents.channels, updated_at: new Date().toISOString() });
-      if (anyShare && dailyForUpload.length) await supabase.from("market_daily").upsert(dailyForUpload.map((r) => ({ user_id: user.id, structure_id: struct.id, city, ...r })));
-      else await supabase.from("market_daily").delete().eq("user_id", user.id).eq("structure_id", struct.id);
+      const rShare = await supabase.from("market_share").upsert({ user_id: user.id, structure_id: struct.id, city, share_occupancy: consents.occupancy, share_adr: consents.adr, share_demand: consents.demand, share_channels: consents.channels, updated_at: new Date().toISOString() });
+      if (rShare.error) st.failed = true;
+      const rDaily = (anyShare && dailyForUpload.length)
+        ? await supabase.from("market_daily").upsert(dailyForUpload.map((r) => ({ user_id: user.id, structure_id: struct.id, city, ...r })))
+        : await supabase.from("market_daily").delete().eq("user_id", user.id).eq("structure_id", struct.id);
+      if (rDaily.error) st.failed = true;
       if (profile && (consents.demand || consents.channels)) {
         // si carica solo il gruppo di dati che condividi
         const d = consents.demand, c = consents.channels;
-        await supabase.from("market_profile").upsert({
+        const rProf = await supabase.from("market_profile").upsert({
           user_id: user.id, structure_id: struct.id, city,
           future_occ: d ? profile.future_occ : null, pickup_pct: d ? profile.pickup_pct : null, lead_avg: d ? profile.lead_avg : null,
           los_avg: c ? profile.los_avg : null, cancel_rate: c ? profile.cancel_rate : null, direct_pct: c ? profile.direct_pct : null, foreign_pct: c ? profile.foreign_pct : null,
           updated_at: new Date().toISOString(),
         });
-      } else await supabase.from("market_profile").delete().eq("user_id", user.id).eq("structure_id", struct.id);
+        if (rProf.error) st.failed = true;
+      } else { const rDel = await supabase.from("market_profile").delete().eq("user_id", user.id).eq("structure_id", struct.id); if (rDel.error) st.failed = true; }
       const from = shiftISO(toISO(new Date()), -WINDOW), to = toISO(new Date());
-      const { data } = await supabase.rpc("market_pulse", { p_city: city, p_from: from, p_to: to });
+      const { data, error: e1 } = await supabase.rpc("market_pulse", { p_city: city, p_from: from, p_to: to });
+      if (e1) st.failed = true;
       setPulse((Array.isArray(data) ? data[0] : data) as Pulse ?? null);
-      const { data: bd } = await supabase.rpc("market_breakdown", { p_city: city, p_from: from, p_to: to });
+      const { data: bd, error: e2 } = await supabase.rpc("market_breakdown", { p_city: city, p_from: from, p_to: to });
+      if (e2) st.failed = true;
       setBreakdown(Array.isArray(bd) ? (bd as typeof breakdown) : []);
-    } catch {} finally { setLoading(false); }
+      if (st.failed) setNetErr("Alcuni dati della Rete città non sono stati caricati o salvati. Le medie di zona potrebbero mancare o non essere aggiornate: riprova tra poco.");
+    } catch { setNetErr("Rete città non raggiungibile: controlla la connessione e riprova. I tuoi dati qui sotto sono comunque calcolati dalle tue prenotazioni."); } finally { setLoading(false); }
   }, [consents, consentsFor, user?.id, struct?.id, city, dailyForUpload, profile]);
 
   useEffect(() => { void refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [consents, consentsFor, struct?.id, city]);
@@ -157,6 +171,41 @@ export default function MercatoPage() {
           <span>{t("su")} {pulse.n_structures} {t("strutture della rete")}, {pulse.n_demo_structures} {t("sono demo dimostrative (non concorrenti reali) — usate per mostrare la funzione. Le medie qui sotto le includono.")}</span>
         </div>
       )}
+
+      {/* Stato della rete: errori e assenza di accesso sempre visibili (mai silenziosi) */}
+      {!supabase || !user?.id ? (
+        <div className="mb-4 rounded-xl border border-dashed border-line px-3 py-2 text-[12px] text-dim">{t("Modalità solo locale: la Rete città richiede un account collegato. Qui sotto vedi solo i tuoi dati reali; il confronto con la città compare dopo l'accesso.")}</div>
+      ) : netErr ? (
+        <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[12px]" style={{ borderColor: "color-mix(in srgb,var(--warn) 40%,var(--line))", background: "color-mix(in srgb,var(--warn) 10%,var(--surface))", color: "var(--warn)" }}>
+          <span>{t(netErr)}</span>
+          <button onClick={() => void refresh()} disabled={loading} className="rounded-md border border-line bg-surface px-2.5 py-1 font-semibold text-txt hover:bg-wash disabled:opacity-60">{loading ? t("Riprovo…") : t("Riprova")}</button>
+        </div>
+      ) : null}
+
+      {/* ANNO SU ANNO: solo dati tuoi reali, nessun dato di rete */}
+      <section className="mt-4">
+        <h3 className="text-[15px] font-bold tracking-tight text-txt">{t("Il tuo anno su anno")}</h3>
+        <p className="mb-2 mt-0.5 text-xs text-dim">{t("Stessi giorni della settimana, 52 settimane prima. Solo dalle tue prenotazioni reali: non dipende dalla rete.")}</p>
+        <div className="rounded-2xl border border-line p-4" style={{ background: "var(--surface)" }}>
+          {yoyPast && yoyNext && (yoyPast.hasHistory || yoyNext.hasHistory) ? (
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[{ label: t("Occupazione ultimi") + " " + WINDOW + " " + t("gg"), now: yoyPast.now.occ, ly: yoyPast.lastYear.occ, d: yoyPast.deltaOccPts, ok: yoyPast.hasHistory, kind: "occ" as const },
+                { label: "ADR " + WINDOW + " " + t("gg"), now: yoyPast.now.adr, ly: yoyPast.lastYear.adr, d: yoyPast.deltaAdrPct, ok: yoyPast.hasHistory && yoyPast.lastYear.adr > 0, kind: "adr" as const },
+                { label: t("Occupazione prossimi 30 gg (già a libro)"), now: yoyNext.now.occ, ly: yoyNext.lastYearAtSameDate?.occ ?? yoyNext.lastYear.occ, d: yoyNext.lastYearAtSameDate ? yoyNext.deltaPaceOccPts : yoyNext.deltaOccPts, ok: yoyNext.hasHistory, kind: "occ" as const, pace: !!yoyNext.lastYearAtSameDate }].map((c, i) => (
+                <div key={i} className="rounded-xl border border-line bg-paper p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">{c.label}</div>
+                  <div className="font-mono text-xl font-bold text-txt">{c.kind === "occ" ? `${Math.round(c.now * 100)}%` : c.now ? eur(Math.round(c.now)) : "—"}</div>
+                  {c.ok ? (
+                    <div className="text-[11px] text-dim">{t("anno scorso")}{"pace" in c && c.pace ? " " + t("alla stessa data") : ""} {c.kind === "occ" ? `${Math.round(c.ly * 100)}%` : eur(Math.round(c.ly))}{c.d != null && <b style={{ color: c.d >= 0 ? "var(--ok)" : "var(--warn)" }}> ({c.d > 0 ? "+" : ""}{c.d}{c.kind === "occ" ? " pt" : "%"})</b>}</div>
+                  ) : <div className="text-[11px] text-faint">{t("nessuno storico per questo periodo")}</div>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[13px] text-dim">{t("Nessuna prenotazione registrata per lo stesso periodo dell'anno scorso: il confronto compare quando c'è storico (importa le prenotazioni passate).")}</p>
+          )}
+        </div>
+      </section>
 
       {/* KPI: come vai rispetto alla città */}
       <section className="mt-4">

@@ -10,6 +10,7 @@ import { italianHolidays, italianBridges } from "@/lib/holidays";
 import { computeSuggestions, loadAutopilot, saveAutopilot, toOverrideMap, highDemandMap } from "@/lib/autopilot";
 import { summarizeAppliedSuggestions } from "@/lib/autopilot-explain";
 import { inScope } from "@/lib/scope";
+import { buildChanges, recordBatches } from "@/lib/revenue-history";
 
 export default function AutopilotRunner() {
   const { bookings, roomTypes, units, events, rateOverrides, setDayRates, structures, addActivity } = useData();
@@ -34,6 +35,8 @@ export default function AutopilotRunner() {
       const hd = highDemandMap(evs, holidays, bridges, today, cfg.horizonDays);
       const sugg = computeSuggestions(bookings, roomTypes, units, rateOverrides, cfg, today, sid ?? "all", hd);
       if (sugg.length) {
+        // Storico con "Annulla": registra il valore precedente di ogni tariffa prima di scriverla.
+        recordBatches("autopilot-auto", "Autopilot giornaliero", buildChanges(sugg.map((x) => ({ key: x.key, typeName: x.typeName, iso: x.iso, structureId: x.structureId, effBefore: x.current, after: x.suggested })), rateOverrides));
         setDayRates(toOverrideMap(sugg));
         addActivity("rate", `Autopilot${st ? ` (${st.name})` : ""}: ${sugg.length} tariffe aggiornate automaticamente. ${summarizeAppliedSuggestions(sugg)}`, sid);
       }

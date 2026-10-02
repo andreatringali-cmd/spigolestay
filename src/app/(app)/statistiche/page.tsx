@@ -5,7 +5,7 @@ import { useData } from "@/lib/store";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { commissionOf, revenueInRange, nightlyRevenue } from "@/lib/booking";
 import { toISO, addDays, nights, parseISO } from "@/lib/dates";
-import { eur, num } from "@/lib/format";
+import { eur } from "@/lib/format";
 import { PageHeader, StatCard } from "@/components/ui";
 import Donut from "@/components/Donut";
 import Bars from "@/components/Bars";
@@ -15,11 +15,14 @@ import Gauge from "@/components/Gauge";
 import { flagColor, flagGradient } from "@/lib/flags";
 import ScrollStrip from "@/components/ScrollStrip";
 import Icon from "@/components/Icon";
+import EmptyState from "@/components/EmptyState";
 import { useLang } from "@/lib/i18n";
 
 const PALETTE = ["#BE5D38", "#7A8450", "#C08A3A", "#957A66", "#4F8A5B", "#5B74E6", "#B3453A"];
 const pad2 = (n: number) => String(n).padStart(2, "0");
 const monthLabelOf = (mk: string) => { const [yy, mm] = mk.split("-").map(Number); return new Date(yy, mm - 1, 1).toLocaleDateString("it-IT", { month: "long", year: "numeric" }); };
+// Importi: mai arrotondati agli euro interi (77,50 resta 77,50); si tagliano solo i decimali oltre i centesimi.
+const r2 = (n: number) => Math.round(n * 100) / 100;
 const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
 
 export default function StatistichePage() {
@@ -92,11 +95,51 @@ export default function StatistichePage() {
     }
     const arrivals = active.filter((b) => b.checkIn >= from && b.checkIn < to).length;
     const occ = scopedUnits.length ? roomNights / (scopedUnits.length * days) : 0;
-    return { revenue: Math.round(revenue), roomNights, count: arrivals, occ, adr: roomNights ? revenue / roomNights : 0, revpar: scopedUnits.length ? revenue / (scopedUnits.length * days) : 0 };
+    return { revenue: r2(revenue), roomNights, count: arrivals, occ, adr: roomNights ? revenue / roomNights : 0, revpar: scopedUnits.length ? revenue / (scopedUnits.length * days) : 0 };
   };
+  // Confronto dei KPI mensili: col mese precedente oppure con lo STESSO mese dell'anno scorso.
+  const [cmpMode, setCmpMode] = useState<"prev" | "yoy">("prev");
   const cur = metrics(R.from, R.to);
-  const prev = metrics(R.pfrom, R.pto);
-  const delta = (a: number, b: number) => (b > 0 ? Math.round(((a - b) / b) * 100) : a > 0 ? 100 : 0);
+  const prevM = metrics(R.pfrom, R.pto);
+  const yoyM = metrics(`${rY - 1}-${pad2(rM)}-01`, toISO(new Date(rY - 1, rM, 1)));
+  const prev = cmpMode === "yoy" ? yoyM : prevM;
+  const cmpLabel = cmpMode === "yoy" ? monthLabelOf(`${rY - 1}-${pad2(rM)}`) : R.cmp;
+
+  // KPI di comportamento per un periodo (prenotazioni con arrivo nel periodo): durata media, anticipo
+  // di prenotazione (lead time, solo dove la data di prenotazione è nota), valore medio, cancellazioni.
+  const behaviour = (arr: typeof active, from: string, to: string) => {
+    const n = arr.length;
+    const avgStay = n ? arr.reduce((a, b) => a + nights(b.checkIn, b.checkOut), 0) / n : 0;
+    const leads = arr.filter((b) => b.bookedOn).map((b) => Math.round((new Date(b.checkIn).getTime() - new Date(b.bookedOn as string).getTime()) / 86400000)).filter((x) => x >= 0);
+    const lead = leads.length ? leads.reduce((a, x) => a + x, 0) / leads.length : null;
+    const avgValue = n ? arr.reduce((a, b) => a + (b.total ?? 0), 0) / n : 0;
+    const allInPeriod = bookings.filter((b) => b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId) && b.checkIn >= from && b.checkIn < to);
+    const canc = allInPeriod.filter((b) => b.status === "cancelled").length;
+    return { n, avgStay, lead, leadN: leads.length, avgValue, canc, allN: allInPeriod.length, cancRate: allInPeriod.length ? canc / allInPeriod.length : 0 };
+  };
+  const behaviourRow = (x: ReturnType<typeof behaviour>) => (
+    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <StatCard label={t("Durata media")} value={x.n ? `${x.avgStay.toFixed(1).replace(".", ",")} ${t("notti")}` : "—"} hint={x.n ? `${x.n} ${t("prenotazioni")}` : t("nessun arrivo")} />
+      <StatCard label={t("Anticipo medio (lead time)")} value={x.lead != null ? `${Math.round(x.lead)} ${t("giorni")}` : "—"} hint={x.lead != null ? `su ${x.leadN} ${t("prenotazioni con data nota")}` : t("data di prenotazione non disponibile")} />
+      <StatCard label={t("Valore medio prenotazione")} value={x.n ? eur(x.avgValue) : "—"} hint={t("solo soggiorno")} />
+      <StatCard label={t("Cancellazioni")} value={x.allN ? `${Math.round(x.cancRate * 100)}%` : "—"} color={x.cancRate >= 0.2 ? "var(--warn)" : undefined} hint={x.allN ? `${x.canc} su ${x.allN} ${t("prenotazioni")}` : t("nessuna prenotazione")} />
+    </div>
+  );
+
+  // Esporta in CSV (separatore ; e BOM: si apre bene in Excel italiano) le righe della tabella mostrata.
+  const csvNum = (n: number) => n.toFixed(2).replace(".", ",");
+  const exportRegistro = (fileLabel: string, periodLabel: string, rows: { label: string; storico: boolean; camere: number; occ: number; arrivi: number; partenze: number; ospiti: number; adr: number; lordo: number; commissioni: number }[], tot: { camere: number; occ: number; arrivi: number; partenze: number; ospiti: number; adr: number; lordo: number; commissioni: number; netto: number }) => {
+    const q = (x: unknown) => `"${String(x ?? "").replace(/"/g, '""')}"`;
+    const head = [periodLabel, "Stato", "Camere vendute", "Occupazione %", "Arrivi", "Partenze", "Ospiti", "ADR", "Revenue", "Commissioni", "Netto"];
+    const body: (string | number)[][] = rows.map((r) => [r.label, r.storico ? "Storico" : "Previsione", r.camere, Math.round(r.occ * 100), r.arrivi, r.partenze, r.ospiti, csvNum(r.camere ? r.adr : 0), csvNum(r.lordo), csvNum(r.commissioni), csvNum(r.lordo - r.commissioni)]);
+    body.push(["Totale", "", tot.camere, Math.round(tot.occ * 100), tot.arrivi, tot.partenze, tot.ospiti, csvNum(tot.camere ? tot.adr : 0), csvNum(tot.lordo), csvNum(tot.commissioni), csvNum(tot.netto)]);
+    const csv = "\ufeff" + [head, ...body].map((r) => r.map(q).join(";")).join("\r\n");
+    const scope = activeStructureId === "all" ? "tutte-le-strutture" : (structures.find((x) => x.id === activeStructureId)?.name ?? "struttura").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = `statistiche-${fileLabel}-${scope}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  };
+  // Variazione % sul periodo di confronto; con confronto a zero non è definita (niente "+100%" fuorviante).
+  const delta = (a: number, b: number): number | null => (b > 0 ? Math.round(((a - b) / b) * 100) : null);
 
   // Prenotazioni con arrivo nel mese selezionato → base di tutti i grafici categoriali.
   const monthArr = active.filter((b) => b.channel !== "blocked" && b.checkIn >= R.from && b.checkIn < R.to);
@@ -143,8 +186,8 @@ export default function StatistichePage() {
       const iso = `${repMonth}-${pad2(d)}`;
       const occBks = bks.filter((b) => b.checkIn <= iso && iso < b.checkOut);
       const camere = occBks.filter((b) => b.unitId).length;
-      const lordo = Math.round(occBks.reduce((a, b) => a + nightlyRevenue(b, iso), 0));
-      const commissioni = Math.round(occBks.reduce((a, b) => a + commissionOf(b) / nights(b.checkIn, b.checkOut), 0));
+      const lordo = r2(occBks.reduce((a, b) => a + nightlyRevenue(b, iso), 0));
+      const commissioni = r2(occBks.reduce((a, b) => a + commissionOf(b) / nights(b.checkIn, b.checkOut), 0));
       const ospiti = occBks.reduce((a, b) => a + b.adults + b.children, 0);
       const arrivi = bks.filter((b) => b.checkIn === iso).length;
       const partenze = bks.filter((b) => b.checkOut === iso).length;
@@ -173,7 +216,7 @@ export default function StatistichePage() {
     color: chColor(c),
     values: active
       .filter((b) => b.channel === c && b.total && nights(b.checkIn, b.checkOut) > 0)
-      .map((b) => Math.round((b.total ?? 0) / nights(b.checkIn, b.checkOut))),
+      .map((b) => r2((b.total ?? 0) / nights(b.checkIn, b.checkOut))),
   })).filter((s) => s.values.length > 0);
 
   // Galleria grafici (4 per pagina, frecce per scorrere)
@@ -182,7 +225,7 @@ export default function StatistichePage() {
   const charts = [
     { key: "occ-gauge", title: t("Occupazione del mese"), node: <Gauge value={Math.round(cur.occ * 100)} unit="%" color="var(--ok)" /> },
     { key: "price-ch", title: t("Prezzo a notte per canale"), wide: true, node: <DensityChart series={priceByChannel} xLabel={t("Prezzo a notte (€)")} unit="€" /> },
-    { key: "rev-ch", title: t("Ricavi per canale (mese)"), wide: true, node: <Donut data={revenueByChannel} center={`€ ${num(monthRevenue)}`} format={(n) => eur(n)} /> },
+    { key: "rev-ch", title: t("Ricavi per canale (mese)"), wide: true, node: <Donut data={revenueByChannel} center={eur(monthRevenue)} format={(n) => eur(n)} /> },
     { key: "weekday", title: t("Occupazione per giorno settimana"), node: <ColumnChart bars={weekday} format={(n) => `${n}%`} /> },
     { key: "country", title: t("Provenienza ospiti per paese"), node: <ColumnChart bars={byCountry} labelColor="var(--txt)" allLabels /> },
     { key: "stay", title: t("Durata del soggiorno"), node: <Bars items={stayDist} /> },
@@ -228,12 +271,12 @@ export default function StatistichePage() {
     color: chColor(c),
     values: active
       .filter((b) => b.channel === c && b.checkIn >= yearFrom && b.checkIn < yearTo && b.total && nights(b.checkIn, b.checkOut) > 0)
-      .map((b) => Math.round((b.total ?? 0) / nights(b.checkIn, b.checkOut))),
+      .map((b) => r2((b.total ?? 0) / nights(b.checkIn, b.checkOut))),
   })).filter((s) => s.values.length > 0);
   const chartsY = [
     { key: "y-occ-gauge", title: t("Occupazione dell'anno"), node: <Gauge value={Math.round(annCur.occ * 100)} unit="%" color="var(--ok)" /> },
     { key: "y-price-ch", title: t("Prezzo a notte per canale"), wide: true, node: <DensityChart series={priceByChannelY} xLabel={t("Prezzo a notte (€)")} unit="€" /> },
-    { key: "y-rev-ch", title: t("Ricavi per canale (anno)"), wide: true, node: <Donut data={revenueByChannelY} center={`€ ${num(yearRevenue)}`} format={(n) => eur(n)} /> },
+    { key: "y-rev-ch", title: t("Ricavi per canale (anno)"), wide: true, node: <Donut data={revenueByChannelY} center={eur(yearRevenue)} format={(n) => eur(n)} /> },
     { key: "y-rev-month", title: t("Ricavi per mese"), wide: true, node: <ColumnChart bars={annualBars} format={(n) => eur(n)} allLabels /> },
     { key: "y-country", title: t("Provenienza ospiti per paese"), node: <ColumnChart bars={byCountryY} labelColor="var(--txt)" allLabels /> },
     { key: "y-stay", title: t("Durata del soggiorno"), node: <Bars items={stayDistY} /> },
@@ -271,7 +314,7 @@ export default function StatistichePage() {
       iso: String(b.i), label: b.label, storico: b.lastDayISO < todayISO, days: b.days,
       camere: Math.round(b.camere), occ: scopedUnits.length && b.days ? b.camere / (scopedUnits.length * b.days) : 0,
       arrivi: b.arrivi, partenze: b.partenze, ospiti: Math.round(b.ospiti),
-      adr: b.camere ? b.lordo / b.camere : 0, lordo: Math.round(b.lordo), commissioni: Math.round(b.commissioni),
+      adr: b.camere ? b.lordo / b.camere : 0, lordo: r2(b.lordo), commissioni: r2(b.commissioni),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annualYear, bookings, activeStructureId, scopedUnits.length, todayISO]);
@@ -320,6 +363,15 @@ export default function StatistichePage() {
           <option value="incasso">{t("All'incasso")}</option>
         </select>
       </span>
+      {showMonth && (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-wash py-1 pl-3 pr-1 text-xs font-medium text-dim" title={t("Con cosa confrontare le KPI del mese")}>
+          {t("Confronta con")}:
+          <select value={cmpMode} onChange={(e) => setCmpMode(e.target.value as "prev" | "yoy")} className="rounded-full border-none bg-transparent py-0.5 pl-1 pr-5 text-xs font-semibold text-txt outline-none">
+            <option value="prev">{t("mese precedente")}</option>
+            <option value="yoy">{t("stesso mese anno scorso")}</option>
+          </select>
+        </span>
+      )}
       <div className="ml-auto flex items-center gap-2">
         {(() => { const on = showMonth ? chartsOn : chartsOnY; const tog = showMonth ? toggleCharts : toggleChartsY; return (
           <button onClick={tog} title={on ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${on ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
@@ -337,7 +389,11 @@ export default function StatistichePage() {
   // colonne, stesso ordine, "madre" = quella che prima era il Previsionale.
   type RepRow = { iso: string; label: string; storico: boolean; highlight?: boolean; camere: number; occ: number; arrivi: number; partenze: number; ospiti: number; adr: number; lordo: number; commissioni: number };
   type RepTotal = { camere: number; occ: number; arrivi: number; partenze: number; ospiti: number; adr: number; lordo: number; commissioni: number; netto: number };
-  const RepTableView = ({ periodLabel, rows, totStorico, totPrevis, totAll }: { periodLabel: string; rows: RepRow[]; totStorico: RepTotal; totPrevis: RepTotal; totAll: RepTotal }) => (
+  const RepTableView = ({ periodLabel, rows, totStorico, totPrevis, totAll, fileLabel }: { periodLabel: string; rows: RepRow[]; totStorico: RepTotal; totPrevis: RepTotal; totAll: RepTotal; fileLabel: string }) => (
+    <>
+    <div className="mb-2 flex justify-end">
+      <button onClick={() => exportRegistro(fileLabel, periodLabel, rows, totAll)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash" title={t("Scarica la tabella in CSV (si apre in Excel)")}>{t("Esporta CSV")}</button>
+    </div>
     <div className="max-h-[60vh] overflow-auto rounded-xl border border-line bg-surface shadow-sm">
       <table className="w-full min-w-[1000px] table-fixed text-sm">
         <RepCols />
@@ -392,21 +448,30 @@ export default function StatistichePage() {
         </tfoot>
       </table>
     </div>
+    </>
   );
 
   return (
     <div>
       <PageHeader title={t("Statistiche")} subtitle={t("Due report: mensile (con previsionale) e annuale")} />
 
+      {active.length === 0 && (
+        <div className="mb-4 rounded-xl border border-line bg-surface shadow-sm"><EmptyState title={t("Nessuna prenotazione da analizzare")} sub={activeStructureId === "all" ? t("Le statistiche compariranno appena ci sono prenotazioni.") : t("Questa struttura non ha ancora prenotazioni: le statistiche compariranno appena ce ne sono. Cambia struttura in alto per vedere le altre.")} /></div>
+      )}
+      {active.length > 0 && scopedUnits.length === 0 && (
+        <div className="mb-4 rounded-lg border px-3 py-2 text-xs text-dim" style={{ borderColor: "var(--warn)", background: "color-mix(in srgb, var(--warn) 8%, transparent)" }}>{t("Nessuna unità attiva nell'ambito selezionato: occupazione, ADR e RevPAR non sono calcolabili (ricavi e arrivi sì).")}</div>
+      )}
       {report === "produzione" && (<>
       {/* KPI del mese selezionato con confronto sul mese precedente */}
       <div className="mt-1 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <KpiD label={t("Notti vendute")} value={String(cur.roomNights)} d={prev ? delta(cur.roomNights, prev.roomNights) : null} cmp={R.cmp} />
-        <KpiD label={t("Occupazione")} value={`${Math.round(cur.occ * 100)}%`} d={prev ? delta(cur.occ, prev.occ) : null} cmp={R.cmp} />
-        <KpiD label="ADR" value={eur(cur.adr)} d={prev ? delta(cur.adr, prev.adr) : null} cmp={R.cmp} />
-        <KpiD label="RevPAR" value={eur(cur.revpar)} d={prev ? delta(cur.revpar, prev.revpar) : null} cmp={R.cmp} />
-        <KpiD label={t("Ricavi")} value={eur(cur.revenue)} d={prev ? delta(cur.revenue, prev.revenue) : null} cmp={R.cmp} />
+        <KpiD label={t("Notti vendute")} value={String(cur.roomNights)} d={prev ? delta(cur.roomNights, prev.roomNights) : null} cmp={cmpLabel} />
+        <KpiD label={t("Occupazione")} value={`${Math.round(cur.occ * 100)}%`} d={prev ? delta(cur.occ, prev.occ) : null} cmp={cmpLabel} />
+        <KpiD label="ADR" value={eur(cur.adr)} d={prev ? delta(cur.adr, prev.adr) : null} cmp={cmpLabel} />
+        <KpiD label="RevPAR" value={eur(cur.revpar)} d={prev ? delta(cur.revpar, prev.revpar) : null} cmp={cmpLabel} />
+        <KpiD label={t("Ricavi")} value={eur(cur.revenue)} d={prev ? delta(cur.revenue, prev.revenue) : null} cmp={cmpLabel} />
       </div>
+      {behaviourRow(behaviour(monthArr, R.from, R.to))}
+      {monthArr.length === 0 && active.length > 0 && <p className="mt-2 text-xs text-faint">{t("Nessun arrivo in questo mese: durata media, anticipo e cancellazioni non sono calcolabili.")}</p>}
 
       <div className="mt-6">
         {chartsOn && (
@@ -442,6 +507,7 @@ export default function StatistichePage() {
           totStorico={totStorico}
           totPrevis={totPrevis}
           totAll={totAll}
+          fileLabel={`mese-${repMonth}`}
         />
         <p className="mt-2 text-xs text-faint"><b className="text-dim">{t("Storico")}</b> {t("= giorni già passati")} · <b className="text-dim">{t("Previsione")}</b> {t("= giorni futuri")}. {t("Tutte le prenotazioni prese e confermate valgono come ricavo pieno (come se tutto fosse incassato), indipendentemente dal selettore \"Ricavi\" qui sopra che riguarda solo le KPI card. Gli incassi effettivi sono nella sezione")} <b className="text-dim">{t("Incassi")}</b>.</p>
       </div>
@@ -462,6 +528,7 @@ export default function StatistichePage() {
           <KpiD label="RevPAR" value={eur(annCur.revpar)} d={delta(annCur.revpar, annPrev.revpar)} cmp={String(annualYear - 1)} />
           <KpiD label={t("Ricavi")} value={eur(annCur.revenue)} d={delta(annCur.revenue, annPrev.revenue)} cmp={String(annualYear - 1)} />
         </div>
+        {behaviourRow(behaviour(yearArr, yearFrom, yearTo))}
 
         {/* Grafici dell'anno — stessi del Mensile, scalati sull'anno scelto invece che sul mese. */}
         <div className="mt-6">
@@ -490,6 +557,7 @@ export default function StatistichePage() {
             totStorico={yearTotStorico}
             totPrevis={yearTotPrevis}
             totAll={yearTotAll}
+            fileLabel={`anno-${annualYear}`}
           />
         </div>
         <p className="mt-3 text-xs text-faint"><b className="text-dim">{t("Storico")}</b> {t("= mesi già conclusi")} · <b className="text-dim">{t("Previsione")}</b> {t("= mesi futuri")}. {t("La tabella usa sempre il ricavo per notte (competenza), indipendentemente dal selettore \"Ricavi\" qui sopra che riguarda solo le KPI card:")} <b className="text-dim">{basis === "notte" ? t("per notte (competenza)") : basis === "arrivo" ? t("per data di arrivo") : t("all'incasso")}</b>. {t("Confronto sull'anno")} {annualYear - 1}.</p>

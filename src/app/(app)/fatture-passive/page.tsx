@@ -14,6 +14,7 @@ import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { eur } from "@/lib/format";
 import { apiPost } from "@/lib/invoicing/client";
+import { groupTotals, dueSummary, matchesDue, toCashRow, findDuplicate, signedCents, csvCell, type DueFilter } from "@/lib/purchases";
 
 // Dati fornitore per le OTA (per l'autofattura: sede estera del cedente).
 const OTA_META: Record<string, { name: string; country: string }> = {
@@ -70,7 +71,15 @@ export default function FatturePassivePage() {
   const [year, setYear] = useState<number | "all">(new Date().getFullYear());
   const [tipo, setTipo] = useState("all");
   const [pay, setPay] = useState("all");   // all | paid | unpaid
-  const [scad, setScad] = useState("all"); // all | overdue
+  const [scad, setScad] = useState<DueFilter>("all"); // all | overdue | week
+  const [catF, setCatF] = useState("all");
+  const [supF, setSupF] = useState("all");
+  const [view, setView] = useState<"elenco" | "riepiloghi">("elenco");
+  const [sumBy, setSumBy] = useState<"supplier" | "category" | "month">("supplier");
+  const [sort, setSort] = useState<{ key: "doc_date" | "supplier_name" | "total_cents" | "due_date"; dir: 1 | -1 }>({ key: "doc_date", dir: -1 });
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [inCassa, setInCassa] = useState<Set<string>>(new Set());
+  const [info, setInfo] = useState("");
   // editor
   const [edit, setEdit] = useState<ReturnType<typeof emptyForm> | null>(null);
   const [saving, setSaving] = useState(false);
@@ -88,26 +97,58 @@ export default function FatturePassivePage() {
     ]);
     if (d.error) setErr(d.error.message); else setDocs((d.data ?? []) as Doc[]);
     setSuppliers((s.data ?? []) as Supplier[]);
+    // Documenti già registrati in Cassa: il movimento ha lo stesso id del documento.
+    if (!d.error) {
+      const paidIds = ((d.data ?? []) as Doc[]).filter((x) => x.paid).map((x) => x.id);
+      const found = new Set<string>();
+      for (let i = 0; i < paidIds.length; i += 60) {
+        const { data: cm } = await supabase.from("cash_movements").select("id").in("id", paidIds.slice(i, i + 60));
+        for (const r of (cm ?? []) as { id: string }[]) found.add(r.id);
+      }
+      setInCassa(found);
+    }
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
 
   const t = todayISO();
+  // Ambito struttura (stessa regola di prima: senza struttura = solo con "Tutte").
+  const scoped = useMemo(() => docs.filter((r) => !single || r.structure_id === activeStructureId), [docs, single, activeStructureId]);
+  // Scadenzario: su tutti i documenti non pagati dell'ambito, indipendentemente dai filtri.
+  const due = useMemo(() => dueSummary(scoped, t), [scoped, t]);
+  const supplierNames = useMemo(() => Array.from(new Set(scoped.map((r) => (r.supplier_name ?? "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "it")), [scoped]);
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    return docs.filter((r) => {
-      if (single && r.structure_id !== activeStructureId) return false; // senza struttura: visibili solo con "Tutte"
+    const list = scoped.filter((r) => {
       if (year !== "all" && (r.doc_date ?? "").slice(0, 4) !== String(year)) return false;
       if (tipo !== "all" && r.doc_type !== tipo) return false;
       if (pay === "paid" && !r.paid) return false;
       if (pay === "unpaid" && r.paid) return false;
-      if (scad === "overdue" && !(r.due_date && r.due_date < t && !r.paid)) return false;
-      if (term && !`${r.supplier_name ?? ""} ${r.doc_number ?? ""} ${r.category ?? ""}`.toLowerCase().includes(term)) return false;
+      if (!matchesDue(r, scad, t)) return false;
+      if (catF !== "all" && (r.category ?? "") !== (catF === "none" ? "" : catF)) return false;
+      if (supF !== "all" && (r.supplier_name ?? "").trim() !== supF) return false;
+      if (term && !`${r.supplier_name ?? ""} ${r.doc_number ?? ""} ${r.category ?? ""} ${r.notes ?? ""}`.toLowerCase().includes(term)) return false;
       return true;
     });
-  }, [docs, q, year, tipo, pay, scad, t, single, activeStructureId]);
+    const k = sort.key;
+    return list.sort((a, b) => {
+      const av = k === "total_cents" ? signedCents(a, a.total_cents) : (a[k] ?? "");
+      const bv = k === "total_cents" ? signedCents(b, b.total_cents) : (b[k] ?? "");
+      // documenti senza valore (es. senza scadenza) sempre in fondo
+      if (av === "" && bv !== "") return 1;
+      if (bv === "" && av !== "") return -1;
+      return av < bv ? -sort.dir : av > bv ? sort.dir : 0;
+    });
+  }, [scoped, q, year, tipo, pay, scad, catF, supF, sort, t]);
 
-  const totals = useMemo(() => filtered.reduce((a, r) => ({ imp: a.imp + r.taxable_cents, iva: a.iva + r.vat_cents, tot: a.tot + r.total_cents, unpaid: a.unpaid + (r.paid ? 0 : r.total_cents) }), { imp: 0, iva: 0, tot: 0, unpaid: 0 }), [filtered]);
+  // Totali con segno: le note di credito riducono il costo.
+  const totals = useMemo(() => filtered.reduce((a, r) => ({ imp: a.imp + signedCents(r, r.taxable_cents), iva: a.iva + signedCents(r, r.vat_cents), tot: a.tot + signedCents(r, r.total_cents), unpaid: a.unpaid + (r.paid || r.doc_type === "nota_credito" ? 0 : signedCents(r, r.total_cents)) }), { imp: 0, iva: 0, tot: 0, unpaid: 0 }), [filtered]);
+  const summary = useMemo(() => groupTotals(filtered, sumBy), [filtered, sumBy]);
+  const sortBy = (key: typeof sort.key) => setSort((p) => ({ key, dir: p.key === key ? (p.dir === 1 ? -1 : 1) : (key === "supplier_name" || key === "due_date" ? 1 : -1) }));
+  const arrow = (key: typeof sort.key) => (sort.key === key ? (sort.dir === 1 ? " ▲" : " ▼") : "");
+  const filtersActive = q || tipo !== "all" || pay !== "all" || scad !== "all" || catF !== "all" || supF !== "all";
+  const resetFilters = () => { setQ(""); setTipo("all"); setPay("all"); setScad("all"); setCatF("all"); setSupF("all"); };
+  const pickDue = (f: DueFilter) => { if (scad === f) { setScad("all"); return; } setScad(f); setPay("all"); setYear("all"); setView("elenco"); };
 
   const defStructure = single ? activeStructureId : structures.length === 1 ? structures[0].id : "";
   const openNew = () => { setEdit(emptyForm(defStructure)); setAf({}); setAfMsg(""); };
@@ -169,6 +210,8 @@ export default function FatturePassivePage() {
   const save = async () => {
     if (!supabase || !user || !edit) return;
     if (!edit.structureId && structures.length > 1) { setErr("Scegli la struttura a cui appartiene la fattura (o «Comune a tutte»)."); return; }
+    const dup = findDuplicate(docs, { id: edit.id || undefined, supplier_name: edit.supplierName, doc_number: edit.doc_number, doc_date: edit.doc_date });
+    if (dup && !(await ask({ title: "Possibile duplicato", message: `Esiste già un documento n. ${dup.doc_number} di ${dup.supplier_name} del ${dup.doc_date ? new Date(dup.doc_date).toLocaleDateString("it-IT") : "—"}. Salvare comunque?`, confirmLabel: "Salva comunque" }))) return;
     setSaving(true); setErr("");
     // Fornitore: usa quello scelto o crea/riusa per nome.
     let supplierId = edit.supplierId;
@@ -190,24 +233,69 @@ export default function FatturePassivePage() {
     const res = edit.id ? await supabase.from("purchase_documents").update(row).eq("id", edit.id) : await supabase.from("purchase_documents").insert(row);
     setSaving(false);
     if (res.error) { setErr(res.error.message); return; }
+    // Se il documento era già in Cassa, il movimento resta allineato (o viene tolto se non è più pagato).
+    if (edit.id && inCassa.has(edit.id)) await syncCash({ id: edit.id, ...row } as unknown as Doc);
     setEdit(null); await load();
   };
   const del = async () => {
     if (!supabase || !edit?.id) return;
     if (!(await ask({ message: "Eliminare questa fattura passiva?", danger: true, confirmLabel: "Elimina" }))) return;
+    await supabase.from("cash_movements").delete().eq("id", edit.id);
     await supabase.from("purchase_documents").delete().eq("id", edit.id);
     setEdit(null); await load();
   };
-  const togglePaid = async (r: Doc) => { if (!supabase) return; await supabase.from("purchase_documents").update({ paid: !r.paid, paid_at: !r.paid ? todayISO() : null }).eq("id", r.id); await load(); };
 
-  const exportCsv = () => {
-    const head = ["Data", "Struttura", "Fornitore", "Numero", "Tipo", "Categoria", "Imponibile", "IVA", "Totale", "Scadenza", "Pagata"];
-    const lines = filtered.map((r) => [r.doc_date ?? "", structName(r.structure_id), r.supplier_name ?? "", r.doc_number ?? "", TIPI[r.doc_type], r.category ?? "", cents(r.taxable_cents).toFixed(2), cents(r.vat_cents).toFixed(2), cents(r.total_cents).toFixed(2), r.due_date ?? "", r.paid ? "sì" : "no"].map((x) => `"${String(x).replace(/"/g, '""')}"`).join(","));
-    const blob = new Blob([[head.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `fatture-passive-${year}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  // ---- Collegamento alla Cassa: il movimento ha lo stesso id del documento (nessun doppione possibile).
+  const syncCash = async (d: Doc) => {
+    if (!supabase || !user) return;
+    const row = toCashRow(d, user.id, todayISO());
+    if (!row) { await supabase.from("cash_movements").delete().eq("id", d.id); return; }
+    await supabase.from("cash_movements").upsert(row, { onConflict: "id" });
+  };
+  const registerCash = async (list: Doc[]) => {
+    if (!supabase || !user) return;
+    const rows = list.map((d) => toCashRow(d, user.id, todayISO())).filter((x): x is NonNullable<typeof x> => !!x);
+    if (!rows.length) { setInfo("Nessun documento pagato da registrare in Cassa."); return; }
+    const { error } = await supabase.from("cash_movements").upsert(rows, { onConflict: "id" });
+    if (error) { setErr(error.message); return; }
+    setInfo(`${rows.length} ${rows.length === 1 ? "documento registrato" : "documenti registrati"} in Cassa.`); setSel(new Set()); await load();
+  };
+  const unregisterCash = async (id: string) => {
+    if (!supabase) return;
+    await supabase.from("cash_movements").delete().eq("id", id);
+    setInfo("Movimento rimosso dalla Cassa."); await load();
+  };
+  const togglePaid = async (r: Doc) => {
+    if (!supabase) return;
+    await supabase.from("purchase_documents").update({ paid: !r.paid, paid_at: !r.paid ? todayISO() : null, updated_at: new Date().toISOString() }).eq("id", r.id);
+    if (r.paid && inCassa.has(r.id)) await supabase.from("cash_movements").delete().eq("id", r.id); // non più pagata: via dalla Cassa
+    await load();
+  };
+  const bulkPaid = async () => {
+    if (!supabase || sel.size === 0) return;
+    const ids = filtered.filter((r) => sel.has(r.id) && !r.paid).map((r) => r.id);
+    if (!ids.length) { setInfo("I documenti selezionati risultano già pagati."); return; }
+    if (!(await ask({ title: "Segna come pagate", message: `Segnare ${ids.length} document${ids.length === 1 ? "o" : "i"} come pagat${ids.length === 1 ? "o" : "i"} con data di oggi?`, confirmLabel: "Segna pagate" }))) return;
+    const { error } = await supabase.from("purchase_documents").update({ paid: true, paid_at: todayISO(), updated_at: new Date().toISOString() }).in("id", ids);
+    if (error) { setErr(error.message); return; }
+    setInfo(`${ids.length} document${ids.length === 1 ? "o segnato" : "i segnati"} come pagat${ids.length === 1 ? "o" : "i"}.`); setSel(new Set()); await load();
   };
 
-  const sel = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+  // CSV per Excel italiano: separatore ";" e decimali con virgola; le note di credito sono negative.
+  const dl = (name: string, lines: string[]) => { const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href); };
+  const money = (c: number) => (c / 100).toFixed(2).replace(".", ",");
+  const exportCsv = () => {
+    const head = ["Data", "Struttura", "Fornitore", "Numero", "Tipo", "Categoria", "Imponibile", "IVA", "Totale", "Scadenza", "Pagata", "Data pagamento", "Metodo", "In Cassa"];
+    const lines = filtered.map((r) => [r.doc_date ?? "", structName(r.structure_id), r.supplier_name ?? "", r.doc_number ?? "", TIPI[r.doc_type], r.category ?? "", money(signedCents(r, r.taxable_cents)), money(signedCents(r, r.vat_cents)), money(signedCents(r, r.total_cents)), r.due_date ?? "", r.paid ? "sì" : "no", r.paid_at ?? "", r.payment_method ?? "", inCassa.has(r.id) ? "sì" : "no"].map(csvCell).join(";"));
+    dl(`fatture-passive-${year}.csv`, [head.map(csvCell).join(";"), ...lines]);
+  };
+  const exportSummary = () => {
+    const label = sumBy === "supplier" ? "Fornitore" : sumBy === "category" ? "Categoria" : "Mese";
+    const head = [label, "Documenti", "Imponibile", "IVA", "Totale", "Da pagare"];
+    dl(`riepilogo-fatture-passive-${sumBy}-${year}.csv`, [head.map(csvCell).join(";"), ...summary.map((r) => [r.key, r.count, money(r.taxable), money(r.vat), money(r.total), money(r.unpaid)].map(csvCell).join(";"))]);
+  };
+
+  const selCls = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
   const totEur = numv(edit?.taxableEur ?? 0) + numv(edit?.vatEur ?? 0);
@@ -215,6 +303,20 @@ export default function FatturePassivePage() {
   return (
     <div>
       <PageHeader title="Fatture passive" subtitle="Fatture e costi dei fornitori" />
+
+      {/* Scadenzario: sempre sui documenti non pagati, a prescindere dai filtri. Clic = filtra l'elenco. */}
+      {(due.overdue.count + due.week.count + due.later.count + due.noDate.count) > 0 && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {([
+            ["Scadute", due.overdue, "var(--err)", "overdue"],
+            ["Scadono entro 7 giorni", due.week, "var(--warn)", "week"],
+            ["Più avanti", due.later, "var(--dim)", null],
+            ["Senza scadenza", due.noDate, "var(--faint)", null],
+          ] as [string, { count: number; cents: number }, string, DueFilter | null][]).map(([l, b, col, f]) => (
+            <StatCard key={l} label={l} value={eur(cents(b.cents))} color={b.count > 0 ? col : "var(--faint)"} hint={`${b.count} ${b.count === 1 ? "documento" : "documenti"} da pagare`} onClick={f ? () => pickDue(f) : undefined} active={!!f && scad === f} />
+          ))}
+        </div>
+      )}
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[["Imponibile", totals.imp, "var(--dim)"], ["IVA", totals.iva, "var(--dim)"], ["Totale", totals.tot, "var(--txt)"], ["Da pagare", totals.unpaid, totals.unpaid > 0 ? "var(--warn)" : "var(--ok)"]].map(([l, v, c]) => (
@@ -225,56 +327,123 @@ export default function FatturePassivePage() {
       <Card className="mb-4">
         {/* Stessa griglia dei KPI sopra: ricerca larga quanto una card e allineata. */}
         <div className="grid grid-cols-2 items-center gap-3 sm:grid-cols-4">
-          <SearchInput value={q} onChange={setQ} placeholder="Cerca fornitore, numero, categoria…" className="col-span-2 w-full sm:col-span-1" />
+          <SearchInput value={q} onChange={setQ} placeholder="Cerca fornitore, numero, categoria, note…" className="col-span-2 w-full sm:col-span-1" />
           <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-3">
-            <select value={String(year)} onChange={(e) => setYear(e.target.value === "all" ? "all" : Number(e.target.value))} className={sel}><option value="all">Tutti gli anni</option>{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
-            <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={sel}><option value="all">Tutti i tipi</option>{Object.entries(TIPI).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-            <select value={pay} onChange={(e) => setPay(e.target.value)} className={sel}><option value="all">Pagate e non</option><option value="unpaid">Da pagare</option><option value="paid">Pagate</option></select>
-            <select value={scad} onChange={(e) => setScad(e.target.value)} className={sel}><option value="all">Tutte le scadenze</option><option value="overdue">Scadute non pagate</option></select>
-            <div className="ml-auto flex items-center gap-2">
-              <button onClick={exportCsv} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
-              <button onClick={() => { setOta(true); setCsvTotal(null); setCsvInfo(""); }} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash" title="Precompila una fattura passiva OTA dalle commissioni tracciate o da un CSV">⚡ Autofattura OTA</button>
-              <button onClick={openNew} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuova fattura</button>
-            </div>
+            <select value={String(year)} onChange={(e) => setYear(e.target.value === "all" ? "all" : Number(e.target.value))} className={selCls}><option value="all">Tutti gli anni</option>{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
+            <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={selCls}><option value="all">Tutti i tipi</option>{Object.entries(TIPI).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+            <select value={pay} onChange={(e) => setPay(e.target.value)} className={selCls}><option value="all">Pagate e non</option><option value="unpaid">Da pagare</option><option value="paid">Pagate</option></select>
+            <select value={scad} onChange={(e) => setScad(e.target.value as DueFilter)} className={selCls}><option value="all">Tutte le scadenze</option><option value="overdue">Scadute non pagate</option><option value="week">In scadenza entro 7 giorni</option></select>
+            <select value={catF} onChange={(e) => setCatF(e.target.value)} className={selCls}><option value="all">Tutte le categorie</option>{CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}<option value="none">Senza categoria</option></select>
+            <select value={supF} onChange={(e) => setSupF(e.target.value)} className={`${selCls} max-w-[200px]`}><option value="all">Tutti i fornitori</option>{supplierNames.map((n) => <option key={n} value={n}>{n}</option>)}</select>
+            {filtersActive ? <button onClick={resetFilters} className="text-xs font-semibold text-focus hover:underline">Azzera filtri</button> : null}
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-lg border border-line bg-surface p-0.5">
+            {(["elenco", "riepiloghi"] as const).map((v) => (
+              <button key={v} onClick={() => setView(v)} className={`rounded-md px-3 py-1.5 text-sm font-semibold capitalize transition ${view === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{v}</button>
+            ))}
+          </div>
+          <span className="text-xs text-faint">{filtered.length} {filtered.length === 1 ? "documento" : "documenti"}</span>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <button onClick={view === "elenco" ? exportCsv : exportSummary} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{view === "elenco" ? "Esporta CSV" : "Esporta riepilogo"}</button>
+            <button onClick={() => { setOta(true); setCsvTotal(null); setCsvInfo(""); }} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash" title="Precompila una fattura passiva OTA dalle commissioni tracciate o da un CSV">⚡ Autofattura OTA</button>
+            <button onClick={openNew} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuova fattura</button>
           </div>
         </div>
       </Card>
 
       {err && <Card className="mb-4"><p className="text-sm text-[color:var(--err)]">{err}</p></Card>}
+      {info && <div className="mb-4 flex items-center gap-2 rounded-lg border border-line bg-wash px-3 py-2 text-sm font-medium text-txt"><span className="flex-1">{info}</span><button onClick={() => setInfo("")} className="rounded px-2 text-dim hover:bg-surface">✕</button></div>}
 
+      {view === "riepiloghi" && (
+        <Card className="mb-4">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg border border-line bg-surface p-0.5">
+              {([["supplier", "Per fornitore"], ["category", "Per categoria"], ["month", "Per mese"]] as const).map(([k, l]) => (
+                <button key={k} onClick={() => setSumBy(k)} className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${sumBy === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{l}</button>
+              ))}
+            </div>
+            <span className="text-xs text-faint">Sui documenti che corrispondono ai filtri qui sopra; le note di credito sono sottratte.</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead><tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
+                <th className="px-3 py-2 font-semibold">{sumBy === "supplier" ? "Fornitore" : sumBy === "category" ? "Categoria" : "Mese"}</th><th className="px-3 py-2 text-right font-semibold">Doc.</th><th className="px-3 py-2 text-right font-semibold">Imponibile</th><th className="px-3 py-2 text-right font-semibold">IVA</th><th className="px-3 py-2 text-right font-semibold">Totale</th><th className="px-3 py-2 text-right font-semibold">Da pagare</th><th className="w-40 px-3 py-2 font-semibold">Quota</th>
+              </tr></thead>
+              <tbody>
+                {summary.map((r) => {
+                  const maxAbs = Math.max(1, ...summary.map((x) => Math.abs(x.total)));
+                  const label = sumBy === "month" && /^\d{4}-\d{2}$/.test(r.key) ? new Date(Number(r.key.slice(0, 4)), Number(r.key.slice(5, 7)) - 1, 1).toLocaleDateString("it-IT", { month: "long", year: "numeric" }) : r.key;
+                  const clickable = sumBy !== "month" && r.key !== "Senza fornitore";
+                  return (
+                    <tr key={r.key} className={`border-b border-line last:border-0 ${clickable ? "cursor-pointer hover:bg-wash" : ""}`} onClick={clickable ? () => { if (sumBy === "supplier") setSupF(r.key); else setCatF(r.key === "Senza categoria" ? "none" : r.key); setView("elenco"); } : undefined}>
+                      <td className="px-3 py-2 font-medium capitalize text-txt">{label}</td>
+                      <td className="px-3 py-2 text-right font-mono text-dim">{r.count}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-dim">{eur(cents(r.taxable))}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-dim">{eur(cents(r.vat))}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right font-mono font-semibold text-txt">{eur(cents(r.total))}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right font-mono" style={{ color: r.unpaid > 0 ? "var(--warn)" : "var(--faint)" }}>{eur(cents(r.unpaid))}</td>
+                      <td className="px-3 py-2"><div className="h-2 w-full rounded-full bg-wash"><div className="h-2 rounded-full" style={{ width: `${Math.round((Math.abs(r.total) / maxAbs) * 100)}%`, backgroundColor: r.total < 0 ? "var(--ok)" : "var(--focus)" }} /></div></td>
+                    </tr>
+                  );
+                })}
+                {summary.length === 0 && <tr><td colSpan={7}><EmptyState title="Nessun dato da riepilogare" sub="Cambia i filtri o registra una fattura." /></td></tr>}
+                {summary.length > 0 && <tr className="border-t border-line bg-wash/50 font-semibold"><td className="px-3 py-2 text-txt">Totale</td><td className="px-3 py-2 text-right font-mono text-dim">{filtered.length}</td><td className="px-3 py-2 text-right font-mono text-dim">{eur(cents(totals.imp))}</td><td className="px-3 py-2 text-right font-mono text-dim">{eur(cents(totals.iva))}</td><td className="px-3 py-2 text-right font-mono text-txt">{eur(cents(totals.tot))}</td><td className="px-3 py-2 text-right font-mono" style={{ color: totals.unpaid > 0 ? "var(--warn)" : "var(--faint)" }}>{eur(cents(totals.unpaid))}</td><td /></tr>}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {view === "elenco" && sel.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash px-3 py-2 text-sm">
+          <span className="font-semibold text-txt">{sel.size} selezionat{sel.size === 1 ? "o" : "i"}</span>
+          <button onClick={bulkPaid} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Segna come pagate</button>
+          <button onClick={() => registerCash(filtered.filter((r) => sel.has(r.id) && r.paid))} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash" title="Crea in Cassa il movimento di uscita dei documenti pagati selezionati">Registra in Cassa</button>
+          <button onClick={() => setSel(new Set())} className="ml-auto text-xs font-semibold text-dim hover:text-txt">Annulla selezione</button>
+        </div>
+      )}
+
+      {view === "elenco" && (
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
-        <table className="w-full min-w-[860px] text-sm">
+        <table className="w-full min-w-[900px] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-faint">
-              <th className="px-3 py-2 font-semibold">Data</th>{!single && <th className="px-3 py-2 font-semibold">Struttura</th>}<th className="px-3 py-2 font-semibold">Fornitore</th><th className="px-3 py-2 font-semibold">Numero</th><th className="px-3 py-2 font-semibold">Tipo</th><th className="px-3 py-2 font-semibold">Categoria</th><th className="px-3 py-2 text-right font-semibold">Imponibile</th><th className="px-3 py-2 text-right font-semibold">IVA</th><th className="px-3 py-2 text-right font-semibold">Totale</th><th className="px-3 py-2 font-semibold">Scadenza</th><th className="px-3 py-2 font-semibold">Stato</th>
+              <th className="w-8 px-3 py-2"><input type="checkbox" aria-label="Seleziona tutte" checked={filtered.length > 0 && filtered.every((r) => sel.has(r.id))} onChange={(e) => setSel(e.target.checked ? new Set(filtered.map((r) => r.id)) : new Set())} /></th>
+              <th className="cursor-pointer select-none px-3 py-2 font-semibold hover:text-txt" onClick={() => sortBy("doc_date")}>Data{arrow("doc_date")}</th>{!single && <th className="px-3 py-2 font-semibold">Struttura</th>}<th className="cursor-pointer select-none px-3 py-2 font-semibold hover:text-txt" onClick={() => sortBy("supplier_name")}>Fornitore{arrow("supplier_name")}</th><th className="px-3 py-2 font-semibold">Numero</th><th className="px-3 py-2 font-semibold">Tipo</th><th className="px-3 py-2 font-semibold">Categoria</th><th className="px-3 py-2 text-right font-semibold">Imponibile</th><th className="px-3 py-2 text-right font-semibold">IVA</th><th className="cursor-pointer select-none px-3 py-2 text-right font-semibold hover:text-txt" onClick={() => sortBy("total_cents")}>Totale{arrow("total_cents")}</th><th className="cursor-pointer select-none px-3 py-2 font-semibold hover:text-txt" onClick={() => sortBy("due_date")}>Scadenza{arrow("due_date")}</th><th className="px-3 py-2 font-semibold">Stato</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((r) => {
-              const overdue = r.due_date && r.due_date < t && !r.paid;
+              const overdue = r.due_date && r.due_date < t && !r.paid && r.doc_type !== "nota_credito";
+              const credit = r.doc_type === "nota_credito";
               return (
                 <tr key={r.id} onClick={() => openEdit(r)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
+                  <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label="Seleziona" checked={sel.has(r.id)} onChange={(e) => setSel((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} /></td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-dim">{r.doc_date ? new Date(r.doc_date).toLocaleDateString("it-IT") : "—"}</td>
                   {!single && <td className="px-3 py-2.5 text-dim">{structName(r.structure_id)}</td>}
                   <td className="px-3 py-2.5 font-medium text-txt">{r.supplier_name || "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs text-dim">{r.doc_number || "—"}</td>
                   <td className="px-3 py-2.5 text-dim">{TIPI[r.doc_type]}</td>
                   <td className="px-3 py-2.5 text-dim">{r.category || "—"}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-dim">{eur(cents(r.taxable_cents))}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-dim">{eur(cents(r.vat_cents))}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono font-semibold text-txt">{eur(cents(r.total_cents))}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-dim">{eur(cents(signedCents(r, r.taxable_cents)))}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-dim">{eur(cents(signedCents(r, r.vat_cents)))}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono font-semibold text-txt">{eur(cents(signedCents(r, r.total_cents)))}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-xs" style={{ color: overdue ? "var(--err)" : "var(--dim)" }}>{r.due_date ? new Date(r.due_date).toLocaleDateString("it-IT") : "—"}</td>
-                  <td className="px-3 py-2.5" onClick={(e) => { e.stopPropagation(); togglePaid(r); }}>
-                    <span className="cursor-pointer rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${r.paid ? "var(--ok)" : overdue ? "var(--err)" : "var(--warn)"} 16%, transparent)`, color: r.paid ? "var(--ok)" : overdue ? "var(--err)" : "var(--warn)" }}>{r.paid ? "Pagata" : overdue ? "Scaduta" : "Da pagare"}</span>
+                  <td className="px-3 py-2.5" onClick={(e) => { e.stopPropagation(); if (!credit) togglePaid(r); }}>
+                    <span className={`${credit ? "" : "cursor-pointer"} rounded-full px-2 py-0.5 text-[11px] font-semibold`} style={{ backgroundColor: `color-mix(in srgb, ${r.paid ? "var(--ok)" : overdue ? "var(--err)" : "var(--warn)"} 16%, transparent)`, color: r.paid ? "var(--ok)" : overdue ? "var(--err)" : "var(--warn)" }}>{r.paid ? "Pagata" : overdue ? "Scaduta" : "Da pagare"}</span>
+                    {inCassa.has(r.id) && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim" title="Registrata in Cassa">Cassa</span>}
                   </td>
                 </tr>
               );
             })}
-            {!loading && filtered.length === 0 && <tr><td colSpan={11}><EmptyState title="Nessuna fattura passiva" sub="Registra la prima con “+ Nuova fattura”." /></td></tr>}
-            {loading && <tr><td colSpan={11} className="px-3 py-10 text-center text-sm text-faint">Caricamento…</td></tr>}
+            {!loading && filtered.length === 0 && <tr><td colSpan={12}><EmptyState title={filtersActive ? "Nessuna fattura con questi filtri" : "Nessuna fattura passiva"} sub={filtersActive ? "Prova ad azzerare i filtri." : "Registra la prima con “+ Nuova fattura”."} /></td></tr>}
+            {loading && <tr><td colSpan={12} className="px-3 py-10 text-center text-sm text-faint">Caricamento…</td></tr>}
           </tbody>
         </table>
       </div>
+      )}
 
       {ota && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -327,7 +496,7 @@ export default function FatturePassivePage() {
                 </label>
               )}
               <label className={`${lbl} sm:col-span-2`}>Fornitore
-                <input list="sup-list" value={edit.supplierName} onChange={(e) => setEdit({ ...edit, supplierName: e.target.value, supplierId: null })} className={inp} placeholder="Nome fornitore" />
+                <input list="sup-list" value={edit.supplierName} onChange={(e) => { const name = e.target.value; const last = !edit.id && !edit.category ? docs.find((d) => (d.supplier_name ?? "").trim().toLowerCase() === name.trim().toLowerCase() && d.category) : undefined; setEdit({ ...edit, supplierName: name, supplierId: null, category: last?.category ?? edit.category }); }} className={inp} placeholder="Nome fornitore" />
                 <datalist id="sup-list">{suppliers.map((s) => <option key={s.id} value={s.name} />)}</datalist>
               </label>
               <label className={lbl}>Numero documento<input value={edit.doc_number} onChange={(e) => setEdit({ ...edit, doc_number: e.target.value })} className={inp} /></label>
@@ -354,6 +523,16 @@ export default function FatturePassivePage() {
                   {af.status && <button onClick={dlAutofattura} disabled={!!afBusy} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{afBusy === "xml" ? "Scarico…" : "Scarica XML"}</button>}
                 </div>
                 {afMsg && <p className="mt-2 text-[12px] text-dim">{afMsg}</p>}
+              </div>
+            )}
+            {edit.id && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash/50 p-3">
+                <span className="text-sm font-semibold text-txt">Cassa</span>
+                {inCassa.has(edit.id)
+                  ? (<><span className="text-xs text-dim">Registrata in Cassa come uscita.</span><button onClick={async () => { await unregisterCash(edit.id); setEdit(null); }} className="ml-auto rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Rimuovi dalla Cassa</button></>)
+                  : edit.paid
+                    ? (<><span className="text-xs text-dim">Non ancora in Cassa. Salva prima eventuali modifiche.</span><button onClick={async () => { const d = docs.find((x) => x.id === edit.id); if (d) { await registerCash([d]); setEdit(null); } }} className="ml-auto rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Registra in Cassa</button></>)
+                    : <span className="text-xs text-faint">Segna la fattura come pagata per poterla registrare in Cassa.</span>}
               </div>
             )}
             <div className="mt-3 flex items-center gap-2">

@@ -164,3 +164,28 @@ export function toFaqItems(rendered: RenderedEntry[], lang: ConciergeLang): { to
     answer: [r.text, r.mapUrl ? `📍 ${t.map}: ${r.mapUrl}` : "", r.tel ? `📞 ${t.call}: ${r.tel.replace("tel:", "")}${r.waUrl ? ` · ${t.wa}: ${r.waUrl}` : ""}` : ""].filter(Boolean).join("\n"),
   }));
 }
+
+// Argomento "semplice" di una domanda dell'ospite (it/en), per raggruppare le "domande senza risposta".
+// Restituisce una categoria della base di conoscenza (CATEGORY_LABEL) oppure "altro". L'ordine conta: le regole
+// più specifiche vengono prima. Nessuna AI: parole chiave, quindi istantaneo e prevedibile.
+const TOPIC_RULES: [string, RegExp][] = [
+  ["wifi", /wi-?fi|wlan|internet|password|\brete\b|network/],
+  ["accesso", /codice|\bcode\b|chiav|\bkeys?\b|ingresso|entrare|citofon|pulsantier|portone|\bdoor|\block|self.?check/],
+  ["colazione", /colazion|breakfast|cornett|brioche|cappuccin/],
+  ["checkin", /check-?in|check-?out|checkin|checkout|arrivo tardi|late arrival|anticip|posticip|early|\blate\b|bagagl|luggage|\bbags?\b|deposito bagagli|a che ora|what time/],
+  ["regole", /animal|\bcani?\b|\bcane\b|gatt|\bpets?\b|\bdogs?\b|fumare|fumo|smok|silenzio|rumor|\bquiet\b|\bfeste?\b|party|visitator|visitor|ospiti extra|extra guest/],
+  ["pagamenti", /pagar|pagament|\bpay|fattur|invoice|receipt|ricevut|tassa|city tax|tourist tax|contanti|\bcash\b|carta di credito|rimbors|refund|prezz|\bcost|\bprice|cauzion|caparra|\bdeposit/],
+  ["contatti", /telefon|\bphone\b|chiamar|\bcall\b|contatt|emergenz|emergency|medic|doctor|farmaci|pharmac|ospedal|hospital|problem|rott[oa]|broken|non funzion|not working|reclam|complain/],
+  ["servizi", /parchegg|parking|lavatric|washing|laundry|lavander|asciugaman|towel|lenzuol|sheets|aria condizionat|climatizz|air.?condition|riscaldament|heating|asciugacapelli|hair.?dryer|cucina|kitchen|\bferro\b|\biron\b|culla|\bcrib\b|ascensor|elevator|\blift\b|taxi|transfer|noleggi|\brent|\bbik|bici|piscina|\bpool\b|terrazz|terrace|balcon|sdraio|frigo|fridge|cassaforte|\bsafe\b|zanzar|mosquito|pulizi|cleaning|housekeeping/],
+  ["mare", /\bmare\b|spiagg|\blido|\blidi\b|beach|\bsea\b|swim|nuot|snorkel/],
+  ["cibo", /ristorant|mangiar|\bcena|\bcenar|pranz|pizz|restaurant|\beat\b|dinner|lunch|aperitiv|\bbar\b|gelat|trattori|osteria|street food|\bvino|\bwine/],
+  ["escursioni", /escursion|\bgit[ae]\b|\bbarca|\bboat|trekking|\bhike|\bhiking|\betna\b|excursion|\btrip|riserva|\bcruise|\btour\b/],
+  ["cultura", /vedere|visitar|museo|museum|chiesa|church|duomo|teatro|theat|monument|attraction|sightsee|cosa fare|things to do|archeolog|\bsee\b|\bvisit\b/],
+  ["arrivo", /come arriv|raggiung|aeroporto|stazione|\bbus\b|\btreno|\btrain|airport|station|indicazion|direction|how to get|where is|dove si trova|dove siete|\bmap|mappa|navigat|\bztl\b|\bstrada/],
+  ["dintorni", /supermerc|supermarket|market|negozi|\bshop|dintorni|nearby|\bzona\b|\barea\b|vicin|close to/],
+];
+export function classifyQuestion(question: string): string {
+  const t = norm(question || "");
+  for (const [cat, re] of TOPIC_RULES) if (re.test(t)) return cat;
+  return "altro";
+}

@@ -32,6 +32,13 @@ export interface FascicoloFiscaleDocProps {
   invoiceVat: number;
   invoiceTotal: number;
   invoiceModuleReady: boolean; // dati emittente (P.IVA/ragione sociale) configurati in Impostazioni fattura
+  // Opzionali (aggiunte): note di credito emesse, bollo, documenti scartati. Se assenti non compare nulla.
+  creditNoteCount?: number;
+  creditNoteTaxable?: number;
+  creditNoteVat?: number;
+  creditNoteTotal?: number;
+  bolloTotal?: number;
+  rejectedCount?: number;
 }
 
 const INK = "#1B1A17";
@@ -141,6 +148,16 @@ export default function FascicoloFiscaleDoc(p: FascicoloFiscaleDocProps) {
         ) : (
           <p style={{ margin: 0, fontSize: 12, color: FAINT }}>Fatturazione elettronica non ancora attiva (dati emittente da completare in Impostazioni fattura).</p>
         )}
+        {p.invoiceModuleReady && (p.creditNoteCount ?? 0) > 0 && (
+          <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 20 }}>
+            {stat("Note di credito", `${p.creditNoteCount}`)}
+            {stat("Imponibile NC", `−${money(p.creditNoteTaxable ?? 0)}`)}
+            {stat("IVA NC", `−${money(p.creditNoteVat ?? 0)}`)}
+            {stat("Totale al netto NC", money(p.invoiceTotal - (p.creditNoteTotal ?? 0)))}
+          </div>
+        )}
+        {p.invoiceModuleReady && (p.bolloTotal ?? 0) > 0 && <p style={{ margin: "8px 0 0", fontSize: 10.5, color: DIM }}>Di cui bollo virtuale nei totali delle fatture: {money(p.bolloTotal ?? 0)}.</p>}
+        {p.invoiceModuleReady && (p.rejectedCount ?? 0) > 0 && <p style={{ margin: "8px 0 0", fontSize: 10.5, color: FAINT }}>Esclusi dai totali: {p.rejectedCount} documenti scartati dallo SdI e le bozze.</p>}
         {p.invoiceModuleReady && p.invoiceCount === 0 && <p style={{ margin: "8px 0 0", fontSize: 10.5, color: FAINT }}>Nessuna fattura emessa nell&apos;anno selezionato.</p>}
       </div>
 

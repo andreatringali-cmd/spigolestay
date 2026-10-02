@@ -12,11 +12,17 @@ import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useToast } from "@/components/ToastProvider";
 import { italianHolidays, italianBridges } from "@/lib/holidays";
-import { computeSuggestions, loadAutopilot, saveAutopilot, toOverrideMap, highDemandMap, type AutopilotCfg, type Suggestion } from "@/lib/autopilot";
+import { computeSuggestions, loadAutopilot, saveAutopilot, toOverrideMap, highDemandMap, GUARDRAIL_LABEL, type AutopilotCfg, type Suggestion } from "@/lib/autopilot";
 import { explainSuggestion, explainSuggestionCompact, summarizeAppliedSuggestions } from "@/lib/autopilot-explain";
 import { fetchCityPulse, computeMarketSignal, pulseHasDemo, MARKET_WINDOW, type MarketPulse } from "@/lib/market";
 import { forecastOccupancy, nextWeekendISOs, FORECAST_DEMO_NOTE } from "@/lib/forecast";
 import { inScope } from "@/lib/scope";
+import { rateForDay, loadWeekendPct, effectiveMinStay } from "@/lib/pricing";
+import { simulateImpact } from "@/lib/revenue-impact";
+import { buildChanges, recordBatches, type RevenueSource } from "@/lib/revenue-history";
+import { scanGaps } from "@/lib/revenue-gaps";
+import ImpactPreview from "@/components/ImpactPreview";
+import PriceHistoryCard from "@/components/PriceHistoryCard";
 
 const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
 
@@ -31,6 +37,7 @@ export default function RevenueAutopilotPage() {
   // con "Tutte" il default (valido per le strutture senza impostazioni proprie).
   const [cfg, setCfg] = useState<AutopilotCfg>(() => loadAutopilot(scopeSid));
   const [cfgVer, setCfgVer] = useState(0);
+  const [preview, setPreview] = useState(false);
   useEffect(() => { setCfg(loadAutopilot(scopeSid)); }, [scopeSid]);
 
   // Struttura di riferimento per il benchmark di zona: con una struttura selezionata SOLO quella (senza città → nessun
@@ -96,6 +103,16 @@ export default function RevenueAutopilotPage() {
 
   const setCfgPersist = (patch: Partial<AutopilotCfg>) => { const next = { ...cfg, ...patch }; setCfg(next); saveAutopilot(patch, scopeSid); setCfgVer((v) => v + 1); };
 
+  // Scrive le tariffe (override del calendario) registrando prima lo storico per "Annulla".
+  // Difesa in profondità: con una struttura selezionata si scrive SOLO su quella struttura.
+  const commit = (list: Suggestion[], source: RevenueSource, label: string) => {
+    const safe = scopeSid ? list.filter((s) => s.structureId === scopeSid) : list;
+    if (!safe.length) return 0;
+    recordBatches(source, label, buildChanges(safe.map((s) => ({ key: s.key, typeName: s.typeName, iso: s.iso, structureId: s.structureId, effBefore: s.current, after: s.suggested })), rateOverrides));
+    setDayRates(toOverrideMap(safe));
+    return safe.length;
+  };
+
   // Autopilot attivo: applica automaticamente i suggerimenti una volta appena pronti.
   // Il ref si riarma al cambio struttura: ogni struttura ha il suo autopilot.
   const auto = useRef(false);
@@ -106,7 +123,7 @@ export default function RevenueAutopilotPage() {
     // Con "Tutte" si applicano solo i suggerimenti delle strutture che hanno l'autopilot attivo.
     const toApply = scopeSid ? suggestions : suggestions.filter((s) => loadAutopilot(s.structureId).on);
     if (toApply.length) {
-      setDayRates(toOverrideMap(toApply));
+      commit(toApply, "autopilot-auto", "Autopilot");
       toast(`Autopilot: applicati ${toApply.length} aggiustamenti prezzo.`, "success");
       addActivity("rate", `Autopilot: ${toApply.length} tariffe aggiornate automaticamente. ${summarizeAppliedSuggestions(toApply)}`, scopeSid);
     }
@@ -114,16 +131,32 @@ export default function RevenueAutopilotPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg.on, roomTypes.length, suggestions.length, scopeSid]);
 
+  // Simulazione dell'impatto sulle camere ancora libere (le prenotazioni già confermate non cambiano prezzo).
+  const impact = useMemo(() => simulateImpact(suggestions.map((s) => ({ typeId: s.typeId, iso: s.iso, current: s.current, next: s.suggested })), bookings, units), [suggestions, bookings, units]);
+  const limitedCount = suggestions.filter((s) => s.limitedBy).length;
+
+  // Notti orfane e prenotazioni senza camera (dati reali dallo store).
+  const gapScan = useMemo(() => scanGaps({ bookings, units, roomTypes, fromISO: todayISO, days: 60, structureId: scope, rateOf: (tid, iso) => rateForDay(tid, iso, roomTypes, rateOverrides, loadWeekendPct()), minStayOf: (rt) => effectiveMinStay(rt, roomTypes) }), [bookings, units, roomTypes, rateOverrides, todayISO, scope]);
+
+  // Stato dati: perché eventualmente non ci sono suggerimenti.
+  const scopedTypes = useMemo(() => roomTypes.filter((rt) => (scope === "all" || rt.structureId === scope) && units.some((u) => u.roomTypeId === rt.id && !u.outOfService)), [roomTypes, units, scope]);
+  const zeroPriceTypes = useMemo(() => scopedTypes.filter((rt) => rateForDay(rt.id, todayISO, roomTypes, {}, 0) <= 0), [scopedTypes, roomTypes, todayISO]);
+  // Esempio dei limiti attivi su una tariffa base di € 100.
+  const guardExample = useMemo(() => {
+    const lo = Math.max(100 - cfg.maxChangePct, cfg.floorPct), hi = Math.min(100 + cfg.maxChangePct, cfg.ceilPct);
+    return { lo: Math.round(lo), hi: Math.round(hi) };
+  }, [cfg.maxChangePct, cfg.floorPct, cfg.ceilPct]);
+
   const up = suggestions.filter((s) => s.suggested > s.current);
   const down = suggestions.filter((s) => s.suggested < s.current);
-  const netDelta = suggestions.reduce((a, s) => a + (s.suggested - s.current), 0);
 
-  const applyOne = (s: Suggestion) => { setDayRates({ [s.key]: s.suggested }); toast(`${s.typeName} · ${fmtDay(s.iso)}: ${eur(s.suggested)}`, "success"); addActivity("rate", explainSuggestion(s), s.structureId); };
+  const applyOne = (s: Suggestion) => { if (commit([s], "autopilot-manuale", "Autopilot · singola tariffa") === 0) return; toast(`${s.typeName} · ${fmtDay(s.iso)}: ${eur(s.suggested)}`, "success"); addActivity("rate", explainSuggestion(s), s.structureId); };
   const applyAll = () => {
     if (!suggestions.length) return;
-    setDayRates(toOverrideMap(suggestions));
-    toast(`Applicati ${suggestions.length} aggiustamenti.`, "success");
-    addActivity("rate", `Applicati manualmente ${suggestions.length} aggiustamenti prezzo. ${summarizeAppliedSuggestions(suggestions)}`, scopeSid);
+    const n = commit(suggestions, "autopilot-manuale", "Autopilot · applica tutti");
+    setPreview(false);
+    toast(`Applicati ${n} aggiustamenti.`, "success");
+    addActivity("rate", `Applicati manualmente ${n} aggiustamenti prezzo. ${summarizeAppliedSuggestions(suggestions)}`, scopeSid);
   };
 
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
@@ -164,7 +197,7 @@ export default function RevenueAutopilotPage() {
         <Card><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Suggerimenti</div><div className="mt-1 font-mono text-2xl font-bold text-txt">{suggestions.length}</div></Card>
         <Card><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Rialzi</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: "var(--ok)" }}>{up.length}</div></Card>
         <Card><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Ribassi</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: "var(--warn)" }}>{down.length}</div></Card>
-        <Card><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Impatto netto/notte</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: netDelta >= 0 ? "var(--ok)" : "var(--warn)" }}>{netDelta >= 0 ? "+" : ""}{eur(netDelta)}</div></Card>
+        <Card><div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Effetto se si vendono le camere libere</div><div className="mt-1 font-mono text-2xl font-bold" style={{ color: impact.net >= 0 ? "var(--ok)" : "var(--warn)" }}>{impact.net >= 0 ? "+" : "−"}{eur(Math.abs(impact.net))}</div><div className="mt-0.5 text-[10px] text-faint">su {impact.freeNightRooms} notti-camera libere · {impact.soldNightRooms} già vendute restano al loro prezzo</div></Card>
       </div>
 
       <Card className="mb-4">
@@ -175,18 +208,60 @@ export default function RevenueAutopilotPage() {
             </button>
             <div>
               <div className="text-sm font-semibold text-txt">Autopilot {cfg.on ? "attivo" : "spento"}</div>
-              <div className="text-[11px] text-faint">{cfg.on ? "Applica automaticamente entro i limiti impostati." : "Suggerisce soltanto: applichi tu."} {scopeSid ? `Impostazioni valide solo per ${getStructure(scopeSid)?.name ?? "questa struttura"}.` : structures.length > 1 ? "Impostazioni predefinite: valgono per le strutture che non ne hanno di proprie (selezionane una in alto a destra per personalizzarle)." : ""}</div>
+              <div className="text-[11px] text-faint">{cfg.on ? "Applica automaticamente entro i limiti impostati, una volta al giorno quando apri l'app (non lavora sul server a app chiusa)." : "Suggerisce soltanto: applichi tu."} {scopeSid ? `Impostazioni valide solo per ${getStructure(scopeSid)?.name ?? "questa struttura"}.` : structures.length > 1 ? "Impostazioni predefinite: valgono per le strutture che non ne hanno di proprie (selezionane una in alto a destra per personalizzarle)." : ""}</div>
             </div>
           </div>
-          <button onClick={applyAll} disabled={!suggestions.length} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">Applica tutti ({suggestions.length})</button>
+          <button onClick={() => setPreview(true)} disabled={!suggestions.length} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">Applica tutti ({suggestions.length})</button>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <label className={lbl}>Orizzonte (giorni)<input type="number" min={7} max={120} value={cfg.horizonDays} onChange={(e) => setCfgPersist({ horizonDays: Math.max(1, Number(e.target.value) || 30) })} className={inp} /></label>
-          <label className={lbl}>Variazione max ±%<input type="number" min={5} max={80} value={cfg.maxChangePct} onChange={(e) => setCfgPersist({ maxChangePct: Math.max(1, Number(e.target.value) || 25) })} className={inp} /></label>
-          <label className={lbl}>Pavimento (% base)<input type="number" min={30} max={100} value={cfg.floorPct} onChange={(e) => setCfgPersist({ floorPct: Math.max(10, Number(e.target.value) || 70) })} className={inp} /></label>
-          <label className={lbl}>Tetto (% base)<input type="number" min={100} max={400} value={cfg.ceilPct} onChange={(e) => setCfgPersist({ ceilPct: Math.max(100, Number(e.target.value) || 180) })} className={inp} /></label>
+          <label className={lbl}>Orizzonte (giorni)<input type="number" min={7} max={120} value={cfg.horizonDays} onChange={(e) => setCfgPersist({ horizonDays: Math.min(120, Math.max(1, Number(e.target.value) || 30)) })} className={inp} /></label>
+          <label className={lbl}>Variazione max ±%<input type="number" min={5} max={80} value={cfg.maxChangePct} onChange={(e) => setCfgPersist({ maxChangePct: Math.min(80, Math.max(1, Number(e.target.value) || 25)) })} className={inp} /></label>
+          <label className={lbl}>Pavimento (% base)<input type="number" min={30} max={100} value={cfg.floorPct} onChange={(e) => setCfgPersist({ floorPct: Math.min(100, Math.max(10, Number(e.target.value) || 70)) })} className={inp} /></label>
+          <label className={lbl}>Tetto (% base)<input type="number" min={100} max={400} value={cfg.ceilPct} onChange={(e) => setCfgPersist({ ceilPct: Math.min(400, Math.max(100, Number(e.target.value) || 180)) })} className={inp} /></label>
         </div>
+        <p className="mt-3 text-[11px] text-faint">Guardrail: su una tariffa base di € 100 il prezzo proposto resta sempre tra <b className="text-dim">€ {guardExample.lo}</b> e <b className="text-dim">€ {guardExample.hi}</b>. Rispetta anche il prezzo minimo della tipologia (se impostato in Camere). I giorni frenati da un limite sono segnati nella tabella.</p>
+      </Card>
+
+      {/* Avvisi sui dati: tipologie senza tariffa, prenotazioni senza camera */}
+      {(zeroPriceTypes.length > 0 || gapScan.unassigned.length > 0) && (
+        <div className="mb-4 space-y-2">
+          {zeroPriceTypes.length > 0 && (
+            <div className="rounded-xl border px-3 py-2 text-[12px]" style={{ borderColor: "color-mix(in srgb,#f59e0b 35%,var(--line))", background: "color-mix(in srgb,#f59e0b 8%,var(--surface))", color: "#B45309" }}>
+              <b>Tariffa base mancante:</b> {zeroPriceTypes.map((r) => r.name).join(", ")}. Senza una tariffa base l&apos;autopilot non può proporre nulla per queste tipologie: impostala in Tariffe.
+            </div>
+          )}
+          {gapScan.unassigned.length > 0 && (
+            <div className="rounded-xl border px-3 py-2 text-[12px]" style={{ borderColor: "color-mix(in srgb,#f59e0b 35%,var(--line))", background: "color-mix(in srgb,#f59e0b 8%,var(--surface))", color: "#B45309" }}>
+              <b>{gapScan.unassigned.length} {gapScan.unassigned.length === 1 ? "prenotazione senza camera assegnata" : "prenotazioni senza camera assegnata"}</b> nei prossimi 60 giorni: contano comunque sulla loro tipologia per calcolare l&apos;occupazione, ma assegnale dal Calendario per avere buchi e notti orfane precisi.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Notti orfane: buchi di 1-2 notti tra due prenotazioni della stessa camera */}
+      <Card className="mb-4">
+        <div className="mb-2 flex items-center justify-between">
+          <SectionTitle>Notti orfane · prossimi 60 giorni</SectionTitle>
+          <span className="text-[11px] text-faint">{gapScan.gaps.length ? `${gapScan.gaps.length} buchi` : "da prenotazioni reali"}</span>
+        </div>
+        {gapScan.gaps.length === 0 ? (
+          <p className="py-3 text-center text-sm text-faint">Nessun buco di 1-2 notti tra due prenotazioni della stessa camera.</p>
+        ) : (
+          <ul className="divide-y divide-line text-sm">
+            {gapScan.gaps.slice(0, 12).map((g) => (
+              <li key={`${g.unitId}|${g.from}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <div className="min-w-0"><span className="font-medium text-txt">{g.unitName}</span> <span className="text-dim">· {g.typeName}</span>{structures.length > 1 && scope === "all" && <span className="text-faint"> · {getStructure(g.structureId)?.name ?? ""}</span>}
+                  <div className="text-[11px] text-faint">{fmtDay(g.from)} → {fmtDay(g.to)} · {g.nights} {g.nights === 1 ? "notte" : "notti"} libere{g.value > 0 ? ` · valgono ${eur(g.value)} a tariffa attuale` : ""}</div></div>
+                {g.unsellable
+                  ? <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: "var(--err)", background: "color-mix(in srgb,var(--err) 12%,transparent)" }} title="La tipologia richiede più notti del buco: oggi non è vendibile così com'è.">non vendibile · minimo {g.minStay} notti</span>
+                  : <span className="shrink-0 rounded-full bg-wash px-2 py-0.5 text-[11px] font-medium text-dim">vendibile</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {gapScan.gaps.length > 12 && <p className="mt-2 text-[11px] text-faint">Mostrati i primi 12 di {gapScan.gaps.length}.</p>}
+        {gapScan.gaps.length > 0 && <p className="mt-2 text-[11px] text-faint">Un buco di 1-2 notti è difficile da riempire: se è &quot;non vendibile&quot; valuta di ridurre il minimo notti per quelle date dal Calendario.</p>}
       </Card>
 
       <Card>
@@ -195,7 +270,7 @@ export default function RevenueAutopilotPage() {
           <span className="text-[11px] text-faint">prossimi {cfg.horizonDays} giorni{structures.length > 1 && scope !== "all" ? ` · ${getStructure(scope)?.name ?? ""}` : ""}</span>
         </div>
         {suggestions.length === 0 ? (
-          <p className="py-8 text-center text-sm text-faint">Nessun aggiustamento consigliato: le tariffe sono già ottimali per l&apos;occupazione attuale.</p>
+          <p className="py-8 text-center text-sm text-faint">{scopedTypes.length === 0 ? "Nessuna tipologia con camere attive: aggiungi camere e tipologie per ricevere suggerimenti." : zeroPriceTypes.length === scopedTypes.length ? "Nessuna tipologia ha una tariffa base: impostala in Tariffe per ricevere suggerimenti." : "Nessun aggiustamento consigliato: le tariffe sono già in linea con l'occupazione attuale."}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
@@ -208,7 +283,7 @@ export default function RevenueAutopilotPage() {
                     <td className="px-2 py-2 text-center font-mono text-dim">{s.occ}%</td>
                     <td className="whitespace-nowrap px-2 py-2 text-right font-mono text-dim">{eur(s.current)}</td>
                     <td className="whitespace-nowrap px-2 py-2 text-right font-mono font-bold" style={{ color: s.suggested >= s.current ? "var(--ok)" : "var(--warn)" }}>{eur(s.suggested)} <span className="text-[10px]">({s.deltaPct > 0 ? "+" : ""}{s.deltaPct}%)</span></td>
-                    <td className="px-2 py-2 text-[11px] text-faint">{explainSuggestionCompact(s)}</td>
+                    <td className="px-2 py-2 text-[11px] text-faint">{explainSuggestionCompact(s)}{s.limitedBy && <span className="ml-1.5 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ color: "#B45309", background: "color-mix(in srgb,#f59e0b 16%,transparent)" }} title={`Frenato da: ${GUARDRAIL_LABEL[s.limitedBy]}. Senza limiti: ${eur(s.rawSuggested)}`}>limitato</span>}</td>
                     <td className="px-2 py-2 text-right"><button onClick={() => applyOne(s)} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">Applica</button></td>
                   </tr>
                 ))}
@@ -219,7 +294,22 @@ export default function RevenueAutopilotPage() {
         )}
       </Card>
 
-      <p className="mt-3 text-[11px] text-faint">Le tariffe applicate diventano override nel calendario: puoi sempre modificarle o rimuoverle da Tariffe/Calendario.</p>
+      {limitedCount > 0 && <p className="mt-3 text-[11px] text-faint">{limitedCount} proposte sono state frenate dai tuoi limiti (badge &quot;limitato&quot;): allarga i guardrail se vuoi che il motore si muova di più.</p>}
+      <p className="mt-3 text-[11px] text-faint">Le tariffe applicate diventano override nel calendario: puoi sempre modificarle o rimuoverle da Tariffe/Calendario, oppure annullare l&apos;applicazione dallo storico qui sotto.</p>
+
+      <PriceHistoryCard structureId={scope} sources={["autopilot-manuale", "autopilot-auto"]} />
+
+      <ImpactPreview
+        open={preview}
+        title={`Applica ${suggestions.length} aggiustamenti`}
+        subtitle={scopeSid ? `Solo su ${getStructure(scopeSid)?.name ?? "questa struttura"}` : structures.length > 1 ? "Su tutte le strutture, ciascuna con i propri limiti" : undefined}
+        impact={impact}
+        examples={suggestions.slice(0, 5).map((s) => ({ label: `${s.typeName} · ${fmtDay(s.iso)}`, from: s.current, to: s.suggested, note: s.limitedBy ? `Frenato da: ${GUARDRAIL_LABEL[s.limitedBy]}` : undefined }))}
+        notes={limitedCount ? [`${limitedCount} proposte sono limitate dai guardrail.`] : undefined}
+        confirmLabel={`Applica ${suggestions.length}`}
+        onConfirm={applyAll}
+        onCancel={() => setPreview(false)}
+      />
     </div>
   );
 }

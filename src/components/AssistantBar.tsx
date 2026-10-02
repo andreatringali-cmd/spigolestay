@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { answer, SUGGESTIONS, type SavedQuote } from "@/lib/assistant";
+import { askAssistantAi, type AiTurn } from "@/lib/assistant-ai";
 import { useLang } from "@/lib/i18n";
 import Icon from "./Icon";
 
@@ -14,6 +15,9 @@ export default function AssistantBar() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  // Risposta dell'AI alla domanda libera (le regole restano istantanee; l'AI interviene con Invio o quando non capiscono).
+  const [ai, setAi] = useState<{ q: string; text: string; loading: boolean; err: string } | null>(null);
+  const [turns, setTurns] = useState<AiTurn[]>([]);
 
   // Scorciatoie: "/" o Ctrl/Cmd+K aprono; Esc chiude.
   useEffect(() => {
@@ -31,8 +35,27 @@ export default function AssistantBar() {
   const quotes = useMemo<SavedQuote[]>(() => { if (!open) return []; try { return JSON.parse(localStorage.getItem("spigolestay:preventivi") || "[]"); } catch { return []; } }, [open]);
   const res = useMemo(() => answer(q, { bookings, guests, structures, units, roomTypes, quotes, activeStructureId, today: new Date() }), [q, bookings, guests, structures, units, roomTypes, quotes, activeStructureId]);
 
-  const go = (href: string) => { setOpen(false); setQ(""); router.push(href); };
-  const openBk = (id: string) => { setOpen(false); setQ(""); openBooking(id); };
+  const ctx = { bookings, guests, structures, units, roomTypes, quotes, activeStructureId, today: new Date() };
+  const askAi = async () => {
+    const question = q.trim();
+    if (!question || ai?.loading) return;
+    setAi({ q: question, text: "", loading: true, err: "" });
+    try {
+      const text = await askAssistantAi(question, ctx, turns);
+      setAi({ q: question, text, loading: false, err: "" });
+      setTurns((t) => [...t, { role: "user" as const, text: question }, { role: "assistant" as const, text }].slice(-8));
+    } catch (e) {
+      setAi({ q: question, text: "", loading: false, err: e instanceof Error ? e.message : "Errore" });
+    }
+  };
+  const close = () => { setOpen(false); setAi(null); setTurns([]); };
+  // Con la domanda cambiata la risposta AI precedente non vale più.
+  useEffect(() => { setAi((a) => (a && a.q !== q.trim() && !a.loading ? null : a)); }, [q]);
+  const notUnderstood = res.kind === "empty" && !!res.suggestions;
+  const aiShown = !!ai && ai.q === q.trim();
+
+  const go = (href: string) => { close(); setQ(""); router.push(href); };
+  const openBk = (id: string) => { close(); setQ(""); openBooking(id); };
 
   return (
     <>
@@ -49,7 +72,7 @@ export default function AssistantBar() {
 
       {open && (
         <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[9vh]">
-          <button aria-label="Chiudi" onClick={() => setOpen(false)} className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
+          <button aria-label="Chiudi" onClick={close} className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
           <div className="anim-pop relative flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
             {/* Barra di richiesta */}
             <div className="flex items-center gap-2.5 border-b border-line px-3.5 py-3">
@@ -58,6 +81,7 @@ export default function AssistantBar() {
                 ref={inputRef}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && q.trim()) { e.preventDefault(); void askAi(); } }}
                 placeholder="Chiedimi qualsiasi cosa…"
                 className="w-full bg-transparent text-[15px] text-txt outline-none placeholder:text-faint"
               />
@@ -68,7 +92,7 @@ export default function AssistantBar() {
 
             {/* Conversazione / risposta */}
             <div className="max-h-[62vh] overflow-y-auto p-3.5">
-              {(res.kind === "help" || (res.kind === "empty" && res.suggestions)) && (
+              {(res.kind === "help" || (res.kind === "empty" && res.suggestions && !aiShown)) && (
                 <div>
                   {res.detail && (
                     <div className="mb-3 flex items-start gap-2.5">
@@ -80,6 +104,18 @@ export default function AssistantBar() {
                     {(res.suggestions ?? SUGGESTIONS).map((s) => (
                       <button key={s} onClick={() => setQ(s)} className="rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-medium text-dim transition hover:border-focus hover:text-focus">{s}</button>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {aiShown && ai && (
+                <div className="mb-3 flex items-start gap-2.5">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white" style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--focus) 82%, #fff) 0%, var(--focus) 100%)" }}><Icon name="sparkles" size={14} /></span>
+                  <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-line bg-wash px-4 py-3">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">Assistente AI</div>
+                    {ai.loading && <div className="text-sm text-dim">Sto guardando i tuoi dati…</div>}
+                    {ai.err && <div className="text-sm text-err">{ai.err}</div>}
+                    {ai.text && <p className="whitespace-pre-line text-sm leading-relaxed text-txt">{ai.text}</p>}
                   </div>
                 </div>
               )}
@@ -136,7 +172,9 @@ export default function AssistantBar() {
             </div>
 
             <div className="flex items-center justify-between border-t border-line bg-wash px-4 py-2 text-[11px] text-faint">
-              <span>Assistente Xenora · risponde sui tuoi dati</span>
+              {q.trim() && !aiShown
+                ? <button onClick={() => void askAi()} className="font-semibold text-focus hover:underline">{notUnderstood ? "Non l'ho capita: chiedi all'AI" : "Chiedi all'AI"} ↵</button>
+                : <span>Assistente Xenora · risponde sui tuoi dati</span>}
               <span className="flex items-center gap-1"><kbd className="rounded border border-line bg-surface px-1 py-0.5 font-semibold text-dim">Esc</kbd> chiudi</span>
             </div>
           </div>

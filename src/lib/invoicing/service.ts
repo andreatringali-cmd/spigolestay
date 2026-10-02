@@ -246,18 +246,27 @@ export async function createBlankDocument(admin: SupabaseClient, tenantId: strin
 }
 
 // Crea una NOTA DI CREDITO in bozza che storna un documento emesso (copia righe/intestatario).
+// Il totale è la somma delle componenti (imponibile + IVA + fuori campo): bollo e arrotondamento NON si copiano
+// (restano 0), altrimenti total_cents non tornerebbe con le righe (prima copiava il total_cents della fattura,
+// bollo incluso). Da confermare col commercialista se la NC debba stornare anche il bollo.
 export async function createCreditNote(admin: SupabaseClient, tenantId: string, sourceId: string): Promise<CreateResult> {
   const { data: src } = await admin.from("documents").select("*").eq("id", sourceId).eq("tenant_id", tenantId).maybeSingle();
   if (!src) throw new Error("document_not_found");
   if (src.stato === "bozza") throw new Error("source_not_issued");
   if (src.doc_kind === "nota_di_credito") throw new Error("already_credit_note");
+  // Anti-doppio storno: niente seconda NC se ce n'è già una in bozza o se le emesse coprono già il totale.
+  const { data: prevNc } = await admin.from("documents").select("id, stato, total_cents").eq("tenant_id", tenantId).eq("related_document_id", sourceId).eq("doc_kind", "nota_di_credito");
+  if ((prevNc ?? []).some((n) => n.stato === "bozza")) throw new Error("Esiste già una nota di credito in bozza per questo documento: completala o eliminala prima di crearne un'altra.");
+  const alreadyCredited = (prevNc ?? []).filter((n) => ["emessa", "inviata_intermediario", "consegnata"].includes(n.stato as string)).reduce((a, n) => a + Number(n.total_cents ?? 0), 0);
+  const creditable = Number(src.taxable_cents ?? 0) + Number(src.vat_cents ?? 0) + Number(src.out_of_scope_cents ?? 0);
+  if (alreadyCredited >= creditable && alreadyCredited > 0) throw new Error("Il documento risulta già interamente stornato da note di credito emesse.");
   const { data: srcLines } = await admin.from("document_lines").select("*").eq("document_id", sourceId).order("pos");
   const { data: doc, error } = await admin.from("documents").insert({
     tenant_id: tenantId, structure_id: src.structure_id, booking_id: src.booking_id, booking_code: src.booking_code,
     doc_kind: "nota_di_credito", sdi_type: "TD04", regime: src.regime, serie: src.structure_id, stato: "bozza",
     counterpart: src.counterpart, counterpart_id: src.counterpart_id, related_document_id: src.id,
     payment_method: src.payment_method, vat_exigibility: src.vat_exigibility, send_sdi: src.send_sdi, provider: src.provider, currency: src.currency,
-    taxable_cents: src.taxable_cents, vat_cents: src.vat_cents, out_of_scope_cents: src.out_of_scope_cents, bollo_cents: 0, rounding_cents: 0, total_cents: src.total_cents, advance_cents: 0,
+    taxable_cents: src.taxable_cents, vat_cents: src.vat_cents, out_of_scope_cents: src.out_of_scope_cents, bollo_cents: 0, rounding_cents: 0, total_cents: (src.taxable_cents ?? 0) + (src.vat_cents ?? 0) + (src.out_of_scope_cents ?? 0), advance_cents: 0,
     notes: `Storno documento ${src.number_label ?? ""}`,
   }).select("id").single();
   if (error || !doc) throw new Error(error?.message || "insert_failed");
@@ -269,7 +278,8 @@ export async function createCreditNote(admin: SupabaseClient, tenantId: string, 
     })));
   }
   await admin.from("document_events").insert({ tenant_id: tenantId, document_id: nid, kind: "created", message: `Nota di credito da ${src.number_label ?? "documento"}` });
-  return { documentId: nid, toPayCents: src.total_cents, totalCents: src.total_cents };
+  const ncTotal = (src.taxable_cents ?? 0) + (src.vat_cents ?? 0) + (src.out_of_scope_cents ?? 0);
+  return { documentId: nid, toPayCents: ncTotal, totalCents: ncTotal };
 }
 
 export interface IssueResult { number: number; numberLabel: string; serie: string; anno: number }

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { conciergeAnswer } from "@/lib/concierge-engine";
+import { withOrgData } from "@/lib/concierge-orgdata";
+import { AI_CONCIERGE_KEY, parseAiConciergePrefs } from "@/lib/aiConcierge";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,8 +22,10 @@ export async function POST(req: Request) {
 
     const { data: row } = await auth.admin.from("app_state").select("data").eq("user_id", auth.tenantId).maybeSingle();
     const blob = ((row?.data ?? {}) as Record<string, string>) || {};
-    let data: Record<string, unknown> = {};
-    try { data = JSON.parse(blob["spigolestay:data:v1"] || "{}"); } catch { data = {}; }
+    let personal: Record<string, unknown> = {};
+    try { personal = JSON.parse(blob["spigolestay:data:v1"] || "{}"); } catch { personal = {}; }
+    // Strutture condivise (Structure.orgId): vivono in org_state, non nel blob personale. Sola lettura.
+    const data = await withOrgData(auth.admin, auth.tenantId, personal);
 
     const bookings = (Array.isArray(data.bookings) ? data.bookings : []) as { id: string; guestId: string }[];
     const bk = bookingId ? bookings.find((x) => x.id === bookingId) : undefined;
@@ -36,8 +40,11 @@ export async function POST(req: Request) {
       data: { structures: data.structures, bookings: data.bookings, units: data.units, roomTypes: data.roomTypes },
       roomAccessRaw: blob["spigolestay:roomaccess"], conciergeFaqRaw: faqRaw,
       structureId, bookingId, guest: g ? { id: g.id, language: g.language } : undefined, guestName: g?.fullName, message,
+      tone: parseAiConciergePrefs(blob[AI_CONCIERGE_KEY]).tone, // la prova usa lo stesso tono scelto in Impostazioni
+
       assumeVerified: b?.verified !== false, // la prova la fa il proprietario: Wi-Fi e accesso si vedono come per un ospite in casa
     });
+    console.log("[concierge]", JSON.stringify({ src: "prova", answered: result.answered, reason: result.reason, topic: result.topic, ms: result.ms })); // la prova NON finisce nell'elenco "senza risposta"
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     return NextResponse.json({ ok: false, error: "ask_failed", message: (e as Error)?.message ?? "errore" }, { status: 500 });

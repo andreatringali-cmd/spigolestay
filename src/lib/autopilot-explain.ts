@@ -9,7 +9,7 @@
 // last-minute, buchi tra prenotazioni, festivi/ponti/eventi reali, benchmark di zona
 // "Rete città" se attivo). Se un segnale non è disponibile, la relativa frase viene
 // semplicemente omessa: meglio una spiegazione più corta che una inventata.
-import type { Suggestion } from "./autopilot";
+import { GUARDRAIL_LABEL, type Suggestion } from "./autopilot";
 import { parseISO } from "./dates";
 
 const WEEKDAY_LONG = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
@@ -44,6 +44,9 @@ function zoneClause(rawReason: string): string {
 const hasDemoZone = (reasons: string[]): boolean => reasons.some((r) => r.endsWith(DEMO_MARK));
 const DEMO_NOTE = "* la Rete città di zona include, per ora, anche strutture demo dimostrative insieme a quelle reali";
 
+// Frase onesta sul guardrail che ha frenato la proposta (vuota se nessuno l'ha fatto).
+const guardNote = (s: Suggestion): string => (s.limitedBy ? ` Limitato da: ${GUARDRAIL_LABEL[s.limitedBy]} (senza limiti il motore avrebbe proposto € ${s.rawSuggested}).` : "");
+
 /**
  * Spiegazione completa (soggetto + giorno) di una proposta, pensata per il registro
  * attività o per un contesto senza altre colonne (es. "Autopilot ha applicato: ...").
@@ -67,7 +70,7 @@ export function explainSuggestion(s: Suggestion): string {
 
   const why = clauses.length ? joinIt(clauses) : "l'andamento delle prenotazioni rilevato dal motore prezzi";
   const note = hasDemoZone(signals.zoneReasons) ? ` (${DEMO_NOTE})` : "";
-  return `Ho ${verb} il prezzo di ${s.typeName} per ${day} del ${pct}% perché ${why}${note}.`;
+  return `Ho ${verb} il prezzo di ${s.typeName} per ${day} del ${pct}% perché ${why}${note}.${guardNote(s)}`;
 }
 
 /**
@@ -92,7 +95,7 @@ export function explainSuggestionCompact(s: Suggestion): string {
 
   const why = clauses.length ? joinIt(clauses) : "andamento prenotazioni";
   const note = hasDemoZone(signals.zoneReasons) ? ` (${DEMO_NOTE})` : "";
-  return `${verb === "alza" ? "Alza" : "Abbassa"} del ${pct}% perché ${why}${note}.`;
+  return `${verb === "alza" ? "Alza" : "Abbassa"} del ${pct}% perché ${why}${note}.${guardNote(s)}`;
 }
 
 /**

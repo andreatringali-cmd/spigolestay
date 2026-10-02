@@ -73,7 +73,7 @@ export function commissionPctOf(b: CommissionBookingLike): number {
   return b.commissionPct ?? loadChannelCommissionPct(b.channel, b.structureId) ?? CHANNELS[b.channel].commission * 100;
 }
 export function commissionOf(b: CommissionBookingLike): number {
-  return b.commissionAmount ?? Math.round((b.total ?? 0) * commissionPctOf(b) / 100);
+  return b.commissionAmount ?? Math.round((b.total ?? 0) * commissionPctOf(b)) / 100; // ai centesimi, non all'euro intero
 }
 export function nettoOf(b: CommissionBookingLike): number {
   return (b.total ?? 0) - commissionOf(b);

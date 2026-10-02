@@ -76,3 +76,8 @@ export async function sendWhatsapp(admin: SupabaseClient, tenantId: string, args
     return { ok: true, message: "Inviato", id: j?.messages?.[0]?.id };
   } catch (e) { return { ok: false, message: (e as Error)?.message ?? "Invio non riuscito." }; }
 }
+
+// Token del tenant per scaricare i file dei messaggi in arrivo (vocali): resta sul server.
+export async function getWhatsappToken(admin: SupabaseClient, tenantId: string): Promise<string | null> {
+  return (await readCfg(admin, tenantId))?.token ?? null;
+}

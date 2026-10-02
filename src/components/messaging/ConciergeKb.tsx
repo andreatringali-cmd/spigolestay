@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useData } from "@/lib/store";
@@ -20,6 +20,9 @@ const catLabel = (c: string) => CATEGORY_LABEL[c] ?? c;
 
 type Row = ConciergeEntry & { id: string };
 
+// Precompilazione di "Nuova voce" (da "Domande a cui non ho saputo rispondere"): titolo e categoria dalla domanda dell'ospite.
+export interface KbPrefill { nonce: number; title: string; category: string; lang: ConciergeLang }
+
 interface Draft {
   id?: string;
   level: "shared" | "property";
@@ -33,6 +36,7 @@ interface Draft {
   address: string;
   map_url: string;
   sort_order: string;
+  prefillNonce?: number; // presente se la bozza nasce da una domanda senza risposta
 }
 
 const emptyDraft = (lang: ConciergeLang): Draft => ({
@@ -150,7 +154,7 @@ function EntryForm({ draft, setDraft, onSave, onCancel, saving, isNew, structure
   );
 }
 
-export default function ConciergeKb({ sid }: { sid: string }) {
+export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; prefill?: KbPrefill | null; onCreated?: () => void }) {
   const { structures, bookings, guests } = useData();
   const ask = useConfirm();
   const st = structures.find((s) => s.id === sid);
@@ -172,6 +176,16 @@ export default function ConciergeKb({ sid }: { sid: string }) {
   }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setDraft(null); }, [sid]);
+
+  // Nuova voce precompilata da una domanda senza risposta: apre il modulo (in alto) con titolo e categoria già scelti.
+  const topRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!prefill) return;
+    setLang(prefill.lang);
+    setDraft({ ...emptyDraft(prefill.lang), title: prefill.title, category: CATEGORY_ORDER.includes(prefill.category) ? prefill.category : "servizi", prefillNonce: prefill.nonce });
+    setTimeout(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.nonce]);
 
   // Voci visibili: della struttura scelta e condivise, nella lingua scelta.
   const visible = useMemo(() => rows.filter((r) => r.lang === lang && (r.level === "shared" || r.property_id === sid)), [rows, lang, sid]);
@@ -205,8 +219,10 @@ export default function ConciergeKb({ sid }: { sid: string }) {
       : await supabase.from("concierge_entries").insert({ ...p, level: draft.level, property_id: draft.level === "property" ? sid : null });
     setSaving(false);
     if (res.error) { setErr(`Salvataggio non riuscito: ${res.error.message}`); return; }
+    const fromQuestion = !draft.id && draft.prefillNonce !== undefined && draft.prefillNonce === prefill?.nonce;
     setDraft(null);
     await load();
+    if (fromQuestion) onCreated?.(); // la domanda senza risposta da cui è nata la voce esce dall'elenco
   };
 
   const remove = async (e: Row) => {
@@ -304,7 +320,7 @@ export default function ConciergeKb({ sid }: { sid: string }) {
   };
 
   return (
-    <div className="mb-4 space-y-4">
+    <div ref={topRef} className="mb-4 space-y-4">
       <Card>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
           <SectionTitle>Base di conoscenza del Concierge</SectionTitle>

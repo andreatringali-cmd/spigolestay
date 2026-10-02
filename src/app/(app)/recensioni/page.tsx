@@ -5,6 +5,7 @@ import { parseISO, toISO } from "@/lib/dates";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import Icon from "@/components/Icon";
 import EmptyState from "@/components/EmptyState";
+import SearchInput from "@/components/SearchInput";
 import { useData } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { apiPost } from "@/lib/invoicing/client";
@@ -63,6 +64,10 @@ export default function RecensioniPage() {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<"all" | SourceKey>("all");
   const [ratingFilter, setRatingFilter] = useState<"all" | "pos" | "neu" | "neg">("all");
+  const [replyFilter, setReplyFilter] = useState<"all" | "todo" | "done">("all"); // stato risposta
+  const [search, setSearch] = useState(""); // ricerca testo (ospite / testo recensione)
+  const [sortBy, setSortBy] = useState<"new" | "old" | "low" | "high">("new");
+  const [trendDays, setTrendDays] = useState<30 | 90 | 365>(90); // finestra del confronto "media per periodo"
 
   // Struttura selezionata per configurazione/visualizzazione recensioni.
   const [selStructureId, setSelStructureId] = useState<string>("");
@@ -308,9 +313,38 @@ export default function RecensioniPage() {
     });
   }, [directReviews]);
 
+  const searchTerm = search.trim().toLowerCase();
   const shown = reviews
     .filter((r) => filter === "all" || r.source === filter)
-    .filter((r) => ratingFilter === "all" || r.bucket === ratingFilter);
+    .filter((r) => ratingFilter === "all" || r.bucket === ratingFilter)
+    .filter((r) => replyFilter === "all" || (replyFilter === "todo" ? !replies[r.id] : !!replies[r.id]))
+    .filter((r) => !searchTerm || `${r.guest} ${r.text}`.toLowerCase().includes(searchTerm))
+    .sort((a, b) => sortBy === "old" ? (a.date || "").localeCompare(b.date || "") : sortBy === "low" ? a.rating - b.rating || (b.date || "").localeCompare(a.date || "") : sortBy === "high" ? b.rating - a.rating || (b.date || "").localeCompare(a.date || "") : (b.date || "").localeCompare(a.date || ""));
+  const filtersActive = filter !== "all" || ratingFilter !== "all" || replyFilter !== "all" || !!searchTerm;
+  const resetFilters = () => { setFilter("all"); setRatingFilter("all"); setReplyFilter("all"); setSearch(""); };
+  // Recensioni negative senza risposta: priorità per la reputazione.
+  const negUnanswered = reviews.filter((r) => r.bucket === "neg" && !replies[r.id]).length;
+  // Giorni trascorsi dalla recensione (per evidenziare quelle che aspettano da tempo).
+  const ageDays = (iso: string) => { const t0 = parseISO(iso).getTime(); return isNaN(t0) ? 0 : Math.max(0, Math.floor((Date.now() - t0) / 86400000)); };
+  // Media per periodo: ultimi N giorni vs N giorni precedenti, sulle recensioni realmente disponibili qui
+  // (con Google solo le ~5 più recenti: il confronto è indicativo e lo dichiariamo in pagina).
+  const trend = useMemo(() => {
+    const now = Date.now(), W = trendDays * 86400000;
+    const inWin = (r: NormalizedReview, from: number, to: number) => { const t0 = parseISO(r.date).getTime(); return !isNaN(t0) && t0 > from && t0 <= to; };
+    const cur = reviews.filter((r) => inWin(r, now - W, now));
+    const prv = reviews.filter((r) => inWin(r, now - 2 * W, now - W));
+    const av = (xs: NormalizedReview[]) => (xs.length ? xs.reduce((a, r) => a + r.rating, 0) / xs.length : null);
+    return { cur: av(cur), curN: cur.length, prv: av(prv), prvN: prv.length };
+  }, [reviews, trendDays]);
+
+  const exportCsv = () => {
+    const head = ["Data", "Fonte", "Ospite", "Voto (0-10)", "Testo", "Risposta"];
+    const q = (x: unknown) => `"${String(x ?? "").replace(/"/g, '""').replace(/\r?\n/g, " ")}"`;
+    const lines = shown.map((r) => [r.date, SRC[r.source as SourceKey]?.label ?? r.source, r.guest, r.rating, r.text, replies[r.id] ?? ""].map(q).join(";"));
+    const csv = "\ufeff" + [head.map(q).join(";"), ...lines].join("\r\n");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = `recensioni-${(structures.find((s) => s.id === selStructureId)?.name || "struttura").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${toISO(new Date())}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  };
   // Media: con Google collegato usa la media REALE su tutte le recensioni (google.rating), non il campione di ~5.
   const avg = (googleConnected && typeof google.rating === "number") ? google.rating : (reviews.length ? reviews.reduce((a, r) => a + r.rating, 0) / reviews.length : 0);
   const totalCount = google.total && googleConnected ? google.total : reviews.length;
@@ -506,9 +540,39 @@ export default function RecensioniPage() {
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Media" value={<>{avg.toFixed(1)}<span className="text-xs text-faint">/10</span></>} />
         <StatCard label="Recensioni" value={<>{totalCount}{googleConnected && google.total && google.total > reviews.length ? <span className="text-xs text-faint"> ({reviews.length} qui)</span> : null}</>} />
-        <StatCard label="Da rispondere" value={unanswered} color={unanswered ? "var(--warn)" : "var(--ok)"} />
+        <StatCard label="Da rispondere" value={unanswered} color={unanswered ? "var(--warn)" : "var(--ok)"} hint={negUnanswered ? `di cui ${negUnanswered} negative` : undefined} onClick={unanswered ? () => { setReplyFilter(replyFilter === "todo" ? "all" : "todo"); } : undefined} active={replyFilter === "todo"} />
         <StatCard label="Positive" value={`${reviews.length ? Math.round(reviews.filter((r) => r.bucket === "pos").length / reviews.length * 100) : 0}%`} color="var(--ok)" />
       </div>
+
+      {/* Allerta reputazione: negative senza risposta */}
+      {negUnanswered > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3 text-sm" style={{ borderColor: "var(--err)", background: "color-mix(in srgb, var(--err) 8%, transparent)" }}>
+          <span className="text-txt"><b>{negUnanswered}</b> {negUnanswered === 1 ? "recensione negativa senza risposta" : "recensioni negative senza risposta"}: rispondere in fretta limita il danno di reputazione.</span>
+          <button onClick={() => { setRatingFilter("neg"); setReplyFilter("todo"); setFilter("all"); }} className="rounded-lg bg-[color:var(--err)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">Mostrale</button>
+        </div>
+      )}
+
+      {/* Media per periodo: ultimi N giorni vs N giorni precedenti */}
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <SectionTitle>Andamento della media</SectionTitle>
+          <div className="mb-3 flex items-center gap-1">
+            {([[30, "30 giorni"], [90, "90 giorni"], [365, "12 mesi"]] as const).map(([d, lab]) => (
+              <button key={d} onClick={() => setTrendDays(d)} className={`rounded-lg px-2 py-1 text-xs font-semibold transition ${trendDays === d ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{lab}</button>
+            ))}
+          </div>
+        </div>
+        {trend.curN === 0 && trend.prvN === 0 ? (
+          <p className="text-sm text-faint">Nessuna recensione datata in questo periodo: con più recensioni comparirà il confronto con il periodo precedente.</p>
+        ) : (
+          <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+            <div><span className="font-mono text-2xl font-bold tabular-nums text-txt">{trend.cur != null ? trend.cur.toFixed(1) : "—"}</span><span className="text-xs text-faint">/10 · ultimi {trendDays === 365 ? "12 mesi" : trendDays + " giorni"} ({trend.curN})</span></div>
+            <div><span className="font-mono text-lg font-semibold tabular-nums text-dim">{trend.prv != null ? trend.prv.toFixed(1) : "—"}</span><span className="text-xs text-faint">/10 · periodo precedente ({trend.prvN})</span></div>
+            {trend.cur != null && trend.prv != null && (() => { const d = trend.cur - trend.prv; const up = d >= 0; return <span className="text-sm font-semibold" style={{ color: Math.abs(d) < 0.05 ? "var(--faint)" : up ? "var(--ok)" : "var(--err)" }}>{Math.abs(d) < 0.05 ? "stabile" : `${up ? "▲" : "▼"} ${Math.abs(d).toFixed(1)}`}</span>; })()}
+          </div>
+        )}
+        <p className="mt-1.5 text-[11px] text-faint">Calcolata sulle recensioni disponibili qui sotto (di Google arrivano solo le ~5 più recenti): è un indicatore, non la media ufficiale della piattaforma.</p>
+      </Card>
 
       {/* Chiedi la recensione: automazione della richiesta Google post check-out + tracciamento invio */}
       <Card className="mb-4">
@@ -713,7 +777,23 @@ export default function RecensioniPage() {
         {([["all", "Tutte", "var(--focus)"], ["pos", "Positive (8-10)", "var(--ok)"], ["neu", "Neutre (6-7)", "var(--warn)"], ["neg", "Negative (<6)", "var(--err)"]] as const).map(([k, label, col]) => (
           <button key={k} onClick={() => setRatingFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${ratingFilter === k ? "text-white" : "text-dim hover:bg-wash"}`} style={ratingFilter === k ? { backgroundColor: col } : undefined}>{label}</button>
         ))}
+        <span className="mx-1 h-4 w-px bg-line" />
+        <span className="mr-1 text-xs font-semibold text-faint">Risposta:</span>
+        {([["all", "Tutte"], ["todo", `Da rispondere (${unanswered})`], ["done", "Risposte"]] as const).map(([k, label]) => (
+          <button key={k} onClick={() => setReplyFilter(k)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${replyFilter === k ? "text-white" : "text-dim hover:bg-wash"}`} style={replyFilter === k ? { backgroundColor: k === "todo" ? "var(--warn)" : "var(--focus)" } : undefined}>{label}</button>
+        ))}
         <button onClick={() => setShowManual((v) => !v)} className="ml-auto flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash"><Icon name="plus" size={13} /> Aggiungi a mano</button>
+      </div>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SearchInput value={search} onChange={setSearch} placeholder="Cerca ospite o testo…" />
+        <label className="flex items-center gap-1.5 text-xs font-semibold text-faint">Ordina
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-xs font-semibold text-txt outline-none focus:border-focus">
+            <option value="new">Più recenti</option><option value="old">Più vecchie</option><option value="low">Voto più basso</option><option value="high">Voto più alto</option>
+          </select>
+        </label>
+        <span className="text-[11px] text-faint">{shown.length} di {reviews.length}</span>
+        {filtersActive && <button onClick={resetFilters} className="text-[11px] font-semibold text-focus hover:underline">Azzera filtri</button>}
+        <button onClick={exportCsv} disabled={!shown.length} className="ml-auto rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40" title="Esporta in CSV le recensioni attualmente mostrate">Esporta CSV</button>
       </div>
 
       {/* Form inserimento manuale */}
@@ -753,7 +833,7 @@ export default function RecensioniPage() {
 
       <div className="space-y-3">
         {shown.map((r) => (
-          <Card key={r.id}>
+          <Card key={r.id} className={!replies[r.id] ? (r.bucket === "neg" ? "border-l-4 border-l-[color:var(--err)]" : "border-l-4 border-l-[color:var(--warn)]") : ""}>
             <div className="flex flex-wrap items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color(r.bucket) }} />
               <span className="font-semibold text-txt">{r.guest}</span>
@@ -762,6 +842,7 @@ export default function RecensioniPage() {
               <span className="font-mono text-sm text-dim">{r.rating}/10</span>
               {r.id.startsWith("manual-") && <span className="rounded-full border border-line px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint">manuale</span>}
               {isChx(r) && <span className="rounded-full border border-line px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint" title="Importata automaticamente da Channex">via Channex</span>}
+              {!replies[r.id] && <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${r.bucket === "neg" ? "var(--err)" : "var(--warn)"} 14%, transparent)`, color: r.bucket === "neg" ? "var(--err)" : "var(--warn)" }}>Da rispondere{ageDays(r.date) > 0 ? ` · da ${ageDays(r.date)} g` : ""}</span>}
               <span className="ml-auto text-xs text-faint">{fmt(r.date)}</span>
               {r.id.startsWith("manual-") && <button onClick={() => removeManual(r.id)} className="text-faint hover:text-[color:var(--err)]" title="Elimina recensione manuale"><Icon name="trash" size={14} /></button>}
             </div>
@@ -772,6 +853,7 @@ export default function RecensioniPage() {
                   {r.source === "google" && <button onClick={() => publishOnGoogle(r.id)} className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-surface" title="Copia la risposta e apri la gestione recensioni di Google">📋 Copia e rispondi su Google →</button>}
                   {r.source === "direct" && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title="La risposta è pubblicata sul tuo mini-sito">✓ Pubblicata sul mini-sito</span>}
                   {isChx(r) && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title={`La risposta è stata inviata su ${SRC[r.source as SourceKey]?.label} tramite Channex`}>✓ Pubblicata su {SRC[r.source as SourceKey]?.label}</span>}
+                  {r.source !== "direct" && !isChx(r) && <button onClick={() => { setDraft((d) => ({ ...d, [r.id]: replies[r.id] ?? "" })); const n = { ...replies }; delete n[r.id]; persistReplies(n); }} className="text-[11px] font-semibold text-focus hover:underline">Modifica</button>}
                   <button onClick={() => removeReply(r)} className="text-[11px] text-faint hover:text-[color:var(--err)]">Rimuovi</button>
                 </div>
               </div>
@@ -804,7 +886,7 @@ export default function RecensioniPage() {
               : "Incolla il Place ID di Google per importare le recensioni, oppure aggiungine una a mano."}
           </Card>
         )}
-        {reviews.length > 0 && shown.length === 0 && <Card className="py-8 text-center text-sm text-faint">Nessuna recensione per questa fonte.</Card>}
+        {reviews.length > 0 && shown.length === 0 && <Card className="py-8 text-center text-sm text-faint">Nessuna recensione con questi filtri.{filtersActive && <> <button onClick={resetFilters} className="font-semibold text-focus hover:underline">Azzera i filtri</button></>}</Card>}
       </div>
 
       <p className="mt-3 text-[11px] text-faint">Google è collegato via Google Places API (recensioni reali, ~5 più recenti). Le recensioni <strong>Dirette</strong> le lasciano gli ospiti dal tuo mini-sito e qui puoi rispondere e pubblicare davvero la risposta. <strong>Booking.com, Airbnb ed Expedia</strong> si importano automaticamente quando Channex è collegato (serve l&apos;app &quot;Messages &amp; Reviews&quot; installata su Channex); <strong>Tripadvisor</strong> non è coperto e resta a inserimento manuale.</p>

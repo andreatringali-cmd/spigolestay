@@ -16,15 +16,17 @@ import { eur, num } from "@/lib/format";
 import { captureA4ToPdfBlob } from "@/lib/pdf-capture";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
+import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import FascicoloFiscaleDoc, { type ChannelRow } from "@/components/pdf/FascicoloFiscaleDoc";
 
 const daysInYear = (yr: number) => ((yr % 4 === 0 && yr % 100 !== 0) || yr % 400 === 0 ? 366 : 365);
 
 interface DocRow {
   id: string; structure_id: string | null; doc_kind: string; stato: string;
-  issue_date: string | null; created_at: string;
-  taxable_cents: number; vat_cents: number; total_cents: number;
+  issue_date: string | null; created_at: string; number_label: string | null; counterpart: { name?: string; lastName?: string; vat?: string | null; tax_code?: string | null } | null;
+  taxable_cents: number; vat_cents: number; out_of_scope_cents: number; bollo_cents: number; total_cents: number;
 }
+const ISSUED = new Set(["emessa", "inviata_intermediario", "consegnata"]);
 
 export default function FascicoloFiscalePage() {
   const { t } = useLang();
@@ -94,7 +96,7 @@ export default function FascicoloFiscalePage() {
     if (!supabase) { setLoadingDocs(false); return; }
     setLoadingDocs(true);
     Promise.all([
-      supabase.from("documents").select("id, structure_id, doc_kind, stato, issue_date, created_at, taxable_cents, vat_cents, total_cents"),
+      supabase.from("documents").select("id, structure_id, doc_kind, stato, issue_date, created_at, number_label, counterpart, taxable_cents, vat_cents, out_of_scope_cents, bollo_cents, total_cents"),
       supabase.from("tenant_invoice_settings").select("denominazione, vat, tax_code").maybeSingle(),
     ]).then(([docs, settings]) => {
       if (docs.error) setDocsErr(docs.error.message); else setDocRows((docs.data ?? []) as DocRow[]);
@@ -104,17 +106,42 @@ export default function FascicoloFiscalePage() {
     });
   }, []);
 
-  const yearInvoices = docRows.filter((r) => {
-    if (r.doc_kind !== "fattura") return false;
-    if (r.stato === "bozza") return false; // solo emesse, non le bozze
+  // Documenti dell'anno nello scope struttura (esclusi bozze e ricevute). "Emessi" = emessa/inviata/consegnata:
+  // gli scartati dallo SdI non entrano nei totali (vengono solo contati e segnalati).
+  const yearDocs = docRows.filter((r) => {
+    if (r.stato === "bozza" || r.doc_kind === "ricevuta_non_fiscale") return false;
     if (activeStructureId !== "all" && r.structure_id !== activeStructureId) return false;
     const y = (r.issue_date ?? r.created_at ?? "").slice(0, 4);
     return y === String(year);
   });
+  const yearInvoices = yearDocs.filter((r) => r.doc_kind === "fattura" && ISSUED.has(r.stato));
+  const yearCreditNotes = yearDocs.filter((r) => r.doc_kind === "nota_di_credito" && ISSUED.has(r.stato));
+  const rejectedCount = yearDocs.filter((r) => r.stato === "scartata").length;
   const invoiceCount = yearInvoices.length;
   const invoiceTaxable = yearInvoices.reduce((a, r) => a + (r.taxable_cents ?? 0), 0) / 100;
   const invoiceVat = yearInvoices.reduce((a, r) => a + (r.vat_cents ?? 0), 0) / 100;
   const invoiceTotal = yearInvoices.reduce((a, r) => a + (r.total_cents ?? 0), 0) / 100;
+  const creditNoteCount = yearCreditNotes.length;
+  const creditNoteTaxable = yearCreditNotes.reduce((a, r) => a + (r.taxable_cents ?? 0), 0) / 100;
+  const creditNoteVat = yearCreditNotes.reduce((a, r) => a + (r.vat_cents ?? 0), 0) / 100;
+  const creditNoteTotal = yearCreditNotes.reduce((a, r) => a + (r.total_cents ?? 0), 0) / 100;
+  const bolloTotal = yearInvoices.reduce((a, r) => a + (r.bollo_cents ?? 0), 0) / 100;
+  const netTaxable = invoiceTaxable - creditNoteTaxable, netVat = invoiceVat - creditNoteVat, netTotal = invoiceTotal - creditNoteTotal;
+
+  // Esportazione CSV per il commercialista: l'elenco dei documenti emessi dell'anno (NC con segno negativo).
+  const exportDocsCsv = () => {
+    const rowsCsv = yearDocs.filter((r) => ISSUED.has(r.stato)).sort((a, b) => (a.issue_date ?? "").localeCompare(b.issue_date ?? "")).map((r) => {
+      const sg = r.doc_kind === "nota_di_credito" ? -1 : 1;
+      const cp = r.counterpart;
+      return [
+        r.issue_date ? r.issue_date.split("-").reverse().join("/") : "", getStructure(r.structure_id ?? "")?.name ?? "", r.doc_kind === "nota_di_credito" ? "Nota di credito" : "Fattura", r.number_label ?? "",
+        `${cp?.name ?? ""} ${cp?.lastName ?? ""}`.trim(), cp?.vat ?? "", cp?.tax_code ?? "",
+        centsToCsv(sg * r.taxable_cents), centsToCsv(sg * r.vat_cents), centsToCsv(sg * (r.out_of_scope_cents ?? 0)), centsToCsv(sg * (r.bollo_cents ?? 0)), centsToCsv(sg * r.total_cents),
+      ];
+    });
+    downloadCsv(`documenti-emessi-${year}${activeStructureId !== "all" ? `-${structureLabel.replace(/\s+/g, "-").toLowerCase()}` : ""}`,
+      buildCsv(["Data", "Struttura", "Tipo", "Numero", "Cliente", "P.IVA", "Codice fiscale", "Imponibile", "IVA", "Fuori campo IVA", "Bollo", "Totale"], rowsCsv));
+  };
 
   // ---- Generazione PDF: cattura l'anteprima reale fuori schermo (stessa tecnica di Planning pulizie/Preventivi) ----
   const pdfRef = useRef<HTMLDivElement>(null);
@@ -125,6 +152,7 @@ export default function FascicoloFiscalePage() {
     channels: channelRows,
     cityTaxEnabled, cityTaxDovuta, cityTaxIncassata, cityTaxDaIncassare,
     invoiceCount, invoiceTaxable, invoiceVat, invoiceTotal, invoiceModuleReady,
+    creditNoteCount, creditNoteTaxable, creditNoteVat, creditNoteTotal, bolloTotal, rejectedCount,
   };
 
   const downloadPdf = async () => {
@@ -148,9 +176,14 @@ export default function FascicoloFiscalePage() {
         title={t("Fascicolo fiscale")}
         subtitle={t("Un unico PDF con incassi per canale, tassa di soggiorno e fatture emesse — pronto per il commercialista")}
         actions={
-          <button onClick={downloadPdf} disabled={generating || loadingDocs} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
-            {generating ? t("Genero…") : t("Genera fascicolo fiscale (PDF)")}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={exportDocsCsv} disabled={loadingDocs || invoiceCount + creditNoteCount === 0} title="Elenco dei documenti emessi dell'anno (CSV per Excel; note di credito in negativo)" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">
+              {t("Esporta documenti (CSV)")}
+            </button>
+            <button onClick={downloadPdf} disabled={generating || loadingDocs} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+              {generating ? t("Genero…") : t("Genera fascicolo fiscale (PDF)")}
+            </button>
+          </div>
         }
       />
 
@@ -233,6 +266,15 @@ export default function FascicoloFiscalePage() {
                   <div><div className="text-xs text-dim">{t("Imponibile")}</div><div className="font-mono text-lg font-bold text-txt">{eur(invoiceTaxable)}</div></div>
                   <div><div className="text-xs text-dim">IVA</div><div className="font-mono text-lg font-bold text-txt">{eur(invoiceVat)}</div></div>
                   <div><div className="text-xs text-dim">{t("Totale")}</div><div className="font-mono text-lg font-bold text-txt">{eur(invoiceTotal)}</div></div>
+                  {creditNoteCount > 0 && (<>
+                    <div className="col-span-2 mt-1 border-t border-line pt-2 text-xs font-semibold uppercase tracking-wide text-faint sm:col-span-4">{t("Note di credito emesse")}</div>
+                    <div><div className="text-xs text-dim">{t("N. NC")}</div><div className="font-mono text-lg font-bold text-txt">{creditNoteCount}</div></div>
+                    <div><div className="text-xs text-dim">{t("Imponibile")}</div><div className="font-mono text-lg font-bold text-txt">−{eur(creditNoteTaxable)}</div></div>
+                    <div><div className="text-xs text-dim">IVA</div><div className="font-mono text-lg font-bold text-txt">−{eur(creditNoteVat)}</div></div>
+                    <div><div className="text-xs text-dim">{t("Totale al netto NC")}</div><div className="font-mono text-lg font-bold" style={{ color: "var(--ok)" }}>{eur(netTotal)}</div><div className="text-[10px] text-faint">imp. {eur(netTaxable)} · IVA {eur(netVat)}</div></div>
+                  </>)}
+                  {bolloTotal > 0 && <div className="col-span-2 text-[11px] text-dim sm:col-span-4">{t("Di cui bollo virtuale")}: <b className="font-mono text-txt">{eur(bolloTotal)}</b></div>}
+                  {rejectedCount > 0 && <div className="col-span-2 text-[11px] font-medium text-[color:var(--warn)] sm:col-span-4">{rejectedCount} {t("documenti scartati dallo SdI esclusi dai totali: correggili e reinviali.")}</div>}
                 </div>
               ) : (
                 <p className="text-sm text-faint">{t("Fatturazione elettronica non ancora attiva (completa i dati emittente in Impostazioni fattura).")}</p>

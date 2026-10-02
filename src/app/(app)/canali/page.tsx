@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -11,6 +11,9 @@ import { apiPost } from "@/lib/invoicing/client";
 import { forceFullSync } from "@/components/ChannexAutoSync";
 import { CHANNELS, type Channel } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
+import { usePriceCorrections } from "@/lib/usePriceCorrections";
+import { CorrectionEditor, CorrectionHistory, BulkCorrection, ParityPanel, buildPriceRows } from "@/components/PriceCorrectionPanel";
+import { correctionLabel, logForStructure, type Correction } from "@/lib/priceCorrection";
 import { loadChannelColor, saveChannelColor, loadChannelCommissionPct, saveChannelCommissionPct } from "@/lib/channelOverrides";
 
 interface LogEntry { id: string; ts: number; text: string; color: string; structureId?: string }
@@ -24,7 +27,7 @@ const LOG_KEY = "spigolestay:canali:log";
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `x-${Math.floor(performance.now() * 1000)}`);
 
 export default function CanaliPage() {
-  const { structures, roomTypes, units, bookings, activeStructureId } = useData();
+  const { structures, roomTypes, units, bookings, activeStructureId, rateOverrides } = useData();
   const ask = useConfirm();
   const { t } = useLang();
   const relTime = (ts: number) => {
@@ -167,41 +170,24 @@ export default function CanaliPage() {
     } catch { setOtaByStructure(prev); }
     setTogglingChannel(null);
   };
-  // Correzione di prezzo (derived_option) a livello di connessione canale — sostituisce l'apertura
-  // manuale della dashboard Channex per lo stesso identico bisogno che ha spinto Andrea ad
-  // aggiustare Booking.com a mano. Un solo step per ora (+/- percentuale); il valore letto da
-  // Channex precompila il modulo, così il Salva non rischia mai di azzerare una correzione esistente.
-  const CORR_SIGN: Record<string, string> = { increase_by_percent: "+", decrease_by_percent: "−" };
-  const [priceCorr, setPriceCorr] = useState<Record<string, { rule: "increase_by_percent" | "decrease_by_percent"; value: string; loaded: boolean }>>({});
+  // Correzione di prezzo (derived_option) a livello di connessione canale: valore REALE letto/scritto su
+  // Channex (hook usePriceCorrections), con anteprima, verifica per rilettura e storico. Vedi
+  // components/PriceCorrectionPanel.tsx. Il valore letto precompila il modulo e, se la lettura
+  // fallisce, il salvataggio resta bloccato (niente sovrascritture alla cieca).
+  const corrApi = usePriceCorrections();
   // Bozza commissione predefinita per canale (colore invece si applica subito, senza bozza).
   const [commDraft, setCommDraft] = useState<Record<string, string>>({});
   const [commSaved, setCommSaved] = useState<string | null>(null);
-  const [corrMsg, setCorrMsg] = useState<Record<string, { text: string; ok?: boolean }>>({});
-  const [corrSaving, setCorrSaving] = useState<string | null>(null);
-  const loadPriceCorr = async (channelId: string) => {
-    try {
-      const j = await apiPost<{ ok: boolean; rule?: string | null; value?: string | null }>("channex/price-correction", { channelId, action: "get" });
-      const rule = j.rule === "increase_by_percent" || j.rule === "decrease_by_percent" ? j.rule : "increase_by_percent";
-      setPriceCorr((cur) => ({ ...cur, [channelId]: { rule, value: j.value ?? "", loaded: true } }));
-    } catch { setPriceCorr((cur) => ({ ...cur, [channelId]: cur[channelId] ?? { rule: "increase_by_percent", value: "", loaded: true } })); }
-  };
+  const [suggest, setSuggest] = useState<Correction | null>(null);
   useEffect(() => {
     if (!otaByStructure) return;
-    const ids = Object.values(otaByStructure).flat().map((c) => c.id).filter(Boolean);
-    for (const id of ids) if (!priceCorr[id]) loadPriceCorr(id);
+    for (const [sid, list] of Object.entries(otaByStructure)) for (const ch of list) if (ch.id && !corrApi.current[ch.id]) corrApi.load(ch.id, sid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otaByStructure]);
-  const saveCorr = async (channelId: string) => {
-    const draft = priceCorr[channelId];
-    if (!draft) return;
-    setCorrSaving(channelId); setCorrMsg((cur) => ({ ...cur, [channelId]: { text: t("Salvo…") } }));
-    try {
-      const j = await apiPost<{ ok: boolean; error?: string }>("channex/price-correction", { channelId, action: "set", rule: draft.rule, value: draft.value });
-      if (j.ok) setCorrMsg((cur) => ({ ...cur, [channelId]: { text: t("Salvato ✓"), ok: true } }));
-      else setCorrMsg((cur) => ({ ...cur, [channelId]: { text: j.error || t("Salvataggio non riuscito"), ok: false } }));
-    } catch (e) { setCorrMsg((cur) => ({ ...cur, [channelId]: { text: e instanceof Error ? e.message : "errore di rete", ok: false } })); }
-    setCorrSaving(null);
-  };
+  const corrText = (id: string) => { const cs = corrApi.current[id]; return !cs ? "…" : cs.loaded ? correctionLabel(cs.correction) : cs.loading ? "…" : "?"; };
+  // Prezzi Xenora dei prossimi 14 giorni della struttura in vista (base del confronto e delle anteprime).
+  const priceRows = useMemo(() => buildPriceRows(effStructure, roomTypes, rateOverrides, 14), [effStructure, roomTypes, rateOverrides]);
+  const structureChannels = effStructure !== "all" ? (otaByStructure?.[effStructure] ?? []).filter((c) => c.id) : [];
   // Card "essenziali" (logo + nome + stato) nella lista canali: il dettaglio (attiva/disattiva,
   // correzione prezzo) si apre al click, invece di stare tutto incollato nella card.
   const [channelDetail, setChannelDetail] = useState<{ sid: string; c: { id: string; channel: string; title: string; active: boolean } } | null>(null);
@@ -371,8 +357,7 @@ export default function CanaliPage() {
                         }).map((c, i) => {
                           const chKey = c.channel as Channel;
                           const label = CHANNELS[chKey]?.label ?? c.title;
-                          const draft = c.id ? priceCorr[c.id] : undefined;
-                          const corr = draft?.loaded && draft.value ? `${CORR_SIGN[draft.rule]}${draft.value}%` : t("nessuna");
+                          const corr = c.id ? corrText(c.id) : "—";
                           const commPct = loadChannelCommissionPct(chKey, g.sid) ?? (CHANNELS[chKey]?.commission ?? 0) * 100;
                           const color = loadChannelColor(chKey) || `var(${CHANNELS[chKey]?.cssVar ?? ""})`;
                           return (
@@ -408,17 +393,49 @@ export default function CanaliPage() {
         </>
       )}
 
+      {/* Correzione prezzo OTA: stato chiaro quando il collegamento non c'è, confronto Xenora ↔ canali,
+         correzione in blocco e storico. La correzione è REALE (Channex); i prezzi OTA mostrati sono STIME. */}
+      {otaOff ? (
+        <Card className="mb-5">
+          <SectionTitle>{t("Correzione prezzo OTA")}</SectionTitle>
+          <p className="text-sm text-dim">{t("Il collegamento al Channel Manager non è attivo su questo ambiente: non posso leggere né modificare le correzioni di prezzo dei canali. Nessun dato viene inviato e nessun prezzo mostrato qui è reale.")}</p>
+        </Card>
+      ) : (
+        <div className="mb-5 flex flex-col gap-4">
+          <div>
+            <SectionTitle>{t("Correzione prezzo OTA")}</SectionTitle>
+            <p className="-mt-2 text-xs text-dim">{t("La correzione di ogni canale è reale: viene letta da Channex e le modifiche vengono inviate e riverificate. I prezzi OTA mostrati nei confronti sono invece stime (prezzo Xenora × correzione).")}</p>
+          </div>
+          {effStructure === "all" ? (
+            <Card><p className="text-sm text-dim">{t("Seleziona una struttura in alto per vedere il confronto prezzi, applicare una correzione in blocco e consultare lo storico: ogni correzione riguarda solo la struttura scelta.")}</p></Card>
+          ) : otaLoading && !otaByStructure ? (
+            <Card><p className="text-sm text-faint">{t("Verifico…")}</p></Card>
+          ) : structureChannels.length === 0 ? (
+            <Card><p className="text-sm text-dim">{t("Questa struttura non ha ancora canali OTA collegati: la correzione prezzo si imposta per ogni canale, appena collegato.")}</p></Card>
+          ) : (
+            <>
+              <ParityPanel sid={effStructure} channels={structureChannels} api={corrApi} rows={priceRows} onSuggest={(c, corr) => { setSuggest(corr); setChannelDetail({ sid: effStructure, c }); }} />
+              <BulkCorrection sid={effStructure} channels={structureChannels} api={corrApi} rows={priceRows} onLogged={(text, ok) => pushLog(text, ok ? "var(--ok)" : "var(--err)", effStructure)} />
+            </>
+          )}
+          <Card>
+            <div className="mb-3 flex items-center justify-between">
+              <SectionTitle>{t("Storico correzioni")}</SectionTitle>
+              {logForStructure(corrApi.log, effStructure).length > 0 && <button onClick={async () => { if (await ask({ message: t("Svuotare lo storico delle correzioni?"), danger: true, confirmLabel: t("Svuota") })) corrApi.clearLog(effStructure); }} className="text-xs font-medium text-dim hover:text-txt">{t("Pulisci")}</button>}
+            </div>
+            <CorrectionHistory entries={logForStructure(corrApi.log, effStructure)} allEntries={corrApi.log} api={corrApi} onLogged={(text, ok) => pushLog(text, ok ? "var(--ok)" : "var(--err)", effStructure !== "all" ? effStructure : undefined)} />
+          </Card>
+        </div>
+      )}
+
       {/* Dettaglio canale: attiva/disattiva + correzione prezzo — Xenora scrive direttamente su
          Channex (nessun passaggio manuale sul pannello Channex). */}
       {channelDetail && (() => {
         const { sid, c } = channelDetail;
-        const draft = c.id ? priceCorr[c.id] : undefined;
-        const current = draft?.loaded && draft.value ? `${CORR_SIGN[draft.rule]}${draft.value}%` : t("nessuna");
-        const msg = c.id ? corrMsg[c.id] : undefined;
         const label = CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title;
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setChannelDetail(null); }}>
-            <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) { setChannelDetail(null); setSuggest(null); } }}>
+            <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-xl">
               <div className="mb-4 flex items-center gap-3">
                 <ChannelLogo channel={c.channel as keyof typeof CHANNELS} size={32} title={label} />
                 <div className="min-w-0 flex-1">
@@ -426,26 +443,11 @@ export default function CanaliPage() {
                   <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
                 </div>
                 {c.id && <button onClick={() => toggleChannel(sid, c)} disabled={togglingChannel === c.id} className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">{togglingChannel === c.id ? "…" : c.active ? t("Disattiva") : t("Attiva")}</button>}
-                <button onClick={() => setChannelDetail(null)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt">✕</button>
+                <button onClick={() => { setChannelDetail(null); setSuggest(null); }} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt">✕</button>
               </div>
 
               {c.id && (
-                <div className="rounded-xl border border-line bg-paper p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="flex items-center gap-1 text-xs font-semibold text-txt">{t("Correzione prezzo")}<span title={t("Rispetto al prezzo Xenora: si somma sopra eventuali promozioni attive sul canale stesso (Genius, offerte a tempo, ecc.) — non le sostituisce.")} className="grid h-3.5 w-3.5 cursor-help place-items-center rounded-full bg-wash text-[9px] font-bold text-faint">?</span></span>
-                    <span className="text-xs text-dim">{t("Attuale")} <b className="text-txt">{current}</b></span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <select value={draft?.rule ?? "increase_by_percent"} onChange={(e) => setPriceCorr((cur) => ({ ...cur, [c.id]: { rule: e.target.value as "increase_by_percent" | "decrease_by_percent", value: cur[c.id]?.value ?? "", loaded: true } }))} className="rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
-                      <option value="increase_by_percent">+</option>
-                      <option value="decrease_by_percent">−</option>
-                    </select>
-                    <input type="number" min={0} step="0.01" value={draft?.value ?? ""} onChange={(e) => setPriceCorr((cur) => ({ ...cur, [c.id]: { rule: cur[c.id]?.rule ?? "increase_by_percent", value: e.target.value, loaded: true } }))} placeholder="0" className="w-20 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
-                    <span className="text-sm text-dim">%</span>
-                    <button onClick={() => saveCorr(c.id)} disabled={corrSaving === c.id} className="ml-auto rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>{corrSaving === c.id ? "…" : t("Salva")}</button>
-                  </div>
-                  {msg && <div className="mt-2 text-xs font-semibold" style={{ color: msg.ok === false ? "var(--err)" : msg.ok ? "var(--ok)" : "var(--dim)" }}>{msg.text}</div>}
-                </div>
+                <CorrectionEditor sid={sid} c={c} api={corrApi} rows={buildPriceRows(sid, roomTypes, rateOverrides, 14)} initialDraft={suggest} onLogged={(text, ok) => pushLog(text, ok ? "var(--ok)" : "var(--err)", sid)} />
               )}
 
               {(() => {

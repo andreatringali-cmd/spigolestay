@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Structure } from "@/lib/types";
 import { getConciergeReply } from "@/lib/ai/guest-concierge";
+import type { ConciergeTone } from "@/lib/aiConcierge";
 import { accessCodeOf, kbLang, renderEntry, resolveEntries, toFaqItems, selectRelevant, SENSITIVE_CATEGORIES, type ConciergeEntry } from "@/lib/concierge-kb";
 
 // Motore unico del Concierge (solo server): lo usano sia il webhook WhatsApp sia la casella "Prova" di Xenora,
@@ -49,10 +50,22 @@ export interface EngineInput {
   guestName?: string;
   message: string;
   transcript?: string;
+  tone?: ConciergeTone;                     // Impostazioni → Concierge AI (formale / amichevole / essenziale); assente = amichevole
 }
-export interface EngineResult { answered: boolean; reply?: string; topic?: string; reason?: string; hasBooking: boolean; lang: "it" | "en" }
+// ms: tempi del motore in millisecondi (kb = lettura base di conoscenza, ai = chiamata AI, total = tutto il motore)
+export interface EngineResult { answered: boolean; reply?: string; topic?: string; reason?: string; hasBooking: boolean; lang: "it" | "en"; ms?: { total: number; kb: number; ai: number } }
 
+// NB: i dati passati in inp.data devono già comprendere le strutture condivise (Structure.orgId): vedi withOrgData() in
+// src/lib/concierge-orgdata.ts, che il webhook e /api/concierge/ask chiamano prima. Qui non si legge né si scrive org_state.
 export async function conciergeAnswer(inp: EngineInput): Promise<EngineResult> {
+  const t0 = Date.now();
+  const ms = { total: 0, kb: 0, ai: 0 };
+  const r = await runConcierge(inp, ms);
+  ms.total = Date.now() - t0;
+  return { ...r, ms };
+}
+
+async function runConcierge(inp: EngineInput, ms: { total: number; kb: number; ai: number }): Promise<EngineResult> {
   const structures = arr<StLite>(inp.data.structures);
   const bookings = arr<BookingLite>(inp.data.bookings);
   const units = arr<UnitLite>(inp.data.units);
@@ -71,6 +84,7 @@ export async function conciergeAnswer(inp: EngineInput): Promise<EngineResult> {
   const accessInfo = hasBooking ? ([unit?.accessInfo, st.accessInfo].filter(Boolean).join(" · ") || undefined) : undefined;
   const hasParking = (st.services ?? []).some((s) => /parcheggi/i.test(s)) || (roomType?.amenities ?? []).some((a) => /parcheggi/i.test(a)) || undefined;
 
+  const tKb = Date.now();
   // Base di conoscenza: tabella concierge_entries (condiviso + struttura, con override e voci AUTO dalla prenotazione).
   let faq: { topic: string; answer: string }[] = [];
   let entries: ConciergeEntry[] = [];
@@ -98,11 +112,14 @@ export async function conciergeAnswer(inp: EngineInput): Promise<EngineResult> {
     } catch { faq = []; }
   }
 
+  ms.kb = Date.now() - tKb;
+  const tAi = Date.now();
   const outcome = await getConciergeReply({
     faq: selectRelevant(faq, inp.message), hasBooking, guestName: inp.guestName, lang,
     structureName: st.name, address: st.address, checkInFrom: st.checkInFrom, checkInTo: st.checkInTo, checkOutBy: st.checkOutBy,
-    accessInfo, hasParking, transcript: inp.transcript, lastGuestMessage: inp.message,
+    accessInfo, hasParking, transcript: inp.transcript, lastGuestMessage: inp.message, tone: inp.tone,
   });
+  ms.ai = Date.now() - tAi;
   if (!outcome.ok) return { answered: false, reason: outcome.error === "ai_not_configured" ? "AI non configurata (manca ANTHROPIC_API_KEY)" : `errore AI (${outcome.error})`, hasBooking, lang };
   if (!outcome.result.canAnswer || !outcome.result.reply) return { answered: false, topic: outcome.result.topic, reason: "domanda non coperta dalle informazioni disponibili o non di routine", hasBooking, lang };
   return { answered: true, reply: outcome.result.reply, topic: outcome.result.topic, hasBooking, lang };

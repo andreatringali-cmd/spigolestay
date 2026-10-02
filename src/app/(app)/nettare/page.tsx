@@ -13,7 +13,11 @@ import { useLang } from "@/lib/i18n";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { italianHolidays, italianBridges } from "@/lib/holidays";
 import { DEFAULT_STRAT, RISK_PRESET, MONTHS, cellKey, runNettare, applyMod, hasMod, normalizeStrategy, type Cell, type Mod, type Period, type Risk, type Strategy, type Step } from "@/lib/nettare";
-import { effBase } from "@/lib/pricing";
+import { effBase, rateForDay, loadWeekendPct } from "@/lib/pricing";
+import ImpactPreview from "@/components/ImpactPreview";
+import PriceHistoryCard from "@/components/PriceHistoryCard";
+import { simulateImpact } from "@/lib/revenue-impact";
+import { buildChanges, recordBatches } from "@/lib/revenue-history";
 import { fetchCityPulse, computeMarketSignal, pulseHasDemo, type MarketPulse } from "@/lib/market";
 
 const WINDOW = 90;
@@ -53,6 +57,7 @@ export default function NettarePage() {
   const [openKids, setOpenKids] = useState<Record<string, boolean>>({});
   const [hover, setHover] = useState<{ key: string; x: number; y: number } | null>(null);
   const [panel, setPanel] = useState<string | null>(null);
+  const [preview, setPreview] = useState(false);
 
   useEffect(() => {
     try { const r = localStorage.getItem(MODS_KEY); if (r) setMods(JSON.parse(r)); } catch {}
@@ -125,7 +130,8 @@ export default function NettarePage() {
   const published = (rtId: string, iso: string): number | undefined => rateOverrides[cellKey(rtId, iso)] ?? rateOverrides[iso];
   const stats = useMemo(() => {
     let sum = 0, n = 0, potential = 0, pending = 0;
-    const occ = my.occ || 0.5;
+    // Nessun valore inventato: la stima usa la TUA occupazione storica reale; senza storico non si stima.
+    const occ = my.occ;
     for (const rt of sTypes) {
       const rtUnits = sUnits.filter((u) => u.roomTypeId === rt.id).length;
       for (const d of next30) {
@@ -134,17 +140,33 @@ export default function NettarePage() {
         if (published(rt.id, d) !== c.final) pending++;
       }
     }
-    return { avg: n ? Math.round(sum / n) : basePrice, potential: Math.round(potential), pending };
+    return { avg: n ? Math.round(sum / n) : basePrice, potential: occ > 0 ? Math.round(potential) : null as number | null, pending };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [res.cells, sTypes, sUnits, next30, my.occ, basePrice, rateOverrides]);
 
-  const applyPrices = async () => {
-    if (!sTypes.length) return;
-    const ok = await ask({ title: t("Applica prezzi Nèttare"), message: `${t("Imposto i prezzi consigliati (con i tuoi modificatori) per i prossimi")} ${FUTURE} ${t("giorni su tutte le tipologie di")} ${struct?.name}. ${t("Potrai modificarli a mano quando vuoi.")}`, confirmLabel: t("Applica") });
-    if (!ok) return;
+  // Piano di applicazione: SOLO le tipologie della struttura in vista, solo le tariffe che cambiano davvero
+  // rispetto a quelle effettive oggi nel calendario.
+  const plan = useMemo(() => {
+    const out: { rtId: string; rtName: string; iso: string; cur: number; next: number }[] = [];
+    const wk = loadWeekendPct();
+    for (const rt of sTypes) for (const d of next30) {
+      const c = res.cells[cellKey(rt.id, d)]; if (!c) continue;
+      const cur = rateForDay(rt.id, d, roomTypes, rateOverrides, wk);
+      if (cur !== c.final) out.push({ rtId: rt.id, rtName: rt.name, iso: d, cur, next: c.final });
+    }
+    return out;
+  }, [sTypes, next30, res.cells, roomTypes, rateOverrides]);
+  const impact = useMemo(() => simulateImpact(plan.map((x) => ({ typeId: x.rtId, iso: x.iso, current: x.cur, next: x.next })), sBookings, sUnits), [plan, sBookings, sUnits]);
+
+  const applyPrices = () => {
+    if (!sTypes.length || !struct) return;
     const map: Record<string, number> = {};
-    for (const rt of sTypes) for (const d of next30) { const c = res.cells[cellKey(rt.id, d)]; if (c) map[cellKey(rt.id, d)] = c.final; }
+    const wk = loadWeekendPct();
+    const drafts: { key: string; typeName: string; iso: string; structureId: string; effBefore: number; after: number }[] = [];
+    for (const rt of sTypes) for (const d of next30) { const c = res.cells[cellKey(rt.id, d)]; if (!c) continue; map[cellKey(rt.id, d)] = c.final; drafts.push({ key: cellKey(rt.id, d), typeName: rt.name, iso: d, structureId: struct.id, effBefore: rateForDay(rt.id, d, roomTypes, rateOverrides, wk), after: c.final }); }
+    recordBatches("nettare", `Nèttare · prossimi ${FUTURE} giorni`, buildChanges(drafts, rateOverrides));
     setDayRates(map);
+    setPreview(false);
     setApplied(true); setTimeout(() => setApplied(false), 2400);
   };
 
@@ -211,11 +233,11 @@ export default function NettarePage() {
             <div><div className="text-[11px] font-semibold uppercase tracking-wider text-faint">{t("Motore prezzi dinamici")}</div><div className="font-display text-xl font-bold tracking-tight text-txt">Nèttare</div></div>
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <div><div className="text-[11px] font-semibold text-faint">{t("Ricavo in più stimato")} · {FUTURE}gg</div><div className="font-mono text-3xl font-extrabold tracking-tight" style={{ color: stats.potential > 0 ? "var(--ok)" : "var(--txt)" }}>{stats.potential > 0 ? "+" : ""}{eur(stats.potential)}</div></div>
+            <div title={stats.potential == null ? t("Serve lo storico delle prenotazioni per stimare.") : `${t("Stima: differenza rispetto alla tariffa di partenza × la tua occupazione storica")} (${Math.round(my.occ * 100)}%)`}><div className="text-[11px] font-semibold text-faint">{t("Ricavo in più stimato")} · {FUTURE}gg</div><div className="font-mono text-3xl font-extrabold tracking-tight" style={{ color: (stats.potential ?? 0) > 0 ? "var(--ok)" : "var(--txt)" }}>{stats.potential == null ? "—" : `${stats.potential > 0 ? "+" : ""}${eur(stats.potential)}`}</div><div className="text-[10px] text-faint">{stats.potential == null ? t("nessuno storico: stima non disponibile") : `${t("stima con occupazione storica")} ${Math.round(my.occ * 100)}%`}</div></div>
             <div><div className="text-[11px] text-faint">{t("Prezzo medio")}</div><div className="font-mono text-lg font-bold text-txt">{eur(stats.avg)}</div></div>
             <div><div className="text-[11px] text-faint">{t("Periodi")}</div><div className="font-mono text-lg font-bold text-txt">{strat.periods.length}</div></div>
             <div><div className="text-[11px] text-faint">{t("Da applicare")}</div><div className="font-mono text-lg font-bold" style={{ color: stats.pending ? "var(--warn)" : "var(--ok)" }}>{stats.pending}</div></div>
-            <button onClick={applyPrices} className="rounded-full px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 active:scale-95" style={{ background: "var(--focus)" }}>{applied ? `✓ ${t("Prezzi applicati")}` : `${t("Applica ai prossimi")} ${FUTURE} ${t("giorni")}`}</button>
+            <button onClick={() => setPreview(true)} disabled={!sTypes.length} className="rounded-full px-5 py-2.5 disabled:opacity-50 text-sm font-semibold text-white transition hover:brightness-110 active:scale-95" style={{ background: "var(--focus)" }}>{applied ? `✓ ${t("Prezzi applicati")}` : `${t("Applica ai prossimi")} ${FUTURE} ${t("giorni")}`}</button>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px]">
@@ -493,6 +515,20 @@ export default function NettarePage() {
           setPanel(null);
         }}
       />}
+
+      <PriceHistoryCard structureId={struct.id} sources={["nettare"]} />
+
+      <ImpactPreview
+        open={preview}
+        title={t("Applica prezzi Nèttare")}
+        subtitle={`${struct.name} · ${t("prossimi")} ${FUTURE} ${t("giorni")}`}
+        impact={impact}
+        examples={[...plan].sort((a, b) => Math.abs(b.next - b.cur) - Math.abs(a.next - a.cur)).slice(0, 5).map((x) => ({ label: `${x.rtName} · ${new Date(x.iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" })}`, from: x.cur, to: x.next }))}
+        notes={[t("Imposta i prezzi consigliati (con i tuoi modificatori) solo per questa struttura. Potrai modificarli a mano quando vuoi.")]}
+        confirmLabel={t("Applica")}
+        onConfirm={applyPrices}
+        onCancel={() => setPreview(false)}
+      />
     </div>
   );
 }

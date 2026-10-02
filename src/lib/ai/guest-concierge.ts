@@ -11,6 +11,7 @@
 // Usa la stessa Messages API di Anthropic di src/lib/ai/checkin-extract.ts e di
 // /api/ai/guest-reply. GATING: senza ANTHROPIC_API_KEY → { ok:false, error:"ai_not_configured" }
 // (nessun crash, nessuna risposta automatica).
+import { normalizeTone, type ConciergeTone } from "@/lib/aiConcierge";
 export const CONCIERGE_AI_MODEL = process.env.CONCIERGE_AI_MODEL || process.env.GUEST_REPLY_AI_MODEL || process.env.CHECKIN_AI_MODEL || "claude-haiku-4-5-20251001";
 
 export type ConciergeTopic = "checkin_time" | "wifi" | "parking" | "directions" | "faq" | "other";
@@ -30,6 +31,7 @@ export interface ConciergeContext {
   hasBooking?: boolean; // l'interlocutore ha una prenotazione in corso o futura (false = contatto sconosciuto)
   transcript?: string; // breve contesto della conversazione (facoltativo)
   lastGuestMessage: string;
+  tone?: ConciergeTone; // formal | friendly (default, tono storico) | concise — Impostazioni → Concierge AI
 }
 
 export interface ConciergeResult {
@@ -39,6 +41,15 @@ export interface ConciergeResult {
 }
 
 export type ConciergeOutcome = { ok: true; result: ConciergeResult } | { ok: false; error: string };
+
+// Istruzione di stile per il tono scelto. Riguarda SOLO come si scrive la "reply": le regole di sicurezza non cambiano.
+export function toneInstruction(tone?: ConciergeTone): string {
+  switch (normalizeTone(tone)) {
+    case "formal": return "tono formale e rispettoso (in italiano dai del Lei; in inglese un registro cortese e formale), frasi complete, nessuna emoji, breve e chiara (1-4 frasi; per elenchi come ristoranti, spiagge o musei scegli i 4-6 consigli più adatti e dì che ce ne sono altri)";
+    case "concise": return "tono essenziale: vai dritto al punto, niente saluti, convenevoli o emoji, massimo 1-2 frasi (per elenchi come ristoranti, spiagge o musei scegli i 3-4 consigli più adatti e dì che ce ne sono altri)";
+    default: return "tono cordiale e professionale, breve e chiara (1-4 frasi; per elenchi come ristoranti, spiagge o musei scegli i 4-6 consigli più adatti e dì che ce ne sono altri)";
+  }
+}
 
 const LANG_NAMES: Record<string, string> = { it: "italiano", en: "inglese", fr: "francese", de: "tedesco", es: "spagnolo" };
 
@@ -85,7 +96,7 @@ Regole FERREE:
 - Se il messaggio dell'ospite non è chiaramente una delle domande ammesse, canAnswer = false e topic = "other".
 - In caso di qualunque dubbio, canAnswer = false.
 - NON aggiungere frasi di chiusura né inviti a scrivere su WhatsApp o a contattare il gestore "per altri dettagli": rispondi alla domanda e fermati.${noBookingRule}
-- "reply" va scritto in ${langName}, tono cordiale e professionale, breve e chiara (1-4 frasi; per elenchi come ristoranti, spiagge o musei scegli i 4-6 consigli più adatti e dì che ce ne sono altri), rivolgendoti all'ospite per nome se disponibile. Nessun preambolo, nessuna firma. Se canAnswer è false, reply può restare vuoto ("").
+- "reply" va scritto in ${langName}, ${toneInstruction(ctx.tone)}, rivolgendoti all'ospite per nome se disponibile. Nessun preambolo, nessuna firma. Se canAnswer è false, reply può restare vuoto ("").
 Dati disponibili:
 ${facts}
 ${ctx.transcript ? `Conversazione recente (dal più vecchio al più recente):\n"""\n${ctx.transcript}\n"""\n` : ""}Ultimo messaggio dell'ospite${ctx.guestName ? ` (${ctx.guestName})` : ""}: "${lastMsg.replace(/\s+/g, " ")}"

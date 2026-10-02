@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { FORFETTARIO_NOTE } from "@/lib/invoicing/folio";
 import { apiPost } from "@/lib/invoicing/client";
+import { validateIssuerSettings, hasErrors, normalizeVat, normalizeCf } from "@/lib/invoicing/validate";
 
 interface Settings {
   regime: string; denominazione: string; vat: string; tax_code: string;
@@ -44,7 +45,13 @@ export default function ImpostazioniFatturaPage() {
     });
   }, []);
 
-  const set = (patch: Partial<Settings>) => setS((p) => ({ ...p, ...patch }));
+  const set = (patch: Partial<Settings>) => { setDirty(true); setS((p) => ({ ...p, ...patch })); };
+  const [dirty, setDirty] = useState(false);
+  // Controlli sui dati emittente: gli ERRORI (formato) bloccano il salvataggio, gli AVVISI (campi mancanti) no.
+  const issues = useMemo(() => validateIssuerSettings(s), [s]);
+  const errOf = (field: string) => issues.find((i) => i.field === field && i.level === "error")?.msg;
+  const warnOf = (field: string) => issues.find((i) => i.field === field && i.level === "warn")?.msg;
+  const canIssue = !!s.denominazione.trim() && !!(s.vat.trim() || s.tax_code.trim());
 
   // Carica lo stato credenziali quando il provider selezionato le richiede.
   const provNeedsCreds = s.default_provider === "openapi";
@@ -98,22 +105,33 @@ export default function ImpostazioniFatturaPage() {
 
   const save = async () => {
     if (!supabase || !user) { setMsg("Devi essere connesso."); return; }
+    if (hasErrors(issues)) { setMsg("Correggi i campi segnati in rosso prima di salvare."); return; }
     setSaving(true); setMsg("");
     const regime_note = s.regime === "forfettario" && !s.regime_note.trim() ? FORFETTARIO_NOTE : s.regime_note;
-    const { error } = await supabase.from("tenant_invoice_settings").upsert({ tenant_id: user.id, ...s, regime_note, updated_at: new Date().toISOString() });
+    // Normalizzazione: spazi tolti, P.IVA senza prefisso IT, CF/provincia/codice SDI maiuscoli, PEC minuscola.
+    const it = (s.country || "IT").toUpperCase() === "IT";
+    const clean: Settings = {
+      ...s, denominazione: s.denominazione.trim(), vat: it ? normalizeVat(s.vat) : s.vat.trim(), tax_code: it ? normalizeCf(s.tax_code) : s.tax_code.trim(),
+      address: s.address.trim(), city: s.city.trim(), cap: s.cap.trim(), province: s.province.trim().toUpperCase(),
+      pec: s.pec.trim().toLowerCase(), sdi: s.sdi.trim().toUpperCase(), regime_note,
+    };
+    const { error } = await supabase.from("tenant_invoice_settings").upsert({ tenant_id: user.id, ...clean, updated_at: new Date().toISOString() });
     setSaving(false);
+    if (!error) { setS(clean); setDirty(false); }
     setMsg(error ? "Errore: " + error.message : "Impostazioni salvate ✓");
   };
 
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
+  const fieldCls = (error?: string) => `${inp}${error ? " !border-[color:var(--err)]" : ""}`;
+  const fieldMsg = (m?: string, soft?: boolean) => (m ? <span className="mt-0.5 block text-[11px] font-medium" style={{ color: soft ? "var(--warn)" : "var(--err)" }}>{m}</span> : null);
 
   if (loading) return <div className="p-6 text-sm text-faint">Caricamento…</div>;
 
   return (
     <div>
       <PageHeader title="Impostazioni fattura" subtitle="Regime, dati dell'emittente e servizio di invio"
-        actions={<button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? "Salvataggio…" : "Salva"}</button>} />
+        actions={<div className="flex items-center gap-2">{dirty && <span className="text-[11px] font-semibold text-[color:var(--warn)]">modifiche non salvate</span>}<button onClick={save} disabled={saving} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{saving ? "Salvataggio…" : "Salva"}</button></div>} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -209,19 +227,35 @@ export default function ImpostazioniFatturaPage() {
 
         <Card className="lg:col-span-2">
           <SectionTitle>Dati emittente (in fattura)</SectionTitle>
+          <p className="mt-1 text-[11px] text-faint">I dati dell&apos;emittente valgono per tutto l&apos;account (tutte le strutture).</p>
+          {!canIssue && <p className="mt-2 rounded-lg border border-[color:var(--warn)] px-3 py-2 text-[12px] font-medium text-[color:var(--warn)]">Per poter emettere documenti servono almeno la denominazione e la Partita IVA (o il codice fiscale).</p>}
           <div className="mt-2 grid gap-3 sm:grid-cols-2">
             <label className="block sm:col-span-2"><span className={lbl}>Denominazione / ragione sociale</span><input value={s.denominazione} onChange={(e) => set({ denominazione: e.target.value })} className={inp} /></label>
-            <label className="block"><span className={lbl}>Partita IVA</span><input value={s.vat} onChange={(e) => set({ vat: e.target.value })} className={inp} /></label>
-            <label className="block"><span className={lbl}>Codice fiscale</span><input value={s.tax_code} onChange={(e) => set({ tax_code: e.target.value })} className={inp} /></label>
+            <label className="block"><span className={lbl}>Partita IVA</span><input value={s.vat} onChange={(e) => set({ vat: e.target.value })} className={fieldCls(errOf("vat"))} inputMode="numeric" />{fieldMsg(errOf("vat"))}</label>
+            <label className="block"><span className={lbl}>Codice fiscale</span><input value={s.tax_code} onChange={(e) => set({ tax_code: e.target.value })} className={fieldCls(errOf("tax_code"))} />{fieldMsg(errOf("tax_code") || warnOf("tax_code"), !errOf("tax_code"))}</label>
             <label className="block sm:col-span-2"><span className={lbl}>Indirizzo</span><input value={s.address} onChange={(e) => set({ address: e.target.value })} className={inp} /></label>
             <label className="block"><span className={lbl}>Città</span><input value={s.city} onChange={(e) => set({ city: e.target.value })} className={inp} /></label>
             <div className="grid grid-cols-2 gap-3">
-              <label className="block"><span className={lbl}>CAP</span><input value={s.cap} onChange={(e) => set({ cap: e.target.value })} className={inp} /></label>
-              <label className="block"><span className={lbl}>Provincia</span><input value={s.province} onChange={(e) => set({ province: e.target.value })} className={inp} /></label>
+              <label className="block"><span className={lbl}>CAP</span><input value={s.cap} onChange={(e) => set({ cap: e.target.value })} className={fieldCls(errOf("cap"))} inputMode="numeric" />{fieldMsg(errOf("cap"))}</label>
+              <label className="block"><span className={lbl}>Provincia</span><input value={s.province} onChange={(e) => set({ province: e.target.value })} maxLength={2} placeholder="SR" className={fieldCls(errOf("province"))} />{fieldMsg(errOf("province"))}</label>
             </div>
-            <label className="block"><span className={lbl}>PEC</span><input value={s.pec} onChange={(e) => set({ pec: e.target.value })} className={inp} /></label>
-            <label className="block"><span className={lbl}>Codice destinatario / SDI</span><input value={s.sdi} onChange={(e) => set({ sdi: e.target.value })} className={inp} /></label>
+            <label className="block"><span className={lbl}>PEC</span><input value={s.pec} onChange={(e) => set({ pec: e.target.value })} className={fieldCls(errOf("pec"))} />{fieldMsg(errOf("pec"))}</label>
+            <label className="block"><span className={lbl}>Codice destinatario / SDI</span><input value={s.sdi} onChange={(e) => set({ sdi: e.target.value })} className={fieldCls(errOf("sdi"))} />{fieldMsg(errOf("sdi"))}</label>
             <label className="block sm:col-span-2"><span className={lbl}>Piè di pagina PDF</span><input value={s.footer_note} onChange={(e) => set({ footer_note: e.target.value })} className={inp} /></label>
+          </div>
+          {issues.some((i) => i.level === "warn" && i.field === "address") && <p className="mt-2 text-[11px] text-[color:var(--warn)]">{issues.find((i) => i.field === "address")?.msg}</p>}
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <SectionTitle>Anteprima intestazione in fattura</SectionTitle>
+          <div className="rounded-lg border border-line bg-paper px-4 py-3 text-sm leading-relaxed text-txt">
+            <div className="font-semibold">{s.denominazione || <span className="text-faint">Denominazione non impostata</span>}</div>
+            {s.vat && <div className="text-dim">P.IVA {s.vat}</div>}
+            {s.tax_code && <div className="text-dim">CF {s.tax_code}</div>}
+            <div className="text-dim">{[s.address, [s.cap, s.city].filter(Boolean).join(" "), s.province].filter(Boolean).join(", ") || <span className="text-faint">Indirizzo non impostato</span>}</div>
+            {s.pec && <div className="text-dim">PEC {s.pec}</div>}
+            {s.regime === "forfettario" && <div className="mt-2 border-t border-line pt-2 text-[12px] text-dim">{s.regime_note.trim() || FORFETTARIO_NOTE}</div>}
+            {s.footer_note && <div className="mt-1 text-[12px] text-faint">{s.footer_note}</div>}
           </div>
         </Card>
       </div>

@@ -322,6 +322,36 @@ const fld = "w-full rounded-lg border border-line bg-paper px-3.5 py-2.5 text-[1
 const fldTA = "w-full resize-y rounded-lg border border-line bg-paper px-3.5 py-2.5 text-[15px] leading-relaxed text-txt outline-none focus:border-focus min-h-[9rem]";
 // Ripulisce i dati dai caratteri NUL ( ): il tipo jsonb di Postgres li rifiuta (errore 22P05).
 const stripNul = (o: unknown) => { try { return JSON.parse(JSON.stringify(o).replace(/ /g, "")); } catch { return o; } };
+// ---- Pulizia in pubblicazione ----
+// Il motore della guida disegna una scheda anche per le voci senza titolo né testo, un puntino per le righe
+// d'elenco senza nome e un pulsante morto per le azioni senza etichetta o senza link. Per questo, SOLO quando
+// la guida viene pubblicata (public_guides) togliamo le voci vuote: nell'editor restano, così si può continuare a compilarle.
+const ne = (x?: string) => !!(x ?? "").trim();
+const cleanActions = (as?: GAction[]) => (as ? as.filter((a) => ne(a.label) && ne(a.href)) : as);
+function cleanContent(c?: GContent): GContent | undefined {
+  if (!c) return c;
+  return {
+    ...c,
+    home: { ...c.home, welcome: (c.home?.welcome ?? []).filter((w) => ne(w)) },
+    sections: (c.sections ?? []).map((sec) => ({
+      ...sec,
+      photos: (sec.photos ?? []).filter((x) => ne(x)),
+      ...(sec.steps ? { steps: sec.steps.filter((st) => ne(st.h) || ne(st.p)).map((st) => ({ ...st, actions: cleanActions(st.actions) })) } : {}),
+      ...(sec.amenities ? { amenities: sec.amenities.filter((a) => ne(a.label)) } : {}),
+      items: (sec.items ?? []).map((it) => {
+        const list = it.list ? it.list.filter((r) => ne(r.n)) : it.list;
+        return { ...it, ...(list ? { list } : {}), actions: cleanActions(it.actions) };
+      }).filter((it) => ne(it.h) || ne(it.p) || (it.list && it.list.length > 0) || (it.actions && it.actions.length > 0)),
+    })),
+  };
+}
+const cleanGuide = (g: Guide): Guide => ({
+  ...g,
+  content: cleanContent(g.content),
+  i18n: g.i18n ? (Object.fromEntries(Object.entries(g.i18n).map(([k, v]) => [k, cleanContent(v as GContent | undefined)])) as Guide["i18n"]) : g.i18n,
+});
+// Frammenti dei testi segnaposto dei vecchi modelli: se restano nella guida, l'ospite li leggerebbe così come sono.
+const PLACEHOLDER_SNIPPETS = ["Nome locale", "Nome spiaggia", "+39 …", "Indirizzo e come raggiungerci", "Descrivi ", "Come aprire il portone", "Dove trovare le chiavi", "Locale/indirizzo e orari", "Come chiamare un taxi", "Come arrivare dall'aeroporto", "Indicate qui come", "Usa una riga per punto", "Musei, chiese, luoghi d'arte", "Gite di mezza giornata", "Supermercato, farmacia e bancomat più vicini", "Come funziona e le buone pratiche"];
 // Campo in sola lettura: il dato arriva dalle Impostazioni struttura, qui non si modifica.
 const fldRO = "w-full rounded-lg border border-line bg-wash px-3.5 py-2.5 text-[15px] text-dim outline-none cursor-not-allowed";
 const F = ({ label, children }: { label: string; children: React.ReactNode }) => (<label className="block text-xs font-medium text-dim">{label}<div className="mt-1">{children}</div></label>);
@@ -487,6 +517,7 @@ export default function GuidaOspitiPage() {
   const [openSec, setOpenSec] = useState<string | null>(null);
   const [openStruct, setOpenStruct] = useState(false); // "Struttura e contatti" (chiusa di default)
   const [openHome, setOpenHome] = useState(false);      // "Home · benvenuto" (chiusa di default)
+  const [openCheck, setOpenCheck] = useState(false);    // "Controllo della guida" (chiuso di default)
   const [codesUnit, setCodesUnit] = useState<string | null>(null); // camera di cui si stanno modificando i codici (scheda)
   const content: GContent = guide.content ?? EMPTY_CONTENT;
   const setContent = (c: GContent) => set({ content: c });
@@ -499,7 +530,18 @@ export default function GuidaOspitiPage() {
       (s.items?.some((it) => it.h?.trim() || it.p?.trim() || (it.list?.length ?? 0))) ||
       (s.steps?.some((st) => st.h?.trim() || st.p?.trim())) || (s.amenities?.length))
   );
-  const loadDemo = () => { if (guide.content && !confirm("Sostituire i contenuti attuali con l'esempio di Siracusa?")) return; updateStructure(sid, DEMO_STRUCT); set({ ...DEMO_GUIDE, content: DEMO_CONTENT, i18n: {} }); refresh(); };
+  // L'esempio sostituisce i TESTI della guida, ma non tocca dati reali: dei dati struttura e delle credenziali
+  // (WiFi, orari, telefoni, link) compila solo i campi ancora vuoti.
+  const loadDemo = () => {
+    if (hasRealContent && !confirm("Sostituire i testi della guida con l'esempio di Siracusa?\n\nI dati già inseriti (indirizzo, telefoni, WiFi, orari, link) NON vengono toccati: l'esempio compila solo i campi vuoti. Le traduzioni verranno rigenerate.")) return;
+    const sRec = (struct ?? {}) as unknown as Record<string, unknown>;
+    const structPatch = Object.fromEntries(Object.entries(DEMO_STRUCT).filter(([k]) => !String(sRec[k] ?? "").trim()));
+    if (Object.keys(structPatch).length) updateStructure(sid, structPatch);
+    const gRec = guide as unknown as Record<string, unknown>;
+    const guidePatch = Object.fromEntries(Object.entries(DEMO_GUIDE).filter(([k]) => !String(gRec[k] ?? "").trim()));
+    set({ ...guidePatch, content: DEMO_CONTENT, i18n: {} });
+    refresh();
+  };
 
   // Stato "pronta" mostrato nell'header di ogni card a tendina (✓ compilata / ○ da compilare).
   const secReady = (s: GSection) => { const op = (s.id === "wifi" && !!(guide.wifiNetwork || guide.wifiPassword)) || (s.id === "contacts" && !!(guide.phone || guide.whatsapp || guide.phoneGreta)) || (s.id === "review" && !!guide.reviewUrl); return !s.hidden && (sectionFilled(s) || op); };
@@ -611,6 +653,9 @@ export default function GuidaOspitiPage() {
   const [docs, setDocs] = useState("");
   const [taxFixed, setTaxFixed] = useState(false);
   const [guestName, setGuestName] = useState("");
+  // Codici e dati del link ospite sono valori di SESSIONE legati alla struttura in uso: cambiando struttura
+  // si azzerano, altrimenti il cancello/portone di una struttura finirebbe nel link e nell'anteprima di un'altra.
+  useEffect(() => { setRooms(""); setGate(""); setDoor(""); setDoor2(""); setDocs(""); setGuestName(""); setTaxFixed(false); }, [sid]);
 
   // Codici e istruzioni PER CAMERA (mai nella guida pubblica: viaggiano solo nel link ospite).
   // Mappa unitId → { gate, door, door2 }. Salvata a parte, sincronizzata col prefisso spigolestay:.
@@ -777,7 +822,7 @@ export default function GuidaOspitiPage() {
     const g = all[sid];
     if (!g) return;
     const t = setTimeout(() => {
-      supabase!.from("public_guides").upsert({ id: sid, data: stripNul(g), updated_at: new Date().toISOString() }).then(undefined, () => {});
+      supabase!.from("public_guides").upsert({ id: sid, data: stripNul(cleanGuide(g)), updated_at: new Date().toISOString() }).then(undefined, () => {});
     }, 4000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -806,6 +851,46 @@ export default function GuidaOspitiPage() {
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ---- Controllo della guida: cosa manca o cosa l'ospite vedrebbe vuoto/sbagliato ----
+  type GuideIssue = { level: "err" | "warn"; text: string; go?: () => void };
+  const guideIssues: GuideIssue[] = (() => {
+    const out: GuideIssue[] = [];
+    const sec = (id: string) => content.sections.find((x) => x.id === id);
+    const goSec = (id: string) => () => { setMainTab("app"); setOpenSec(id); };
+    const goStruct = () => { setMainTab("app"); setOpenStruct(true); };
+    if (!hasRealContent) out.push({ level: "err", text: "La guida è ancora vuota: compila almeno Arrivo, WiFi e Contatti (oppure carica l'esempio) prima di inviarla agli ospiti." });
+    if (!structReady) out.push({ level: "err", text: "Mancano nome o indirizzo della struttura: servono per intestazione e mappa.", go: goStruct });
+    if (!(guide.phone || guide.whatsapp || guide.phoneGreta)) out.push({ level: "warn", text: "Nessun telefono o WhatsApp: l'ospite non ha un modo per contattarti dalla guida.", go: goStruct });
+    if (!content.home.hidden && !homeReady) out.push({ level: "warn", text: "Il messaggio di benvenuto è vuoto.", go: () => { setMainTab("app"); setOpenHome(true); } });
+    if (sec("wifi") && !sec("wifi")!.hidden && !(guide.wifiNetwork || "").trim()) out.push({ level: "warn", text: "WiFi: rete non impostata (la sezione non comparirà nella guida).", go: goSec("wifi") });
+    if (sec("checkin") && !sec("checkin")!.hidden) {
+      if (!ciFrom) out.push({ level: "warn", text: "Orario di check-in non impostato.", go: goSec("checkin") });
+      if (!coBy) out.push({ level: "warn", text: "Orario di check-out non impostato.", go: goSec("checkin") });
+      const noCodes = structUnits.filter((u) => !codesOf(u.id).some((c) => c.value.trim())).length;
+      if (noCodes > 0) out.push({ level: "warn", text: `${noCodes} ${noCodes === 1 ? "camera senza codici" : "camere senza codici"} di accesso: nel link dell'ospite non comparirà nessun codice.`, go: goSec("checkin") });
+    }
+    if (sec("review") && !sec("review")!.hidden && !guide.reviewUrl) out.push({ level: "warn", text: "Link recensioni non impostato.", go: goSec("review") });
+    for (const sc of content.sections) {
+      if (sc.hidden) continue;
+      const label = sc.title || sc.id;
+      let noBody = 0, noTitle = 0, deadBtn = 0, blankRows = 0;
+      const scanActs = (as?: GAction[]) => (as ?? []).forEach((a) => { if (ne(a.label) !== ne(a.href)) deadBtn++; });
+      (sc.steps ?? []).forEach((st) => { if (ne(st.h) && !ne(st.p) && !(st.actions?.length) && !st.code) noBody++; if (!ne(st.h) && ne(st.p)) noTitle++; scanActs(st.actions); });
+      (sc.items ?? []).forEach((it) => { const rowsOk = (it.list ?? []).some((r) => ne(r.n)); if (ne(it.h) && !ne(it.p) && !rowsOk && !(it.actions?.length)) noBody++; if (!ne(it.h) && (ne(it.p) || rowsOk)) noTitle++; blankRows += (it.list ?? []).filter((r) => !ne(r.n)).length; scanActs(it.actions); });
+      const blob = JSON.stringify({ i: sc.intro, st: sc.steps, it: sc.items });
+      const ph = PLACEHOLDER_SNIPPETS.filter((x) => blob.includes(x));
+      if (ph.length) out.push({ level: "err", text: `«${label}» contiene ancora testi d'esempio (es. «${ph[0].trim()}»): sostituiscili con i tuoi.`, go: goSec(sc.id) });
+      if (noBody) out.push({ level: "warn", text: `«${label}»: ${noBody} ${noBody === 1 ? "voce ha" : "voci hanno"} il titolo ma nessun testo.`, go: goSec(sc.id) });
+      if (noTitle) out.push({ level: "warn", text: `«${label}»: ${noTitle} ${noTitle === 1 ? "voce ha" : "voci hanno"} il testo ma nessun titolo.`, go: goSec(sc.id) });
+      if (deadBtn) out.push({ level: "warn", text: `«${label}»: ${deadBtn} ${deadBtn === 1 ? "pulsante senza" : "pulsanti senza"} etichetta o senza link (non verrà pubblicato).`, go: goSec(sc.id) });
+      if (blankRows) out.push({ level: "warn", text: `«${label}»: ${blankRows} ${blankRows === 1 ? "riga d'elenco senza nome" : "righe d'elenco senza nome"} (non verrà pubblicata).`, go: goSec(sc.id) });
+    }
+    if (hasRealContent && !hasTranslations && !tr.running) out.push({ level: "warn", text: "Nessuna traduzione ancora: gli ospiti stranieri vedono la guida in italiano (parte da sola poco dopo le modifiche)." });
+    if (tr.err) out.push({ level: "warn", text: tr.err });
+    return out;
+  })();
+  const issueErr = guideIssues.filter((x) => x.level === "err").length;
 
   return (
     <div>
@@ -851,7 +936,7 @@ export default function GuidaOspitiPage() {
             <option value="es">🇪🇸 Español</option>
           </select>
           <a href={previewUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">Schermo intero ↗</a>
-          <button onClick={() => { savedSigRef.current = sigRef.current; setLastSaved(Date.now()); refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 1500); if (supabase && sid && all[sid]) supabase.from("public_guides").upsert({ id: sid, data: stripNul(all[sid]), updated_at: new Date().toISOString() }).then(undefined, () => {}); }} title="Salvataggio automatico attivo · clicca per salvare e pubblicare subito" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1 text-xs font-semibold text-dim hover:bg-wash">
+          <button onClick={() => { savedSigRef.current = sigRef.current; setLastSaved(Date.now()); refresh(); setSavedTick(true); window.setTimeout(() => setSavedTick(false), 1500); if (supabase && sid && all[sid]) supabase.from("public_guides").upsert({ id: sid, data: stripNul(cleanGuide(all[sid])), updated_at: new Date().toISOString() }).then(undefined, () => {}); }} title="Salvataggio automatico attivo · clicca per salvare e pubblicare subito" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1 text-xs font-semibold text-dim hover:bg-wash">
             {savedTick
               ? <span className="flex items-center gap-1" style={{ color: "var(--ok)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> Salvato</span>
               : <>💾 Salvataggio automatico{lastSaved ? ` · ${new Date(lastSaved).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : ""}</>}
@@ -871,6 +956,31 @@ export default function GuidaOspitiPage() {
         <div className="space-y-4">
         {(<>
           <SectionTitle>Sezioni della guida ({content.sections.length})</SectionTitle>
+          <div className="anim-in overflow-hidden rounded-2xl border bg-surface shadow-sm" style={{ borderColor: guideIssues.length ? (issueErr ? "var(--err)" : "var(--warn)") : "var(--ok)" }}>
+            <button onClick={() => setOpenCheck((o) => !o)} className="flex w-full min-w-0 items-center gap-2.5 px-4 py-2.5 text-left">
+              <span className="text-[16px] leading-none">{guideIssues.length ? "🔎" : "✅"}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-txt">Controllo della guida</span>
+              <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${guideIssues.length ? (issueErr ? "var(--err)" : "var(--warn)") : "var(--ok)"} 14%, transparent)`, color: guideIssues.length ? (issueErr ? "var(--err)" : "var(--warn)") : "var(--ok)" }}>{guideIssues.length ? `${guideIssues.length} da sistemare` : "tutto a posto"}</span>
+            </button>
+            {openCheck && (
+              <div className="border-t border-line px-4 pb-3 pt-2.5">
+                {guideIssues.length === 0 ? (
+                  <p className="text-xs text-dim">Nessun problema trovato: dati, sezioni e pulsanti sono completi.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {guideIssues.map((it, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-dim">
+                        <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: it.level === "err" ? "var(--err)" : "var(--warn)" }} />
+                        <span className="min-w-0 flex-1">{it.text}</span>
+                        {it.go && <button onClick={it.go} className="shrink-0 font-semibold text-focus hover:underline">Apri</button>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mt-2 text-[11px] text-faint">Le voci, i pulsanti e le righe vuote restano nell&apos;editor (puoi continuare a compilarli) ma <b>non vengono pubblicati</b> nella guida degli ospiti. L&apos;anteprima a destra li può ancora mostrare.</p>
+              </div>
+            )}
+          </div>
           <div className="anim-in overflow-hidden rounded-2xl border border-line bg-surface shadow-sm transition-all hover:border-focus hover:shadow-md">
             <button onClick={() => setOpenStruct((o) => !o)} className="flex w-full min-w-0 items-center gap-2.5 px-4 py-2.5 text-left">
               <span className="text-[16px] leading-none">🏠</span>

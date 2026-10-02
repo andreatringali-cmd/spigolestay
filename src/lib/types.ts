@@ -125,6 +125,27 @@ export interface ExtraService {
   price: number;
   per: "stay" | "night" | "person" | "day"; // a soggiorno / a notte / a persona / a giornata
   active?: boolean; // se false, non proposto/mostrato (undefined = attivo)
+  // ── Upselling (tutti opzionali: i cataloghi esistenti restano validi) ──
+  kind?: ExtraKind;        // categoria: pilota le regole di proposta (assente = dedotta dal nome)
+  seasonFrom?: number;     // mese 1-12 di inizio stagione (assente = tutto l'anno); può "girare" l'anno (es. 11 → 3)
+  seasonTo?: number;       // mese 1-12 di fine stagione (incluso)
+  minNights?: number;      // soggiorno minimo (notti) perché l'extra venga proposto
+  maxQty?: number;         // quantità massima per prenotazione
+  confirmed?: boolean;     // il gestore ha verificato il prezzo (false = esempio precaricato: NON viene proposto agli ospiti)
+}
+
+export type ExtraKind = "late-checkout" | "early-checkin" | "breakfast" | "parking" | "transfer" | "excursion" | "other";
+
+// Offerta di extra inviata a un ospite. Vive sulla prenotazione (Booking.upsellOffers) così
+// viaggia con la sync già esistente delle prenotazioni (id + updatedAt, last-write-wins).
+export interface UpsellOffer {
+  id: string;
+  at: number;              // epoch ms di invio
+  via: "whatsapp" | "email" | "copy" | "diretto"; // "diretto" = venduto di persona/telefono, registrato subito
+  items: { extraId: string; name: string; qty: number; amount: number }[]; // amount = totale riga in €
+  total: number;
+  status: "sent" | "accepted" | "declined";
+  decidedAt?: number;      // epoch ms di accettazione/rifiuto registrati dal gestore
 }
 
 export const DEFAULT_EXTRAS: ExtraService[] = [
@@ -341,7 +362,8 @@ export interface Booking {
   invoiceNo?: string;   // numero fattura emessa
   extraGuests?: { firstName: string; lastName: string; sex?: "M" | "F"; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string }[]; // co-ospiti (dal web check-in o aggiunti a mano)
   primaryGuest?: { firstName?: string; lastName?: string; sex?: "M" | "F"; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string }; // dati ospite principale conservati sulla prenotazione (es. se l'anagrafica viene eliminata) — per Alloggiati Web
-  extras?: { name: string; price: number }[]; // servizi/consumi extra aggiunti alla prenotazione
+  extras?: { name: string; price: number; extraId?: string; qty?: number; offerId?: string }[]; // servizi/consumi extra aggiunti alla prenotazione (extraId/offerId: se venduti dal modulo Upselling)
+  upsellOffers?: UpsellOffer[]; // registro offerte di extra inviate all'ospite (proposta/accettata/rifiutata)
   invoiceRequest?: InvoiceRequest; // "richiedo fattura" raccolto al check-in online (dati intestazione)
   // Politica di cancellazione applicata alla prenotazione (dal piano tariffario scelto).
   // Salvata sulla prenotazione così la gestione ospite può valutare il rimborso anche a distanza di tempo.

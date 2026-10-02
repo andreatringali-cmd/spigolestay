@@ -70,11 +70,20 @@ export interface SuggestionSignals {
   zoneReasons: string[];                     // motivazioni del benchmark "Rete città" (solo se dati reali di zona presenti)
 }
 
+// Quale guardrail ha limitato la proposta (se nessuno: il motore non è stato frenato).
+export type GuardrailKind = "maxUp" | "maxDown" | "ceil" | "floor" | "typeMin";
+export const GUARDRAIL_LABEL: Record<GuardrailKind, string> = {
+  maxUp: "variazione massima verso l'alto", maxDown: "variazione massima verso il basso",
+  ceil: "tetto (% della base)", floor: "pavimento (% della base)", typeMin: "prezzo minimo della tipologia",
+};
+
 export interface Suggestion {
   key: string;          // `${typeId}|${iso}`
   typeId: string; typeName: string; structureId: string; iso: string;
   base: number; current: number; suggested: number; deltaPct: number;
   occ: number;          // occupazione 0..100 della tipologia in quel giorno
+  rawSuggested: number; // tariffa che il motore avrebbe proposto SENZA guardrail
+  limitedBy?: GuardrailKind; // guardrail che ha frenato la proposta (assente = nessuno)
   reasons: string[];
   signals: SuggestionSignals;
 }
@@ -82,9 +91,11 @@ export interface Suggestion {
 const activeOn = (b: Booking, iso: string) => b.status !== "cancelled" && b.channel !== "blocked" && b.checkIn <= iso && iso < b.checkOut;
 
 // Occupazione di una tipologia in un giorno = camere occupate / camere disponibili.
-function typeOccupancy(typeUnitIds: Set<string>, bookings: Booking[], iso: string): number {
+// Una prenotazione senza camera ancora assegnata conta comunque sulla sua tipologia: ignorarla farebbe
+// sembrare la tipologia più vuota di com'è e porterebbe a ribassi sbagliati.
+function typeOccupancy(typeUnitIds: Set<string>, typeId: string, bookings: Booking[], iso: string): number {
   if (!typeUnitIds.size) return 0;
-  const occ = bookings.filter((b) => b.unitId && typeUnitIds.has(b.unitId) && activeOn(b, iso)).length;
+  const occ = bookings.filter((b) => (b.unitId ? typeUnitIds.has(b.unitId) : b.roomTypeId === typeId) && activeOn(b, iso)).length;
   return Math.round((occ / typeUnitIds.size) * 100);
 }
 
@@ -106,9 +117,9 @@ export function computeSuggestions(
       const current = rateForDay(rt.id, iso, roomTypes, rateOverrides, weekendPct); // tariffa attuale (con override)
       if (base <= 0) continue;
 
-      const occ = typeOccupancy(typeUnitIds, bookings, iso);
-      const occNext = typeOccupancy(typeUnitIds, bookings, shiftISO(iso, 1));
-      const occPrev = typeOccupancy(typeUnitIds, bookings, shiftISO(iso, -1));
+      const occ = typeOccupancy(typeUnitIds, rt.id, bookings, iso);
+      const occNext = typeOccupancy(typeUnitIds, rt.id, bookings, shiftISO(iso, 1));
+      const occPrev = typeOccupancy(typeUnitIds, rt.id, bookings, shiftISO(iso, -1));
 
       let mult = 1; const reasons: string[] = [];
       let occBand: SuggestionSignals["occBand"];
@@ -131,17 +142,25 @@ export function computeSuggestions(
       if (z.mult !== 1) { mult *= z.mult; reasons.push(...z.reasons); }
 
       // Guardrail: variazione massima vs base + pavimento/tetto
-      let suggested = Math.round(base * mult);
+      const rawSuggested = Math.max(1, Math.round(base * mult));
+      let suggested = rawSuggested;
+      let limitedBy: GuardrailKind | undefined;
       const maxUp = base * (1 + cfg.maxChangePct / 100), maxDown = base * (1 - cfg.maxChangePct / 100);
-      suggested = Math.min(maxUp, Math.max(maxDown, suggested));
-      suggested = Math.min(base * (cfg.ceilPct / 100), Math.max(base * (cfg.floorPct / 100), suggested));
+      if (suggested > maxUp) { suggested = maxUp; limitedBy = "maxUp"; }
+      else if (suggested < maxDown) { suggested = maxDown; limitedBy = "maxDown"; }
+      const ceil = base * (cfg.ceilPct / 100), floor = base * (cfg.floorPct / 100);
+      if (suggested > ceil) { suggested = ceil; limitedBy = "ceil"; }
+      else if (suggested < floor) { suggested = floor; limitedBy = "floor"; }
       suggested = Math.max(1, Math.round(suggested));
+      // Prezzo minimo vendibile impostato sulla tipologia (Camere): mai proposto sotto.
+      if (rt.minPrice && rt.minPrice > 0 && suggested < rt.minPrice) { suggested = Math.round(rt.minPrice); limitedBy = "typeMin"; }
+      if (suggested === rawSuggested) limitedBy = undefined; // il guardrail non ha cambiato nulla
 
       const deltaPct = current > 0 ? Math.round(((suggested - current) / current) * 100) : 0;
       if (Math.abs(deltaPct) < 3 || suggested === current) continue; // ignora variazioni trascurabili
 
       const signals: SuggestionSignals = { occBand, weekend: isWeekendISO(iso), lastMinute, gap, highDemandLabel, zoneReasons: z.reasons };
-      out.push({ key: `${rt.id}|${iso}`, typeId: rt.id, typeName: rt.name, structureId: rt.structureId, iso, base, current, suggested, deltaPct, occ, reasons, signals });
+      out.push({ key: `${rt.id}|${iso}`, typeId: rt.id, typeName: rt.name, structureId: rt.structureId, iso, base, current, suggested, deltaPct, occ, rawSuggested, limitedBy, reasons, signals });
     }
   }
   // Prima i cambiamenti più grandi (in valore assoluto).

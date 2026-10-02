@@ -10,7 +10,7 @@ import StyleChooser from "@/components/StyleChooser";
 import { apiPost } from "@/lib/invoicing/client";
 import { useData } from "@/lib/store";
 import { NOTIF_DEF, loadNotifPrefs } from "@/lib/notifPrefs";
-import { AI_CONCIERGE_DEF, AI_CONCIERGE_KEY, loadAiConciergePrefs } from "@/lib/aiConcierge";
+import { AI_CONCIERGE_DEF, AI_CONCIERGE_KEY, CONCIERGE_TONES, CONCIERGE_TONE_LABEL, loadAiConciergePrefs, normalizeTone } from "@/lib/aiConcierge";
 
 // Errore comune: incollare il link di embed/pubblico del calendario invece del semplice ID
 // (es. "https://calendar.google.com/calendar/embed?src=xxx%40group.calendar.google.com&ctz=...").
@@ -40,6 +40,7 @@ export default function ImpostazioniPage() {
   const [aiConcierge, setAiConciergeState] = useState(AI_CONCIERGE_DEF);
   useEffect(() => { setAiConciergeState(loadAiConciergePrefs()); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const setAiConciergeEnabled = (v: boolean) => setAiConciergeState((p) => { const n = { ...p, enabled: v }; try { localStorage.setItem(AI_CONCIERGE_KEY, JSON.stringify(n)); } catch {} return n; });
+  const setAiConciergeTone = (v: string) => setAiConciergeState((p) => { const n = { ...p, tone: normalizeTone(v) }; try { localStorage.setItem(AI_CONCIERGE_KEY, JSON.stringify(n)); } catch {} return n; });
   const setAiConciergeStructure = (v: string) => setAiConciergeState((p) => { const n = { ...p, defaultStructureId: v }; try { localStorage.setItem(AI_CONCIERGE_KEY, JSON.stringify(n)); } catch {} return n; });
   const ask = useConfirm();
 
@@ -206,6 +207,14 @@ export default function ImpostazioniPage() {
         <SectionTitle>{t("Concierge AI 🤖")}</SectionTitle>
         <p className="mb-3 text-xs text-dim">{t("Se attivo, risponde IN AUTOMATICO su WhatsApp solo alle domande semplici (orario check-in, wifi, parcheggio, indicazioni stradali) quando è sicura della risposta: per tutto il resto — reclami, richieste economiche o qualunque dubbio — lascia il messaggio a te, come oggi.")}</p>
         <Toggle label={t("Risposta automatica alle domande semplici")} checked={aiConcierge.enabled} onChange={setAiConciergeEnabled} />
+        {aiConcierge.enabled && (
+          <label className="mt-3 block text-xs font-medium text-dim">{t("Tono delle risposte")}
+            <select value={aiConcierge.tone} onChange={(e) => setAiConciergeTone(e.target.value)} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt">
+              {CONCIERGE_TONES.map((k) => <option key={k} value={k}>{t(CONCIERGE_TONE_LABEL[k])}</option>)}
+            </select>
+            <span className="mt-1 block text-[11px] text-faint">{t("Formale: dà del Lei, frasi complete. Amichevole: cordiale e diretto. Essenziale: solo l'informazione, in una o due frasi.")}</span>
+          </label>
+        )}
         {aiConcierge.enabled && structures.length > 1 && (
           <label className="mt-3 block text-xs font-medium text-dim">{t("Struttura di riferimento per chi scrive senza prenotazione")}
             <select value={aiConcierge.defaultStructureId ?? ""} onChange={(e) => setAiConciergeStructure(e.target.value)} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt">

@@ -9,6 +9,7 @@ import { useLang } from "@/lib/i18n";
 import { CHANNELS, type Booking, type Guest } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
 import LinkPreview from "@/components/messaging/LinkPreview";
+import VoiceNote from "@/components/messaging/VoiceNote";
 import { eur } from "@/lib/format";
 import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
 import { apiPost } from "@/lib/invoicing/client";
@@ -41,7 +42,7 @@ declare global {
 
 
 // wid = id del messaggio su WhatsApp; st = stato di consegna (sent ✓, delivered ✓✓, read ✓✓ blu, failed).
-interface Msg { id: string; dir: "out" | "in"; text: string; ts: number; via?: string; wid?: string; st?: "sent" | "delivered" | "read" | "failed" }
+interface Msg { id: string; dir: "out" | "in"; text: string; ts: number; via?: string; wid?: string; st?: "sent" | "delivered" | "read" | "failed"; media?: { kind: "audio"; id: string; transcribed: boolean } }
 type Threads = Record<string, Msg[]>;
 const KEY = "spigolestay:threads:v1";
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()));
@@ -681,6 +682,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                               : <span className="absolute -left-1 bottom-0 h-3 w-3 border-b border-l border-line bg-surface [clip-path:polygon(100%_0,0_100%,100%_100%)]" />
                           )}
                           {isAiReply && <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold">🤖 {t("Risposta automatica")}</div>}
+                          {m.media?.kind === "audio" && <VoiceNote mediaId={m.media.id} transcribed={m.media.transcribed} />}
                           <div className="whitespace-pre-wrap break-words">{m.text}</div>
                           <LinkPreview text={m.text} />
                         </div>

@@ -26,6 +26,22 @@ function nightsInWindow(ci: string, co: string, winStart: number, winEnd: number
   return e > s ? Math.round((e - s) / DAY) : 0;
 }
 
+
+// Arrivi e ospiti·notti di una struttura nella finestra [winStart, winEnd) (millisecondi UTC).
+// Solo prenotazioni non cancellate. Condivisa tra riordino e stima delle scorte.
+export function consumptionInWindow(bookings: FcBooking[], structureId: string, winStart: number, winEnd: number): { arrivals: number; guestNights: number } {
+  let arrivals = 0;
+  let guestNights = 0;
+  for (const b of bookings) {
+    if (b.structureId !== structureId || b.status === "cancelled") continue;
+    const ci = toMs(b.checkIn);
+    if (!isNaN(ci) && ci >= winStart && ci < winEnd) arrivals++;
+    const nights = nightsInWindow(b.checkIn, b.checkOut, winStart, winEnd);
+    if (nights > 0) guestNights += nights * Math.max(1, num(b.adults, 1) + num(b.children, 0));
+  }
+  return { arrivals, guestNights };
+}
+
 export interface ForecastInput {
   structureId: string;
   today: string;               // ISO YYYY-MM-DD
@@ -45,15 +61,7 @@ export function forecastConsumption(input: ForecastInput): FcLine[] {
 
   // Arrivi (check-in nella finestra) e ospiti·notti (notti nella finestra × occupazione),
   // solo per la struttura richiesta e prenotazioni non cancellate.
-  const mine = bookings.filter((b) => b.structureId === structureId && b.status !== "cancelled");
-  let arrivals = 0;
-  let guestNights = 0;
-  for (const b of mine) {
-    const ci = toMs(b.checkIn);
-    if (!isNaN(ci) && ci >= winStart && ci < winEnd) arrivals++;
-    const nights = nightsInWindow(b.checkIn, b.checkOut, winStart, winEnd);
-    if (nights > 0) guestNights += nights * Math.max(1, num(b.adults, 1) + num(b.children, 0));
-  }
+  const { arrivals, guestNights } = consumptionInWindow(bookings, structureId, winStart, winEnd);
 
   const lines: FcLine[] = [];
   for (const p of products) {
@@ -69,4 +77,59 @@ export function forecastConsumption(input: ForecastInput): FcLine[] {
     if (qty > 0) lines.push({ product_id: p.id, arrivals, guestNights, need: Math.round(need * 1000) / 1000, qty, packSize: pack });
   }
   return lines;
+}
+
+// ============================================================
+//  Scorte — stima della giacenza di oggi e stato rispetto alla soglia minima.
+//  La giacenza "contata" è l'ultimo valore salvato dall'utente (data = updated_at).
+//  Da quella data si sottrae il consumo STIMATO dalle prenotazioni (arrivi e
+//  ospiti·notti trascorsi): niente stato aggiuntivo, nessun doppio scarico.
+// ============================================================
+export type StockState = "ok" | "low" | "out" | "none";
+
+export interface StockEstimate {
+  counted: number;        // giacenza contata/caricata
+  consumed: number;       // consumo stimato dalla data del conteggio a oggi
+  estimated: number;      // stima di oggi (mai sotto zero)
+  dailyRate: number;      // consumo medio giornaliero atteso (prossimi `horizonDays`)
+  coverageDays: number | null; // giorni di copertura (null = consumo nullo/non stimabile)
+}
+
+// fromISO = data del conteggio (inclusa), todayISO = oggi (esclusa).
+export function estimateStock(args: {
+  bookings: FcBooking[]; structureId: string; product: FcProduct;
+  counted: number; countedAtISO: string | null; todayISO: string; horizonDays?: number;
+}): StockEstimate {
+  const { bookings, structureId, product, counted, countedAtISO, todayISO } = args;
+  const horizon = Math.max(1, args.horizonDays ?? 30);
+  const cpa = num(product.consumption_per_arrival);
+  const cpgn = num(product.consumption_per_guest_night);
+  let consumed = 0;
+  if (countedAtISO && countedAtISO < todayISO) {
+    const w = consumptionInWindow(bookings, structureId, toMs(countedAtISO), toMs(todayISO));
+    consumed = w.arrivals * cpa + w.guestNights * cpgn;
+  }
+  const estimated = Math.max(0, counted - consumed);
+  const f = consumptionInWindow(bookings, structureId, toMs(todayISO), toMs(todayISO) + horizon * DAY);
+  const dailyRate = (f.arrivals * cpa + f.guestNights * cpgn) / horizon;
+  const coverageDays = dailyRate > 0 ? Math.floor(estimated / dailyRate) : null;
+  return { counted, consumed: Math.round(consumed * 100) / 100, estimated: Math.round(estimated * 100) / 100, dailyRate, coverageDays };
+}
+
+// "none" = nessuna giacenza registrata e nessuna soglia: non monitorato.
+export function stockState(estimated: number, min: number, tracked: boolean): StockState {
+  if (!tracked) return "none";
+  if (estimated <= 0) return "out";
+  if (min > 0 && estimated <= min) return "low";
+  return "ok";
+}
+
+// Quantità da ordinare per un prodotto sotto soglia: copre l'orizzonte + soglia minima,
+// arrotondata al pack e mai sotto il minimo d'ordine.
+export function reorderQty(args: { estimated: number; min: number; dailyRate: number; horizonDays: number; packSize?: number; minOrderQty?: number }): number {
+  const pack = Math.max(1, num(args.packSize, 1));
+  const need = args.dailyRate * Math.max(0, args.horizonDays) + Math.max(0, args.min) - Math.max(0, args.estimated);
+  if (need <= 0) return 0;
+  const q = Math.ceil(need / pack) * pack;
+  return Math.max(q, Math.max(1, num(args.minOrderQty, 1)));
 }

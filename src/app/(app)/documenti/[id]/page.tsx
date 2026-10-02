@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
@@ -12,6 +12,7 @@ import { nights } from "@/lib/dates";
 import { cityTaxOf } from "@/lib/booking";
 import { invPost, centsEur, DOC_KIND_LABEL, STATO } from "@/lib/invoicing/client";
 import { BOLLO_THRESHOLD_CENTS } from "@/lib/invoicing/folio";
+import { validateDocument, hasErrors, type Issue } from "@/lib/invoicing/validate";
 
 interface Doc { id: string; tenant_id: string; structure_id: string | null; booking_id: string | null; booking_code: string | null;
   doc_kind: string; sdi_type: string; regime: string | null; number_label: string | null; stato: string; issue_date: string | null;
@@ -21,6 +22,12 @@ interface Doc { id: string; tenant_id: string; structure_id: string | null; book
 interface DbLine { id: string; pos: number; description: string; qty: number; unit_price_cents: number; vat_rate: number; vat_nature: string | null; line_total_cents: number; source_kind: string | null }
 interface Ev { id: string; ts: string; kind: string; message: string }
 interface Pay { id: string; amount_cents: number; method: string | null; paid_at: string; note: string | null }
+interface Related { id: string; number_label: string | null; doc_kind: string; role: string; stato?: string; total_cents?: number }
+// Dati emittente letti da tenant_invoice_settings (per account).
+interface IssuerInfo { denominazione: string | null; vat: string | null; tax_code: string | null; address: string | null; city: string | null; cap: string | null; province: string | null; pec: string | null; regime_note: string | null; footer_note: string | null; bollo_auto: boolean | null }
+const CREDIT_VALID = new Set(["emessa", "inviata_intermediario", "consegnata"]);
+// Aliquota di default per le nuove righe, secondo il regime con cui è stato creato il documento.
+const defaultVat = (regime: string | null | undefined, base: string) => regime === "forfettario" ? "N2.2" : regime === "non_imprenditoriale" ? "0" : base;
 // Riga in editing (prezzo in euro per comodità dell'utente).
 interface ELine { id?: string; description: string; qty: number; unitEur: number; vat: string; sourceKind: string }
 
@@ -57,7 +64,11 @@ export default function DocumentoPage() {
   const [bq, setBq] = useState("");
   const [vies, setVies] = useState<{ status?: string; msg?: string }>({});
   const [cpList, setCpList] = useState<{ id: string; kind: string; name: string; vat: string | null; tax_code: string | null; country: string | null; address: string | null; city: string | null; cap: string | null; province: string | null; sdi_code: string | null; pec: string | null }[]>([]);
-  const [related, setRelated] = useState<{ id: string; number_label: string | null; doc_kind: string; role: string }[]>([]);
+  const [related, setRelated] = useState<Related[]>([]);
+  const [issuer, setIssuer] = useState<IssuerInfo | null>(null);
+  const [payAmt, setPayAmt] = useState("");
+  const [payMethod, setPayMethod] = useState("Bonifico bancario");
+  const bolloTouched = useRef(false);
 
   const hydrate = useCallback((d: Doc, dl: DbLine[]) => {
     setF({
@@ -75,24 +86,26 @@ export default function DocumentoPage() {
 
   const load = useCallback(async () => {
     if (!supabase) { setLoading(false); return; }
-    const [d, l, e, p] = await Promise.all([
+    const [d, l, e, p, iss] = await Promise.all([
       supabase.from("documents").select("*").eq("id", id).maybeSingle(),
       supabase.from("document_lines").select("*").eq("document_id", id).order("pos"),
       supabase.from("document_events").select("*").eq("document_id", id).order("ts", { ascending: false }),
       supabase.from("document_payments").select("*").eq("document_id", id).order("paid_at"),
+      supabase.from("tenant_invoice_settings").select("denominazione, vat, tax_code, address, city, cap, province, pec, regime_note, footer_note, bollo_auto").maybeSingle(),
     ]);
+    setIssuer((iss.data ?? null) as IssuerInfo | null);
     const dd = (d.data ?? null) as Doc | null;
     setDoc(dd); setEvents((e.data ?? []) as Ev[]); setPays((p.data ?? []) as Pay[]);
     if (dd) hydrate(dd, (l.data ?? []) as DbLine[]);
     // Documenti collegati: la fattura di origine (se questo è una NC) e le NC che stornano questo doc.
     if (dd) {
-      const rel: { id: string; number_label: string | null; doc_kind: string; role: string }[] = [];
+      const rel: Related[] = [];
       if (dd.related_document_id) {
-        const { data: src } = await supabase.from("documents").select("id, number_label, doc_kind").eq("id", dd.related_document_id).maybeSingle();
-        if (src) rel.push({ ...(src as { id: string; number_label: string | null; doc_kind: string }), role: "Documento di origine" });
+        const { data: src } = await supabase.from("documents").select("id, number_label, doc_kind, stato, total_cents").eq("id", dd.related_document_id).maybeSingle();
+        if (src) rel.push({ ...(src as Omit<Related, "role">), role: "Documento di origine" });
       }
-      const { data: nc } = await supabase.from("documents").select("id, number_label, doc_kind").eq("related_document_id", dd.id);
-      (nc ?? []).forEach((x) => rel.push({ ...(x as { id: string; number_label: string | null; doc_kind: string }), role: "Nota di credito" }));
+      const { data: nc } = await supabase.from("documents").select("id, number_label, doc_kind, stato, total_cents").eq("related_document_id", dd.id);
+      (nc ?? []).forEach((x) => rel.push({ ...(x as Omit<Related, "role">), role: "Nota di credito" }));
       setRelated(rel);
     }
     setLoading(false);
@@ -141,14 +154,38 @@ export default function DocumentoPage() {
     return { taxable, vat, out, bolloCents, roundingCents, total };
   }, [lines, f.bollo, f.rounding]);
 
-  const bolloEligible = doc?.regime === "forfettario" && (totals.taxable + totals.vat + totals.out) > BOLLO_THRESHOLD_CENTS;
+  const preBollo = totals.taxable + totals.vat + totals.out;
+  const bolloEligible = doc?.regime === "forfettario" && preBollo > BOLLO_THRESHOLD_CENTS;
+
+  // Bollo automatico (impostazione "Bollo automatico", forfettario): segue la soglia finché l'utente non lo tocca a mano.
+  const bolloAutoOn = doc?.regime === "forfettario" && (issuer?.bollo_auto ?? true);
+  useEffect(() => {
+    if (doc?.stato !== "bozza" || !bolloAutoOn || bolloTouched.current) return;
+    setF((p) => (p.bollo === bolloEligible ? p : { ...p, bollo: bolloEligible }));
+  }, [doc?.stato, bolloAutoOn, bolloEligible]);
 
   const paid = pays.reduce((a, p) => a + p.amount_cents, 0);
-  const residuo = totals.total - paid;
+  // Note di credito emesse collegate a questo documento: riducono quanto resta da incassare.
+  const credited = related.filter((r) => r.role === "Nota di credito" && r.stato && CREDIT_VALID.has(r.stato)).reduce((a, r) => a + (r.total_cents ?? 0), 0);
+  const residuo = totals.total - paid - credited;
   const frozen = !!doc && doc.stato !== "bozza";
+  const isCreditNote = (doc?.doc_kind ?? f.doc_kind) === "nota_di_credito";
+
+  // Controlli prima dell'emissione (solo in bozza). Errori = bloccano "Emetti"; avvisi = solo segnalati.
+  const issues: Issue[] = useMemo(() => {
+    if (!doc || doc.stato !== "bozza") return [];
+    return validateDocument({
+      docKind: f.doc_kind, regime: doc.regime, issueDate: f.issue_date, dueDate: f.due_date, sendSdi: f.send_sdi,
+      counterpart: { kind: cp.kind, name: cp.name, lastName: cp.lastName, vat: cp.vat, tax_code: cp.tax_code, country: cp.country, address: cp.address, city: cp.city, cap: cp.cap, province: cp.province },
+      sdiCode: f.sdi_code, pec: f.pec,
+      lines: lines.map((l) => ({ description: l.description, qty: l.qty, unitEur: l.unitEur, vat: l.vat })),
+      bollo: f.bollo, preBolloCents: preBollo, totalCents: totals.total, bolloThresholdCents: BOLLO_THRESHOLD_CENTS, issuer,
+    });
+  }, [doc, f, cp, lines, preBollo, totals.total, issuer]);
+  const blocked = hasErrors(issues);
 
   const setLine = (i: number, patch: Partial<ELine>) => setLines((p) => p.map((l, j) => (j === i ? { ...l, ...patch } : l)));
-  const addLine = (preset: Partial<ELine>) => setLines((p) => [...p, { description: "", qty: 1, unitEur: 0, vat: "22", sourceKind: "extra", ...preset }]);
+  const addLine = (preset: Partial<ELine>) => setLines((p) => [...p, { description: "", qty: 1, unitEur: 0, vat: defaultVat(doc?.regime, "22"), sourceKind: "extra", ...preset }]);
   const delLine = (i: number) => setLines((p) => p.filter((_, j) => j !== i));
   const delCityTax = () => setLines((p) => p.filter((l) => l.vat !== "N1" && l.sourceKind !== "city_tax"));
 
@@ -157,9 +194,11 @@ export default function DocumentoPage() {
     const b = bookings.find((x) => x.id === bid); if (!b) return;
     const rt = getRoomType(b.roomTypeId); const structure = getStructure(b.structureId); const g = getGuest(b.guestId);
     const add: ELine[] = [];
-    if (b.total) add.push({ description: `${(rt?.name ?? "Soggiorno").toUpperCase()} – ${dmy(b.checkIn)} al ${dmy(b.checkOut)}`, qty: 1, unitEur: b.total, vat: "10", sourceKind: "accommodation" });
-    if (b.cleaningFee) add.push({ description: "Pulizia finale", qty: 1, unitEur: b.cleaningFee, vat: "10", sourceKind: "cleaning" });
-    (b.extras ?? []).forEach((e) => { if (e?.price) add.push({ description: e.name || "Extra", qty: 1, unitEur: e.price, vat: "22", sourceKind: "extra" }); });
+    // Aliquote secondo il regime del documento (forfettario → N2.2, come fa il folio lato server).
+    const v10 = defaultVat(doc?.regime, "10"), v22 = defaultVat(doc?.regime, "22");
+    if (b.total) add.push({ description: `${(rt?.name ?? "Soggiorno").toUpperCase()} – ${dmy(b.checkIn)} al ${dmy(b.checkOut)}`, qty: 1, unitEur: b.total, vat: v10, sourceKind: "accommodation" });
+    if (b.cleaningFee) add.push({ description: "Pulizia finale", qty: 1, unitEur: b.cleaningFee, vat: v10, sourceKind: "cleaning" });
+    (b.extras ?? []).forEach((e) => { if (e?.price) add.push({ description: e.name || "Extra", qty: 1, unitEur: e.price, vat: v22, sourceKind: "extra" }); });
     const tax = cityTaxOf(structure, b.adults ?? 0, nights(b.checkIn, b.checkOut), b.total ?? 0, b.cityTaxExempt);
     if (tax) add.push({ description: "Imposta di soggiorno", qty: 1, unitEur: tax, vat: "N1", sourceKind: "city_tax" });
     setLines((p) => [...p, ...add]);
@@ -206,8 +245,9 @@ export default function DocumentoPage() {
 
   const act = async (label: string, fn: () => Promise<void>) => { setBusy(label); setMsg(""); try { await fn(); await load(); } catch (e) { setMsg(e instanceof Error ? e.message : "Errore"); } finally { setBusy(""); } };
   const onSave = () => act("save", async () => { if (await saveDraft()) setMsg("Bozza salvata ✓"); });
-  const onIssue = () => act("issue", async () => { if (await saveDraft()) { await invPost("issue", { documentId: id }); setMsg("Documento emesso ✓"); } });
-  const onSaveSend = () => act("savesend", async () => { if (await saveDraft()) { await invPost("issue", { documentId: id }); const r = await invPost<{ message?: string }>("send", { documentId: id }); setMsg(r.message || "Emesso e inviato"); } });
+  const blockMsg = () => setMsg("Non posso emettere: correggi prima gli errori elencati in “Controlli prima dell'emissione”.");
+  const onIssue = () => { if (blocked) { blockMsg(); return; } act("issue", async () => { if (await saveDraft()) { await invPost("issue", { documentId: id }); setMsg("Documento emesso ✓"); } }); };
+  const onSaveSend = () => { if (blocked) { blockMsg(); return; } act("savesend", async () => { if (await saveDraft()) { await invPost("issue", { documentId: id }); const r = await invPost<{ message?: string }>("send", { documentId: id }); setMsg(r.message || "Emesso e inviato"); } }); };
   const send = () => act("send", async () => { const r = await invPost<{ message?: string }>("send", { documentId: id }); if (r.message) setMsg(r.message); });
   const refresh = () => act("status", async () => { const r = await invPost<{ message?: string }>("status", { documentId: id }); if (r.message) setMsg(r.message); });
   const downloadXml = () => act("xml", async () => { const r = await invPost<{ xml: string }>("xml", { documentId: id }); const b = new Blob([r.xml], { type: "application/xml" }); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${(doc?.number_label ?? id).replace(/[^\w-]/g, "_")}.xml`; a.click(); URL.revokeObjectURL(a.href); });
@@ -239,9 +279,24 @@ export default function DocumentoPage() {
     router.push("/documenti");
   };
 
-  const printPdf = async () => {
-    if (!doc) return;
-    const { data: se } = await supabase!.from("tenant_invoice_settings").select("*").maybeSingle();
+  // Anteprima (autoPrint=false) o stampa/PDF (autoPrint=true) dello stesso documento di cortesia.
+  const openDoc = async (autoPrint: boolean) => {
+    if (!doc || !supabase) return;
+    const { data: se } = await supabase.from("tenant_invoice_settings").select("*").maybeSingle();
+    // Riepilogo IVA per aliquota/natura (stessa matematica dei totali a video).
+    const vatGroups = (() => {
+      const g = new Map<string, { label: string; base: number; vat: number }>();
+      for (const l of lines) {
+        const cents = Math.round(l.unitEur * 100 * (l.qty || 0));
+        const label = l.vat === "N1" ? "Fuori campo IVA (N1)" : l.vat === "N2.2" ? "Non soggetta (N2.2)" : `IVA ${l.vat}%`;
+        const cur = g.get(l.vat) ?? { label, base: 0, vat: 0 };
+        cur.base += cents; g.set(l.vat, cur);
+      }
+      for (const [k, v] of g) { const r = k === "N1" || k === "N2.2" ? 0 : Number(k) || 0; v.vat = Math.round(v.base * r / 100); }
+      return [...g.values()];
+    })();
+    const origin = related.find((r) => r.role === "Documento di origine");
+    const dmyLong = (iso: string) => (iso ? new Date(iso + "T00:00:00").toLocaleDateString("it-IT") : "");
     const e = (c: number) => eur(centsEur(c));
     const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
     const rows = lines.map((l) => `<tr><td>${esc(l.description)}</td><td style="text-align:right">${l.qty}</td><td style="text-align:right">${l.vat === "N1" || l.vat === "N2.2" ? l.vat : l.vat + "%"}</td><td style="text-align:right">${eur(l.unitEur * (l.qty || 0))}</td></tr>`).join("");
@@ -258,11 +313,16 @@ export default function DocumentoPage() {
       <div class="head"><div>${emit || '<div>Emittente da configurare</div>'}</div><div style="text-align:right"><div class="doc">${DOC_KIND_LABEL[doc.doc_kind]}</div><div>n. ${doc.number_label ?? "(bozza)"}</div><div>${f.issue_date ? new Date(f.issue_date).toLocaleDateString("it-IT") : ""}</div></div></div>
       <div class="p"><div><h4>Cliente</h4>${cli}</div>${doc.booking_code ? `<div style="text-align:right"><h4>Prenotazione</h4><div>${esc(doc.booking_code)}</div></div>` : ""}</div>
       <table><thead><tr><th>Descrizione</th><th style="text-align:right">Q.tà</th><th style="text-align:right">IVA</th><th style="text-align:right">Totale</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="tot"><div><span>Imponibile</span><span>${e(totals.taxable)}</span></div><div><span>IVA</span><span>${e(totals.vat)}</span></div>${totals.out ? `<div><span>Fuori campo IVA (art.15)</span><span>${e(totals.out)}</span></div>` : ""}${totals.bolloCents ? `<div><span>Bollo</span><span>${e(totals.bolloCents)}</span></div>` : ""}<div class="g"><span>Totale</span><span>${e(totals.total)}</span></div></div>
+      ${origin ? `<div class="note" style="border-top:0;margin-top:10px;padding-top:0">Storna il documento n. ${esc(origin.number_label ?? "")}</div>` : ""}
+      <div class="tot"><div><span>Imponibile</span><span>${e(totals.taxable)}</span></div><div><span>IVA</span><span>${e(totals.vat)}</span></div>${totals.out ? `<div><span>Fuori campo IVA (art.15)</span><span>${e(totals.out)}</span></div>` : ""}${totals.bolloCents ? `<div><span>Bollo</span><span>${e(totals.bolloCents)}</span></div>` : ""}${totals.roundingCents ? `<div><span>Arrotondamento</span><span>${e(totals.roundingCents)}</span></div>` : ""}<div class="g"><span>Totale</span><span>${e(totals.total)}</span></div></div>
+      ${vatGroups.length > 1 || (vatGroups[0] && vatGroups[0].vat > 0) ? `<table style="width:280px;margin-left:auto;font-size:11px;color:#5c6479"><thead><tr><th>Riepilogo IVA</th><th style="text-align:right">Imponibile</th><th style="text-align:right">Imposta</th></tr></thead><tbody>${vatGroups.map((g) => `<tr><td>${esc(g.label)}</td><td style="text-align:right">${e(g.base)}</td><td style="text-align:right">${e(g.vat)}</td></tr>`).join("")}</tbody></table>` : ""}
+      ${f.payment_method || f.due_date ? `<div class="note" style="border-top:0;margin-top:14px;padding-top:0">Pagamento: ${esc(f.payment_method)}${f.due_date ? ` · scadenza ${dmyLong(f.due_date)}` : ""}</div>` : ""}
       ${f.notes ? `<div class="note"><h4 style="margin:0 0 4px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#5c6479">Causale / Note</h4>${esc(f.notes)}</div>` : ""}
       <div class="note">${se?.regime_note ? esc(se.regime_note) + "<br>" : ""}${esc(se?.footer_note ?? "")}<br>Documento di cortesia — non valido ai fini fiscali.</div></body></html>`);
-    w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
+    w.document.close(); w.focus(); if (autoPrint) setTimeout(() => w.print(), 300);
   };
+  const printPdf = () => openDoc(true);
+  const previewDoc = () => openDoc(false);
 
   if (loading) return <div className="p-6 text-sm text-faint">Caricamento…</div>;
   if (!doc) return <div className="p-6 text-sm text-faint">Documento non trovato. <button onClick={() => router.push("/documenti")} className="font-semibold text-focus hover:underline">Torna ai documenti</button></div>;
@@ -271,7 +331,13 @@ export default function DocumentoPage() {
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
   const e2 = (c: number) => eur(centsEur(c));
-  const setDue = (days: number) => setF((p) => ({ ...p, due_date: new Date(Date.now() + days * 86400000).toISOString().slice(0, 10) }));
+  // Scadenza = data di emissione + N giorni (non "oggi + N": la fattura può avere una data diversa).
+  const setDue = (days: number) => setF((p) => {
+    const base = p.issue_date ? new Date(p.issue_date + "T12:00:00") : new Date();
+    base.setDate(base.getDate() + days);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return { ...p, due_date: `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}` };
+  });
 
   return (
     <div>
@@ -326,7 +392,7 @@ export default function DocumentoPage() {
               </div>
               <label className={lbl}>Tipologia<select value={f.doc_kind} onChange={(e) => setF({ ...f, doc_kind: e.target.value })} className={inp}><option value="fattura">Fattura</option><option value="nota_di_credito">Nota di credito</option><option value="ricevuta_non_fiscale">Ricevuta</option></select></label>
               <label className={lbl}>Data emissione<input type="date" value={f.issue_date} onChange={(e) => setF({ ...f, issue_date: e.target.value })} className={inp} /></label>
-              <div><span className={lbl}>Scadenza pagamento</span><div className="mt-1 flex gap-1"><input type="date" value={f.due_date} onChange={(e) => setF({ ...f, due_date: e.target.value })} className="w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt" />{[30, 60, 120].map((d) => <button key={d} onClick={() => setDue(d)} className="shrink-0 rounded-lg bg-wash px-2 text-xs font-semibold text-dim hover:bg-line">+{d}</button>)}</div></div>
+              <div><span className={lbl}>Scadenza pagamento</span><div className="mt-1 flex gap-1"><input type="date" value={f.due_date} onChange={(e) => setF({ ...f, due_date: e.target.value })} className="w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt" />{[0, 15, 30, 60].map((d) => <button key={d} onClick={() => setDue(d)} className="shrink-0 rounded-lg bg-wash px-2 text-xs font-semibold text-dim hover:bg-line" title={d === 0 ? "Scadenza = data di emissione" : `Scadenza = emissione + ${d} giorni`}>{d === 0 ? "ora" : `+${d}`}</button>)}</div></div>
               <label className={lbl}>Metodo di pagamento<select value={f.payment_method} onChange={(e) => setF({ ...f, payment_method: e.target.value })} className={inp}><option>Bonifico bancario</option><option>Carta</option><option>Contanti</option><option>PayPal</option><option>Assegno</option></select></label>
               <details className="sm:col-span-2 mt-1">
                 <summary className="cursor-pointer text-xs font-semibold text-focus">Altre opzioni</summary>
@@ -363,7 +429,7 @@ export default function DocumentoPage() {
           </div>
           {!frozen && (
             <div className="mt-2 flex flex-wrap gap-1.5">
-              <button onClick={() => addLine({ description: "", vat: "22", sourceKind: "extra" })} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash">+ Riga</button>
+              <button onClick={() => addLine({ description: "", sourceKind: "extra" })} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash">+ Riga</button>
               <button onClick={() => addLine({ description: "Imposta di soggiorno", vat: "N1", sourceKind: "city_tax" })} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash">+ Tassa soggiorno</button>
               <button onClick={delCityTax} className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-[color:var(--err)] hover:bg-wash">Elimina tasse soggiorno</button>
             </div>
@@ -373,7 +439,7 @@ export default function DocumentoPage() {
             <div className="flex justify-between"><span className="text-dim">IVA</span><span className="font-mono">{e2(totals.vat)}</span></div>
             {totals.out > 0 && <div className="flex justify-between"><span className="text-dim">Fuori campo IVA (art.15)</span><span className="font-mono">{e2(totals.out)}</span></div>}
             {!frozen && (
-              <div className="flex items-center justify-between"><span className="text-dim">Bollo virtuale {bolloEligible ? "(dovuto)" : ""}</span><label className="inline-flex cursor-pointer items-center gap-1"><input type="checkbox" checked={f.bollo} onChange={(e) => setF({ ...f, bollo: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /><span className="font-mono">{e2(totals.bolloCents)}</span></label></div>
+              <div className="flex items-center justify-between"><span className="text-dim">Bollo virtuale {bolloEligible ? "(dovuto)" : ""}</span><label className="inline-flex cursor-pointer items-center gap-1"><input type="checkbox" checked={f.bollo} onChange={(e) => { bolloTouched.current = true; setF({ ...f, bollo: e.target.checked }); }} className="h-4 w-4 accent-[color:var(--focus)]" /><span className="font-mono">{e2(totals.bolloCents)}</span></label></div>
             )}
             {frozen && totals.bolloCents > 0 && <div className="flex justify-between"><span className="text-dim">Bollo</span><span className="font-mono">{e2(totals.bolloCents)}</span></div>}
             {!frozen && <label className="flex items-center justify-between"><span className="text-dim">Arrotonda all'euro</span><input type="checkbox" checked={f.rounding} onChange={(e) => setF({ ...f, rounding: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>}
@@ -423,9 +489,22 @@ export default function DocumentoPage() {
             {events.map((ev) => <div key={ev.id} className="flex gap-2 text-[13px]"><span className="w-24 shrink-0 text-[11px] text-faint">{new Date(ev.ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span><span className="text-txt">{ev.message}</span></div>)}
           </div>
           <div className="mt-3 border-t border-line pt-2">
-            <div className="mb-1 flex items-center justify-between"><span className="text-sm font-semibold text-txt">Incassi</span>{residuo > 0 ? <span className="text-[11px] font-semibold text-[color:var(--warn)]">Residuo {e2(residuo)}</span> : <span className="text-[11px] font-semibold text-[color:var(--ok)]">Saldato ✓</span>}</div>
-            {pays.map((p) => <div key={p.id} className="flex justify-between text-sm text-dim"><span>{new Date(p.paid_at).toLocaleDateString("it-IT")} · {p.method}</span><span className="font-mono">{e2(p.amount_cents)}</span></div>)}
-            {residuo > 0 && <button onClick={() => addPayment(residuo, "manuale")} disabled={!!busy} className="mt-2 rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">Incassa tutto ({e2(residuo)})</button>}
+            {isCreditNote ? (
+              <p className="text-[12px] text-dim">La nota di credito riduce l&apos;importo dovuto dal documento di origine: non ha incassi propri.</p>
+            ) : (<>
+              <div className="mb-1 flex items-center justify-between"><span className="text-sm font-semibold text-txt">Incassi</span>{residuo > 0 ? <span className="text-[11px] font-semibold text-[color:var(--warn)]">Residuo {e2(residuo)}</span> : <span className="text-[11px] font-semibold text-[color:var(--ok)]">Saldato ✓</span>}</div>
+              {pays.map((p) => <div key={p.id} className="flex justify-between text-sm text-dim"><span>{new Date(p.paid_at).toLocaleDateString("it-IT")} · {p.method}</span><span className="font-mono">{e2(p.amount_cents)}</span></div>)}
+              {credited > 0 && <div className="flex justify-between text-sm text-dim"><span>Stornato da note di credito</span><span className="font-mono">−{e2(credited)}</span></div>}
+              {residuo < 0 && <p className="mt-1 text-[11px] font-semibold text-[color:var(--warn)]">Incassato/stornato oltre il totale di {e2(-residuo)}: verifica gli incassi.</p>}
+              {residuo > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <input value={payAmt} onChange={(e) => setPayAmt(e.target.value)} inputMode="decimal" placeholder={`€ (max ${e2(residuo)})`} className="w-28 rounded border border-line bg-paper px-2 py-1.5 text-sm" />
+                  <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)} className="rounded border border-line bg-paper px-1.5 py-1.5 text-sm"><option>Bonifico bancario</option><option>Carta</option><option>Contanti</option><option>PayPal</option><option>Assegno</option></select>
+                  <button onClick={() => { const c = Math.round(num(payAmt) * 100); if (c <= 0) { setMsg("Indica un importo da incassare."); return; } if (c > residuo) { setMsg(`L'importo supera il residuo (${e2(residuo)}).`); return; } setPayAmt(""); addPayment(c, payMethod); }} disabled={!!busy || !payAmt.trim()} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-50">Registra incasso</button>
+                  <button onClick={() => addPayment(residuo, payMethod)} disabled={!!busy} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">Incassa tutto ({e2(residuo)})</button>
+                </div>
+              )}
+            </>)}
           </div>
           {related.length > 0 && (
             <div className="mt-3 border-t border-line pt-2">
@@ -441,16 +520,31 @@ export default function DocumentoPage() {
         </Card>
       </div>
 
+      {/* CONTROLLI PRIMA DELL'EMISSIONE */}
+      {!frozen && (
+        <Card className="mt-4">
+          <div className="flex items-center justify-between"><SectionTitle>Controlli prima dell&apos;emissione</SectionTitle>
+            <span className="text-[11px] font-semibold" style={{ color: blocked ? "var(--err)" : issues.length ? "var(--warn)" : "var(--ok)" }}>{blocked ? `${issues.filter((i) => i.level === "error").length} da correggere` : issues.length ? `${issues.length} avvisi` : "tutto a posto ✓"}</span></div>
+          {issues.length > 0 ? (
+            <ul className="mt-2 space-y-1">
+              {issues.map((i, k) => <li key={k} className="flex gap-2 text-[13px]"><span className="shrink-0 font-bold" style={{ color: i.level === "error" ? "var(--err)" : "var(--warn)" }}>{i.level === "error" ? "✕" : "!"}</span><span className="text-txt">{i.msg}</span></li>)}
+            </ul>
+          ) : <p className="mt-1 text-[12px] text-dim">Dati dell&apos;emittente, intestatario, voci, date e bollo risultano coerenti.</p>}
+          {blocked && <p className="mt-2 text-[11px] text-faint">Gli errori bloccano l&apos;emissione (puoi comunque salvare la bozza); gli avvisi no.</p>}
+        </Card>
+      )}
+
       {/* AZIONI */}
       <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         {!frozen && <>
           <button onClick={onSave} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "save" ? "Salvo…" : "Salva bozza"}</button>
-          <button onClick={onIssue} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "issue" ? "Emissione…" : "Emetti"}</button>
-          {f.send_sdi && f.doc_kind !== "ricevuta_non_fiscale" && <button onClick={onSaveSend} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "savesend" ? "…" : "Salva e invia"}</button>}
+          <button onClick={onIssue} disabled={!!busy || blocked} title={blocked ? "Correggi prima gli errori nei controlli" : undefined} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "issue" ? "Emissione…" : "Emetti"}</button>
+          {f.send_sdi && f.doc_kind !== "ricevuta_non_fiscale" && <button onClick={onSaveSend} disabled={!!busy || blocked} title={blocked ? "Correggi prima gli errori nei controlli" : undefined} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "savesend" ? "…" : "Salva e invia"}</button>}
           <button onClick={deleteDraft} disabled={!!busy} className="rounded-lg border border-[color:var(--err)] px-3 py-2 text-sm font-semibold text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_10%,transparent)] disabled:opacity-50">{busy === "del" ? "Elimino…" : "Elimina bozza"}</button>
         </>}
         {doc.stato === "emessa" && doc.send_sdi && <button onClick={send} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "send" ? "Invio…" : "Invia allo SdI"}</button>}
         {doc.stato === "inviata_intermediario" && <button onClick={refresh} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "status" ? "Controllo…" : "Aggiorna esito"}</button>}
+        <button onClick={previewDoc} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Anteprima</button>
         <button onClick={printPdf} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Stampa PDF</button>
         {doc.provider_ref && <button onClick={downloadXml} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "xml" ? "…" : "Scarica XML"}</button>}
         {frozen && doc.doc_kind !== "nota_di_credito" && doc.stato !== "stornata" && <button onClick={creditNote} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-[color:var(--err)] hover:bg-wash disabled:opacity-50">{busy === "nc" ? "…" : "Nota di credito"}</button>}

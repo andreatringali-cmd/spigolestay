@@ -13,6 +13,8 @@ import { eur } from "@/lib/format";
 import { bookingGrandTotal } from "@/lib/booking";
 import { nights } from "@/lib/dates";
 import { CHANNELS, type Booking } from "@/lib/types";
+import type { SavedQuote } from "@/lib/assistant";
+import { askAssistantAi, type AiTurn } from "@/lib/assistant-ai";
 
 // Data locale (NON UTC): altrimenti vicino a mezzanotte "oggi" sfasa di un giorno.
 const todayISO = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; };
@@ -32,7 +34,8 @@ type Ans = { title: string; value?: string; detail?: string; speech?: string; li
 
 export default function AssistentePage() {
   const router = useRouter();
-  const { bookings: allBookings, roomTypes, units: allUnits, getGuest, getStructure, getUnit, activeStructureId } = useData();
+  const { bookings: allBookings, guests, structures, roomTypes, units: allUnits, getGuest, getStructure, getUnit, activeStructureId } = useData();
+  const turnsRef = useRef<AiTurn[]>([]); // memoria della conversazione con l'AI (domande libere)
   // Tutto ciò che l'assistente conta/elenca segue la struttura selezionata (con "Tutte" resta tutto l'account).
   const bookings = useMemo(() => (activeStructureId === "all" ? allBookings : allBookings.filter((b) => b.structureId === activeStructureId)), [allBookings, activeStructureId]);
   const units = useMemo(() => (activeStructureId === "all" ? allUnits : allUnits.filter((u) => u.structureId === activeStructureId)), [allUnits, activeStructureId]);
@@ -294,12 +297,22 @@ export default function AssistentePage() {
       const tot = ((data ?? []) as { total_cents: number }[]).reduce((a, r) => a + r.total_cents, 0);
       return { title: "Fatture fornitori da pagare", value: eur(tot / 100), detail: `${(data ?? []).length} fatture non pagate.`, go: { label: "Fatture passive", href: "/fatture-passive" } };
     }
-    return { title: "Non ho capito", value: "🤔", detail: "Prova con: chi arriva oggi, partenze, check-in, ricavo del mese, da incassare — oppure dimmi il nome di un ospite." };
-  }, [answers, active, dueCents, firstName, getGuest, narrate, subOf, units, t, activeStructureId]);
+    // Domanda libera: la risposta la prepara l'AI sui dati reali (stessa struttura selezionata).
+    try {
+      let quotes: SavedQuote[] = [];
+      try { quotes = JSON.parse(localStorage.getItem("spigolestay:preventivi") || "[]"); } catch {}
+      const reply = await askAssistantAi(text, { bookings: allBookings, guests, structures, units: allUnits, roomTypes, quotes, activeStructureId, today: new Date() }, turnsRef.current);
+      turnsRef.current = [...turnsRef.current, { role: "user" as const, text }, { role: "assistant" as const, text: reply }].slice(-8);
+      return { title: "Assistente", detail: reply, speech: reply.replace(/•/g, ",") };
+    } catch (e) {
+      return { title: "Non ho capito", value: "🤔", detail: `${e instanceof Error && e.message !== "Errore" ? e.message + ". " : ""}Prova con: chi arriva oggi, partenze, check-in, ricavo del mese, da incassare — oppure dimmi il nome di un ospite.` };
+    }
+  }, [answers, active, dueCents, firstName, getGuest, narrate, subOf, units, t, activeStructureId, allBookings, guests, structures, allUnits, roomTypes]);
 
   const ask = useCallback(async (text: string) => {
     if (!text.trim()) return;
     setSent(text.trim());
+    setAns({ title: "Sto guardando i tuoi dati…", detail: "" });
     const a = await answer(text);
     setAns(a);
     speak(a.speech ?? [a.title, a.value, a.detail].filter(Boolean).join(". "));

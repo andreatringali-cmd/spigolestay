@@ -6,6 +6,7 @@ import Icon from "@/components/Icon";
 import { useData } from "@/lib/store";
 import type { Structure } from "@/lib/types";
 import ConciergeKb from "./ConciergeKb";
+import ConciergeUnanswered, { type KbPrefill } from "./ConciergeUnanswered";
 
 interface FAQ { id: string; topic: string; keywords: string; answer: string }
 const LANGS: [string, string][] = [["it", "🇮🇹"], ["en", "🇬🇧"], ["fr", "🇫🇷"], ["de", "🇩🇪"], ["es", "🇪🇸"]];
@@ -52,6 +53,8 @@ export default function ConciergePanel() {
   const [msgs, setMsgs] = useState<{ role: "guest" | "bot"; text: string }[]>([]);
   const [input, setInput] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
+  const [prefill, setPrefill] = useState<KbPrefill | null>(null); // "Aggiungi alla base" da una domanda senza risposta
+  const [createdTick, setCreatedTick] = useState(0);
   const scroller = useRef<HTMLDivElement>(null);
 
   // Chiave per struttura; se non esiste ancora si parte da una COPIA della vecchia chiave globale (non spostata), altrimenti dai default derivati dalla struttura.
@@ -100,7 +103,8 @@ export default function ConciergePanel() {
           <span className="text-[11px] text-faint">La base di conoscenza è separata per struttura.</span>
         </div>
       )}
-      {sid && <ConciergeKb sid={sid} />}
+      {sid && <ConciergeUnanswered sid={sid} onAdd={setPrefill} createdTick={createdTick} />}
+      {sid && <ConciergeKb sid={sid} prefill={prefill} onCreated={() => setCreatedTick((n) => n + 1)} />}
       <SectionTitle>Prove rapide e FAQ locali</SectionTitle>
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       {/* Chat demo */}

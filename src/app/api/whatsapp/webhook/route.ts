@@ -1,9 +1,12 @@
 import { NextResponse, after } from "next/server";
+import { fetchWaMedia, transcribeAudio, transcriptionConfigured } from "@/lib/whatsapp-media";
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { parseNotifPrefs } from "@/lib/notifPrefs";
 import { AI_CONCIERGE_KEY, parseAiConciergePrefs } from "@/lib/aiConcierge";
 import { conciergeAnswer, resolveStructureId, type BookingLite } from "@/lib/concierge-engine";
+import { loadOrgDatas, mergeOrgData } from "@/lib/concierge-orgdata";
+import { logUnanswered } from "@/lib/concierge-unanswered";
 import { sendWhatsapp } from "@/lib/whatsapp";
 
 export const runtime = "nodejs";
@@ -26,7 +29,7 @@ export const maxDuration = 60; // le risposte AI e i tentativi sugli stati posso
 const DATA_KEY = "spigolestay:data:v1";
 const THREADS_KEY = "spigolestay:threads:v1";
 type MsgSt = "sent" | "delivered" | "read" | "failed";
-type Msg = { id: string; dir: "in" | "out"; text: string; ts: number; via?: string; wid?: string; st?: MsgSt };
+type Msg = { id: string; dir: "in" | "out"; text: string; ts: number; via?: string; wid?: string; st?: MsgSt; media?: { kind: "audio"; id: string; transcribed: boolean } };
 interface WaStatus { id?: string; status?: string }
 const ST_RANK: Record<string, number> = { sent: 1, failed: 1.5, delivered: 2, read: 3 };
 
@@ -46,14 +49,17 @@ export async function GET(req: Request) {
 interface WaMessage {
   id?: string;
   from?: string;
+  type?: string;
+  audio?: { id?: string };
   text?: { body?: string };
   button?: { text?: string };
   interactive?: { button_reply?: { title?: string }; list_reply?: { title?: string } };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function applyIncoming(admin: SupabaseClient<any>, tenantId: string, fromDigits: string, text: string, msgId: string) {
+async function applyIncoming(admin: SupabaseClient<any>, tenantId: string, fromDigits: string, text: string, msgId: string, media?: Msg["media"]) {
   // Stesso pattern rev-lock + retry singolo già usato in public-review/public-booking.
+  let orgGuestsCache: { id: string; fullName?: string; phone?: string; language?: string }[] | null = null; // letti al massimo una volta
   for (let attempt = 0; attempt < 2; attempt++) {
     const { data: row } = await admin.from("app_state").select("data, rev").eq("user_id", tenantId).maybeSingle();
     const blob = ((row?.data ?? {}) as Record<string, string>) || {};
@@ -66,11 +72,21 @@ async function applyIncoming(admin: SupabaseClient<any>, tenantId: string, fromD
 
     const guests = (Array.isArray(data.guests) ? data.guests : []) as { id: string; fullName?: string; phone?: string; language?: string }[];
     // Confronto sulle ultime 9 cifre: i numeri salvati a mano spesso hanno/non hanno prefisso internazionale.
-    const guest = guests.find((g) => { const d = (g.phone || "").replace(/\D/g, ""); return d.length >= 6 && d.slice(-9) === fromDigits.slice(-9); });
+    const byPhone = (g: { phone?: string }) => { const d = (g.phone || "").replace(/\D/g, ""); return d.length >= 6 && d.slice(-9) === fromDigits.slice(-9); };
+    let guest = guests.find(byPhone);
+    if (!guest) {
+      // Ospite di una struttura CONDIVISA (es. prenotato dal socio): sta solo in org_state. Sola lettura, mai bloccante.
+      if (orgGuestsCache === null) {
+        try {
+          orgGuestsCache = (await loadOrgDatas(admin, tenantId)).flatMap((od) => (Array.isArray(od.guests) ? od.guests : [])) as { id: string; fullName?: string; phone?: string; language?: string }[];
+        } catch { orgGuestsCache = []; }
+      }
+      guest = orgGuestsCache.find(byPhone);
+    }
     const key = guest?.id || `wa:${fromDigits}`;
     const list = threads[key] ?? [];
     if (list.some((m) => m.id === msgId)) return { ok: true, guestName: guest?.fullName }; // già ricevuto (retry di Meta), idempotente
-    threads[key] = [...list, { id: msgId, dir: "in", text, ts: Date.now() }];
+    threads[key] = [...list, { id: msgId, dir: "in", text, ts: Date.now(), ...(media ? { media } : {}) }];
     blob[THREADS_KEY] = JSON.stringify(threads);
 
     let write = admin.from("app_state").update({ data: blob, updated_at: new Date().toISOString() }).eq("user_id", tenantId);
@@ -160,23 +176,38 @@ async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: 
     const prefs = parseAiConciergePrefs(info.aiConciergeRaw);
     if (!prefs.enabled) return; // interruttore spento (default): nessuna risposta automatica
 
-    const structures = (Array.isArray(info.structures) ? info.structures : []) as { id: string }[];
-    const bookingsArr = (Array.isArray(info.bookings) ? info.bookings : []) as BookingLite[];
+    // Il blob personale non contiene le strutture condivise (Structure.orgId, es. Central Perk): sono in org_state.
+    // Le leggiamo (sola lettura) e le uniamo ai dati personali come fa il browser con combineData().
+    const data = mergeOrgData(
+      { structures: info.structures, bookings: info.bookings, units: info.units, roomTypes: info.roomTypes },
+      await loadOrgDatas(admin, tenantId),
+    );
+    const structures = (Array.isArray(data.structures) ? data.structures : []) as { id: string }[];
+    const bookingsArr = (Array.isArray(data.bookings) ? data.bookings : []) as BookingLite[];
     // Struttura di riferimento: prenotazione dell'ospite, poi struttura unica, poi quella predefinita in Impostazioni.
     const structureId = resolveStructureId(structures, bookingsArr, info.guest?.id, prefs.defaultStructureId);
-    if (!structureId) return; // nessun contesto struttura affidabile → nessuna risposta automatica
+    if (!structureId) {
+      // Nessun contesto struttura affidabile → nessuna risposta automatica; la domanda va comunque nell'elenco "senza risposta".
+      console.log("[concierge]", JSON.stringify({ answered: false, reason: "struttura non determinabile", hasBooking: !!info.guest, q: info.text.slice(0, 60) }));
+      await logUnanswered(admin, tenantId, { q: info.text, sid: "", reason: "struttura di riferimento non determinabile", hasBooking: !!info.guest });
+      return;
+    }
 
     const transcript = (info.priorMessages || []).slice(-4).filter((m) => m.text?.trim())
       .map((m) => `${m.dir === "out" ? "Struttura" : "Ospite"}: ${m.text.replace(/\s+/g, " ").trim()}`).join("\n") || undefined;
 
     const result = await conciergeAnswer({
       admin, tenantId,
-      data: { structures: info.structures, bookings: info.bookings, units: info.units, roomTypes: info.roomTypes },
+      data: { structures: data.structures, bookings: data.bookings, units: data.units, roomTypes: data.roomTypes },
       roomAccessRaw: info.roomAccessRaw, conciergeFaqRaw: info.conciergeFaqRaw,
-      structureId, guest: info.guest, guestName: info.guestName, message: info.text, transcript,
+      structureId, guest: info.guest, guestName: info.guestName, message: info.text, transcript, tone: prefs.tone,
     });
-    console.log("[concierge]", JSON.stringify({ answered: result.answered, reason: result.reason, topic: result.topic, hasBooking: result.hasBooking, lang: result.lang, q: info.text.slice(0, 60) }));
-    if (!result.answered || !result.reply) return;
+    console.log("[concierge]", JSON.stringify({ answered: result.answered, reason: result.reason, topic: result.topic, hasBooking: result.hasBooking, lang: result.lang, tone: prefs.tone, ms: result.ms, q: info.text.slice(0, 60) }));
+    if (!result.answered || !result.reply) {
+      // Registra la domanda (testo troncato, struttura, motivo, data) per "Domande a cui non ho saputo rispondere".
+      await logUnanswered(admin, tenantId, { q: info.text, sid: structureId, reason: result.reason, topic: result.topic, hasBooking: result.hasBooking });
+      return;
+    }
     const reply = result.reply;
 
     const sent = await sendWhatsapp(admin, tenantId, { to: info.fromDigits, text: reply });
@@ -229,9 +260,23 @@ export async function POST(req: Request) {
 
         for (const m of messages) {
           const fromDigits = (m.from || "").replace(/\D/g, "");
-          const text = m.text?.body || m.button?.text || m.interactive?.button_reply?.title || m.interactive?.list_reply?.title || "";
+          let text = m.text?.body || m.button?.text || m.interactive?.button_reply?.title || m.interactive?.list_reply?.title || "";
+          // Vocale: lo trascriviamo (se c'è una chiave) così compare come testo e il Concierge può rispondere.
+          let media: Msg["media"] | undefined;
+          let voiceNoText = false;
+          if (!text && m.type === "audio" && m.audio?.id) {
+            let transcribed = false;
+            if (transcriptionConfigured()) {
+              const file = await fetchWaMedia(admin, tenantId, m.audio.id);
+              const tr = file ? await transcribeAudio(file.bytes, file.mime) : null;
+              if (tr?.ok && tr.text) { text = tr.text; transcribed = true; }
+              else console.log("[whatsapp voice]", JSON.stringify({ file: !!file, error: tr?.error }));
+            }
+            if (!transcribed) { text = "🎙️ Messaggio vocale (senza trascrizione)"; voiceNoText = true; }
+            media = { kind: "audio", id: m.audio.id, transcribed };
+          }
           if (!fromDigits || !text || !m.id) continue;
-          const res = await applyIncoming(admin, tenantId, fromDigits, text, m.id);
+          const res = await applyIncoming(admin, tenantId, fromDigits, text, m.id, media);
 
           // Notifica email al gestore (interruttore "Messaggi degli ospiti") — fire-and-forget.
           if (res.ok && res.notifPrefsRaw !== undefined) {
@@ -252,7 +297,7 @@ export async function POST(req: Request) {
 
             // Concierge AI — SOLO per messaggi davvero nuovi (notifPrefsRaw è assente sui retry di
             // Meta/duplicati, vedi applyIncoming). Fire-and-forget: non blocca la risposta 200 al webhook.
-            after(() => tryAutoReply(admin, tenantId, {
+            if (!voiceNoText) after(() => tryAutoReply(admin, tenantId, {
               aiConciergeRaw: res.aiConciergeRaw as string | undefined,
               conciergeFaqRaw: res.conciergeFaqRaw as Record<string, string> | undefined,
               roomAccessRaw: res.roomAccessRaw as string | undefined,

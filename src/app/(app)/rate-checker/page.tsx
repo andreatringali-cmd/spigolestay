@@ -8,9 +8,10 @@ import { useLang } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 import type { Competitor, MarketRateRow } from "@/lib/ratecheck/service";
+import { toISO } from "@/lib/dates";
 
 const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayISO = () => toISO(new Date());
 
 const DAYS = 14;
 const cfgKey = (structureId: string) => `spigolestay:ratecheck:${structureId || "all"}`;
@@ -54,6 +55,8 @@ export default function RateCheckerPage() {
   const [market, setMarket] = useState<MarketRateRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [typeSel, setTypeSel] = useState<string>("all"); // "all" = media delle tipologie, altrimenti id tipologia
 
   useEffect(() => { setCompetitors(loadCompetitors(activeStructureId)); }, [activeStructureId]);
 
@@ -88,6 +91,7 @@ export default function RateCheckerPage() {
       if (j?.configured === false) { setConfigured(false); setMarket([]); return; }
       setConfigured(true);
       setMarket(Array.isArray(j?.rows) ? j.rows : []);
+      setUpdatedAt(Date.now());
       if (j?.error) setErr(String(j.error));
     } catch {
       setConfigured(null); setErr(t("Errore di rete.")); setMarket([]);
@@ -99,17 +103,34 @@ export default function RateCheckerPage() {
 
   const marketByDate = useMemo(() => { const m = new Map<string, MarketRateRow>(); for (const r of market) m.set(r.date, r); return m; }, [market]);
 
+  // Tipologie su cui calcolare "la mia tariffa": tutte (media) o quella scelta (se non esiste più, si torna alla media).
+  const selType = typeSel !== "all" ? rts.find((r) => r.id === typeSel) : undefined;
+  const rowTypes = selType ? [selType] : rts;
   const rows = useMemo(() => {
     const start = todayISO();
     const wk = loadWeekendPct();
     return Array.from({ length: DAYS }, (_, i) => {
       const iso = addDays(start, i);
-      // La MIA tariffa del giorno = media della tariffa effettiva (override per tipologia, derivate, weekend)
-      // delle tipologie della struttura in vista — la stessa del calendario.
-      const mine = rts.length ? Math.round(rts.reduce((a, rt) => a + rateForDay(rt.id, iso, roomTypes, rateOverrides, wk), 0) / rts.length) : 0;
+      // La MIA tariffa del giorno = tariffa effettiva (override per tipologia, derivate, weekend) della tipologia scelta,
+      // o la media delle tipologie della struttura in vista — la stessa del calendario.
+      const mine = rowTypes.length ? Math.round(rowTypes.reduce((a, rt) => a + rateForDay(rt.id, iso, roomTypes, rateOverrides, wk), 0) / rowTypes.length) : 0;
       return { iso, mine, mkt: marketByDate.get(iso) };
     });
-  }, [rateOverrides, rts, roomTypes, marketByDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rateOverrides, rts, selType?.id, roomTypes, marketByDate]);
+
+  // Sintesi della posizione sui giorni con un dato di mercato reale.
+  const summary = useMemo(() => {
+    let sotto = 0, linea = 0, sopra = 0, gapSum = 0, n = 0;
+    for (const r of rows) {
+      if (!r.mkt || !(r.mkt.avg > 0) || !(r.mine > 0)) continue;
+      const k = position(r.mine, r.mkt.avg).key;
+      if (k === "sotto") sotto++; else if (k === "sopra") sopra++; else linea++;
+      gapSum += (r.mine - r.mkt.avg) / r.mkt.avg; n++;
+    }
+    return { sotto, linea, sopra, n, avgGapPct: n ? Math.round((gapSum / n) * 100) : null };
+  }, [rows]);
+  const noCoords = activeStructureId === "all" || typeof activeStructure?.lat !== "number" || typeof activeStructure?.lng !== "number";
 
   const isConfigured = configured === true;
 
@@ -135,7 +156,16 @@ export default function RateCheckerPage() {
           </div>
         </div>
 
-        {err && isConfigured && <div className="mt-3 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}>{err}</div>}
+        {err && <div role="alert" className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}><span>{err}</span><button onClick={() => void refresh()} disabled={loading} className="rounded-md border border-line bg-surface px-2 py-0.5 font-semibold text-txt hover:bg-wash disabled:opacity-60">{t("Riprova")}</button></div>}
+        {isConfigured && !err && updatedAt && <div className="mt-2 text-[11px] text-faint">{t("Ultimo aggiornamento")}: {new Date(updatedAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}</div>}
+        {isConfigured && noCoords && (
+          <div className="mt-3 rounded-lg px-3 py-2 text-xs" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}>
+            {activeStructureId === "all" ? t("Seleziona una struttura in alto: il confronto usa le sue coordinate e i suoi competitor.") : t("Questa struttura non ha le coordinate (latitudine/longitudine): imposta l'indirizzo nella scheda struttura, altrimenti il provider può non trovare i competitor giusti.")}
+          </div>
+        )}
+        {isConfigured && competitors.length === 0 && !showConfig && (
+          <div className="mt-3 rounded-lg border border-dashed border-line px-3 py-2 text-xs text-dim">{t("Nessun competitor impostato: il provider userà solo la zona. Aggiungi le strutture simili dal pulsante Competitor per un confronto più preciso.")}</div>
+        )}
 
         {/* Config competitor */}
         {showConfig && (
@@ -192,7 +222,26 @@ export default function RateCheckerPage() {
       )}
 
       <Card>
-        <SectionTitle>{t("Le tue tariffe")} · {t("prossimi")} {DAYS} {t("giorni")}</SectionTitle>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <SectionTitle>{t("Le tue tariffe")} · {t("prossimi")} {DAYS} {t("giorni")}</SectionTitle>
+          {rts.length > 1 && (
+            <select value={selType ? selType.id : "all"} onChange={(e) => setTypeSel(e.target.value)} aria-label={t("Tipologia")} className="mb-3 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-txt outline-none focus:border-focus">
+              <option value="all">{t("Media di tutte le tipologie")}</option>
+              {rts.map((rt) => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
+            </select>
+          )}
+        </div>
+        {isConfigured && summary.n > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="rounded-full px-2.5 py-1 font-semibold" style={{ color: "var(--ok)", background: "color-mix(in srgb, var(--ok) 14%, transparent)" }}>{summary.sotto} {t("giorni sotto mercato")}</span>
+            <span className="rounded-full bg-wash px-2.5 py-1 font-semibold text-dim">{summary.linea} {t("in linea")}</span>
+            <span className="rounded-full px-2.5 py-1 font-semibold" style={{ color: "var(--err)", background: "color-mix(in srgb, var(--err) 14%, transparent)" }}>{summary.sopra} {t("giorni sopra mercato")}</span>
+            {summary.avgGapPct != null && <span className="text-faint">{t("Scarto medio dalla media di mercato")}: <b className="text-dim">{summary.avgGapPct > 0 ? "+" : ""}{summary.avgGapPct}%</b> ({summary.n} {t("giorni con dato")})</span>}
+          </div>
+        )}
+        {isConfigured && !loading && !err && market.length === 0 && (
+          <p className="mb-3 rounded-lg border border-dashed border-line px-3 py-2 text-xs text-faint">{t("Il provider è collegato ma non ha restituito tariffe di mercato per questi giorni.")}</p>
+        )}
         {rts.length === 0 ? (
           <div className="py-8 text-center text-sm text-faint">{t("Nessuna tipologia: imposta i prezzi nelle Tariffe.")}</div>
         ) : (
