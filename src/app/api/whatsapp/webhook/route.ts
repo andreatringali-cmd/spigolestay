@@ -24,7 +24,10 @@ export const dynamic = "force-dynamic";
 
 const DATA_KEY = "spigolestay:data:v1";
 const THREADS_KEY = "spigolestay:threads:v1";
-type Msg = { id: string; dir: "in" | "out"; text: string; ts: number; via?: string };
+type MsgSt = "sent" | "delivered" | "read" | "failed";
+type Msg = { id: string; dir: "in" | "out"; text: string; ts: number; via?: string; wid?: string; st?: MsgSt };
+interface WaStatus { id?: string; status?: string }
+const ST_RANK: Record<string, number> = { sent: 1, failed: 1.5, delivered: 2, read: 3 };
 
 // Handshake di verifica richiesto da Meta alla configurazione del webhook.
 export async function GET(req: Request) {
@@ -90,6 +93,41 @@ async function applyIncoming(admin: SupabaseClient<any>, tenantId: string, fromD
     // Conflitto di rev: un altro processo ha scritto nel mentre, riprova una volta.
   }
   return { ok: false };
+}
+
+// Spunte di consegna: Meta manda gli aggiornamenti di stato (sent/delivered/read/failed) dei messaggi
+// inviati da noi, con lo stesso id (wamid) restituito all'invio. Lo salviamo sul messaggio nel thread;
+// lo stato non torna mai indietro (letto > consegnato > inviato). Stesso rev-lock + retry di applyIncoming.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function applyStatuses(admin: SupabaseClient<any>, tenantId: string, statuses: WaStatus[]) {
+  const wanted = new Map<string, MsgSt>();
+  for (const s of statuses) if (s.id && s.status && ST_RANK[s.status] !== undefined) wanted.set(s.id, s.status as MsgSt);
+  if (!wanted.size) return;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data: row } = await admin.from("app_state").select("data, rev").eq("user_id", tenantId).maybeSingle();
+    const blob = ((row?.data ?? {}) as Record<string, string>) || {};
+    const rev = typeof (row as { rev?: number } | null)?.rev === "number" ? (row as { rev: number }).rev : null;
+    let threads: Record<string, Msg[]> = {};
+    try { threads = JSON.parse(blob[THREADS_KEY] || "{}"); } catch { return; }
+    let changed = false, matched = false;
+    for (const list of Object.values(threads)) {
+      for (const m of list) {
+        const next = m.wid ? wanted.get(m.wid) : undefined;
+        if (!next) continue;
+        matched = true;
+        if ((ST_RANK[next] ?? 0) > (ST_RANK[m.st ?? ""] ?? 0)) { m.st = next; changed = true; }
+      }
+    }
+    // Il messaggio può non avere ancora l'id WhatsApp sul server (il browser lo sincronizza entro ~4s):
+    // se non lo troviamo, aspettiamo un attimo e riproviamo invece di perdere lo stato.
+    if (!matched) { if (attempt < 2) { await new Promise((r) => setTimeout(r, 3500)); continue; } return; }
+    if (!changed) return;
+    blob[THREADS_KEY] = JSON.stringify(threads);
+    let write = admin.from("app_state").update({ data: blob, updated_at: new Date().toISOString() }).eq("user_id", tenantId);
+    if (rev !== null) write = write.eq("rev", rev);
+    const { data: updated } = await write.select("rev");
+    if (updated && updated.length > 0) return;
+  }
 }
 
 interface StLite { id: string; name?: string; address?: string; checkInFrom?: string; checkInTo?: string; checkOutBy?: string; accessInfo?: string; services?: string[] }
@@ -175,7 +213,7 @@ async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: 
       let threads: Record<string, Msg[]> = {};
       try { threads = JSON.parse(blob[THREADS_KEY] || "{}"); } catch { threads = {}; }
       const list = threads[info.threadKey] ?? [];
-      threads[info.threadKey] = [...list, { id: randomUUID(), dir: "out", text: outcome.result.reply, ts: Date.now(), via: "🤖 Concierge AI" }];
+      threads[info.threadKey] = [...list, { id: randomUUID(), dir: "out", text: outcome.result.reply, ts: Date.now(), via: "🤖 Concierge AI", ...(sent.id ? { wid: sent.id, st: "sent" as const } : {}) }];
       blob[THREADS_KEY] = JSON.stringify(threads);
 
       let write = admin.from("app_state").update({ data: blob, updated_at: new Date().toISOString() }).eq("user_id", tenantId);
@@ -194,7 +232,7 @@ export async function POST(req: Request) {
   if (!sbUrl || !service) return NextResponse.json({ ok: true });
   const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  const body = await req.json().catch(() => null) as { entry?: { changes?: { value?: { metadata?: { phone_number_id?: string }; messages?: WaMessage[] } }[] }[] } | null;
+  const body = await req.json().catch(() => null) as { entry?: { changes?: { value?: { metadata?: { phone_number_id?: string }; messages?: WaMessage[]; statuses?: WaStatus[] } }[] }[] } | null;
 
   try {
     for (const entry of body?.entry ?? []) {
@@ -202,12 +240,15 @@ export async function POST(req: Request) {
         const value = change.value;
         const phoneNumberId = value?.metadata?.phone_number_id;
         const messages = value?.messages ?? [];
-        if (!phoneNumberId || !messages.length) continue;
+        const statuses = value?.statuses ?? [];
+        if (!phoneNumberId || (!messages.length && !statuses.length)) continue;
 
         const { data: creds } = await admin.from("provider_credentials").select("tenant_id, config").eq("provider", "whatsapp");
         const match = (creds ?? []).find((c) => (c.config as Record<string, unknown> | null)?.phone_id === phoneNumberId);
         if (!match) continue; // numero non collegato a nessun tenant Xenora
         const tenantId = match.tenant_id as string;
+
+        if (statuses.length) await applyStatuses(admin, tenantId, statuses); // spunte di consegna/lettura
 
         for (const m of messages) {
           const fromDigits = (m.from || "").replace(/\D/g, "");

@@ -40,7 +40,8 @@ declare global {
 }
 
 
-interface Msg { id: string; dir: "out" | "in"; text: string; ts: number; via?: string }
+// wid = id del messaggio su WhatsApp; st = stato di consegna (sent ✓, delivered ✓✓, read ✓✓ blu, failed).
+interface Msg { id: string; dir: "out" | "in"; text: string; ts: number; via?: string; wid?: string; st?: "sent" | "delivered" | "read" | "failed" }
 type Threads = Record<string, Msg[]>;
 const KEY = "spigolestay:threads:v1";
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()));
@@ -222,8 +223,10 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       .catch(() => {});
   }, [chxBookingId, sel]);
 
-  const addTo = (gid: string, dir: "out" | "in", text: string, via?: string) => { if (!text.trim()) return; setThreads((tt) => ({ ...tt, [gid]: [...(tt[gid] ?? []), { id: uid(), dir, text: text.trim(), ts: Date.now(), via }] })); playSound(dir === "out" ? "sent" : "received"); };
-  const add = (dir: "out" | "in", text: string, via?: string) => { if (sel) addTo(sel, dir, text, via); };
+  const addTo = (gid: string, dir: "out" | "in", text: string, via?: string): string | undefined => { if (!text.trim()) return undefined; const id = uid(); setThreads((tt) => ({ ...tt, [gid]: [...(tt[gid] ?? []), { id, dir, text: text.trim(), ts: Date.now(), via }] })); playSound(dir === "out" ? "sent" : "received"); return id; };
+  const add = (dir: "out" | "in", text: string, via?: string) => (sel ? addTo(sel, dir, text, via) : undefined);
+  // Collega a un messaggio in uscita l'id WhatsApp (wamid): serve per le spunte di consegna/lettura.
+  const markSent = (gid: string, id: string, wid: string) => setThreads((tt) => ({ ...tt, [gid]: (tt[gid] ?? []).map((m) => (m.id === id ? { ...m, wid, st: m.st ?? "sent" } : m)) }));
 
   // Collegamento WhatsApp Cloud API: se attivo, invio reale dall'app.
   const [wa, setWa] = useState({ connected: false, phoneId: "" });
@@ -231,7 +234,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const [waBusy, setWaBusy] = useState("");
   const waOn = wa.connected;
   useEffect(() => { apiPost<{ connected: boolean; phoneId: string }>("whatsapp/settings", { action: "status" }).then((r) => setWa({ connected: !!r.connected, phoneId: r.phoneId || "" })).catch(() => {}); }, []);
-  const waSendReal = async (to: string, text: string) => { try { const r = await apiPost<{ ok: boolean }>("whatsapp/send", { to, text }); return !!r.ok; } catch { return false; } };
+  const waSendReal = async (to: string, text: string): Promise<{ ok: boolean; id?: string }> => { try { const r = await apiPost<{ ok: boolean; id?: string }>("whatsapp/send", { to, text }); return { ok: !!r.ok, id: r.id }; } catch { return { ok: false }; } };
   const waSave = async () => {
     setWaBusy("save");
     try { const r = await apiPost<{ ok: boolean; message?: string }>("whatsapp/settings", { action: "save", token: waTok || undefined, phoneId: wa.phoneId }); window.alert(r.message || "Salvato"); setWaTok(""); const st = await apiPost<{ connected: boolean; phoneId: string }>("whatsapp/settings", { action: "status" }); setWa({ connected: !!st.connected, phoneId: st.phoneId || "" }); }
@@ -309,8 +312,11 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const digits = (current?.phone ?? "").replace(/\D/g, "");
   const sendWa = async () => {
     if (!draft.trim()) return;
-    const text = draft; add("out", text, "WhatsApp"); setDraft("");
-    if (waOn && digits && await waSendReal(digits, text)) return; // inviato via Cloud API
+    const text = draft; const gid = sel; const mid = add("out", text, "WhatsApp"); setDraft("");
+    if (waOn && digits) {
+      const r = await waSendReal(digits, text);
+      if (r.ok) { if (gid && mid && r.id) markSent(gid, mid, r.id); return; } // inviato via Cloud API
+    }
     if (digits) window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
   };
   const sendMail = async () => {
@@ -460,8 +466,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     const dg = (x.g.phone ?? "").replace(/\D/g, "");
     // WhatsApp collegato + numero → invio reale; email → invio reale via server (Resend), non bozza mailto.
     let sentReal = false;
+    let wid: string | undefined;
     if (l.kind === "wa") {
-      sentReal = !!(waOn && dg && await waSendReal(dg, body));
+      if (waOn && dg) { const r = await waSendReal(dg, body); sentReal = r.ok; wid = r.id; }
     } else if (l.kind === "email" && x.g.email) {
       const st = getStructure(x.b.structureId);
       try {
@@ -470,7 +477,8 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       } catch { sentReal = false; }
     }
     if (!sentReal) window.open(l.href, "_blank", "noopener"); // fallback: apre wa.me/mailto se l'invio reale non è possibile
-    addTo(x.g.id, "out", body, l.kind === "wa" ? "WhatsApp" : "Email");
+    const mid = addTo(x.g.id, "out", body, l.kind === "wa" ? "WhatsApp" : "Email");
+    if (mid && wid) markSent(x.g.id, mid, wid);
     saveSent([{ key: sentKey(x), guest: x.g.fullName, tpl: x.tpl.name, via: l.kind === "wa" ? "WhatsApp" : "Email", ts: Date.now() }, ...sent.filter((s) => s.key !== sentKey(x))].slice(0, 200));
   };
   // "Invia oggi" copre oggi + gli arretrati non ancora inviati (finestra di recupero).
@@ -674,7 +682,13 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                           <div className="whitespace-pre-wrap break-words">{m.text}</div>
                           <LinkPreview text={m.text} />
                         </div>
-                        {groupEnd && <div className="mt-1 px-1 text-[10px] text-faint">{hhmm}{m.via ? ` · ${m.via}` : ""}</div>}
+                        {groupEnd && <div className="mt-1 px-1 text-[10px] text-faint">{hhmm}{m.via ? ` · ${m.via}` : ""}{out && m.st && (
+                          <span
+                            className="ml-1 font-bold"
+                            style={{ color: m.st === "read" ? "#34B7F1" : m.st === "failed" ? "var(--err)" : "var(--faint)" }}
+                            title={m.st === "sent" ? t("Inviato") : m.st === "delivered" ? t("Consegnato") : m.st === "read" ? t("Letto") : t("Non consegnato")}
+                          >{m.st === "sent" ? "✓" : m.st === "failed" ? "⚠" : "✓✓"}</span>
+                        )}</div>}
                       </div>
                     </div>
                   </div>
