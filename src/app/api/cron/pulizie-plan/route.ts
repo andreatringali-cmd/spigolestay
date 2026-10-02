@@ -81,7 +81,10 @@ export async function GET(req: Request) {
       try { cfg = { enabled: false, time: "08:00", email: false, emailTo: "", whatsapp: false, whatsappTo: "", ...(JSON.parse(blob[CFG_PREFIX + structureId] || "{}") as Partial<AutoShareCfg>) }; } catch { continue; }
       if (!cfg.enabled || (!cfg.email && !cfg.whatsapp)) continue;
       configured++;
-      if (nowSlot < (cfg.time || "08:00")) continue; // non ancora arrivato l'orario scelto
+      // Il cron gira UNA volta al giorno (piano Hobby, precisione oraria): tolleranza di 60 minuti, così
+      // un orario scelto alle 08:00 parte anche se Vercel lo esegue alle 07:xx (ora solare) e non salta mai la giornata.
+      const toMin = (hm: string) => { const [h, m] = hm.split(":").map(Number); return (h || 0) * 60 + (m || 0); };
+      if (toMin(nowSlot) < toMin(cfg.time || "08:00") - 60) continue; // troppo presto rispetto all'orario scelto
       matched++;
 
       // Claim anti-duplicato: una sola riga per tenant+struttura+giorno; se già presente, salta.
