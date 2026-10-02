@@ -77,9 +77,11 @@ export default function DocumentiPage() {
 
   // Nuovo documento VUOTO: la prenotazione si collega dopo dalla scheda.
   const createNew = async () => {
-    setCreating(true);
+    // Con "Tutte" non indovino la struttura: se ce n'è più di una chiedo di sceglierla in alto a destra.
+    const structureId = activeStructureId !== "all" ? activeStructureId : structures.length === 1 ? structures[0].id : undefined;
+    if (!structureId) { setErr("Seleziona prima una struttura in alto a destra per creare un nuovo documento."); return; }
+    setCreating(true); setErr("");
     try {
-      const structureId = activeStructureId !== "all" ? activeStructureId : structures[0]?.id;
       const r = await apiPost<{ documentId: string }>("invoicing/new", { structureId });
       router.push(`/documenti/${r.documentId}`);
     } catch (e) { setErr(e instanceof Error ? e.message : "Errore"); setCreating(false); }

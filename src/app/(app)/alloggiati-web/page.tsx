@@ -143,7 +143,7 @@ export default function AlloggiatiWebPage() {
 
   return (
     <div>
-      <PageHeader title="Alloggiati Web" subtitle="Schedine ospiti alla Questura (Portale Alloggiati)"
+      <PageHeader title="Alloggiati Web" subtitle={`Schedine ospiti alla Questura (Portale Alloggiati) · Struttura: ${structures.find((x) => x.id === sid)?.name ?? "—"}`}
         actions={structures.length > 1 && activeStructureId === "all" ? <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt">{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select> : undefined} />
 
       {/* Card riepilogo in alto */}

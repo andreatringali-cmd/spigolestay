@@ -17,7 +17,7 @@ import { useAccess } from "@/lib/access";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { CO_LEVELS, coManagerPerms, levelOf, type CoLevel } from "@/lib/comanager";
-import { loadDeposit, saveDeposit, type DepositCfg } from "@/lib/deposit";
+import { loadDeposit, type DepositCfg } from "@/lib/deposit";
 
 function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
   return (
@@ -220,10 +220,16 @@ export default function StrutturaSchedaPage() {
     });
   }, [isNew, user, authUser]);
 
-  // Acconto richiesto (VOCE UNICA per tutte le strutture, non per-struttura).
-  const [deposit, setDepositState] = useState<DepositCfg>({ on: true, pct: 30 });
-  useEffect(() => { setDepositState(loadDeposit()); }, []);
-  const updateDeposit = (patch: Partial<DepositCfg>) => setDepositState((p) => { const n = { ...p, ...patch }; saveDeposit(n); return n; });
+  // Acconto richiesto: PER STRUTTURA (Structure.depositPct, salvato con la scheda). Finché la struttura
+  // non ne ha uno proprio si mostra la vecchia voce globale come valore di partenza.
+  const [globalDeposit, setGlobalDeposit] = useState<DepositCfg>({ on: true, pct: 30 });
+  useEffect(() => { setGlobalDeposit(loadDeposit()); }, []);
+  const deposit: DepositCfg = typeof f.depositPct === "number" ? { on: f.depositPct > 0, pct: f.depositPct } : globalDeposit;
+  const updateDeposit = (patch: Partial<DepositCfg>) => {
+    // min 1: per spegnere l'acconto si usa l'interruttore
+    if (patch.pct !== undefined) { set("depositPct", Math.max(1, Math.min(100, Math.round(patch.pct || 0)))); return; }
+    if (patch.on !== undefined) set("depositPct", patch.on ? (deposit.pct || globalDeposit.pct || 30) : 0);
+  };
 
   const groups = Array.from(new Set(structures.map((s) => s.groupName)));
   const toggleArr = (k: "services" | "payMethods", x: string) => setF((p) => { const cur = p[k] ?? []; return { ...p, [k]: cur.includes(x) ? cur.filter((y) => y !== x) : [...cur, x] }; });
@@ -587,7 +593,7 @@ export default function StrutturaSchedaPage() {
                   <span className="flex items-center gap-1"><input type="number" min={0} max={100} value={deposit.pct} onChange={(e) => updateDeposit({ pct: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} className={`${inp} w-20`} /><span className="text-dim">%</span></span>
                 </div>
               )}
-              <p className="mt-1.5 text-[11px] text-faint">{t("Voce unica: vale per tutte le strutture. Mostrata all'ospite alla prenotazione diretta.")}</p>
+              <p className="mt-1.5 text-[11px] text-faint">{t("Vale solo per questa struttura (si salva con la scheda). Mostrata all'ospite alla prenotazione diretta.")}</p>
             </div>
             <div className="mb-2 rounded-lg border border-line bg-paper p-2.5">
               <div className="flex items-center justify-between gap-2">

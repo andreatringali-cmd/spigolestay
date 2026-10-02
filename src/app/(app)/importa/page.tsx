@@ -69,7 +69,8 @@ export default function ImportaPage() {
 
   // Prenotazioni importate in precedenza (qualsiasi import, CSV o ICS, tagga sempre la nota
   // con "Importato da …"): permette di ANNULLARLE in un click, senza cercarle a mano.
-  const importedBookings = useMemo(() => bookings.filter((b) => (b.note || "").includes("Importato da")), [bookings]);
+  // Solo quelle della struttura scelta qui sopra: l'annullamento non tocca gli import delle altre strutture.
+  const importedBookings = useMemo(() => bookings.filter((b) => b.structureId === structureId && (b.note || "").includes("Importato da")), [bookings, structureId]);
   const undoImport = () => { importedBookings.forEach((b) => deleteBooking(b.id)); setConfirmUndo(false); };
 
   const icsRooms = useMemo(() => { const set = new Set<string>(); events.forEach((e) => { if (e.room) set.add(e.room.trim()); }); return [...set]; }, [events]);
@@ -97,6 +98,9 @@ export default function ImportaPage() {
   // Segui il selettore struttura globale (in alto a destra): se è selezionata una struttura
   // specifica, non ha senso farne scegliere un'altra qui dentro.
   useEffect(() => { if (activeStructureId !== "all") setStructureId(activeStructureId); }, [activeStructureId]);
+
+  // Cambiando struttura, le mappature camere (che puntano a camere/tipologie della struttura precedente) si azzerano.
+  useEffect(() => { setTargetUnit(""); setRoomMap({}); setUnitMap({}); setUnitMapType({}); }, [structureId]);
 
   const headers = rows[0] ?? [];
   const dataRows = useMemo(() => rows.slice(1).filter((r) => r.some((c) => (c || "").trim())), [rows]);
@@ -305,7 +309,7 @@ export default function ImportaPage() {
         <Card className="mb-4 border-[color:var(--warn)]/40 bg-[color:color-mix(in_srgb,var(--warn)_8%,transparent)]">
           <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-txt">{importedBookings.length} {t("prenotazioni importate in precedenza")}</div>
+              <div className="text-sm font-semibold text-txt">{importedBookings.length} {t("prenotazioni importate in precedenza")}{structures.length > 1 ? ` · ${structures.find((x) => x.id === structureId)?.name ?? ""}` : ""}</div>
               <div className="text-xs text-dim">{t("Se qualcosa non va, puoi eliminarle tutte in un click e ripartire da capo.")}</div>
             </div>
             <button onClick={() => setConfirmUndo(true)} className="shrink-0 rounded-lg border border-[color:var(--err)] px-3 py-2 text-sm font-semibold text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_10%,transparent)]">{t("Elimina l'importazione")}</button>

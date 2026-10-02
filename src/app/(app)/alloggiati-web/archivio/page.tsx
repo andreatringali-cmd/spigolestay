@@ -76,7 +76,7 @@ export default function AlloggiatiArchivioPage() {
 
   return (
     <div>
-      <PageHeader title="Archivio ricevute · Questura" subtitle="Storico degli invii alla Questura: riscarica o stampa la ricevuta in qualsiasi momento"
+      <PageHeader title="Archivio ricevute · Questura" subtitle={`Storico degli invii alla Questura: riscarica o stampa la ricevuta in qualsiasi momento · Struttura: ${structures.find((x) => x.id === sid)?.name ?? "—"}`}
         actions={<Link href="/alloggiati-web" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← Torna alle schedine</Link>} />
 
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">

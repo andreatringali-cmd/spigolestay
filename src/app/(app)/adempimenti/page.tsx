@@ -10,7 +10,7 @@ import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 import { centsEur, apiPost } from "@/lib/invoicing/client";
 import { shortenLink } from "@/lib/guestlink";
-import { cityTaxTotal, DEFAULT_CITY_TAX_RULES } from "@/lib/citytax";
+import { cityTaxTotalByStructure } from "@/lib/citytax";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Booking, Guest, Structure } from "@/lib/types";
 
@@ -146,14 +146,20 @@ function ArrivalRow({ b, g, st, origin, waOn, showStruct, rooms, expected: expec
 
 export default function AdempimentiPage() {
   const router = useRouter();
-  const { bookings, structures, getGuest, getStructure, activeStructureId } = useData();
+  const { bookings: allBookings, structures, getGuest, getStructure, activeStructureId } = useData();
+  // Tutto ciò che segue lavora SOLO sulla struttura selezionata in alto a destra ("Tutte" = nessun filtro).
+  const inScope = useCallback((sid: string | null | undefined) => activeStructureId === "all" || sid === activeStructureId, [activeStructureId]);
+  const bookings = useMemo(() => (activeStructureId === "all" ? allBookings : allBookings.filter((b) => b.structureId === activeStructureId)), [allBookings, activeStructureId]);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const showStruct = activeStructureId === "all"; // se una struttura è già selezionata in alto, non ripeto il nome
   const bkNo = (b: Booking) => b.code || b.id.slice(0, 6).toUpperCase();       // numero prenotazione
   const structPart = (structureId: string) => (showStruct ? ` · ${getStructure(structureId)?.name ?? ""}` : "");
-  const [sched, setSched] = useState<{ id: string; arrival: string; stato: string; booking_id: string | null; guest: { cognome?: string; nome?: string } | null; structure_id: string | null }[]>([]);
-  const [istat, setIstat] = useState<{ id: string; arrival: string; stato: string; booking_id: string | null; structure_id: string | null }[]>([]);
-  const [docs, setDocs] = useState<{ id: string; number_label: string | null; stato: string; total_cents: number; counterpart: { name?: string } | null }[]>([]);
+  const [schedAll, setSched] = useState<{ id: string; arrival: string; stato: string; booking_id: string | null; guest: { cognome?: string; nome?: string } | null; structure_id: string | null }[]>([]);
+  const [istatAll, setIstat] = useState<{ id: string; arrival: string; stato: string; booking_id: string | null; structure_id: string | null }[]>([]);
+  const [docsAll, setDocs] = useState<{ id: string; structure_id: string | null; number_label: string | null; stato: string; total_cents: number; counterpart: { name?: string } | null }[]>([]);
+  const sched = useMemo(() => schedAll.filter((s) => inScope(s.structure_id)), [schedAll, inScope]);
+  const istat = useMemo(() => istatAll.filter((s) => inScope(s.structure_id)), [istatAll, inScope]);
+  const docs = useMemo(() => docsAll.filter((d) => inScope(d.structure_id)), [docsAll, inScope]);
   const [pays, setPays] = useState<{ document_id: string; amount_cents: number }[]>([]);
   const [passive, setPassive] = useState<{ id: string; supplier_name: string | null; due_date: string | null; total_cents: number; paid: boolean }[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -168,12 +174,12 @@ export default function AdempimentiPage() {
     const [a, i, d, p, pv] = await Promise.all([
       supabase.from("alloggiati_schedine").select("id, arrival, stato, booking_id, guest, structure_id"),
       supabase.from("istat_rows").select("id, arrival, stato, booking_id, structure_id").in("stato", ["pending", "sent"]),
-      supabase.from("documents").select("id, number_label, stato, total_cents, counterpart").in("stato", ["scartata", "emessa", "inviata_intermediario", "consegnata"]),
+      supabase.from("documents").select("id, structure_id, number_label, stato, total_cents, counterpart").in("stato", ["scartata", "emessa", "inviata_intermediario", "consegnata"]),
       supabase.from("document_payments").select("document_id, amount_cents"),
       supabase.from("purchase_documents").select("id, supplier_name, due_date, total_cents, paid"),
     ]);
-    setSched((a.data ?? []) as typeof sched); setIstat((i.data ?? []) as typeof istat);
-    setDocs((d.data ?? []) as typeof docs); setPays((p.data ?? []) as typeof pays);
+    setSched((a.data ?? []) as typeof schedAll); setIstat((i.data ?? []) as typeof istatAll);
+    setDocs((d.data ?? []) as typeof docsAll); setPays((p.data ?? []) as typeof pays);
     setPassive((pv.data ?? []) as typeof passive);
   }, []);
   useEffect(() => { loadData(); }, [loadData]);
@@ -192,7 +198,8 @@ export default function AdempimentiPage() {
   const transferToSchedine = async () => {
     setSyncing(true); setSyncMsg("");
     try {
-      await apiPost<{ count?: number }>("alloggiati/sync", {});
+      // Solo la struttura selezionata (con "Tutte" il server sincronizza tutte le strutture).
+      await apiPost<{ count?: number }>("alloggiati/sync", activeStructureId !== "all" ? { structureId: activeStructureId } : {});
       await loadData();
       setSyncMsg("✓ Schedine aggiornate. Vedi «Pronte da inviare» qui a fianco.");
     } catch (e) { setSyncMsg(e instanceof Error ? e.message : "Errore nel trasferimento."); }
@@ -204,7 +211,7 @@ export default function AdempimentiPage() {
   const transferToIstat = async () => {
     setSyncingIstat(true); setIstatMsg("");
     try {
-      const r = await apiPost<{ count?: number }>("istat/sync", {});
+      const r = await apiPost<{ count?: number }>("istat/sync", activeStructureId !== "all" ? { structureId: activeStructureId } : {});
       await loadData();
       setIstatMsg(`✓ Movimenti ISTAT generati${typeof r?.count === "number" ? `: ${r.count}` : ""}.`);
     } catch (e) { setIstatMsg(e instanceof Error ? e.message : "Errore nella generazione."); }
@@ -231,11 +238,12 @@ export default function AdempimentiPage() {
     const p2 = (n: number) => String(n).padStart(2, "0");
     const start = `${y}-${p2(startM + 1)}-01`;
     const end = startM + 3 >= 12 ? `${y + 1}-01-01` : `${y}-${p2(startM + 4)}-01`;
-    const inScope = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId) && b.checkIn >= start && b.checkIn < end);
-    const { total, count } = cityTaxTotal(inScope, DEFAULT_CITY_TAX_RULES);
+    const taxBookings = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.checkIn >= start && b.checkIn < end); // bookings è già limitato alla struttura attiva
+    // Ogni soggiorno è calcolato con le regole della SUA struttura (Strutture → Tassa di soggiorno).
+    const { total, count } = cityTaxTotalByStructure(taxBookings, getStructure);
     return {
       key: "tassa", label: "Tassa di soggiorno", status: count > 0 ? "fatto" : "niente", count,
-      detail: count > 0 ? `Imposta stimata ${eur(total)} su ${count} ${count === 1 ? "soggiorno" : "soggiorni"} (trimestre in corso, regole Siracusa).` : "Nessun soggiorno da tassare nel periodo.",
+      detail: count > 0 ? `Imposta stimata ${eur(total)} su ${count} ${count === 1 ? "soggiorno" : "soggiorni"} (trimestre in corso, regole della struttura).` : "Nessun soggiorno da tassare nel periodo.",
     };
   };
 

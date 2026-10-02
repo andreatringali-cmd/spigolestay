@@ -48,12 +48,16 @@ export default function ChiusuraCassaPage() {
   const scope = activeStructureId !== "all" ? activeStructureId : struct;
   const scopeName = scope === "all" ? "Tutte le strutture" : getStructure(scope)?.name ?? "—";
 
+  // Chiusure recenti: con una struttura nello scope si vedono solo le sue (con "Tutte" tutte).
   const loadClosures = async () => {
     if (!supabase) return;
-    const { data } = await supabase.from("cash_closures").select("id, day, conto, structure_id, expected_cents, counted_cents, diff_cents, note").order("day", { ascending: false }).limit(40);
+    let q = supabase.from("cash_closures").select("id, day, conto, structure_id, expected_cents, counted_cents, diff_cents, note");
+    if (scope !== "all") q = q.eq("structure_id", scope);
+    const { data } = await q.order("day", { ascending: false }).limit(40);
     setClosures((data ?? []) as Closure[]);
   };
-  useEffect(() => { loadClosures(); }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadClosures(); }, [scope]);
 
   // Composizione movimenti (come Prima Nota) nello scope struttura scelto.
   const all = useMemo<Mov[]>(() => {
@@ -89,7 +93,7 @@ export default function ChiusuraCassaPage() {
     body.push(["", "", "Uscite", "", -uscite]);
     body.push(["", "", "Saldo teorico", "", expected]);
     if (counted !== "") { body.push(["", "", "Contato", "", numv(counted)]); body.push(["", "", "Differenza", "", diff]); }
-    exportExcel(`chiusura-cassa-${day}-${scope}`, headers, body);
+    exportExcel(`chiusura-cassa-${day}-${scope === "all" ? "tutte" : scopeName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`, headers, body);
   };
 
   const printClose = () => {

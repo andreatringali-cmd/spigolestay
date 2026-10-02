@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { nights } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
-import { cityTaxForBooking } from "@/lib/citytax";
+import { cityTaxForBooking, cityTaxRulesOf, DEFAULT_CITY_TAX_RULES } from "@/lib/citytax";
 
 const MONTHS = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -15,18 +15,43 @@ export default function TassaSoggiornoPage() {
   const { t } = useLang();
   const { bookings, guests, structures, getStructure, activeStructureId } = useData();
 
-  // Regole (Comune di Siracusa): a Siracusa la tassa è in % del pernottamento con tetto € a persona/notte.
-  const [taxMode, setTaxMode] = useState<"percentuale" | "fisso">("percentuale");
-  const [amount, setAmount] = useState(2);   // € per persona/notte (modalità fisso)
-  const [pct, setPct] = useState(4);         // % del pernottamento (modalità percentuale)
-  const [cap, setCap] = useState(5);         // tetto massimo € per persona/notte
-  const [maxNights, setMaxNights] = useState(7);
-  const [childrenExempt, setChildrenExempt] = useState(true);
-  const [exemptAge, setExemptAge] = useState(14); // esenti sotto questa età (Siracusa: under 14)
+  // Regole: con UNA struttura selezionata partono dalla sua configurazione (Strutture → Tassa di
+  // soggiorno) e si possono ritoccare qui per una simulazione; con "Tutte" ogni prenotazione usa
+  // le regole della propria struttura (sola lettura).
+  const activeSt = activeStructureId === "all" ? undefined : getStructure(activeStructureId);
+  const stRules = cityTaxRulesOf(activeSt);
+  const base = stRules ?? DEFAULT_CITY_TAX_RULES;
+  const [taxMode, setTaxMode] = useState<"percentuale" | "fisso">(base.taxMode);
+  const [amount, setAmount] = useState(base.amount);   // € per persona/notte (modalità fisso)
+  const [pct, setPct] = useState(base.pct);            // % del pernottamento (modalità percentuale)
+  const [cap, setCap] = useState(base.cap);            // tetto massimo € per persona/notte (0 = nessun tetto)
+  const [maxNights, setMaxNights] = useState(base.maxNights);
+  const [childrenExempt, setChildrenExempt] = useState(base.childrenExempt);
+  const [exemptAge, setExemptAge] = useState(base.exemptAge); // esenti sotto questa età
+  const rulesSig = JSON.stringify(stRules);
+  useEffect(() => {
+    const r = stRules ?? DEFAULT_CITY_TAX_RULES;
+    setTaxMode(r.taxMode); setAmount(r.amount); setPct(r.pct); setCap(r.cap); setMaxNights(r.maxNights); setChildrenExempt(r.childrenExempt); setExemptAge(r.exemptAge);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStructureId, rulesSig]);
+  const single = activeStructureId !== "all";
+  const taxOn = single ? !!activeSt?.cityTax : structures.some((s) => !!s.cityTax);
+  // Comune: della struttura selezionata; con "Tutte" l'elenco dei comuni configurati.
+  const comune = single
+    ? (activeSt?.cityTaxComune?.trim() || "")
+    : [...new Set(structures.filter((s) => s.cityTax).map((s) => s.cityTaxComune?.trim()).filter(Boolean) as string[])].join(", ");
+  const comuneLabel = comune || t("comune non indicato");
 
   // Periodo
   const [mode, setMode] = useState<"mese" | "trimestre">("trimestre");
   const [year, setYear] = useState(new Date().getFullYear());
+  // Anni selezionabili: anno corrente ±1 più gli anni delle prenotazioni.
+  const years = useMemo(() => {
+    const cur = new Date().getFullYear();
+    const ys = new Set<number>([cur - 1, cur, cur + 1, year]);
+    bookings.forEach((b) => { const y = Number(b.checkIn.slice(0, 4)); if (y >= 2000) ys.add(y); });
+    return [...ys].sort((a, b) => a - b);
+  }, [bookings, year]);
   const [month, setMonth] = useState(new Date().getMonth()); // 0-11
   const [quarter, setQuarter] = useState(Math.floor(new Date().getMonth() / 3) + 1); // 1-4
 
@@ -50,10 +75,13 @@ export default function TassaSoggiornoPage() {
     (b) => b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId) && b.checkIn >= start && b.checkIn < end
   );
 
-  const rows = inPeriod.map((b) => {
+  const rows = inPeriod.flatMap((b) => {
     // Logica unica in @/lib/citytax (condivisa con "Elabora tutto" degli Adempimenti).
-    const { persons, taxable, tax } = cityTaxForBooking(b, { taxMode, amount, pct, cap, maxNights, childrenExempt, exemptAge });
-    return { b, persons, taxable, tax };
+    // Struttura selezionata: regole mostrate sotto (modificabili); "Tutte": regole della struttura della prenotazione.
+    const rules = single ? { taxMode, amount, pct, cap, maxNights, childrenExempt, exemptAge } : cityTaxRulesOf(getStructure(b.structureId));
+    if (!rules || (single && !taxOn)) return []; // struttura senza tassa di soggiorno attiva
+    const { persons, taxable, tax } = cityTaxForBooking(b, rules);
+    return [{ b, persons, taxable, tax }];
   });
   const total = rows.reduce((a, r) => a + r.tax, 0);
 
@@ -92,17 +120,17 @@ export default function TassaSoggiornoPage() {
       tr.tot td{border-top:2px solid #1f2127;font-weight:700;font-size:16px}
       .meta{color:#5f6067;font-size:13px;margin:2px 0}
     </style></head><body>
-      <div class="head"><div class="brand">Xenora</div><div class="meta">${struttura} · Siracusa</div></div>
+      <div class="head"><div class="brand">Xenora</div><div class="meta">${struttura}${comune ? " · " + comune : ""}</div></div>
       <h1>Dichiarazione imposta di soggiorno</h1>
-      <div class="meta">Periodo: <b>${label}</b> — Comune di Siracusa</div>
+      <div class="meta">Periodo: <b>${label}</b>${comune ? " — Comune di " + comune : ""}</div>
       <table>
         <tr><th>Voce</th><th class="n">Valore</th></tr>
         <tr><td>Pernottamenti soggetti a imposta</td><td class="n">${totNotti}</td></tr>
         <tr><td>Persone paganti</td><td class="n">${totPax}</td></tr>
-        <tr><td>Tariffa applicata</td><td class="n">${taxMode === "percentuale" ? `${pct}% del pernottamento · max ${money(cap)}/persona/notte` : `${money(amount)} / persona / notte`}</td></tr>
+        <tr><td>Tariffa applicata</td><td class="n">${!single ? "secondo le regole di ciascuna struttura" : taxMode === "percentuale" ? `${pct}% del pernottamento${cap > 0 ? ` · max ${money(cap)}/persona/notte` : ""}` : `${money(amount)} / persona / notte`}</td></tr>
         <tr class="tot"><td>Totale imposta da versare</td><td class="n">${money(total)}</td></tr>
       </table>
-      <p class="meta" style="margin-top:28px">Regole applicate: max ${maxNights} notti per soggiorno${childrenExempt ? ", minori esenti" : ""}. Documento riepilogativo non ufficiale generato da Xenora.</p>
+      <p class="meta" style="margin-top:28px">Regole applicate: ${single ? `max ${maxNights} notti per soggiorno${childrenExempt ? ", minori esenti" : ""}` : "quelle configurate per ciascuna struttura"}. Documento riepilogativo non ufficiale generato da Xenora.</p>
       <script>window.onload=function(){window.print()}<\/script>
     </body></html>`);
     w.document.close();
@@ -148,7 +176,7 @@ export default function TassaSoggiornoPage() {
           ) : (
             <label className="text-xs text-dim">{t("Trimestre")}<select value={quarter} onChange={(e) => setQuarter(Number(e.target.value))} className={sel}>{[1, 2, 3, 4].map((q) => (<option key={q} value={q}>{q}º {t("trimestre")}</option>))}</select></label>
           )}
-          <label className="text-xs text-dim">{t("Anno")}<select value={year} onChange={(e) => setYear(Number(e.target.value))} className={sel}>{[2025, 2026, 2027].map((y) => (<option key={y} value={y}>{y}</option>))}</select></label>
+          <label className="text-xs text-dim">{t("Anno")}<select value={year} onChange={(e) => setYear(Number(e.target.value))} className={sel}>{years.map((y) => (<option key={y} value={y}>{y}</option>))}</select></label>
           <div className="ml-auto text-right">
             <div className="text-xs text-dim">{t("Imposta da versare")} · {label}</div>
             <div className="font-mono text-2xl font-bold text-txt">{eur(total)}</div>
@@ -158,7 +186,10 @@ export default function TassaSoggiornoPage() {
 
       {/* Regole */}
       <Card className="mb-5">
-        <SectionTitle>{t("Regole (Comune di Siracusa)")}</SectionTitle>
+        <SectionTitle>{t("Regole")} ({comuneLabel})</SectionTitle>
+        {!single && <p className="mb-2 text-xs text-dim">{t("Con «Tutte le strutture» ogni soggiorno è calcolato con le regole della propria struttura (Strutture → Tassa di soggiorno). Seleziona una struttura in alto a destra per vederle e simularne di diverse.")}</p>}
+        {single && !taxOn && <p className="mb-2 text-xs text-[color:var(--warn)]">{t("Tassa di soggiorno non attiva per questa struttura: attivala in Strutture per calcolarla.")}</p>}
+        <div className={single ? "" : "pointer-events-none opacity-50"}>
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex items-center rounded-lg border border-line p-0.5">
             <Toggle active={taxMode === "percentuale"} onClick={() => setTaxMode("percentuale")}>{t("Percentuale")}</Toggle>
@@ -179,7 +210,8 @@ export default function TassaSoggiornoPage() {
             {t("Minori esenti (senza età)")}
           </label>
         </div>
-        {taxMode === "percentuale" && <p className="mt-2 text-[11px] text-faint">{t("Siracusa: (prezzo camera ÷ ospiti) × 4%, tetto 5 €/persona/notte, max 7 notti consecutive. Esenti: bambini under 14 e over 80. Dichiarazione e versamento entro il 16 del mese successivo sul portale del Comune.")}</p>}
+        {taxMode === "percentuale" && <p className="mt-2 text-[11px] text-faint">{t("Modalità percentuale: (prezzo camera ÷ ospiti) × % indicata, con tetto a persona/notte e massimo di notti tassabili. Verifica esenzioni, dichiarazione e scadenze di versamento sul portale del Comune.")}</p>}
+        </div>
       </Card>
 
       <div className="grid gap-5 lg:grid-cols-2">

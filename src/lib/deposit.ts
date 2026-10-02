@@ -1,5 +1,6 @@
 // Acconto richiesto sulla prenotazione diretta (motore prenotazioni).
-// Voce UNICA per tutte le strutture: si decide se richiederlo e con quale percentuale.
+// Per struttura: Structure.depositPct (0 = nessun acconto). Se la struttura non ha un valore proprio
+// si usa la vecchia voce globale (fallback retro-compatibile).
 export interface DepositCfg { on: boolean; pct: number }
 
 const KEY = "spigolestay:deposit";
@@ -11,6 +12,15 @@ export function loadDeposit(): DepositCfg {
     if (r) { const d = JSON.parse(r); return { on: d.on !== false, pct: Math.max(0, Math.min(100, Number(d.pct) || 0)) }; }
   } catch {}
   return { ...DEFAULT };
+}
+
+// Acconto di una struttura: il suo depositPct se impostato, altrimenti la voce globale.
+export function depositFor(structure?: { depositPct?: number }): DepositCfg {
+  if (structure && typeof structure.depositPct === "number") {
+    const pct = Math.max(0, Math.min(100, Math.round(structure.depositPct)));
+    return { on: pct > 0, pct };
+  }
+  return loadDeposit();
 }
 
 export function saveDeposit(d: DepositCfg) {

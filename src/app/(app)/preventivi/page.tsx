@@ -6,7 +6,7 @@ import { useData } from "@/lib/store";
 import { nights, parseISO, toISO, shiftISO } from "@/lib/dates";
 import { cityTaxOf } from "@/lib/booking";
 import { eur } from "@/lib/format";
-import { loadDeposit } from "@/lib/deposit";
+import { depositFor } from "@/lib/deposit";
 import { shortenLink } from "@/lib/guestlink";
 import { supabase } from "@/lib/supabase";
 import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } from "@/lib/rate-plans";
@@ -127,8 +127,11 @@ export default function PreventiviPage() {
   const taxPersons = adults + taxKids;
   const [acconto, setAcconto] = useState<number>(50);
   const [structPct, setStructPct] = useState<number>(50); // % acconto impostata nella scheda struttura (card centrale)
-  // Predefinito dalla % acconto impostata nella scheda struttura (voce globale).
-  useEffect(() => { try { const d = loadDeposit(); const pct = Math.min(100, Math.max(0, Math.round(d.pct || 0))); setStructPct(pct || 50); setAcconto(d.on ? pct : 0); } catch {} }, []);
+  // Predefinito dalla % acconto impostata nella scheda della struttura (fallback: voce globale).
+  useEffect(() => { try { const d = depositFor(structures.find((s) => s.id === structureId)); const pct = Math.min(100, Math.max(0, Math.round(d.pct || 0))); setStructPct(pct || 50); setAcconto(d.on ? pct : 0); } catch {} // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Cambiando struttura aggiorno solo la % di riferimento della struttura (non tocco l'acconto già scelto/caricato).
+  useEffect(() => { try { const d = depositFor(structures.find((s) => s.id === structureId)); const pct = Math.min(100, Math.max(0, Math.round(d.pct || 0))); setStructPct(pct || 50); } catch {} }, [structureId, structures]);
   const [breakfast, setBreakfast] = useState(true);
   const [breakfastPrice, setBreakfastPrice] = useState(0); // € a notte (0 = inclusa)
   const [parking, setParking] = useState(true);

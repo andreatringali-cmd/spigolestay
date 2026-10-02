@@ -45,8 +45,10 @@ export function occurrences(r: Rule, fromISO: string, toISO: string): string[] {
 }
 
 // Una regola/movimento è visibile nello scope della struttura selezionata?
-export const scopeVisible = (structureId: string | undefined, active: string) =>
-  active === "all" || !structureId || structureId === "all" || structureId === active;
+// Con "Tutte" si vede tutto; con UNA struttura selezionata solo ciò che appartiene a quella
+// struttura (i movimenti "comuni", senza struttura, restano visibili solo con "Tutte").
+export const scopeVisible = (structureId: string | undefined | null, active: string) =>
+  active === "all" || structureId === active;
 
 // Movimenti automatici dalle prenotazioni (dirette → contanti, OTA → banca + commissione).
 export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, active: string): Mov[] {

@@ -115,12 +115,13 @@ export default function DocumentoPage() {
     setMsg(error ? "Errore anagrafica: " + error.message : "Intestatario salvato in anagrafica ✓");
     if (!error) loadCounterparts();
   };
-  // Se in alto è selezionata UNA struttura, il documento in bozza la eredita (menu nascosto).
+  // Se in alto è selezionata UNA struttura, il documento in bozza la eredita (menu nascosto),
+  // ma solo se non è già collegato a una prenotazione (in tal caso vale la struttura della prenotazione).
   useEffect(() => {
-    if (doc?.stato === "bozza" && activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId)) {
+    if (doc?.stato === "bozza" && !link.bookingId && activeStructureId !== "all" && structures.some((x) => x.id === activeStructureId)) {
       setStructureId((cur) => (cur === activeStructureId ? cur : activeStructureId));
     }
-  }, [doc?.stato, activeStructureId, structures]);
+  }, [doc?.stato, activeStructureId, structures, link.bookingId]);
 
   // Calcolo totali live dalle righe in editing.
   const totals = useMemo(() => {
@@ -171,11 +172,13 @@ export default function DocumentoPage() {
   };
   const bookingList = useMemo(() => {
     const term = bq.trim().toLowerCase();
-    return [...bookings].filter((b) => b.status !== "cancelled" && b.channel !== "blocked")
+    // Solo prenotazioni della struttura del documento (o, se non ancora assegnata, di quella selezionata in alto).
+    const scopeId = structureId || (activeStructureId !== "all" ? activeStructureId : "");
+    return [...bookings].filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && (!scopeId || b.structureId === scopeId))
       .sort((a, b) => (b.checkIn || "").localeCompare(a.checkIn || ""))
       .filter((b) => { if (!term) return true; return `${getGuest(b.guestId)?.fullName ?? ""} ${b.code ?? ""}`.toLowerCase().includes(term); })
       .slice(0, 40);
-  }, [bookings, bq, getGuest]);
+  }, [bookings, bq, getGuest, structureId, activeStructureId]);
 
   const saveDraft = async () => {
     if (!supabase || !user || !doc) return false;

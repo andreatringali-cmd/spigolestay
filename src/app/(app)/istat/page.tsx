@@ -143,7 +143,7 @@ export default function IstatPage() {
 
   return (
     <div>
-      <PageHeader title="ISTAT · Turist@t" subtitle="Movimento turistico verso il portale regionale"
+      <PageHeader title="ISTAT · Turist@t" subtitle={`Movimento turistico verso il portale regionale · Struttura: ${structures.find((x) => x.id === sid)?.name ?? "—"}`}
         actions={structures.length > 1 && activeStructureId === "all" ? <select value={sid} onChange={(e) => setSid(e.target.value)} className="rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt">{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select> : undefined} />
 
       {/* Chiusura giornaliera: situazione del giorno selezionato (come Turist@t) */}

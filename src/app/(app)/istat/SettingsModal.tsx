@@ -11,7 +11,7 @@ const REGIONS = ["Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagn
 
 // Finestra centrale con le impostazioni ISTAT / portale regionale (si impostano una volta).
 export default function IstatSettingsModal({ sid, onClose }: { sid: string; onClose: () => void }) {
-  const { structures } = useData();
+  const { structures, activeStructureId } = useData();
   const [msid, setMsid] = useState(sid);
   const [s, setS] = useState<Sett>(DEF);
   const [busy, setBusy] = useState("");
@@ -62,7 +62,7 @@ export default function IstatSettingsModal({ sid, onClose }: { sid: string; onCl
           <button onClick={onClose} aria-label="Chiudi" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">✕</button>
         </div>
 
-        {structures.length > 1 && (
+        {structures.length > 1 && activeStructureId === "all" && (
           <label className="block"><span className={lbl}>Struttura</span><select value={msid} onChange={(e) => setMsid(e.target.value)} className={inp}>{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
         )}
         <div className="mt-2 space-y-2">

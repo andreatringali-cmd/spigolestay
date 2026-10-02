@@ -44,7 +44,7 @@ export default function IstatArchivioPage() {
 
   return (
     <div>
-      <PageHeader title="Archivio invii ISTAT" subtitle="Storico delle chiusure giornaliere inviate all'Osservatorio Turistico"
+      <PageHeader title="Archivio invii ISTAT" subtitle={`Storico delle chiusure giornaliere inviate all'Osservatorio Turistico · Struttura: ${structures.find((x) => x.id === sid)?.name ?? "—"}`}
         actions={<Link href="/istat" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← Torna al movimento</Link>} />
 
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
