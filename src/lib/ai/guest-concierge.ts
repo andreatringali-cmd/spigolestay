@@ -96,7 +96,7 @@ Rispondi SOLO con un oggetto JSON valido, senza testo extra, con ESATTAMENTE que
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: CONCIERGE_AI_MODEL, max_tokens: 1200, messages: [{ role: "user", content: prompt }] }),
+      body: JSON.stringify({ model: CONCIERGE_AI_MODEL, max_tokens: 700, messages: [{ role: "user", content: prompt }] }),
     });
     if (!res.ok) return { ok: false, error: `http_${res.status}` };
     const j = await res.json().catch(() => null) as { content?: { type: string; text?: string }[] } | null;

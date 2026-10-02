@@ -139,6 +139,23 @@ export function renderEntry(e: ConciergeEntry, ctx: AutoCtx, lang: ConciergeLang
   };
 }
 
+const STOP = new Set(["il","lo","la","le","gli","un","una","di","a","da","in","con","su","per","tra","fra","e","o","ma","che","chi","cosa","come","dove","quando","quanto","quanti","posso","potete","puoi","c","ce","è","sono","ho","mi","ti","si","del","della","dei","delle","al","alla","nel","nella","ora","orario","the","a","an","of","to","in","on","at","for","and","or","is","are","do","does","can","i","you","we","what","where","how","when","there","your","my","me","it","be","have","please"]);
+const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+// Tiene solo le voci che parlano di ciò che l'ospite chiede (confronto sulle radici delle parole: "bagagli" ≈ "bagaglio").
+// Se nessuna voce combacia restituisce tutto: l'AI decide, un po' più lenta ma senza perdere risposte per sinonimi.
+export function selectRelevant<T extends { topic: string; answer: string }>(items: T[], question: string, max = 10): T[] {
+  const stems = Array.from(new Set(norm(question).split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !STOP.has(w)).map((w) => w.slice(0, 4))));
+  if (!stems.length) return items;
+  const scored = items.map((it) => {
+    const hay = norm(it.topic + " " + it.answer);
+    const tp = norm(it.topic);
+    let s = 0;
+    for (const st of stems) { if (tp.includes(st)) s += 3; else if (hay.includes(st)) s += 1; }
+    return { it, s };
+  }).filter((x) => x.s > 0).sort((a, b) => b.s - a.s);
+  return scored.length ? scored.slice(0, max).map((x) => x.it) : items;
+}
+
 // Testo per il concierge/WhatsApp: i bottoni diventano righe con link (WhatsApp non ha bottoni nel testo libero).
 export function toFaqItems(rendered: RenderedEntry[], lang: ConciergeLang): { topic: string; answer: string }[] {
   const t = T[lang];

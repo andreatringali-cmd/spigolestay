@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Structure } from "@/lib/types";
 import { getConciergeReply } from "@/lib/ai/guest-concierge";
-import { accessCodeOf, kbLang, renderEntry, resolveEntries, toFaqItems, SENSITIVE_CATEGORIES, type ConciergeEntry } from "@/lib/concierge-kb";
+import { accessCodeOf, kbLang, renderEntry, resolveEntries, toFaqItems, selectRelevant, SENSITIVE_CATEGORIES, type ConciergeEntry } from "@/lib/concierge-kb";
 
 // Motore unico del Concierge (solo server): lo usano sia il webhook WhatsApp sia la casella "Prova" di Xenora,
 // così le due strade danno la STESSA risposta. Unisce la base di conoscenza (concierge_entries: condiviso + struttura),
@@ -99,7 +99,7 @@ export async function conciergeAnswer(inp: EngineInput): Promise<EngineResult> {
   }
 
   const outcome = await getConciergeReply({
-    faq, hasBooking, guestName: inp.guestName, lang,
+    faq: selectRelevant(faq, inp.message), hasBooking, guestName: inp.guestName, lang,
     structureName: st.name, address: st.address, checkInFrom: st.checkInFrom, checkInTo: st.checkInTo, checkOutBy: st.checkOutBy,
     accessInfo, hasParking, transcript: inp.transcript, lastGuestMessage: inp.message,
   });

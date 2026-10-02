@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { parseNotifPrefs } from "@/lib/notifPrefs";
@@ -8,6 +8,7 @@ import { sendWhatsapp } from "@/lib/whatsapp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // le risposte AI e i tentativi sugli stati possono richiedere qualche secondo
 
 // Webhook WhatsApp Cloud API (Meta) — riceve i messaggi IN ARRIVO dagli ospiti.
 // Un solo endpoint condiviso per tutti i tenant (si registra UNA VOLTA nell'app Meta di Xenora):
@@ -165,7 +166,7 @@ async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: 
     const structureId = resolveStructureId(structures, bookingsArr, info.guest?.id, prefs.defaultStructureId);
     if (!structureId) return; // nessun contesto struttura affidabile → nessuna risposta automatica
 
-    const transcript = (info.priorMessages || []).slice(-8).filter((m) => m.text?.trim())
+    const transcript = (info.priorMessages || []).slice(-4).filter((m) => m.text?.trim())
       .map((m) => `${m.dir === "out" ? "Struttura" : "Ospite"}: ${m.text.replace(/\s+/g, " ").trim()}`).join("\n") || undefined;
 
     const result = await conciergeAnswer({
@@ -174,6 +175,7 @@ async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: 
       roomAccessRaw: info.roomAccessRaw, conciergeFaqRaw: info.conciergeFaqRaw,
       structureId, guest: info.guest, guestName: info.guestName, message: info.text, transcript,
     });
+    console.log("[concierge]", JSON.stringify({ answered: result.answered, reason: result.reason, topic: result.topic, hasBooking: result.hasBooking, lang: result.lang, q: info.text.slice(0, 60) }));
     if (!result.answered || !result.reply) return;
     const reply = result.reply;
 
@@ -250,7 +252,7 @@ export async function POST(req: Request) {
 
             // Concierge AI — SOLO per messaggi davvero nuovi (notifPrefsRaw è assente sui retry di
             // Meta/duplicati, vedi applyIncoming). Fire-and-forget: non blocca la risposta 200 al webhook.
-            tryAutoReply(admin, tenantId, {
+            after(() => tryAutoReply(admin, tenantId, {
               aiConciergeRaw: res.aiConciergeRaw as string | undefined,
               conciergeFaqRaw: res.conciergeFaqRaw as Record<string, string> | undefined,
               roomAccessRaw: res.roomAccessRaw as string | undefined,
@@ -264,7 +266,7 @@ export async function POST(req: Request) {
               roomTypes: res.roomTypes,
               threadKey: res.threadKey as string,
               priorMessages: (res.priorMessages as Msg[]) || [],
-            }).catch(() => {});
+            }).catch((e) => console.error("[whatsapp webhook concierge]", e)));
           }
         }
       }
