@@ -10,7 +10,7 @@ import { eur } from "@/lib/format";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
-import { type Promo, loadPromos, promoMailto } from "@/lib/promos";
+import { type Promo, loadPromos, promosForStructure, promoMailto } from "@/lib/promos";
 import { useEffect } from "react";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
@@ -95,7 +95,7 @@ export default function OspiteSchedaPage() {
   // Invio promo singolo
   const [promos, setPromos] = useState<Promo[]>([]);
   const [pickPromo, setPickPromo] = useState(false);
-  useEffect(() => { setPromos(loadPromos()); }, []);
+  useEffect(() => { setPromos(promosForStructure(loadPromos(), activeStructureId)); }, [activeStructureId]);
   const lastSt = stays[0] ? getStructure(stays[0].structureId) : undefined;
   const sendPromo = (p: Promo) => {
     if (g.email) { const contatti = [lastSt?.phone, lastSt?.email, lastSt?.website].filter(Boolean).join(" · "); window.open(promoMailto([g.email], p, { nome: g.firstName, struttura: lastSt?.name, contatti }), "_blank"); }

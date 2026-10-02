@@ -13,7 +13,7 @@ import { eur } from "@/lib/format";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { commissionOf } from "@/lib/booking";
 import ChannelLogo from "@/components/ChannelLogo";
-import { type Promo, loadPromos, promoMailto } from "@/lib/promos";
+import { type Promo, loadPromos, promosForStructure, promoMailto } from "@/lib/promos";
 import Icon from "@/components/Icon";
 import { exportExcel } from "@/lib/export";
 
@@ -61,7 +61,7 @@ export default function OspitiPage() {
   const toggleSel = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const [promos, setPromos] = useState<Promo[]>([]);
   const [pickPromo, setPickPromo] = useState(false);
-  useEffect(() => { setPromos(loadPromos()); }, []);
+  useEffect(() => { setPromos(promosForStructure(loadPromos(), activeStructureId)); }, [activeStructureId]);
   const [confirmClearNl, setConfirmClearNl] = useState(false);
   const [openReg, setOpenReg] = useState({ ospiti: true, nl: true });
 
