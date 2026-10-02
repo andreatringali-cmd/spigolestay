@@ -59,7 +59,7 @@ const preview = (m: Msg | undefined, t: (s: string) => string) => (m ? `${m.dir 
 // ── Invii programmati (ex "Centro messaggi"), ora dentro le conversazioni ──
 type Lang = "it" | "en" | "fr" | "de" | "es";
 type Trigger = "manual" | "before_arrival" | "on_arrival" | "after_arrival" | "on_checkout" | "after_checkout";
-interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; trigger: Trigger; days: number; time: string; active: boolean; srcId?: string }
+interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; trigger: Trigger; days: number; time: string; active: boolean; srcId?: string; structureIds?: string[] }
 const TPL_KEY = "spigolestay:msgtemplates";
 const SENT_KEY = "spigolestay:msgsent";
 const GUIDE_BASE = "https://spigole-guest-guide.vercel.app";
@@ -441,7 +441,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const queue = useMemo(() => {
     const catchupFrom = addDaysISO(todayISO, -3);
     return templates.filter((tp) => tp.active && tp.trigger !== "manual").flatMap((tp) =>
-      bookingsWithGuest.map(({ b, g }) => {
+      bookingsWithGuest.filter(({ b }) => !tp.structureIds?.length || tp.structureIds.includes(b.structureId)).map(({ b, g }) => {
         const anchor = tp.trigger === "before_arrival" ? addDaysISO(b.checkIn, -tp.days)
           : tp.trigger === "on_arrival" ? b.checkIn
           : tp.trigger === "after_arrival" ? addDaysISO(b.checkIn, tp.days)
@@ -716,7 +716,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
                 <select onChange={(e) => { const v = e.target.value; e.target.value = ""; if (v === "__manage__") { if (onManageTemplates) onManageTemplates(); else router.push("/modelli"); } else if (v) insertTemplate(v); }} defaultValue="" className="rounded-full border border-line bg-paper px-3 py-1 text-xs text-dim outline-none transition hover:bg-wash focus:border-focus">
                   <option value="">{t("Inserisci un modello…")}</option>
-                  {templates.map((tp) => (<option key={tp.id} value={tp.id}>{tp.name}</option>))}
+                  {templates.filter((tp) => !tp.structureIds?.length || tp.structureIds.includes(current?.b?.structureId ?? activeStructureId)).map((tp) => (<option key={tp.id} value={tp.id}>{tp.name}</option>))}
                   {templates.length > 0 && <option disabled>──────────</option>}
                   <option value="__manage__">✎ {t("Gestisci modelli…")}</option>
                 </select>
