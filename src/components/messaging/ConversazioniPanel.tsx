@@ -160,10 +160,12 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       return best;
     };
     for (const key of Object.keys(threads)) {
-      // Con una struttura selezionata ogni struttura vede SOLO i propri ospiti (chi ha una prenotazione
-      // lì). I contatti senza prenotazione non hanno una struttura nota: compaiono solo in "Tutte".
-      if (activeStructureId !== "all") break;
       if (map.has(key) || !(threads[key]?.length)) continue;
+      // Con una struttura selezionata ogni struttura vede SOLO i propri ospiti: chi ha una prenotazione
+      // in un'altra struttura NON compare qui. Restano visibili in ogni struttura solo i contatti mai
+      // legati a nessuna prenotazione (numero nuovo / richiesta prima di prenotare): non hanno una
+      // struttura nota e vanno comunque visti, altrimenti il messaggio si perde.
+      if (activeStructureId !== "all" && bookings.some((b) => b.guestId === key && b.channel !== "blocked")) continue;
       const g = guests.find((x) => x.id === key);
       if (g) {
         const past = pastStayOf(g.id);
