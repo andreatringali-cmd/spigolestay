@@ -8,6 +8,7 @@ import { playSound } from "@/lib/sound";
 import { useLang } from "@/lib/i18n";
 import { CHANNELS, type Booking, type Guest } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
+import LinkPreview from "@/components/messaging/LinkPreview";
 import { eur } from "@/lib/format";
 import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
 import { apiPost } from "@/lib/invoicing/client";
@@ -668,6 +669,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                           )}
                           {isAiReply && <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold">🤖 {t("Risposta automatica")}</div>}
                           <div className="whitespace-pre-wrap break-words">{m.text}</div>
+                          <LinkPreview text={m.text} />
                         </div>
                         {groupEnd && <div className="mt-1 px-1 text-[10px] text-faint">{hhmm}{m.via ? ` · ${m.via}` : ""}</div>}
                       </div>
