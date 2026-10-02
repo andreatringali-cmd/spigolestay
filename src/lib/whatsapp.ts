@@ -60,7 +60,8 @@ export async function sendWhatsapp(admin: SupabaseClient, tenantId: string, args
     body.template = { name: args.templateName, language: { code: args.lang || "it" } };
   } else {
     body.type = "text";
-    body.text = { body: args.text || "" };
+    // preview_url: senza, la Cloud API NON genera l'anteprima (foto + descrizione) dei link nel testo.
+    body.text = { body: args.text || "", preview_url: true };
   }
   try {
     const r = await fetch(`${GRAPH}/${cfg.phoneId}/messages`, {
