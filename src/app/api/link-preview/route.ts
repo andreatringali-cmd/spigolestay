@@ -12,7 +12,7 @@ const decode = (s: string) => s.replace(/&amp;/g, "&").replace(/&quot;/g, '"').r
 const meta = (html: string, key: string) => {
   const re = new RegExp(`<meta[^>]+(?:property|name)=["']${key}["'][^>]*>`, "i");
   const tag = html.match(re)?.[0] || "";
-  const c = tag.match(/content=["']([^"']*)["']/i)?.[1];
+  const c = tag.match(/content=(["'])([\s\S]*?)\1/i)?.[2];
   return c ? decode(c).trim() : "";
 };
 

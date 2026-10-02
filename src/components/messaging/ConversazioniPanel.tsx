@@ -159,6 +159,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       return best;
     };
     for (const key of Object.keys(threads)) {
+      // Con una struttura selezionata ogni struttura vede SOLO i propri ospiti (chi ha una prenotazione
+      // lì). I contatti senza prenotazione non hanno una struttura nota: compaiono solo in "Tutte".
+      if (activeStructureId !== "all") break;
       if (map.has(key) || !(threads[key]?.length)) continue;
       const g = guests.find((x) => x.id === key);
       if (g) {
