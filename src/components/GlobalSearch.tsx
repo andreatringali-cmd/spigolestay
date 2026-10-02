@@ -9,7 +9,16 @@ import { useLang } from "@/lib/i18n";
 
 export default function GlobalSearch() {
   const router = useRouter();
-  const { bookings, guests, structures, units, openBooking, getStructure, getUnit } = useData();
+  const { bookings: allBookings, guests: allGuests, structures: allStructures, units: allUnits, openBooking, getStructure, getUnit, activeStructureId } = useData();
+  // Con una struttura selezionata la ricerca vede solo i suoi dati.
+  const scopedAll = activeStructureId !== "all";
+  const bookings = scopedAll ? allBookings.filter((b) => b.structureId === activeStructureId) : allBookings;
+  const units = scopedAll ? allUnits.filter((u) => u.structureId === activeStructureId) : allUnits;
+  const structures = scopedAll ? allStructures.filter((s) => s.id === activeStructureId) : allStructures;
+  // Ospiti: chi ha una prenotazione nella struttura + chi non ne ha in nessuna (stessa regola della pagina Ospiti).
+  const guests = scopedAll
+    ? allGuests.filter((g) => bookings.some((b) => b.guestId === g.id) || !allBookings.some((b) => b.guestId === g.id && b.status !== "cancelled" && b.channel !== "blocked"))
+    : allGuests;
   const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");

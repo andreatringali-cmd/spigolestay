@@ -3,20 +3,24 @@
 import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon";
 import { useLang } from "@/lib/i18n";
+import { useData } from "@/lib/store";
 
-type Note = { id: string; text: string; done: boolean };
+type Note = { id: string; text: string; done: boolean; structureId?: string }; // senza structureId = vale per tutte
 const KEY = "spigolestay:daynotes";
 
 // Promemoria manuali del giorno, persistiti in locale.
 export default function DayNotes() {
   const { t } = useLang();
-  const [notes, setNotes] = useState<Note[]>([]);
+  const { activeStructureId } = useData();
+  const [allNotes, setNotes] = useState<Note[]>([]);
   const [text, setText] = useState("");
+  // Con una struttura selezionata: solo i suoi promemoria + quelli generali.
+  const notes = activeStructureId === "all" ? allNotes : allNotes.filter((n) => !n.structureId || n.structureId === activeStructureId);
   const ready = useRef(false);
   useEffect(() => { try { const r = localStorage.getItem(KEY); if (r) setNotes(JSON.parse(r)); } catch {} ready.current = true; }, []);
-  useEffect(() => { if (!ready.current) return; try { localStorage.setItem(KEY, JSON.stringify(notes)); } catch {} }, [notes]);
+  useEffect(() => { if (!ready.current) return; try { localStorage.setItem(KEY, JSON.stringify(allNotes)); } catch {} }, [allNotes]);
 
-  const add = () => { const t = text.trim(); if (!t) return; setNotes((n) => [...n, { id: String(Date.now()) + Math.random().toString(36).slice(2, 6), text: t, done: false }]); setText(""); };
+  const add = () => { const t = text.trim(); if (!t) return; setNotes((n) => [...n, { id: String(Date.now()) + Math.random().toString(36).slice(2, 6), text: t, done: false, ...(activeStructureId !== "all" ? { structureId: activeStructureId } : {}) }]); setText(""); };
   const toggle = (id: string) => setNotes((n) => n.map((x) => (x.id === id ? { ...x, done: !x.done } : x)));
   const remove = (id: string) => setNotes((n) => n.filter((x) => x.id !== id));
 

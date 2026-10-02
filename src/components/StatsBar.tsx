@@ -7,7 +7,9 @@ import { eur } from "@/lib/format";
 const WINDOW = 30;
 
 export default function StatsBar() {
-  const { units, bookings } = useData();
+  const { units: allUnits, bookings: allBookings, activeStructureId } = useData();
+  const units = activeStructureId === "all" ? allUnits : allUnits.filter((u) => u.structureId === activeStructureId);
+  const bookings = activeStructureId === "all" ? allBookings : allBookings.filter((b) => b.structureId === activeStructureId);
 
   const start = new Date();
   const s = new Date(start.getFullYear(), start.getMonth(), start.getDate());
@@ -25,7 +27,7 @@ export default function StatsBar() {
   let departures = 0;
 
   for (const b of bookings) {
-    if (b.status === "cancelled") continue;
+    if (b.status === "cancelled" || b.channel === "blocked") continue;
     // notti nella finestra
     for (let d = new Date(s); toISO(d) < endISO; d.setDate(d.getDate() + 1)) {
       const iso = toISO(d);

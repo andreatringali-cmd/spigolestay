@@ -94,7 +94,9 @@ interface DragView {
 }
 
 export default function CalendarGrid() {
-  const { structures, units, roomTypes, bookings, guests, events, rateOverrides, moveBooking, openBooking, addBooking, updateBooking, deleteBooking, addEvent, updateEvent, deleteEvent, setDayRates, clearDayRates, activeStructureId, updateUnit, deleteUnit, addUnit } = useData();
+  const { structures, units, roomTypes, bookings, guests, events: allEvents, rateOverrides, moveBooking, openBooking, addBooking, updateBooking, deleteBooking, addEvent, updateEvent, deleteEvent, setDayRates, clearDayRates, activeStructureId, updateUnit, deleteUnit, addUnit } = useData();
+  // Eventi: con una struttura selezionata solo i suoi (quelli senza struttura valgono per tutte).
+  const events = activeStructureId === "all" ? allEvents : allEvents.filter((e) => !e.structureId || e.structureId === activeStructureId);
   const router = useRouter();
 
   // Configurazione "Visualizza" (persistita): finestra giorni + righe mostrate + densità.
@@ -191,7 +193,7 @@ export default function CalendarGrid() {
         const lists = activeStructureId === "all" ? Object.values(res.byStructure) : [res.byStructure[activeStructureId] ?? []];
         const real: Record<string, boolean> = {};
         lists.flat().forEach((c) => { real[c.channel] = !!real[c.channel] || c.active; });
-        if (Object.keys(real).length) setRealChannels(real);
+        setRealChannels(real); // anche vuoto: la legenda non deve restare quella della struttura precedente
       } catch {}
     })();
   }, [activeStructureId]);
@@ -267,7 +269,7 @@ export default function CalendarGrid() {
   const [tipDone, setTipDone] = useState<Set<string>>(new Set());
   useEffect(() => { try { const r = localStorage.getItem("spigolestay:caltips"); if (r) setTipDone(new Set(JSON.parse(r))); } catch {} }, []);
   const markTip = (k: string) => setTipDone((p) => { const n = new Set(p).add(k); try { localStorage.setItem("spigolestay:caltips", JSON.stringify([...n])); } catch {} return n; });
-  const tipKey = (s: { dir?: string; subject?: string; detail?: string }) => `${s.dir ?? ""}|${s.subject ?? ""}|${s.detail ?? ""}`;
+  const tipKey = (s: { dir?: string; subject?: string; detail?: string }) => `${activeStructureId === "all" ? "" : activeStructureId + "#"}${s.dir ?? ""}|${s.subject ?? ""}|${s.detail ?? ""}`;
   // Conferma spostamento prenotazione (drag su un'altra camera/data).
   const [moveConfirm, setMoveConfirm] = useState<null | { id: string; targetUnitId: string; checkIn: string; checkOut: string; prev: { unitId: string | null; checkIn: string; checkOut: string } }>(null);
   // Selettore che compare cliccando su una cella libera: prenotazione o fuori servizio.
@@ -361,7 +363,7 @@ export default function CalendarGrid() {
   const saveEvent = () => {
     if (!evDraft || !evDraft.name.trim()) return;
     if (evDraft.id) updateEvent(evDraft.id, { name: evDraft.name.trim(), from: evDraft.from, to: evDraft.to, color: evDraft.color });
-    else addEvent({ name: evDraft.name.trim(), from: evDraft.from, to: evDraft.to, color: evDraft.color });
+    else addEvent({ name: evDraft.name.trim(), from: evDraft.from, to: evDraft.to, color: evDraft.color, ...(activeStructureId !== "all" ? { structureId: activeStructureId } : {}) });
     setEvDraft(null);
   };
   const saveOos = () => {

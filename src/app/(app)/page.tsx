@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { apiPost } from "@/lib/invoicing/client";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { CHANNELS, type Channel } from "@/lib/types";
@@ -316,6 +317,7 @@ export default function Dashboard() {
       let invii = 0;
       for (const t of tpls.filter((x) => x.active && x.trigger !== "manual")) for (const b of bookings) {
         if (b.status === "cancelled") continue;
+        if (sFilter !== "all" && b.structureId !== sFilter) continue;
         const a = t.trigger === "before_arrival" ? addD(b.checkIn, -t.days)
           : t.trigger === "on_arrival" ? b.checkIn
           : t.trigger === "after_arrival" ? addD(b.checkIn, t.days)
@@ -329,7 +331,23 @@ export default function Dashboard() {
       setCc({ invii, canali: connected, tot: Object.keys(conn).length, sync: syncs.length ? relTime(Math.max(...syncs)) : t("mai") });
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMap]);
+  }, [autoMap, sFilter]);
+  // Stato canali REALE (Channex) per la struttura attiva: sostituisce il conteggio locale globale.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await apiPost<{ ok: boolean; byStructure?: Record<string, { channel: string; active: boolean }[]> }>("channex/status", {});
+        if (!alive || !res?.ok || !res.byStructure) return;
+        const lists = sFilter === "all" ? Object.values(res.byStructure) : [res.byStructure[sFilter] ?? []];
+        const byCh: Record<string, boolean> = {};
+        lists.flat().forEach((c) => { byCh[c.channel] = !!byCh[c.channel] || c.active; });
+        const tot = Object.keys(byCh).length;
+        if (tot > 0 || sFilter !== "all") setCc((p) => ({ ...p, canali: Object.values(byCh).filter(Boolean).length, tot }));
+      } catch {}
+    })();
+    return () => { alive = false; };
+  }, [sFilter]);
 
   // ===== Panoramica operativa (widget riferiti a OGGI) =====
   const guestOf = (id: string) => guests.find((g) => g.id === id);
@@ -491,7 +509,7 @@ export default function Dashboard() {
         const todoArr = arrivals;
         const todoDep = departures;
         const todoStay = inHouse;
-        const planningKey = `planning:${date}`;
+        const planningKey = sFilter === "all" ? `planning:${date}` : `planning:${sFilter}:${date}`; // un'attività per struttura
         const keys = [
           planningKey,
           ...todoDep.flatMap((b) => DEPARTURE_TASKS.map((t) => `${b.id}:${t.id}`)),

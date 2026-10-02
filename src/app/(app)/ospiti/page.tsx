@@ -56,6 +56,8 @@ export default function OspitiPage() {
   const [seg, setSeg] = useState<string>("all"); // segmento CRM: all|repeat|vip|new|ch:<canale>
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "stays", dir: "desc" });
   const [sel, setSel] = useState<Set<string>>(new Set());
+  // Cambiando struttura attiva la selezione multipla non ha più senso (potrebbe includere ospiti non visibili).
+  useEffect(() => { setSel(new Set()); }, [activeStructureId]);
   const toggleSel = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const [promos, setPromos] = useState<Promo[]>([]);
   const [pickPromo, setPickPromo] = useState(false);
@@ -83,6 +85,9 @@ export default function OspitiPage() {
     // i contatti senza prenotazioni (es. iscritti newsletter/lead), che non sono legati a una struttura.
     .filter((r) => activeStructureId === "all" || r.list.length > 0 || !bookings.some((b) => b.guestId === r.guest.id && b.status !== "cancelled" && b.channel !== "blocked"))
     .filter((r) => !term || r.guest.fullName.toLowerCase().includes(term) || (r.guest.email ?? "").toLowerCase().includes(term) || (r.guest.country ?? "").toLowerCase().includes(term));
+
+  // Anagrafiche visibili nella struttura attiva (ospiti con prenotazioni lì + contatti senza prenotazioni), senza ricerca.
+  const totalVisible = activeStructureId === "all" ? guests.length : guests.filter((g) => bookings.some((b) => b.guestId === g.id && b.structureId === activeStructureId && b.status !== "cancelled" && b.channel !== "blocked") || !bookings.some((b) => b.guestId === g.id && b.status !== "cancelled" && b.channel !== "blocked")).length;
 
   const sorted = [...rows].sort((a, b) => {
     const d = sort.dir === "asc" ? 1 : -1;
@@ -286,7 +291,7 @@ export default function OspitiPage() {
 
   return (
     <div>
-      <PageHeader title={t("Ospiti")} subtitle={`${guests.length} ${t("anagrafiche")}`} />
+      <PageHeader title={t("Ospiti")} subtitle={`${totalVisible} ${t("anagrafiche")}`} />
 
       {/* Card statistiche */}
       <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">

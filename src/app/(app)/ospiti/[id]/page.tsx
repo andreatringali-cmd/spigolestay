@@ -49,7 +49,7 @@ export default function OspiteSchedaPage() {
   const { t } = useLang();
   const params = useParams<{ id: string }>();
   const isNew = params.id === "nuovo";
-  const { guests, bookings, addGuest, updateGuest, deleteGuest, getStructure, getUnit, openBooking } = useData();
+  const { guests, bookings, activeStructureId, addGuest, updateGuest, deleteGuest, getStructure, getUnit, openBooking } = useData();
   const ask = useConfirm();
 
   const existing = guests.find((g) => g.id === params.id);
@@ -82,7 +82,10 @@ export default function OspiteSchedaPage() {
   }, [existing, isNew]);
   const toggleTag = (t: string) => setG((p) => { const cur = p.tags ?? []; return { ...p, tags: cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t] }; });
 
-  const list = existing ? bookings.filter((b) => b.guestId === existing.id).sort((a, b) => (a.checkIn < b.checkIn ? 1 : -1)) : [];
+  // Soggiorni della struttura attiva; se l'ospite non ha nulla lì (es. link diretto) si mostrano tutti, mai dati nascosti.
+  const guestAll = existing ? bookings.filter((b) => b.guestId === existing.id) : [];
+  const guestInStruct = activeStructureId === "all" ? guestAll : guestAll.filter((b) => b.structureId === activeStructureId);
+  const list = [...(guestInStruct.length ? guestInStruct : guestAll)].sort((a, b) => (a.checkIn < b.checkIn ? 1 : -1));
   const stays = list.filter((b) => b.status !== "cancelled");
   const totalNights = stays.reduce((a, b) => a + nights(b.checkIn, b.checkOut), 0);
   const totalSpend = stays.reduce((a, b) => a + (b.total ?? 0), 0);

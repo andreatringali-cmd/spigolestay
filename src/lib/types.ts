@@ -283,6 +283,7 @@ export interface CalEvent {
   from: string; // ISO incluso
   to: string;   // ISO escluso (giorno dopo l'ultimo)
   color: string; // colore esadecimale
+  structureId?: string; // struttura a cui appartiene (assente = visibile in tutte)
   updatedAt?: number; // epoch ms ultima modifica (sync last-write-wins)
 }
 

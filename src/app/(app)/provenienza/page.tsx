@@ -10,7 +10,7 @@ import { nights } from "@/lib/dates";
 const YEARS = (() => { const y = new Date().getFullYear(); return [y, y - 1, y - 2]; })();
 
 export default function ProvenienzaPage() {
-  const { bookings, getGuest } = useData();
+  const { bookings, getGuest, activeStructureId } = useData();
   const [year, setYear] = useState(new Date().getFullYear());
 
   const { byCountry, byProvince, totals } = useMemo(() => {
@@ -19,6 +19,7 @@ export default function ProvenienzaPage() {
     let arrivi = 0, presenze = 0;
     for (const b of bookings) {
       if (b.status === "cancelled" || b.channel === "blocked") continue;
+      if (activeStructureId !== "all" && b.structureId !== activeStructureId) continue;
       if ((b.checkIn ?? "").slice(0, 4) !== String(year)) continue;
       const g = getGuest(b.guestId);
       const people = (b.adults ?? 1) + (b.children ?? 0);
@@ -31,7 +32,7 @@ export default function ProvenienzaPage() {
     }
     const sort = (m: Map<string, { arrivi: number; presenze: number }>) => [...m.entries()].sort((a, b) => b[1].presenze - a[1].presenze);
     return { byCountry: sort(bc), byProvince: sort(bp), totals: { arrivi, presenze } };
-  }, [bookings, getGuest, year]);
+  }, [bookings, getGuest, year, activeStructureId]);
 
   const Bars = ({ data, max }: { data: [string, { arrivi: number; presenze: number }][]; max: number }) => (
     <div className="flex flex-col gap-2">

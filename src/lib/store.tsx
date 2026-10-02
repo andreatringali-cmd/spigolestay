@@ -19,6 +19,7 @@ export interface Activity {
   type: ActivityType;
   text: string;
   by?: string; // utente che ha compiuto l'azione
+  structureId?: string; // struttura a cui si riferisce (assente = generale, visibile in tutte)
 }
 
 export interface NewBookingPrefill {
@@ -39,7 +40,7 @@ interface DataContextValue {
   rateOverrides: Record<string, number>; // tariffa forzata per giorno (ISO → €)
   activities: Activity[]; // registro attività
   directReviews: DirectReview[]; // recensioni dirette lasciate dagli ospiti sul mini-sito
-  addActivity: (type: ActivityType, text: string) => void;
+  addActivity: (type: ActivityType, text: string, structureId?: string) => void;
   setDirectReviewReply: (id: string, reply: string) => void; // salva/pubblica la risposta a una recensione diretta
 
   // Scheda prenotazione (drawer globale)
@@ -143,8 +144,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return u ? (`${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.username) : undefined;
     } catch { return undefined; }
   };
-  const logAct = (type: ActivityType, text: string) => {
-    setActivities((prev) => [{ id: uid(), ts: Date.now(), type, text, by: currentActor() }, ...prev].slice(0, 500));
+  const logAct = (type: ActivityType, text: string, structureId?: string) => {
+    setActivities((prev) => [{ id: uid(), ts: Date.now(), type, text, by: currentActor(), ...(structureId ? { structureId } : {}) }, ...prev].slice(0, 500));
     playSound(type === "booking" ? "booking" : type === "cancel" ? "cancel" : "notify");
   };
 
@@ -391,7 +392,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const now = Date.now();
         return prev.map((s) => ({ ...s, order: orderById.get(s.id) ?? s.order, updatedAt: now }));
       }),
-      addRoomType: (rt) => { const id = uid(); setRoomTypes((prev) => [...prev, { id, ...rt, updatedAt: Date.now() }]); logAct("config", `Tipologia creata — ${rt.name}`); return id; },
+      addRoomType: (rt) => { const id = uid(); setRoomTypes((prev) => [...prev, { id, ...rt, updatedAt: Date.now() }]); logAct("config", `Tipologia creata — ${rt.name}`, rt.structureId); return id; },
       updateRoomType: (id, patch) => {
         // Punto centrale di scrittura delle tariffe base/restrizioni: logga qui, una volta sola,
         // qualunque sia la pagina che chiama updateRoomType (Tariffe, Tipologia…), confrontando
@@ -400,14 +401,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setRoomTypes((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch, updatedAt: Date.now() } : x)));
         if (before) {
           if ("basePrice" in patch && typeof patch.basePrice === "number" && patch.basePrice !== before.basePrice)
-            logAct("rate", `Tariffa base modificata — ${before.name}: €${before.basePrice} → €${patch.basePrice}`);
+            logAct("rate", `Tariffa base modificata — ${before.name}: €${before.basePrice} → €${patch.basePrice}`, before.structureId);
           if ("minStay" in patch && typeof patch.minStay === "number" && patch.minStay !== before.minStay)
-            logAct("rate", `Soggiorno minimo modificato — ${before.name}: ${patch.minStay} nott${patch.minStay === 1 ? "e" : "i"}`);
+            logAct("rate", `Soggiorno minimo modificato — ${before.name}: ${patch.minStay} nott${patch.minStay === 1 ? "e" : "i"}`, before.structureId);
           if ("salesClosed" in patch && patch.salesClosed !== before.salesClosed)
-            logAct("rate", `Vendite ${patch.salesClosed ? "chiuse" : "riaperte"} — ${before.name}`);
+            logAct("rate", `Vendite ${patch.salesClosed ? "chiuse" : "riaperte"} — ${before.name}`, before.structureId);
         }
       },
-      addUnit: (u) => { const id = uid(); setUnits((prev) => [...prev, { id, ...u, updatedAt: Date.now() }]); logAct("config", `Camera aggiunta — ${u.name}`); return id; },
+      addUnit: (u) => { const id = uid(); setUnits((prev) => [...prev, { id, ...u, updatedAt: Date.now() }]); logAct("config", `Camera aggiunta — ${u.name}`, u.structureId); return id; },
       updateUnit: (id, patch) => setUnits((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch, updatedAt: Date.now() } : x))),
       setUnitRoomType: (unitId, roomTypeId) =>
         setUnits((prev) => prev.map((u) => (u.id === unitId ? { ...u, roomTypeId, updatedAt: Date.now() } : u))),
@@ -497,8 +498,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const rec: Booking = { id: uid(), bookedOn: new Date().toISOString().slice(0, 10), ...b, code, updatedAt: Date.now() };
         setBookings((prev) => [...prev, rec]);
         const gName = guests.find((g) => g.id === b.guestId)?.fullName;
-        if (b.channel === "blocked") logAct("block", `Fuori servizio${b.note ? " — " + b.note : ""}`);
-        else logAct("booking", `Nuova prenotazione${gName ? " — " + gName : ""} · ${b.channel}`);
+        if (b.channel === "blocked") logAct("block", `Fuori servizio${b.note ? " — " + b.note : ""}`, b.structureId);
+        else logAct("booking", `Nuova prenotazione${gName ? " — " + gName : ""} · ${b.channel}`, b.structureId);
         if (rec.status !== "cancelled") { syncGcal(rec, "upsert"); notifyOwner("newBooking", rec); }
         return rec;
       },
@@ -512,7 +513,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch, updatedAt: Date.now() } : b)));
         const gName = guests.find((g) => g.id === (patch.guestId ?? before?.guestId))?.fullName;
         if (patch.status === "cancelled" && before?.status !== "cancelled") {
-          logAct("cancel", `Prenotazione annullata${gName ? " — " + gName : ""}`);
+          logAct("cancel", `Prenotazione annullata${gName ? " — " + gName : ""}`, before?.structureId);
           if (updated) { syncGcal(updated, "delete"); notifyOwner("cancel", updated); }
           return;
         }
@@ -529,7 +530,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             if (changed.includes("status")) labels.push("stato");
             if (changed.includes("adults") || changed.includes("children")) labels.push("ospiti");
             const detail = labels.length ? ` (${labels.join(", ")})` : "";
-            logAct("booking", `Prenotazione modificata${gName ? " — " + gName : ""}${detail}`);
+            logAct("booking", `Prenotazione modificata${gName ? " — " + gName : ""}${detail}`, before.structureId);
           }
           // Notifica proprietario: pagamento ha priorità su "modificata" per lo stesso aggiornamento
           // (es. un salvataggio che tocca solo "paid" non deve generare anche un'email di modifica).
@@ -565,7 +566,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         // Se è cambiata struttura, l'evento sul vecchio calendario (se diverso) va tolto.
         if (moved && crossed && cur) syncGcal(cur, "delete");
         if (moved) { syncGcal(moved, "upsert"); notifyOwner("modified", moved); }
-        logAct("move", crossed ? `Prenotazione spostata a ${structures.find((s) => s.id === target!.structureId)?.name ?? "altra struttura"}` : "Prenotazione spostata di camera");
+        logAct("move", crossed ? `Prenotazione spostata a ${structures.find((s) => s.id === target!.structureId)?.name ?? "altra struttura"}` : "Prenotazione spostata di camera", cur?.structureId);
       },
       deleteBooking: (id) => {
         const b = bookings.find((x) => x.id === id);
@@ -573,7 +574,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         tomb("bookings", id);
         setBookings((prev) => prev.filter((b) => b.id !== id));
         setSelectedBookingId((s) => (s === id ? null : s));
-        logAct("cancel", `Cancellazione${gName ? " — " + gName : ""}`);
+        logAct("cancel", `Cancellazione${gName ? " — " + gName : ""}`, b?.structureId);
         if (b) { syncGcal(b, "delete"); notifyOwner("cancel", b); }
       },
 
@@ -585,11 +586,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         tomb("bookings", ...ids);
         setBookings((prev) => prev.filter((b) => !ids.has(b.id)));
         setSelectedBookingId((s) => (s && ids.has(s) ? null : s));
-        logAct("cancel", `Cancellazione gruppo (${members.length} camere)${gName ? " — " + gName : ""}`);
+        logAct("cancel", `Cancellazione gruppo (${members.length} camere)${gName ? " — " + gName : ""}`, members[0].structureId);
         members.forEach((m) => { syncGcal(m, "delete"); notifyOwner("cancel", m); });
       },
 
-      addEvent: (e) => { setEvents((prev) => [...prev, { id: uid(), ...e, updatedAt: Date.now() }]); logAct("event", `Evento: ${e.name}`); },
+      addEvent: (e) => { setEvents((prev) => [...prev, { id: uid(), ...e, updatedAt: Date.now() }]); logAct("event", `Evento: ${e.name}`, e.structureId); },
       updateEvent: (id, patch) => setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch, updatedAt: Date.now() } : e))),
       deleteEvent: (id) => { tomb("events", id); setEvents((prev) => prev.filter((e) => e.id !== id)); },
 

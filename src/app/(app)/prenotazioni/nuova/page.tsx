@@ -113,7 +113,7 @@ export default function NuovaPrenotazionePage() {
   const rowsOf = (sId: string) => roomTypes.filter((rt) => rt.structureId === sId).filter((rt) => (onlyAvail ? availUnits(rt).length > 0 : true));
   const totalTypes = orderedStructs.reduce((a, s) => a + rowsOf(s.id).length, 0);
 
-  const selected = roomTypes.filter((rt) => (qty[rt.id] ?? 0) > 0);
+  const selected = roomTypes.filter((rt) => (qty[rt.id] ?? 0) > 0 && (!locked || rt.structureId === activeStructureId));
   const totalRooms = selected.reduce((a, rt) => a + (qty[rt.id] ?? 0), 0);
   const grandTotal = selected.reduce((a, rt) => a + linePrice(rt) * (qty[rt.id] ?? 0), 0);
   const totalCap = selected.reduce((a, rt) => a + cap(rt) * (qty[rt.id] ?? 0), 0);

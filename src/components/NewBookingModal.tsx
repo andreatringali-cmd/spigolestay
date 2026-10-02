@@ -70,7 +70,8 @@ export default function NewBookingModal() {
   const availTypes = (sId: string) => roomTypes.filter((rt) => rt.structureId === sId && !effectiveClosed(rt, roomTypes) && availUnits(rt).length > 0);
   const totalAvail = orderedStructs.reduce((a, s) => a + availTypes(s.id).length, 0);
 
-  const selectedLines = roomTypes.filter((rt) => (qty[rt.id] ?? 0) > 0);
+  // Con una struttura selezionata in alto si possono scegliere solo le sue tipologie.
+  const selectedLines = roomTypes.filter((rt) => (qty[rt.id] ?? 0) > 0 && (!locked || rt.structureId === activeStructureId));
   const totalRooms = selectedLines.reduce((a, rt) => a + (qty[rt.id] ?? 0), 0);
   const totalPrice = selectedLines.reduce((a, rt) => a + linePrice(rt) * (qty[rt.id] ?? 0), 0);
   const totalCap = selectedLines.reduce((a, rt) => a + cap(rt) * (qty[rt.id] ?? 0), 0);

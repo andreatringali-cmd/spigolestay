@@ -168,10 +168,12 @@ export function answer(raw: string, ctx: AssistantCtx): Answer {
 
   // ── Preventivi ──
   if (/preventiv|offert/.test(q)) {
-    const open = ctx.quotes.filter((qt) => qt.status !== "confermato");
+    // Solo i preventivi della struttura attiva (quelli senza struttura restano visibili).
+    const quotes = ctx.activeStructureId === "all" ? ctx.quotes : ctx.quotes.filter((qt) => !qt.structureId || qt.structureId === ctx.activeStructureId);
+    const open = quotes.filter((qt) => qt.status !== "confermato");
     const val = open.reduce((a, qt) => a + (qt.total ?? 0), 0);
-    if (!ctx.quotes.length) return { kind: "empty", icon: "fileText", title: "Nessun preventivo salvato", href: "/preventivi", hrefLabel: "Crea preventivo" };
-    return { kind: "answer", icon: "fileText", title: "Preventivi aperti (non confermati)", metric: String(open.length), detail: `Valore potenziale ${eur(val)} · ${ctx.quotes.length} totali`, items: open.slice(0, 8).map((qt) => ({ label: qt.name, sub: `n. ${qt.number} · ${fmtD(qt.checkIn)} → ${fmtD(qt.checkOut)}`, badge: eur(qt.total), href: "/preventivi" })), href: "/preventivi", hrefLabel: "Apri preventivi" };
+    if (!quotes.length) return { kind: "empty", icon: "fileText", title: "Nessun preventivo salvato", href: "/preventivi", hrefLabel: "Crea preventivo" };
+    return { kind: "answer", icon: "fileText", title: "Preventivi aperti (non confermati)", metric: String(open.length), detail: `Valore potenziale ${eur(val)} · ${quotes.length} totali`, items: open.slice(0, 8).map((qt) => ({ label: qt.name, sub: `n. ${qt.number} · ${fmtD(qt.checkIn)} → ${fmtD(qt.checkOut)}`, badge: eur(qt.total), href: "/preventivi" })), href: "/preventivi", hrefLabel: "Apri preventivi" };
   }
 
   // ── Arrivi / partenze / in struttura ──
@@ -200,7 +202,9 @@ export function answer(raw: string, ctx: AssistantCtx): Answer {
   // ── Ricerca ospite per nome ──
   const nameQ = raw.replace(/\b(trova|cerca|prenotazione\s+di|ospite|dov['eè]|dettagli)\b/gi, "").trim();
   if (nameQ.length >= 3) {
-    const matches = ctx.guests.filter((g) => g.fullName.toLowerCase().includes(nameQ.toLowerCase()));
+    // Con una struttura selezionata: solo ospiti con prenotazioni in quella struttura (+ chi non ne ha in nessuna).
+    const anyBk = (id: string) => ctx.bookings.some((b) => b.guestId === id && b.status !== "cancelled" && b.channel !== "blocked");
+    const matches = ctx.guests.filter((g) => g.fullName.toLowerCase().includes(nameQ.toLowerCase()) && (ctx.activeStructureId === "all" || scoped.some((b) => b.guestId === g.id) || !anyBk(g.id)));
     if (matches.length) {
       const ids = new Set(matches.map((g) => g.id));
       const bks = scoped.filter((b) => ids.has(b.guestId)).sort((a, b) => b.checkIn.localeCompare(a.checkIn));

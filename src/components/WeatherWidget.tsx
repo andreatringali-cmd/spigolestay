@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useLang } from "@/lib/i18n";
+import { useData } from "@/lib/store";
 
 type Day = { date: string; tmax: number; tmin: number; code: number };
 
@@ -21,16 +22,24 @@ const DOW = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
 // Previsioni per Siracusa (Open-Meteo, senza chiave). Degrada con eleganza se offline.
 export default function WeatherWidget({ compact }: { compact?: boolean }) {
   const { t } = useLang();
+  // Meteo della struttura attiva (con "Tutte" la prima che ha le coordinate); fallback Siracusa.
+  const { structures, activeStructureId } = useData();
+  const pool = activeStructureId === "all" ? structures : structures.filter((s) => s.id === activeStructureId);
+  const geo = pool.find((s) => typeof s.lat === "number" && typeof s.lng === "number");
+  const lat = typeof geo?.lat === "number" ? geo.lat : 37.0755;
+  const lng = typeof geo?.lng === "number" ? geo.lng : 15.2866;
+  const cityName = (geo?.city || "").trim() || "Siracusa"; // senza coordinate: meteo di Siracusa (fallback storico)
   const [days, setDays] = useState<Day[] | null>(null);
   const [err, setErr] = useState(false);
   useEffect(() => {
     let alive = true;
-    fetch("https://api.open-meteo.com/v1/forecast?latitude=37.0755&longitude=15.2866&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe%2FRome&forecast_days=5")
+    setDays(null); setErr(false);
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe%2FRome&forecast_days=5`)
       .then((r) => r.json())
       .then((j) => { if (!alive) return; const d = j.daily; setDays(d.time.map((t: string, i: number) => ({ date: t, tmax: Math.round(d.temperature_2m_max[i]), tmin: Math.round(d.temperature_2m_min[i]), code: d.weather_code[i] }))); })
       .catch(() => { if (alive) setErr(true); });
     return () => { alive = false; };
-  }, []);
+  }, [lat, lng]);
 
   // Versione compatta per la testata (accanto all'aiuto "?").
   if (compact) {
@@ -40,8 +49,8 @@ export default function WeatherWidget({ compact }: { compact?: boolean }) {
       </div>
     );
     return (
-      <div className="hidden items-center gap-2 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-1 sm:flex" title={t("Previsioni Siracusa · prossimi giorni")}>
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">{t("Siracusa")}</span>
+      <div className="hidden items-center gap-2 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-1 sm:flex" title={`${t("Previsioni")} ${cityName} · ${t("prossimi giorni")}`}>
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">{cityName === "Siracusa" ? t("Siracusa") : cityName}</span>
         {days.slice(0, 3).map((d, i) => {
           const w = WMO[d.code] ?? { t: "—", e: "🌡️" };
           const dow = DOW[new Date(d.date + "T12:00:00").getDay()];
@@ -60,7 +69,7 @@ export default function WeatherWidget({ compact }: { compact?: boolean }) {
   return (
     <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Meteo")} · {t("Siracusa")}</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Meteo")} · {cityName === "Siracusa" ? t("Siracusa") : cityName}</span>
         <span className="text-[11px] text-faint">{t("prossimi giorni")}</span>
       </div>
       {err ? (

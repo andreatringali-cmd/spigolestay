@@ -93,6 +93,8 @@ export default function PrenotazioniPage() {
   const [chartOrder, setChartOrder] = useState<string[]>([]);
   const persistChartOrder = (o: string[]) => { setChartOrder(o); try { localStorage.setItem("spigolestay:prenchartorder", JSON.stringify(o)); } catch {} };
   const [chartMenu, setChartMenu] = useState(false);
+  // Cambiando struttura attiva il filtro locale struttura/camera non ha più senso: si azzera.
+  useEffect(() => { setLoc("all"); }, [activeStructureId]);
   const chartRef = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (chartRef.current && !chartRef.current.contains(e.target as Node)) setChartMenu(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
   useEffect(() => { try { const r = localStorage.getItem("spigolestay:prenchart:v2"); if (r) setHiddenPren(new Set(JSON.parse(r))); } catch {} try { const o = localStorage.getItem("spigolestay:prenchartorder"); if (o) setChartOrder(JSON.parse(o)); } catch {} }, []);

@@ -27,7 +27,9 @@ function relTime(ts: number, t: (s: string) => string): string {
 const SEEN_KEY = "spigolestay:activityseen";
 
 export default function ActivityLog() {
-  const { activities } = useData();
+  const { activities: allActivities, activeStructureId } = useData();
+  // Solo le voci della struttura attiva (quelle senza struttura — accessi, sicurezza — restano sempre visibili).
+  const activities = activeStructureId === "all" ? allActivities : allActivities.filter((a) => !a.structureId || a.structureId === activeStructureId);
   const { t } = useLang();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);

@@ -42,7 +42,8 @@ export default function StatistichePage() {
   // La chiave interna resta "produzione" per non toccare la persistenza/tipizzazione esistente.
   const [report, setReport] = useState<"produzione" | "annuale">("produzione");
 
-  const active = bookings.filter((b) => b.status !== "cancelled" && (activeStructureId === "all" || b.structureId === activeStructureId));
+  // Esclusi i blocchi "fuori servizio" (channel = blocked): non sono prenotazioni e gonfierebbero notti/occupazione/RevPAR.
+  const active = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId));
   const scopedStructures = activeStructureId === "all" ? structures : structures.filter((s) => s.id === activeStructureId);
   const scopedUnits = units.filter((u) => !u.outOfService && (activeStructureId === "all" || u.structureId === activeStructureId));
   const channels = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked");

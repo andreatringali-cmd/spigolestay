@@ -25,7 +25,9 @@ const META: Record<ActivityType, { label: string; color: string }> = {
 };
 
 export default function RegistroPage() {
-  const { activities } = useData();
+  const { activities: allActivities, activeStructureId } = useData();
+  // Con una struttura selezionata: solo le sue voci + quelle generali (accessi, sicurezza) senza struttura.
+  const activities = useMemo(() => activeStructureId === "all" ? allActivities : allActivities.filter((a) => !a.structureId || a.structureId === activeStructureId), [allActivities, activeStructureId]);
   const { t } = useLang();
   const [type, setType] = useState<string>("all");
   const [q, setQ] = useState("");
