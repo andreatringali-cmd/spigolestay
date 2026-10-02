@@ -9,6 +9,7 @@ import { loadPromos } from "@/lib/promos";
 import { eur } from "@/lib/format";
 import { amenityIcon } from "@/lib/amenities";
 import { isPublicMode, publicSlug, lsGet, DATA_KEY, getSiteConfigRaw } from "@/lib/publicdata";
+import { inScope } from "@/lib/scope";
 
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
 const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return toISO(d); };
@@ -198,7 +199,7 @@ export function Site() {
   }, [galItems.length]);
 
   // Offerte attive (modulo Promozioni).
-  const offers = useMemo(() => { try { const t = new Date().toISOString().slice(0, 10); return loadPromos().filter((p) => p.discountPct && p.code && (!p.validUntil || p.validUntil >= t)); } catch { return []; } }, []);
+  const offers = useMemo(() => { try { const t = new Date().toISOString().slice(0, 10); return loadPromos().filter((p) => inScope(p.structureId, sid) && p.discountPct && p.code && (!p.validUntil || p.validUntil >= t)); } catch { return []; } }, [sid]);
 
   // Recensioni REALI soltanto: lette dallo store recensioni (spigolestay:sitereviews),
   // una lista scritta dal proprietario/importata. Nessun testo inventato: se non ci

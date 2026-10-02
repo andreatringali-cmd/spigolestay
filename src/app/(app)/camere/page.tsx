@@ -150,6 +150,10 @@ export default function CamerePage() {
 
   const scoped = structures.filter((s) => (activeStructureId === "all" ? localS === "all" || s.id === localS : s.id === activeStructureId));
 
+  // Cambiando struttura si azzerano selezione multipla e modale aperto: le camere selezionate di un'altra
+  // struttura non devono restare "invisibili" e finire nella modifica in blocco.
+  useEffect(() => { setSel(new Set()); setRoomModal(null); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [activeStructureId, localS]);
+
   return (
     <div>
       <PageHeader

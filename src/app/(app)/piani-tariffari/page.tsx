@@ -7,6 +7,7 @@ import { eur } from "@/lib/format";
 import { PageHeader, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
+import { inScope, newItemStructureId } from "@/lib/scope";
 
 const BOARDS = ["Solo pernottamento", "Colazione", "Mezza pensione", "Pensione completa"];
 const DEPOSITS = [
@@ -24,6 +25,7 @@ interface RatePlan {
   dateFrom?: string; dateTo?: string; // intervallo temporale (vuoto = sempre)
   roomTypeIds?: string[];       // tipologie a cui si applica (assente/vuoto = tutte)
   description?: string;
+  structureId?: string;         // struttura del piano (assente = vale per tutte le strutture)
 }
 // Set consigliato per un B&B (colazione sempre inclusa): base flessibile a 0%, non rimborsabile scontato, lunga permanenza.
 const DEFAULT_PLANS: RatePlan[] = [
@@ -109,7 +111,10 @@ export default function PianiTariffariPage() {
     savePlans(plans.filter((p) => p.id !== id));
     if (p) addActivity("rateplan", `Piano tariffario eliminato — ${p.name}`);
   };
-  const addPlan = () => { const p: RatePlan = { id: uid(), name: t("Nuovo piano"), adjPct: 0, refundable: true, board: "Solo pernottamento", minStay: 1, enabled: true, deposit: "none" }; upsert(p); setEditId(p.id); };
+  const addPlan = () => { const sid = newItemStructureId(effStructure); const p: RatePlan = { id: uid(), name: t("Nuovo piano"), adjPct: 0, refundable: true, board: "Solo pernottamento", minStay: 1, enabled: true, deposit: "none", ...(sid ? { structureId: sid } : {}) }; upsert(p); setEditId(p.id); };
+  // Si salva SEMPRE l'elenco completo (tutte le strutture); la vista mostra solo i piani della struttura + quelli per tutte.
+  const shownPlans = plans.filter((p) => inScope(p.structureId, effStructure));
+  const structName = (id?: string) => (id ? structures.find((s) => s.id === id)?.name ?? "?" : t("Tutte le strutture"));
 
   const types = roomTypes.filter((rt) => effStructure === "all" || rt.structureId === effStructure);
   const refBase = types.length ? effectiveBase(types[0], roomTypes) : 100;
@@ -164,14 +169,14 @@ export default function PianiTariffariPage() {
                 </tr>
               </thead>
               <tbody>
-                {plans.map((p) => {
+                {shownPlans.map((p) => {
                   const on = p.enabled !== false;
                   const nRooms = p.roomTypeIds?.length;
                   return (
                     <tr key={p.id} onClick={() => setEditId(p.id)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
                       <td className="px-3 py-2.5">
                         <div className="font-semibold text-txt">{p.name}</div>
-                        <div className="text-[10px] text-faint">{fmtRange(p, t)}</div>
+                        <div className="text-[10px] text-faint">{fmtRange(p, t)}{structures.length > 1 ? ` · ${structName(p.structureId)}` : ""}</div>
                       </td>
                       <td className="px-3 py-2.5 text-dim">{t(p.board)}</td>
                       <td className="px-3 py-2.5"><span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ backgroundColor: p.adjPct === 0 ? "var(--wash)" : `color-mix(in srgb, ${p.adjPct > 0 ? "var(--ok)" : "var(--err)"} 16%, transparent)`, color: p.adjPct === 0 ? "var(--dim)" : p.adjPct > 0 ? "var(--ok)" : "var(--err)" }}>{p.adjPct > 0 ? "+" : ""}{p.adjPct}%</span></td>
@@ -190,7 +195,7 @@ export default function PianiTariffariPage() {
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {plans.map((p) => {
+          {shownPlans.map((p) => {
             const on = p.enabled !== false;
             const price = Math.round(refBase * (1 + p.adjPct / 100));
             return (
@@ -206,6 +211,7 @@ export default function PianiTariffariPage() {
                   <span className="rounded-full px-2 py-0.5 font-medium" style={{ backgroundColor: `color-mix(in srgb, ${p.refundable ? "var(--ok)" : "var(--err)"} 14%, transparent)`, color: p.refundable ? "var(--ok)" : "var(--err)" }}>{cancelLabel(p, t)}</span>
                   <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{depositLabel(p, t)}</span>
                   <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{t("min")} {p.minStay} {t("notti")}</span>
+                  {structures.length > 1 && <span className="rounded-full bg-wash px-2 py-0.5 text-dim">{structName(p.structureId)}</span>}
                 </div>
                 <div className="mt-3 flex items-center justify-between border-t border-line pt-2.5 text-xs">
                   <span className="flex items-center gap-1.5 font-semibold" style={{ color: on ? "var(--ok)" : "var(--faint)" }}><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: on ? "var(--ok)" : "var(--faint)" }} />{on ? t("Attivo") : t("Sospeso")}</span>
@@ -222,17 +228,19 @@ export default function PianiTariffariPage() {
 
       <p className="mt-4 text-xs text-faint">{t("Vedi l'effetto dei piani giorno per giorno nell'Anteprima prezzi della pagina")} <a href="/tariffe" className="font-semibold text-focus hover:underline">{t("Tariffe")}</a>.</p>
 
-      {editing && <PlanModal plan={editing} allTypes={types} roomName={roomName} onSave={(p) => { upsert(p); setEditId(null); }} onDelete={async () => { await delPlan(editing.id); setEditId(null); }} onClose={() => setEditId(null)} />}
+      {editing && <PlanModal plan={editing} allTypes={editing.structureId ? roomTypes.filter((rt) => rt.structureId === editing.structureId) : types} structures={structures} roomName={roomName} onSave={(p) => { upsert(p); setEditId(null); }} onDelete={async () => { await delPlan(editing.id); setEditId(null); }} onClose={() => setEditId(null)} />}
     </div>
   );
 }
 
-function PlanModal({ plan, allTypes, roomName, onSave, onDelete, onClose }: {
-  plan: RatePlan; allTypes: { id: string; name: string }[]; roomName: (id: string) => string;
+function PlanModal({ plan, allTypes: typesIn, structures, roomName, onSave, onDelete, onClose }: {
+  plan: RatePlan; allTypes: { id: string; name: string; structureId?: string }[]; structures: { id: string; name: string }[]; roomName: (id: string) => string;
   onSave: (p: RatePlan) => void; onDelete: () => void; onClose: () => void;
 }) {
   const { t } = useLang();
   const [f, setF] = useState<RatePlan>({ ...plan });
+  // Tipologie selezionabili: quelle della struttura del piano (se ha una struttura), altrimenti quelle passate dalla pagina.
+  const allTypes = useMemo(() => (f.structureId ? typesIn.filter((x) => !x.structureId || x.structureId === f.structureId) : typesIn), [typesIn, f.structureId]);
   const set = <K extends keyof RatePlan>(k: K, v: RatePlan[K]) => setF((p) => ({ ...p, [k]: v }));
   const allSelected = !f.roomTypeIds || f.roomTypeIds.length === 0;
   const toggleRoom = (id: string) => setF((p) => {
@@ -250,6 +258,15 @@ function PlanModal({ plan, allTypes, roomName, onSave, onDelete, onClose }: {
         <label className={lbl}>{t("Trattamento")}<select value={f.board} onChange={(e) => set("board", e.target.value)} className={`${inp} mt-1`}>{BOARDS.map((b) => <option key={b} value={b}>{t(b)}</option>)}</select></label>
         <label className={lbl}>{t("Notti minime")}<input type="number" min={1} value={f.minStay} onFocus={(e) => e.currentTarget.select()} onChange={(e) => set("minStay", num(e.target.value, 1))} className={`${inp} mt-1`} /></label>
       </div>
+
+      {structures.length > 1 && (
+        <label className={`${lbl} mt-3 block`}>{t("Valido per")}
+          <select value={f.structureId ?? ""} onChange={(e) => setF((p) => ({ ...p, structureId: e.target.value || undefined, roomTypeIds: undefined }))} className={`${inp} mt-1`}>
+            <option value="">{t("Tutte le strutture")}</option>
+            {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </label>
+      )}
 
       {/* Prezzo */}
       <div className="mt-3 rounded-lg border border-line p-3">

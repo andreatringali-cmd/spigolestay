@@ -6,11 +6,12 @@ import type { RoomType, ExtraService } from "@/lib/types";
 import { DEFAULT_EXTRAS } from "@/lib/types";
 import { getImages } from "@/lib/images";
 import { eur } from "@/lib/format";
-import { effectiveBase, effectiveClosed } from "@/lib/pricing";
+import { effectiveBase, effectiveClosed, structureWeekendPct } from "@/lib/pricing";
 import { cityTaxOf } from "@/lib/booking";
 import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } from "@/lib/rate-plans";
 import { amenityIcon } from "@/lib/amenities";
 import { loadPromos } from "@/lib/promos";
+import { inScope } from "@/lib/scope";
 import { loadPublicSite, lsGet, isPublicMode, publicSlug, findAvailableSibling, findNetworkSuggestions, type SiblingSuggestion } from "@/lib/publicdata";
 
 // ---- pricing helpers --------------------------------------------------------
@@ -60,13 +61,15 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   // Config salvata (piani, weekend) — fallback ai default.
   const plans = useMemo<Plan[]>(() => { const p = loadPlans(); return p.length ? p : DEFAULT_PLANS; }, []);
   const weekendPct = useMemo(() => { try { const r = lsGet("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {} return 25; }, []);
-  const promos = useMemo(() => { try { return loadPromos(); } catch { return []; } }, []);
+  const allPromos = useMemo(() => { try { return loadPromos(); } catch { return []; } }, []);
 
   const qp = (k: string) => { try { return new URLSearchParams(window.location.search).get(k); } catch { return null; } };
   // Deep link dai comparatori (Meta Search): ?rt=<id>&checkin=&checkout=. Se manca la
   // struttura (?s), la ricavo dalla tipologia richiesta così la camera è già visibile.
   const rtParam = qp("rt");
   const [structureId, setStructureId] = useState(() => qp("s") || (rtParam ? roomTypes.find((r) => r.id === rtParam)?.structureId : "") || structures[0]?.id || "");
+  // Offerte della struttura selezionata (+ quelle valide per tutte).
+  const promos = useMemo(() => allPromos.filter((p) => inScope(p.structureId, structureId)), [allPromos, structureId]);
   // Nel motore pubblico (mini-sito / embed) i dati arrivano DOPO il mount: appena compaiono le
   // strutture, se non ne ho una valida selezionata la imposto (da ?s, da ?rt, o la prima).
   useEffect(() => {
@@ -138,7 +141,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
 
   const dayPrice = (rt: RoomType, iso: string, plan: Plan) => {
     const base = effectiveBase(rt, roomTypes);
-    const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(base * (isWeekendISO(iso) ? 1 + weekendPct / 100 : 1));
+    const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(base * (isWeekendISO(iso) ? 1 + structureWeekendPct(rt.structureId, weekendPct) / 100 : 1));
     return Math.max(0, Math.round(raw * (1 + plan.adjPct / 100)));
   };
   const stayPrice = (rt: RoomType, plan: Plan) => { let t = 0; for (let i = 0; i < nights; i++) t += dayPrice(rt, addDays(checkIn, i), plan); return t; };
@@ -156,7 +159,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
       const variants = [rt, ...descendantsOf(rt.id)].map((v) => ({
         v,
         fits: (v.maxOccupancy ?? v.beds) >= pax,
-        offers: plans.filter((p) => planApplies(p, { roomTypeId: v.id, checkIn, nights })).map((p) => ({ p, price: stayPrice(v, p) })).filter((x) => x.price > 0),
+        offers: plans.filter((p) => planApplies(p, { roomTypeId: v.id, checkIn, nights, structureId })).map((p) => ({ p, price: stayPrice(v, p) })).filter((x) => x.price > 0),
       })).filter((x) => x.offers.length > 0);
       const sellable = variants.filter((x) => x.fits);
       const hasDeriv = variants.length > 1;

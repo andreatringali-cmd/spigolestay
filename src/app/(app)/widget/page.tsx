@@ -98,6 +98,9 @@ export default function WidgetPage() {
   const c = widgets.find((w) => w.id === editingId) ?? null;
   const set = <K extends keyof Cfg>(k: K, v: Cfg[K]) => { if (!c) return; setWidgets((prev) => prev.map((w) => (w.id === c.id ? { ...w, [k]: v } : w))); };
 
+  // Cambiando struttura in alto, si chiude l'editor se il widget aperto appartiene a un'altra struttura.
+  useEffect(() => { if (editingId && activeStructureId !== "all" && c && c.structureId !== activeStructureId) setEditingId(null); }, [activeStructureId, editingId, c]);
+
   // Lista filtrata per la struttura selezionata in alto ("Tutte" = tutti i widget).
   const shownWidgets = activeStructureId === "all" ? widgets : widgets.filter((w) => w.structureId === activeStructureId);
   const defStructId = activeStructureId !== "all" && structures.some((s) => s.id === activeStructureId) ? activeStructureId : (structures[0]?.id ?? "");

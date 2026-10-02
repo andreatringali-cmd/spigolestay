@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { PageHeader, Card } from "@/components/ui";
-import { loadPromos } from "@/lib/promos";
+import { loadPromos, promosForStructure } from "@/lib/promos";
 import { getSiteConfigRaw } from "@/lib/publicdata";
 import Icon from "@/components/Icon";
 
@@ -20,7 +20,8 @@ export default function BookingEngineHub() {
   const sid = activeStructureId !== "all" ? activeStructureId : structures[0]?.id;
 
   useEffect(() => {
-    try { setPromoCount(loadPromos().filter((p) => p.discountPct && p.code).length); } catch {}
+    // Offerte della struttura in vista (+ quelle valide per tutte); con "Tutte" si contano tutte.
+    try { setPromoCount(promosForStructure(loadPromos(), activeStructureId).filter((p) => p.discountPct && p.code).length); } catch {}
     try {
       // Config del mini-sito SCOPED per struttura (vedi src/lib/publicdata.ts): il
       // tagline mostrato qui deve seguire la struttura attiva, non una chiave globale.
@@ -32,7 +33,7 @@ export default function BookingEngineHub() {
       const sections = sid ? all[sid]?.content?.sections : undefined;
       setGuideSections(Array.isArray(sections) ? sections.filter((s: { intro?: string; photos?: unknown[] }) => s.intro?.trim() || s.photos?.length).length : 0);
     } catch { setGuideSections(0); }
-  }, [sid, structures]);
+  }, [sid, structures, activeStructureId]);
   const types = useMemo(() => roomTypes.filter((rt) => rt.structureId === sid && !rt.deriveFrom), [roomTypes, sid]);
   const maxOcc = Math.max(0, ...types.map((rt) => rt.maxOccupancy ?? rt.beds ?? 0));
   const childrenOk = types.some((rt) => rt.childrenAllowed !== false);
@@ -58,6 +59,9 @@ export default function BookingEngineHub() {
   return (
     <div>
       <PageHeader title="Booking Engine" subtitle="Impostazioni del motore di prenotazione, in un unico posto" />
+      {activeStructureId === "all" && structures.length > 1 && (
+        <p className="mb-3 rounded-lg border border-line bg-wash px-3 py-2 text-xs text-dim">Con «Tutte le strutture» qui sotto vedi i dati di <b className="text-txt">{structures.find((s) => s.id === sid)?.name}</b>: seleziona una struttura in alto a destra per vedere e modificare le impostazioni di un&apos;altra.</p>
+      )}
       {/* Ordine delle card = ordine delle voci "Booking Engine" nella sidebar (vedi nav.ts):
           Widget sito, Xenosite, Promozioni, Upselling, Guida ospiti prima; le due impostazioni
           che vivono altrove (Camere, Strutture) in coda, non essendo voci di questo gruppo. */}

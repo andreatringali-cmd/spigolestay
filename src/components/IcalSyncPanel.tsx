@@ -21,7 +21,7 @@ const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? cry
 
 export default function IcalSyncPanel() {
   const data = useData();
-  const { structures } = data;
+  const { structures, activeStructureId } = data;
   const ask = useConfirm();
   const { t } = useLang();
 
@@ -31,7 +31,9 @@ export default function IcalSyncPanel() {
   useEffect(() => { uRef.current = data.units; }, [data.units]);
   useEffect(() => { rtRef.current = data.roomTypes; }, [data.roomTypes]);
 
-  const [feeds, setFeeds] = useState<Feed[]>([]);
+  // `allFeeds` = tutti i calendari salvati (tutte le strutture); `feeds` = solo quelli della struttura in vista.
+  const [allFeeds, setFeeds] = useState<Feed[]>([]);
+  const feeds = allFeeds.filter((f) => activeStructureId === "all" || f.structureId === activeStructureId);
   const [auto, setAuto] = useState(false);
   const [busy, setBusy] = useState<string | null>(null); // id feed in sync, o "all"
   const [form, setForm] = useState<{ name: string; url: string; structureId: string }>({ name: "", url: "", structureId: "" });
@@ -40,7 +42,12 @@ export default function IcalSyncPanel() {
     try { const f = localStorage.getItem(FEEDS_KEY); if (f) setFeeds(JSON.parse(f)); } catch {}
     try { setAuto(localStorage.getItem(AUTO_KEY) === "1"); } catch {}
   }, []);
-  useEffect(() => { if (!form.structureId && structures[0]) setForm((f) => ({ ...f, structureId: structures[0].id })); }, [structures, form.structureId]);
+  // Il nuovo calendario parte dalla struttura in vista (con "Tutte": la prima).
+  useEffect(() => {
+    const want = activeStructureId !== "all" ? activeStructureId : (form.structureId || structures[0]?.id || "");
+    if (want && form.structureId !== want) setForm((f) => ({ ...f, structureId: want }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structures, activeStructureId]);
   const save = (next: Feed[]) => { setFeeds(next); try { localStorage.setItem(FEEDS_KEY, JSON.stringify(next)); } catch {} };
 
   const ctx = () => ({
@@ -67,15 +74,16 @@ export default function IcalSyncPanel() {
     const feed = feeds.find((f) => f.id === id); if (!feed || busy) return;
     setBusy(id);
     const res = await syncOne(feed);
-    save(feeds.map((f) => (f.id === id ? res : f)));
+    save(allFeeds.map((f) => (f.id === id ? res : f)));
     setBusy(null);
   };
 
   const runAll = async () => {
     if (busy || !feeds.length) return;
     setBusy("all");
-    let cur = feeds;
-    for (const f of cur) {
+    // Si sincronizzano SOLO i calendari della struttura in vista; si salva sempre l'elenco completo.
+    let cur = allFeeds;
+    for (const f of feeds) {
       const res = await syncOne(f);
       cur = cur.map((x) => (x.id === f.id ? res : x));
       save(cur);
@@ -88,12 +96,12 @@ export default function IcalSyncPanel() {
     const url = form.url.trim();
     if (!/^https?:\/\//i.test(url) || !form.structureId) return;
     const name = form.name.trim() || t("Calendario iCal");
-    save([...feeds, { id: uid(), name, url, structureId: form.structureId }]);
+    save([...allFeeds, { id: uid(), name, url, structureId: form.structureId }]);
     setForm({ name: "", url: "", structureId: form.structureId });
   };
   const removeFeed = async (id: string) => {
     const f = feeds.find((x) => x.id === id);
-    if (await ask({ title: t("Rimuovi calendario"), message: `${t("Smettere di sincronizzare")} "${f?.name}"? ${t("Le prenotazioni già importate restano.")}`, danger: true, confirmLabel: t("Rimuovi") })) save(feeds.filter((x) => x.id !== id));
+    if (await ask({ title: t("Rimuovi calendario"), message: `${t("Smettere di sincronizzare")} "${f?.name}"? ${t("Le prenotazioni già importate restano.")}`, danger: true, confirmLabel: t("Rimuovi") })) save(allFeeds.filter((x) => x.id !== id));
   };
   const toggleAuto = () => { const v = !auto; setAuto(v); try { localStorage.setItem(AUTO_KEY, v ? "1" : "0"); } catch {} };
 
@@ -161,7 +169,7 @@ export default function IcalSyncPanel() {
           <input value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://…/calendar.ics" className={`mt-1 ${inp}`} />
         </label>
         <div className="flex gap-2">
-          <select value={form.structureId} onChange={(e) => setForm({ ...form, structureId: e.target.value })} className={inp}>
+          <select value={form.structureId} disabled={activeStructureId !== "all"} onChange={(e) => setForm({ ...form, structureId: e.target.value })} className={`${inp} disabled:opacity-60`}>
             {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <button onClick={addFeed} disabled={!/^https?:\/\//i.test(form.url.trim()) || !form.structureId} className="shrink-0 rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{t("Aggiungi")}</button>

@@ -9,6 +9,7 @@ import { toISO } from "@/lib/dates";
 import { italianHolidays, italianBridges } from "@/lib/holidays";
 import { computeSuggestions, loadAutopilot, saveAutopilot, toOverrideMap, highDemandMap } from "@/lib/autopilot";
 import { summarizeAppliedSuggestions } from "@/lib/autopilot-explain";
+import { inScope } from "@/lib/scope";
 
 export default function AutopilotRunner() {
   const { bookings, roomTypes, units, events, rateOverrides, setDayRates, structures, addActivity } = useData();
@@ -17,22 +18,27 @@ export default function AutopilotRunner() {
   useEffect(() => {
     if (done.current) return;
     if (!roomTypes.length) return; // attendi l'idratazione dello store
-    const cfg = loadAutopilot();
     const today = toISO(new Date());
-    if (!cfg.on || cfg.lastRun === today) { done.current = true; return; }
-
     const years = [new Date().getFullYear(), new Date().getFullYear() + 1];
-    const city = structures[0]?.city ?? "";
-    const holidays = italianHolidays(years, city);
-    const bridges = italianBridges(holidays);
-    const hd = highDemandMap(events ?? [], holidays, bridges, today, cfg.horizonDays);
 
-    const sugg = computeSuggestions(bookings, roomTypes, units, rateOverrides, cfg, today, "all", hd);
-    if (sugg.length) {
-      setDayRates(toOverrideMap(sugg));
-      addActivity("rate", `Autopilot: ${sugg.length} tariffe aggiornate automaticamente. ${summarizeAppliedSuggestions(sugg)}`);
+    // Ogni struttura ha il proprio autopilot (config + ultima esecuzione) e viene ottimizzata da sola,
+    // con la SUA città (festivi) e i SUOI eventi: mai le tariffe di una struttura calcolate sui dati di un'altra.
+    const list = structures.length ? structures : [undefined];
+    for (const st of list) {
+      const sid = st?.id;
+      const cfg = loadAutopilot(sid);
+      if (!cfg.on || cfg.lastRun === today) continue;
+      const holidays = italianHolidays(years, st?.city ?? "");
+      const bridges = italianBridges(holidays);
+      const evs = (events ?? []).filter((e) => !sid || inScope(e.structureId, sid));
+      const hd = highDemandMap(evs, holidays, bridges, today, cfg.horizonDays);
+      const sugg = computeSuggestions(bookings, roomTypes, units, rateOverrides, cfg, today, sid ?? "all", hd);
+      if (sugg.length) {
+        setDayRates(toOverrideMap(sugg));
+        addActivity("rate", `Autopilot${st ? ` (${st.name})` : ""}: ${sugg.length} tariffe aggiornate automaticamente. ${summarizeAppliedSuggestions(sugg)}`, sid);
+      }
+      saveAutopilot({ lastRun: today }, sid);
     }
-    saveAutopilot({ ...cfg, lastRun: today });
     done.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomTypes.length]);

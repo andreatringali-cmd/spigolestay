@@ -24,8 +24,15 @@ export function loadChannelColor(channel: Channel): string | undefined {
   const v = readMap(COLOR_KEY)[channel];
   return typeof v === "string" && v ? v : undefined;
 }
-export function loadChannelCommissionPct(channel: Channel): number | undefined {
-  const v = readMap(COMMISSION_KEY)[channel];
+// La commissione può essere diversa per struttura (es. una riceve il lordo e la fattura a parte, l'altra il netto):
+// la voce della struttura è salvata nella STESSA mappa con chiave "<canale>@<structureId>" (la forma storica,
+// una chiave per canale, resta valida e fa da default per le strutture senza voce propria).
+const commKey = (channel: Channel, structureId?: string) => (structureId ? `${channel}@${structureId}` : channel);
+export function loadChannelCommissionPct(channel: Channel, structureId?: string): number | undefined {
+  const m = readMap(COMMISSION_KEY);
+  const own = structureId ? m[commKey(channel, structureId)] : undefined;
+  if (typeof own === "number" && Number.isFinite(own)) return own;
+  const v = m[channel];
   return typeof v === "number" && Number.isFinite(v) ? v : undefined;
 }
 export const CHANNEL_COLORS_EVENT = "spigolestay:channelcolors";
@@ -33,8 +40,8 @@ export function saveChannelColor(channel: Channel, hex: string) {
   const m = readMap(COLOR_KEY); m[channel] = hex; writeMap(COLOR_KEY, m);
   try { window.dispatchEvent(new Event(CHANNEL_COLORS_EVENT)); } catch {}
 }
-export function saveChannelCommissionPct(channel: Channel, pct: number) {
-  const m = readMap(COMMISSION_KEY); m[channel] = pct; writeMap(COMMISSION_KEY, m);
+export function saveChannelCommissionPct(channel: Channel, pct: number, structureId?: string) {
+  const m = readMap(COMMISSION_KEY); m[commKey(channel, structureId)] = pct; writeMap(COMMISSION_KEY, m);
 }
 
 // Applica i colori salvati come proprietà inline sull'elemento passato (il div con la classe

@@ -6,6 +6,7 @@ import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
+import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 import type { Competitor, MarketRateRow } from "@/lib/ratecheck/service";
 
 const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -39,8 +40,7 @@ export default function RateCheckerPage() {
   const { roomTypes, rateOverrides, activeStructureId, structures } = useData();
   const { t } = useLang();
 
-  const rts = roomTypes.filter((rt) => activeStructureId === "all" || rt.structureId === activeStructureId);
-  const avgBase = rts.length ? Math.round(rts.reduce((a, rt) => a + rt.basePrice, 0) / rts.length) : 0;
+  const rts = useMemo(() => roomTypes.filter((rt) => activeStructureId === "all" || rt.structureId === activeStructureId), [roomTypes, activeStructureId]);
 
   const activeStructure = activeStructureId !== "all" ? structures.find((s) => s.id === activeStructureId) : undefined;
 
@@ -101,12 +101,15 @@ export default function RateCheckerPage() {
 
   const rows = useMemo(() => {
     const start = todayISO();
+    const wk = loadWeekendPct();
     return Array.from({ length: DAYS }, (_, i) => {
       const iso = addDays(start, i);
-      const mine = rateOverrides[iso] ?? avgBase;
+      // La MIA tariffa del giorno = media della tariffa effettiva (override per tipologia, derivate, weekend)
+      // delle tipologie della struttura in vista — la stessa del calendario.
+      const mine = rts.length ? Math.round(rts.reduce((a, rt) => a + rateForDay(rt.id, iso, roomTypes, rateOverrides, wk), 0) / rts.length) : 0;
       return { iso, mine, mkt: marketByDate.get(iso) };
     });
-  }, [rateOverrides, avgBase, marketByDate]);
+  }, [rateOverrides, rts, roomTypes, marketByDate]);
 
   const isConfigured = configured === true;
 

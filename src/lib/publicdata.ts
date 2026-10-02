@@ -165,7 +165,14 @@ export function buildPublishData(structureId: string): Record<string, string> | 
       status: b.status,
       channel: b.channel,
     }));
-  const events = (blob.events ?? []).filter((e) => (e as { structureId?: string }).structureId === structureId);
+  // Eventi: quelli della struttura + quelli senza struttura ("per tutte").
+  const events = (blob.events ?? []).filter((e) => { const sid = (e as { structureId?: string }).structureId; return !sid || sid === structureId; });
+  // Tariffe forzate: solo le chiavi "<tipologia>|<giorno>" delle tipologie di QUESTA struttura (+ le chiavi giorno nude, valide per tutte).
+  const rateOverrides: Record<string, number> = {};
+  for (const [k, v] of Object.entries(blob.rateOverrides ?? {})) {
+    const bar = k.indexOf("|");
+    if (bar < 0 || rtIds.has(k.slice(0, bar))) rateOverrides[k] = v;
+  }
 
   // Recensioni dirette della struttura: pubblicate sul mini-sito (con l'eventuale
   // risposta del gestore). Sono dati NOSTRI, quindi possono comparire pubblicamente.
@@ -178,7 +185,7 @@ export function buildPublishData(structureId: string): Record<string, string> | 
     bookings,
     guests: [],       // nessun dato ospite in pubblico
     events,
-    rateOverrides: blob.rateOverrides ?? {},
+    rateOverrides,
     activities: [],
     directReviews,
   });
@@ -191,7 +198,17 @@ export function buildPublishData(structureId: string): Record<string, string> | 
   const firstStructureId = (blob.structures ?? [])[0]?.id as string | undefined;
   for (const k of AUX_KEYS) {
     try {
-      const v = k === "spigolestay:sito" ? getSiteConfigRaw(structureId, firstStructureId) : localStorage.getItem(k);
+      let v = k === "spigolestay:sito" ? getSiteConfigRaw(structureId, firstStructureId) : localStorage.getItem(k);
+      // Promo e piani tariffari: SOLO quelli di questa struttura (+ "per tutte", senza structureId).
+      if (v != null && (k === "spigolestay:promos" || k === "spigolestay:rateplans")) {
+        const arr = JSON.parse(v);
+        if (Array.isArray(arr)) v = JSON.stringify(arr.filter((x: { structureId?: string }) => !x?.structureId || x.structureId === structureId));
+      }
+      // Regole prezzo: il default + la regola di questa struttura (mai quelle delle altre).
+      if (v != null && k === "spigolestay:pricerules") {
+        const o = JSON.parse(v);
+        if (o && typeof o === "object" && o.byStructure) { const own = o.byStructure[structureId]; o.byStructure = own ? { [structureId]: own } : undefined; v = JSON.stringify(o); }
+      }
       if (v != null) out[k] = v;
     } catch {}
   }

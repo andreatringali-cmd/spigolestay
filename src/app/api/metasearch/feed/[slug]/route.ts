@@ -14,7 +14,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { effectiveBase, effectiveClosed } from "@/lib/pricing";
+import { effectiveBase, effectiveClosed, weekendPctFromRaw } from "@/lib/pricing";
 import type { RoomType } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ slug: strin
   // piano) — la stessa base che /prenota mostra come tariffa del giorno.
   const dayPrice = (rt: RoomType, iso: string): number => {
     const base = effectiveBase(rt, allTypes);
-    const raw = overrides[`${rt.id}|${iso}`] ?? overrides[iso] ?? Math.round(base * (isWeekendISO(iso) ? 1 + weekendPct / 100 : 1));
+    const raw = overrides[`${rt.id}|${iso}`] ?? overrides[iso] ?? Math.round(base * (isWeekendISO(iso) ? 1 + weekendPctFromRaw(siteData["spigolestay:pricerules"], rt.structureId) / 100 : 1));
     return Math.max(0, Math.round(raw));
   };
 

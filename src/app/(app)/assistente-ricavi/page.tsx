@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { toISO, shiftISO, parseISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
+import { rateForDay, loadWeekendPct } from "@/lib/pricing";
+import { inScope, newItemStructureId } from "@/lib/scope";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import Icon from "@/components/Icon";
 
@@ -11,9 +13,9 @@ const isWeekend = (iso: string) => { const d = new Date(iso).getDay(); return d 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
 
 // Eventi locali: li aggiunge il gestore a mano (sagre, concerti, crociere…) — nessuna fonte
-// esterna/automatica. Un'unica lista condivisa (gli eventi riguardano la città, non una singola
-// struttura), con la data vera invece di un offset da "oggi".
-interface LocalEvent { id: string; name: string; date: string; impact: "alto" | "medio" }
+// esterna/automatica. Ogni evento appartiene alla struttura selezionata al momento della creazione
+// (structureId assente = evento "per tutte", visibile ovunque), con la data vera invece di un offset da "oggi".
+interface LocalEvent { id: string; name: string; date: string; impact: "alto" | "medio"; structureId?: string }
 const EVENTS_KEY = "spigolestay:localevents";
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now() + Math.random()));
 
@@ -27,24 +29,28 @@ export default function AssistenteRicaviPage() {
   const { roomTypes, units, bookings, rateOverrides, setDayRates, activeStructureId, structures } = useData();
   const today = toISO(new Date());
   const [horizon, setHorizon] = useState(30);
-  const weekendPct = useMemo(() => { try { const r = localStorage.getItem("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendPct ?? 25; } catch {} return 25; }, []);
+  // Regola weekend della struttura selezionata (se ha la propria), altrimenti quella di default.
+  const weekendPct = useMemo(() => loadWeekendPct(activeStructureId === "all" ? undefined : activeStructureId), [activeStructureId]);
 
   const scopeUnits = units.filter((u) => !u.outOfService && (activeStructureId === "all" || u.structureId === activeStructureId));
   const scopeTypes = roomTypes.filter((rt) => activeStructureId === "all" || rt.structureId === activeStructureId);
   const baseRate = scopeTypes.length ? Math.round(scopeTypes.reduce((a, rt) => a + rt.basePrice, 0) / scopeTypes.length) : 100;
 
-  const [myEvents, setMyEvents] = useState<LocalEvent[]>([]);
+  const [allEvents, setMyEvents] = useState<LocalEvent[]>([]);
   useEffect(() => { try { const r = localStorage.getItem(EVENTS_KEY); if (r) setMyEvents(JSON.parse(r)); } catch {} }, []);
+  // Si salva SEMPRE la lista completa (eventi di tutte le strutture); la vista è filtrata per struttura attiva.
+  const myEvents = useMemo(() => allEvents.filter((e) => inScope(e.structureId, activeStructureId)), [allEvents, activeStructureId]);
   const persistEvents = (next: LocalEvent[]) => { setMyEvents(next); try { localStorage.setItem(EVENTS_KEY, JSON.stringify(next)); } catch {} };
   const [newEvName, setNewEvName] = useState("");
   const [newEvDate, setNewEvDate] = useState("");
   const [newEvImpact, setNewEvImpact] = useState<"alto" | "medio">("medio");
   const addEvent = () => {
     if (!newEvName.trim() || !newEvDate) return;
-    persistEvents([...myEvents, { id: uid(), name: newEvName.trim(), date: newEvDate, impact: newEvImpact }].sort((a, b) => a.date.localeCompare(b.date)));
+    const sid = newItemStructureId(activeStructureId);
+    persistEvents([...allEvents, { id: uid(), name: newEvName.trim(), date: newEvDate, impact: newEvImpact, ...(sid ? { structureId: sid } : {}) }].sort((a, b) => a.date.localeCompare(b.date)));
     setNewEvName(""); setNewEvDate(""); setNewEvImpact("medio");
   };
-  const removeEvent = (id: string) => persistEvents(myEvents.filter((e) => e.id !== id));
+  const removeEvent = (id: string) => persistEvents(allEvents.filter((e) => e.id !== id));
 
   const events = useMemo(() => myEvents.map((e) => ({ ...e, iso: e.date })), [myEvents]);
   const eventOf = (iso: string) => events.find((e) => e.iso === iso);
@@ -61,17 +67,29 @@ export default function AssistenteRicaviPage() {
     if (ev) { factor += ev.impact === "alto" ? 0.3 : 0.15; reasons.push({ text: ev.name, kind: "event" }); }
     if (occPct >= 80) { factor += 0.15; reasons.push({ text: "Alta domanda", kind: "demand" }); }
     else if (occPct <= 30 && daysFrom(iso) <= 5) { factor -= 0.12; reasons.push({ text: "Last-minute", kind: "lastminute" }); }
-    const current = rateOverrides[iso] ?? Math.round(baseRate * (isWeekend(iso) ? 1 + weekendPct / 100 : 1));
+    // Tariffa attuale = media effettiva (override per tipologia, derivate, weekend) delle tipologie in scope.
+    const current = scopeTypes.length ? Math.round(scopeTypes.reduce((a, rt) => a + rateForDay(rt.id, iso, roomTypes, rateOverrides, weekendPct), 0) / scopeTypes.length) : Math.round(baseRate * (isWeekend(iso) ? 1 + weekendPct / 100 : 1));
     const rate = Math.max(0, Math.round(baseRate * factor));
     return { iso, occPct, free, rate, current, reasons, delta: rate - current };
   };
 
-  const days = useMemo(() => Array.from({ length: horizon }, (_, i) => suggest(shiftISO(today, i + 1))), [horizon, rateOverrides, activeStructureId, bookings]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const days = useMemo(() => Array.from({ length: horizon }, (_, i) => suggest(shiftISO(today, i + 1))), [horizon, rateOverrides, activeStructureId, bookings, roomTypes, units, myEvents, weekendPct]);
   const opportunities = days.filter((d) => Math.abs(d.delta) >= 1 && d.free > 0);
   const upside = opportunities.reduce((a, d) => a + Math.max(0, d.delta) * d.free, 0);
 
-  const applyOne = (d: { iso: string; rate: number }) => setDayRates({ [d.iso]: d.rate });
-  const applyAll = () => setDayRates(Object.fromEntries(opportunities.map((d) => [d.iso, d.rate])));
+  // Scrive gli override per (tipologia|giorno) SOLO sulle tipologie della struttura selezionata (mai la chiave ISO
+  // nuda, che varrebbe per tutte le strutture). Ogni tipologia mantiene la sua proporzione rispetto alla media.
+  const mapFor = (d: { iso: string; rate: number; current: number }) => {
+    const out: Record<string, number> = {};
+    for (const rt of scopeTypes) {
+      const cur = rateForDay(rt.id, d.iso, roomTypes, rateOverrides, weekendPct);
+      out[`${rt.id}|${d.iso}`] = Math.max(0, Math.round(d.current > 0 ? cur * (d.rate / d.current) : d.rate));
+    }
+    return out;
+  };
+  const applyOne = (d: { iso: string; rate: number; current: number }) => setDayRates(mapFor(d));
+  const applyAll = () => setDayRates(Object.assign({}, ...opportunities.map((d) => mapFor(d))));
 
   return (
     <div>

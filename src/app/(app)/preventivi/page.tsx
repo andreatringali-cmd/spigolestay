@@ -9,7 +9,8 @@ import { eur } from "@/lib/format";
 import { depositFor } from "@/lib/deposit";
 import { shortenLink } from "@/lib/guestlink";
 import { supabase } from "@/lib/supabase";
-import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } from "@/lib/rate-plans";
+import { loadPlans, planApplies, planDepositPct, cancelText, plansForStructure, type RatePlan } from "@/lib/rate-plans";
+import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
@@ -109,13 +110,17 @@ export default function PreventiviPage() {
   const availOf = (rtId: string) => units.filter((u) => u.roomTypeId === rtId && !u.outOfService && !bookings.some((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.unitId === u.id && b.checkIn < checkOut && b.checkOut > checkIn)).length;
   const datesOk = !!(checkIn && checkOut && checkOut > checkIn);
   // Piani tariffari (definiti in Tariffe): scelti qui, applicano il loro scarto al prezzo del calendario.
-  const [plans, setPlans] = useState<RatePlan[]>([]);
+  const [allPlans, setPlans] = useState<RatePlan[]>([]);
+  // Solo i piani della struttura del preventivo (+ quelli per tutte).
+  const plans = useMemo(() => plansForStructure(allPlans, structureId), [allPlans, structureId]);
   const [planId, setPlanId] = useState("flex");
-  useEffect(() => { const p = loadPlans(); setPlans(p); setPlanId((prev) => (p.some((x) => x.id === prev) ? prev : p[0]?.id ?? prev)); }, []);
+  useEffect(() => { setPlans(loadPlans()); }, []);
+  useEffect(() => { setPlanId((prev) => (plans.some((x) => x.id === prev) ? prev : plans[0]?.id ?? prev)); }, [plans]);
   const activePlan = plans.find((p) => p.id === planId);
   const planAdj = activePlan?.adjPct ?? 0;
   // Prezzo automatico dal calendario per una tipologia nel periodo, con lo scarto del piano scelto (poi modificabile).
-  const autoPrice = (rtId: string) => { const base = roomTypes.find((r) => r.id === rtId)?.basePrice ?? 100; let sum = 0, cnt = 0; for (let d = checkIn; d && d < checkOut && cnt < 60; d = shiftISO(d, 1)) { sum += rateOverrides[`${rtId}|${d}`] ?? rateOverrides[d] ?? base; cnt++; } const avg = cnt > 0 ? sum / cnt : base; return Math.max(0, Math.round(avg * (1 + planAdj / 100))); };
+  // Tariffa del giorno = stessa del calendario (override per tipologia, derivate, weekend della struttura).
+  const autoPrice = (rtId: string) => { const base = roomTypes.find((r) => r.id === rtId)?.basePrice ?? 100; const wk = loadWeekendPct(); let sum = 0, cnt = 0; for (let d = checkIn; d && d < checkOut && cnt < 60; d = shiftISO(d, 1)) { sum += roomTypes.some((r) => r.id === rtId) ? rateForDay(rtId, d, roomTypes, rateOverrides, wk) : base; cnt++; } const avg = cnt > 0 ? sum / cnt : base; return Math.max(0, Math.round(avg * (1 + planAdj / 100))); };
   const updateLine = (i: number, patch: Partial<QuoteRoom>) => setRoomLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const addLine = () => setRoomLines((ls) => { const used = new Set(ls.map((l) => l.roomTypeId)); const next = typesOf.find((t) => !used.has(t.id)) ?? typesOf[0]; return next ? [...ls, { roomTypeId: next.id, qty: 1, price: autoPrice(next.id) }] : ls; });
   const removeLine = (i: number) => setRoomLines((ls) => ls.filter((_, j) => j !== i));
@@ -164,11 +169,33 @@ export default function PreventiviPage() {
   const pdfPage1Ref = useRef<HTMLDivElement>(null);
   const pdfPage2Ref = useRef<HTMLDivElement>(null);
   // Dati di pagamento (salvati nel browser, si inseriscono una volta).
+  // Forma salvata: { holder, iban, extra } = default storico per tutte le strutture; { byStructure: { [id]: {holder,iban,extra} } } =
+  // dati propri di una struttura (un IBAN inserito per una struttura non finisce sul preventivo di un'altra).
+  const PAY_KEY = "spigolestay:paysettings";
   const [payHolder, setPayHolder] = useState("");
   const [payIban, setPayIban] = useState("");
   const [payExtra, setPayExtra] = useState("PayPal / Revolut: su richiesta inviamo il link dedicato.");
-  useEffect(() => { try { const r = JSON.parse(localStorage.getItem("spigolestay:paysettings") || "{}"); if (r.holder) setPayHolder(r.holder); if (r.iban) setPayIban(r.iban); if (typeof r.extra === "string") setPayExtra(r.extra); } catch {} }, []);
-  useEffect(() => { try { localStorage.setItem("spigolestay:paysettings", JSON.stringify({ holder: payHolder, iban: payIban, extra: payExtra })); } catch {} }, [payHolder, payIban, payExtra]);
+  useEffect(() => {
+    try {
+      const r = JSON.parse(localStorage.getItem(PAY_KEY) || "{}");
+      const own = structureId && r.byStructure ? r.byStructure[structureId] : undefined;
+      const src = own ?? r;
+      setPayHolder(src.holder ?? ""); setPayIban(src.iban ?? ""); setPayExtra(typeof src.extra === "string" ? src.extra : "PayPal / Revolut: su richiesta inviamo il link dedicato.");
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structureId]);
+  // Si salva SOLO quando l'utente modifica un campo (mai al caricamento), nella voce della struttura del preventivo.
+  const updPay = (patch: Partial<{ holder: string; iban: string; extra: string }>) => {
+    const vals = { holder: payHolder, iban: payIban, extra: payExtra, ...patch };
+    if (patch.holder !== undefined) setPayHolder(patch.holder);
+    if (patch.iban !== undefined) setPayIban(patch.iban);
+    if (patch.extra !== undefined) setPayExtra(patch.extra);
+    try {
+      const r = JSON.parse(localStorage.getItem(PAY_KEY) || "{}");
+      if (structureId && structures.length > 1) localStorage.setItem(PAY_KEY, JSON.stringify({ ...r, byStructure: { ...(r.byStructure ?? {}), [structureId]: vals } }));
+      else localStorage.setItem(PAY_KEY, JSON.stringify({ ...r, ...vals }));
+    } catch {}
+  };
   const [saved, setSaved] = useState<Preventivo[]>([]);
   // Archivio filtrato per la struttura attiva (selettore in alto) — "tutte" mostra ogni preventivo.
   const scopedSaved = activeStructureId === "all" ? saved : saved.filter((p) => p.structureId === activeStructureId);
@@ -312,6 +339,17 @@ export default function PreventiviPage() {
     }
   };
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Cambiando struttura in alto a destra, un NUOVO preventivo passa alla struttura attiva (non si tocca una modifica in corso).
+  const prevActive = useRef(activeStructureId);
+  useEffect(() => {
+    if (prevActive.current === activeStructureId) return;
+    prevActive.current = activeStructureId;
+    if (activeStructureId === "all" || editingId || !structures.some((s) => s.id === activeStructureId)) return;
+    setStructureId(activeStructureId);
+    const rt0 = roomTypes.find((r) => r.structureId === activeStructureId);
+    setRoomLines(rt0 ? [{ roomTypeId: rt0.id, qty: 1, price: rt0.basePrice }] : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStructureId]);
   const loadQuote = (p: Preventivo) => {
     setTab("nuovo");
     setEditingId(p.id);
@@ -679,14 +717,14 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             <Field label={t("Nome")}><input value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inp} placeholder={t("Nome")} /></Field>
             <Field label={t("Email")}><input value={email} onChange={(e) => setEmail(e.target.value)} className={inp} placeholder={t("opzionale")} /></Field>
             <Field label={t("Telefono")}><input value={phone} onChange={(e) => setPhone(e.target.value)} className={inp} placeholder="+39…" /></Field>
-            {structures.length > 1 && (
+            {structures.length > 1 && !lockedStructure && (
               <Field label={t("Struttura")}>
                 <select value={structureId} onChange={(e) => { const sid = e.target.value; setStructureId(sid); const rt0 = roomTypes.find((r) => r.structureId === sid); setRoomLines(rt0 ? [{ roomTypeId: rt0.id, qty: 1, price: autoPrice(rt0.id) }] : []); }} className={inp}>
                   {structures.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
                 </select>
               </Field>
             )}
-            {structures.length > 1 && <div className="hidden sm:block" />}
+            {structures.length > 1 && !lockedStructure && <div className="hidden sm:block" />}
             <Field label={t("Check-in")}><input type="date" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); if (e.target.value >= checkOut) setCheckOut(shiftISO(e.target.value, 1)); }} className={inp} /></Field>
             <Field label={t("Check-out")}><input type="date" value={checkOut} min={shiftISO(checkIn, 1)} onChange={(e) => setCheckOut(e.target.value)} className={inp} /></Field>
             <Field label={t("Adulti")}><input type="number" min={1} value={adults} onChange={(e) => setAdults(Math.max(1, Number(e.target.value)))} className={inp} /></Field>
@@ -720,7 +758,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
               <div className="sm:col-span-2">
                 <div className="mb-1 text-xs font-medium text-dim">{t("Piano tariffario")} <span className="font-normal text-faint">({t("parte dal prezzo del calendario")})</span></div>
                 <div className="flex flex-wrap gap-2">
-                  {plans.filter((p) => planApplies(p, { checkIn, nights: n })).map((p) => {
+                  {plans.filter((p) => planApplies(p, { checkIn, nights: n, structureId })).map((p) => {
                     const on = p.id === planId;
                     return (
                       <button key={p.id} type="button" onClick={() => { setPlanId(p.id); setAcconto(planDepositPct(p)); }} className={`rounded-lg border px-3 py-1.5 text-sm transition ${on ? "font-semibold" : "text-dim hover:bg-wash"}`} style={on ? { borderColor: "var(--focus)", backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)", color: "var(--focus)" } : { borderColor: "var(--line)" }}>
@@ -814,12 +852,12 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                 <>
                   <div className="mb-2 text-[11px] text-faint">{t("Nessun IBAN sulla struttura: inserisci qui i dati (salvati nel browser). Suggerito: impostarlo nella scheda struttura.")}</div>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <Field label={t("Intestatario")}><input value={payHolder} onChange={(e) => setPayHolder(e.target.value)} className={inp} placeholder={t("Nome Cognome")} /></Field>
-                    <Field label="IBAN"><input value={payIban} onChange={(e) => setPayIban(e.target.value)} className={inp} placeholder="IT…" /></Field>
+                    <Field label={t("Intestatario")}><input value={payHolder} onChange={(e) => updPay({ holder: e.target.value })} className={inp} placeholder={t("Nome Cognome")} /></Field>
+                    <Field label="IBAN"><input value={payIban} onChange={(e) => updPay({ iban: e.target.value })} className={inp} placeholder="IT…" /></Field>
                   </div>
                 </>
               )}
-              <div className="mt-2"><Field label={t("Altri metodi (facoltativo)")}><input value={payExtra} onChange={(e) => setPayExtra(e.target.value)} className={inp} /></Field></div>
+              <div className="mt-2"><Field label={t("Altri metodi (facoltativo)")}><input value={payExtra} onChange={(e) => updPay({ extra: e.target.value })} className={inp} /></Field></div>
             </div>
             <div className="sm:col-span-2"><Field label={t("Note (opzionale)")}><textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className={`${inp} resize-none`} placeholder={t("Es. offerta valida 3 giorni, richieste particolari…")} /></Field></div>
           </div>

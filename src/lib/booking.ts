@@ -67,10 +67,10 @@ export function bookingPaidTotal(b: BookingLike): number {
 // Calcolo UNICO della commissione OTA, condiviso ovunque venga mostrata o sommata.
 // Se è nota la cifra esatta (commissionAmount, es. da Booking.com/Channex) ha sempre priorità
 // sul calcolo via percentuale, che resta una stima quando la cifra esatta non c'è.
-type CommissionBookingLike = { total?: number; channel: Channel; commissionPct?: number; commissionAmount?: number | null };
+type CommissionBookingLike = { total?: number; channel: Channel; commissionPct?: number; commissionAmount?: number | null; structureId?: string };
 export function commissionPctOf(b: CommissionBookingLike): number {
   if (b.commissionAmount != null && b.total) return Math.round((b.commissionAmount / b.total) * 1000) / 10;
-  return b.commissionPct ?? loadChannelCommissionPct(b.channel) ?? CHANNELS[b.channel].commission * 100;
+  return b.commissionPct ?? loadChannelCommissionPct(b.channel, b.structureId) ?? CHANNELS[b.channel].commission * 100;
 }
 export function commissionOf(b: CommissionBookingLike): number {
   return b.commissionAmount ?? Math.round((b.total ?? 0) * commissionPctOf(b) / 100);

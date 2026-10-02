@@ -18,6 +18,7 @@ export interface RatePlan {
   dateTo?: string;
   roomTypeIds?: string[];  // tipologie a cui si applica (assente/vuoto = tutte)
   description?: string;
+  structureId?: string;    // struttura a cui appartiene il piano (assente = vale per tutte le strutture)
 }
 
 import { lsGet } from "./publicdata";
@@ -29,9 +30,17 @@ export function loadPlans(): RatePlan[] {
   return [];
 }
 
+// Piani visibili con la struttura selezionata ("all" = tutti): quelli della struttura + quelli per tutte.
+export function plansForStructure(plans: RatePlan[], structureId: string): RatePlan[] {
+  if (!structureId || structureId === "all") return plans;
+  return plans.filter((p) => !p.structureId || p.structureId === structureId);
+}
+
 // Il piano è offerto per queste date / tipologia / durata?
-export function planApplies(p: RatePlan, opts: { roomTypeId?: string; checkIn?: string; nights?: number }): boolean {
+export function planApplies(p: RatePlan, opts: { roomTypeId?: string; checkIn?: string; nights?: number; structureId?: string }): boolean {
   if (p.enabled === false) return false;
+  // Piano di una struttura precisa: non si applica alle altre (senza structureId = vale per tutte).
+  if (p.structureId && opts.structureId && p.structureId !== opts.structureId) return false;
   if (p.roomTypeIds && p.roomTypeIds.length && opts.roomTypeId && !p.roomTypeIds.includes(opts.roomTypeId)) return false;
   if (typeof opts.nights === "number" && opts.nights > 0 && p.minStay > opts.nights) return false;
   // Intervallo temporale valutato sul check-in

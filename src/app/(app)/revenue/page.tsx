@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
+import { inScope } from "@/lib/scope";
 import { rateForDay, loadWeekendPct } from "@/lib/pricing";
 import { shiftISO, nights, toISO } from "@/lib/dates";
 import { fetchCityPulse, computeMarketSignal, revenueSuggestion, pulseHasDemo, MARKET_WINDOW, type MarketPulse } from "@/lib/market";
@@ -32,8 +33,10 @@ export default function RevenuePage() {
 
   // ── Benchmark di zona "Rete città" (onesto): struttura di riferimento + i MIEI dati reali. ──
   const struct = useMemo(() => {
-    const active = structures.find((s) => s.id === activeStructureId && (s.city || "").trim());
-    return active || structures.find((s) => (s.city || "").trim()) || structures[0];
+    // Con una struttura selezionata il riferimento è SOLO quella (anche senza città: segnale neutro),
+    // mai un'altra struttura. Con "Tutte" si usa la prima struttura con città.
+    if (activeStructureId !== "all") return structures.find((s) => s.id === activeStructureId);
+    return structures.find((s) => (s.city || "").trim()) || structures[0];
   }, [structures, activeStructureId]);
   const city = (struct?.city || "").trim();
   const my = useMemo(() => {
@@ -75,7 +78,7 @@ export default function RevenuePage() {
     for (let i = 0; i < days; i++) {
       const iso = addDays(start, i);
       const sold = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId) && b.checkIn <= iso && b.checkOut > iso).length;
-      const hasEvent = events.some((e) => iso >= e.from && iso < e.to);
+      const hasEvent = events.some((e) => inScope(e.structureId, activeStructureId) && iso >= e.from && iso < e.to);
       // Prezzo attuale = media effettiva per tipologia (include gli override applicati con chiave tipo|iso).
       const base = rts.length ? Math.round(rts.reduce((a, rt) => a + rateForType(rt.id, iso), 0) / rts.length) : avgBase;
       out.push({ iso, occ: sold / totalUnits, sold, hasEvent, base });

@@ -55,9 +55,13 @@ export default function UpsellingPage() {
 
   const arrivals = useMemo(() => bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && b.checkIn >= today && (activeStructureId === "all" || b.structureId === activeStructureId)).sort((a, b) => a.checkIn.localeCompare(b.checkIn)).slice(0, 30), [bookings, today, activeStructureId]);
 
-  // Ricavo potenziale: media prezzo extra (della struttura del catalogo) × arrivi × take-rate 30%.
+  // Ricavo potenziale: per ogni arrivo, media prezzo degli extra attivi DELLA SUA struttura × take-rate 30%.
+  // (con "Tutte" ogni arrivo usa il catalogo della propria struttura, non quello di una sola.)
+  const avgOf = (structId: string) => { const ex = extrasOf(structId); return ex.length ? ex.reduce((a, e) => a + e.price, 0) / ex.length : 0; };
   const avgExtra = activeCat.length ? activeCat.reduce((a, e) => a + e.price, 0) / activeCat.length : 0;
-  const potential = Math.round(avgExtra * arrivals.length * 0.3);
+  const potential = Math.round(arrivals.reduce((a, b) => a + avgOf(b.structureId), 0) * 0.3);
+  // Cambiando struttura si chiudono editor/proposte aperti (gli id degli extra sono di un altro catalogo).
+  useEffect(() => { setEditId(null); setOfferFor(null); setShareOpen(false); setPicked(new Set()); }, [activeStructureId]);
 
   const offerMsg = (bookingId: string) => {
     const b = bookings.find((x) => x.id === bookingId); if (!b) return "";

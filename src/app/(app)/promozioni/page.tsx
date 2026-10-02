@@ -9,6 +9,7 @@ import ScrollStrip from "@/components/ScrollStrip";
 import { type Promo, loadPromos, savePromos, newPromoId, applyPromo, DEFAULT_PROMOS } from "@/lib/promos";
 import { GUEST_TAGS, type Channel } from "@/lib/types";
 import { commissionOf } from "@/lib/booking";
+import { inScope, newItemStructureId } from "@/lib/scope";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import VarLegend, { PROMO_VARS } from "@/components/VarLegend";
@@ -27,7 +28,7 @@ const RIPRENOTA_PROMO: Promo = {
 
 // I segmenti "intelligenti" (calcolati dallo storico) + le categorie ospite (flag VIP e tag "tag:<nome>").
 type Segment = string;
-interface SendLog { id: string; promoName: string; date: string; recipients: number; segment: Segment; }
+interface SendLog { id: string; promoName: string; date: string; recipients: number; segment: Segment; structureId?: string; }
 
 const SEGMENTS: { key: Segment; label: string; desc: string }[] = [
   { key: "ota", label: "Arrivati da OTA", desc: "Prenotarono via Booking/Airbnb — riportali al diretto" },
@@ -45,15 +46,25 @@ const fmtD = (iso: string) => { try { return parseISO(iso).toLocaleDateString("i
 const daysAgo = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 
 export default function PromozioniPage() {
-  const { guests, bookings, structures } = useData();
+  const { guests: allGuests, bookings: allBookings, structures, activeStructureId } = useData();
+  // Con una struttura selezionata: solo le SUE prenotazioni e gli ospiti che hanno soggiornato (o prenotato) da lei.
+  const bookings = useMemo(() => (activeStructureId === "all" ? allBookings : allBookings.filter((b) => b.structureId === activeStructureId)), [allBookings, activeStructureId]);
+  const guests = useMemo(() => {
+    if (activeStructureId === "all") return allGuests;
+    const ids = new Set(bookings.map((b) => b.guestId));
+    return allGuests.filter((g) => ids.has(g.id));
+  }, [allGuests, bookings, activeStructureId]);
   const ask = useConfirm();
   const toast = useToast();
   const today = toISO(new Date());
   const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 
   // ── Libreria promo (salvate) ──
-  const [promos, setPromos] = useState<Promo[]>([]);
-  const [logs, setLogs] = useState<SendLog[]>([]);
+  // `allPromos`/`allLogs` = elenco COMPLETO salvato (tutte le strutture); `promos`/`logs` = vista filtrata sulla struttura attiva.
+  const [allPromos, setPromos] = useState<Promo[]>([]);
+  const [allLogs, setLogs] = useState<SendLog[]>([]);
+  const promos = useMemo(() => allPromos.filter((p) => inScope(p.structureId, activeStructureId)), [allPromos, activeStructureId]);
+  const logs = useMemo(() => allLogs.filter((l) => inScope(l.structureId, activeStructureId)), [allLogs, activeStructureId]);
   useEffect(() => {
     let list = loadPromos();
     try {
@@ -67,6 +78,7 @@ export default function PromozioniPage() {
   }, []);
   const persistPromos = (n: Promo[]) => { setPromos(n); savePromos(n); };
   const persistLogs = (n: SendLog[]) => { setLogs(n); try { localStorage.setItem("spigolestay:promolog", JSON.stringify(n)); } catch {} };
+  const removeLog = (id: string) => persistLogs(allLogs.filter((x) => x.id !== id));
 
   // ── Editor promo ──
   const empty = { name: "", subject: "", discount: 0, code: "", body: "" };
@@ -79,31 +91,37 @@ export default function PromozioniPage() {
   const [validFrom, setValidFrom] = useState("");
   const [validTo, setValidTo] = useState("");
   const [body, setBody] = useState(empty.body);
+  const [promoStructure, setPromoStructure] = useState<string>(newItemStructureId(activeStructureId) ?? ""); // "" = per tutte le strutture
+  // Cambiando struttura in alto a destra, una NUOVA promo parte con la struttura attiva (non si tocca una modifica in corso).
+  useEffect(() => { if (!editId) setPromoStructure(newItemStructureId(activeStructureId) ?? ""); }, [activeStructureId, editId]);
 
-  const resetEditor = () => { setEditId(null); setName(""); setSubject(empty.subject); setDiscount(empty.discount); setCode(empty.code); setValidUntil(""); setValidFrom(""); setValidTo(""); setBody(empty.body); };
+  const resetEditor = () => { setEditId(null); setPromoStructure(newItemStructureId(activeStructureId) ?? ""); setName(""); setSubject(empty.subject); setDiscount(empty.discount); setCode(empty.code); setValidUntil(""); setValidFrom(""); setValidTo(""); setBody(empty.body); };
   const savePromo = () => {
     if (!name.trim() && !subject.trim()) return;
-    const data = { name: name.trim() || subject.trim(), subject: subject.trim(), body, discountPct: discount || undefined, code: code.trim() || undefined, validUntil: validUntil || undefined, validFrom: validFrom || undefined, validTo: validTo || undefined };
-    if (editId) persistPromos(promos.map((p) => (p.id === editId ? { ...p, ...data } : p)));
-    else persistPromos([{ id: newPromoId(), ...data, createdAt: today }, ...promos]);
+    const data = { name: name.trim() || subject.trim(), subject: subject.trim(), body, discountPct: discount || undefined, code: code.trim() || undefined, validUntil: validUntil || undefined, validFrom: validFrom || undefined, validTo: validTo || undefined, structureId: promoStructure || undefined };
+    if (editId) persistPromos(allPromos.map((p) => (p.id === editId ? { ...p, ...data } : p)));
+    else persistPromos([{ id: newPromoId(), ...data, createdAt: today }, ...allPromos]);
     resetEditor();
   };
-  const editPromo = (p: Promo) => { setEditId(p.id); setName(p.name); setSubject(p.subject); setDiscount(p.discountPct ?? 0); setCode(p.code ?? ""); setValidUntil(p.validUntil ?? ""); setValidFrom(p.validFrom ?? ""); setValidTo(p.validTo ?? ""); setBody(p.body); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const dupPromo = (p: Promo) => persistPromos([{ ...p, id: newPromoId(), name: `${p.name} (copia)`, createdAt: today }, ...promos]);
+  const editPromo = (p: Promo) => { setEditId(p.id); setName(p.name); setSubject(p.subject); setDiscount(p.discountPct ?? 0); setCode(p.code ?? ""); setValidUntil(p.validUntil ?? ""); setValidFrom(p.validFrom ?? ""); setValidTo(p.validTo ?? ""); setBody(p.body); setPromoStructure(p.structureId ?? ""); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const dupPromo = (p: Promo) => persistPromos([{ ...p, id: newPromoId(), name: `${p.name} (copia)`, createdAt: today }, ...allPromos]);
   const delPromo = async (id: string) => {
     const p = promos.find((x) => x.id === id);
     if (!(await ask({ title: "Elimina promo", message: `Eliminare la promo${p ? ` "${p.name}"` : ""}? L'operazione non è reversibile.`, danger: true, confirmLabel: "Elimina" }))) return;
-    persistPromos(promos.filter((x) => x.id !== id)); if (editId === id) resetEditor();
+    persistPromos(allPromos.filter((x) => x.id !== id)); if (editId === id) resetEditor();
   };
 
   const contactsOf = (s?: { phone?: string; email?: string; website?: string }) => [s?.phone, s?.email, s?.website].filter(Boolean).join(" · ");
-  const defaultStruct = structures[0];
+  // Brand/contatti dell'anteprima: la struttura attiva; solo con "Tutte" si ripiega sulla prima.
+  const defaultStruct = activeStructureId !== "all" ? structures.find((s) => s.id === activeStructureId) ?? structures[0] : structures[0];
   const previewBody = applyPromo(body, { nome: "Marco", sconto: discount, codice: code || "—", scadenza: validUntil ? new Date(validUntil).toLocaleDateString("it-IT") : "—", struttura: defaultStruct?.name ?? "", contatti: contactsOf(defaultStruct) });
 
   // ── Invio (separato) ──
   const [sending, setSending] = useState<Promo | null>(null);
   const [segment, setSegment] = useState<Segment>("lapsed");
-  const [structureId, setStructureId] = useState<string>("all");
+  const [structureId, setStructureId] = useState<string>(activeStructureId);
+  // Il destinatario segue la struttura attiva (il select del modale è bloccato quando ne è selezionata una).
+  useEffect(() => { setStructureId(activeStructureId); }, [activeStructureId]);
 
   const audience = useMemo(() => {
     const withStruct = (gid: string) => structureId === "all" || bookings.some((b) => b.guestId === gid && b.structureId === structureId);
@@ -151,7 +169,7 @@ export default function PromozioniPage() {
       } catch { fail++; }
     }
     setPromoSending(false);
-    if (ok > 0) persistLogs([{ id: newPromoId(), promoName: sending.name, date: today, recipients: ok, segment }, ...logs]);
+    if (ok > 0) persistLogs([{ id: newPromoId(), promoName: sending.name, date: today, recipients: ok, segment, ...(structureId !== "all" ? { structureId } : {}) }, ...allLogs]);
     toast(`Inviate ${ok} email${fail ? ` · ${fail} non riuscite (controlla email/limiti)` : ""}.`, fail && ok === 0 ? "error" : "success");
     if (ok > 0) setSending(null);
   };
@@ -207,6 +225,9 @@ export default function PromozioniPage() {
             <label className="col-span-2 block text-xs font-medium text-dim">Scadenza offerta <span className="font-normal text-faint">· ultimo giorno per prenotare</span><input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={`${inp} mt-1`} /></label>
             <label className="block text-xs font-medium text-dim">Valida per soggiorni dal<input type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} className={`${inp} mt-1`} /></label>
             <label className="block text-xs font-medium text-dim">al<input type="date" value={validTo} min={validFrom || undefined} onChange={(e) => setValidTo(e.target.value)} className={`${inp} mt-1`} /></label>
+            {structures.length > 1 && (
+              <label className="col-span-2 block text-xs font-medium text-dim">Valida per<select value={promoStructure} onChange={(e) => setPromoStructure(e.target.value)} className={`${inp} mt-1`}><option value="">Tutte le strutture</option>{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+            )}
             <label className="col-span-2 block text-xs font-medium text-dim">Messaggio<textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} className={`${inp} mt-1 resize-y`} /></label>
             <div className="col-span-2"><VarLegend vars={PROMO_VARS} onInsert={(tk) => setBody((b) => `${b}${tk}`)} /></div>
           </div>
@@ -242,7 +263,7 @@ export default function PromozioniPage() {
                   <td className="px-3 py-2 text-dim">{segMeta(l.segment)?.label ?? l.segment}</td>
                   <td className="px-3 py-2 font-mono text-txt">{l.recipients}</td>
                   <td className="px-3 py-2 text-dim">{fmtD(l.date)}</td>
-                  <td className="px-3 py-2 text-right"><button onClick={() => persistLogs(logs.filter((x) => x.id !== l.id))} className="text-faint hover:text-[color:var(--err)]">✕</button></td>
+                  <td className="px-3 py-2 text-right"><button onClick={() => removeLog(l.id)} className="text-faint hover:text-[color:var(--err)]">✕</button></td>
                 </tr>
               ))}</tbody>
             </table>
@@ -261,7 +282,7 @@ export default function PromozioniPage() {
               <optgroup label="Segmenti">{SEGMENTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</optgroup>
               <optgroup label="Per categoria">{TAG_SEGMENTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</optgroup>
             </select></label>
-            <label className="mt-3 block text-xs font-medium text-dim">Struttura<select value={structureId} onChange={(e) => setStructureId(e.target.value)} className={`${inp} mt-1`}><option value="all">Tutte le strutture</option>{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+            <label className="mt-3 block text-xs font-medium text-dim">Struttura<select value={structureId} disabled={activeStructureId !== "all"} onChange={(e) => setStructureId(e.target.value)} className={`${inp} mt-1 disabled:opacity-60`}><option value="all">Tutte le strutture</option>{structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
             <div className="mt-2 text-xs text-faint">{segMeta(segment)?.desc} · <b className="text-dim">{audience.length} destinatari</b></div>
             <div className="mt-4 flex items-center justify-end gap-2 border-t border-line pt-4">
               <button onClick={() => setSending(null)} className="rounded-lg border border-line px-3 py-2 text-sm text-dim hover:bg-wash">Annulla</button>

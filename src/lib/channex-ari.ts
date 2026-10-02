@@ -1,4 +1,4 @@
-import { effectiveBase, effectiveMinStay, effectiveClosed } from "@/lib/pricing";
+import { effectiveBase, effectiveMinStay, effectiveClosed, structureWeekendPct } from "@/lib/pricing";
 import { addDays, isWeekend, toISO } from "@/lib/dates";
 import type { RoomType, Unit, Booking } from "@/lib/types";
 import type { RestrictionRow } from "@/lib/channex";
@@ -59,7 +59,7 @@ export function buildAriPayload(
       const closed = closes[`${rt.id}|${iso}`] ?? 0; // camere chiuse alla vendita per quel giorno
       availability.push({ property_id: map.propertyId, room_type_id: mp.roomTypeId, date: iso, availability: Math.max(0, totalUnits - occupied - closed) });
       if (mp.ratePlanId) {
-        const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(effectiveBase(rt, roomTypes) * (isWeekend(dt) ? 1 + weekendPct / 100 : 1));
+        const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(effectiveBase(rt, roomTypes) * (isWeekend(dt) ? 1 + structureWeekendPct(rt.structureId, weekendPct) / 100 : 1));
         const row: RestrictionRow = {
           property_id: map.propertyId,
           rate_plan_id: mp.ratePlanId,

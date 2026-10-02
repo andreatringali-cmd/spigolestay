@@ -3,6 +3,7 @@
 
 import type { RoomType } from "./types";
 import { parseISO, isWeekend } from "./dates";
+import { lsGet } from "./publicdata";
 
 export function effectiveBase(rt: RoomType, all: RoomType[], seen: Set<string> = new Set()): number {
   if (!rt.deriveFrom || seen.has(rt.id)) return rt.basePrice;
@@ -36,18 +37,59 @@ export const isWeekendISO = (iso: string) => isWeekend(parseISO(iso));
 // Se l'interruttore è spento (weekendOn: false), la % effettiva è 0: ogni chiamante la applica
 // già come "prezzo base × (1 + weekendPct/100)", quindi 0 la disattiva ovunque senza dover
 // insegnare a ciascun punto d'uso il concetto di interruttore.
-export function loadWeekendPct(): number {
-  if (typeof localStorage === "undefined") return 25;
+//
+// INDIPENDENTE PER STRUTTURA: la forma storica `{weekendOn, weekendPct}` resta valida e vale
+// come DEFAULT per tutte le strutture. In più si può salvare `byStructure: { [structureId]:
+// { weekendOn?, weekendPct? } }`: una struttura con la propria voce usa quella, le altre
+// continuano a usare il default.
+export interface WeekendRule { weekendOn?: boolean; weekendPct?: number }
+const RULES_KEY = "spigolestay:pricerules";
+
+// Lettura tollerante da stringa grezza (localStorage, snapshot pubblico o dati server).
+export function parseWeekendRules(raw: string | null | undefined): { def: WeekendRule; byStructure: Record<string, WeekendRule> } {
   try {
-    const r = localStorage.getItem("spigolestay:pricerules");
-    if (r) { const v = JSON.parse(r); if (v.weekendOn === false) return 0; return v.weekendPct ?? 25; }
+    if (raw) {
+      const v = JSON.parse(raw);
+      return { def: { weekendOn: v.weekendOn, weekendPct: v.weekendPct }, byStructure: (v.byStructure && typeof v.byStructure === "object") ? v.byStructure : {} };
+    }
   } catch {}
-  return 25;
+  return { def: {}, byStructure: {} };
 }
-export function loadWeekendOn(): boolean {
-  if (typeof localStorage === "undefined") return true;
-  try { const r = localStorage.getItem("spigolestay:pricerules"); if (r) return JSON.parse(r).weekendOn !== false; } catch {}
-  return true;
+const effPct = (r: WeekendRule): number => (r.weekendOn === false ? 0 : (r.weekendPct ?? 25));
+
+// % weekend effettiva da una stringa grezza, per una struttura (se ha la propria voce) o di default.
+export function weekendPctFromRaw(raw: string | null | undefined, structureId?: string): number {
+  const { def, byStructure } = parseWeekendRules(raw);
+  const own = structureId ? byStructure[structureId] : undefined;
+  // Campi mancanti nella voce della struttura → ricadono sul default.
+  return own ? effPct({ weekendOn: own.weekendOn ?? def.weekendOn, weekendPct: own.weekendPct ?? def.weekendPct }) : effPct(def);
+}
+export function weekendOnFromRaw(raw: string | null | undefined, structureId?: string): boolean {
+  const { def, byStructure } = parseWeekendRules(raw);
+  const own = structureId ? byStructure[structureId] : undefined;
+  return (own ? (own.weekendOn ?? def.weekendOn) : def.weekendOn) !== false;
+}
+
+function rawRules(): string | null {
+  try { return lsGet(RULES_KEY); } catch { return null; }
+}
+export function loadWeekendPct(structureId?: string): number {
+  return weekendPctFromRaw(rawRules(), structureId);
+}
+export function loadWeekendOn(structureId?: string): boolean {
+  return weekendOnFromRaw(rawRules(), structureId);
+}
+
+// Cache per rateForDay (chiamata migliaia di volte per render): si ri-parsa solo se la stringa cambia.
+let _cacheRaw: string | null | undefined = undefined;
+let _cacheParsed: { def: WeekendRule; byStructure: Record<string, WeekendRule> } = { def: {}, byStructure: {} };
+export function structureWeekendPct(structureId: string | undefined, fallback: number): number {
+  if (!structureId) return fallback;
+  const raw = rawRules();
+  if (raw !== _cacheRaw) { _cacheRaw = raw; _cacheParsed = parseWeekendRules(raw); }
+  const own = _cacheParsed.byStructure[structureId];
+  if (!own) return fallback; // nessuna regola propria: vale quella passata dal chiamante (default)
+  return effPct({ weekendOn: own.weekendOn ?? _cacheParsed.def.weekendOn, weekendPct: own.weekendPct ?? _cacheParsed.def.weekendPct });
 }
 
 // TARIFFA UNICA per (tipologia, giorno): override calendario (per tipo o per giorno),
@@ -74,5 +116,6 @@ export function rateForDay(typeId: string, iso: string, all: RoomType[], overrid
   }
   // 3) Tipologia base: prezzo di listino + maggiorazione weekend.
   const base = effectiveBase(rt, all);
-  return Math.max(0, Math.round(base * (isWeekendISO(iso) ? 1 + weekendPct / 100 : 1)));
+  const wk = structureWeekendPct(rt.structureId, weekendPct); // regola weekend della struttura della tipologia (se propria)
+  return Math.max(0, Math.round(base * (isWeekendISO(iso) ? 1 + wk / 100 : 1)));
 }

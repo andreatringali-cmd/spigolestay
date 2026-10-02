@@ -18,8 +18,17 @@ const typeColor = (rt: RoomType, i: number) => rt.color ?? AV_COLORS[i % AV_COLO
 
 const PLANS_KEY = "spigolestay:rateplans";
 const DEFAULT_PLAN_NAMES = ["Flessibile", "Non rimborsabile", "Lunga permanenza"];
-function loadPlanNames(): string[] {
-  try { const p = localStorage.getItem(PLANS_KEY); if (p) { const arr = JSON.parse(p) as { name: string }[]; const n = arr.map((x) => x.name).filter(Boolean); if (n.length) return n; } } catch {}
+// Nomi dei piani offerti alle strutture indicate: piani della struttura + piani "per tutte" (senza structureId).
+function loadPlanNames(structureIds: string[] = []): string[] {
+  try {
+    const p = localStorage.getItem(PLANS_KEY);
+    if (p) {
+      const arr = JSON.parse(p) as { name: string; structureId?: string }[];
+      const scopedArr = structureIds.length ? arr.filter((x) => !x.structureId || structureIds.includes(x.structureId)) : arr;
+      const n = Array.from(new Set(scopedArr.map((x) => x.name).filter(Boolean)));
+      if (n.length) return n;
+    }
+  } catch {}
   return DEFAULT_PLAN_NAMES;
 }
 const scartoOf = (rt: RoomType) => { const v = rt.deriveValue ?? 0; const sign = v >= 0 ? "+" : ""; return rt.deriveMode === "amount" ? `${sign}${v} €` : `${sign}${v}%`; };
@@ -338,7 +347,7 @@ function DerivataModal({ structureIds, parentId, editId, onClose }: { structureI
   const editing = editId ? types.find((x) => x.id === editId) : undefined;
   const structureNameOf = (id: string) => structures.find((s) => s.id === id)?.name ?? "";
   const [planNames, setPlanNames] = useState<string[]>(DEFAULT_PLAN_NAMES);
-  useEffect(() => { setPlanNames(loadPlanNames()); }, []);
+  useEffect(() => { setPlanNames(loadPlanNames(structureIds)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [structureIds.join(",")]);
 
   // Evita cicli: una tariffa non può basarsi su una sua discendente.
   const descends = (a: RoomType | undefined, targetId: string, guard = new Set<string>()): boolean => {

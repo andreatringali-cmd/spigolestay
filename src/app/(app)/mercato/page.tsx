@@ -24,13 +24,19 @@ export default function MercatoPage() {
   const { structures, units, bookings, guests, activeStructureId } = useData();
   const { user } = useAuth();
 
+  // Con una struttura selezionata si usa SOLO quella (se non ha la città: messaggio "imposta la città"),
+  // mai un'altra; con "Tutte" la prima struttura con città.
   const struct = useMemo(() => {
-    const active = structures.find((s) => s.id === activeStructureId && (s.city || "").trim());
-    return active || structures.find((s) => (s.city || "").trim()) || structures[0];
+    if (activeStructureId !== "all") return structures.find((s) => s.id === activeStructureId);
+    return structures.find((s) => (s.city || "").trim()) || structures[0];
   }, [structures, activeStructureId]);
   const city = (struct?.city || "").trim();
 
-  const [consents, setConsents] = useState<Consents>({ occupancy: true, adr: true, demand: false, channels: false });
+  const DEFAULT_CONSENTS: Consents = { occupancy: true, adr: true, demand: false, channels: false };
+  const [consents, setConsents] = useState<Consents>(DEFAULT_CONSENTS);
+  // Struttura per cui i consensi sono stati caricati: i consensi sono PER STRUTTURA, quindi non si sincronizza nulla
+  // finché non sono quelli della struttura in vista (altrimenti i consensi dell'altra finirebbero su questa).
+  const [consentsFor, setConsentsFor] = useState<string | null>(null);
   const [pulse, setPulse] = useState<Pulse | null>(null);
   const [breakdown, setBreakdown] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,12 +67,14 @@ export default function MercatoPage() {
   useEffect(() => {
     if (!supabase || !user?.id || !struct?.id) return;
     let cancelled = false;
+    setConsentsFor(null); setConsents(DEFAULT_CONSENTS); setPulse(null); setBreakdown([]);
     (async () => {
       try {
         const { data } = await supabase!.from("market_share").select("*").eq("user_id", user.id).eq("structure_id", struct.id).maybeSingle();
-        if (cancelled || !data) return;
-        setConsents({ occupancy: !!data.share_occupancy, adr: !!data.share_adr, demand: !!data.share_demand, channels: !!data.share_channels });
+        if (cancelled) return;
+        if (data) setConsents({ occupancy: !!data.share_occupancy, adr: !!data.share_adr, demand: !!data.share_demand, channels: !!data.share_channels });
       } catch {}
+      if (!cancelled) setConsentsFor(struct.id);
     })();
     return () => { cancelled = true; };
   }, [user?.id, struct?.id]);
@@ -102,7 +110,7 @@ export default function MercatoPage() {
   const dailyForUpload = useMemo(() => myDaily.map((r) => ({ date: r.date, rooms_total: r.rooms_total, rooms_sold: r.rooms_sold, revenue: r.revenue })), [myDaily]);
 
   const refresh = useCallback(async () => {
-    if (!supabase || !user?.id || !struct?.id || !city) return;
+    if (!supabase || !user?.id || !struct?.id || !city || consentsFor !== struct.id) return;
     setLoading(true);
     try {
       const anyShare = consents.occupancy || consents.adr || consents.demand || consents.channels;
@@ -125,9 +133,9 @@ export default function MercatoPage() {
       const { data: bd } = await supabase.rpc("market_breakdown", { p_city: city, p_from: from, p_to: to });
       setBreakdown(Array.isArray(bd) ? (bd as typeof breakdown) : []);
     } catch {} finally { setLoading(false); }
-  }, [consents, user?.id, struct?.id, city, dailyForUpload, profile]);
+  }, [consents, consentsFor, user?.id, struct?.id, city, dailyForUpload, profile]);
 
-  useEffect(() => { void refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [consents, struct?.id, city]);
+  useEffect(() => { void refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [consents, consentsFor, struct?.id, city]);
 
   const toggle = (k: keyof Consents) => setConsents((c) => ({ ...c, [k]: !c[k] }));
   const enough = (pulse?.n_structures ?? 0) >= THRESHOLD;

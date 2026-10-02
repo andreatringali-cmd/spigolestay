@@ -4,7 +4,8 @@ import { Fragment, useEffect, useState } from "react";
 import { useData } from "@/lib/store";
 import { addDays, isWeekend, toISO, weekdayShort } from "@/lib/dates";
 import type { RoomType } from "@/lib/types";
-import { effectiveBase, effectiveMinStay, effectiveClosed, loadWeekendOn } from "@/lib/pricing";
+import { effectiveBase, effectiveMinStay, effectiveClosed, rateForDay, parseWeekendRules, weekendOnFromRaw } from "@/lib/pricing";
+import { inScope } from "@/lib/scope";
 import { AV_COLORS } from "@/lib/users";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
@@ -12,7 +13,7 @@ import { useLang } from "@/lib/i18n";
 
 const DAYS = 14;
 
-interface RatePlan { id: string; name: string; adjPct: number; refundable: boolean; board: string; minStay: number; enabled?: boolean }
+interface RatePlan { id: string; name: string; adjPct: number; refundable: boolean; board: string; minStay: number; enabled?: boolean; structureId?: string }
 const DEFAULT_PLANS: RatePlan[] = [
   { id: "flex", name: "Flessibile", adjPct: 0, refundable: true, board: "Colazione", minStay: 1, enabled: true },
   { id: "nonref", name: "Non rimborsabile", adjPct: -10, refundable: false, board: "Colazione", minStay: 1, enabled: true },
@@ -41,7 +42,9 @@ export default function TariffePage() {
   const effStructure = activeStructureId !== "all" ? activeStructureId : localStructure;
 
   const { t } = useLang();
-  const [plans, setPlans] = useState<RatePlan[]>(DEFAULT_PLANS);
+  const [allPlans, setPlans] = useState<RatePlan[]>(DEFAULT_PLANS);
+  // Solo i piani della struttura in vista (+ quelli per tutte, senza structureId).
+  const plans = allPlans.filter((p) => inScope(p.structureId, effStructure));
   const [weekendPct, setWeekendPct] = useState(25);
   const [weekendOn, setWeekendOnState] = useState(true);
   const [planId, setPlanId] = useState("flex");
@@ -52,13 +55,36 @@ export default function TariffePage() {
       const p = localStorage.getItem(PLANS_KEY);
       const arr: RatePlan[] = p ? JSON.parse(p) : DEFAULT_PLANS;
       setPlans(arr);
-      setPlanId((prev) => (arr.some((x) => x.id === prev) ? prev : arr[0]?.id ?? prev));
-      const r = localStorage.getItem(RULES_KEY); if (r) setWeekendPct(JSON.parse(r).weekendPct ?? 25);
-      setWeekendOnState(loadWeekendOn());
     } catch {}
   }, []);
-  const saveWeekend = (v: number) => { setWeekendPct(v); try { localStorage.setItem(RULES_KEY, JSON.stringify({ weekendPct: v, weekendOn })); } catch {} };
-  const setWeekendOn = (on: boolean) => { setWeekendOnState(on); try { localStorage.setItem(RULES_KEY, JSON.stringify({ weekendPct, weekendOn: on })); } catch {} };
+  // Il piano selezionato deve esistere tra quelli visibili con la struttura attuale.
+  useEffect(() => { setPlanId((prev) => (plans.some((x) => x.id === prev) ? prev : plans[0]?.id ?? prev)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [effStructure, allPlans]);
+  // Regola weekend INDIPENDENTE per struttura: con una struttura in vista si legge/scrive la sua voce
+  // (`byStructure[id]`), con "Tutte" il default (forma storica) valido per le strutture senza regola propria.
+  const wkScope = effStructure === "all" ? undefined : effStructure;
+  useEffect(() => {
+    try {
+      const r = localStorage.getItem(RULES_KEY);
+      const { def, byStructure } = parseWeekendRules(r);
+      const own = wkScope ? byStructure[wkScope] : undefined;
+      setWeekendPct(own?.weekendPct ?? def.weekendPct ?? 25);
+      setWeekendOnState(weekendOnFromRaw(r, wkScope));
+    } catch {}
+  }, [wkScope]);
+  // Scrive la regola nel posto giusto preservando tutto il resto dell'oggetto (altre strutture, altri campi).
+  const writeRule = (pct: number, on: boolean) => {
+    try {
+      let obj: Record<string, unknown> = {};
+      try { const r = localStorage.getItem(RULES_KEY); if (r) obj = JSON.parse(r) || {}; } catch {}
+      if (wkScope) {
+        const by = (obj.byStructure && typeof obj.byStructure === "object" ? obj.byStructure : {}) as Record<string, unknown>;
+        obj = { ...obj, byStructure: { ...by, [wkScope]: { weekendPct: pct, weekendOn: on } } };
+      } else obj = { ...obj, weekendPct: pct, weekendOn: on };
+      localStorage.setItem(RULES_KEY, JSON.stringify(obj));
+    } catch {}
+  };
+  const saveWeekend = (v: number) => { setWeekendPct(v); writeRule(v, weekendOn); };
+  const setWeekendOn = (on: boolean) => { setWeekendOnState(on); writeRule(weekendPct, on); };
 
   const start = new Date();
   const s = new Date(start.getFullYear(), start.getMonth(), start.getDate());
@@ -69,8 +95,8 @@ export default function TariffePage() {
   // Prezzo del giorno per una tipologia: override calendario → base derivata → +weekend, poi piano.
   const dayPrice = (rt: RoomType, d: Date) => {
     const iso = toISO(d);
-    const base = effectiveBase(rt, roomTypes);
-    const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(base * (isWeekend(d) && weekendOn ? 1 + weekendPct / 100 : 1));
+    // Stessa tariffa unica del calendario (derivate incluse); % weekend della struttura della tipologia.
+    const raw = rateForDay(rt.id, iso, roomTypes, rateOverrides, weekendOn ? weekendPct : 0);
     return Math.max(0, Math.round(raw * (1 + (activePlan?.adjPct ?? 0) / 100)));
   };
 
@@ -281,6 +307,7 @@ export default function TariffePage() {
               <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: weekendOn ? "22px" : "2px" }} />
             </button>
           </div>
+          <p className="mt-2 text-[11px] text-faint">{wkScope ? `${t("Regola valida solo per")} ${structureNameOf(wkScope)}.` : t("Regola predefinita: vale per le strutture che non hanno una regola propria (selezionane una in alto a destra per impostarne una diversa).")}</p>
         </Card>
       </section>
 

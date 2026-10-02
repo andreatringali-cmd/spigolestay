@@ -26,13 +26,36 @@ export function highDemandMap(events: { from: string; to: string; name: string }
   return m;
 }
 
+// Config INDIPENDENTE PER STRUTTURA. Forma salvata (retro-compatibile con la vecchia forma piatta):
+//   { on, horizonDays, maxChangePct, floorPct, ceilPct, lastRun?,            ← DEFAULT per tutte le strutture
+//     byStructure?: { [structureId]: Partial<AutopilotCfg> } }                ← sovrascritture della singola struttura
+// Una struttura senza voce propria usa il default; una voce propria sovrascrive solo i campi presenti.
 const KEY = "spigolestay:autopilot";
-export function loadAutopilot(): AutopilotCfg {
-  if (typeof localStorage === "undefined") return { ...DEFAULT_AUTOPILOT };
-  try { const r = localStorage.getItem(KEY); if (r) return { ...DEFAULT_AUTOPILOT, ...JSON.parse(r) }; } catch {}
-  return { ...DEFAULT_AUTOPILOT };
+type StoredAutopilot = Partial<AutopilotCfg> & { byStructure?: Record<string, Partial<AutopilotCfg>> };
+function readStored(): StoredAutopilot {
+  if (typeof localStorage === "undefined") return {};
+  try { const r = localStorage.getItem(KEY); if (r) { const v = JSON.parse(r); if (v && typeof v === "object") return v as StoredAutopilot; } } catch {}
+  return {};
 }
-export function saveAutopilot(cfg: AutopilotCfg) { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch {} }
+export function loadAutopilot(structureId?: string): AutopilotCfg {
+  const { byStructure, ...def } = readStored();
+  const own = structureId && byStructure ? byStructure[structureId] : undefined;
+  return { ...DEFAULT_AUTOPILOT, ...def, ...(own ?? {}) };
+}
+// Salva una modifica (parziale o completa): con structureId nella voce di quella struttura, altrimenti nel default.
+// Preserva tutto il resto (altre strutture, forma storica).
+export function saveAutopilot(patch: Partial<AutopilotCfg>, structureId?: string) {
+  try {
+    const cur = readStored();
+    if (structureId) {
+      const by = { ...(cur.byStructure ?? {}) };
+      by[structureId] = { ...(by[structureId] ?? {}), ...patch };
+      localStorage.setItem(KEY, JSON.stringify({ ...cur, byStructure: by }));
+    } else {
+      localStorage.setItem(KEY, JSON.stringify({ ...cur, ...patch }));
+    }
+  } catch {}
+}
 
 // Segnali REALI (nessun dato inventato) usati per generare la spiegazione in linguaggio
 // naturale di una proposta (vedi lib/autopilot-explain.ts). Rispecchiano esattamente le

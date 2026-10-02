@@ -14,6 +14,7 @@ export interface Promo {
   validFrom?: string;  // periodo di validità: primo giorno di soggiorno coperto (ISO)
   validTo?: string;    // periodo di validità: ultimo giorno di soggiorno coperto (ISO)
   createdAt?: string;
+  structureId?: string; // struttura a cui appartiene la promo (assente = vale per tutte le strutture)
 }
 
 const KEY = "spigolestay:promos";
@@ -45,6 +46,11 @@ export const DEFAULT_PROMOS: Promo[] = [
 
 export function loadPromos(): Promo[] {
   try { const r = lsGet(KEY); return r ? JSON.parse(r) : []; } catch { return []; }
+}
+// Promo visibili con la struttura selezionata ("all" = tutte): quelle della struttura + quelle per tutte.
+export function promosForStructure(list: Promo[], structureId: string): Promo[] {
+  if (!structureId || structureId === "all") return list;
+  return list.filter((p) => !p.structureId || p.structureId === structureId);
 }
 export function savePromos(list: Promo[]) {
   try { localStorage.setItem(KEY, JSON.stringify(list)); } catch {}

@@ -16,6 +16,7 @@ import { computeSuggestions, loadAutopilot, saveAutopilot, toOverrideMap, highDe
 import { explainSuggestion, explainSuggestionCompact, summarizeAppliedSuggestions } from "@/lib/autopilot-explain";
 import { fetchCityPulse, computeMarketSignal, pulseHasDemo, MARKET_WINDOW, type MarketPulse } from "@/lib/market";
 import { forecastOccupancy, nextWeekendISOs, FORECAST_DEMO_NOTE } from "@/lib/forecast";
+import { inScope } from "@/lib/scope";
 
 const fmtDay = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" });
 
@@ -24,13 +25,19 @@ export default function RevenueAutopilotPage() {
   const { user } = useAuth();
   const toast = useToast();
   const todayISO = toISO(new Date());
-  const [cfg, setCfg] = useState<AutopilotCfg>(loadAutopilot());
   const scope = activeStructureId;
+  const scopeSid = scope === "all" ? undefined : scope;
+  // Config autopilot INDIPENDENTE per struttura: con una struttura selezionata si legge/scrive la sua voce,
+  // con "Tutte" il default (valido per le strutture senza impostazioni proprie).
+  const [cfg, setCfg] = useState<AutopilotCfg>(() => loadAutopilot(scopeSid));
+  const [cfgVer, setCfgVer] = useState(0);
+  useEffect(() => { setCfg(loadAutopilot(scopeSid)); }, [scopeSid]);
 
-  // Struttura di riferimento per il benchmark di zona (attiva con città, altrimenti la prima con città).
+  // Struttura di riferimento per il benchmark di zona: con una struttura selezionata SOLO quella (senza città → nessun
+  // segnale di zona), mai un'altra; con "Tutte" la prima con città.
   const struct = useMemo(() => {
-    const active = structures.find((s) => s.id === scope && (s.city || "").trim());
-    return active || structures.find((s) => (s.city || "").trim()) || structures[0];
+    if (scope !== "all") return structures.find((s) => s.id === scope);
+    return structures.find((s) => (s.city || "").trim()) || structures[0];
   }, [structures, scope]);
   const city = (struct?.city || "").trim();
 
@@ -53,19 +60,26 @@ export default function RevenueAutopilotPage() {
   useEffect(() => { let off = false; (async () => { const p = await fetchCityPulse(supabase, city); if (!off) setPulse(p); })(); return () => { off = true; }; }, [user?.id, city]);
   const signal = useMemo(() => computeMarketSignal(my.occ, my.adr, pulse), [my.occ, my.adr, pulse]);
 
-  // Giorni ad alta richiesta (festivi/ponti/eventi) per prezzi consapevoli.
-  const highDemand = useMemo(() => {
+  // Giorni ad alta richiesta (festivi/ponti/eventi DELLA struttura) per prezzi consapevoli.
+  const highDemandFor = (sid: string | undefined, horizon: number) => {
     const years = [new Date().getFullYear(), new Date().getFullYear() + 1];
-    const city = (scope !== "all" ? getStructure(scope)?.city : structures[0]?.city) ?? "";
+    const city = (sid ? getStructure(sid)?.city : structures[0]?.city) ?? "";
     const h = italianHolidays(years, city);
-    return highDemandMap(events ?? [], h, italianBridges(h), todayISO, cfg.horizonDays);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events, scope, structures, cfg.horizonDays, todayISO]);
+    const evs = (events ?? []).filter((e) => !sid || inScope(e.structureId, sid));
+    return highDemandMap(evs, h, italianBridges(h), todayISO, horizon);
+  };
 
-  const suggestions = useMemo(
-    () => computeSuggestions(bookings, roomTypes, units, rateOverrides, cfg, todayISO, scope, highDemand, signal),
-    [bookings, roomTypes, units, rateOverrides, cfg, todayISO, scope, highDemand, signal],
-  );
+  // Suggerimenti: con una struttura, calcolati con la SUA config; con "Tutte", struttura per struttura
+  // ciascuna con la propria config (default se non ne ha una).
+  const suggestions = useMemo(() => {
+    const sids: (string | undefined)[] = scopeSid ? [scopeSid] : (structures.length ? structures.map((s) => s.id) : [undefined]);
+    const all = sids.flatMap((sid) => {
+      const c = sid === scopeSid ? cfg : loadAutopilot(sid);
+      return computeSuggestions(bookings, roomTypes, units, rateOverrides, c, todayISO, sid ?? "all", highDemandFor(sid, c.horizonDays), signal);
+    });
+    return all.sort((a, b) => Math.abs(b.suggested - b.current) - Math.abs(a.suggested - a.current));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings, roomTypes, units, rateOverrides, cfg, cfgVer, todayISO, scopeSid, structures, events, signal]);
 
   // Previsione storica (lib/forecast.ts): segnale INFORMATIVO in più per il prossimo
   // weekend, separato dal motore prezzi vero e proprio (non altera suggestions/mult).
@@ -80,32 +94,36 @@ export default function RevenueAutopilotPage() {
   }, [bookings, units, scope, todayISO, pulse]);
   const weekendForecastHasDemo = weekendForecast.some((f) => f.networkHasDemo);
 
-  const setCfgPersist = (patch: Partial<AutopilotCfg>) => { const next = { ...cfg, ...patch }; setCfg(next); saveAutopilot(next); };
+  const setCfgPersist = (patch: Partial<AutopilotCfg>) => { const next = { ...cfg, ...patch }; setCfg(next); saveAutopilot(patch, scopeSid); setCfgVer((v) => v + 1); };
 
   // Autopilot attivo: applica automaticamente i suggerimenti una volta appena pronti.
+  // Il ref si riarma al cambio struttura: ogni struttura ha il suo autopilot.
   const auto = useRef(false);
+  useEffect(() => { auto.current = false; }, [scopeSid]);
   useEffect(() => {
     if (!cfg.on || auto.current) return;
     if (!roomTypes.length) return; // attendi l'idratazione dello store
-    if (suggestions.length) {
-      setDayRates(toOverrideMap(suggestions));
-      toast(`Autopilot: applicati ${suggestions.length} aggiustamenti prezzo.`, "success");
-      addActivity("rate", `Autopilot: ${suggestions.length} tariffe aggiornate automaticamente. ${summarizeAppliedSuggestions(suggestions)}`);
+    // Con "Tutte" si applicano solo i suggerimenti delle strutture che hanno l'autopilot attivo.
+    const toApply = scopeSid ? suggestions : suggestions.filter((s) => loadAutopilot(s.structureId).on);
+    if (toApply.length) {
+      setDayRates(toOverrideMap(toApply));
+      toast(`Autopilot: applicati ${toApply.length} aggiustamenti prezzo.`, "success");
+      addActivity("rate", `Autopilot: ${toApply.length} tariffe aggiornate automaticamente. ${summarizeAppliedSuggestions(toApply)}`, scopeSid);
     }
     auto.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cfg.on, roomTypes.length, suggestions.length]);
+  }, [cfg.on, roomTypes.length, suggestions.length, scopeSid]);
 
   const up = suggestions.filter((s) => s.suggested > s.current);
   const down = suggestions.filter((s) => s.suggested < s.current);
   const netDelta = suggestions.reduce((a, s) => a + (s.suggested - s.current), 0);
 
-  const applyOne = (s: Suggestion) => { setDayRates({ [s.key]: s.suggested }); toast(`${s.typeName} · ${fmtDay(s.iso)}: ${eur(s.suggested)}`, "success"); addActivity("rate", explainSuggestion(s)); };
+  const applyOne = (s: Suggestion) => { setDayRates({ [s.key]: s.suggested }); toast(`${s.typeName} · ${fmtDay(s.iso)}: ${eur(s.suggested)}`, "success"); addActivity("rate", explainSuggestion(s), s.structureId); };
   const applyAll = () => {
     if (!suggestions.length) return;
     setDayRates(toOverrideMap(suggestions));
     toast(`Applicati ${suggestions.length} aggiustamenti.`, "success");
-    addActivity("rate", `Applicati manualmente ${suggestions.length} aggiustamenti prezzo. ${summarizeAppliedSuggestions(suggestions)}`);
+    addActivity("rate", `Applicati manualmente ${suggestions.length} aggiustamenti prezzo. ${summarizeAppliedSuggestions(suggestions)}`, scopeSid);
   };
 
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
@@ -157,7 +175,7 @@ export default function RevenueAutopilotPage() {
             </button>
             <div>
               <div className="text-sm font-semibold text-txt">Autopilot {cfg.on ? "attivo" : "spento"}</div>
-              <div className="text-[11px] text-faint">{cfg.on ? "Applica automaticamente entro i limiti impostati." : "Suggerisce soltanto: applichi tu."}</div>
+              <div className="text-[11px] text-faint">{cfg.on ? "Applica automaticamente entro i limiti impostati." : "Suggerisce soltanto: applichi tu."} {scopeSid ? `Impostazioni valide solo per ${getStructure(scopeSid)?.name ?? "questa struttura"}.` : structures.length > 1 ? "Impostazioni predefinite: valgono per le strutture che non ne hanno di proprie (selezionane una in alto a destra per personalizzarle)." : ""}</div>
             </div>
           </div>
           <button onClick={applyAll} disabled={!suggestions.length} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">Applica tutti ({suggestions.length})</button>

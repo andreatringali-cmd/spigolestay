@@ -13,7 +13,7 @@ import { CHANNELS, type Channel } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
 import { loadChannelColor, saveChannelColor, loadChannelCommissionPct, saveChannelCommissionPct } from "@/lib/channelOverrides";
 
-interface LogEntry { id: string; ts: number; text: string; color: string }
+interface LogEntry { id: string; ts: number; text: string; color: string; structureId?: string }
 
 // Tavolozza di colori predefiniti per canale (dieci toni distinti, pensati per restare
 // leggibili sia su barre calendario chiare che scure). Il picker nativo resta disponibile
@@ -37,13 +37,19 @@ export default function CanaliPage() {
   const [localStructure, setLocalStructure] = useState("all");
   const effStructure = activeStructureId !== "all" ? activeStructureId : localStructure;
 
-  const [log, setLog] = useState<LogEntry[]>([]);
+  // `allLog` = registro completo salvato (tutte le strutture); `log` = vista filtrata sulla struttura in vista.
+  const [allLog, setLog] = useState<LogEntry[]>([]);
+  const log = allLog.filter((l) => effStructure === "all" || !l.structureId || l.structureId === effStructure);
   useEffect(() => {
     try {
       const l = localStorage.getItem(LOG_KEY); if (l) setLog(JSON.parse(l));
     } catch {}
   }, []);
   const saveLog = (next: LogEntry[]) => { setLog(next); try { localStorage.setItem(LOG_KEY, JSON.stringify(next.slice(0, 40))); } catch {} };
+  // Aggiunge una voce in testa al registro COMPLETO, etichettata con la struttura a cui si riferisce.
+  const pushLog = (text: string, color: string, structureId?: string) => saveLog([{ id: uid(), ts: Date.now(), text, color, ...(structureId ? { structureId } : {}) }, ...allLog]);
+  // Svuota solo le voci della struttura in vista (con "Tutte" svuota tutto).
+  const clearLog = () => saveLog(effStructure === "all" ? [] : allLog.filter((l) => l.structureId && l.structureId !== effStructure));
 
   // Sincronizzazione reale verso Channex (staging): crea property + camere + tariffe da Xenora.
   const [chxMap, setChxMap] = useState<Record<string, { propertyId: string; rooms?: Record<string, { roomTypeId: string; ratePlanId?: string }>; at: string }>>({});
@@ -66,7 +72,7 @@ export default function CanaliPage() {
   const importOta = async () => {
     setImpSync({ running: true, msg: "Controllo nuove prenotazioni dalle OTA…" });
     try {
-      const j = await apiPost<{ ok: boolean; imported?: number; cancelled?: number; feed?: number; skipped?: number; acked?: number; errors?: string[]; error?: string }>("channex/import", {});
+      const j = await apiPost<{ ok: boolean; imported?: number; cancelled?: number; feed?: number; skipped?: number; acked?: number; errors?: string[]; error?: string }>("channex/import", effStructure !== "all" ? { structureId: effStructure } : {});
       if (!j.ok) { setImpSync({ running: false, ok: false, msg: j.error || "Import non riuscito" }); return; }
       const n = (j.imported ?? 0) + (j.cancelled ?? 0);
       // Diagnostica: se il feed ha righe ma nulla è stato importato, spiega il perché (di solito
@@ -76,7 +82,7 @@ export default function CanaliPage() {
       else if ((j.feed ?? 0) === 0) msg = "Nessuna prenotazione nel feed Channex (nessuna in attesa di conferma).";
       else msg = `${j.feed} nel feed ma 0 importate · ${j.skipped ?? 0} saltate${j.errors?.length ? ` · ${j.errors[0]}` : " (probabile tipologia non mappata o soggiorno già concluso)"}`;
       setImpSync({ running: false, ok: n > 0, msg });
-      if (n > 0) saveLog([{ id: uid(), ts: Date.now(), text: `${t("Prenotazioni OTA importate da Channex")} — ${j.imported ?? 0}`, color: "var(--ok)" }, ...log]);
+      if (n > 0) pushLog(`${t("Prenotazioni OTA importate da Channex")} — ${j.imported ?? 0}`, "var(--ok)", effStructure !== "all" ? effStructure : undefined);
     } catch (e) { setImpSync({ running: false, ok: false, msg: e instanceof Error ? e.message : "errore di rete" }); }
   };
   useEffect(() => { try { const m = localStorage.getItem("spigolestay:channexmap"); if (m) setChxMap(JSON.parse(m)); } catch {} }, []);
@@ -239,7 +245,7 @@ export default function CanaliPage() {
       // Struttura appena creata su Channex → invia subito la finestra ARI iniziale (500 giorni).
       try { window.dispatchEvent(new Event("spigolestay:channex-dirty")); } catch {}
       setChxSync({ running: false, ok: true, msg: `Struttura creata su Channex ✓ · ${okRooms}/${rooms.length} camere` });
-      saveLog([{ id: uid(), ts: Date.now(), text: `${t("Struttura sincronizzata su Channex")} — ${st.name}`, color: "var(--ok)" }, ...log]);
+      pushLog(`${t("Struttura sincronizzata su Channex")} — ${st.name}`, "var(--ok)", sid);
     } catch (e) {
       setChxSync({ running: false, ok: false, msg: e instanceof Error ? e.message : "errore di rete" });
     }
@@ -367,7 +373,7 @@ export default function CanaliPage() {
                           const label = CHANNELS[chKey]?.label ?? c.title;
                           const draft = c.id ? priceCorr[c.id] : undefined;
                           const corr = draft?.loaded && draft.value ? `${CORR_SIGN[draft.rule]}${draft.value}%` : t("nessuna");
-                          const commPct = loadChannelCommissionPct(chKey) ?? (CHANNELS[chKey]?.commission ?? 0) * 100;
+                          const commPct = loadChannelCommissionPct(chKey, g.sid) ?? (CHANNELS[chKey]?.commission ?? 0) * 100;
                           const color = loadChannelColor(chKey) || `var(${CHANNELS[chKey]?.cssVar ?? ""})`;
                           return (
                             <tr key={c.id || c.channel + i} className="border-b border-line last:border-0 hover:bg-wash">
@@ -447,11 +453,11 @@ export default function CanaliPage() {
                 const savedColor = loadChannelColor(chKey);
                 const computedColor = typeof window !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue(CHANNELS[chKey]?.cssVar ?? "").trim() : "";
                 const pickerColor = savedColor || (/^#/.test(computedColor) ? computedColor : "#888888");
-                const commVal = commDraft[c.id] ?? String(loadChannelCommissionPct(chKey) ?? Math.round((CHANNELS[chKey]?.commission ?? 0) * 1000) / 10);
+                const commVal = commDraft[c.id] ?? String(loadChannelCommissionPct(chKey, sid) ?? Math.round((CHANNELS[chKey]?.commission ?? 0) * 1000) / 10);
                 // Suggerimento basato sui dati reali: media della commissione ESATTA (non stimata)
                 // comunicata dal canale sulle ultime prenotazioni — così la predefinita si imposta
                 // su un numero osservato, non a intuito.
-                const realComm = bookings.filter((b) => b.channel === chKey && b.status !== "cancelled" && b.commissionAmount != null && b.total).slice(-10);
+                const realComm = bookings.filter((b) => b.structureId === sid && b.channel === chKey && b.status !== "cancelled" && b.commissionAmount != null && b.total).slice(-10);
                 const realAvgPct = realComm.length ? Math.round((realComm.reduce((a, b) => a + (b.commissionAmount! / b.total!) * 100, 0) / realComm.length) * 10) / 10 : null;
                 return (
                   <div className="mt-3 grid grid-cols-2 gap-3">
@@ -472,7 +478,7 @@ export default function CanaliPage() {
                       <div className="flex items-center gap-1.5">
                         <input type="number" min={0} step="0.1" value={commVal} onChange={(e) => setCommDraft((cur) => ({ ...cur, [c.id]: e.target.value }))} className="w-14 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
                         <span className="text-sm text-dim">%</span>
-                        <button onClick={() => { const v = Number(commVal.replace(",", ".")); if (Number.isFinite(v) && v >= 0) { saveChannelCommissionPct(chKey, v); setCommSaved(c.id); window.setTimeout(() => setCommSaved(null), 1200); } }} className="shrink-0 rounded-lg border border-line px-2 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{commSaved === c.id ? "✓" : t("Salva")}</button>
+                        <button onClick={() => { const v = Number(commVal.replace(",", ".")); if (Number.isFinite(v) && v >= 0) { saveChannelCommissionPct(chKey, v, sid); setCommSaved(c.id); window.setTimeout(() => setCommSaved(null), 1200); } }} className="shrink-0 rounded-lg border border-line px-2 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{commSaved === c.id ? "✓" : t("Salva")}</button>
                       </div>
                       {realAvgPct != null && (
                         <button onClick={() => setCommDraft((cur) => ({ ...cur, [c.id]: String(realAvgPct) }))} className="mt-1.5 text-left text-[11px] text-dim hover:text-focus">
@@ -527,7 +533,7 @@ export default function CanaliPage() {
       <Card className="mt-5">
         <div className="mb-3 flex items-center justify-between">
           <SectionTitle>{t("Registro sincronizzazioni")}</SectionTitle>
-          {log.length > 0 && <button onClick={async () => { if (await ask({ message: t("Svuotare il registro sincronizzazioni?"), danger: true, confirmLabel: t("Svuota") })) saveLog([]); }} className="text-xs font-medium text-dim hover:text-txt">{t("Pulisci")}</button>}
+          {log.length > 0 && <button onClick={async () => { if (await ask({ message: t("Svuotare il registro sincronizzazioni?"), danger: true, confirmLabel: t("Svuota") })) clearLog(); }} className="text-xs font-medium text-dim hover:text-txt">{t("Pulisci")}</button>}
         </div>
         {log.length === 0 ? <p className="text-sm text-faint">{t("Nessuna sincronizzazione ancora.")}</p> : (
           <div className="flex flex-col divide-y divide-[color:var(--line)]">
