@@ -13,8 +13,8 @@
 // (nessun crash, nessuna risposta automatica).
 export const CONCIERGE_AI_MODEL = process.env.CONCIERGE_AI_MODEL || process.env.GUEST_REPLY_AI_MODEL || process.env.CHECKIN_AI_MODEL || "claude-haiku-4-5-20251001";
 
-export type ConciergeTopic = "checkin_time" | "wifi" | "parking" | "directions" | "other";
-const SAFE_TOPICS: ConciergeTopic[] = ["checkin_time", "wifi", "parking", "directions"];
+export type ConciergeTopic = "checkin_time" | "wifi" | "parking" | "directions" | "faq" | "other";
+const SAFE_TOPICS: ConciergeTopic[] = ["checkin_time", "wifi", "parking", "directions", "faq"];
 
 export interface ConciergeContext {
   guestName?: string;
@@ -26,6 +26,7 @@ export interface ConciergeContext {
   checkOutBy?: string;
   accessInfo?: string; // istruzioni/codici di accesso (possono contenere la rete/password wifi)
   hasParking?: boolean;
+  faq?: { topic: string; answer: string }[]; // risposte scritte dal gestore (Messaggi → Concierge)
   transcript?: string; // breve contesto della conversazione (facoltativo)
   lastGuestMessage: string;
 }
@@ -54,26 +55,28 @@ export async function getConciergeReply(ctx: ConciergeContext): Promise<Concierg
     ctx.checkOutBy ? `- Check-out: entro le ${ctx.checkOutBy}` : null,
     ctx.accessInfo ? `- Istruzioni/codici di accesso (possono includere rete e password wifi): ${ctx.accessInfo}` : null,
     typeof ctx.hasParking === "boolean" ? `- Parcheggio disponibile: ${ctx.hasParking ? "sì" : "no, non risulta disponibile"}` : null,
+    ...(ctx.faq ?? []).map((f) => `- Informazione scritta dal gestore su "${f.topic}": ${f.answer}`),
   ].filter(Boolean).join("\n") || "(nessun dato strutturato disponibile)";
 
   const prompt = `Sei il concierge automatico di "${ctx.structureName || "una struttura ricettiva"}": rispondi via WhatsApp SENZA revisione umana, quindi devi essere prudentissimo.
-Puoi rispondere automaticamente SOLO a queste 4 domande di routine, se hai i dati per farlo con certezza:
+Puoi rispondere automaticamente SOLO a queste domande di routine, se hai i dati per farlo con certezza:
 - checkin_time: orario di check-in e/o check-out
 - wifi: rete/password wifi
 - parking: disponibilità di parcheggio
 - directions: indicazioni stradali per raggiungere la struttura (solo se l'indirizzo è tra i dati disponibili)
+- faq: qualunque altra domanda (es. bagagli, colazione, animali, taxi) ma SOLO se una voce "Informazione scritta dal gestore" tra i dati copre ESPLICITAMENTE la domanda: rispondi usando solo quel testo, senza aggiungere nulla
 Per QUALSIASI altra cosa — reclami, richieste economiche o di pagamento, cambi/cancellazioni di prenotazione, domande ambigue, o un minimo dubbio — NON rispondere automaticamente: lo farà l'host di persona.
 Regole FERREE:
 - canAnswer = true SOLO se sei sicuro al 100% E tutti i dati necessari sono esplicitamente presenti qui sotto in "Dati disponibili".
 - NON INVENTARE MAI alcun dato (orari, indirizzo, password wifi, istruzioni) assente dai "Dati disponibili": se manca anche un solo dato richiesto dalla domanda, canAnswer = false.
-- Se il messaggio dell'ospite non è chiaramente una delle 4 domande ammesse, canAnswer = false e topic = "other".
+- Se il messaggio dell'ospite non è chiaramente una delle domande ammesse, canAnswer = false e topic = "other".
 - In caso di qualunque dubbio, canAnswer = false.
 - "reply" va scritto in ${langName}, tono cordiale e professionale, breve (1-3 frasi), rivolgendoti all'ospite per nome se disponibile. Nessun preambolo, nessuna firma. Se canAnswer è false, reply può restare vuoto ("").
 Dati disponibili:
 ${facts}
 ${ctx.transcript ? `Conversazione recente (dal più vecchio al più recente):\n"""\n${ctx.transcript}\n"""\n` : ""}Ultimo messaggio dell'ospite${ctx.guestName ? ` (${ctx.guestName})` : ""}: "${lastMsg.replace(/\s+/g, " ")}"
 Rispondi SOLO con un oggetto JSON valido, senza testo extra, con ESATTAMENTE queste chiavi:
-{"canAnswer": true|false, "reply": "", "topic": "checkin_time|wifi|parking|directions|other"}`;
+{"canAnswer": true|false, "reply": "", "topic": "checkin_time|wifi|parking|directions|faq|other"}`;
 
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {

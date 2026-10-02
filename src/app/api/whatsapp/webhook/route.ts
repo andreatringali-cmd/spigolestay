@@ -81,6 +81,7 @@ async function applyIncoming(admin: SupabaseClient<any>, tenantId: string, fromD
         guestName: guest?.fullName,
         notifPrefsRaw: blob["spigolestay:notifs"],
         aiConciergeRaw: blob[AI_CONCIERGE_KEY],
+        conciergeFaqRaw: Object.fromEntries(Object.keys(blob).filter((k) => k.startsWith("spigolestay:concierge")).map((k) => [k, blob[k]])) as Record<string, string>,
         structures: data.structures,
         bookings: data.bookings,
         units: data.units,
@@ -145,6 +146,7 @@ interface BookingLite { id: string; structureId: string; unitId: string | null; 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: {
   aiConciergeRaw?: string;
+  conciergeFaqRaw?: Record<string, string>;
   fromDigits: string;
   text: string;
   guestName?: string;
@@ -188,7 +190,20 @@ async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: 
     const transcript = (info.priorMessages || []).slice(-8).filter((m) => m.text?.trim())
       .map((m) => `${m.dir === "out" ? "Struttura" : "Ospite"}: ${m.text.replace(/\s+/g, " ").trim()}`).join("\n") || undefined;
 
+    // Risposte scritte dal gestore (Messaggi → Concierge), per struttura; si ignorano i segnaposto
+    // "chiedi al gestore" dei testi di partenza, che non sono informazioni vere.
+    let faq: { topic: string; answer: string }[] = [];
+    try {
+      const raw = info.conciergeFaqRaw?.["spigolestay:concierge:" + st.id] ?? info.conciergeFaqRaw?.["spigolestay:concierge"];
+      const list = raw ? (JSON.parse(raw) as { topic?: string; answer?: string }[]) : [];
+      faq = list
+        .filter((f) => f?.topic && f?.answer && !/chiedi (pure )?al gestore|da concordare con il gestore|modificabile qui|giro la tua domanda/i.test(f.answer))
+        .map((f) => ({ topic: String(f.topic).slice(0, 80), answer: String(f.answer).slice(0, 600) }))
+        .slice(0, 40);
+    } catch { faq = []; }
+
     const outcome = await getConciergeReply({
+      faq,
       guestName: info.guestName,
       lang: info.guest?.language,
       structureName: st.name,
@@ -278,6 +293,7 @@ export async function POST(req: Request) {
             // Meta/duplicati, vedi applyIncoming). Fire-and-forget: non blocca la risposta 200 al webhook.
             tryAutoReply(admin, tenantId, {
               aiConciergeRaw: res.aiConciergeRaw as string | undefined,
+              conciergeFaqRaw: res.conciergeFaqRaw as Record<string, string> | undefined,
               fromDigits,
               text,
               guestName: res.guestName,
