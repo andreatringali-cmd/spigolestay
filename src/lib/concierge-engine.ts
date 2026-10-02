@@ -44,6 +44,7 @@ export interface EngineInput {
   conciergeFaqRaw?: Record<string, string>; // vecchia FAQ locale (usata solo se la tabella è vuota)
   structureId: string;
   bookingId?: string;                       // prova dalla UI: prenotazione scelta a mano
+  assumeVerified?: boolean;                 // prova dalla UI: tratta l'interlocutore come ospite con prenotazione in corso
   guest?: { id?: string; language?: string };
   guestName?: string;
   message: string;
@@ -64,7 +65,7 @@ export async function conciergeAnswer(inp: EngineInput): Promise<EngineResult> {
   const bk = inp.bookingId
     ? bookings.find((b) => b.id === inp.bookingId)
     : inp.guest?.id ? activeBookingOf(bookings, inp.guest.id) : undefined;
-  const hasBooking = !!bk && bk.status !== "cancelled" && (bk.checkOut || "") >= oggi;
+  const hasBooking = (!!bk && bk.status !== "cancelled" && (bk.checkOut || "") >= oggi) || !!inp.assumeVerified;
   const unit = bk ? units.find((u) => u.id === bk.unitId) : undefined;
   const roomType = bk ? roomTypes.find((r) => r.id === bk.roomTypeId) : undefined;
   const accessInfo = hasBooking ? ([unit?.accessInfo, st.accessInfo].filter(Boolean).join(" · ") || undefined) : undefined;
@@ -79,11 +80,11 @@ export async function conciergeAnswer(inp: EngineInput): Promise<EngineResult> {
   } catch { entries = []; }
 
   if (entries.length) {
-    const accessCode = hasBooking && bk ? accessCodeOf(inp.roomAccessRaw, bk.unitId, !!bk.parking) : "";
+    const accessCode = bk && hasBooking ? accessCodeOf(inp.roomAccessRaw, bk.unitId, !!bk.parking) : "";
     const resolved = resolveEntries(entries, inp.structureId, lang)
       // Chi non ha una prenotazione in corso non riceve mai Wi-Fi, codici o istruzioni d'accesso.
       .filter((e) => hasBooking || !(SENSITIVE_CATEGORIES.has(e.category) || e.auto_source === "access_code"));
-    const rendered = resolved.map((e) => renderEntry(e, { structure: st as unknown as Structure, booking: hasBooking && bk ? bk : undefined, accessCode }, lang));
+    const rendered = resolved.map((e) => renderEntry(e, { structure: st as unknown as Structure, booking: bk && bk.status !== "cancelled" ? bk : undefined, accessCode }, lang));
     faq = toFaqItems(rendered, lang).map((f) => ({ topic: f.topic.slice(0, 80), answer: f.answer.slice(0, 1800) })).slice(0, 80);
   } else {
     // Ripiego: vecchia FAQ salvata nel browser (Messaggi → Concierge), senza i segnaposto "chiedi al gestore".

@@ -42,6 +42,15 @@ export type ConciergeOutcome = { ok: true; result: ConciergeResult } | { ok: fal
 
 const LANG_NAMES: Record<string, string> = { it: "italiano", en: "inglese", fr: "francese", de: "tedesco", es: "spagnolo" };
 
+// Se l'ultima frase è solo un invito a scrivere su WhatsApp / contattare per altri dettagli, la toglie.
+export function stripClosingInvite(reply: string): string {
+  const parts = reply.trim().split(/(?<=[.!?])\s+/);
+  if (parts.length < 2) return reply.trim();
+  const last = parts[parts.length - 1];
+  const invito = /whatsapp/i.test(last) && /(scriv|contatt|messag|chied|write|message|contact|text us|reach)/i.test(last) && /(dettagli|informazioni|altro|ulterior|details|more|further|anything|se hai|if you|per qualsiasi|for any)/i.test(last);
+  return invito ? parts.slice(0, -1).join(" ").trim() : reply.trim();
+}
+
 export async function getConciergeReply(ctx: ConciergeContext): Promise<ConciergeOutcome> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return { ok: false, error: "ai_not_configured" };
@@ -74,8 +83,9 @@ Regole FERREE:
 - canAnswer = true SOLO se sei sicuro al 100% E tutti i dati necessari sono esplicitamente presenti qui sotto in "Dati disponibili".
 - NON INVENTARE MAI alcun dato (orari, indirizzo, password wifi, istruzioni) assente dai "Dati disponibili": se manca anche un solo dato richiesto dalla domanda, canAnswer = false.
 - Se il messaggio dell'ospite non è chiaramente una delle domande ammesse, canAnswer = false e topic = "other".
-- In caso di qualunque dubbio, canAnswer = false.${noBookingRule}
-- "reply" va scritto in ${langName}, tono cordiale e professionale, breve (1-3 frasi), rivolgendoti all'ospite per nome se disponibile. Nessun preambolo, nessuna firma. Se canAnswer è false, reply può restare vuoto ("").
+- In caso di qualunque dubbio, canAnswer = false.
+- NON aggiungere frasi di chiusura né inviti a scrivere su WhatsApp o a contattare il gestore "per altri dettagli": rispondi alla domanda e fermati.${noBookingRule}
+- "reply" va scritto in ${langName}, tono cordiale e professionale, breve e chiara (1-4 frasi; per elenchi come ristoranti, spiagge o musei scegli i 4-6 consigli più adatti e dì che ce ne sono altri), rivolgendoti all'ospite per nome se disponibile. Nessun preambolo, nessuna firma. Se canAnswer è false, reply può restare vuoto ("").
 Dati disponibili:
 ${facts}
 ${ctx.transcript ? `Conversazione recente (dal più vecchio al più recente):\n"""\n${ctx.transcript}\n"""\n` : ""}Ultimo messaggio dell'ospite${ctx.guestName ? ` (${ctx.guestName})` : ""}: "${lastMsg.replace(/\s+/g, " ")}"
@@ -86,7 +96,7 @@ Rispondi SOLO con un oggetto JSON valido, senza testo extra, con ESATTAMENTE que
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: CONCIERGE_AI_MODEL, max_tokens: 400, messages: [{ role: "user", content: prompt }] }),
+      body: JSON.stringify({ model: CONCIERGE_AI_MODEL, max_tokens: 1200, messages: [{ role: "user", content: prompt }] }),
     });
     if (!res.ok) return { ok: false, error: `http_${res.status}` };
     const j = await res.json().catch(() => null) as { content?: { type: string; text?: string }[] } | null;
@@ -98,7 +108,7 @@ Rispondi SOLO con un oggetto JSON valido, senza testo extra, con ESATTAMENTE que
 
     const topicRaw = typeof parsed.topic === "string" ? parsed.topic : "other";
     const topic: ConciergeTopic = (SAFE_TOPICS as string[]).includes(topicRaw) ? (topicRaw as ConciergeTopic) : "other";
-    const reply = typeof parsed.reply === "string" ? parsed.reply.trim() : "";
+    const reply = typeof parsed.reply === "string" ? stripClosingInvite(parsed.reply) : "";
     const canAnswer = parsed.canAnswer === true && SAFE_TOPICS.includes(topic) && !!reply;
     return { ok: true, result: canAnswer ? { canAnswer: true, reply, topic } : { canAnswer: false, reply: "", topic } };
   } catch {

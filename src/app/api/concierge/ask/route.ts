@@ -36,6 +36,7 @@ export async function POST(req: Request) {
       data: { structures: data.structures, bookings: data.bookings, units: data.units, roomTypes: data.roomTypes },
       roomAccessRaw: blob["spigolestay:roomaccess"], conciergeFaqRaw: faqRaw,
       structureId, bookingId, guest: g ? { id: g.id, language: g.language } : undefined, guestName: g?.fullName, message,
+      assumeVerified: b?.verified !== false, // la prova la fa il proprietario: Wi-Fi e accesso si vedono come per un ospite in casa
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
