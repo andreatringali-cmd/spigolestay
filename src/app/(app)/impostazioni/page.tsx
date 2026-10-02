@@ -40,6 +40,7 @@ export default function ImpostazioniPage() {
   const [aiConcierge, setAiConciergeState] = useState(AI_CONCIERGE_DEF);
   useEffect(() => { setAiConciergeState(loadAiConciergePrefs()); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const setAiConciergeEnabled = (v: boolean) => setAiConciergeState((p) => { const n = { ...p, enabled: v }; try { localStorage.setItem(AI_CONCIERGE_KEY, JSON.stringify(n)); } catch {} return n; });
+  const setAiConciergeStructure = (v: string) => setAiConciergeState((p) => { const n = { ...p, defaultStructureId: v }; try { localStorage.setItem(AI_CONCIERGE_KEY, JSON.stringify(n)); } catch {} return n; });
   const ask = useConfirm();
 
   // Sync Google Calendar in TEMPO REALE: Xenora scrive/cancella direttamente gli eventi sul
@@ -205,6 +206,15 @@ export default function ImpostazioniPage() {
         <SectionTitle>{t("Concierge AI 🤖")}</SectionTitle>
         <p className="mb-3 text-xs text-dim">{t("Se attivo, risponde IN AUTOMATICO su WhatsApp solo alle domande semplici (orario check-in, wifi, parcheggio, indicazioni stradali) quando è sicura della risposta: per tutto il resto — reclami, richieste economiche o qualunque dubbio — lascia il messaggio a te, come oggi.")}</p>
         <Toggle label={t("Risposta automatica alle domande semplici")} checked={aiConcierge.enabled} onChange={setAiConciergeEnabled} />
+        {aiConcierge.enabled && structures.length > 1 && (
+          <label className="mt-3 block text-xs font-medium text-dim">{t("Struttura di riferimento per chi scrive senza prenotazione")}
+            <select value={aiConcierge.defaultStructureId ?? ""} onChange={(e) => setAiConciergeStructure(e.target.value)} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt">
+              <option value="">{t("Nessuna (non rispondere)")}</option>
+              {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <span className="mt-1 block text-[11px] text-faint">{t("Chi ha una prenotazione viene riconosciuto da solo; questa scelta serve per i numeri nuovi.")}</span>
+          </label>
+        )}
       </Card>
 
       <Card className="mt-4">

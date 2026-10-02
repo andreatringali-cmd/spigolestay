@@ -180,6 +180,7 @@ async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: 
       }
     }
     if (!st && structures.length === 1) st = structures[0];
+    if (!st && prefs.defaultStructureId) st = structures.find((s) => s.id === prefs.defaultStructureId);
     if (!st) return; // nessun contesto struttura affidabile → nessuna risposta automatica
 
     const accessInfo = [unit?.accessInfo, st.accessInfo].filter(Boolean).join(" · ") || undefined;

@@ -9,6 +9,9 @@
 // prefisso in authsync.tsx — nessuna route dedicata di salvataggio necessaria).
 export const AI_CONCIERGE_DEF = {
   enabled: false,
+  // Struttura a cui riferirsi per chi scrive senza alcuna prenotazione (numero nuovo): senza, con più
+  // strutture il Concierge non sa quali dati usare e non risponde. Vuoto = nessuna.
+  defaultStructureId: "",
 };
 export type AiConciergePrefs = typeof AI_CONCIERGE_DEF;
 
