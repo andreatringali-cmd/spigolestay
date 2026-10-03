@@ -53,6 +53,9 @@ export default function CalendarioDettaglio() {
   const [winStart, setWinStart] = useState(today);
   const [mode, setMode] = useState<Modo>("day");
   const [modal, setModal] = useState<{ id: string; key: string } | null>(null);
+  // Colonne lunghe: mostra le prime 6 schede, poi "Mostra tutte" (e, aperta, scorre dentro la colonna invece di allungare la pagina).
+  const [openCols, setOpenCols] = useState<Record<string, boolean>>({});
+  const COL_LIMIT = 6;
   const [cleanDone, setCleanDone] = useState<Record<string, boolean>>({});
   useEffect(() => {
     const h = () => setCleanDone(readCleanDone());
@@ -247,13 +250,21 @@ export default function CalendarioDettaglio() {
                 <p className="text-xs text-faint">{c.sub}</p>
               </div>
               {c.list.length === 0 ? <Vuoto title={c.empty} sub={c.emptySub} /> : (
-                <div className="flex flex-col gap-3">
-                  {groups.map((g) => (
+                <div className={`flex flex-col gap-3 ${openCols[c.key] && c.list.length > COL_LIMIT ? "max-h-[80vh] overflow-y-auto pr-1" : ""}`}>
+                  {groups.map((g) => {
+                    if (!openCols[c.key]) { const before = groups.slice(0, groups.indexOf(g)).reduce((a, x) => a + x.items.length, 0); if (before >= COL_LIMIT) return null; g = { ...g, items: g.items.slice(0, COL_LIMIT - before) }; }
+                    return (
                     <div key={g.day || "all"} className="flex flex-col gap-3">
                       {g.day && <div className="text-xs font-bold uppercase tracking-wide text-faint">{dayShort(g.day)}{g.day === today ? " · oggi" : ""}</div>}
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-1">{g.items.map(card)}</div>
                     </div>
-                  ))}
+                    );
+                  })}
+                  {c.list.length > COL_LIMIT && (
+                    <button onClick={() => setOpenCols((o) => ({ ...o, [c.key]: !o[c.key] }))} className="rounded-xl border border-line bg-surface px-3 py-2 text-sm font-semibold text-focus transition hover:border-focus">
+                      {openCols[c.key] ? "Mostra meno" : `Mostra tutte le ${c.list.length}`}
+                    </button>
+                  )}
                 </div>
               )}
             </section>

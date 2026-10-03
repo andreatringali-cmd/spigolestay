@@ -34,8 +34,12 @@ const FILTERS: { key: string; label: string }[] = [
 const dayLabel = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
 const GUIDE_RE = /guest-guide|\/guida|guida ospiti/i;
 
-export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, showStructure }: {
+export interface DettaglioSection { key: string; title: string; color: string; ids: string[]; empty: string }
+
+export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, showStructure, sections }: {
   bookings: Booking[];
+  /** Se presente: niente filtri rapidi, le righe sono divise in queste categorie (es. Arrivi, In casa, Partenze). */
+  sections?: DettaglioSection[];
   guestName: (b: Booking) => string;
   unitLabel: (b: Booking) => string | null;
   showStructure: boolean;
@@ -50,6 +54,8 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
   const [threads, setThreads] = useState<Record<string, { dir: string; text: string }[]>>({});
   const [rems, setRems] = useState<Record<string, Record<string, number>>>({});
   const [modal, setModal] = useState<{ id: string; key: string } | null>(null);
+  const [openSec, setOpenSec] = useState<Record<string, boolean>>({}); // categorie espanse (oltre le prime righe)
+  const SEC_LIMIT = 5;
 
   const load = useCallback(async () => {
     try { setThreads(JSON.parse(localStorage.getItem("spigolestay:threads:v1") || "{}")); } catch { setThreads({}); }
@@ -123,19 +129,7 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
   const modalRow = modal ? rows.find((r) => r.b.id === modal.id) : undefined;
   const modalStep = modalRow?.j?.steps.find((x) => x.key === modal?.key);
 
-  return (
-    <div>
-      <div className="no-print mb-3 flex flex-wrap items-center gap-1.5">
-        {FILTERS.map((f) => (
-          <button key={f.key} onClick={() => setFilter(f.key)} className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${filter === f.key ? "border-focus bg-focus text-white" : "border-line bg-surface text-dim hover:border-focus hover:text-focus"}`}>
-            {f.label}{counts[f.key] > 0 && f.key !== "all" ? <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${filter === f.key ? "bg-white/25" : f.key === "late" ? "bg-[color:color-mix(in_srgb,var(--err)_14%,transparent)] text-[color:var(--err)]" : "bg-wash"}`}>{counts[f.key]}</span> : null}
-          </button>
-        ))}
-        <span className="ml-auto text-xs text-faint">{shown.length} prenotazioni</span>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        {shown.map(({ b, j }) => {
+  const renderRows = (list: typeof rows) => list.map(({ b, j }) => {
           const unit = units.find((u) => u.id === b.unitId);
           const rt = roomTypes.find((r) => r.id === (unit?.roomTypeId ?? b.roomTypeId));
           const st = getStructure(b.structureId);
@@ -224,9 +218,42 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
               </div>
             </article>
           );
-        })}
+  });
+
+  return (
+    <div>
+      {!sections && <div className="no-print mb-3 flex flex-wrap items-center gap-1.5">
+        {FILTERS.map((f) => (
+          <button key={f.key} onClick={() => setFilter(f.key)} className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${filter === f.key ? "border-focus bg-focus text-white" : "border-line bg-surface text-dim hover:border-focus hover:text-focus"}`}>
+            {f.label}{counts[f.key] > 0 && f.key !== "all" ? <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${filter === f.key ? "bg-white/25" : f.key === "late" ? "bg-[color:color-mix(in_srgb,var(--err)_14%,transparent)] text-[color:var(--err)]" : "bg-wash"}`}>{counts[f.key]}</span> : null}
+          </button>
+        ))}
+        <span className="ml-auto text-xs text-faint">{shown.length} prenotazioni</span>
+      </div>}
+
+      {sections && (
+        <div className="flex flex-col gap-7">
+          {sections.map((sec) => {
+            const ids = new Set(sec.ids);
+            const list = rows.filter((r) => ids.has(r.b.id));
+            return (
+              <section key={sec.key}>
+                <div className="mb-2.5 flex items-center gap-2.5">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: sec.color }} />
+                  <h2 className="font-display text-lg font-bold text-txt">{sec.title}</h2>
+                  <span className="rounded-full px-2 py-0.5 text-xs font-bold tabular-nums" style={{ color: sec.color, background: `color-mix(in srgb, ${sec.color} 14%, transparent)` }}>{list.length}</span>
+                </div>
+                {list.length ? <div className="flex flex-col gap-3">{renderRows(openSec[sec.key] ? list : list.slice(0, SEC_LIMIT))}{list.length > SEC_LIMIT && <button onClick={() => setOpenSec((o) => ({ ...o, [sec.key]: !o[sec.key] }))} className="rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-focus transition hover:border-focus">{openSec[sec.key] ? "Mostra meno" : `Mostra tutte le ${list.length}`}</button>}</div> : <div className="rounded-xl border border-dashed border-line px-4 py-5 text-sm text-faint">{sec.empty}</div>}
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      {!sections && <div className="flex flex-col gap-3">
+        {renderRows(shown)}
         {!shown.length && <div className="rounded-xl border border-line bg-surface"><EmptyState title={filter === "all" ? "Nessuna prenotazione con questi filtri" : "Nessuna prenotazione in questa categoria"} /></div>}
-      </div>
+      </div>}
       {modal && modalRow && modalRow.j && modalStep && (
         <StepActions
           key={`${modal.id}:${modal.key}`}
