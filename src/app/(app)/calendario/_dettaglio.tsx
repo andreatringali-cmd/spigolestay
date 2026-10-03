@@ -219,7 +219,7 @@ export default function CalendarioDettaglio() {
       </div>
 
       {/* Arrivi / In casa / Partenze */}
-      <div className="mt-5 grid grid-cols-1 gap-6 xl:grid-cols-3 xl:items-start xl:gap-4">
+      <div className="mt-5 flex flex-col gap-8">
         {COLS.map((c) => {
           // In modalità 7 giorni arrivi e partenze sono raggruppati per giorno.
           const groups: { day: string; items: Row[] }[] = [];
@@ -250,13 +250,13 @@ export default function CalendarioDettaglio() {
                 <p className="text-xs text-faint">{c.sub}</p>
               </div>
               {c.list.length === 0 ? <Vuoto title={c.empty} sub={c.emptySub} /> : (
-                <div className={`flex flex-col gap-3 ${openCols[c.key] && c.list.length > COL_LIMIT ? "max-h-[80vh] overflow-y-auto pr-1" : ""}`}>
+                <div className={`flex flex-col gap-3 `}>
                   {groups.map((g) => {
                     if (!openCols[c.key]) { const before = groups.slice(0, groups.indexOf(g)).reduce((a, x) => a + x.items.length, 0); if (before >= COL_LIMIT) return null; g = { ...g, items: g.items.slice(0, COL_LIMIT - before) }; }
                     return (
                     <div key={g.day || "all"} className="flex flex-col gap-3">
                       {g.day && <div className="text-xs font-bold uppercase tracking-wide text-faint">{dayShort(g.day)}{g.day === today ? " · oggi" : ""}</div>}
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-1">{g.items.map(card)}</div>
+                      <div className="flex flex-col gap-3">{g.items.map(card)}</div>
                     </div>
                     );
                   })}

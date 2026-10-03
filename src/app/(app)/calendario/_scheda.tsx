@@ -2,7 +2,7 @@
 
 // Scheda alta di una prenotazione per la vista Calendario · Dettagliato. Stesso linguaggio di
 // "Prenotazioni · Dettagliata" (anteprima camera, ospite, date, passaggi con pallini, segnalazioni, avanzamento),
-// impaginata in verticale per stare nelle tre colonne Arrivi / In casa / Partenze, più una fascia di avvisi.
+// impaginata in riga (anteprima a sinistra, dati al centro, importo a destra), una sotto l'altra per categoria.
 import type { Booking, Structure, Unit, RoomType } from "@/lib/types";
 import { CHANNELS } from "@/lib/types";
 import { parseISO, nights } from "@/lib/dates";
@@ -51,76 +51,75 @@ export default function SchedaGiorno({ b, j, guestName, unit, roomType, structur
       role="button" tabIndex={0}
       onClick={onOpen}
       onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onOpen(); } }}
-      className="group flex min-w-0 cursor-pointer flex-col gap-2.5 rounded-2xl border border-line bg-surface p-3 shadow-sm transition hover:border-focus hover:shadow-md focus-visible:border-focus focus-visible:outline-none"
+      className="group flex min-w-0 cursor-pointer flex-col gap-3 rounded-2xl border border-line bg-surface p-3 shadow-sm transition hover:border-focus hover:shadow-md focus-visible:border-focus focus-visible:outline-none md:flex-row md:items-stretch md:gap-4"
       style={anyLate || hasErr ? { borderLeft: "3px solid var(--err)" } : undefined}
     >
-      {/* Anteprima camera + ospite + date */}
-      <div className="flex min-w-0 items-start gap-3">
-        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl" style={photo ? undefined : { background: `linear-gradient(145deg, color-mix(in srgb, ${tint} 85%, #fff), color-mix(in srgb, ${tint} 70%, #000))` }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {photo && <img src={photo} alt="" className="absolute inset-0 h-full w-full object-cover" />}
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-5 text-white">
-            <div className="truncate text-xs font-bold leading-tight">{unitName ?? <span className="italic">Da assegnare</span>}</div>
-            <div className="truncate text-[10px] opacity-90">{roomType?.name ?? ""}</div>
-          </div>
+      {/* Anteprima camera */}
+      <div className="relative h-28 w-full shrink-0 overflow-hidden rounded-xl md:h-auto md:w-40" style={photo ? undefined : { background: `linear-gradient(145deg, color-mix(in srgb, ${tint} 85%, #fff), color-mix(in srgb, ${tint} 70%, #000))` }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {photo && <img src={photo} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 text-white">
+          <div className="truncate text-sm font-bold leading-tight">{unitName ?? <span className="italic">Da assegnare</span>}</div>
+          <div className="truncate text-[11px] opacity-90">{roomType?.name ?? ""}</div>
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <h3 className="min-w-0 truncate text-base font-bold text-txt">{guestName}</h3>
-            <span className="shrink-0"><ChannelLogo channel={b.channel} size={16} title={b.channel === "direct" ? "xenora.it" : CHANNELS[b.channel].label} /></span>
-          </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-dim">
-            <span className="font-medium capitalize text-txt">{dayLabel(b.checkIn)}</span><span className="text-faint">→</span><span className="font-medium capitalize text-txt">{dayLabel(b.checkOut)}</span>
-          </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-dim">
-            <span>{n} {n === 1 ? "notte" : "notti"}</span><span className="text-faint">·</span><span>{people} {people === 1 ? "ospite" : "ospiti"}</span>
-            {b.groupId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-focus">Gruppo</span>}
-            {b.status === "tentative" && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]">Opzione</span>}
-            {showStructure && structure && <span className="max-w-full truncate text-[11px] font-semibold text-faint">{structure.name}</span>}
-          </div>
-          {tag && <span className="mt-1.5 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: tagTone, background: `color-mix(in srgb, ${tagTone} 12%, transparent)` }}>{tag}</span>}
-        </div>
+        {showStructure && structure && <span className="absolute left-2 top-2 max-w-[90%] truncate rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white">{structure.name}</span>}
       </div>
 
-      {/* Avvisi: le cose da non perdere di vista */}
-      {avvisi.length > 0 && (
-        <div className="flex flex-col gap-1">
-          {avvisi.map((a) => (
-            <div key={a.key} title={a.title} className="flex items-start gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold leading-snug" style={{ color: TONE[a.tone], background: `color-mix(in srgb, ${a.tone === "info" ? "var(--faint)" : TONE[a.tone]} 13%, transparent)` }}>
-              <span aria-hidden className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: TONE[a.tone] }} />
-              <span className="min-w-0">{a.label}</span>
-            </div>
-          ))}
+      {/* Ospite, date, avvisi e passaggi */}
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+          <h3 className="min-w-0 truncate text-base font-bold text-txt">{guestName}</h3>
+          <span className="shrink-0"><ChannelLogo channel={b.channel} size={16} title={b.channel === "direct" ? "xenora.it" : CHANNELS[b.channel].label} /></span>
+          {b.groupId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-focus">Gruppo</span>}
+          {b.status === "tentative" && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]">Opzione</span>}
         </div>
-      )}
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-dim">
+          <span className="font-medium capitalize text-txt">{dayLabel(b.checkIn)}</span><span className="text-faint">→</span><span className="font-medium capitalize text-txt">{dayLabel(b.checkOut)}</span>
+          <span className="text-faint">·</span><span>{n} {n === 1 ? "notte" : "notti"}</span>
+          <span className="text-faint">·</span><span>{people} {people === 1 ? "ospite" : "ospiti"}</span>
+          {tag && <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: tagTone, background: `color-mix(in srgb, ${tagTone} 12%, transparent)` }}>{tag}</span>}
+        </div>
 
-      {/* Passaggi */}
-      {steps.length > 0 && (
-        <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-          {steps.map((s) => <StepButton key={s.key} s={s} onStep={onStep} />)}
-        </div>
-      )}
+        {/* Avvisi: le cose da non perdere di vista */}
+        {avvisi.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {avvisi.map((a) => (
+              <div key={a.key} title={a.title} className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold leading-snug" style={{ color: TONE[a.tone], background: `color-mix(in srgb, ${a.tone === "info" ? "var(--faint)" : TONE[a.tone]} 13%, transparent)` }}>
+                <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: TONE[a.tone] }} />
+                <span className="min-w-0">{a.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
-      {chips.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {chips.slice(0, 4).map((c) => <Chip key={c.key} c={c} />)}
-          {chips.length > 4 && <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-medium text-faint">+{chips.length - 4}</span>}
-        </div>
-      )}
+        {/* Passaggi */}
+        {steps.length > 0 && (
+          <div className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3 xl:grid-cols-4">
+            {steps.map((s) => <StepButton key={s.key} s={s} onStep={onStep} />)}
+          </div>
+        )}
+
+        {chips.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {chips.slice(0, 5).map((c) => <Chip key={c.key} c={c} />)}
+            {chips.length > 5 && <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-medium text-faint">+{chips.length - 5}</span>}
+          </div>
+        )}
+      </div>
 
       {/* Importo e avanzamento */}
-      <div className="mt-auto flex flex-row items-center justify-between gap-3 border-t border-line pt-2">
-        <div className="min-w-0">
-          <div className="font-mono text-base font-bold text-txt">{total ? eur(total) : "—"}</div>
+      <div className="flex shrink-0 flex-row items-center justify-between gap-3 border-t border-line pt-2 md:w-44 md:flex-col md:items-end md:justify-between md:border-l md:border-t-0 md:pl-4 md:pt-0">
+        <div className="min-w-0 md:text-right">
+          <div className="font-mono text-lg font-bold text-txt">{total ? eur(total) : "—"}</div>
           <div className="truncate text-[11px] text-faint">{total ? (resid <= 0.005 ? "Saldato" : `Mancano ${eur(resid)}`) : ""}</div>
         </div>
         {j.total > 0 && (
-          <div className="min-w-[110px] flex-1 sm:max-w-[170px]">
+          <div className="min-w-[110px] md:w-full">
             <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-dim"><span>{j.done} di {j.total}</span><span>{pct}%</span></div>
             <div className="h-1.5 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: anyLate ? "var(--err)" : pct === 100 ? "var(--ok)" : "var(--focus)" }} /></div>
             {j.next
-              ? <button onClick={(e) => { e.stopPropagation(); onStep(j.next!); }} className="mt-1.5 block w-full truncate text-right text-[11px] font-semibold" style={{ color: j.next.state === "late" ? "var(--err)" : "var(--focus)" }}>Prossimo: {j.next.label} →</button>
-              : <div className="mt-1.5 text-right text-[11px] font-semibold" style={{ color: "var(--ok)" }}>Tutto in ordine ✓</div>}
+              ? <button onClick={(e) => { e.stopPropagation(); onStep(j.next!); }} className="mt-1.5 block w-full truncate text-left text-[11px] font-semibold md:text-right" style={{ color: j.next.state === "late" ? "var(--err)" : "var(--focus)" }}>Prossimo: {j.next.label} →</button>
+              : <div className="mt-1.5 text-[11px] font-semibold md:text-right" style={{ color: "var(--ok)" }}>Tutto in ordine ✓</div>}
           </div>
         )}
       </div>

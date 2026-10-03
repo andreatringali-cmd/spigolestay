@@ -7,9 +7,8 @@ import WeatherWidget from "@/components/WeatherWidget";
 import { useLang } from "@/lib/i18n";
 import { useData } from "@/lib/store";
 import CalendarioDettaglio from "./_dettaglio";
-import CalendarioV3 from "./_v3";
 
-type Vista = "grid" | "detail" | "v3";
+type Vista = "grid" | "detail";
 const VIEW_KEY = "spigolestay:cal:view";
 
 export default function CalendarioPage() {
@@ -20,7 +19,7 @@ export default function CalendarioPage() {
   const [view, setView] = useState<Vista | null>(null);
   useEffect(() => {
     let v: Vista = "grid";
-    try { const saved = localStorage.getItem(VIEW_KEY); if (saved === "detail" || saved === "v3") v = saved; } catch {}
+    try { if (localStorage.getItem(VIEW_KEY) === "detail") v = "detail"; } catch {}
     setView(v);
   }, []);
   const choose = (v: Vista) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch {} };
@@ -31,7 +30,7 @@ export default function CalendarioPage() {
         subtitle={st ? `${st.name} · ${t("Disponibilità, prenotazioni e tariffe, giorno per giorno")}` : t("Disponibilità, prenotazioni e tariffe di tutte le strutture, giorno per giorno")}
         actions={<>
           <div className="no-print inline-flex rounded-lg border border-line bg-wash p-0.5" role="group" aria-label="Vista del calendario">
-            {([["grid", "Griglia"], ["detail", "Dettagliato"], ["v3", "v3"]] as const).map(([k, l]) => (
+            {([["grid", "Griglia"], ["detail", "Dettagliato"]] as const).map(([k, l]) => (
               <button key={k} onClick={() => choose(k)} aria-pressed={view === k} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${view === k ? "bg-surface text-focus shadow-sm" : "text-dim hover:text-txt"}`}>{l}</button>
             ))}
           </div>
@@ -40,7 +39,6 @@ export default function CalendarioPage() {
       />
       {view === "grid" && <CalendarGrid />}
       {view === "detail" && <CalendarioDettaglio />}
-      {view === "v3" && <CalendarioV3 />}
     </div>
   );
 }
