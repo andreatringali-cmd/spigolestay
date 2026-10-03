@@ -141,8 +141,10 @@ export default function LoginPage() {
       <main className="relative flex w-full min-h-0 flex-1 flex-col items-center justify-center overflow-x-hidden overflow-y-auto">
         <div className="w-full max-w-md rounded-3xl border border-[#eceae4] bg-white px-6 py-6 shadow-[0_20px_50px_-28px_rgba(31,27,22,0.35)] sm:px-8 sm:py-8">
           {/* Logo dentro il box, centrato */}
-          <div className="mb-4 flex justify-center">
+          <div className="mb-4 flex flex-col items-center">
             <Image src="/xenora-logo.png" alt="Xenora" width={220} height={62} priority className="object-contain" style={{ width: 220, height: "auto" }} />
+            {/* Slogan di marca: resta in inglese in ogni lingua (volutamente non passa dal sistema i18n) */}
+            <p lang="en" className="mt-2 max-w-full text-balance text-center text-[13px] leading-snug text-[#6b6459]">The intelligent operating system for hospitality.</p>
           </div>
 
           {recovery ? (

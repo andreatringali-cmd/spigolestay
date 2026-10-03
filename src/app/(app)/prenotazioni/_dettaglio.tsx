@@ -1,0 +1,218 @@
+"use client";
+
+// Vista "Dettagliata" delle prenotazioni: righe alte con anteprima della camera, ospite, date e tutti i
+// passaggi da fare (check-in, pagamento, schedina, ISTAT…). Mostra l'elenco già filtrato dalla pagina.
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useData } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import { CHANNELS, type Booking } from "@/lib/types";
+import { parseISO, toISO, nights } from "@/lib/dates";
+import { bookingPaidTotal, commissionOf } from "@/lib/booking";
+import { eur } from "@/lib/format";
+import { bookingCode } from "@/lib/bookingCode";
+import { journeyBucket, journeyOf, isLiveBooking, type JourneyStep, type StepState } from "@/lib/booking-journey";
+import ChannelLogo from "@/components/ChannelLogo";
+import EmptyState from "@/components/EmptyState";
+
+type SchedRow = { booking_id: string | null; stato: string };
+type IstatRow = { booking_id: string | null; stato: string };
+type DocRow = { booking_id: string | null; stato: string };
+
+const STATE_COLOR: Record<StepState, string> = { done: "var(--ok)", todo: "var(--warn)", late: "var(--err)", na: "var(--faint)" };
+const STATE_GLYPH: Record<StepState, string> = { done: "✓", todo: "", late: "!", na: "–" };
+const FILTERS: { key: string; label: string }[] = [
+  { key: "all", label: "Tutte" },
+  { key: "late", label: "In ritardo" },
+  { key: "todo", label: "Da fare" },
+  { key: "arrive", label: "Arrivano oggi" },
+  { key: "inhouse", label: "In casa" },
+  { key: "leave", label: "Partono oggi" },
+];
+const dayLabel = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
+const GUIDE_RE = /guest-guide|\/guida|guida ospiti/i;
+
+export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, showStructure }: {
+  bookings: Booking[];
+  guestName: (b: Booking) => string;
+  unitLabel: (b: Booking) => string | null;
+  showStructure: boolean;
+}) {
+  const router = useRouter();
+  const { guests, units, roomTypes, getStructure, openBooking } = useData();
+  const today = toISO(new Date());
+  const [filter, setFilter] = useState("all");
+  const [sched, setSched] = useState<SchedRow[]>([]);
+  const [istat, setIstat] = useState<IstatRow[]>([]);
+  const [docs, setDocs] = useState<DocRow[]>([]);
+  const [threads, setThreads] = useState<Record<string, { dir: string; text: string }[]>>({});
+
+  const load = useCallback(async () => {
+    try { setThreads(JSON.parse(localStorage.getItem("spigolestay:threads:v1") || "{}")); } catch { setThreads({}); }
+    if (!supabase) return;
+    const [a, i, d] = await Promise.all([
+      supabase.from("alloggiati_schedine").select("booking_id, stato"),
+      supabase.from("istat_rows").select("booking_id, stato"),
+      supabase.from("documents").select("booking_id, stato").not("booking_id", "is", null),
+    ]);
+    setSched((a.data ?? []) as SchedRow[]); setIstat((i.data ?? []) as IstatRow[]); setDocs((d.data ?? []) as DocRow[]);
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const h = () => { void load(); };
+    window.addEventListener("focus", h);
+    window.addEventListener("spigolestay:datasync", h);
+    return () => { window.removeEventListener("focus", h); window.removeEventListener("spigolestay:datasync", h); };
+  }, [load]);
+
+  const schedBy = useMemo(() => {
+    const m = new Map<string, "da_validare" | "pronta" | "inviata">();
+    const rank = { da_validare: 3, pronta: 2, inviata: 1 } as const;
+    for (const s of sched) {
+      if (!s.booking_id || !(s.stato in rank)) continue;
+      const st = s.stato as keyof typeof rank;
+      const cur = m.get(s.booking_id);
+      if (!cur || rank[st] > rank[cur]) m.set(s.booking_id, st);
+    }
+    return m;
+  }, [sched]);
+  const istatBy = useMemo(() => {
+    const m = new Map<string, "pending" | "sent">();
+    for (const r of istat) {
+      if (!r.booking_id || (r.stato !== "pending" && r.stato !== "sent")) continue;
+      if (m.get(r.booking_id) !== "pending") m.set(r.booking_id, r.stato);
+    }
+    return m;
+  }, [istat]);
+  const docBy = useMemo(() => { const m = new Map<string, string>(); for (const d of docs) if (d.booking_id && d.stato !== "bozza" && d.stato !== "scartata") m.set(d.booking_id, d.stato); return m; }, [docs]);
+
+  // Ordine pensato per il lavoro: prima in casa e in arrivo (dal più vicino), poi lo storico (dal più recente).
+  const ordered = useMemo(() => {
+    const live = bookings.filter((b) => b.checkOut >= today).sort((a, b) => a.checkIn.localeCompare(b.checkIn) || a.checkOut.localeCompare(b.checkOut));
+    const past = bookings.filter((b) => b.checkOut < today).sort((a, b) => b.checkOut.localeCompare(a.checkOut));
+    return [...live, ...past];
+  }, [bookings, today]);
+
+  const rows = useMemo(() => ordered.map((b) => {
+    const guest = guests.find((g) => g.id === b.guestId);
+    const j = isLiveBooking(b) ? journeyOf(b, {
+      today, guest, structure: getStructure(b.structureId),
+      schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
+      guideSent: (threads[b.guestId] ?? []).some((m) => m.dir === "out" && GUIDE_RE.test(m.text)),
+      invoiceStato: docBy.get(b.id),
+    }) : null;
+    return { b, j, buckets: j ? journeyBucket(b, today, j) : [] };
+  }), [ordered, guests, getStructure, today, schedBy, istatBy, threads, docBy]);
+
+  const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.key, f.key === "all" ? rows.length : rows.filter((r) => r.buckets.includes(f.key)).length])), [rows]);
+  const shown = filter === "all" ? rows : rows.filter((r) => r.buckets.includes(filter));
+
+  const gotoStep = (e: React.MouseEvent, s: JourneyStep) => { e.stopPropagation(); if (s.href) router.push(s.href); };
+
+  return (
+    <div>
+      <div className="no-print mb-3 flex flex-wrap items-center gap-1.5">
+        {FILTERS.map((f) => (
+          <button key={f.key} onClick={() => setFilter(f.key)} className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${filter === f.key ? "border-focus bg-focus text-white" : "border-line bg-surface text-dim hover:border-focus hover:text-focus"}`}>
+            {f.label}{counts[f.key] > 0 && f.key !== "all" ? <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${filter === f.key ? "bg-white/25" : f.key === "late" ? "bg-[color:color-mix(in_srgb,var(--err)_14%,transparent)] text-[color:var(--err)]" : "bg-wash"}`}>{counts[f.key]}</span> : null}
+          </button>
+        ))}
+        <span className="ml-auto text-xs text-faint">{shown.length} prenotazioni</span>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {shown.map(({ b, j }) => {
+          const unit = units.find((u) => u.id === b.unitId);
+          const rt = roomTypes.find((r) => r.id === (unit?.roomTypeId ?? b.roomTypeId));
+          const st = getStructure(b.structureId);
+          const photo = unit?.photos?.[0];
+          const tint = rt?.color || st?.photoColor || "var(--focus)";
+          const n = nights(b.checkIn, b.checkOut);
+          const arrivesIn = Math.round((Date.parse(b.checkIn) - Date.parse(today)) / 86400000);
+          const live = isLiveBooking(b);
+          const total = bookingPaidTotal(b);
+          const resid = Math.max(0, total - (b.paid ?? 0));
+          const people = b.adults + b.children;
+          const when = !live ? (b.status === "no_show" ? "No-show" : b.status === "cancelled" ? "Cancellata" : "") :
+            b.checkOut < today ? "Partita" :
+            b.checkOut === today ? "Parte oggi" :
+            b.checkIn === today ? "Arriva oggi" :
+            b.checkIn > today ? (arrivesIn === 1 ? "Arriva domani" : `Tra ${arrivesIn} giorni`) :
+            `In casa · notte ${Math.round((Date.parse(today) - Date.parse(b.checkIn)) / 86400000) + 1} di ${n}`;
+          const whenTone = !live ? "var(--err)" : b.checkIn === today || b.checkOut === today ? "var(--focus)" : b.checkOut < today ? "var(--faint)" : "var(--dim)";
+          const steps = (j?.steps ?? []).filter((s) => s.state !== "na" || s.key === "checkout");
+          const pct = j && j.total ? Math.round((j.done / j.total) * 100) : 0;
+          return (
+            <article key={b.id} onClick={() => openBooking(b.id)} className={`group flex cursor-pointer flex-col gap-3 rounded-2xl border border-line bg-surface p-3 shadow-sm transition hover:border-focus hover:shadow-md md:flex-row md:items-stretch md:gap-4 ${live ? "" : "opacity-70"}`}>
+              {/* Anteprima camera */}
+              <div className="relative h-28 w-full shrink-0 overflow-hidden rounded-xl md:h-auto md:w-40" style={photo ? undefined : { background: `linear-gradient(145deg, color-mix(in srgb, ${tint} 85%, #fff), color-mix(in srgb, ${tint} 70%, #000))` }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {photo && <img src={photo} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 text-white">
+                  <div className="truncate text-sm font-bold leading-tight">{unit ? unit.name.replace(/^camera\s*/i, "") : <span className="italic">Da assegnare</span>}</div>
+                  <div className="truncate text-[11px] opacity-90">{rt?.name ?? unitLabel(b) ?? ""}</div>
+                </div>
+                {showStructure && st && <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white">{st.name}</span>}
+              </div>
+
+              {/* Ospite, date, passaggi */}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <h3 className="truncate text-base font-bold text-txt">{guestName(b) || "—"}</h3>
+                  <ChannelLogo channel={b.channel} size={16} title={b.channel === "direct" ? "xenora.it" : CHANNELS[b.channel].label} />
+                  <span className="font-mono text-[11px] text-faint">{bookingCode(b)}</span>
+                  {b.groupId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-focus">Gruppo</span>}
+                  {b.status === "tentative" && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]">Opzione</span>}
+                </div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-dim">
+                  <span className="font-medium capitalize text-txt">{dayLabel(b.checkIn)}</span><span className="text-faint">→</span><span className="font-medium capitalize text-txt">{dayLabel(b.checkOut)}</span>
+                  <span className="text-faint">·</span><span>{n} {n === 1 ? "notte" : "notti"}</span>
+                  <span className="text-faint">·</span><span>{people} {people === 1 ? "ospite" : "ospiti"}</span>
+                  {when && <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: whenTone, background: `color-mix(in srgb, ${whenTone} 12%, transparent)` }}>{when}</span>}
+                </div>
+
+                {steps.length > 0 && (
+                  <div className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3 xl:grid-cols-4">
+                    {steps.map((s) => (
+                      <button key={s.key} onClick={(e) => gotoStep(e, s)} title={`${s.label}: ${s.detail}`} className="flex min-w-0 items-start gap-2 rounded-lg text-left transition hover:bg-wash">
+                        <span className="mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full text-[10px] font-extrabold" style={{ color: STATE_COLOR[s.state], border: `1.5px solid ${STATE_COLOR[s.state]}`, background: s.state === "done" ? `color-mix(in srgb, ${STATE_COLOR[s.state]} 14%, transparent)` : "transparent" }}>{STATE_GLYPH[s.state]}</span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-xs font-semibold text-txt">{s.label}</span>
+                          <span className="block truncate text-[11px]" style={{ color: s.state === "late" ? "var(--err)" : "var(--faint)" }}>{s.detail}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {j && j.chips.length > 0 && (
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {j.chips.map((c) => (
+                      <span key={c.key} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: c.tone === "err" ? "var(--err)" : c.tone === "warn" ? "var(--warn)" : "var(--dim)", background: `color-mix(in srgb, ${c.tone === "err" ? "var(--err)" : c.tone === "warn" ? "var(--warn)" : "var(--faint)"} 14%, transparent)` }}>{c.label}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Importi e avanzamento */}
+              <div className="flex shrink-0 flex-row items-center justify-between gap-3 border-t border-line pt-2 md:w-44 md:flex-col md:items-end md:justify-between md:border-l md:border-t-0 md:pl-4 md:pt-0">
+                <div className="md:text-right">
+                  <div className="font-mono text-lg font-bold text-txt">{total ? eur(total) : "—"}</div>
+                  <div className="text-[11px] text-faint">{total ? (resid <= 0.005 ? "Saldato" : `Mancano ${eur(resid)}`) : ""}{commissionOf(b) ? ` · comm. ${eur(commissionOf(b))}` : ""}</div>
+                </div>
+                {j && j.total > 0 && (
+                  <div className="min-w-[110px] md:w-full">
+                    <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-dim"><span>{j.done} di {j.total}</span><span>{pct}%</span></div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: j.steps.some((s) => s.state === "late") ? "var(--err)" : pct === 100 ? "var(--ok)" : "var(--focus)" }} /></div>
+                    {j.next ? <button onClick={(e) => gotoStep(e, j.next!)} className="mt-1.5 block w-full truncate text-left text-[11px] font-semibold md:text-right" style={{ color: j.next.state === "late" ? "var(--err)" : "var(--focus)" }}>Prossimo: {j.next.label} →</button> : <div className="mt-1.5 text-[11px] font-semibold md:text-right" style={{ color: "var(--ok)" }}>Tutto in ordine ✓</div>}
+                  </div>
+                )}
+              </div>
+            </article>
+          );
+        })}
+        {!shown.length && <div className="rounded-xl border border-line bg-surface"><EmptyState title={filter === "all" ? "Nessuna prenotazione con questi filtri" : "Nessuna prenotazione in questa categoria"} /></div>}
+      </div>
+    </div>
+  );
+}
