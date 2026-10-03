@@ -8,12 +8,10 @@ import type { DayStats } from "./_modello";
 export type Modo = "day" | "week";
 
 type Kind = "arr" | "dep" | "stay" | "free" | "clean";
-const KINDS: { key: Kind; label: string; color: string }[] = [
-  { key: "arr", label: "Arrivi", color: "var(--ok)" },
-  { key: "dep", label: "Partenze", color: "var(--warn)" },
-  { key: "stay", label: "Restano", color: "var(--focus)" },
-  { key: "free", label: "Libere", color: "var(--dim)" },
-  { key: "clean", label: "Pulizie", color: "var(--txt)" },
+const MOVES: { key: Kind; color: string; name: (n: number) => string }[] = [
+  { key: "arr", color: "var(--ok)", name: (n) => (n === 1 ? "arrivo" : "arrivi") },
+  { key: "dep", color: "var(--warn)", name: (n) => (n === 1 ? "partenza" : "partenze") },
+  { key: "stay", color: "var(--focus)", name: (n) => (n === 1 ? "resta" : "restano") },
 ];
 const svgP = { width: 12, height: 12, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.4, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
@@ -76,27 +74,28 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
               <span className="block truncate text-[10px] font-semibold uppercase tracking-wide text-faint">{wk}</span>
               <span className="mx-auto grid h-7 min-w-7 place-items-center rounded-full px-1 font-mono text-sm font-bold tabular-nums sm:h-8 sm:min-w-8 sm:text-base" style={isToday ? { background: "var(--focus)", color: "#fff" } : { color: "var(--txt)" }}>{d.getDate()}</span>
               <span className="block truncate text-[10px] text-faint">{d.getDate() === 1 || iso === days[0].iso ? mon : " "}</span>
-              <span className="mt-0.5 flex flex-col gap-0.5">
-                {KINDS.map((k) => {
+              {/* Movimenti del giorno: solo quelli che ci sono, con il nome per esteso (icona e numero stanno insieme) */}
+              <span className="mt-1 flex min-h-[3.4rem] flex-col items-stretch justify-start gap-1">
+                {MOVES.filter((k) => valueOf(stats, k.key) > 0).map((k) => {
                   const v = valueOf(stats, k.key);
-                  const text = k.key === "free" ? `${v}` : k.key === "clean" && v > 0 && stats.cleanDone > 0 ? `${stats.cleanDone}/${v}` : `${v}`;
                   return (
-                    <span key={k.key} className="flex items-center justify-between gap-0.5 rounded px-0.5 text-[10px] font-semibold tabular-nums sm:px-1 sm:text-[11px]" style={{ color: v > 0 ? k.color : "var(--faint)", opacity: v > 0 ? 1 : 0.55 }} title={`${k.label}: ${text}${k.key === "free" ? ` su ${stats.totalUnits}` : ""}`}>
+                    <span key={k.key} className="inline-flex items-center justify-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums sm:px-2 sm:text-xs" style={{ color: k.color, background: `color-mix(in srgb, ${k.color} 14%, transparent)` }} title={`${v} ${k.name(v)}`}>
                       <KindIcon k={k.key} />
-                      <span>{text}</span>
+                      <span>{v}</span>
+                      <span className="hidden sm:inline">{k.name(v)}</span>
                     </span>
                   );
                 })}
+                {MOVES.every((k) => valueOf(stats, k.key) === 0) && <span className="py-1 text-[11px] text-faint">Nessun movimento</span>}
+              </span>
+              <span className="mt-1 block truncate border-t border-line pt-1.5 text-[10px] text-faint sm:text-[11px]" title={`Camere libere nella notte: ${stats.free} su ${stats.totalUnits} · Pulizie${stats.cleanDone > 0 ? ` fatte ${stats.cleanDone} su ${stats.clean}` : `: ${stats.clean}`}`}>
+                <b className="font-semibold text-dim">{stats.free}</b> libere · <b className="font-semibold text-dim">{stats.cleanDone > 0 ? `${stats.cleanDone}/${stats.clean}` : stats.clean}</b> pulizie
               </span>
             </button>
           );
         })}
       </div>
 
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-faint">
-        {KINDS.map((k) => <span key={k.key} className="inline-flex items-center gap-1"><span style={{ color: k.color }}><KindIcon k={k.key} /></span>{k.label}</span>)}
-        <span className="ml-auto hidden sm:inline">Notte di ciascun giorno · Pulizie come nel calendario a griglia</span>
-      </div>
     </div>
   );
 }
