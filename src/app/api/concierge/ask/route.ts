@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { conciergeAnswer } from "@/lib/concierge-engine";
 import { withOrgData } from "@/lib/concierge-orgdata";
+import { normalizeLang, isGuestLang } from "@/lib/concierge-i18n";
 import { AI_CONCIERGE_KEY, parseAiConciergePrefs } from "@/lib/aiConcierge";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Prova del Concierge dentro Xenora: stessa logica del WhatsApp automatico, senza inviare nulla a nessuno.
-// Body: { structureId, bookingId?, message }  →  { ok, answered, reply?, topic?, reason?, hasBooking, lang }
+// Body: { structureId, bookingId?, message, lang? }  (lang = it|en|de|fr|es: lingua dell'ospite per la prova; assente = automatica)  →  { ok, answered, reply?, topic?, reason?, hasBooking, lang }
 export async function POST(req: Request) {
   const auth = await authTenant(req);
   if (isResponse(auth)) return auth;
@@ -16,6 +17,8 @@ export async function POST(req: Request) {
     const b = await req.json().catch(() => ({}));
     const message = String(b?.message || "").trim().slice(0, 1000);
     const structureId = String(b?.structureId || "").trim();
+    const nl = normalizeLang(b?.lang ? String(b.lang) : "");
+    const forceLang = isGuestLang(nl) ? nl : undefined;
     const bookingId = b?.bookingId ? String(b.bookingId) : undefined;
     if (!message) return NextResponse.json({ ok: false, error: "missing_message" }, { status: 400 });
     if (!structureId) return NextResponse.json({ ok: false, error: "missing_structure" }, { status: 400 });
@@ -39,7 +42,7 @@ export async function POST(req: Request) {
       admin: auth.admin, tenantId: auth.tenantId,
       data: { structures: data.structures, bookings: data.bookings, units: data.units, roomTypes: data.roomTypes },
       roomAccessRaw: blob["spigolestay:roomaccess"], conciergeFaqRaw: faqRaw,
-      structureId, bookingId, guest: g ? { id: g.id, language: g.language } : undefined, guestName: g?.fullName, message,
+      structureId, bookingId, forceLang, guest: g ? { id: g.id, language: g.language } : undefined, guestName: g?.fullName, message,
       tone: parseAiConciergePrefs(blob[AI_CONCIERGE_KEY]).tone, // la prova usa lo stesso tono scelto in Impostazioni
 
       assumeVerified: b?.verified !== false, // la prova la fa il proprietario: Wi-Fi e accesso si vedono come per un ospite in casa

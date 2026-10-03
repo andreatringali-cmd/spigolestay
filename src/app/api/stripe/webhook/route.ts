@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { handleSubscriptionPaid, type SubscriptionPaidInput } from "@/lib/invoicing/subscription-billing";
 import { planByKey } from "@/lib/stripe-plans";
+import { adminFromEnv, recordChatPayment } from "@/lib/chat-pay-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +47,15 @@ export async function POST(req: Request) {
             guest: { firstName: (m.gn || "").split(" ")[0] || "", lastName: (m.gn || "").split(" ").slice(1).join(" "), email: m.ge || "", phone: m.gp || "", country: m.gc || "" },
           }),
         });
+      }
+      // Link di pagamento in chat (kind "chatpay"): registra l'incasso sulla prenotazione e scrive
+      // "Pagamento ricevuto" nel thread. Idempotente (paidSessions + id messaggio pay:<sessione>),
+      // quindi sicuro anche se arriva prima/dopo la pagina di ritorno. Se fallisce → 500 e Stripe ritenta.
+      if (session.payment_status === "paid" && m.kind === "chatpay") {
+        const admin = adminFromEnv();
+        if (!admin) return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 500 });
+        const rec = await recordChatPayment(admin, session);
+        if (!rec.ok) return NextResponse.json({ ok: false, error: "chatpay_record_failed", detail: rec.error }, { status: 500 });
       }
       // I saldi pagati al check-in (kind "quote") vengono registrati dal ritorno pagina
       // (pay-confirm). Qui li lasciamo passare: la creazione prenotazione non serve.

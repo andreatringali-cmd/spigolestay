@@ -6,6 +6,8 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useData } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { apiPost } from "@/lib/invoicing/client";
+import { LANG_LABEL, type GuestLang } from "@/lib/concierge-i18n";
+import ConciergeTranslations from "./ConciergeTranslations";
 import {
   CATEGORY_LABEL, CATEGORY_ORDER, mapUrlOf, renderEntry, resolveEntries,
   type AutoSource, type ConciergeEntry, type ConciergeLang,
@@ -293,7 +295,8 @@ export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; 
   const [bookingId, setBookingId] = useState("");
   const [asking, setAsking] = useState(false);
   const [askErr, setAskErr] = useState("");
-  const [res, setRes] = useState<{ ok: boolean; answered: boolean; reply?: string; topic?: string; reason?: string; question: string } | null>(null);
+  const [testLang, setTestLang] = useState<"" | GuestLang>(""); // lingua dell'ospite per la prova ("" = automatica: anagrafica ospite o testo)
+  const [res, setRes] = useState<{ ok: boolean; answered: boolean; reply?: string; topic?: string; reason?: string; lang?: string; question: string } | null>(null);
   const bookingOptions = useMemo(() => bookings
     .filter((b) => b.structureId === sid)
     .sort((a, b) => b.checkIn.localeCompare(a.checkIn))
@@ -311,7 +314,7 @@ export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; 
     if (!message || asking) return;
     setAsking(true); setAskErr(""); setRes(null);
     try {
-      const r = await apiPost<{ ok: boolean; answered: boolean; reply?: string; topic?: string; reason?: string }>("concierge/ask", { structureId: sid, bookingId: bookingId || undefined, message });
+      const r = await apiPost<{ ok: boolean; answered: boolean; reply?: string; topic?: string; reason?: string; lang?: string }>("concierge/ask", { structureId: sid, bookingId: bookingId || undefined, message, lang: testLang || undefined });
       setRes({ ...r, question: message });
     } catch (e) {
       setAskErr(e instanceof Error ? e.message : "Errore");
@@ -344,6 +347,8 @@ export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; 
         )}
       </Card>
 
+      {!loading && <ConciergeTranslations sid={sid} rows={rows} />}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <SectionTitle>Anteprima: come la vedrebbe l&apos;ospite ({lang.toUpperCase()})</SectionTitle>
@@ -374,6 +379,12 @@ export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; 
               {bookingOptions.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
             </select>
           </label>
+          <label className="mt-2 block text-[11px] font-semibold text-faint">Lingua dell&apos;ospite
+            <select value={testLang} onChange={(e) => setTestLang(e.target.value as "" | GuestLang)} className={`${inputCls} mt-0.5`}>
+              <option value="">Automatica (dalla prenotazione o dal testo)</option>
+              {(["it", "en", "de", "fr", "es"] as GuestLang[]).map((l) => <option key={l} value={l}>{LANG_LABEL[l]}</option>)}
+            </select>
+          </label>
           <div className="mt-2 flex gap-2">
             <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submit(); }} placeholder="Scrivi la domanda dell'ospite…" className={`${inputCls} flex-1`} />
             <button onClick={submit} disabled={asking || !q.trim()} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">Invia</button>
@@ -386,7 +397,7 @@ export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; 
                 {res.answered ? (
                   <div className="flex justify-start"><div className="max-w-[85%] whitespace-pre-line rounded-2xl border border-line bg-surface px-3 py-2 text-sm text-txt">
                     {res.reply}
-                    {res.topic && <div className="mt-1 text-[10px] text-faint">Argomento: {res.topic}</div>}
+                    {(res.topic || res.lang) && <div className="mt-1 text-[10px] text-faint">{res.topic ? `Argomento: ${res.topic}` : ""}{res.topic && res.lang ? " · " : ""}{res.lang ? `Lingua: ${res.lang.toUpperCase()}` : ""}</div>}
                   </div></div>
                 ) : (
                   <div className="rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}>

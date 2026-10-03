@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Structure } from "@/lib/types";
 import { getConciergeReply } from "@/lib/ai/guest-concierge";
 import type { ConciergeTone } from "@/lib/aiConcierge";
+import { isTranslateLang, toTranslationMap, type GuestLang } from "@/lib/concierge-i18n";
+import { loadTranslations } from "@/lib/concierge-translations";
 import { accessCodeOf, kbLang, renderEntry, resolveEntries, toFaqItems, selectRelevant, SENSITIVE_CATEGORIES, type ConciergeEntry } from "@/lib/concierge-kb";
 
 // Motore unico del Concierge (solo server): lo usano sia il webhook WhatsApp sia la casella "Prova" di Xenora,
@@ -47,13 +49,14 @@ export interface EngineInput {
   bookingId?: string;                       // prova dalla UI: prenotazione scelta a mano
   assumeVerified?: boolean;                 // prova dalla UI: tratta l'interlocutore come ospite con prenotazione in corso
   guest?: { id?: string; language?: string };
+  forceLang?: GuestLang;                    // prova dalla UI: lingua dell'ospite scelta a mano (ignora anagrafica e testo)
   guestName?: string;
   message: string;
   transcript?: string;
   tone?: ConciergeTone;                     // Impostazioni → Concierge AI (formale / amichevole / essenziale); assente = amichevole
 }
 // ms: tempi del motore in millisecondi (kb = lettura base di conoscenza, ai = chiamata AI, total = tutto il motore)
-export interface EngineResult { answered: boolean; reply?: string; topic?: string; reason?: string; hasBooking: boolean; lang: "it" | "en"; ms?: { total: number; kb: number; ai: number } }
+export interface EngineResult { answered: boolean; reply?: string; topic?: string; reason?: string; hasBooking: boolean; lang: GuestLang; ms?: { total: number; kb: number; ai: number } }
 
 // NB: i dati passati in inp.data devono già comprendere le strutture condivise (Structure.orgId): vedi withOrgData() in
 // src/lib/concierge-orgdata.ts, che il webhook e /api/concierge/ask chiamano prima. Qui non si legge né si scrive org_state.
@@ -71,7 +74,7 @@ async function runConcierge(inp: EngineInput, ms: { total: number; kb: number; a
   const units = arr<UnitLite>(inp.data.units);
   const roomTypes = arr<RoomTypeLite>(inp.data.roomTypes);
   const st = structures.find((s) => s.id === inp.structureId);
-  const lang = kbLang(inp.guest?.language, inp.message);
+  const lang: GuestLang = inp.forceLang ?? kbLang(inp.guest?.language, inp.message);
   if (!st) return { answered: false, reason: "nessuna struttura di riferimento", hasBooking: false, lang };
 
   const oggi = todayISO();
@@ -95,7 +98,10 @@ async function runConcierge(inp: EngineInput, ms: { total: number; kb: number; a
 
   if (entries.length) {
     const accessCode = bk && hasBooking ? accessCodeOf(inp.roomAccessRaw, bk.unitId, !!bk.parking) : "";
-    const resolved = resolveEntries(entries, inp.structureId, lang)
+    // Lingue de/fr/es: traduzioni salvate fuori tabella (blob app_state); per ogni voce, ripiego su inglese e poi italiano.
+    let tr: ReturnType<typeof toTranslationMap> | undefined;
+    if (isTranslateLang(lang)) { try { tr = toTranslationMap(await loadTranslations(inp.admin, inp.tenantId)); } catch { tr = undefined; } }
+    const resolved = resolveEntries(entries, inp.structureId, lang, tr)
       // Chi non ha una prenotazione in corso non riceve mai Wi-Fi, codici o istruzioni d'accesso.
       .filter((e) => hasBooking || !(SENSITIVE_CATEGORIES.has(e.category) || e.auto_source === "access_code"));
     const rendered = resolved.map((e) => renderEntry(e, { structure: st as unknown as Structure, booking: bk && bk.status !== "cancelled" ? bk : undefined, accessCode }, lang));

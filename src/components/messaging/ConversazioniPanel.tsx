@@ -15,6 +15,8 @@ import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
 import { apiPost } from "@/lib/invoicing/client";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
+import { chatPayContext } from "@/lib/chat-pay";
+import { fmtEur, parseEurInput, planChatPayment, chatPayGuestMessage, maxChatPayCents, type ChatPayKind } from "@/lib/chat-pay-core";
 
 // Email del titolare Xenora: vede la nota di setup una tantum del webhook WhatsApp
 // (l'accesso vero resta comunque verificato lato server).
@@ -42,7 +44,7 @@ declare global {
 
 
 // wid = id del messaggio su WhatsApp; st = stato di consegna (sent ✓, delivered ✓✓, read ✓✓ blu, failed).
-interface Msg { id: string; dir: "out" | "in"; text: string; ts: number; via?: string; wid?: string; st?: "sent" | "delivered" | "read" | "failed"; media?: { kind: "audio"; id: string; transcribed: boolean } }
+interface Msg { id: string; dir: "out" | "in"; text: string; ts: number; via?: string; wid?: string; st?: "sent" | "delivered" | "read" | "failed"; media?: { kind: "audio"; id: string; transcribed: boolean }; sys?: "payment" }
 type Threads = Record<string, Msg[]>;
 const KEY = "spigolestay:threads:v1";
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()));
@@ -432,6 +434,44 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     setDraft((d) => `${d.trim()}${d.trim() ? "\n\n" : ""}${msg}`);
   };
 
+  // ── Link di pagamento in chat (saldo / tassa di soggiorno) ──
+  // Importo precompilato = residuo reale della prenotazione (stessi calcoli di incassi.ts), modificabile
+  // solo verso il basso. Il server ricontrolla tutto (accesso, Stripe della struttura, residuo) e
+  // restituisce un link firmato: qui lo si inserisce nella bozza, poi si invia col normale invio.
+  const [payFor, setPayFor] = useState<string | null>(null); // id ospite per cui il pannello è aperto (si chiude da solo cambiando conversazione)
+  const payOpen = payFor !== null && payFor === sel;
+  const [payKind, setPayKind] = useState<ChatPayKind>("saldo");
+  const [payAmount, setPayAmount] = useState("");
+  const [payBusy, setPayBusy] = useState(false);
+  const [payErr, setPayErr] = useState("");
+  const payInputFor = (cents: number) => (cents / 100).toFixed(2).replace(".", ",");
+  const openPay = () => {
+    const b = current?.b; if (!b) return;
+    const ctx = chatPayContext(b, getStructure(b.structureId));
+    setPayKind("saldo"); setPayErr(""); setPayAmount(payInputFor(maxChatPayCents(ctx, "saldo"))); setPayFor((v) => (v === sel ? null : sel));
+  };
+  const pickPayKind = (k: ChatPayKind) => {
+    const b = current?.b; if (!b) return;
+    setPayKind(k); setPayErr(""); setPayAmount(payInputFor(maxChatPayCents(chatPayContext(b, getStructure(b.structureId)), k)));
+  };
+  const createPayLink = async () => {
+    const b = current?.b; if (!b || !current || payBusy) return;
+    const ctx = chatPayContext(b, getStructure(b.structureId));
+    const typed = parseEurInput(payAmount);
+    if (typed === null) { setPayErr(t("Importo non valido.")); return; }
+    const plan = planChatPayment(ctx, payKind, typed);
+    if (!plan.ok) { setPayErr(t(plan.message)); return; }
+    setPayBusy(true); setPayErr("");
+    try {
+      const r = await apiPost<{ ok: boolean; url: string; amount: number }>("stripe/chat-pay", { bookingId: b.id, kind: payKind, amount: plan.cents / 100 });
+      const g = guests.find((x) => x.id === current.id);
+      const msg = chatPayGuestMessage(langOf(g), payKind, Math.round(r.amount * 100), r.url);
+      setDraft((d) => `${d.trim()}${d.trim() ? "\n\n" : ""}${msg}`);
+      setPayFor(null);
+    } catch (e) { setPayErr(e instanceof Error ? e.message : t("Errore")); }
+    finally { setPayBusy(false); }
+  };
+
   // ── Coda invii automatici (calcolata sulle prenotazioni reali) ──
   const bookingsWithGuest = useMemo(() => bookings
     .filter((b) => (activeStructureId === "all" || b.structureId === activeStructureId) && b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked")
@@ -667,6 +707,20 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 // Messaggio generato in automatico dal Concierge AI (webhook WhatsApp, Impostazioni →
                 // Concierge AI): va sempre riconoscibile a colpo d'occhio rispetto a ciò che scrive l'host.
                 const isAiReply = out && m.via === "🤖 Concierge AI";
+                // Messaggio di sistema scritto dal server quando l'ospite paga col link (webhook Stripe).
+                if (m.sys === "payment") {
+                  return (
+                    <div key={m.id}>
+                      {showDay && <div className="my-4 flex justify-center"><span className="rounded-full border border-line bg-surface px-3 py-1 text-[10px] font-semibold capitalize text-dim shadow-sm">{dayLabel(m.ts, t)}</span></div>}
+                      <div className="my-2 flex justify-center">
+                        <div className="max-w-[88%] rounded-xl px-3.5 py-2 text-center text-xs font-semibold leading-relaxed" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }}>
+                          <div className="whitespace-pre-wrap break-words">{m.text}</div>
+                          <div className="mt-0.5 text-[10px] font-normal text-faint">{hhmm}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
                 return (
                   <div key={m.id}>
                     {showDay && <div className="my-4 flex justify-center"><span className="rounded-full border border-line bg-surface px-3 py-1 text-[10px] font-semibold capitalize text-dim shadow-sm">{dayLabel(m.ts, t)}</span></div>}
@@ -717,6 +771,45 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
             )}
 
             <div className="border-t border-line bg-surface p-3">
+              {payOpen && current.b && (() => {
+                const b = current.b;
+                const st = getStructure(b.structureId);
+                const ctx = chatPayContext(b, st);
+                const base = planChatPayment(ctx, payKind);
+                const taxOk = planChatPayment(ctx, "tassa").ok;
+                const blockedErr = !base.ok && base.error !== "amount_too_low" && base.error !== "invalid_amount" && base.error !== "amount_exceeds_balance" ? base : null;
+                const maxC = maxChatPayCents(ctx, payKind);
+                return (
+                  <div className="mb-2 rounded-xl border border-line bg-paper p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-txt">💳 {t("Link di pagamento per")} {current.name}</span>
+                      <button onClick={() => setPayFor(null)} className="text-xs text-faint hover:text-txt" title={t("Chiudi")}>✕</button>
+                    </div>
+                    {blockedErr ? (
+                      <div className="text-xs font-medium" style={{ color: blockedErr.error === "already_paid" || blockedErr.error === "tax_already_paid" ? "var(--ok)" : "var(--warn)" }}>
+                        {blockedErr.error === "already_paid" || blockedErr.error === "tax_already_paid" ? "✓ " : "⚠ "}{t(blockedErr.message)}
+                        {blockedErr.error === "stripe_not_connected" && st && <button onClick={() => router.push(`/strutture/${st.id}`)} className="ml-2 underline">{t("Apri la struttura")}</button>}
+                        {payKind === "tassa" && taxOk === false && <button onClick={() => pickPayKind("saldo")} className="ml-2 underline">{t("Torna al saldo")}</button>}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="mb-2 flex flex-wrap gap-1.5">
+                          <button onClick={() => pickPayKind("saldo")} className="rounded-full border px-3 py-1 text-xs font-semibold" style={payKind === "saldo" ? { borderColor: "var(--focus)", color: "var(--focus)", backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : { borderColor: "var(--line)", color: "var(--dim)" }}>{t("Saldo")}</button>
+                          <button onClick={() => pickPayKind("tassa")} disabled={!taxOk} title={taxOk ? undefined : t("Tassa di soggiorno non prevista o già incassata")} className="rounded-full border px-3 py-1 text-xs font-semibold disabled:opacity-40" style={payKind === "tassa" ? { borderColor: "var(--focus)", color: "var(--focus)", backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : { borderColor: "var(--line)", color: "var(--dim)" }}>{t("Tassa di soggiorno")}</button>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm text-dim">€</span>
+                          <input value={payAmount} onChange={(e) => { setPayAmount(e.target.value); setPayErr(""); }} inputMode="decimal" className="w-28 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm font-semibold text-txt outline-none focus:border-focus" aria-label={t("Importo")} />
+                          <span className="text-[11px] text-faint">{t("Residuo")} {fmtEur(ctx.balanceCents)}{payKind === "tassa" ? ` · ${t("tassa")} ${fmtEur(ctx.cityTaxCents)}` : ctx.cityTaxCents > 0 && !ctx.cityTaxExempt && !ctx.cityTaxPaid ? ` (${t("tassa di soggiorno inclusa")} ${fmtEur(ctx.cityTaxCents)})` : ""} · {t("massimo")} {fmtEur(maxC)}</span>
+                          <button onClick={createPayLink} disabled={payBusy} className="ml-auto rounded-full bg-focus px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-50">{payBusy ? t("Creo il link…") : t("Crea link e inseriscilo nel messaggio")}</button>
+                        </div>
+                        <p className="mt-1.5 text-[11px] text-faint">{t("Il link si inserisce nella bozza: poi lo invii tu col normale invio. Quando l'ospite paga, l'incasso si registra da solo sulla prenotazione e qui compare «Pagamento ricevuto».")}</p>
+                      </>
+                    )}
+                    {payErr && <div className="mt-1.5 text-xs font-medium text-[color:var(--err)]">{payErr}</div>}
+                  </div>
+                );
+              })()}
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
                 <select onChange={(e) => { const v = e.target.value; e.target.value = ""; if (v === "__manage__") { if (onManageTemplates) onManageTemplates(); else router.push("/modelli"); } else if (v) insertTemplate(v); }} defaultValue="" className="rounded-full border border-line bg-paper px-3 py-1 text-xs text-dim outline-none transition hover:bg-wash focus:border-focus">
                   <option value="">{t("Inserisci un modello…")}</option>
@@ -726,6 +819,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 </select>
                 <button onClick={insertGuide} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition hover:bg-wash hover:text-txt">📖 {t("Guida ospiti")}</button>
                 {current.b && <button onClick={insertCheckin} title={t("Invia il link per il check-in online (compila la schedina alloggiati)")} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition hover:bg-wash hover:text-txt">📝 {t("Check-in online")}</button>}
+                {current.b && <button onClick={openPay} title={t("Crea un link per far pagare all'ospite il saldo (o la tassa di soggiorno) con carta: il pagamento si registra da solo")} className="rounded-full border px-3 py-1 text-xs font-semibold transition hover:bg-wash" style={payOpen ? { borderColor: "var(--focus)", color: "var(--focus)", backgroundColor: "color-mix(in srgb, var(--focus) 8%, transparent)" } : { borderColor: "var(--line)", color: "var(--dim)" }}>💳 {t("Link di pagamento")}</button>}
                 {!current.b && current.isReturning && <button onClick={insertLoyaltyOffer} title={t("Inserisce una proposta di sconto fedeltà per il prossimo soggiorno")} className="rounded-full border border-line px-3 py-1 text-xs font-medium text-dim transition hover:bg-wash hover:text-txt">🎁 {t("Proponi sconto fedeltà")}</button>}
                 {aiUnavailable ? (
                   <span className="rounded-full border border-dashed border-line px-3 py-1 text-xs font-medium text-faint" title={t("La risposta assistita dall'AI sarà attivata a breve")}>✨ {t("Bozza con AI")} · {t("disponibile a breve")}</span>

@@ -119,6 +119,24 @@ export async function findBookingStoreById(admin: SupabaseClient, bookingId: str
   return null;
 }
 
+// Ritrova una prenotazione tra i dati a cui il TENANT ha accesso: le organizzazioni condivise
+// di cui è membro attivo e il proprio stato personale. È la verifica di autorizzazione usata
+// dal link di pagamento in chat (un gestore non può toccare prenotazioni di altri).
+export async function findBookingStoreForTenant(admin: SupabaseClient, tenantId: string, bookingId: string): Promise<BookingStore | null> {
+  if (!tenantId || !bookingId) return null;
+  const { data: ms } = await admin.from("memberships").select("org_id, active").eq("user_id", tenantId);
+  for (const m of arr(ms)) {
+    if ((m as { active?: boolean }).active === false) continue;
+    const orgId = String((m as { org_id?: string }).org_id || "");
+    if (!orgId) continue;
+    const hit = await scan(admin, "org_state", "org_id", orgId, bookingId);
+    if (hit) { hit.ownerId = tenantId; return hit; }
+  }
+  const hit = await scan(admin, "app_state", "user_id", tenantId, bookingId);
+  if (hit) { hit.ownerId = tenantId; return hit; }
+  return null;
+}
+
 // Scrive una patch sull'oggetto prenotazione (rev-locked, un retry).
 export async function writeBookingPatch(admin: SupabaseClient, store: BookingStore, patch: Json): Promise<boolean> {
   return mutateStore(admin, store, (data, idx) => {

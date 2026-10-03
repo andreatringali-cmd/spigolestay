@@ -80,7 +80,7 @@ export default function ConciergeUnanswered({ sid, onAdd, createdTick }: {
     const t = r.q.replace(/[?!.\s]+$/g, "").trim().slice(0, 80);
     nonce.current += 1;
     pending.current = { nonce: nonce.current, ids: r.ids };
-    onAdd({ nonce: nonce.current, title: t.charAt(0).toUpperCase() + t.slice(1), category: cat === "altro" ? "servizi" : cat, lang: kbLang(undefined, r.q) });
+    onAdd({ nonce: nonce.current, title: t.charAt(0).toUpperCase() + t.slice(1), category: cat === "altro" ? "servizi" : cat, lang: kbLang(undefined, r.q) === "it" ? "it" : "en" }); // la tabella ammette solo it/en: le altre lingue ripiegano sull'inglese
   };
 
   return (

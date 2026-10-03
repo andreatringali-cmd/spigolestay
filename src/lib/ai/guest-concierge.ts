@@ -96,7 +96,7 @@ Regole FERREE:
 - Se il messaggio dell'ospite non è chiaramente una delle domande ammesse, canAnswer = false e topic = "other".
 - In caso di qualunque dubbio, canAnswer = false.
 - NON aggiungere frasi di chiusura né inviti a scrivere su WhatsApp o a contattare il gestore "per altri dettagli": rispondi alla domanda e fermati.${noBookingRule}
-- "reply" va scritto in ${langName}, ${toneInstruction(ctx.tone)}, rivolgendoti all'ospite per nome se disponibile. Nessun preambolo, nessuna firma. Se canAnswer è false, reply può restare vuoto ("").
+- "reply" va scritto in ${langName} (la lingua dell'ospite) anche se i "Dati disponibili" sono in un'altra lingua: usa solo le informazioni che contengono, ma NON tradurre né modificare mai link, numeri di telefono, indirizzi, password Wi-Fi, codici e orari. Stile: ${toneInstruction(ctx.tone)}, rivolgendoti all'ospite per nome se disponibile. Nessun preambolo, nessuna firma. Se canAnswer è false, reply può restare vuoto ("").
 Dati disponibili:
 ${facts}
 ${ctx.transcript ? `Conversazione recente (dal più vecchio al più recente):\n"""\n${ctx.transcript}\n"""\n` : ""}Ultimo messaggio dell'ospite${ctx.guestName ? ` (${ctx.guestName})` : ""}: "${lastMsg.replace(/\s+/g, " ")}"
