@@ -146,7 +146,6 @@ export default function LoginPage() {
           <div className="mb-4 flex flex-col items-center">
             <Image src="/xenora-logo.png" alt="Xenora" width={220} height={62} priority className="object-contain" style={{ width: 220, height: "auto" }} />
             {/* Slogan di marca: resta in inglese in ogni lingua (volutamente non passa dal sistema i18n) */}
-            <p lang="en" className="mt-2 max-w-full text-balance text-center text-[13px] leading-snug text-[#6b6459]">The intelligent operating system for hospitality.</p>
           </div>
 
           {recovery ? (
@@ -247,7 +246,7 @@ export default function LoginPage() {
         </div>
 
       </main>
-      <footer className="mt-3 border-t border-[#eceae4] px-2 pt-2 text-[11px] text-[#9a9186]">
+      <footer className="relative mt-3 border-t border-[#eceae4] px-2 pt-2 text-[11px] text-[#9a9186]">
         {/* Mobile: sito + social sulla stessa riga */}
         <div className="flex items-center justify-between gap-2 sm:hidden">
           <a href="https://xenoradigitalsolutions.com" target="_blank" rel="noreferrer" className="hover:text-[#4a453d] hover:underline">xenoradigitalsolutions.com</a>
