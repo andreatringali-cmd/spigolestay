@@ -104,7 +104,9 @@ async function resolveCounterpart(
   }
   // Dati fattura raccolti al check-in online ("richiedo fattura").
   const ir = ctx.booking.invoiceRequest;
-  if (ir?.wants) {
+  // L'ospite ha compilato i dati di fatturazione: si usano anche se manca la spunta "wants" (dati presenti = richiesta implicita).
+  const irHasData = !!(ir && (ir.name || ir.vat || ir.taxCode || ir.address || ir.sdiCode || ir.pec));
+  if (ir && (ir.wants || irHasData)) {
     return {
       counterpartId: null,
       snapshot: {
@@ -117,10 +119,12 @@ async function resolveCounterpart(
       },
     };
   }
+  // Nessuna richiesta: intestatario privato precompilato con i dati lasciati dall'ospite al check-in.
   const g = ctx.guest;
+  const street = [g?.address, g?.streetNumber].filter(Boolean).join(" ").trim();
   return {
     counterpartId: null,
-    snapshot: { kind: "privato", name: g?.fullName || "Cliente", tax_code: null, country: g?.country || "IT", sdi_code: "0000000", email: g?.email ?? null },
+    snapshot: { kind: "privato", name: g?.fullName || "Cliente", tax_code: null, address: street || null, province: g?.province ?? null, country: g?.country || "IT", sdi_code: "0000000", email: g?.email ?? null },
   };
 }
 

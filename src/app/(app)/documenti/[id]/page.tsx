@@ -205,8 +205,15 @@ export default function DocumentoPage() {
     setStructureId(b.structureId);
     setLink({ bookingId: b.id, bookingCode: b.code ?? null });
     const ir = b.invoiceRequest;
-    if (ir?.wants) setCp({ kind: ir.kind ?? "privato", name: ir.name ?? "", lastName: "", vat: ir.vat ?? "", tax_code: ir.taxCode ?? "", country: ir.country ?? "IT", address: ir.address ?? "", city: ir.city ?? "", cap: ir.cap ?? "", province: ir.province ?? "" });
-    else if (g && !cp.name) setCp((c) => ({ ...c, name: g.firstName ?? g.fullName, lastName: g.lastName ?? "" }));
+    const irHasData = !!(ir && (ir.name || ir.vat || ir.taxCode || ir.address || ir.sdiCode || ir.pec));
+    if (ir && (ir.wants || irHasData)) {
+      setCp({ kind: ir.kind ?? "privato", name: ir.name ?? "", lastName: "", vat: ir.vat ?? "", tax_code: ir.taxCode ?? "", country: ir.country ?? "IT", address: ir.address ?? "", city: ir.city ?? "", cap: ir.cap ?? "", province: ir.province ?? "" });
+      setF((p) => ({ ...p, sdi_code: ir.sdiCode || p.sdi_code, pec: ir.pec ?? p.pec }));
+    } else if (g) {
+      // Nessuna richiesta di fattura: si parte dai dati lasciati dall'ospite al check-in (solo campi ancora vuoti).
+      const street = [g.address, g.streetNumber].filter(Boolean).join(" ").trim();
+      setCp((c) => ({ ...c, name: c.name || (g.firstName ?? g.fullName), lastName: c.lastName || (g.lastName ?? ""), address: c.address || street, province: c.province || (g.province ?? ""), country: c.country || g.country || "IT" }));
+    }
     setBookingPicker(false);
   };
   const bookingList = useMemo(() => {

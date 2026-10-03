@@ -361,7 +361,7 @@ export default function Dashboard2() {
     }
     return m;
   }, [istat]);
-  const docBy = useMemo(() => { const m = new Map<string, string>(); for (const d of docs) if (d.booking_id && d.stato !== "bozza" && d.stato !== "scartata") m.set(d.booking_id, d.stato); return m; }, [docs]);
+  const docBy = useMemo(() => { const m = new Map<string, string>(); for (const d of docs) if (d.booking_id && d.stato !== "scartata") { const cur = m.get(d.booking_id); if (!cur || cur === "bozza") m.set(d.booking_id, d.stato); } /* un documento emesso batte la bozza */ return m; }, [docs]);
   const journeyFor = (b: (typeof bookings)[number]) => isLiveBooking(b) ? journeyOf(b, {
     today: todayISO, guest: guests.find((g) => g.id === b.guestId), structure: getStructure(b.structureId),
     schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",

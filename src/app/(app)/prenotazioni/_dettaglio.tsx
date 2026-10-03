@@ -97,7 +97,7 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
     }
     return m;
   }, [istat]);
-  const docBy = useMemo(() => { const m = new Map<string, string>(); for (const d of docs) if (d.booking_id && d.stato !== "bozza" && d.stato !== "scartata") m.set(d.booking_id, d.stato); return m; }, [docs]);
+  const docBy = useMemo(() => { const m = new Map<string, string>(); for (const d of docs) if (d.booking_id && d.stato !== "scartata") { const cur = m.get(d.booking_id); if (!cur || cur === "bozza") m.set(d.booking_id, d.stato); } /* un documento emesso batte la bozza */ return m; }, [docs]);
 
   // Ordine pensato per il lavoro: prima in casa e in arrivo (dal più vicino), poi lo storico (dal più recente).
   const ordered = useMemo(() => {

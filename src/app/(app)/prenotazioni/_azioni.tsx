@@ -47,6 +47,7 @@ export default function StepActions(p: StepActionsProps) {
   const [rem, setRem] = useState<Record<string, number>>(() => readReminders()[b.id] ?? {});
   const [amount, setAmount] = useState("");
   const [cfg, setCfg] = useState<{ auto: boolean; ready: boolean } | null>(null);
+  const [draftDoc, setDraftDoc] = useState<{ id: string; stato: string } | null | undefined>(undefined); // fattura già creata per questa prenotazione (undefined = in verifica)
   const hasPhone = !!(guest?.phone ?? "").replace(/\D/g, "");
   const hasMail = !!guest?.email;
   const due = Math.max(0, bookingPaidTotal(b) - (b.paid ?? 0));
@@ -61,6 +62,15 @@ export default function StepActions(p: StepActionsProps) {
       .then(({ data }) => { if (on) setCfg({ auto: !!data?.auto_daily, ready: !!data?.username }); });
     return () => { on = false; };
   }, [step.key, b.structureId]);
+
+  // Fattura: c'è già un documento per questa prenotazione? In tal caso si apre, non se ne crea un altro.
+  useEffect(() => {
+    if (!supabase || step.key !== "invoice") return;
+    let on = true;
+    supabase.from("documents").select("id, stato").eq("booking_id", b.id).neq("stato", "scartata").order("created_at", { ascending: false }).limit(1).maybeSingle()
+      .then(({ data }) => { if (on) setDraftDoc((data as { id: string; stato: string } | null) ?? null); });
+    return () => { on = false; };
+  }, [step.key, b.id]);
 
   const run = async (key: string, fn: () => Promise<SendResult | { ok: boolean; message: string } | void>) => {
     setBusy(key); setRes(null);
@@ -182,9 +192,23 @@ export default function StepActions(p: StepActionsProps) {
       {sendButtons(build, "guide", "Invia la guida")}
     </>);
   } else if (step.key === "invoice") {
+    const ir = b.invoiceRequest;
+    const filled = ir ? [ir.name, ir.vat || ir.taxCode, ir.address].filter(Boolean).length : 0;
     body = (<>
-      <p className="text-sm text-dim">L'ospite ha chiesto la fattura. Creo la bozza dai dati della prenotazione e la apro per controllarla ed emetterla.</p>
-      <div className="flex flex-wrap gap-2"><button className={btnPrimary} style={{ background: "var(--focus)" }} disabled={!!busy} onClick={() => run("inv", async () => { const r = await apiPost<{ documentId: string }>("invoicing/create", { bookingId: b.id }); p.onClose(); router.push(`/documenti/${r.documentId}`); })}>{busy === "inv" ? "Creo…" : "Crea la fattura"}</button></div>
+      <p className="text-sm text-dim">
+        {draftDoc ? <>La fattura è già stata creata ({draftDoc.stato === "bozza" ? "bozza" : draftDoc.stato}): aprila per controllare i dati ed emetterla.</>
+          : <>{ir && filled ? "L'ospite ha inserito i suoi dati di fatturazione: li trovi già compilati nella bozza (intestatario, partita IVA o codice fiscale, indirizzo, codice destinatario e PEC)." : "Creo la bozza dai dati della prenotazione, compilata con quanto l'ospite ha lasciato al check-in."}</>}
+      </p>
+      {ir && filled > 0 && !draftDoc && (
+        <div className="rounded-lg border border-line bg-paper px-3 py-2 text-xs text-dim">
+          <b className="text-txt">{ir.name || guest?.fullName}</b>{ir.vat ? ` · P.IVA ${ir.vat}` : ""}{ir.taxCode ? ` · CF ${ir.taxCode}` : ""}{ir.address ? ` · ${[ir.address, ir.cap, ir.city, ir.province].filter(Boolean).join(" ")}` : ""}{ir.sdiCode ? ` · SDI ${ir.sdiCode}` : ""}{ir.pec ? ` · PEC ${ir.pec}` : ""}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {draftDoc
+          ? <button className={btnPrimary} style={{ background: "var(--focus)" }} onClick={() => { p.onClose(); router.push(`/documenti/${draftDoc.id}`); }}>{draftDoc.stato === "bozza" ? "Apri la bozza" : "Apri la fattura"}</button>
+          : <button className={btnPrimary} style={{ background: "var(--focus)" }} disabled={!!busy || draftDoc === undefined} onClick={() => run("inv", async () => { const r = await apiPost<{ documentId: string }>("invoicing/create", { bookingId: b.id }); p.onClose(); p.onChanged(); router.push(`/documenti/${r.documentId}`); })}>{busy === "inv" ? "Creo…" : "Crea la fattura"}</button>}
+      </div>
     </>);
   } else if (step.key === "review") {
     const url = googleReviewUrl(structure?.googlePlaceId);

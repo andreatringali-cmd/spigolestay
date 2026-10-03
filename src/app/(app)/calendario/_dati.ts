@@ -64,7 +64,7 @@ export function useDatiPercorso() {
   }, [istat]);
   const docBy = useMemo(() => {
     const m = new Map<string, string>();
-    for (const d of docs) if (d.booking_id && d.stato !== "bozza" && d.stato !== "scartata") m.set(d.booking_id, d.stato);
+    for (const d of docs) if (d.booking_id && d.stato !== "scartata") { const cur = m.get(d.booking_id); if (!cur || cur === "bozza") m.set(d.booking_id, d.stato); } /* un documento emesso batte la bozza */
     return m;
   }, [docs]);
 

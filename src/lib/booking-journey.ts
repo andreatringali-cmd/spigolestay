@@ -83,10 +83,13 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   if (c.guideSent) steps.push({ key: "guide", label: "Guida ospiti", state: "done", detail: "Inviata in chat", href: "/messaggi" });
   else if (!departed) steps.push({ key: "guide", label: "Guida ospiti", href: "/messaggi", state: arrivesIn <= 0 ? "late" : "todo", detail: arrivesIn <= 1 ? "Non ancora inviata" : "Da inviare prima dell'arrivo" });
 
-  // 7 · Fattura / ricevuta (solo se richiesta o già emessa)
-  const hasInvoice = !!b.invoiceNo || (c.invoiceStato && c.invoiceStato !== "bozza");
-  if (hasInvoice) steps.push({ key: "invoice", label: "Fattura", state: "done", detail: b.invoiceNo ? `N. ${b.invoiceNo}` : "Emessa", href: "/documenti" });
-  else if (b.invoiceRequest) steps.push({ key: "invoice", label: "Fattura", href: "/documenti", state: departed ? "late" : "todo", detail: "Richiesta dall'ospite" });
+  // 7 · Fattura / ricevuta (se richiesta dall'ospite, in bozza o già emessa)
+  const issued = !!b.invoiceNo || (!!c.invoiceStato && c.invoiceStato !== "bozza");
+  const ir = b.invoiceRequest;
+  const irAsked = !!(ir && (ir.wants || ir.name || ir.vat || ir.taxCode || ir.address));
+  if (issued) steps.push({ key: "invoice", label: "Fattura", state: "done", detail: b.invoiceNo ? `N. ${b.invoiceNo}` : "Emessa", href: "/documenti" });
+  else if (c.invoiceStato === "bozza") steps.push({ key: "invoice", label: "Fattura", href: "/documenti", state: departed ? "late" : "todo", detail: "Bozza da controllare ed emettere" });
+  else if (irAsked) steps.push({ key: "invoice", label: "Fattura", href: "/documenti", state: departed ? "late" : "todo", detail: "Richiesta dall'ospite" });
 
   // 8 · Check-out
   steps.push({
