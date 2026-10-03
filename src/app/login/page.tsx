@@ -1,5 +1,6 @@
 "use client";
 
+import LoginWaves from "@/components/LoginWaves";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -138,6 +139,7 @@ export default function LoginPage() {
 
   return (
     <div className="login-bg relative flex flex-col overflow-hidden px-6 py-6 text-[#1f1b16]">
+      <LoginWaves />
       <main className="relative flex w-full min-h-0 flex-1 flex-col items-center justify-center overflow-x-hidden overflow-y-auto">
         <div className="w-full max-w-md rounded-3xl border border-[#e6ebf5] bg-white px-6 py-6 shadow-[0_20px_50px_-28px_rgba(31,27,22,0.35)] sm:px-8 sm:py-8">
           {/* Logo dentro il box, centrato */}
@@ -269,8 +271,7 @@ export default function LoginPage() {
 
       <style>{`
         html,body{overscroll-behavior-y:none}
-        /* Soft blue-lavender abstract gradient mesh: base bianco ghiaccio, alone azzurro/pervinca/lavanda solo ai bordi, centro quasi bianco */
-        .login-bg{height:100vh;height:100dvh;background-color:#F8FAFF;background-image:radial-gradient(62% 58% at 0% 0%,rgba(220,235,255,.95) 0%,rgba(220,235,255,0) 72%),radial-gradient(58% 62% at 100% 0%,rgba(228,216,255,.85) 0%,rgba(228,216,255,0) 72%),radial-gradient(64% 62% at 100% 100%,rgba(201,216,255,.9) 0%,rgba(201,216,255,0) 74%),radial-gradient(58% 58% at 0% 100%,rgba(220,235,255,.9) 0%,rgba(220,235,255,0) 74%),radial-gradient(34% 42% at 0% 52%,rgba(228,216,255,.5) 0%,rgba(228,216,255,0) 75%),radial-gradient(34% 42% at 100% 50%,rgba(201,216,255,.45) 0%,rgba(201,216,255,0) 75%)}
+        .login-bg{height:100vh;height:100dvh;background-color:#FCFDFF}
       `}</style>
     </div>
   );
