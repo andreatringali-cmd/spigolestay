@@ -1,0 +1,227 @@
+"use client";
+
+// Finestra "Risolvi" di un passaggio della vista dettagliata: invece di portare su un'altra pagina, offre le azioni
+// che chiudono davvero il problema (sollecitare l'ospite, mandare il link di pagamento, preparare/inviare la schedina…).
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useData } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
+import { apiPost } from "@/lib/invoicing/client";
+import { useConfirm } from "@/components/ConfirmProvider";
+import { shortenLink, buildGuestLink, buildGroupGuestLink } from "@/lib/guestlink";
+import { chatPayGuestMessage } from "@/lib/chat-pay-core";
+import { bookingPaidTotal } from "@/lib/booking";
+import { googleReviewUrl, reviewRequestMessage } from "@/lib/reviews";
+import { CHECKIN_MSG, GUIDE_MSG, REMINDER_INTRO, greeting, langOf, markReminder, readReminders, sendEmailToGuest, sendWhatsAppToGuest, type SendResult } from "@/lib/guest-messages";
+import type { Booking, Guest, Structure } from "@/lib/types";
+import type { JourneyStep } from "@/lib/booking-journey";
+import { eur } from "@/lib/format";
+
+export interface StepActionsProps {
+  b: Booking;
+  step: JourneyStep;
+  guest?: Guest;
+  structure?: Structure;
+  checkinDone: boolean;
+  schedina: "da_validare" | "pronta" | "inviata" | "none";
+  istat: "pending" | "sent" | "none";
+  paySentInChat: boolean;
+  onClose: () => void;
+  onSwitch: (key: string) => void;
+  onChanged: () => void;
+}
+
+const btn = "inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:opacity-50";
+const btnPrimary = `${btn} border-transparent text-white hover:opacity-90`;
+const btnGhost = `${btn} border-line bg-surface text-txt hover:border-focus hover:text-focus`;
+const fmtDay = (ts: number) => new Date(ts).toLocaleDateString("it-IT", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+
+export default function StepActions(p: StepActionsProps) {
+  const { b, step, guest, structure } = p;
+  const router = useRouter();
+  const ask = useConfirm();
+  const { updateBooking, openBooking, bookings, getUnit } = useData();
+  const lang = langOf(guest);
+  const [busy, setBusy] = useState("");
+  const [res, setRes] = useState<{ ok: boolean; text: string } | null>(null);
+  const [rem, setRem] = useState<Record<string, number>>(() => readReminders()[b.id] ?? {});
+  const [amount, setAmount] = useState("");
+  const [cfg, setCfg] = useState<{ auto: boolean; ready: boolean } | null>(null);
+  const hasPhone = !!(guest?.phone ?? "").replace(/\D/g, "");
+  const hasMail = !!guest?.email;
+  const due = Math.max(0, bookingPaidTotal(b) - (b.paid ?? 0));
+
+  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape") p.onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [p]);
+
+  // Invio automatico attivo? (Alloggiati Web e ISTAT, per la struttura della prenotazione)
+  useEffect(() => {
+    if (!supabase || (step.key !== "alloggiati" && step.key !== "istat")) return;
+    let on = true;
+    supabase.from(step.key === "alloggiati" ? "alloggiati_settings" : "istat_settings").select("auto_daily, username").eq("structure_id", b.structureId).maybeSingle()
+      .then(({ data }) => { if (on) setCfg({ auto: !!data?.auto_daily, ready: !!data?.username }); });
+    return () => { on = false; };
+  }, [step.key, b.structureId]);
+
+  const run = async (key: string, fn: () => Promise<SendResult | { ok: boolean; message: string } | void>) => {
+    setBusy(key); setRes(null);
+    try { const r = await fn(); if (r) setRes({ ok: r.ok, text: r.message }); }
+    catch (e) { setRes({ ok: false, text: e instanceof Error ? e.message : "Errore" }); }
+    setBusy(""); setRem(readReminders()[b.id] ?? {});
+  };
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const fullCheckin = `${origin}/checkin?b=${encodeURIComponent(b.id)}`;
+  const intro = (kind: string) => (rem[kind] ? REMINDER_INTRO[lang] : "");
+  const copy = async (text: string) => { try { await navigator.clipboard.writeText(text); return { ok: true, message: "Copiato negli appunti ✓" }; } catch { return { ok: false, message: "Copia non riuscita." }; } };
+
+  // Invio di un testo su WhatsApp o email + registro "inviato".
+  const deliver = async (via: "wa" | "mail", text: string, subject: string, remKind: string, after?: () => void) => {
+    const r = via === "wa" ? await sendWhatsAppToGuest(guest, text) : await sendEmailToGuest(guest, subject, text, structure);
+    if (r.ok) { markReminder(b.id, remKind); after?.(); p.onChanged(); }
+    return r;
+  };
+  const sendButtons = (build: () => Promise<{ text: string; subject: string }>, remKind: string, label: string, after?: () => void) => (
+    <div className="flex flex-wrap gap-2">
+      <button className={btnPrimary} style={{ background: "#25D366" }} disabled={!!busy || !hasPhone} title={hasPhone ? "" : "Manca il telefono dell'ospite"} onClick={() => run("wa", async () => { const m = await build(); return deliver("wa", m.text, m.subject, remKind, after); })}>{busy === "wa" ? "Invio…" : `WhatsApp · ${label}`}</button>
+      <button className={btnPrimary} style={{ background: "var(--focus)" }} disabled={!!busy || !hasMail} title={hasMail ? "" : "Manca l'email dell'ospite"} onClick={() => run("mail", async () => { const m = await build(); return deliver("mail", m.text, m.subject, remKind, after); })}>{busy === "mail" ? "Invio…" : `Email · ${label}`}</button>
+      <button className={btnGhost} disabled={!!busy} onClick={() => run("copy", async () => { const m = await build(); return copy(m.text); })}>Copia testo</button>
+    </div>
+  );
+
+  const lastLine = (kind: string, what: string) => (rem[kind] ? <p className="text-xs text-dim">{what} il {fmtDay(rem[kind])}</p> : null);
+  const guideUrl = () => {
+    const group = b.groupId ? bookings.filter((x) => x.groupId === b.groupId) : [b];
+    if (group.length > 1) return buildGroupGuestLink({ structureId: b.structureId, guestName: guest?.fullName || "", rooms: group.map((bb) => ({ unitId: bb.unitId, unitCode: getUnit(bb.unitId)?.code || getUnit(bb.unitId)?.name || "", parking: !!bb.parking })) });
+    const u = getUnit(b.unitId);
+    return buildGuestLink({ structureId: b.structureId, unitId: b.unitId, unitCode: u?.code || u?.name || "", guestName: guest?.fullName || "", parking: !!b.parking });
+  };
+
+  // ── Contenuti per passaggio ──
+  let body: React.ReactNode = null;
+
+  if (step.key === "checkin") {
+    const build = async () => ({ text: `${intro("checkin")}${greeting(lang, guest)}${CHECKIN_MSG[lang](await shortenLink(fullCheckin))}`, subject: `Check-in online${structure?.name ? ` · ${structure.name}` : ""}` });
+    body = (<>
+      <p className="text-sm text-dim">L'ospite non ha ancora completato il check-in online. Puoi <b>sollecitarlo</b> (riceve il link) oppure <b>compilarlo tu</b> con i suoi dati.</p>
+      {lastLine("checkin", "Ultimo sollecito")}
+      {sendButtons(build, "checkin", "Sollecita")}
+      <div className="flex flex-wrap gap-2">
+        <button className={btnGhost} onClick={() => { const w = window.open(fullCheckin, "_blank"); if (!w) window.location.href = fullCheckin; }}>Compila io (apri il modulo)</button>
+        <button className={btnGhost} onClick={() => { p.onClose(); openBooking(b.id); }}>Inserisci i dati nella scheda</button>
+      </div>
+    </>);
+  } else if (step.key === "pay" || step.key === "tax") {
+    const kind = step.key === "pay" ? "saldo" : "tassa";
+    const remKind = `pay-${kind}`;
+    const sent = !!rem[remKind] || (kind === "saldo" && p.paySentInChat);
+    const mk = async () => {
+      const asked = amount.trim() ? Number(amount.replace(",", ".")) : undefined;
+      if (asked !== undefined && (!isFinite(asked) || asked <= 0)) throw new Error("Importo non valido.");
+      const r = await apiPost<{ ok: boolean; url: string; amount: number }>("stripe/chat-pay", { bookingId: b.id, kind, ...(asked !== undefined ? { amount: asked } : {}) });
+      return { text: `${intro(remKind) || (sent ? REMINDER_INTRO[lang] : "")}${greeting(lang, guest)}${chatPayGuestMessage(lang, kind, Math.round(r.amount * 100), r.url)}`, subject: `${structure?.name ? structure.name + " · " : ""}${kind === "saldo" ? "Saldo del soggiorno" : "Tassa di soggiorno"}` };
+    };
+    const manual = async () => {
+      if (kind === "saldo") {
+        const amt = amount.trim() ? Number(amount.replace(",", ".")) : due;
+        if (!isFinite(amt) || amt <= 0) return { ok: false, message: "Importo non valido." };
+        if (!(await ask({ title: "Registra incasso", message: `Segnare come incassati ${eur(amt)} per questa prenotazione?`, confirmLabel: "Registra incasso" }))) return;
+        updateBooking(b.id, { paid: Math.round(((b.paid ?? 0) + amt) * 100) / 100 });
+      } else {
+        if (!(await ask({ title: "Tassa di soggiorno", message: "Segnare la tassa di soggiorno come incassata?", confirmLabel: "Sì, incassata" }))) return;
+        updateBooking(b.id, { cityTaxPaid: true });
+      }
+      p.onChanged();
+      return { ok: true, message: "Registrato ✓" };
+    };
+    body = (<>
+      <p className="text-sm text-dim">{kind === "saldo" ? `Mancano ${eur(due)} sul soggiorno.` : "La tassa di soggiorno non risulta incassata."} {sent
+        ? <><b>Il link di pagamento è già stato inviato</b>{rem[remKind] ? ` il ${fmtDay(rem[remKind])}` : " in chat"}: l'ospite non ha ancora pagato. Puoi <b>sollecitarlo</b> con un nuovo messaggio.</>
+        : <><b>Non hai ancora mandato il link di pagamento.</b> Invialo adesso: quando l'ospite paga, l'incasso si registra da solo.</>}</p>
+      <label className="flex items-center gap-2 text-xs text-dim">Importo (lascia vuoto per tutto il residuo)
+        <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder={kind === "saldo" ? eur(due) : "tutta la tassa"} className="w-32 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
+      </label>
+      {sendButtons(mk, remKind, sent ? "Sollecita il pagamento" : "Invia link di pagamento")}
+      <div className="flex flex-wrap gap-2 border-t border-line pt-3">
+        <span className="w-full text-xs text-faint">Ha pagato in contanti o con altro mezzo?</span>
+        <button className={btnGhost} disabled={!!busy} onClick={() => run("manual", manual)}>{kind === "saldo" ? "Registra incasso a mano" : "Segna tassa incassata"}</button>
+      </div>
+    </>);
+  } else if (step.key === "alloggiati" || step.key === "istat") {
+    const isQ = step.key === "alloggiati";
+    const name = isQ ? "schedina alla Questura (Alloggiati Web)" : "comunicazione all'Osservatorio turistico (ISTAT)";
+    const st = isQ ? p.schedina : (p.istat === "pending" ? "pronta" : p.istat === "sent" ? "inviata" : "none");
+    if (!p.checkinDone) {
+      body = (<>
+        <p className="text-sm text-dim">Senza il check-in online dell'ospite non si può preparare la {name}: mancano i dati e il documento. Qui non c'è nulla da fare finché non lo completa.</p>
+        <div className="flex flex-wrap gap-2"><button className={btnPrimary} style={{ background: "var(--focus)" }} onClick={() => p.onSwitch("checkin")}>Vai al check-in: sollecita o compila</button></div>
+      </>);
+    } else {
+      body = (<>
+        <p className="text-sm text-dim">Il check-in è completo. {st === "inviata" ? "Già inviata." : st === "da_validare" ? "La schedina ha dati da correggere." : st === "pronta" ? "È pronta da inviare." : "La " + name + " non è ancora stata preparata."}</p>
+        <div className="rounded-lg border border-line bg-paper px-3 py-2 text-xs text-dim">
+          {cfg === null ? "Controllo le impostazioni…" : !cfg.ready ? <>Credenziali non impostate per questa struttura: l'invio non può partire, né in automatico né a mano. <button className="font-semibold text-focus underline" onClick={() => router.push(isQ ? "/alloggiati-web" : "/istat")}>Impostale ora</button></> : cfg.auto
+            ? <><b className="text-[color:var(--ok)]">Invio automatico attivo</b>: {isQ ? "le schedine pronte partono da sole ogni sera (entro 24 ore dall'arrivo)." : "il movimento viene chiuso e inviato ogni giorno in automatico."} Non devi fare nulla, a meno che manchi qualcosa.</>
+            : <><b className="text-[color:var(--warn)]">Invio automatico spento</b>: lo invii tu. Puoi attivarlo dalle impostazioni {isQ ? "di Alloggiati Web" : "ISTAT"}.</>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {st === "none" && <button className={btnPrimary} style={{ background: "var(--focus)" }} disabled={!!busy} onClick={() => run("prep", async () => { await apiPost(isQ ? "alloggiati/sync" : "istat/sync", { structureId: b.structureId }); p.onChanged(); return { ok: true, message: "Preparata ✓ Controlla lo stato qui sopra tra un istante." }; })}>{busy === "prep" ? "Preparo…" : `Prepara ${isQ ? "la schedina" : "i dati"}`}</button>}
+          {st === "da_validare" && <button className={btnPrimary} style={{ background: "var(--warn)" }} onClick={() => { p.onClose(); openBooking(b.id); }}>Correggi i dati dell'ospite</button>}
+          {isQ && st === "pronta" && <button className={btnPrimary} style={{ background: "var(--err)" }} disabled={!!busy || (cfg !== null && !cfg.ready)} onClick={() => run("send", async () => {
+            if (!(await ask({ title: "Invia alla Questura", message: `Invio alla Questura tutte le schedine pronte di ${structure?.name ?? "questa struttura"}, non solo questa. L'invio è definitivo. Procedere?`, confirmLabel: "Invia alla Questura", danger: true }))) return;
+            const r = await apiPost<{ message?: string; sent?: number }>("alloggiati/send", { structureId: b.structureId }); p.onChanged();
+            return { ok: true, message: r.message || `Inviate: ${r.sent ?? 0}` };
+          })}>{busy === "send" ? "Invio…" : "Invia ora alla Questura"}</button>}
+          <button className={btnGhost} onClick={() => router.push(isQ ? "/alloggiati-web" : "/istat")}>{isQ ? "Apri Alloggiati Web" : "Apri Osservatorio"}</button>
+        </div>
+      </>);
+    }
+  } else if (step.key === "guide") {
+    const build = async () => ({ text: `${intro("guide")}${greeting(lang, guest)}${GUIDE_MSG[lang](await shortenLink(guideUrl()))}`, subject: `Guida ospiti${structure?.name ? ` · ${structure.name}` : ""}` });
+    body = (<>
+      <p className="text-sm text-dim">La guida ospiti (check-in, Wi-Fi, dintorni, codici della camera) non risulta inviata. Mandala adesso all'ospite.</p>
+      {lastLine("guide", "Inviata")}
+      {sendButtons(build, "guide", "Invia la guida")}
+    </>);
+  } else if (step.key === "invoice") {
+    body = (<>
+      <p className="text-sm text-dim">L'ospite ha chiesto la fattura. Creo la bozza dai dati della prenotazione e la apro per controllarla ed emetterla.</p>
+      <div className="flex flex-wrap gap-2"><button className={btnPrimary} style={{ background: "var(--focus)" }} disabled={!!busy} onClick={() => run("inv", async () => { const r = await apiPost<{ documentId: string }>("invoicing/create", { bookingId: b.id }); p.onClose(); router.push(`/documenti/${r.documentId}`); })}>{busy === "inv" ? "Creo…" : "Crea la fattura"}</button></div>
+    </>);
+  } else if (step.key === "review") {
+    const url = googleReviewUrl(structure?.googlePlaceId);
+    const build = async () => ({ text: reviewRequestMessage({ guestName: guest?.fullName, structureName: structure?.name, reviewUrl: url }), subject: `Com'è andato il soggiorno${structure?.name ? ` da ${structure.name}` : ""}?` });
+    body = url ? (<>
+      <p className="text-sm text-dim">L'ospite è partito: una richiesta di recensione ora ha più probabilità di essere accolta.</p>
+      {sendButtons(build, "review", "Richiedi la recensione", () => updateBooking(b.id, { reviewRequestedAt: Date.now(), reviewRequestChannel: "whatsapp" }))}
+    </>) : (<>
+      <p className="text-sm text-dim">Per chiedere la recensione serve il Google Place ID della struttura: non è ancora impostato.</p>
+      <div className="flex flex-wrap gap-2"><button className={btnPrimary} style={{ background: "var(--focus)" }} onClick={() => router.push("/strutture")}>Imposta il Google Place ID</button></div>
+    </>);
+  } else {
+    body = (<>
+      <p className="text-sm text-dim">{step.detail}.</p>
+      {step.href && <div className="flex flex-wrap gap-2"><button className={btnGhost} onClick={() => router.push(step.href!)}>Apri la pagina</button></div>}
+    </>);
+  }
+
+  const guestLabel = guest?.fullName || [b.primaryGuest?.firstName, b.primaryGuest?.lastName].filter(Boolean).join(" ") || "Ospite";
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end justify-center p-3 sm:items-center">
+      <button aria-label="Chiudi" onClick={p.onClose} className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
+      <div role="dialog" aria-label={step.label} className="relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
+        <div className="border-b border-line px-5 py-3.5">
+          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-faint">{step.label}</div>
+          <div className="text-base font-bold text-txt">{guestLabel}</div>
+          <div className="text-xs" style={{ color: step.state === "late" ? "var(--err)" : "var(--dim)" }}>{step.detail}</div>
+        </div>
+        <div className="flex flex-col gap-3 overflow-y-auto px-5 py-4">
+          {body}
+          {res && <div className="rounded-lg px-3 py-2 text-sm font-medium" style={{ color: res.ok ? "var(--ok)" : "var(--err)", background: `color-mix(in srgb, ${res.ok ? "var(--ok)" : "var(--err)"} 12%, transparent)` }}>{res.text}</div>}
+        </div>
+        <div className="flex items-center justify-between gap-2 border-t border-line bg-wash px-5 py-3">
+          <button className="text-sm font-semibold text-focus hover:underline" onClick={() => { p.onClose(); openBooking(b.id); }}>Apri la prenotazione</button>
+          <button className={btnGhost} onClick={p.onClose}>Chiudi</button>
+        </div>
+      </div>
+    </div>
+  );
+}

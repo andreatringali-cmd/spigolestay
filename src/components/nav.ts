@@ -11,6 +11,7 @@ export interface NavItem {
 export const NAV: NavItem[] = [
   // In cima, senza categoria: le cose che apri ogni giorno.
   { label: "Dashboard", href: "/", group: "", icon: "grid" },
+  { label: "Dashboard 2", href: "/dashboard-2", group: "", icon: "grid" },
   { label: "Adempimenti oggi", href: "/adempimenti", group: "", icon: "clipboard", perm: "prenotazioni", module: "pms" },
 
   // PMS: la gestione quotidiana della struttura (il cuore del gestionale).

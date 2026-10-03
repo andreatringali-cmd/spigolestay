@@ -10,6 +10,7 @@ import { CHANNELS, type Booking, type Guest } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
 import LinkPreview from "@/components/messaging/LinkPreview";
 import VoiceNote from "@/components/messaging/VoiceNote";
+import { GUIDE_MSG, CHECKIN_MSG, type Lang } from "@/lib/guest-messages";
 import { eur } from "@/lib/format";
 import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
 import { apiPost } from "@/lib/invoicing/client";
@@ -60,26 +61,11 @@ const dayLabel = (ts: number, t: (s: string) => string) => { const d = new Date(
 const preview = (m: Msg | undefined, t: (s: string) => string) => (m ? `${m.dir === "out" ? `${t("Tu")}: ` : ""}${m.text.replace(/\s+/g, " ").trim()}` : "");
 
 // ── Invii programmati (ex "Centro messaggi"), ora dentro le conversazioni ──
-type Lang = "it" | "en" | "fr" | "de" | "es";
 type Trigger = "manual" | "before_arrival" | "on_arrival" | "after_arrival" | "on_checkout" | "after_checkout";
 interface MsgTemplate { id: string; name: string; texts: Record<Lang, string>; trigger: Trigger; days: number; time: string; active: boolean; srcId?: string; structureIds?: string[] }
 const TPL_KEY = "spigolestay:msgtemplates";
 const SENT_KEY = "spigolestay:msgsent";
 const GUIDE_BASE = "https://spigole-guest-guide.vercel.app";
-const GUIDE_MSG: Record<Lang, (u: string) => string> = {
-  it: (u) => `Qui trovi la guida con tutte le info utili (check-in, wi-fi, dintorni): ${u}`,
-  en: (u) => `Here is our guest guide with all the useful info: ${u}`,
-  fr: (u) => `Voici le guide avec toutes les infos utiles : ${u}`,
-  de: (u) => `Hier ist der Gäste-Guide mit allen Infos: ${u}`,
-  es: (u) => `Aquí tienes la guía con toda la información útil: ${u}`,
-};
-const CHECKIN_MSG: Record<Lang, (u: string) => string> = {
-  it: (u) => `Per velocizzare l'arrivo, compila il check-in online (dati e documento) qui: ${u}`,
-  en: (u) => `To speed up your arrival, please complete the online check-in (details and ID) here: ${u}`,
-  fr: (u) => `Pour accélérer votre arrivée, remplissez le check-in en ligne (données et pièce d'identité) ici : ${u}`,
-  de: (u) => `Um Ihre Ankunft zu beschleunigen, füllen Sie bitte den Online-Check-in (Daten und Ausweis) hier aus: ${u}`,
-  es: (u) => `Para agilizar tu llegada, completa el check-in online (datos y documento) aquí: ${u}`,
-};
 
 // Filo diretto con l'ospite + invii programmati: un unico posto per chattare (tab di /messaggi).
 export default function ConversazioniPanel({ onManageTemplates }: { onManageTemplates?: () => void }) {

@@ -14,6 +14,8 @@ import { bookingCode } from "@/lib/bookingCode";
 import { journeyBucket, journeyOf, isLiveBooking, type JourneyStep, type StepState } from "@/lib/booking-journey";
 import ChannelLogo from "@/components/ChannelLogo";
 import EmptyState from "@/components/EmptyState";
+import { readReminders } from "@/lib/guest-messages";
+import StepActions from "./_azioni";
 
 type SchedRow = { booking_id: string | null; stato: string };
 type IstatRow = { booking_id: string | null; stato: string };
@@ -46,9 +48,12 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
   const [istat, setIstat] = useState<IstatRow[]>([]);
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [threads, setThreads] = useState<Record<string, { dir: string; text: string }[]>>({});
+  const [rems, setRems] = useState<Record<string, Record<string, number>>>({});
+  const [modal, setModal] = useState<{ id: string; key: string } | null>(null);
 
   const load = useCallback(async () => {
     try { setThreads(JSON.parse(localStorage.getItem("spigolestay:threads:v1") || "{}")); } catch { setThreads({}); }
+    setRems(readReminders());
     if (!supabase) return;
     const [a, i, d] = await Promise.all([
       supabase.from("alloggiati_schedine").select("booking_id, stato"),
@@ -62,7 +67,9 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
     const h = () => { void load(); };
     window.addEventListener("focus", h);
     window.addEventListener("spigolestay:datasync", h);
-    return () => { window.removeEventListener("focus", h); window.removeEventListener("spigolestay:datasync", h); };
+    window.addEventListener("spigolestay:reminders", h);
+    window.addEventListener("spigolestay:threads", h);
+    return () => { window.removeEventListener("focus", h); window.removeEventListener("spigolestay:datasync", h); window.removeEventListener("spigolestay:reminders", h); window.removeEventListener("spigolestay:threads", h); };
   }, [load]);
 
   const schedBy = useMemo(() => {
@@ -98,16 +105,23 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
     const j = isLiveBooking(b) ? journeyOf(b, {
       today, guest, structure: getStructure(b.structureId),
       schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
-      guideSent: (threads[b.guestId] ?? []).some((m) => m.dir === "out" && GUIDE_RE.test(m.text)),
+      guideSent: !!rems[b.id]?.guide || (threads[b.guestId] ?? []).some((m) => m.dir === "out" && GUIDE_RE.test(m.text)),
       invoiceStato: docBy.get(b.id),
     }) : null;
     return { b, j, buckets: j ? journeyBucket(b, today, j) : [] };
-  }), [ordered, guests, getStructure, today, schedBy, istatBy, threads, docBy]);
+  }), [ordered, guests, getStructure, today, schedBy, istatBy, threads, docBy, rems]);
 
   const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.key, f.key === "all" ? rows.length : rows.filter((r) => r.buckets.includes(f.key)).length])), [rows]);
   const shown = filter === "all" ? rows : rows.filter((r) => r.buckets.includes(filter));
 
-  const gotoStep = (e: React.MouseEvent, s: JourneyStep) => { e.stopPropagation(); if (s.href) router.push(s.href); };
+  // Un passaggio da fare apre la finestra "Risolvi" con le azioni vere; uno già fatto porta alla pagina di dettaglio.
+  const openStep = (e: React.MouseEvent, b: Booking, s: JourneyStep) => {
+    e.stopPropagation();
+    if (s.state !== "done" && s.state !== "na") setModal({ id: b.id, key: s.key });
+    else if (s.href) router.push(s.href);
+  };
+  const modalRow = modal ? rows.find((r) => r.b.id === modal.id) : undefined;
+  const modalStep = modalRow?.j?.steps.find((x) => x.key === modal?.key);
 
   return (
     <div>
@@ -174,7 +188,7 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
                 {steps.length > 0 && (
                   <div className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3 xl:grid-cols-4">
                     {steps.map((s) => (
-                      <button key={s.key} onClick={(e) => gotoStep(e, s)} title={`${s.label}: ${s.detail}`} className="flex min-w-0 items-start gap-2 rounded-lg text-left transition hover:bg-wash">
+                      <button key={s.key} onClick={(e) => openStep(e, b, s)} title={`${s.label}: ${s.detail}`} className="flex min-w-0 items-start gap-2 rounded-lg text-left transition hover:bg-wash">
                         <span className="mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full text-[10px] font-extrabold" style={{ color: STATE_COLOR[s.state], border: `1.5px solid ${STATE_COLOR[s.state]}`, background: s.state === "done" ? `color-mix(in srgb, ${STATE_COLOR[s.state]} 14%, transparent)` : "transparent" }}>{STATE_GLYPH[s.state]}</span>
                         <span className="min-w-0">
                           <span className="block truncate text-xs font-semibold text-txt">{s.label}</span>
@@ -204,7 +218,7 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
                   <div className="min-w-[110px] md:w-full">
                     <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-dim"><span>{j.done} di {j.total}</span><span>{pct}%</span></div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: j.steps.some((s) => s.state === "late") ? "var(--err)" : pct === 100 ? "var(--ok)" : "var(--focus)" }} /></div>
-                    {j.next ? <button onClick={(e) => gotoStep(e, j.next!)} className="mt-1.5 block w-full truncate text-left text-[11px] font-semibold md:text-right" style={{ color: j.next.state === "late" ? "var(--err)" : "var(--focus)" }}>Prossimo: {j.next.label} →</button> : <div className="mt-1.5 text-[11px] font-semibold md:text-right" style={{ color: "var(--ok)" }}>Tutto in ordine ✓</div>}
+                    {j.next ? <button onClick={(e) => openStep(e, b, j.next!)} className="mt-1.5 block w-full truncate text-left text-[11px] font-semibold md:text-right" style={{ color: j.next.state === "late" ? "var(--err)" : "var(--focus)" }}>Prossimo: {j.next.label} →</button> : <div className="mt-1.5 text-[11px] font-semibold md:text-right" style={{ color: "var(--ok)" }}>Tutto in ordine ✓</div>}
                   </div>
                 )}
               </div>
@@ -213,6 +227,17 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
         })}
         {!shown.length && <div className="rounded-xl border border-line bg-surface"><EmptyState title={filter === "all" ? "Nessuna prenotazione con questi filtri" : "Nessuna prenotazione in questa categoria"} /></div>}
       </div>
+      {modal && modalRow && modalRow.j && modalStep && (
+        <StepActions
+          key={`${modal.id}:${modal.key}`}
+          b={modalRow.b} step={modalStep}
+          guest={guests.find((g) => g.id === modalRow.b.guestId)} structure={getStructure(modalRow.b.structureId)}
+          checkinDone={modalRow.j.steps.find((x) => x.key === "checkin")?.state === "done"}
+          schedina={schedBy.get(modalRow.b.id) ?? "none"} istat={istatBy.get(modalRow.b.id) ?? "none"}
+          paySentInChat={(threads[modalRow.b.guestId] ?? []).some((m) => m.dir === "out" && m.text.includes("chat-pay/go"))}
+          onClose={() => setModal(null)} onSwitch={(key) => setModal({ id: modal.id, key })} onChanged={() => { void load(); }}
+        />
+      )}
     </div>
   );
 }
