@@ -19,6 +19,7 @@ import { amenityIcon } from "@/lib/amenities";
 import { byUnitName } from "@/lib/sortUnits";
 import { ROOMS_PER_STRUCT, ROOM_OVERAGE } from "@/lib/plan";
 import { useLang } from "@/lib/i18n";
+import CamereDettaglio from "./_dettaglio";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
@@ -63,6 +64,10 @@ export default function CamerePage() {
   const toggleSel = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const setManySel = (ids: string[], on: boolean) => setSel((p) => { const n = new Set(p); ids.forEach((id) => (on ? n.add(id) : n.delete(id))); return n; });
   const clearSel = () => setSel(new Set());
+  // Vista: "compact" (tabelle per tipologia) oppure "detail" (righe alte, una per camera). Si ricorda l'ultima scelta.
+  const [view, setView] = useState<"compact" | "detail">("compact");
+  const pickView = (v: "compact" | "detail") => { setView(v); if (v === "detail") setSel(new Set()); try { localStorage.setItem("spigolestay:camere:view", v); } catch {} };
+  useEffect(() => { try { if (localStorage.getItem("spigolestay:camere:view") === "detail") setView("detail"); } catch {} }, []);
   const [bulkFloor, setBulkFloor] = useState("");
   const [bulkView, setBulkView] = useState("");
   const [bulkAmen, setBulkAmen] = useState<Set<string>>(new Set());
@@ -159,7 +164,13 @@ export default function CamerePage() {
       <PageHeader
         title={t("Camere")}
         subtitle={t("Tipologie e singole camere di ogni struttura")}
-        actions={<WeatherWidget compact />}
+        actions={<>
+          <div className="no-print inline-flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold" role="group" aria-label={t("Vista")}>
+            <button onClick={() => pickView("compact")} aria-pressed={view === "compact"} className={`rounded-md px-2.5 py-1.5 transition ${view === "compact" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Compatta")}</button>
+            <button onClick={() => pickView("detail")} aria-pressed={view === "detail"} className={`rounded-md px-2.5 py-1.5 transition ${view === "detail" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Dettagliata")}</button>
+          </div>
+          <WeatherWidget compact />
+        </>}
       />
 
       {scoped.length === 0 && <Card><div className="py-8 text-center text-sm text-faint">{t("Nessuna struttura. Creane una in")} <Link href="/strutture" className="text-focus underline">{t("Strutture")}</Link>.</div></Card>}
@@ -224,6 +235,14 @@ export default function CamerePage() {
 
               {filtriRow()}
 
+              {view === "detail" ? (
+                <CamereDettaglio
+                  structure={s} types={types} totalUnits={sUnits.length}
+                  units={sUnits.filter((u) => { const rt = types.find((x) => x.id === u.roomTypeId); return rt ? (typeMatchQ(rt) || unitMatchQ(u)) : unitMatchQ(u); })}
+                  showStructure={activeStructureId === "all"} highlight={highlight}
+                  onEdit={(u) => setRoomModal({ structureId: s.id, unit: u })} onClearSearch={() => setSearch("")}
+                />
+              ) : (<>
               {/* Tipologie */}
               <SectionTitle>{t("Tipologie")}</SectionTitle>
               <div className="mb-4 grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -330,6 +349,7 @@ export default function CamerePage() {
                   })()}
                 </div>
               )}
+              </>)}
             </div>
           );
         })}

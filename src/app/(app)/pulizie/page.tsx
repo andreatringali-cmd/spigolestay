@@ -18,6 +18,7 @@ import { computePuliziePlan, buildPuliziePlanText, ACT_LABEL, fmtLongIT, type Pl
 import AutoShareSettings from "@/components/pulizie/AutoShareSettings";
 import PulizieDoc, { type PulizieRow } from "@/components/pdf/PulizieDoc";
 import { captureA4ToPdfBlob } from "@/lib/pdf-capture";
+import PulizieDettaglio from "./_dettaglio";
 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
 const fmtShort = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
@@ -65,7 +66,9 @@ export default function PuliziePage() {
   const { t } = useLang();
   const todayISO = toISO(new Date());
   const [date, setDate] = useState(todayISO);
-  const [view, setView] = useState<"rows" | "cards">("cards");
+  const [view, setView] = useState<"rows" | "cards" | "detail">("cards");
+  const pickView = (v: "rows" | "cards" | "detail") => { setView(v); try { localStorage.setItem("spigolestay:pulizie:view", v); } catch {} };
+  useEffect(() => { try { const v = localStorage.getItem("spigolestay:pulizie:view"); if (v === "rows" || v === "cards" || v === "detail") setView(v); } catch {} }, []);
   const [structFilter, setStructFilter] = useState("all");
   const [actionFilter, setActionFilter] = useState<"tutte" | "dafare" | "riassetto" | "partenze" | "arrivi">("tutte");
   const matchAction = (action: ActionKey) => {
@@ -317,7 +320,7 @@ export default function PuliziePage() {
     />
   );
   const Seg = ({ v, icon, title }: { v: "rows" | "cards"; icon: string; title: string }) => (
-    <button onClick={() => setView(v)} title={title} className={`rounded-md p-1.5 transition ${view === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}><Icon name={icon} size={16} /></button>
+    <button onClick={() => pickView(v)} title={title} className={`rounded-md p-1.5 transition ${view === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}><Icon name={icon} size={16} /></button>
   );
 
   // Blocco icone (persone + cane) e date, come sulle card — niente parola "persone".
@@ -494,7 +497,7 @@ export default function PuliziePage() {
       ) : (<>
 
       {/* Card riepilogo — cliccabili per filtrare (stessa grafica delle altre pagine) */}
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {view !== "detail" && <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {([
           { key: "dafare", label: "Da fare", count: toClean.length, color: "var(--txt)" },
           { key: "riassetto", label: "Riassetti", count: counts.riassetto, color: ACT.riassetto.color },
@@ -516,7 +519,7 @@ export default function PuliziePage() {
             </button>
           );
         })}
-      </div>
+      </div>}
 
       {/* Carico biancheria del giorno + data e riepilogo a destra */}
       <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
@@ -557,6 +560,7 @@ export default function PuliziePage() {
         <div className="flex items-center rounded-lg border border-line p-0.5">
           <Seg v="cards" icon="grid" title={t("Vista card")} />
           <Seg v="rows" icon="menu" title={t("Vista lista")} />
+          <button onClick={() => pickView("detail")} aria-pressed={view === "detail"} title="Vista dettagliata" className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${view === "detail" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}><Icon name="clipboard" size={15} /> Dettagliata</button>
         </div>
         <div className="relative ml-auto">
           {copied && <span className="mr-2 text-xs font-medium text-[color:var(--ok)]">{t("Copiato ✓")}</span>}
@@ -636,17 +640,29 @@ export default function PuliziePage() {
       )}
 
       {/* Didascalia colori: cosa significa ogni colore nel planning sotto. */}
-      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim">
+      {view !== "detail" && <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim">
         {(Object.keys(ACT) as ActionKey[]).map((k) => (
           <span key={k} className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: ACT[k].color }} />
             {t(ACT[k].label)}
           </span>
         ))}
-      </div>
+      </div>}
+
+      {/* Planning — vista "Dettagliata": righe alte (file _dettaglio.tsx / _riga.tsx) */}
+      {view === "detail" && (
+        <PulizieDettaglio
+          date={date} todayISO={todayISO} rooms={rooms} scopedStructures={scopedStructures}
+          done={done} notes={notes} openIssues={openIssues} keyOf={keyOf} issueMeta={issueMeta} act={ACT}
+          setNote={setNote} onToggle={toggleDone}
+          onIssue={(r) => setIssueDraft({ unitId: r.unit.id, unitName: r.unit.name, structureName: r.structure.name, type: "guasto", note: "", photo: undefined })}
+          onResolveIssue={resolveIssue}
+          share={{ whatsapp: shareWhatsApp, email: emailPlan, copy: copyPlan, pdf: downloadPlanPdf, auto: autoShareStructure ? () => setAutoOpen(true) : undefined, copied }}
+        />
+      )}
 
       {/* Planning */}
-      <div className="flex flex-col gap-5">
+      {view !== "detail" && <div className="flex flex-col gap-5">
         {scopedStructures.map((s) => {
           const list = rooms.filter((r) => r.structure.id === s.id && (r.oos ? actionFilter === "tutte" : matchAction(r.action)));
           if (actionFilter !== "tutte" && list.length === 0) return null;
@@ -707,7 +723,7 @@ export default function PuliziePage() {
             </div>
           );
         })}
-      </div>
+      </div>}
       </>)}
 
       {/* Aggiungi / modifica prodotto */}
