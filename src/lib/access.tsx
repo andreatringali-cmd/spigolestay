@@ -76,6 +76,9 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     try {
       const flag = `spigolestay:stamped:${userId}`;
       if (sessionStorage.getItem(flag)) return;
+      // Mai creare l'elenco utenti da zero qui: se in questo browser non c'è ancora (nuovo dispositivo o dati cancellati) i dati veri
+      // arrivano dal server; scrivere adesso quelli di esempio li sovrascriverebbe (foto, nome, notifiche andavano perse).
+      if (!localStorage.getItem("spigolestay:users")) return;
       const list = loadUsers();
       const now = new Date().toISOString();
       const next = list.map((u) => (u.id === userId ? { ...u, lastLogin: { at: now, ip: u.lastLogin?.ip ?? "—" } } : u));

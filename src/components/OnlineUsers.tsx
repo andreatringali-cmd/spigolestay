@@ -41,7 +41,11 @@ export default function OnlineUsers() {
   const selfOnline = netOnline && !!user?.id;
 
   const md = (user?.user_metadata ?? {}) as Record<string, unknown>;
-  const myName = (md.full_name as string) || [md.first_name, md.last_name].filter(Boolean).join(" ") || `${localUser?.firstName ?? ""} ${localUser?.lastName ?? ""}`.trim() || (user?.email ?? "").split("@")[0] || t("Tu");
+  // Nome = quello dell'utente registrato in Xenora (nome e cognome del profilo). Il nome dell'account Google (es. "Andrea Tringali (Spi)") è solo l'ultima scelta.
+  const profileName = `${localUser?.firstName ?? ""} ${localUser?.lastName ?? ""}`.trim();
+  const myName = profileName || [md.first_name, md.last_name].filter(Boolean).join(" ") || (md.full_name as string) || (user?.email ?? "").split("@")[0] || t("Tu");
+  // Foto: quella scelta nel profilo; in mancanza, quella dell'account con cui hai fatto l'accesso.
+  const myPhoto = localUser?.photo || (md.avatar_url as string | undefined) || (md.picture as string | undefined);
 
   useEffect(() => {
     if (!supabase || !user?.id) return;
@@ -84,7 +88,7 @@ export default function OnlineUsers() {
 
   const online = [
     // Per me stesso mostro l'email come sottotitolo (così riconosco l'account) ed evito il "tu" doppio.
-    { id: user?.id || "me", name: myName, role: user?.email ?? "", you: true, photo: localUser?.photo },
+    { id: user?.id || "me", name: myName, role: user?.email ?? "", you: true, photo: myPhoto },
     ...peers.map((p) => ({ id: p.userId, name: p.name, role: t("Socio"), you: false, photo: undefined as string | undefined })),
   ];
 

@@ -11,7 +11,7 @@ import ChannelLogo from "@/components/ChannelLogo";
 import LinkPreview from "@/components/messaging/LinkPreview";
 import VoiceNote from "@/components/messaging/VoiceNote";
 import { GUIDE_MSG, CHECKIN_MSG, type Lang } from "@/lib/guest-messages";
-import { markThreadSeen } from "@/lib/navbadges";
+import { isThreadUnread, markThreadSeen } from "@/lib/navbadges";
 import { eur } from "@/lib/format";
 import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
 import { apiPost } from "@/lib/invoicing/client";
@@ -190,6 +190,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const msgs = sel ? threads[sel] ?? [] : [];
   // Conversazione aperta = messaggi letti (spegne il badge nella barra laterale; vale anche per i messaggi che arrivano mentre è aperta).
   useEffect(() => { if (sel) markThreadSeen(sel, threads[sel]); }, [sel, threads]);
+  // Rinfresca l'elenco quando una conversazione viene segnata come letta (il pallino verde segue "non letto", non "ultimo messaggio dell'ospite").
+  const [, setSeenTick] = useState(0);
+  useEffect(() => { const h = () => setSeenTick((n) => n + 1); window.addEventListener("spigolestay:navseen", h); return () => window.removeEventListener("spigolestay:navseen", h); }, []);
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [sel, msgs.length]);
 
   // Prenotazione arrivata da Booking.com/Airbnb/Expedia via Channex → id Channex per la chat
@@ -541,7 +544,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
         <div className="flex-1 overflow-y-auto">
           {people.map((p, i) => {
             const th = threads[p.id] ?? []; const last = th[th.length - 1];
-            const needsReply = !!last && last.dir === "in";
+            const needsReply = !!last && last.dir === "in" && isThreadUnread(p.id, threads[p.id]); // pallino verde = messaggio ricevuto e non ancora letto
             const showHeader = activeStructureId === "all" && (i === 0 || people[i - 1].struct !== p.struct);
             const isSelected = sel === p.id;
             const sub = last

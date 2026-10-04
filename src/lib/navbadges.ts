@@ -31,6 +31,15 @@ export function markThreadSeen(threadKey: string, messages: ThreadMsg[] | undefi
   try { window.dispatchEvent(new Event("spigolestay:navseen")); } catch {}
 }
 
+/** True se nella conversazione c'è un messaggio ricevuto dopo l'ultima volta che l'hai aperta. */
+export function isThreadUnread(threadKey: string, messages: ThreadMsg[] | undefined): boolean {
+  const last = Math.max(0, ...(messages ?? []).filter((m) => m.dir === "in").map((m) => m.ts ?? 0));
+  if (!last) return false;
+  unreadMessages(); // al primo avvio fissa la base: ciò che c'è già conta come letto
+  const seen = readJson<Record<string, number>>(MSG_SEEN_KEY, {});
+  return last > (seen[threadKey] ?? 0);
+}
+
 function unreadMessages(): number {
   const threads = readJson<Record<string, ThreadMsg[]>>(THREADS_KEY, {});
   let seen = readJson<Record<string, number> | null>(MSG_SEEN_KEY, null);
