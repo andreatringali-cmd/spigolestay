@@ -151,7 +151,7 @@ export default function StepActions(p: StepActionsProps) {
     };
     body = (<>
       <p className="text-sm text-dim">{partial
-        ? <>L'ospite ha compilato il check-in per <b>{dec} persona su {exp}</b>: <b>mancano i dati di {missing} {missing === 1 ? "ospite" : "ospiti"}</b>. Per la schedina Questura servono i dati di tutti, anche dei bambini. Puoi <b>sollecitare</b> (il link riapre il modulo con i suoi dati già salvati) o <b>compilare tu</b>. Se in realtà sono meno persone, correggi il numero degli ospiti nella prenotazione.</>
+        ? <>L'ospite ha compilato il check-in per <b>{dec} persona su {exp}</b>: <b>mancano i dati di {missing} {missing === 1 ? "ospite" : "ospiti"}</b>. Per la schedina Questura servono i dati di tutti, anche dei bambini. Puoi <b>sollecitare</b> (il modulo si riapre vuoto: l'ospite deve compilare di nuovo i dati di tutti) o <b>compilare tu</b> con i dati già salvati. Se in realtà sono meno persone, correggi il numero degli ospiti nella prenotazione.</>
         : <>L'ospite non ha ancora completato il check-in online. Puoi <b>sollecitarlo</b> (riceve il link) oppure <b>compilarlo tu</b> con i suoi dati.</>}</p>
       {sendButtons(build, "checkin", partial ? "Chiedi gli altri ospiti" : "Sollecita")}
       <div className="flex flex-wrap gap-2">

@@ -82,9 +82,10 @@ export default function PrenotazioniPage() {
   const [q, setQ] = useState("");
   const [channel, setChannel] = useState<string>("all");
   const [loc, setLoc] = useState<string>("all"); // "all" | "str:<id>" | "unit:<id>"
-  const [from, setFrom] = useState(() => `${new Date().getFullYear()}-01-01`); // default: anno solare corrente
-  const [to, setTo] = useState(() => `${new Date().getFullYear()}-12-31`);
-  const [dateField, setDateField] = useState<"arrivo" | "prenotazione" | "incasa">("arrivo");
+  // Default: oggi e futuro. Si vede chi è in casa oggi, chi parte oggi e tutto ciò che arriva (lo storico si apre cambiando le date).
+  const [from, setFrom] = useState(() => toISO(new Date()));
+  const [to, setTo] = useState("");
+  const [dateField, setDateField] = useState<"attive" | "arrivo" | "prenotazione" | "incasa">("attive");
   const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "checkIn", dir: "asc" });
   const toggleSort = (key: string) => setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
   // Selettore grafici (icona prima di "Nuova")
@@ -126,6 +127,12 @@ export default function PrenotazioniPage() {
       // [from,to] (arrivata prima e non ancora partita), non un confronto su una singola data —
       // è la stessa logica di "chi occupa quel giorno" usata nel Registro di Statistiche, così le
       // due viste mostrano le stesse prenotazioni per lo stesso periodo.
+      // "In corso e future": il soggiorno tocca il periodo (chi parte oggi compare ancora, chi è già partito no).
+      if (dateField === "attive") {
+        if (from && b.checkOut < from) return false;
+        if (to && b.checkIn > to) return false;
+        return true;
+      }
       if (dateField === "incasa") {
         if (from && b.checkOut <= from) return false;
         if (to && b.checkIn > to) return false;
@@ -140,7 +147,7 @@ export default function PrenotazioniPage() {
   }, [bookings, q, channel, activeStructureId, loc, from, to, dateField, todayISO]);
 
   const structuresToShow = structures.filter((s) => activeStructureId === "all" || s.id === activeStructureId);
-  const clearFilters = () => { setQ(""); setChannel("all"); setLoc("all"); setFrom(""); setTo(""); };
+  const clearFilters = () => { setQ(""); setChannel("all"); setLoc("all"); setDateField("attive"); setFrom(toISO(new Date())); setTo(""); }; // torna a "oggi e futuro"
 
   // Ordinamento tabella
   const sortVal = (b: (typeof filtered)[number], key: string): string | number => {
@@ -365,7 +372,8 @@ export default function PrenotazioniPage() {
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca nome o codice…")} className="w-full" />
         <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
         <div className="flex items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
-          <Select value={dateField} onChange={(v) => setDateField(v as "arrivo" | "prenotazione" | "incasa")} label={t("Tipo data")}>
+          <Select value={dateField} onChange={(v) => setDateField(v as "attive" | "arrivo" | "prenotazione" | "incasa")} label={t("Tipo data")}>
+            <option value="attive">{t("In corso e future")}</option>
             <option value="arrivo">{t("Arrivo / check-in")}</option>
             <option value="prenotazione">{t("Data prenotazione")}</option>
             <option value="incasa">{t("In casa (occupazione)")}</option>

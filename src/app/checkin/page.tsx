@@ -166,6 +166,9 @@ function Engine() {
         const d = j as Info;
         setInfo(d);
         const b = d.booking, g = d.guest;
+        // Chi apre il link da ospite compila SEMPRE da capo (niente dati precompilati dal soggiorno precedente o dal check-in già inviato).
+        // Solo l'operatore di Xenora, che compila per conto dell'ospite, vede i dati già salvati.
+        const operator = await (async () => { try { const { data: sd } = await (supabase?.auth.getSession() ?? Promise.resolve({ data: { session: null } })); return !!sd.session; } catch { return false; } })();
         setDoc({ firstName: g.firstName || "", lastName: g.lastName || "", sex: g.sex || "", birthDate: g.birthDate || "", birthPlace: g.birthPlace || "", citizenship: g.citizenship || "", docType: g.docType || DOC_TYPES[0], docNumber: g.docNumber || "", docPlace: g.docPlace || "" });
         setArrival(b.arrivalTime || "Non lo so");
         setGuestReq(b.guestRequests || "");
@@ -183,7 +186,18 @@ function Engine() {
           const need = Math.max(0, (b.adults || 1) + (b.children || 0) - 1); // anche i bambini: la schedina Questura vuole tutti
           setExtras(b.extraGuests?.length ? b.extraGuests.map((e) => ({ ...emptyExtra(), ...e, photoFront: e.docPhotoFront || "", photoBack: e.docPhotoBack || "" })) : Array.from({ length: need }, emptyExtra));
         }
-        if (b.invoiceRequest) setInv((p) => ({ ...p, ...Object.fromEntries(Object.entries(b.invoiceRequest!).filter(([, v]) => v != null).map(([k, v]) => [k, v as string | boolean])) }));
+        if (b.invoiceRequest && operator) setInv((p) => ({ ...p, ...Object.fromEntries(Object.entries(b.invoiceRequest!).filter(([, v]) => v != null).map(([k, v]) => [k, v as string | boolean])) }));
+        if (!operator) {
+          setDoc({ firstName: "", lastName: "", sex: "", birthDate: "", birthPlace: "", citizenship: "", docType: DOC_TYPES[0], docNumber: "", docPlace: "" });
+          setArrival("Non lo so"); setGuestReq(""); setPhotoFront(undefined); setPhotoBack(undefined); setSignature(undefined);
+          const total = d.group && d.group.length > 1
+            ? d.group.reduce((a, r) => a + Math.max(1, (r.adults || 1) + (r.children || 0)), 0)
+            : Math.max(1, (b.adults || 1) + (b.children || 0));
+          if (d.group && d.group.length > 1) {
+            const slots = d.group.flatMap((r) => Array.from({ length: Math.max(1, (r.adults || 1) + (r.children || 0)) }, () => r.b));
+            setExtras(Array.from({ length: Math.max(0, total - 1) }, (_, i) => ({ ...emptyExtra(), room: slots[i + 1] || d.group![0].b })));
+          } else setExtras(Array.from({ length: Math.max(0, total - 1) }, emptyExtra));
+        }
       }
     } catch { setLoadErr("Errore di rete."); }
     setLoading(false);
@@ -204,6 +218,9 @@ function Engine() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.paid]);
+
+  // Spegne il completamento automatico del browser su tutti i campi (l'ospite scrive i propri dati da zero).
+  useEffect(() => { document.querySelectorAll("input, textarea, select").forEach((el) => { el.setAttribute("autocomplete", "off"); if (el instanceof HTMLInputElement && (el.type === "text" || el.type === "email" || el.type === "tel")) el.setAttribute("data-lpignore", "true"); }); });
 
   const setD = <K extends keyof DocData>(k: K, v: string) => setDoc((p) => (p ? { ...p, [k]: v } : p));
   const setExtra = (i: number, k: string, v: string) => setExtras((p) => p.map((e, j) => (j === i ? { ...e, [k]: v } : e)));
@@ -392,7 +409,7 @@ function Engine() {
             </div>
             <div className="text-right text-sm"><div className="text-txt">{fmtD(info.booking.checkIn)}</div><div className="text-faint">→ {fmtD(info.booking.checkOut)}</div></div>
           </div>
-          {info.booking.webCheckin && <div className="mt-2 rounded-lg bg-[color:color-mix(in_srgb,var(--ok)_12%,transparent)] px-3 py-1.5 text-xs font-medium text-[color:var(--ok)]">Check-in già inviato — puoi aggiornare i dati e reinviare.</div>}
+          {info.booking.webCheckin && <div className="mt-2 rounded-lg bg-[color:color-mix(in_srgb,var(--ok)_12%,transparent)] px-3 py-1.5 text-xs font-medium text-[color:var(--ok)]">Check-in già inviato — se devi aggiornare i dati, compila di nuovo tutti i campi e reinvia.</div>}
         </div>
 
         {/* Prenotazione di gruppo: un solo check-in per tutte le camere */}
@@ -405,7 +422,7 @@ function Engine() {
         )}
 
         {/* Bentornato: check-in veloce per ospiti di ritorno */}
-        {info.returning && !info.booking.webCheckin && !isGroup && (
+        {info.returning && !info.booking.webCheckin && !isGroup && isOperator && (
           <div className={`${box} mb-4 p-4`} style={{ borderColor: "var(--ok)" }}>
             <div className="flex items-center gap-2"><span className="text-lg">👋</span><h2 className="font-display text-base font-bold text-txt">Bentornato, {info.guest.firstName || doc?.firstName}!</h2></div>
             <p className="mt-1 text-xs text-dim">Abbiamo già i tuoi dati e il documento del soggiorno precedente. Controlla che sia tutto corretto qui sotto e conferma — oppure invia subito.</p>

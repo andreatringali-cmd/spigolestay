@@ -23,11 +23,11 @@ export const CHECKIN_MSG: Record<Lang, (u: string) => string> = {
 };
 // Check-in incompleto: manca qualche ospite (n = quanti).
 export const CHECKIN_MORE_MSG: Record<Lang, (n: number, u: string) => string> = {
-  it: (n, u) => `Il check-in è quasi completo: ci mancano i dati di ${n} ${n === 1 ? "altro ospite" : "altri ospiti"}. Apri il link e aggiungili con "＋ Aggiungi" (i tuoi dati sono già salvati): ${u}`,
-  en: (n, u) => `Your check-in is almost done: we still need the details of ${n} more ${n === 1 ? "guest" : "guests"}. Open the link and add them with "＋ Add" (your details are already saved): ${u}`,
-  fr: (n, u) => `Votre check-in est presque terminé : il nous manque les données de ${n} ${n === 1 ? "autre personne" : "autres personnes"}. Ouvrez le lien et ajoutez-les avec "＋ Ajouter" (vos données sont déjà enregistrées) : ${u}`,
-  de: (n, u) => `Ihr Check-in ist fast fertig: Es fehlen noch die Daten von ${n} weiteren ${n === 1 ? "Person" : "Personen"}. Öffnen Sie den Link und fügen Sie sie mit "＋ Hinzufügen" hinzu (Ihre Daten sind bereits gespeichert): ${u}`,
-  es: (n, u) => `Su check-in está casi completo: faltan los datos de ${n} ${n === 1 ? "huésped más" : "huéspedes más"}. Abra el enlace y añádalos con "＋ Añadir" (sus datos ya están guardados): ${u}`,
+  it: (n, u) => `Il check-in è quasi completo: ci mancano i dati di ${n} ${n === 1 ? "altro ospite" : "altri ospiti"}. Apri il link e compila di nuovo il modulo con i dati di tutti gli ospiti: ${u}`,
+  en: (n, u) => `Your check-in is almost done: we still need the details of ${n} more ${n === 1 ? "guest" : "guests"}. Open the link and fill in the form again with the details of all guests: ${u}`,
+  fr: (n, u) => `Votre check-in est presque terminé : il nous manque les données de ${n} ${n === 1 ? "autre personne" : "autres personnes"}. Ouvrez le lien et remplissez de nouveau le formulaire avec les données de tous les voyageurs : ${u}`,
+  de: (n, u) => `Ihr Check-in ist fast fertig: Es fehlen noch die Daten von ${n} weiteren ${n === 1 ? "Person" : "Personen"}. Öffnen Sie den Link und füllen Sie das Formular erneut mit den Daten aller Gäste aus: ${u}`,
+  es: (n, u) => `Su check-in está casi completo: faltan los datos de ${n} ${n === 1 ? "huésped más" : "huéspedes más"}. Abra el enlace y rellene de nuevo el formulario con los datos de todos los huéspedes: ${u}`,
 };
 // Apertura dei solleciti: si antepone al messaggio normale.
 export const REMINDER_INTRO: Record<Lang, string> = {
