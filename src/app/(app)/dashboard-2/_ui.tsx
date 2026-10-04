@@ -93,19 +93,19 @@ export function SectionHead({ title, right, children }: { title: ReactNode; righ
 }
 
 /** Tessera KPI: icona tinta, etichetta piccola maiuscola, numero grande, barra opzionale. */
-export function KpiTile({ label, value, color, valueColor, icon, hint, bar, small, onClick, active }: {
-  label: string; value: string; color: string; valueColor?: string; icon: string; hint?: ReactNode;
+export function KpiTile({ label, value, color, valueColor, hint, bar, small, onClick, active }: {
+  label: string; value: string; color: string; valueColor?: string; icon?: string; hint?: ReactNode;
   bar?: { pct: number; color?: string }; small?: boolean; onClick?: () => void; active?: boolean;
 }) {
   const cls = `anim-in rounded-2xl border bg-surface p-4 shadow-sm transition hover:shadow-md ${active ? "border-focus ring-2 ring-[color:var(--focus)]" : "border-line hover:border-focus"} ${onClick ? "cursor-pointer text-left" : ""}`;
   const inner = (
     <>
+      {/* Nessuna icona: etichetta e numero, come nella dashboard attuale (l'icona resta nel tipo per compatibilità) */}
       <div className="flex items-start justify-between gap-2">
-        <IconTile icon={icon} color={color} />
-        {onClick && <span className="text-faint"><Icon name={active ? "eye" : "chevron"} size={13} /></span>}
+        <div className={EYEBROW}>{label}</div>
+        {onClick && <span className="shrink-0 text-faint"><Icon name={active ? "eye" : "chevron"} size={13} /></span>}
       </div>
-      <div className={`mt-3 ${EYEBROW}`}>{label}</div>
-      <div className={`mt-1 font-display font-extrabold leading-none tabular-nums ${small ? "text-2xl" : "text-3xl"}`} style={{ color: valueColor ?? color }}>{value}</div>
+      <div className={`mt-2 font-display font-extrabold leading-none tabular-nums ${small ? "text-2xl" : "text-3xl"}`} style={{ color: valueColor ?? color }}>{value}</div>
       {bar && <Bar pct={bar.pct} color={bar.color ?? color} className="mt-2.5" />}
       {hint && <div className="mt-1.5 text-[11px] text-faint">{hint}</div>}
     </>
