@@ -94,6 +94,7 @@ function Engine() {
   const [payErr, setPayErr] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitErr, setSubmitErr] = useState("");
+  const [ackMissing, setAckMissing] = useState(false); // ha già visto l'avviso "mancano ospiti" e vuole proseguire
   const [done, setDone] = useState(false);
   const [paidNow, setPaidNow] = useState(false);
   // "Aggiungi a Google Wallet": pulsante pubblico dopo il check-in, gated lato server
@@ -179,7 +180,7 @@ function Engine() {
           const need = Math.max(0, slots.length - 1);
           setExtras(Array.from({ length: need }, (_, i) => ({ ...emptyExtra(), room: slots[i + 1] || d.group![0].b })));
         } else {
-          const need = Math.max(0, (b.adults || 1) - 1);
+          const need = Math.max(0, (b.adults || 1) + (b.children || 0) - 1); // anche i bambini: la schedina Questura vuole tutti
           setExtras(b.extraGuests?.length ? b.extraGuests.map((e) => ({ ...emptyExtra(), ...e, photoFront: e.docPhotoFront || "", photoBack: e.docPhotoBack || "" })) : Array.from({ length: need }, emptyExtra));
         }
         if (b.invoiceRequest) setInv((p) => ({ ...p, ...Object.fromEntries(Object.entries(b.invoiceRequest!).filter(([, v]) => v != null).map(([k, v]) => [k, v as string | boolean])) }));
@@ -281,6 +282,15 @@ function Engine() {
     const consented = opts?.assumeConsent || consent;
     const reqOk = !!doc && !!doc.firstName.trim() && !!doc.lastName.trim() && !!doc.birthDate && !!doc.docNumber.trim();
     if (!info || !doc || !reqOk || !consented || (!isOperator && !signature) || submitting) return;
+    // Se con la prenotazione soggiornano più persone di quelle inserite, avvisa prima di inviare (un secondo clic prosegue comunque).
+    const total = Math.max(1, (info.booking.adults || 1) + (info.booking.children || 0));
+    const entered = 1 + extras.filter((e) => e.firstName.trim() && e.lastName.trim()).length;
+    if (!opts?.assumeConsent && entered < total && !ackMissing) {
+      setAckMissing(true);
+      setSubmitErr(`Hai inserito ${entered} ${entered === 1 ? "persona" : "persone"} su ${total}. Per legge servono i dati di tutti gli ospiti (anche dei bambini): completa i campi qui sotto con "＋ Aggiungi". Se vuoi proseguire comunque, premi di nuovo "Invia": potremo chiederti il resto più tardi.`);
+      window.scrollTo(0, 0);
+      return;
+    }
     setSubmitting(true); setSubmitErr("");
     try {
       const r = await fetch("/api/checkin", {

@@ -12,7 +12,7 @@ import { shortenLink, buildGuestLink, buildGroupGuestLink } from "@/lib/guestlin
 import { chatPayGuestMessage } from "@/lib/chat-pay-core";
 import { bookingPaidTotal } from "@/lib/booking";
 import { googleReviewUrl, reviewRequestMessage } from "@/lib/reviews";
-import { CHECKIN_MSG, GUIDE_MSG, REMINDER_INTRO, greeting, langOf, markReminder, useReminderLog, whenLabel, agoLabel, REMINDER_COOLDOWN_MS, sendEmailToGuest, sendWhatsAppToGuest, type SendResult } from "@/lib/guest-messages";
+import { CHECKIN_MSG, CHECKIN_MORE_MSG, GUIDE_MSG, REMINDER_INTRO, greeting, langOf, markReminder, useReminderLog, whenLabel, agoLabel, REMINDER_COOLDOWN_MS, sendEmailToGuest, sendWhatsAppToGuest, type SendResult } from "@/lib/guest-messages";
 import type { Booking, Guest, Structure } from "@/lib/types";
 import type { JourneyStep } from "@/lib/booking-journey";
 import { eur } from "@/lib/format";
@@ -139,13 +139,24 @@ export default function StepActions(p: StepActionsProps) {
   let body: React.ReactNode = null;
 
   if (step.key === "checkin") {
-    const build = async () => ({ text: `${intro("checkin")}${greeting(lang, guest)}${CHECKIN_MSG[lang](await shortenLink(fullCheckin))}`, subject: `Check-in online${structure?.name ? ` · ${structure.name}` : ""}` });
+    // Quanti ospiti hanno dato i dati e quanti ne servono (stessa regola di Adempimenti).
+    const exp = Math.max(1, (b.adults ?? 1) + (b.children ?? 0));
+    const dec = (b.webCheckin === true || !!(b.primaryGuest?.lastName && b.primaryGuest?.docNumber) ? 1 : 0) + (b.extraGuests?.filter((e) => !!(e.lastName || e.firstName)).length ?? 0);
+    const partial = dec > 0 && dec < exp;
+    const missing = exp - dec;
+    const build = async () => {
+      const url = await shortenLink(fullCheckin);
+      const core = partial ? CHECKIN_MORE_MSG[lang](missing, url) : CHECKIN_MSG[lang](url);
+      return { text: `${intro("checkin")}${greeting(lang, guest)}${core}`, subject: `Check-in online${structure?.name ? ` · ${structure.name}` : ""}` };
+    };
     body = (<>
-      <p className="text-sm text-dim">L'ospite non ha ancora completato il check-in online. Puoi <b>sollecitarlo</b> (riceve il link) oppure <b>compilarlo tu</b> con i suoi dati.</p>
-      {sendButtons(build, "checkin", "Sollecita")}
+      <p className="text-sm text-dim">{partial
+        ? <>L'ospite ha compilato il check-in per <b>{dec} persona su {exp}</b>: <b>mancano i dati di {missing} {missing === 1 ? "ospite" : "ospiti"}</b>. Per la schedina Questura servono i dati di tutti, anche dei bambini. Puoi <b>sollecitare</b> (il link riapre il modulo con i suoi dati già salvati) o <b>compilare tu</b>. Se in realtà sono meno persone, correggi il numero degli ospiti nella prenotazione.</>
+        : <>L'ospite non ha ancora completato il check-in online. Puoi <b>sollecitarlo</b> (riceve il link) oppure <b>compilarlo tu</b> con i suoi dati.</>}</p>
+      {sendButtons(build, "checkin", partial ? "Chiedi gli altri ospiti" : "Sollecita")}
       <div className="flex flex-wrap gap-2">
         <button className={btnGhost} onClick={() => { const w = window.open(fullCheckin, "_blank"); if (!w) window.location.href = fullCheckin; }}>Compila io (apri il modulo)</button>
-        <button className={btnGhost} onClick={() => { p.onClose(); openBooking(b.id); }}>Inserisci i dati nella scheda</button>
+        <button className={btnGhost} onClick={() => { p.onClose(); openBooking(b.id); }}>{partial ? "Apri la prenotazione (dati o numero ospiti)" : "Inserisci i dati nella scheda"}</button>
       </div>
     </>);
   } else if (step.key === "pay" || step.key === "tax") {

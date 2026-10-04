@@ -43,7 +43,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   steps.push({
     key: "checkin", label: "Check-in", href: "/adempimenti",
     state: complete ? "done" : arrived ? "late" : "todo",
-    detail: complete ? `Dati completi (${dec}/${exp})` : `${dec > 0 ? `Mancano dati: ${dec}/${exp} ospiti` : "L'ospite non ha ancora compilato"}${note("checkin")}`,
+    detail: complete ? `Dati completi (${dec}/${exp})` : `${dec > 0 ? `Compilati ${dec} su ${exp}: mancano i dati di ${exp - dec} ${exp - dec === 1 ? "ospite" : "ospiti"}` : "L'ospite non ha ancora compilato"}${note("checkin")}`,
   });
 
   // 2 · Pagamento
