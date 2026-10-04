@@ -12,7 +12,7 @@ export const tint = (color: string, pct = 12) => `color-mix(in srgb, ${color} ${
 
 export const daysFrom = (iso: string, today: string) => Math.round((Date.parse(iso) - Date.parse(today)) / 86400000);
 
-export const EYEBROW = "text-[10px] font-semibold uppercase tracking-[0.08em] text-faint";
+export const EYEBROW = "text-[10px] font-semibold uppercase tracking-wide text-faint"; // come le card della dashboard
 
 /** Card base: grande, respirata, hover con bordo --focus e ombra morbida. */
 export function Panel({ children, className = "", style, hover = true }: { children: ReactNode; className?: string; style?: CSSProperties; hover?: boolean }) {
@@ -70,7 +70,7 @@ export function PanelHead({ icon, color, title, count, sub, right }: { icon: str
         <IconTile icon={icon} color={color} />
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="truncate font-display text-base font-bold leading-tight text-txt">{title}</h3>
+            <h3 className="truncate text-sm font-bold leading-tight text-txt">{title}</h3>
             {count !== undefined && <span className="rounded-full bg-wash px-2 py-0.5 font-mono text-[11px] font-bold text-dim">{count}</span>}
           </div>
           {sub && <div className="truncate text-[11px] text-faint">{sub}</div>}
@@ -85,7 +85,7 @@ export function PanelHead({ icon, color, title, count, sub, right }: { icon: str
 export function SectionHead({ title, right, children }: { title: ReactNode; right?: ReactNode; children?: ReactNode }) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-      <h2 className="font-display text-xl font-bold tracking-tight text-txt">{title}</h2>
+      <h2 className="font-display text-lg font-bold text-txt">{title}</h2>
       {children}
       {right && <div className="ml-auto">{right}</div>}
     </div>
@@ -105,7 +105,7 @@ export function KpiTile({ label, value, color, valueColor, hint, bar, small, onC
         <div className={EYEBROW}>{label}</div>
         {onClick && <span className="shrink-0 text-faint"><Icon name={active ? "eye" : "chevron"} size={13} /></span>}
       </div>
-      <div className={`mt-2 font-display font-extrabold leading-none tabular-nums ${small ? "text-2xl" : "text-3xl"}`} style={{ color: valueColor ?? color }}>{value}</div>
+      <div className="mt-1 font-mono text-2xl font-bold tabular-nums" style={{ color: valueColor ?? color }}>{value}</div>
       {bar && <Bar pct={bar.pct} color={bar.color ?? color} className="mt-2.5" />}
       {hint && <div className="mt-1.5 text-[11px] text-faint">{hint}</div>}
     </>
@@ -159,7 +159,7 @@ export function StructureLabel({ name, color, count }: { name?: string; color?: 
   return (
     <div className="flex items-center gap-2 px-1 pb-1.5 pt-0.5">
       <span className="h-3 w-3 shrink-0 rounded-md" style={{ backgroundColor: col }} />
-      <span className="truncate text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: color ?? "var(--dim)" }}>{name}</span>
+      <span className="truncate text-xs font-bold uppercase tracking-wide" style={{ color: color ?? "var(--dim)" }}>{name}</span>
       <span className="font-mono text-[11px] text-faint">· {count}</span>
     </div>
   );

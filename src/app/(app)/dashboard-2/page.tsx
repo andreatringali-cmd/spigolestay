@@ -520,7 +520,7 @@ export default function Dashboard2() {
               node: (
                 <Panel className="flex h-full flex-col">
                   <div className="mb-3 flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-dim">{c.title}</span>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-faint">{c.title}</span>
                     {"extra" in c ? c.extra : null}
                   </div>
                   <div className="flex-1">{c.node}</div>
@@ -625,13 +625,13 @@ export default function Dashboard2() {
             <div className="flex flex-col gap-2">
               {/* Riepilogo adempimenti PA/fiscali → pagina dedicata (evita doppioni sulla dashboard) */}
               <Link href="/adempimenti" className="flex items-center gap-3 rounded-xl border p-2.5 transition hover:border-focus hover:bg-wash" style={{ borderColor: adempimentiCount ? "color-mix(in srgb, var(--focus) 45%, var(--line))" : "var(--line)" }}>
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg font-display text-sm font-extrabold" style={{ backgroundColor: tint(adempimentiCount ? "var(--focus)" : "var(--ok)", 16), color: adempimentiCount ? "var(--focus)" : "var(--ok)" }}>{adempimentiCount || "✓"}</span>
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg font-mono text-sm font-bold" style={{ backgroundColor: tint(adempimentiCount ? "var(--focus)" : "var(--ok)", 16), color: adempimentiCount ? "var(--focus)" : "var(--ok)" }}>{adempimentiCount || "✓"}</span>
                 <span className="min-w-0 flex-1 text-sm font-semibold text-txt">{t("Adempimenti oggi")}{adempimentiCount ? ` · ${t("da gestire")}` : ` · ${t("tutto in ordine")}`}</span>
                 <span className="text-faint"><Icon name="chevron" size={14} /></span>
               </Link>
               {alerts.map((a, i) => (
                 <Link key={i} href={a.href} className="flex items-center gap-3 rounded-xl border border-line p-2.5 transition hover:border-focus hover:bg-wash">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg font-display text-sm font-extrabold" style={{ backgroundColor: tint(a.color, 16), color: a.color }}>{a.n}</span>
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg font-mono text-sm font-bold" style={{ backgroundColor: tint(a.color, 16), color: a.color }}>{a.n}</span>
                   <span className="min-w-0 flex-1 text-sm font-medium text-txt">{t(a.label)}</span>
                   <span className="text-faint"><Icon name="chevron" size={14} /></span>
                 </Link>
@@ -659,7 +659,7 @@ export default function Dashboard2() {
                             <RoomThumb unitId={r.u.id} structureId={r.u.structureId} compact className="h-12 w-12 rounded-lg" />
                             <div className="min-w-0 flex-1">
                               <div className="mb-0.5 flex items-center justify-between gap-2">
-                                <span className="truncate text-sm font-bold text-txt">{r.u.name}</span>
+                                <span className="truncate text-sm font-medium text-txt">{r.u.name}</span>
                                 <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: tint(a.color, 14), color: a.color }}>{t(a.label)}</span>
                               </div>
                               {r.dep && (
@@ -705,8 +705,8 @@ export default function Dashboard2() {
                 <div className="flex flex-col gap-2">
                   {rows.slice(0, 6).map((r, i) => (
                     <div key={r.id + i} className="flex items-center gap-2.5 rounded-xl border border-line p-2 text-sm">
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-xs font-extrabold" style={{ backgroundColor: tint(r.col, 14), color: r.col }}>{r.icon ? <Icon name={r.icon} size={15} /> : (r.name.trim()[0] ?? "?").toUpperCase()}</span>
-                      <span className="min-w-0 flex-1 truncate font-bold text-txt">{r.name}</span>
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-xs font-bold" style={{ backgroundColor: tint(r.col, 14), color: r.col }}>{r.icon ? <Icon name={r.icon} size={15} /> : (r.name.trim()[0] ?? "?").toUpperCase()}</span>
+                      <span className="min-w-0 flex-1 truncate font-medium text-txt">{r.name}</span>
                       <Pill color={r.col} icon={r.icon}>{r.badge}</Pill>
                     </div>
                   ))}
@@ -720,7 +720,7 @@ export default function Dashboard2() {
             <div className="flex items-center gap-4">
               <span className="h-3.5 w-3.5 shrink-0 rounded-full" style={{ backgroundColor: channelsColor, boxShadow: `0 0 0 5px ${tint(channelsColor, 18)}` }} />
               <div className="min-w-0 flex-1">
-                <div className="font-display text-3xl font-extrabold leading-none tabular-nums text-txt">{cc.canali}{cc.tot > 0 ? <span className="text-xl text-faint">/{cc.tot}</span> : ""} <span className="font-sans text-sm font-medium text-dim">{t("connessi")}</span></div>
+                <div className="font-mono text-2xl font-bold leading-none tabular-nums text-txt">{cc.canali}{cc.tot > 0 ? <span className="text-base text-faint">/{cc.tot}</span> : ""} <span className="font-sans text-sm font-medium text-dim">{t("connessi")}</span></div>
                 {cc.tot > 0 && <Bar pct={(cc.canali / cc.tot) * 100} color={channelsColor} className="mt-2.5" />}
                 <div className="mt-1.5 text-[11px] text-faint">{t("ultima sincronizzazione")} · {cc.sync}</div>
               </div>
@@ -740,7 +740,7 @@ export default function Dashboard2() {
           <OpsCard title={t("Riepilogo del mese")} icon="chart" color="#2C8A8A" right={<Link href="/statistiche" className="text-[11px] font-semibold text-focus hover:underline">{t("Statistiche")} →</Link>}>
             <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
               <div>
-                <div className="font-display text-3xl font-extrabold leading-none tabular-nums text-txt">{eur(revMonth)}</div>
+                <div className="font-mono text-2xl font-bold leading-none tabular-nums text-txt">{eur(revMonth)}</div>
                 <div className="mt-1.5 text-[11px] text-faint">{t("ricavi confermati")} · {bkOfMonth} {t("prenotazioni")}</div>
               </div>
               {revMonthDelta !== null && (
@@ -761,7 +761,7 @@ export default function Dashboard2() {
                   return (
                     <button key={b.id} onClick={() => openBooking(b.id)} className="flex items-center gap-2.5 rounded-xl px-1.5 py-1.5 text-left transition hover:bg-wash">
                       <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold" style={{ backgroundColor: tint(col, 16), color: col }}>{cancelled ? "✕" : "+"}</span>
-                      <span className="min-w-0 flex-1 truncate text-sm font-bold text-txt">{guestName(b.guestId)}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-txt">{guestName(b.guestId)}</span>
                       <span className="grid w-[18px] shrink-0 place-items-center">{b.channel !== "blocked" && <ChannelLogo channel={b.channel} size={18} />}</span>
                       <span className="w-12 shrink-0 text-right text-[11px] text-faint">{b.bookedOn ? fmt(b.bookedOn) : ""}</span>
                     </button>
@@ -816,7 +816,7 @@ function ComplianceBanner({ pending, checkinPending, loading }: { pending: numbe
     >
       <IconTile icon={ok ? "id" : "alertTriangle"} color={color} size="lg" />
       <div className="min-w-0 flex-1">
-        <div className="font-display text-base font-bold" style={{ color }}>{ok ? t("Sei in regola con gli adempimenti") : t("Adempimenti PA in sospeso")}</div>
+        <div className="text-sm font-bold" style={{ color }}>{ok ? t("Sei in regola con gli adempimenti") : t("Adempimenti PA in sospeso")}</div>
         <div className="truncate text-xs text-dim">
           {ok
             ? t("Nessuna schedina Alloggiati o movimento ISTAT in attesa.")
@@ -825,7 +825,7 @@ function ComplianceBanner({ pending, checkinPending, loading }: { pending: numbe
               : `${pending} ${t("tra schedine Alloggiati e movimenti ISTAT da controllare")}`}
         </div>
       </div>
-      {!ok && <span className="shrink-0 rounded-full px-2.5 py-0.5 font-mono text-sm font-extrabold" style={{ backgroundColor: tint(color, 16), color }}>{pending}</span>}
+      {!ok && <span className="shrink-0 rounded-full px-2.5 py-0.5 font-mono text-sm font-bold" style={{ backgroundColor: tint(color, 16), color }}>{pending}</span>}
       <span className="shrink-0 text-faint"><Icon name="chevron" size={16} /></span>
     </Link>
   );
@@ -847,7 +847,7 @@ function MoneyRow({ label, value, color }: { label: string; value: string; color
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
         <span className="min-w-0 truncate text-sm text-dim">{label}</span>
       </span>
-      <span className="shrink-0 font-display text-base font-extrabold tabular-nums" style={{ color }}>{value}</span>
+      <span className="shrink-0 font-mono text-sm font-bold tabular-nums" style={{ color }}>{value}</span>
     </div>
   );
 }

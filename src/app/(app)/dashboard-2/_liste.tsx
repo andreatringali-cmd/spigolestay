@@ -65,7 +65,7 @@ export function MoveList({ items, empty, kind, date, today, groupByStructure, st
             <RoomThumb unitId={b.unitId} roomTypeId={b.roomTypeId} structureId={b.structureId} className="min-h-[104px] w-20 self-stretch sm:w-24" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h4 className="min-w-0 flex-1 truncate text-[15px] font-bold text-txt">{guestName(b.guestId)}</h4>
+                <h4 className="min-w-0 flex-1 truncate text-sm font-medium text-txt">{guestName(b.guestId)}</h4>
                 {b.channel !== "blocked" && <ChannelWordmark channel={b.channel} height={18} title={ch.label} />}
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-dim">
@@ -90,7 +90,7 @@ export function MoveList({ items, empty, kind, date, today, groupByStructure, st
               </div>
               <div className="mt-2.5 flex items-end justify-between gap-3 border-t border-line pt-2">
                 <div className="shrink-0">
-                  <div className="font-display text-base font-extrabold leading-tight text-txt">{b.total ? eur(b.total) : "—"}</div>
+                  <div className="font-mono text-sm font-semibold leading-tight text-txt">{b.total ? eur(b.total) : "—"}</div>
                   {b.total ? <div className="text-[11px] text-faint">{resid <= 0.005 ? t("Saldato") : `${t("Mancano")} ${eur(resid)}`}</div> : null}
                 </div>
                 {j && j.total > 0 && (
@@ -142,7 +142,7 @@ export function TodoGroup({ title, icon, color, items, tasks, done, onToggle, au
         <div className="mb-2 flex items-center gap-2.5">
           <RoomThumb unitId={b.unitId} roomTypeId={b.roomTypeId} structureId={b.structureId} compact className="h-11 w-11 rounded-lg" />
           <div className="min-w-0 flex-1">
-            <button onClick={() => openBooking(b.id)} className="block max-w-full truncate text-left text-sm font-bold text-txt hover:text-focus hover:underline">{guestName(b.guestId)}</button>
+            <button onClick={() => openBooking(b.id)} className="block max-w-full truncate text-left text-sm font-medium text-txt hover:text-focus hover:underline">{guestName(b.guestId)}</button>
             <span className="flex min-w-0 items-center gap-1 text-xs text-dim">
               {showStruct && <span className="max-w-[90px] truncate font-semibold" style={{ color: stColor }}>{st?.name}</span>}
               {showStruct && <span className="text-faint">·</span>}
