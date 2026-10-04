@@ -107,6 +107,10 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
     detail: b.reviewRequestedAt ? "Richiesta inviata" : departed ? `Da richiedere${note("review")}` : "Dopo la partenza",
   });
 
+  // Ordine di lettura voluto: check-in, pagamento, guida, schedina, osservatorio, tassa, fattura, check-out (recensione per ultima).
+  const ORDER = ["checkin", "pay", "guide", "alloggiati", "istat", "tax", "invoice", "checkout", "review"];
+  steps.sort((a, b2) => ORDER.indexOf(a.key) - ORDER.indexOf(b2.key));
+
   const relevant = steps.filter((s) => s.state !== "na");
   const done = relevant.filter((s) => s.state === "done").length;
   const next = steps.find((s) => s.state === "late") ?? steps.find((s) => s.state === "todo");
