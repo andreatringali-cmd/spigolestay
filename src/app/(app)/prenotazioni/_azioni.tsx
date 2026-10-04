@@ -16,6 +16,7 @@ import { CHECKIN_MSG, CHECKIN_MORE_MSG, GUIDE_MSG, REMINDER_INTRO, greeting, lan
 import type { Booking, Guest, Structure } from "@/lib/types";
 import type { JourneyStep } from "@/lib/booking-journey";
 import { eur } from "@/lib/format";
+import Icon from "@/components/Icon";
 
 export interface StepActionsProps {
   b: Booking;
@@ -116,13 +117,14 @@ export default function StepActions(p: StepActionsProps) {
     if (r.ok) { markReminder(b.id, remKind); after?.(); p.onChanged(); }
     return r;
   };
-  const sendButtons = (build: () => Promise<{ text: string; subject: string }>, remKind: string, label: string, after?: () => void) => (
+  const sendButtons = (build: () => Promise<{ text: string; subject: string }>, remKind: string, _label: string, after?: () => void, extra?: React.ReactNode) => (
     <>
     {historyBox(remKind)}
-    <div className="flex flex-wrap gap-2">
-      <button className={btnPrimary} style={{ background: "#25D366" }} disabled={!!busy || !hasPhone || isRecent(remKind)} title={hasPhone ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca il telefono dell'ospite"} onClick={() => run("wa", async () => { const m = await build(); return deliver("wa", m.text, m.subject, remKind, after); })}>{busy === "wa" ? "Invio…" : `WhatsApp · ${label}`}</button>
-      <button className={btnPrimary} style={{ background: "var(--focus)" }} disabled={!!busy || !hasMail || isRecent(remKind)} title={hasMail ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca l'email dell'ospite"} onClick={() => run("mail", async () => { const m = await build(); return deliver("mail", m.text, m.subject, remKind, after); })}>{busy === "mail" ? "Invio…" : `Email · ${label}`}</button>
-      <button className={btnGhost} disabled={!!busy} onClick={() => run("copy", async () => { const m = await build(); return copy(m.text); })}>Copia testo</button>
+    <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+      <button className={`${btnPrimary} whitespace-nowrap`} style={{ background: "#25D366" }} disabled={!!busy || !hasPhone || isRecent(remKind)} title={hasPhone ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca il telefono dell'ospite"} onClick={() => run("wa", async () => { const m = await build(); return deliver("wa", m.text, m.subject, remKind, after); })}>{busy === "wa" ? "Invio…" : "WhatsApp"}</button>
+      <button className={`${btnPrimary} whitespace-nowrap`} style={{ background: "var(--focus)" }} disabled={!!busy || !hasMail || isRecent(remKind)} title={hasMail ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca l'email dell'ospite"} onClick={() => run("mail", async () => { const m = await build(); return deliver("mail", m.text, m.subject, remKind, after); })}>{busy === "mail" ? "Invio…" : "Email"}</button>
+      <button className={`${btnGhost} px-2.5`} disabled={!!busy} title="Copia il testo del messaggio" aria-label="Copia il testo del messaggio" onClick={() => run("copy", async () => { const m = await build(); return copy(m.text); })}><Icon name="copy" size={16} /></button>
+      {extra}
     </div>
     {isRecent(remKind) && <button className="self-start text-xs font-semibold text-[color:var(--err)] underline" onClick={() => void unlock(remKind)}>Invio bloccato: ho scritto da poco. Sblocca comunque</button>}
     </>
@@ -153,11 +155,7 @@ export default function StepActions(p: StepActionsProps) {
       <p className="text-sm text-dim">{partial
         ? <>L'ospite ha compilato il check-in per <b>{dec} persona su {exp}</b>: <b>mancano i dati di {missing} {missing === 1 ? "ospite" : "ospiti"}</b>. Per la schedina Questura servono i dati di tutti, anche dei bambini. Puoi <b>sollecitare</b> (il modulo si riapre vuoto: l'ospite deve compilare di nuovo i dati di tutti) o <b>compilare tu</b> con i dati già salvati. Se in realtà sono meno persone, correggi il numero degli ospiti nella prenotazione.</>
         : <>L'ospite non ha ancora completato il check-in online. Puoi <b>sollecitarlo</b> (riceve il link) oppure <b>compilarlo tu</b> con i suoi dati.</>}</p>
-      {sendButtons(build, "checkin", partial ? "Chiedi gli altri ospiti" : "Sollecita")}
-      <div className="flex flex-wrap gap-2">
-        <button className={btnGhost} onClick={() => { const w = window.open(fullCheckin, "_blank"); if (!w) window.location.href = fullCheckin; }}>Compila io (apri il modulo)</button>
-        <button className={btnGhost} onClick={() => { p.onClose(); openBooking(b.id); }}>{partial ? "Apri la prenotazione (dati o numero ospiti)" : "Inserisci i dati nella scheda"}</button>
-      </div>
+      {sendButtons(build, "checkin", "", undefined, <button className={`${btnGhost} whitespace-nowrap`} onClick={() => { const w = window.open(fullCheckin, "_blank"); if (!w) window.location.href = fullCheckin; }}>Compila tu</button>)}
     </>);
   } else if (step.key === "pay" || step.key === "tax") {
     const kind = step.key === "pay" ? "saldo" : "tassa";
