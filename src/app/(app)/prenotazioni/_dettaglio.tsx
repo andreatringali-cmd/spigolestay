@@ -15,7 +15,7 @@ import { journeyBucket, journeyOf, isLiveBooking, type JourneyStep, type StepSta
 import { ChannelWordmark } from "@/components/ChannelLogo";
 import EmptyState from "@/components/EmptyState";
 import { groupSizes, isRealGroup } from "@/lib/groups";
-import { readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
+import { isGuideSent, readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import StepActions from "./_azioni";
 import BookingAmounts from "@/components/BookingAmounts";
 
@@ -115,7 +115,7 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
     const j = isLiveBooking(b) ? journeyOf(b, {
       today, guest, structure: getStructure(b.structureId),
       schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
-      guideSent: !!rems[b.id]?.guide || (threads[b.guestId] ?? []).some((m) => m.dir === "out" && GUIDE_RE.test(m.text)),
+      guideSent: isGuideSent(b, threads[b.guestId], remLog[b.id]),
       invoiceStato: docBy.get(b.id),
       reminderNotes: reminderNotes(remLog[b.id]),
     }) : null;
@@ -207,7 +207,7 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
               </div>
 
               {/* Importi e avanzamento */}
-              <div className="flex shrink-0 flex-col gap-3 border-t border-line pt-2 md:w-60 md:justify-between md:border-l md:border-t-0 md:pl-4 md:pt-0">
+              <div className="flex shrink-0 flex-col gap-1.5 border-t border-line pt-2 md:w-72 md:justify-center md:border-l md:border-t-0 md:pl-4 md:pt-0">
                 <div className="md:text-right">
                   <div className="font-mono text-lg font-bold text-txt">{total ? eur(total) : "—"}{total > 0 && <span className="ml-1.5 font-sans text-[11px] font-normal text-faint">{(b.cleaningFee ?? 0) > 0 || (b.extras ?? []).length > 0 ? "totale" : `soggiorno · ${n} ${n === 1 ? "notte" : "notti"}`}</span>}</div>
                 </div>

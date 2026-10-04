@@ -5,7 +5,7 @@
 // tre colonne (Arrivi / In casa / Partenze) con le schede della vista dettagliata, camere libere e blocchi.
 // Per le prenotazioni usa journeyOf/journeyBucket-style (booking-journey) e la finestra "Risolvi" (StepActions).
 import { groupSizes } from "@/lib/groups";
-import { reminderNotes, useReminderLog } from "@/lib/guest-messages";
+import { isGuideSent, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
@@ -104,7 +104,7 @@ export default function CalendarioDettaglio() {
       const j = journeyOf(b, {
         today, guest: guestById.get(b.guestId), structure: getStructure(b.structureId),
         schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
-        guideSent: !!rems[b.id]?.guide || (threads[b.guestId] ?? []).some((m) => m.dir === "out" && GUIDE_RE.test(m.text)),
+        guideSent: isGuideSent(b, threads[b.guestId], remLog[b.id]),
         invoiceStato: docBy.get(b.id),
         reminderNotes: reminderNotes(remLog[b.id]),
       });

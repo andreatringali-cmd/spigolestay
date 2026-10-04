@@ -188,3 +188,11 @@ export function reminderNotes(log: Record<string, ReminderEntry[]> | undefined):
   if (!log) return {};
   return { checkin: reminderSummary(log.checkin), pay: reminderSummary(log["pay-saldo"]), tax: reminderSummary(log["pay-tassa"]), guide: reminderSummary(log.guide), review: reminderSummary(log.review) };
 }
+
+/** La guida ospiti è già stata inviata PER QUESTA prenotazione? Contano solo i messaggi partiti dopo la creazione della prenotazione
+ *  (la chat è per ospite: i messaggi di soggiorni precedenti o di prova non devono far risultare "inviata" una prenotazione nuova). */
+export function isGuideSent(b: { bookedOn?: string; checkIn: string }, msgs: { dir?: string; text?: string; ts?: number }[] | undefined, log?: Record<string, ReminderEntry[]>): boolean {
+  if (log?.guide?.length) return true;
+  const from = b.bookedOn ? Date.parse(b.bookedOn) : Date.parse(b.checkIn) - 60 * 86400000;
+  return (msgs ?? []).some((m) => m.dir === "out" && typeof m.ts === "number" && m.ts >= from && /guest-guide|\/guida|guida ospiti|atsv\.vercel\.app|spigole-guest-guide/i.test(m.text || ""));
+}

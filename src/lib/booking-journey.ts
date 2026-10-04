@@ -83,7 +83,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
 
   // 6 · Guida ospiti (utile prima dell'arrivo)
   if (c.guideSent) steps.push({ key: "guide", label: "Guida ospiti", state: "done", detail: "Inviata in chat", href: "/messaggi" });
-  else if (!departed) steps.push({ key: "guide", label: "Guida ospiti", href: "/messaggi", state: arrivesIn <= 0 ? "late" : "todo", detail: `${arrivesIn <= 1 ? "Non ancora inviata" : "Da inviare prima dell'arrivo"}${note("guide")}` });
+  else if (!departed) steps.push({ key: "guide", label: "Guida ospiti", href: "/messaggi", state: arrivesIn <= 0 ? "late" : "todo", detail: `${arrivesIn <= 1 ? "Non ancora inviata" : "Da inviare il giorno del check-in"}${note("guide")}` });
 
   // 7 · Fattura / ricevuta (se richiesta dall'ospite, in bozza o già emessa)
   const issued = !!b.invoiceNo || (!!c.invoiceStato && c.invoiceStato !== "bozza");

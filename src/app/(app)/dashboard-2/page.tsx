@@ -16,7 +16,7 @@ import { toISO, parseISO, nights, addDays } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { journeyOf, isLiveBooking, type JourneyStep } from "@/lib/booking-journey";
-import { readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
+import { isGuideSent, readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import { PageHeader } from "@/components/ui";
 import ScrollStrip from "@/components/ScrollStrip";
 import Donut from "@/components/Donut";
@@ -366,7 +366,7 @@ export default function Dashboard2() {
   const journeyFor = (b: (typeof bookings)[number]) => isLiveBooking(b) ? journeyOf(b, {
     today: todayISO, guest: guests.find((g) => g.id === b.guestId), structure: getStructure(b.structureId),
     schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
-    guideSent: !!rems[b.id]?.guide || (threads[b.guestId] ?? []).some((m) => m.dir === "out" && GUIDE_RE.test(m.text)),
+    guideSent: isGuideSent(b, threads[b.guestId], remLog[b.id]),
     invoiceStato: docBy.get(b.id),
     reminderNotes: reminderNotes(remLog[b.id]),
   }) : null;
