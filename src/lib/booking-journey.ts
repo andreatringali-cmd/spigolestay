@@ -78,7 +78,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   steps.push({
     key: "istat", label: "Osservatorio (ISTAT)", href: "/istat",
     state: is === "sent" ? "done" : departed ? "late" : "todo",
-    detail: is === "sent" ? "Inviato" : is === "pending" ? "Pronto da inviare" : "Da preparare",
+    detail: is === "sent" ? "Inviato" : is === "pending" ? "Pronto da inviare" : complete ? "Da preparare" : "Attende il check-in",
   });
 
   // 6 · Guida ospiti (utile prima dell'arrivo)
