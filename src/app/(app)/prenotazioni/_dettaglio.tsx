@@ -209,7 +209,7 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
               {/* Importi e avanzamento */}
               <div className="flex shrink-0 flex-col gap-3 border-t border-line pt-2 md:w-60 md:justify-between md:border-l md:border-t-0 md:pl-4 md:pt-0">
                 <div className="md:text-right">
-                  <div className="font-mono text-lg font-bold text-txt">{total ? eur(total) : "—"}</div>
+                  <div className="font-mono text-lg font-bold text-txt">{total ? eur(total) : "—"}{total > 0 && <span className="ml-1.5 font-sans text-[11px] font-normal text-faint">{(b.cleaningFee ?? 0) > 0 || (b.extras ?? []).length > 0 ? "totale" : `soggiorno · ${n} ${n === 1 ? "notte" : "notti"}`}</span>}</div>
                 </div>
                 <BookingAmounts b={b} structure={st} />
                 {j && j.total > 0 && (

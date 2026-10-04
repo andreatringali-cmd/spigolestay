@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { findBookingStoreForTenant } from "@/lib/manage-booking";
 import { chatPayContext } from "@/lib/chat-pay";
+import { withLiveStripe } from "@/lib/chat-pay-stripe";
 import { planChatPayment, type ChatPayKind } from "@/lib/chat-pay-core";
 import { PAY_TOKEN_TTL_DAYS, paySecret, signPayToken } from "@/lib/chat-pay-token";
 import type { Booking, Structure } from "@/lib/types";
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
     const store = await findBookingStoreForTenant(auth.admin, auth.tenantId, bookingId);
     if (!store) return NextResponse.json({ error: "booking_not_found", message: "Prenotazione non trovata sul server: se l'hai appena creata, riprova tra qualche secondo." }, { status: 404 });
 
-    const ctx = chatPayContext(store.booking as unknown as Booking, (store.structure ?? undefined) as unknown as Structure | undefined);
+    const ctx = await withLiveStripe(chatPayContext(store.booking as unknown as Booking, (store.structure ?? undefined) as unknown as Structure | undefined));
     const plan = planChatPayment(ctx, kind, requested);
     if (!plan.ok) return NextResponse.json({ error: plan.error, message: plan.message, maxAmount: plan.maxCents != null ? plan.maxCents / 100 : undefined }, { status: 400 });
 

@@ -439,16 +439,16 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const payInputFor = (cents: number) => (cents / 100).toFixed(2).replace(".", ",");
   const openPay = () => {
     const b = current?.b; if (!b) return;
-    const ctx = chatPayContext(b, getStructure(b.structureId));
+    const ctx = chatPayContext(b, getStructure(b.structureId), true);
     setPayKind("saldo"); setPayErr(""); setPayAmount(payInputFor(maxChatPayCents(ctx, "saldo"))); setPayFor((v) => (v === sel ? null : sel));
   };
   const pickPayKind = (k: ChatPayKind) => {
     const b = current?.b; if (!b) return;
-    setPayKind(k); setPayErr(""); setPayAmount(payInputFor(maxChatPayCents(chatPayContext(b, getStructure(b.structureId)), k)));
+    setPayKind(k); setPayErr(""); setPayAmount(payInputFor(maxChatPayCents(chatPayContext(b, getStructure(b.structureId), true), k)));
   };
   const createPayLink = async () => {
     const b = current?.b; if (!b || !current || payBusy) return;
-    const ctx = chatPayContext(b, getStructure(b.structureId));
+    const ctx = chatPayContext(b, getStructure(b.structureId), true);
     const typed = parseEurInput(payAmount);
     if (typed === null) { setPayErr(t("Importo non valido.")); return; }
     const plan = planChatPayment(ctx, payKind, typed);
@@ -766,7 +766,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
               {payOpen && current.b && (() => {
                 const b = current.b;
                 const st = getStructure(b.structureId);
-                const ctx = chatPayContext(b, st);
+                const ctx = chatPayContext(b, st, true);
                 const base = planChatPayment(ctx, payKind);
                 const taxOk = planChatPayment(ctx, "tassa").ok;
                 const blockedErr = !base.ok && base.error !== "amount_too_low" && base.error !== "invalid_amount" && base.error !== "amount_exceeds_balance" ? base : null;

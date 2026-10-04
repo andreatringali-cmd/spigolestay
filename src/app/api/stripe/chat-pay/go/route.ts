@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { findBookingStoreForTenant } from "@/lib/manage-booking";
 import { chatPayContext } from "@/lib/chat-pay";
+import { withLiveStripe } from "@/lib/chat-pay-stripe";
 import { fmtEur, planChatPayment, type ChatPayKind } from "@/lib/chat-pay-core";
 import { paySecret, verifyPayToken } from "@/lib/chat-pay-token";
 import { adminFromEnv, recordChatPayment } from "@/lib/chat-pay-server";
@@ -52,7 +53,7 @@ async function handleStart(url: URL) {
 
   // Ricontrollo al momento del click: residuo reale, Stripe collegato, mai oltre il residuo
   // (se nel frattempo è stato incassato qualcosa, l'importo si riduce; non sale mai oltre il token).
-  const plan = planChatPayment(chatPayContext(bk, st), kind as ChatPayKind, maxCents / 100, { clamp: true });
+  const plan = planChatPayment(await withLiveStripe(chatPayContext(bk, st)), kind as ChatPayKind, maxCents / 100, { clamp: true });
   if (!plan.ok) {
     if (plan.error === "already_paid" || plan.error === "tax_already_paid") return page("Già saldato", `<p>Per questa prenotazione non risulta nulla da pagare. Grazie!</p>`);
     if (plan.error === "stripe_not_connected") return page("Pagamento non disponibile", `<p>Il pagamento online non è attivo per questa struttura. Contatta direttamente la struttura.</p>`, 503);

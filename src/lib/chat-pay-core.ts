@@ -62,7 +62,7 @@ export type ChatPayError =
 export const CHAT_PAY_ERROR_MSG: Record<ChatPayError, string> = {
   no_total: "Questa prenotazione non ha un importo: impostalo nella scheda prenotazione.",
   already_paid: "Il saldo è già stato pagato: non c'è nulla da incassare.",
-  stripe_not_connected: "Stripe non è collegato per questa struttura: collegalo in Strutture → Pagamenti.",
+  stripe_not_connected: "Stripe non risulta collegato e attivo per questa struttura: controlla in Strutture → Pagamenti (se è appena collegato, completa i dati richiesti da Stripe).",
   no_city_tax: "Per questa prenotazione non è prevista la tassa di soggiorno.",
   tax_already_paid: "La tassa di soggiorno risulta già incassata.",
   invalid_amount: "Importo non valido.",

@@ -7,7 +7,9 @@ import { balanceDue } from "./incassi";
 import { nights } from "./dates";
 import { toCents, type ChatPayContext } from "./chat-pay-core";
 
-export function chatPayContext(b: Booking, st: Structure | undefined): ChatPayContext {
+// optimistic (solo browser): con un account Stripe collegato non blocca in anticipo sul flag salvato, che può essere vecchio;
+// la verifica vera la fa il server (withLiveStripe).
+export function chatPayContext(b: Booking, st: Structure | undefined, optimistic = false): ChatPayContext {
   const tax = cityTaxOf(st, cityTaxPayers(st, b), nights(b.checkIn, b.checkOut), b.total ?? 0, b.cityTaxExempt);
   return {
     totalCents: toCents(bookingGrandTotal(b, st)),
@@ -16,6 +18,6 @@ export function chatPayContext(b: Booking, st: Structure | undefined): ChatPayCo
     cityTaxExempt: !!b.cityTaxExempt,
     cityTaxPaid: !!b.cityTaxPaid,
     stripeAccount: st?.stripeAccount || undefined,
-    stripeChargesEnabled: !!st?.stripeChargesEnabled,
+    stripeChargesEnabled: !!st?.stripeChargesEnabled || (optimistic && !!st?.stripeAccount),
   };
 }
