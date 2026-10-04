@@ -17,6 +17,8 @@ export default function BookingAmounts({ b, structure }: { b: Booking; structure
   const resid = Math.max(0, total - paid);
   const tax = cityTaxOf(structure, cityTaxPayers(structure, b), n, acc, b.cityTaxExempt);
   const comm = commissionOf(b);
+  // Il dettaglio "come arriviamo al totale" serve solo se oltre al soggiorno c'è altro: altrimenti ripeterebbe il totale già in alto.
+  const showBreakdown = clean > 0 || extras.length > 0 || (!!b.parking && !hasParkingExtra);
   const Row = ({ k, v, color, strong, title }: { k: string; v: string; color?: string; strong?: boolean; title?: string }) => (
     <div className="flex items-baseline justify-between gap-2" title={title}>
       <span className={`min-w-0 truncate ${strong ? "font-semibold text-txt" : "text-faint"}`}>{k}</span>
@@ -25,13 +27,13 @@ export default function BookingAmounts({ b, structure }: { b: Booking; structure
   );
   return (
     <div className="w-full text-[11px] leading-snug">
-      <div className="flex flex-col gap-0.5 border-t border-line pt-1.5">
+      {showBreakdown && <div className="flex flex-col gap-0.5 border-t border-line pt-1.5">
         <Row k={`Soggiorno · ${n} ${n === 1 ? "notte" : "notti"}`} v={eur(acc)} />
         {clean > 0 && <Row k="Pulizia finale" v={eur(clean)} />}
         {extras.map((e, i) => <Row key={i} k={`${e.name || "Extra"}${e.qty && e.qty > 1 ? ` ×${e.qty}` : ""}`} v={eur(e.price || 0)} />)}
         {b.parking && !hasParkingExtra && <Row k="Parcheggio" v="incluso" />}
-      </div>
-      <div className="mt-1.5 flex flex-col gap-0.5 border-t border-line pt-1.5">
+      </div>}
+      <div className={`${showBreakdown ? "mt-1.5 " : ""}flex flex-col gap-0.5 border-t border-line pt-1.5`}>
         <Row k="Incassato" v={eur(paid)} color={paid > 0 ? "var(--ok)" : "var(--faint)"} strong={paid > 0} />
         {resid <= 0.005 ? <Row k="Saldo" v="Saldato ✓" color="var(--ok)" strong /> : <Row k="Da incassare" v={eur(resid)} color="var(--err)" strong />}
         {b.depositPaid && <Row k="Caparra" v="ricevuta ✓" color="var(--ok)" />}
