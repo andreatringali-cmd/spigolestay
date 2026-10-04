@@ -102,10 +102,10 @@ export function KpiTile({ label, value, color, valueColor, hint, bar, small, onC
     <>
       {/* Nessuna icona: etichetta e numero, come nella dashboard attuale (l'icona resta nel tipo per compatibilità) */}
       <div className="flex items-start justify-between gap-2">
-        <div className={EYEBROW}>{label}</div>
+        <div className="text-xs font-medium uppercase tracking-wide text-dim">{label}</div>
         {onClick && <span className="shrink-0 text-faint"><Icon name={active ? "eye" : "chevron"} size={13} /></span>}
       </div>
-      <div className="mt-1 font-mono text-2xl font-bold tabular-nums" style={{ color: valueColor ?? color }}>{value}</div>
+      <div className={`mt-1 font-mono font-bold tabular-nums ${small ? "text-lg" : "text-2xl"}`} style={{ color: valueColor ?? color }}>{value}</div>
       {bar && <Bar pct={bar.pct} color={bar.color ?? color} className="mt-2.5" />}
       {hint && <div className="mt-1.5 text-[11px] text-faint">{hint}</div>}
     </>

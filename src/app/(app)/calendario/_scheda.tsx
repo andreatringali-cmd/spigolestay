@@ -118,9 +118,7 @@ export default function SchedaGiorno({ groupSize, b, j, guestName, unit, roomTyp
           <div className="min-w-[110px] md:w-full">
             <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-dim"><span>{j.done} di {j.total}</span><span>{pct}%</span></div>
             <div className="h-1.5 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: anyLate ? "var(--err)" : pct === 100 ? "var(--ok)" : "var(--focus)" }} /></div>
-            {j.next
-              ? <button onClick={(e) => { e.stopPropagation(); onStep(j.next!); }} className="mt-1.5 block w-full truncate text-left text-[11px] font-semibold md:text-right" style={{ color: j.next.state === "late" ? "var(--err)" : "var(--focus)" }}>Prossimo: {j.next.label} →</button>
-              : <div className="mt-1.5 text-[11px] font-semibold md:text-right" style={{ color: "var(--ok)" }}>Tutto in ordine ✓</div>}
+            {!j.next && <div className="mt-1.5 text-[11px] font-semibold md:text-right" style={{ color: "var(--ok)" }}>Tutto in ordine ✓</div>}
           </div>
         )}
       </div>

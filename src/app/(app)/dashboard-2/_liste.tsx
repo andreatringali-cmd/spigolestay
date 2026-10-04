@@ -97,9 +97,7 @@ export function MoveList({ items, empty, kind, date, today, groupByStructure, st
                   <div className="min-w-0 flex-1 sm:max-w-[190px]">
                     <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-dim"><span>{j.done} {t("di")} {j.total}</span><span>{pct}%</span></div>
                     <Bar pct={pct} color={late ? "var(--err)" : pct === 100 ? "var(--ok)" : "var(--focus)"} />
-                    {j.next
-                      ? <button onClick={(e) => { e.stopPropagation(); onStep?.(b, j.next!); }} className="mt-1 block w-full truncate text-left text-[11px] font-semibold hover:underline" style={{ color: j.next.state === "late" ? "var(--err)" : "var(--focus)" }}>{t("Prossimo passo")}: {j.next.label} →</button>
-                      : <div className="mt-1 text-[11px] font-semibold" style={{ color: "var(--ok)" }}>{t("Tutto in ordine")} ✓</div>}
+                    {!j.next && <div className="mt-1 text-[11px] font-semibold" style={{ color: "var(--ok)" }}>{t("Tutto in ordine")} ✓</div>}
                   </div>
                 )}
               </div>
