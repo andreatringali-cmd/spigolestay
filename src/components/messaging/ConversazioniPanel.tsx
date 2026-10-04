@@ -11,6 +11,7 @@ import ChannelLogo from "@/components/ChannelLogo";
 import LinkPreview from "@/components/messaging/LinkPreview";
 import VoiceNote from "@/components/messaging/VoiceNote";
 import { GUIDE_MSG, CHECKIN_MSG, type Lang } from "@/lib/guest-messages";
+import { markThreadSeen } from "@/lib/navbadges";
 import { eur } from "@/lib/format";
 import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
 import { apiPost } from "@/lib/invoicing/client";
@@ -187,6 +188,8 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     return g ? { id: g.id, name: g.fullName, phone: g.phone, email: g.email, struct: "", lastCheckIn: "", b: undefined as Booking | undefined } : null;
   }, [sel, people, guests]);
   const msgs = sel ? threads[sel] ?? [] : [];
+  // Conversazione aperta = messaggi letti (spegne il badge nella barra laterale; vale anche per i messaggi che arrivano mentre è aperta).
+  useEffect(() => { if (sel) markThreadSeen(sel, threads[sel]); }, [sel, threads]);
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [sel, msgs.length]);
 
   // Prenotazione arrivata da Booking.com/Airbnb/Expedia via Channex → id Channex per la chat

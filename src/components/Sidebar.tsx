@@ -9,6 +9,7 @@ import { useAccess } from "@/lib/access";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import UserSwitcher from "./UserSwitcher";
+import { useNavBadges } from "@/lib/navbadges";
 
 // Email del titolare Xenora che vede il link al back-office (l'accesso vero è comunque
 // verificato lato server dalla variabile ADMIN_EMAILS).
@@ -32,6 +33,8 @@ export default function Sidebar({
   const { can, moduleOn } = useAccess();
   const { t } = useLang();
   const { user } = useAuth();
+  const badges = useNavBadges(pathname);
+  const badgeOf = (href: string) => badges[href] ?? 0;
   const isOwner = !!user?.email && OWNER_EMAILS.includes(user.email.toLowerCase());
   // Mostra TUTTE le voci per cui hai i permessi (anche dei piani superiori): quelle non incluse
   // nel piano appaiono col lucchetto e, cliccandole, portano all'attivazione dall'Abbonamento.
@@ -44,6 +47,8 @@ export default function Sidebar({
   const activeGroup = visible.find((n) => n.href === activeHref)?.group ?? GROUPS[0];
   const [open, setOpen] = useState<Record<string, boolean>>({ [activeGroup]: true });
   // Accordion: aprendo un gruppo si chiude quello precedente (uno solo aperto per volta).
+  // Somma dei badge delle voci di un gruppo (si vede sull'intestazione quando il gruppo è chiuso).
+  const groupBadge = (g: string) => visible.filter((n) => n.group === g && !locked(n)).reduce((a, n) => a + badgeOf(n.href), 0);
   const toggleGroup = (g: string) => setOpen((o) => (o[g] ? {} : { [g]: true }));
   return (
     <>
@@ -91,6 +96,7 @@ export default function Sidebar({
                   style={active ? { backgroundColor: mix(color, 16), color } : ({ "--hovc": color } as CSSProperties)}
                 >
                   <Icon name={n.icon} size={20} />
+                  {badgeOf(n.href) > 0 && !isLk && <span className="absolute right-0.5 top-0.5"><NavBadge n={badgeOf(n.href)} small /></span>}
                   {isLk && <span className="absolute right-0 top-0" style={{ color: "var(--txt)" }}><Icon name="lock" size={10} /></span>}
                 </Link>
               );
@@ -112,6 +118,7 @@ export default function Sidebar({
                     >
                       <span style={{ color: active ? color : "var(--dim)" }}><Icon name={n.icon} size={18} /></span>
                       <span className={active ? "font-semibold" : "font-medium"}>{t(n.label)}</span>
+                      {badgeOf(n.href) > 0 && <span className="ml-auto"><NavBadge n={badgeOf(n.href)} /></span>}
                     </Link>
                   );
                 })}
@@ -128,6 +135,7 @@ export default function Sidebar({
                     style={{ color: isOpen ? "var(--focus)" : "var(--dim)", backgroundColor: isOpen ? mix(color, 12) : undefined }}
                   >
                     <span className="flex-1 text-left">{t(group)}</span>
+                    {!isOpen && groupBadge(group) > 0 && <NavBadge n={groupBadge(group)} />}
                     <span className={`transition-transform ${isOpen ? "rotate-90" : ""}`}><Icon name="chevron" size={14} /></span>
                   </button>
                   {isOpen && (
@@ -149,6 +157,7 @@ export default function Sidebar({
                           >
                             <span style={active ? { color } : { color: "var(--faint)" }}><Icon name={n.icon} size={18} /></span>
                             <span className={active ? "font-semibold" : ""}>{t(n.label)}</span>
+                            {badgeOf(n.href) > 0 && !isLk && <span className="ml-auto"><NavBadge n={badgeOf(n.href)} /></span>}
                             {isLk && <span className="ml-auto" style={{ color: "var(--txt)" }} title={t("Non incluso nel piano — attiva dall'Abbonamento")}><Icon name="lock" size={12} /></span>}
                           </Link>
                         );
@@ -174,3 +183,14 @@ export default function Sidebar({
 
 // color-mix con trasparenza.
 const mix = (color: string, pct: number) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
+
+// Piccolo badge rosso con il numero.
+function NavBadge({ n, small }: { n: number; small?: boolean }) {
+  return (
+    <span
+      aria-label={`${n} da vedere`}
+      className={`inline-grid place-items-center rounded-full font-bold leading-none text-white tabular-nums ${small ? "h-[15px] min-w-[15px] px-1 text-[9px]" : "h-[18px] min-w-[18px] px-1.5 text-[10px]"}`}
+      style={{ background: "var(--err)" }}
+    >{n > 99 ? "99+" : n}</span>
+  );
+}
