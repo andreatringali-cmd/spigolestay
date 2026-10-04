@@ -14,6 +14,7 @@ import { bookingCode } from "@/lib/bookingCode";
 import { journeyBucket, journeyOf, isLiveBooking, type JourneyStep, type StepState } from "@/lib/booking-journey";
 import { ChannelWordmark } from "@/components/ChannelLogo";
 import EmptyState from "@/components/EmptyState";
+import { groupSizes, isRealGroup } from "@/lib/groups";
 import { readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import StepActions from "./_azioni";
 
@@ -45,7 +46,8 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
   showStructure: boolean;
 }) {
   const router = useRouter();
-  const { guests, units, roomTypes, getStructure, openBooking } = useData();
+  const { guests, units, roomTypes, getStructure, openBooking, bookings: allBookings } = useData();
+  const gSizes = useMemo(() => groupSizes(allBookings), [allBookings]); // "Gruppo" solo se ci sono almeno 2 camere attive col stesso groupId
   const today = toISO(new Date());
   const [filter, setFilter] = useState("all");
   const [sched, setSched] = useState<SchedRow[]>([]);
@@ -171,7 +173,7 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
                   <h3 className="truncate text-base font-bold text-txt">{guestName(b) || "—"}</h3>
                   <ChannelWordmark channel={b.channel} height={18} title={b.channel === "direct" ? "xenora.it" : CHANNELS[b.channel].label} />
                   <span className="font-mono text-[11px] text-faint">{bookingCode(b)}</span>
-                  {b.groupId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-focus">Gruppo</span>}
+                  {isRealGroup(gSizes, b.groupId) && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-focus">Gruppo · {gSizes.get(b.groupId!)} camere</span>}
                   {b.status === "tentative" && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]">Opzione</span>}
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-dim">

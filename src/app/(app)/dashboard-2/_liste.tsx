@@ -2,6 +2,9 @@
 
 // Liste di Dashboard 2: movimenti del giorno (In struttura / Partenze / Arrivi) e checklist "Da fare oggi".
 // Stessi dati e stessa logica della dashboard attuale; cambia solo la grafica (righe alte con anteprima camera).
+import { useMemo } from "react";
+import { useData } from "@/lib/store";
+import { groupSizes } from "@/lib/groups";
 import { CHANNELS } from "@/lib/types";
 import { parseISO, nights } from "@/lib/dates";
 import { eur } from "@/lib/format";
@@ -20,6 +23,8 @@ export type MoveKind = "arr" | "dep" | "stay";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function MoveList({ items, empty, kind, date, today, groupByStructure, structures, guestName, getStructure, openBooking, alloggiatiOk, payStatus, journeyFor, onStep }: any) {
   const { t } = useLang();
+  const { bookings: allBk } = useData();
+  const gSizes = useMemo(() => groupSizes(allBk), [allBk]);
   if (!items.length) return <EmptyLine icon={kind === "arr" ? "login" : kind === "dep" ? "logout" : "bed"}>{empty}</EmptyLine>;
 
   const PAY: Record<string, [string, string, string]> = {
@@ -69,7 +74,7 @@ export function MoveList({ items, empty, kind, date, today, groupByStructure, st
                 <span className="inline-flex items-center gap-0.5"><Icon name="users" size={12} />{people}</span>
                 <span className="text-faint">·</span>
                 <span>{n} {n === 1 ? t("notte") : t("notti")}</span>
-                {b.groupId && <Pill color="var(--focus)">{t("Gruppo")}</Pill>}
+                {b.groupId && (gSizes.get(b.groupId) ?? 0) > 1 && <Pill color="var(--focus)">{t("Gruppo")}</Pill>}
                 {b.status === "tentative" && <Pill color="var(--warn)">{t("Opzione")}</Pill>}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">

@@ -4,6 +4,7 @@
 // "chi arriva, chi resta, chi parte e cosa manca, camera per camera". Striscia di 7 giorni con contatori,
 // tre colonne (Arrivi / In casa / Partenze) con le schede della vista dettagliata, camere libere e blocchi.
 // Per le prenotazioni usa journeyOf/journeyBucket-style (booking-journey) e la finestra "Risolvi" (StepActions).
+import { groupSizes } from "@/lib/groups";
 import { reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -94,6 +95,7 @@ export default function CalendarioDettaglio() {
   }, [guestById]);
 
   // ── Prenotazioni del periodo con il loro percorso ──
+  const gSizes = useMemo(() => groupSizes(bookings), [bookings]);
   const remLog = useReminderLog(live); // cronologia dei solleciti (da chat)
   const rows = useMemo(() => {
     const out = new Map<string, Row>();
@@ -234,7 +236,7 @@ export default function CalendarioDettaglio() {
             const t = tagFor(r, c.key);
             return (
               <SchedaGiorno
-                key={r.b.id} b={r.b} j={r.j} guestName={guestName(r.b)}
+                key={r.b.id} b={r.b} j={r.j} guestName={guestName(r.b)} groupSize={r.b.groupId ? gSizes.get(r.b.groupId) : undefined}
                 unit={unit} roomType={typeById.get(unit?.roomTypeId ?? r.b.roomTypeId)}
                 structure={getStructure(r.b.structureId)} showStructure={showStructure}
                 tag={t.tag} tagTone={t.tone} avvisi={avvisiFor(r, c.key)}

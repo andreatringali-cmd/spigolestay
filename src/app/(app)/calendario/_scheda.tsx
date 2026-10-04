@@ -19,7 +19,8 @@ const STATE_GLYPH: Record<StepState, string> = { done: "✓", todo: "", late: "!
 const TONE: Record<Avviso["tone"], string> = { err: "var(--err)", warn: "var(--warn)", info: "var(--dim)" };
 const dayLabel = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
 
-export default function SchedaGiorno({ b, j, guestName, unit, roomType, structure, showStructure, tag, tagTone, avvisi, onOpen, onStep }: {
+export default function SchedaGiorno({ groupSize, b, j, guestName, unit, roomType, structure, showStructure, tag, tagTone, avvisi, onOpen, onStep }: {
+  groupSize?: number; // quante camere attive ha il gruppo (il badge compare solo da 2 in su)
   b: Booking;
   j: Journey;
   guestName: string;
@@ -70,7 +71,7 @@ export default function SchedaGiorno({ b, j, guestName, unit, roomType, structur
         <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
           <h3 className="min-w-0 truncate text-base font-bold text-txt">{guestName}</h3>
           <span className="shrink-0"><ChannelWordmark channel={b.channel} height={18} title={b.channel === "direct" ? "xenora.it" : CHANNELS[b.channel].label} /></span>
-          {b.groupId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-focus">Gruppo</span>}
+          {(groupSize ?? 0) > 1 && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-focus">Gruppo · {groupSize} camere</span>}
           {b.status === "tentative" && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]">Opzione</span>}
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-dim">
