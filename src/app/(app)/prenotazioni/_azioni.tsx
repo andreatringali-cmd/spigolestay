@@ -45,6 +45,7 @@ export default function StepActions(p: StepActionsProps) {
   const [res, setRes] = useState<{ ok: boolean; text: string } | null>(null);
   const hist = useReminderLog([b])[b.id] ?? {}; // cronologia dei messaggi già inviati per questa prenotazione
   const lastTs = (k: string) => hist[k]?.[hist[k].length - 1]?.ts;
+  const [force, setForce] = useState<Record<string, boolean>>({}); // invio sbloccato a mano dopo un messaggio recente
   const [amount, setAmount] = useState("");
   const [cfg, setCfg] = useState<{ auto: boolean; ready: boolean } | null>(null);
   const [draftDoc, setDraftDoc] = useState<{ id: string; stato: string } | null | undefined>(undefined); // fattura già creata per questa prenotazione (undefined = in verifica)
@@ -100,11 +101,12 @@ export default function StepActions(p: StepActionsProps) {
       </div>
     );
   };
-  // Se l'ultimo invio è recentissimo chiede conferma prima di mandarne un altro.
-  const okToSend = async (kind: string) => {
+  // Messaggio recentissimo: l'invio resta BLOCCATO finché non lo sblocchi a mano (conferma esplicita).
+  const isRecent = (kind: string) => { const l = lastTs(kind); return !!l && Date.now() - l < REMINDER_COOLDOWN_MS && !force[kind]; };
+  const unlock = async (kind: string) => {
     const last = lastTs(kind);
-    if (!last || Date.now() - last >= REMINDER_COOLDOWN_MS) return true;
-    return ask({ title: "Hai già scritto da poco", message: `L'ultimo messaggio è partito ${agoLabel(last)} (${whenLabel(last)}). Mandarne un altro adesso rischia di infastidire l'ospite. Inviare comunque?`, confirmLabel: "Invia comunque", danger: true });
+    if (!last) return;
+    if (await ask({ title: "Hai già scritto da poco", message: `L'ultimo messaggio è partito ${agoLabel(last)} (${whenLabel(last)}). Mandarne un altro adesso rischia di infastidire l'ospite. Sbloccare l'invio?`, confirmLabel: "Sblocca l'invio", danger: true })) setForce((f) => ({ ...f, [kind]: true }));
   };
 
   // Invio di un testo su WhatsApp o email + registro "inviato".
@@ -118,10 +120,11 @@ export default function StepActions(p: StepActionsProps) {
     <>
     {historyBox(remKind)}
     <div className="flex flex-wrap gap-2">
-      <button className={btnPrimary} style={{ background: "#25D366" }} disabled={!!busy || !hasPhone} title={hasPhone ? "" : "Manca il telefono dell'ospite"} onClick={() => run("wa", async () => { if (!(await okToSend(remKind))) return { ok: false, message: "Invio annullato." }; const m = await build(); return deliver("wa", m.text, m.subject, remKind, after); })}>{busy === "wa" ? "Invio…" : `WhatsApp · ${label}`}</button>
-      <button className={btnPrimary} style={{ background: "var(--focus)" }} disabled={!!busy || !hasMail} title={hasMail ? "" : "Manca l'email dell'ospite"} onClick={() => run("mail", async () => { if (!(await okToSend(remKind))) return { ok: false, message: "Invio annullato." }; const m = await build(); return deliver("mail", m.text, m.subject, remKind, after); })}>{busy === "mail" ? "Invio…" : `Email · ${label}`}</button>
+      <button className={btnPrimary} style={{ background: "#25D366" }} disabled={!!busy || !hasPhone || isRecent(remKind)} title={hasPhone ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca il telefono dell'ospite"} onClick={() => run("wa", async () => { const m = await build(); return deliver("wa", m.text, m.subject, remKind, after); })}>{busy === "wa" ? "Invio…" : `WhatsApp · ${label}`}</button>
+      <button className={btnPrimary} style={{ background: "var(--focus)" }} disabled={!!busy || !hasMail || isRecent(remKind)} title={hasMail ? (isRecent(remKind) ? "Inviato da poco: sbloccalo qui sotto se serve davvero" : "") : "Manca l'email dell'ospite"} onClick={() => run("mail", async () => { const m = await build(); return deliver("mail", m.text, m.subject, remKind, after); })}>{busy === "mail" ? "Invio…" : `Email · ${label}`}</button>
       <button className={btnGhost} disabled={!!busy} onClick={() => run("copy", async () => { const m = await build(); return copy(m.text); })}>Copia testo</button>
     </div>
+    {isRecent(remKind) && <button className="self-start text-xs font-semibold text-[color:var(--err)] underline" onClick={() => void unlock(remKind)}>Invio bloccato: ho scritto da poco. Sblocca comunque</button>}
     </>
   );
 
