@@ -16,7 +16,7 @@ import { toISO, parseISO, nights, addDays } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { journeyOf, isLiveBooking, type JourneyStep } from "@/lib/booking-journey";
-import { readReminders } from "@/lib/guest-messages";
+import { readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import { PageHeader } from "@/components/ui";
 import ScrollStrip from "@/components/ScrollStrip";
 import Donut from "@/components/Donut";
@@ -362,11 +362,13 @@ export default function Dashboard2() {
     return m;
   }, [istat]);
   const docBy = useMemo(() => { const m = new Map<string, string>(); for (const d of docs) if (d.booking_id && d.stato !== "scartata") { const cur = m.get(d.booking_id); if (!cur || cur === "bozza") m.set(d.booking_id, d.stato); } /* un documento emesso batte la bozza */ return m; }, [docs]);
+  const remLog = useReminderLog(bookings); // cronologia dei solleciti (da chat)
   const journeyFor = (b: (typeof bookings)[number]) => isLiveBooking(b) ? journeyOf(b, {
     today: todayISO, guest: guests.find((g) => g.id === b.guestId), structure: getStructure(b.structureId),
     schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
     guideSent: !!rems[b.id]?.guide || (threads[b.guestId] ?? []).some((m) => m.dir === "out" && GUIDE_RE.test(m.text)),
     invoiceStato: docBy.get(b.id),
+    reminderNotes: reminderNotes(remLog[b.id]),
   }) : null;
   // Un passaggio da fare apre "Risolvi"; uno già fatto porta alla pagina di dettaglio.
   const onStep = (b: { id: string }, s: JourneyStep) => {

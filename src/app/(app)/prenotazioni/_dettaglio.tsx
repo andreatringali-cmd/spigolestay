@@ -14,7 +14,7 @@ import { bookingCode } from "@/lib/bookingCode";
 import { journeyBucket, journeyOf, isLiveBooking, type JourneyStep, type StepState } from "@/lib/booking-journey";
 import ChannelLogo from "@/components/ChannelLogo";
 import EmptyState from "@/components/EmptyState";
-import { readReminders } from "@/lib/guest-messages";
+import { readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import StepActions from "./_azioni";
 
 type SchedRow = { booking_id: string | null; stato: string };
@@ -106,6 +106,7 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
     return [...live, ...past];
   }, [bookings, today]);
 
+  const remLog = useReminderLog(ordered); // cronologia dei solleciti (da chat)
   const rows = useMemo(() => ordered.map((b) => {
     const guest = guests.find((g) => g.id === b.guestId);
     const j = isLiveBooking(b) ? journeyOf(b, {
@@ -113,9 +114,10 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
       schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
       guideSent: !!rems[b.id]?.guide || (threads[b.guestId] ?? []).some((m) => m.dir === "out" && GUIDE_RE.test(m.text)),
       invoiceStato: docBy.get(b.id),
+      reminderNotes: reminderNotes(remLog[b.id]),
     }) : null;
     return { b, j, buckets: j ? journeyBucket(b, today, j) : [] };
-  }), [ordered, guests, getStructure, today, schedBy, istatBy, threads, docBy, rems]);
+  }), [ordered, guests, getStructure, today, schedBy, istatBy, threads, docBy, rems, remLog]);
 
   const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.key, f.key === "all" ? rows.length : rows.filter((r) => r.buckets.includes(f.key)).length])), [rows]);
   const shown = filter === "all" ? rows : rows.filter((r) => r.buckets.includes(filter));

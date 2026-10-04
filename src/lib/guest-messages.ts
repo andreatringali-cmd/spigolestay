@@ -1,6 +1,7 @@
 // Messaggi all'ospite condivisi tra la chat e la vista prenotazioni: testi nelle 5 lingue,
 // invio WhatsApp/email e registrazione nella conversazione. Solo lato browser.
 
+import { useCallback, useEffect, useState } from "react";
 import type { Guest } from "./types";
 import { apiPost } from "./invoicing/client";
 
@@ -38,11 +39,12 @@ export const greeting = (lang: Lang, g?: Guest): string => {
 
 const THREADS_KEY = "spigolestay:threads:v1";
 /** Aggiunge un messaggio inviato alla conversazione dell'ospite (così Messaggi lo mostra). */
-export function recordOutgoing(guestId: string, text: string, via: string, wid?: string) {
+export interface SendMeta { bid: string; rem: string } // a quale prenotazione e a quale promemoria appartiene il messaggio
+export function recordOutgoing(guestId: string, text: string, via: string, wid?: string, meta?: SendMeta) {
   try {
     const all = JSON.parse(localStorage.getItem(THREADS_KEY) || "{}") as Record<string, unknown[]>;
     const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `m${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
-    all[guestId] = [...(all[guestId] ?? []), { id, dir: "out", text, ts: Date.now(), via, ...(wid ? { wid, st: "sent" } : {}) }];
+    all[guestId] = [...(all[guestId] ?? []), { id, dir: "out", text, ts: Date.now(), via, ...(meta ? { bid: meta.bid, rem: meta.rem } : {}), ...(wid ? { wid, st: "sent" } : {}) }];
     localStorage.setItem(THREADS_KEY, JSON.stringify(all));
     window.dispatchEvent(new Event("spigolestay:threads"));
   } catch {}
@@ -66,14 +68,14 @@ async function whatsappConnected(): Promise<boolean> {
 export type SendResult = { ok: boolean; how: "api" | "link" | "none"; message: string };
 
 /** WhatsApp: se la Cloud API è collegata invia davvero (e registra in chat); altrimenti apre wa.me col testo pronto. */
-export async function sendWhatsAppToGuest(g: Guest | undefined, text: string): Promise<SendResult> {
+export async function sendWhatsAppToGuest(g: Guest | undefined, text: string, meta?: SendMeta): Promise<SendResult> {
   const digits = (g?.phone ?? "").replace(/\D/g, "");
   if (!g || !digits) return { ok: false, how: "none", message: "L'ospite non ha un numero di telefono." };
   const wa = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
   if (await whatsappConnected()) {
     try {
       const r = await apiPost<{ ok?: boolean; id?: string; message?: string }>("whatsapp/send", { to: digits, text });
-      if (r?.ok !== false) { recordOutgoing(g.id, text, "Prenotazioni", r?.id); return { ok: true, how: "api", message: "Inviato su WhatsApp ✓" }; }
+      if (r?.ok !== false) { recordOutgoing(g.id, text, "WhatsApp", r?.id, meta); return { ok: true, how: "api", message: "Inviato su WhatsApp ✓" }; }
       window.open(wa, "_blank", "noopener");
       return { ok: true, how: "link", message: `${r?.message || "WhatsApp non ha accettato il messaggio (fuori dalle 24 ore?)"} Ho aperto WhatsApp col testo pronto: invialo da lì.` };
     } catch (e) {
@@ -82,11 +84,11 @@ export async function sendWhatsAppToGuest(g: Guest | undefined, text: string): P
     }
   }
   window.open(wa, "_blank", "noopener");
-  recordOutgoing(g.id, text, "Prenotazioni (WhatsApp)");
+  recordOutgoing(g.id, text, "WhatsApp (link)", undefined, meta);
   return { ok: true, how: "link", message: "Ho aperto WhatsApp col testo pronto: premi invio lì per mandarlo." };
 }
 
-export async function sendEmailToGuest(g: Guest | undefined, subject: string, text: string, structure?: { name?: string; email?: string; photoColor?: string }): Promise<SendResult> {
+export async function sendEmailToGuest(g: Guest | undefined, subject: string, text: string, structure?: { name?: string; email?: string; photoColor?: string }, meta?: SendMeta): Promise<SendResult> {
   if (!g?.email) return { ok: false, how: "none", message: "L'ospite non ha un indirizzo email." };
   try {
     const r = await fetch("/api/email", {
@@ -94,7 +96,87 @@ export async function sendEmailToGuest(g: Guest | undefined, subject: string, te
       body: JSON.stringify({ kind: "guest_message", to: g.email, subject, text, accent: structure?.photoColor, booking: { structureName: structure?.name, structureEmail: structure?.email, color: structure?.photoColor } }),
     });
     const j = await r.json().catch(() => ({}));
-    if (r.ok && j?.ok) { recordOutgoing(g.id, text, "Email"); return { ok: true, how: "api", message: "Email inviata ✓" }; }
+    if (r.ok && j?.ok) { recordOutgoing(g.id, text, "Email", undefined, meta); return { ok: true, how: "api", message: "Email inviata ✓" }; }
     return { ok: false, how: "none", message: j?.error || "Email non inviata, riprova." };
   } catch { return { ok: false, how: "none", message: "Email non inviata: connessione assente." }; }
+}
+
+// ── Cronologia dei solleciti ──
+// Ogni messaggio inviato da qui porta con sé la prenotazione (bid) e il tipo di promemoria (rem) dentro la conversazione:
+// la cronologia si ricava dalla chat, quindi è la stessa su ogni dispositivo e non si perde. Si contano anche i link di pagamento
+// e i check-in mandati direttamente dalla chat (riconosciuti dal testo).
+export interface ReminderEntry { ts: number; via: string }
+export type ReminderLog = Record<string, Record<string, ReminderEntry[]>>; // prenotazione → tipo → invii (dal più vecchio)
+type ThreadMsgLite = { dir?: string; text?: string; ts?: number; via?: string; bid?: string; rem?: string };
+
+export function readReminderLog(bookings: { id: string; guestId: string }[]): ReminderLog {
+  const out: ReminderLog = {};
+  let threads: Record<string, ThreadMsgLite[]> = {};
+  try { threads = JSON.parse(localStorage.getItem(THREADS_KEY) || "{}"); } catch {}
+  const legacy = readReminders();
+  const add = (bid: string, kind: string, ts: number, via: string) => { ((out[bid] ??= {})[kind] ??= []).push({ ts, via }); };
+  for (const b of bookings) {
+    for (const m of threads[b.guestId] ?? []) {
+      if (m.dir !== "out" || typeof m.ts !== "number") continue;
+      const via = m.via || "Messaggio";
+      if (m.rem && m.bid === b.id) { add(b.id, m.rem, m.ts, via); continue; }
+      if (m.rem) continue; // appartiene a un'altra prenotazione dello stesso ospite
+      const t = m.text || "";
+      if (t.includes("chat-pay/go")) add(b.id, /tass|tax|taxe|steuer|tasa/i.test(t) ? "pay-tassa" : "pay-saldo", m.ts, via);
+    }
+    // registro vecchio (solo ultimo invio): vale solo dove la chat non ha nulla per quel tipo
+    for (const [kind, ts] of Object.entries(legacy[b.id] ?? {})) if (!(out[b.id]?.[kind]?.length)) add(b.id, kind, ts, "Messaggio");
+    for (const k of Object.keys(out[b.id] ?? {})) out[b.id][k].sort((a, c) => a.ts - c.ts);
+  }
+  return out;
+}
+
+/** Hook: cronologia dei solleciti sempre aggiornata (si ricarica a ogni invio, sync e ritorno sulla scheda). */
+export function useReminderLog(bookings: { id: string; guestId: string }[]): ReminderLog {
+  const [log, setLog] = useState<ReminderLog>({});
+  const key = bookings.map((b) => b.id + b.guestId).join("|");
+  const load = useCallback(() => { setLog(readReminderLog(bookings)); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    load();
+    const ev = ["focus", "spigolestay:datasync", "spigolestay:reminders", "spigolestay:threads"];
+    ev.forEach((e) => window.addEventListener(e, load));
+    return () => ev.forEach((e) => window.removeEventListener(e, load));
+  }, [load]);
+  return log;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+/** "oggi 10:12" · "ieri 18:40" · "3/10 09:05" */
+export function whenLabel(ts: number, now = Date.now()): string {
+  const d = new Date(ts), n = new Date(now);
+  const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const today = new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
+  if (day === today) return `oggi ${hm}`;
+  if (day === today - 86400000) return `ieri ${hm}`;
+  return `${d.getDate()}/${d.getMonth() + 1} ${hm}`;
+}
+/** "5 minuti fa" · "2 ore fa" · "3 giorni fa" */
+export function agoLabel(ts: number, now = Date.now()): string {
+  const m = Math.max(0, Math.round((now - ts) / 60000));
+  if (m < 1) return "adesso";
+  if (m < 60) return `${m} minut${m === 1 ? "o" : "i"} fa`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} or${h === 1 ? "a" : "e"} fa`;
+  const g = Math.round(h / 24);
+  return `${g} giorn${g === 1 ? "o" : "i"} fa`;
+}
+/** Riga breve per le schede: "sollecitato 2 volte · ultimo oggi 10:12" (vuota se mai inviato) */
+export function reminderSummary(list: ReminderEntry[] | undefined, now = Date.now()): string {
+  if (!list?.length) return "";
+  const last = list[list.length - 1];
+  return `inviato ${list.length} ${list.length === 1 ? "volta" : "volte"} · ultimo ${whenLabel(last.ts, now)}`;
+}
+/** Soglia sotto la quale un nuovo invio viene frenato con una conferma (evita messaggi ripetuti). */
+export const REMINDER_COOLDOWN_MS = 60 * 60 * 1000;
+
+/** Note brevi per le schede (una per passaggio) ricavate dalla cronologia di una prenotazione. */
+export function reminderNotes(log: Record<string, ReminderEntry[]> | undefined): Partial<Record<"checkin" | "pay" | "tax" | "guide" | "review", string>> {
+  if (!log) return {};
+  return { checkin: reminderSummary(log.checkin), pay: reminderSummary(log["pay-saldo"]), tax: reminderSummary(log["pay-tassa"]), guide: reminderSummary(log.guide), review: reminderSummary(log.review) };
 }

@@ -12,7 +12,7 @@ import { shortenLink, buildGuestLink, buildGroupGuestLink } from "@/lib/guestlin
 import { chatPayGuestMessage } from "@/lib/chat-pay-core";
 import { bookingPaidTotal } from "@/lib/booking";
 import { googleReviewUrl, reviewRequestMessage } from "@/lib/reviews";
-import { CHECKIN_MSG, GUIDE_MSG, REMINDER_INTRO, greeting, langOf, markReminder, readReminders, sendEmailToGuest, sendWhatsAppToGuest, type SendResult } from "@/lib/guest-messages";
+import { CHECKIN_MSG, GUIDE_MSG, REMINDER_INTRO, greeting, langOf, markReminder, useReminderLog, whenLabel, agoLabel, REMINDER_COOLDOWN_MS, sendEmailToGuest, sendWhatsAppToGuest, type SendResult } from "@/lib/guest-messages";
 import type { Booking, Guest, Structure } from "@/lib/types";
 import type { JourneyStep } from "@/lib/booking-journey";
 import { eur } from "@/lib/format";
@@ -34,7 +34,6 @@ export interface StepActionsProps {
 const btn = "inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:opacity-50";
 const btnPrimary = `${btn} border-transparent text-white hover:opacity-90`;
 const btnGhost = `${btn} border-line bg-surface text-txt hover:border-focus hover:text-focus`;
-const fmtDay = (ts: number) => new Date(ts).toLocaleDateString("it-IT", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
 
 export default function StepActions(p: StepActionsProps) {
   const { b, step, guest, structure } = p;
@@ -44,7 +43,8 @@ export default function StepActions(p: StepActionsProps) {
   const lang = langOf(guest);
   const [busy, setBusy] = useState("");
   const [res, setRes] = useState<{ ok: boolean; text: string } | null>(null);
-  const [rem, setRem] = useState<Record<string, number>>(() => readReminders()[b.id] ?? {});
+  const hist = useReminderLog([b])[b.id] ?? {}; // cronologia dei messaggi già inviati per questa prenotazione
+  const lastTs = (k: string) => hist[k]?.[hist[k].length - 1]?.ts;
   const [amount, setAmount] = useState("");
   const [cfg, setCfg] = useState<{ auto: boolean; ready: boolean } | null>(null);
   const [draftDoc, setDraftDoc] = useState<{ id: string; stato: string } | null | undefined>(undefined); // fattura già creata per questa prenotazione (undefined = in verifica)
@@ -76,28 +76,55 @@ export default function StepActions(p: StepActionsProps) {
     setBusy(key); setRes(null);
     try { const r = await fn(); if (r) setRes({ ok: r.ok, text: r.message }); }
     catch (e) { setRes({ ok: false, text: e instanceof Error ? e.message : "Errore" }); }
-    setBusy(""); setRem(readReminders()[b.id] ?? {});
+    setBusy("");
   };
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const fullCheckin = `${origin}/checkin?b=${encodeURIComponent(b.id)}`;
-  const intro = (kind: string) => (rem[kind] ? REMINDER_INTRO[lang] : "");
+  const intro = (kind: string) => (hist[kind]?.length ? REMINDER_INTRO[lang] : "");
   const copy = async (text: string) => { try { await navigator.clipboard.writeText(text); return { ok: true, message: "Copiato negli appunti ✓" }; } catch { return { ok: false, message: "Copia non riuscita." }; } };
+
+  // Cronologia di ciò che è già stato inviato per questo passaggio (evita di scrivere due volte all'ospite).
+  const historyBox = (kind: string) => {
+    const list = hist[kind] ?? [];
+    if (!list.length) return <p className="rounded-lg border border-dashed border-line px-3 py-2 text-xs text-faint">Nessun messaggio inviato finora per questo passaggio.</p>;
+    const last = list[list.length - 1];
+    const recent = Date.now() - last.ts < REMINDER_COOLDOWN_MS;
+    return (
+      <div className="rounded-lg border border-line bg-paper px-3 py-2">
+        <div className="flex items-center justify-between gap-2 text-xs"><span className="font-semibold text-txt">Messaggi inviati: {list.length}</span><span className="text-dim">ultimo {agoLabel(last.ts)}</span></div>
+        {recent && <div className="mt-1.5 rounded-md px-2 py-1 text-[11px] font-semibold" style={{ color: "var(--warn)", background: "color-mix(in srgb, var(--warn) 14%, transparent)" }}>Hai scritto da poco ({whenLabel(last.ts)}): meglio aspettare prima di rimandare.</div>}
+        <ul className="mt-1.5 flex flex-col gap-0.5 text-[11px] text-dim">
+          {[...list].reverse().slice(0, 6).map((e, i) => <li key={i} className="flex justify-between gap-2"><span>{whenLabel(e.ts)}</span><span className="truncate text-faint">{e.via}</span></li>)}
+          {list.length > 6 && <li className="text-faint">+ altri {list.length - 6} precedenti</li>}
+        </ul>
+      </div>
+    );
+  };
+  // Se l'ultimo invio è recentissimo chiede conferma prima di mandarne un altro.
+  const okToSend = async (kind: string) => {
+    const last = lastTs(kind);
+    if (!last || Date.now() - last >= REMINDER_COOLDOWN_MS) return true;
+    return ask({ title: "Hai già scritto da poco", message: `L'ultimo messaggio è partito ${agoLabel(last)} (${whenLabel(last)}). Mandarne un altro adesso rischia di infastidire l'ospite. Inviare comunque?`, confirmLabel: "Invia comunque", danger: true });
+  };
 
   // Invio di un testo su WhatsApp o email + registro "inviato".
   const deliver = async (via: "wa" | "mail", text: string, subject: string, remKind: string, after?: () => void) => {
-    const r = via === "wa" ? await sendWhatsAppToGuest(guest, text) : await sendEmailToGuest(guest, subject, text, structure);
+    const meta = { bid: b.id, rem: remKind };
+    const r = via === "wa" ? await sendWhatsAppToGuest(guest, text, meta) : await sendEmailToGuest(guest, subject, text, structure, meta);
     if (r.ok) { markReminder(b.id, remKind); after?.(); p.onChanged(); }
     return r;
   };
   const sendButtons = (build: () => Promise<{ text: string; subject: string }>, remKind: string, label: string, after?: () => void) => (
+    <>
+    {historyBox(remKind)}
     <div className="flex flex-wrap gap-2">
-      <button className={btnPrimary} style={{ background: "#25D366" }} disabled={!!busy || !hasPhone} title={hasPhone ? "" : "Manca il telefono dell'ospite"} onClick={() => run("wa", async () => { const m = await build(); return deliver("wa", m.text, m.subject, remKind, after); })}>{busy === "wa" ? "Invio…" : `WhatsApp · ${label}`}</button>
-      <button className={btnPrimary} style={{ background: "var(--focus)" }} disabled={!!busy || !hasMail} title={hasMail ? "" : "Manca l'email dell'ospite"} onClick={() => run("mail", async () => { const m = await build(); return deliver("mail", m.text, m.subject, remKind, after); })}>{busy === "mail" ? "Invio…" : `Email · ${label}`}</button>
+      <button className={btnPrimary} style={{ background: "#25D366" }} disabled={!!busy || !hasPhone} title={hasPhone ? "" : "Manca il telefono dell'ospite"} onClick={() => run("wa", async () => { if (!(await okToSend(remKind))) return { ok: false, message: "Invio annullato." }; const m = await build(); return deliver("wa", m.text, m.subject, remKind, after); })}>{busy === "wa" ? "Invio…" : `WhatsApp · ${label}`}</button>
+      <button className={btnPrimary} style={{ background: "var(--focus)" }} disabled={!!busy || !hasMail} title={hasMail ? "" : "Manca l'email dell'ospite"} onClick={() => run("mail", async () => { if (!(await okToSend(remKind))) return { ok: false, message: "Invio annullato." }; const m = await build(); return deliver("mail", m.text, m.subject, remKind, after); })}>{busy === "mail" ? "Invio…" : `Email · ${label}`}</button>
       <button className={btnGhost} disabled={!!busy} onClick={() => run("copy", async () => { const m = await build(); return copy(m.text); })}>Copia testo</button>
     </div>
+    </>
   );
 
-  const lastLine = (kind: string, what: string) => (rem[kind] ? <p className="text-xs text-dim">{what} il {fmtDay(rem[kind])}</p> : null);
   const guideUrl = () => {
     const group = b.groupId ? bookings.filter((x) => x.groupId === b.groupId) : [b];
     if (group.length > 1) return buildGroupGuestLink({ structureId: b.structureId, guestName: guest?.fullName || "", rooms: group.map((bb) => ({ unitId: bb.unitId, unitCode: getUnit(bb.unitId)?.code || getUnit(bb.unitId)?.name || "", parking: !!bb.parking })) });
@@ -112,7 +139,6 @@ export default function StepActions(p: StepActionsProps) {
     const build = async () => ({ text: `${intro("checkin")}${greeting(lang, guest)}${CHECKIN_MSG[lang](await shortenLink(fullCheckin))}`, subject: `Check-in online${structure?.name ? ` · ${structure.name}` : ""}` });
     body = (<>
       <p className="text-sm text-dim">L'ospite non ha ancora completato il check-in online. Puoi <b>sollecitarlo</b> (riceve il link) oppure <b>compilarlo tu</b> con i suoi dati.</p>
-      {lastLine("checkin", "Ultimo sollecito")}
       {sendButtons(build, "checkin", "Sollecita")}
       <div className="flex flex-wrap gap-2">
         <button className={btnGhost} onClick={() => { const w = window.open(fullCheckin, "_blank"); if (!w) window.location.href = fullCheckin; }}>Compila io (apri il modulo)</button>
@@ -122,7 +148,7 @@ export default function StepActions(p: StepActionsProps) {
   } else if (step.key === "pay" || step.key === "tax") {
     const kind = step.key === "pay" ? "saldo" : "tassa";
     const remKind = `pay-${kind}`;
-    const sent = !!rem[remKind] || (kind === "saldo" && p.paySentInChat);
+    const sent = (hist[remKind]?.length ?? 0) > 0 || (kind === "saldo" && p.paySentInChat);
     const mk = async () => {
       const asked = amount.trim() ? Number(amount.replace(",", ".")) : undefined;
       if (asked !== undefined && (!isFinite(asked) || asked <= 0)) throw new Error("Importo non valido.");
@@ -144,7 +170,7 @@ export default function StepActions(p: StepActionsProps) {
     };
     body = (<>
       <p className="text-sm text-dim">{kind === "saldo" ? `Mancano ${eur(due)} sul soggiorno.` : "La tassa di soggiorno non risulta incassata."} {sent
-        ? <><b>Il link di pagamento è già stato inviato</b>{rem[remKind] ? ` il ${fmtDay(rem[remKind])}` : " in chat"}: l'ospite non ha ancora pagato. Puoi <b>sollecitarlo</b> con un nuovo messaggio.</>
+        ? <><b>Il link di pagamento è già stato inviato</b>{lastTs(remKind) ? ` (${whenLabel(lastTs(remKind)!)})` : " in chat"}: l'ospite non ha ancora pagato. Puoi <b>sollecitarlo</b> con un nuovo messaggio.</>
         : <><b>Non hai ancora mandato il link di pagamento.</b> Invialo adesso: quando l'ospite paga, l'incasso si registra da solo.</>}</p>
       <label className="flex items-center gap-2 text-xs text-dim">Importo (lascia vuoto per tutto il residuo)
         <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder={kind === "saldo" ? eur(due) : "tutta la tassa"} className="w-32 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
@@ -188,7 +214,6 @@ export default function StepActions(p: StepActionsProps) {
     const build = async () => ({ text: `${intro("guide")}${greeting(lang, guest)}${GUIDE_MSG[lang](await shortenLink(guideUrl()))}`, subject: `Guida ospiti${structure?.name ? ` · ${structure.name}` : ""}` });
     body = (<>
       <p className="text-sm text-dim">La guida ospiti (check-in, Wi-Fi, dintorni, codici della camera) non risulta inviata. Mandala adesso all'ospite.</p>
-      {lastLine("guide", "Inviata")}
       {sendButtons(build, "guide", "Invia la guida")}
     </>);
   } else if (step.key === "invoice") {

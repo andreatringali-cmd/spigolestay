@@ -4,6 +4,7 @@
 // "chi arriva, chi resta, chi parte e cosa manca, camera per camera". Striscia di 7 giorni con contatori,
 // tre colonne (Arrivi / In casa / Partenze) con le schede della vista dettagliata, camere libere e blocchi.
 // Per le prenotazioni usa journeyOf/journeyBucket-style (booking-journey) e la finestra "Risolvi" (StepActions).
+import { reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
@@ -93,6 +94,7 @@ export default function CalendarioDettaglio() {
   }, [guestById]);
 
   // ── Prenotazioni del periodo con il loro percorso ──
+  const remLog = useReminderLog(live); // cronologia dei solleciti (da chat)
   const rows = useMemo(() => {
     const out = new Map<string, Row>();
     for (const b of live) {
@@ -102,11 +104,12 @@ export default function CalendarioDettaglio() {
         schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
         guideSent: !!rems[b.id]?.guide || (threads[b.guestId] ?? []).some((m) => m.dir === "out" && GUIDE_RE.test(m.text)),
         invoiceStato: docBy.get(b.id),
+        reminderNotes: reminderNotes(remLog[b.id]),
       });
       out.set(b.id, { b, j });
     }
     return out;
-  }, [live, from, to, today, guestById, getStructure, schedBy, istatBy, rems, threads, docBy]);
+  }, [live, from, to, today, guestById, getStructure, schedBy, istatBy, rems, threads, docBy, remLog]);
 
   const cols = useMemo(() => {
     const pos = (b: Booking) => (b.unitId ? unitPos.get(b.unitId) ?? 9999 : 10000);

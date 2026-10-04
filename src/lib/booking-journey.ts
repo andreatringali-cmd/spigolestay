@@ -16,6 +16,7 @@ export interface JourneyCtx {
   istat?: "pending" | "sent" | "none";
   guideSent: boolean;                              // guida ospiti già inviata in chat
   invoiceStato?: string;                           // stato del documento fiscale collegato (se esiste)
+  reminderNotes?: Partial<Record<"checkin" | "pay" | "tax" | "guide" | "review", string>>; // "inviato 2 volte · ultimo oggi 10:12", dalla cronologia dei solleciti
 }
 
 const expectedPax = (b: Booking) => Math.max(1, (b.adults ?? 1) + (b.children ?? 0));
@@ -34,6 +35,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   const departed = b.checkOut < c.today;
   const arrivesIn = daysTo(b.checkIn, c.today);
   const g = c.guest;
+  const note = (k: "checkin" | "pay" | "tax" | "guide" | "review") => (c.reminderNotes?.[k] ? ` · ${c.reminderNotes[k]}` : "");
 
   // 1 · Check-in online (dati di tutti gli ospiti)
   const exp = expectedPax(b), dec = declaredPax(b);
@@ -41,7 +43,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   steps.push({
     key: "checkin", label: "Check-in", href: "/adempimenti",
     state: complete ? "done" : arrived ? "late" : "todo",
-    detail: complete ? `Dati completi (${dec}/${exp})` : dec > 0 ? `Mancano dati: ${dec}/${exp} ospiti` : "L'ospite non ha ancora compilato",
+    detail: complete ? `Dati completi (${dec}/${exp})` : `${dec > 0 ? `Mancano dati: ${dec}/${exp} ospiti` : "L'ospite non ha ancora compilato"}${note("checkin")}`,
   });
 
   // 2 · Pagamento
@@ -52,7 +54,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   else steps.push({
     key: "pay", label: "Pagamento", href: "/pagamenti",
     state: resid <= 0.005 ? "done" : b.checkIn < c.today ? "late" : "todo",
-    detail: resid <= 0.005 ? `Saldato ${eurRound(due)}` : paid > 0 ? `Incassati ${eurRound(paid)} · mancano ${eurRound(resid)}` : `Da incassare ${eurRound(resid)}`,
+    detail: resid <= 0.005 ? `Saldato ${eurRound(due)}` : `${paid > 0 ? `Incassati ${eurRound(paid)} · mancano ${eurRound(resid)}` : `Da incassare ${eurRound(resid)}`}${note("pay")}`,
   });
 
   // 3 · Tassa di soggiorno (solo se la struttura la applica)
@@ -60,7 +62,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   if (tax > 0) steps.push({
     key: "tax", label: "Tassa soggiorno", href: "/tassa-soggiorno",
     state: b.cityTaxPaid ? "done" : departed ? "late" : "todo",
-    detail: b.cityTaxPaid ? `Incassata ${eurRound(tax)}` : `Da incassare ${eurRound(tax)}`,
+    detail: b.cityTaxPaid ? `Incassata ${eurRound(tax)}` : `Da incassare ${eurRound(tax)}${note("tax")}`,
   });
 
   // 4 · Schedina Alloggiati Web (Questura): entro 24 ore dall'arrivo
@@ -81,7 +83,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
 
   // 6 · Guida ospiti (utile prima dell'arrivo)
   if (c.guideSent) steps.push({ key: "guide", label: "Guida ospiti", state: "done", detail: "Inviata in chat", href: "/messaggi" });
-  else if (!departed) steps.push({ key: "guide", label: "Guida ospiti", href: "/messaggi", state: arrivesIn <= 0 ? "late" : "todo", detail: arrivesIn <= 1 ? "Non ancora inviata" : "Da inviare prima dell'arrivo" });
+  else if (!departed) steps.push({ key: "guide", label: "Guida ospiti", href: "/messaggi", state: arrivesIn <= 0 ? "late" : "todo", detail: `${arrivesIn <= 1 ? "Non ancora inviata" : "Da inviare prima dell'arrivo"}${note("guide")}` });
 
   // 7 · Fattura / ricevuta (se richiesta dall'ospite, in bozza o già emessa)
   const issued = !!b.invoiceNo || (!!c.invoiceStato && c.invoiceStato !== "bozza");
@@ -102,7 +104,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   if (departed || b.checkOut === c.today) steps.push({
     key: "review", label: "Recensione", href: "/recensioni",
     state: b.reviewRequestedAt ? "done" : departed ? "todo" : "na",
-    detail: b.reviewRequestedAt ? "Richiesta inviata" : departed ? "Da richiedere" : "Dopo la partenza",
+    detail: b.reviewRequestedAt ? "Richiesta inviata" : departed ? `Da richiedere${note("review")}` : "Dopo la partenza",
   });
 
   const relevant = steps.filter((s) => s.state !== "na");
