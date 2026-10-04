@@ -101,6 +101,20 @@ export default function CamereDettaglio({ structure, types, units, totalUnits, s
   };
   const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.key, rows.filter((r) => match(r, f.key)).length])) as Record<FilterKey, number>, [rows]);
   const shown = rows.filter((r) => match(r, filter));
+  // Gruppi per tipologia (nell'ordine delle tipologie). Una tipologia senza camere resta visibile solo senza filtri né ricerca.
+  const groups = useMemo(() => {
+    const noFilter = filter === "all" && units.length === totalUnits;
+    const list = types.map((rt, i) => ({
+      key: rt.id, rt: rt as RoomType | undefined, color: rt.color ?? AV_COLORS[i % AV_COLORS.length],
+      rows: shown.filter((r) => r.rt?.id === rt.id),
+      total: rows.filter((r) => r.rt?.id === rt.id).length,
+      freeNow: rows.filter((r) => r.rt?.id === rt.id && r.snap.stato.kind === "free").length,
+    }));
+    const orphans = shown.filter((r) => !r.rt);
+    if (orphans.length) list.push({ key: "none", rt: undefined, color: "var(--line)", rows: orphans, total: orphans.length, freeNow: orphans.filter((r) => r.snap.stato.kind === "free").length });
+    return list.filter((g) => g.rows.length > 0 || (noFilter && g.rt && !g.rt.deriveFrom));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [types, shown, rows, filter, units.length, totalUnits]);
 
   // ── Azioni ──
   const pickPhoto = (u: Unit) => { photoTarget.current = u.id; fileRef.current?.click(); };
@@ -136,6 +150,10 @@ export default function CamereDettaglio({ structure, types, units, totalUnits, s
     else if (a === "calendar") router.push("/calendario");
   };
 
+  const riga = (r: Row) => <RigaCamera key={r.u.id} r={r} today={today} structure={structure} showStructure={showStructure} highlight={highlight === r.u.id}
+          onEdit={() => onEdit(r.u)} onPhoto={() => pickPhoto(r.u)} onOos={() => (r.u.outOfService ? backInService(r.u) : setOosFor(r.u.id))}
+          onNew={() => newBooking(r)} onCalendar={() => router.push("/calendario")} onFlag={(a) => run(r, a)} />;
+
   const oosRow = oosFor ? rows.find((r) => r.u.id === oosFor) : undefined;
   const codeRow = codeFor ? rows.find((r) => r.u.id === codeFor) : undefined;
   const rateRow = rateFor ? rows.find((r) => r.u.id === rateFor) : undefined;
@@ -156,10 +174,35 @@ export default function CamereDettaglio({ structure, types, units, totalUnits, s
       </div>
       {msg && <div role="status" className="mb-3 rounded-lg border border-line bg-wash px-3 py-2 text-xs font-medium text-txt">{msg}</div>}
 
-      <div className="flex flex-col gap-3">
-        {shown.map((r) => <RigaCamera key={r.u.id} r={r} today={today} structure={structure} showStructure={showStructure} highlight={highlight === r.u.id}
-          onEdit={() => onEdit(r.u)} onPhoto={() => pickPhoto(r.u)} onOos={() => (r.u.outOfService ? backInService(r.u) : setOosFor(r.u.id))}
-          onNew={() => newBooking(r)} onCalendar={() => router.push("/calendario")} onFlag={(a) => run(r, a)} />)}
+      {/* Camere divise per tipologia: ogni tipologia ha la sua testata (prezzo, letti, ospiti, libere stasera) e sotto le sue camere */}
+      <div className="flex flex-col gap-8">
+        {groups.map((g) => (
+          <section key={g.key}>
+            <button
+              onClick={() => { if (g.rt) router.push(`/camere/tipologia/${g.rt.id}`); }} disabled={!g.rt}
+              className="group flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-line bg-surface p-3 text-left shadow-sm transition hover:border-focus hover:shadow-md disabled:cursor-default disabled:hover:border-line"
+            >
+              <span aria-hidden className="h-10 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: g.color }} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-display text-lg font-bold text-txt">{g.rt?.name ?? "Senza tipologia"}</span>
+                <span className="mt-1 flex flex-wrap gap-1.5">
+                  <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">{g.total} {g.total === 1 ? "camera" : "camere"}</span>
+                  {g.total > 0 && <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: g.freeNow > 0 ? "var(--ok)" : "var(--dim)", background: `color-mix(in srgb, ${g.freeNow > 0 ? "var(--ok)" : "var(--faint)"} 14%, transparent)` }}>{g.freeNow} {g.freeNow === 1 ? "libera" : "libere"} oggi</span>}
+                  {g.rt && <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{g.rt.beds} letti</span>}
+                  {g.rt?.maxOccupancy ? <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">max {g.rt.maxOccupancy} ospiti</span> : null}
+                  {g.rt?.size ? <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-dim">{g.rt.size} m²</span> : null}
+                  {g.rt?.bedConfig ? <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] text-faint">{g.rt.bedConfig}</span> : null}
+                </span>
+              </span>
+              {g.rt && <span className="text-right"><span className="font-mono text-lg font-bold text-txt">{eur(g.rt.basePrice)}</span><span className="text-[10px] text-faint"> /notte</span></span>}
+              {g.rt && <span className="text-xs font-semibold text-focus opacity-0 transition group-hover:opacity-100">Apri scheda →</span>}
+            </button>
+            {g.rows.length > 0
+              ? <div className="mt-3 flex flex-col gap-3">{g.rows.map(riga)}</div>
+              : <div className="mt-3 rounded-xl border border-dashed border-line px-4 py-4 text-sm text-faint">Nessuna camera in questa tipologia.</div>}
+          </section>
+        ))}
+        {/* nessun risultato */}
         {shown.length === 0 && (
           <div className="rounded-xl border border-dashed border-line">
             {rows.length === 0
