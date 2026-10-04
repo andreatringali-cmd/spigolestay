@@ -12,7 +12,7 @@ import { bookingPaidTotal, commissionOf } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { bookingCode } from "@/lib/bookingCode";
 import { journeyBucket, journeyOf, isLiveBooking, type JourneyStep, type StepState } from "@/lib/booking-journey";
-import ChannelLogo from "@/components/ChannelLogo";
+import { ChannelWordmark } from "@/components/ChannelLogo";
 import EmptyState from "@/components/EmptyState";
 import { readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import StepActions from "./_azioni";
@@ -169,7 +169,7 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                   <h3 className="truncate text-base font-bold text-txt">{guestName(b) || "—"}</h3>
-                  <ChannelLogo channel={b.channel} size={16} title={b.channel === "direct" ? "xenora.it" : CHANNELS[b.channel].label} />
+                  <ChannelWordmark channel={b.channel} height={18} title={b.channel === "direct" ? "xenora.it" : CHANNELS[b.channel].label} />
                   <span className="font-mono text-[11px] text-faint">{bookingCode(b)}</span>
                   {b.groupId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-focus">Gruppo</span>}
                   {b.status === "tentative" && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]">Opzione</span>}

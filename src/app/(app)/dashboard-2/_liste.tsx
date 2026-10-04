@@ -8,7 +8,7 @@ import { eur } from "@/lib/format";
 import { bookingCode } from "@/lib/bookingCode";
 import type { JourneyStep } from "@/lib/booking-journey";
 import { useLang } from "@/lib/i18n";
-import ChannelLogo from "@/components/ChannelLogo";
+import { ChannelWordmark } from "@/components/ChannelLogo";
 import Icon from "@/components/Icon";
 import { Bar, DotPill, EmptyLine, Panel, PanelHead, Pill, RoomThumb, StructureLabel, daysFrom, tint } from "./_ui";
 
@@ -61,7 +61,7 @@ export function MoveList({ items, empty, kind, date, today, groupByStructure, st
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h4 className="min-w-0 flex-1 truncate text-[15px] font-bold text-txt">{guestName(b.guestId)}</h4>
-                {b.channel !== "blocked" && <ChannelLogo channel={b.channel} size={18} title={ch.label} />}
+                {b.channel !== "blocked" && <ChannelWordmark channel={b.channel} height={18} title={ch.label} />}
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-dim">
                 <span className="font-mono text-[11px] text-faint">{bookingCode(b)}</span>

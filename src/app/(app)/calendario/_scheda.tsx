@@ -9,7 +9,7 @@ import { parseISO, nights } from "@/lib/dates";
 import { bookingPaidTotal } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { type JourneyStep, type StepState, type journeyOf } from "@/lib/booking-journey";
-import ChannelLogo from "@/components/ChannelLogo";
+import { ChannelWordmark } from "@/components/ChannelLogo";
 
 export type Journey = ReturnType<typeof journeyOf>;
 export interface Avviso { key: string; label: string; tone: "err" | "warn" | "info"; title?: string }
@@ -69,7 +69,7 @@ export default function SchedaGiorno({ b, j, guestName, unit, roomType, structur
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
           <h3 className="min-w-0 truncate text-base font-bold text-txt">{guestName}</h3>
-          <span className="shrink-0"><ChannelLogo channel={b.channel} size={16} title={b.channel === "direct" ? "xenora.it" : CHANNELS[b.channel].label} /></span>
+          <span className="shrink-0"><ChannelWordmark channel={b.channel} height={18} title={b.channel === "direct" ? "xenora.it" : CHANNELS[b.channel].label} /></span>
           {b.groupId && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-focus">Gruppo</span>}
           {b.status === "tentative" && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]">Opzione</span>}
         </div>
