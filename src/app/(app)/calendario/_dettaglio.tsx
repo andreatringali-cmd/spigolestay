@@ -87,7 +87,7 @@ export default function CalendarioDettaglio() {
   const winDays = useMemo(() => daysBetween(winStart, shiftISO(winStart, 6)), [winStart]);
   const from = mode === "day" ? sel : winDays[0];
   const to = mode === "day" ? sel : winDays[6];
-  const stripDays = useMemo(() => winDays.map((iso) => ({ iso, stats: dayStats(iso, live, busy, activeUnits, cleanDone) })), [winDays, live, busy, activeUnits, cleanDone]);
+  const stripDays = useMemo(() => winDays.map((iso) => ({ iso, stats: dayStats(iso, live, busy, activeUnits, cleanDone, scopedUnits.filter((u) => u.outOfService).length) })), [winDays, live, busy, activeUnits, cleanDone, scopedUnits]);
 
   const guestName = useCallback((b: Booking) => {
     const g = guestById.get(b.guestId);

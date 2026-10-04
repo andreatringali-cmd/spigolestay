@@ -16,11 +16,11 @@ export function daysBetween(from: string, to: string): string[] {
   return out;
 }
 
-export interface DayStats { arrivals: number; departures: number; stay: number; free: number; totalUnits: number; clean: number; cleanDone: number }
+export interface DayStats { arrivals: number; departures: number; stay: number; free: number; totalUnits: number; clean: number; cleanDone: number; closed: number /* camere chiuse: fuori servizio + bloccate quella notte */ }
 
 // `live`: prenotazioni vere (no blocchi/annullate/no-show) in scope. `busy`: tutte quelle che occupano, blocchi inclusi.
 // `activeUnits`: camere in servizio in scope.
-export function dayStats(day: string, live: Booking[], busy: Booking[], activeUnits: Unit[], cleanDone: Record<string, boolean>): DayStats {
+export function dayStats(day: string, live: Booking[], busy: Booking[], activeUnits: Unit[], cleanDone: Record<string, boolean>, outOfServiceCount = 0): DayStats {
   const occ = new Set<string>();
   for (const b of busy) if (b.unitId && nightOf(b, day)) occ.add(b.unitId);
   const unassigned = live.filter((b) => !b.unitId && nightOf(b, day)).length;
@@ -29,7 +29,11 @@ export function dayStats(day: string, live: Booking[], busy: Booking[], activeUn
   const cleanUnits = new Set<string>();
   const active = new Set(activeUnits.map((u) => u.id));
   for (const b of live) if (b.unitId && active.has(b.unitId) && b.checkIn <= day && day <= b.checkOut) cleanUnits.add(b.unitId);
+  // Camere chiuse nella notte: quelle fuori servizio (sempre) più quelle in servizio con un blocco a date.
+  const blockedUnits = new Set<string>();
+  for (const b of busy) if (isBlock(b) && b.unitId && active.has(b.unitId) && nightOf(b, day)) blockedUnits.add(b.unitId);
   return {
+    closed: outOfServiceCount + blockedUnits.size,
     arrivals: live.filter((b) => b.checkIn === day).length,
     departures: live.filter((b) => b.checkOut === day).length,
     stay: live.filter((b) => b.checkIn < day && day < b.checkOut).length,

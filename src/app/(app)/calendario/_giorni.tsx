@@ -86,7 +86,13 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
                     </span>
                   );
                 })}
-                {MOVES.every((k) => valueOf(stats, k.key) === 0) && <span className="py-1 text-[11px] text-faint">Nessun movimento</span>}
+                {stats.closed > 0 && (
+                  <span className="inline-flex items-center justify-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums sm:px-2 sm:text-xs" style={{ color: "var(--dim)", background: "color-mix(in srgb, var(--faint) 22%, transparent)" }} title={`${stats.closed} ${stats.closed === 1 ? "camera chiusa o fuori servizio" : "camere chiuse o fuori servizio"}`}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+                    <span>{stats.closed}</span><span className="hidden sm:inline">{stats.closed === 1 ? "chiusa" : "chiuse"}</span>
+                  </span>
+                )}
+                {MOVES.every((k) => valueOf(stats, k.key) === 0) && stats.closed === 0 && <span className="py-1 text-[11px] text-faint">Nessun movimento</span>}
               </span>
               <span className="mt-1 block truncate border-t border-line pt-1.5 text-[10px] text-faint sm:text-[11px]" title={`Camere libere nella notte: ${stats.free} su ${stats.totalUnits} · Pulizie${stats.cleanDone > 0 ? ` fatte ${stats.cleanDone} su ${stats.clean}` : `: ${stats.clean}`}`}>
                 <b className="font-semibold text-dim">{stats.free}</b> libere · <b className="font-semibold text-dim">{stats.cleanDone > 0 ? `${stats.cleanDone}/${stats.clean}` : stats.clean}</b> pulizie

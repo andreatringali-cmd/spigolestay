@@ -8,7 +8,7 @@ import { useData } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { CHANNELS, type Booking } from "@/lib/types";
 import { parseISO, toISO, nights } from "@/lib/dates";
-import { bookingPaidTotal, commissionOf } from "@/lib/booking";
+import { bookingPaidTotal } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { bookingCode } from "@/lib/bookingCode";
 import { journeyBucket, journeyOf, isLiveBooking, type JourneyStep, type StepState } from "@/lib/booking-journey";
@@ -17,6 +17,7 @@ import EmptyState from "@/components/EmptyState";
 import { groupSizes, isRealGroup } from "@/lib/groups";
 import { readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import StepActions from "./_azioni";
+import BookingAmounts from "@/components/BookingAmounts";
 
 type SchedRow = { booking_id: string | null; stato: string };
 type IstatRow = { booking_id: string | null; stato: string };
@@ -143,7 +144,6 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
           const arrivesIn = Math.round((Date.parse(b.checkIn) - Date.parse(today)) / 86400000);
           const live = isLiveBooking(b);
           const total = bookingPaidTotal(b);
-          const resid = Math.max(0, total - (b.paid ?? 0));
           const people = b.adults + b.children;
           const when = !live ? (b.status === "no_show" ? "No-show" : b.status === "cancelled" ? "Cancellata" : "") :
             b.checkOut < today ? "Partita" :
@@ -207,11 +207,11 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
               </div>
 
               {/* Importi e avanzamento */}
-              <div className="flex shrink-0 flex-row items-center justify-between gap-3 border-t border-line pt-2 md:w-44 md:flex-col md:items-end md:justify-between md:border-l md:border-t-0 md:pl-4 md:pt-0">
+              <div className="flex shrink-0 flex-col gap-3 border-t border-line pt-2 md:w-60 md:justify-between md:border-l md:border-t-0 md:pl-4 md:pt-0">
                 <div className="md:text-right">
                   <div className="font-mono text-lg font-bold text-txt">{total ? eur(total) : "—"}</div>
-                  <div className="text-[11px] text-faint">{total ? (resid <= 0.005 ? "Saldato" : `Mancano ${eur(resid)}`) : ""}{commissionOf(b) ? ` · comm. ${eur(commissionOf(b))}` : ""}</div>
                 </div>
+                <BookingAmounts b={b} structure={st} />
                 {j && j.total > 0 && (
                   <div className="min-w-[110px] md:w-full">
                     <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-dim"><span>{j.done} di {j.total}</span><span>{pct}%</span></div>
