@@ -76,7 +76,17 @@ export default function TipologiaSchedaPage() {
     else { updateRoomType(params.id, patch); addActivity("config", `Tipologia modificata — ${f.name!.trim()}`); }
     router.push("/camere");
   };
-  const remove = async () => { if (existing && (await ask({ title: t("Elimina tipologia"), message: `${t("Eliminare la tipologia")} "${existing.name}" ${t("e le sue")} ${nUnits} ${t("camere?")}`, danger: true, confirmLabel: t("Elimina") }))) { deleteRoomType(existing.id); router.push("/camere"); } };
+  const remove = async () => {
+    if (!existing) return;
+    // Eliminare una tipologia cancellerebbe anche le sue prenotazioni (storico e incassi): si blocca finché ce ne sono.
+    const unitIdsOfType = new Set(units.filter((u) => u.roomTypeId === existing.id).map((u) => u.id));
+    const nBookings = bookings.filter((b) => b.roomTypeId === existing.id || (b.unitId && unitIdsOfType.has(b.unitId))).length;
+    if (nBookings > 0) {
+      await ask({ title: t("Tipologia con prenotazioni"), message: `"${existing.name}" ${t("ha")} ${nBookings} ${t("prenotazioni (anche passate o pagate): eliminarla le cancellerebbe tutte. Sposta le prenotazioni su un'altra tipologia, oppure disattiva la tipologia dalla vendita.")}`, confirmLabel: t("Ho capito") });
+      return;
+    }
+    if ((await ask({ title: t("Elimina tipologia"), message: `${t("Eliminare la tipologia")} "${existing.name}" ${t("e le sue")} ${nUnits} ${t("camere?")}`, danger: true, confirmLabel: t("Elimina") }))) { deleteRoomType(existing.id); router.push("/camere"); }
+  };
 
   // Imposta il numero esatto di camere della tipologia: crea o rimuove le unità per arrivare al totale.
   const [targetRooms, setTargetRooms] = useState<string>(String(nUnits || 1));

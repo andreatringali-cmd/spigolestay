@@ -143,8 +143,11 @@ export function importIcsEvents(events: IcsEvent[], opts: IcsImportOpts, ctx: Ic
   const forced = targetUnit ? units.find((u) => u.id === targetUnit && u.structureId === structureId) : null;
 
   // Sostituisci import precedenti (solo file): elimina le prenotazioni già importate per non duplicarle.
+  // Si sostituiscono SOLO le prenotazioni create da un precedente import di file/calendario: mai quelle che arrivano
+  // da Channex, dal sito, da Stripe o da Octorate (hanno un extId con prefisso), né quelle inserite a mano.
+  const foreignExt = (x?: string) => /^(channex|site|stripe|octorate):/.test(x || "");
   const del = replacePrev
-    ? bookings.filter((b) => (forced ? b.unitId === forced.id : b.structureId === structureId) && (b.extId || (b.note || "").includes("Importato da")))
+    ? bookings.filter((b) => (forced ? b.unitId === forced.id : b.structureId === structureId) && (b.note || "").includes("Importato da") && !foreignExt(b.extId))
     : [];
   const delIds = new Set(del.map((b) => b.id));
   del.forEach((b) => deleteBooking(b.id));

@@ -74,7 +74,7 @@ export default function ImportaPage() {
   const [propertyFilter, setPropertyFilter] = useState(""); // "" = tutte le righe; altrimenti solo la struttura del file scelta (export Octorate con più strutture)
   const [reassign, setReassign] = useState(false); // rifà da zero le camere delle prenotazioni già importate che non sono ancora finite
   const [futureOnly, setFutureOnly] = useState(true); // importa solo le prenotazioni con partenza da oggi in poi (lo storico non serve)
-  const [replacePrev, setReplacePrev] = useState(true);
+  const [replacePrev, setReplacePrev] = useState(false); // di default NON si cancella nulla: la sostituzione va scelta di proposito
   const [targetUnit, setTargetUnit] = useState<string>(""); // "" = auto per tipologia; altrimenti id camera specifica
   const [roomMap, setRoomMap] = useState<Record<string, string>>({}); // nome camera ICS -> id tipologia (o "__new__")
   const [unitMap, setUnitMap] = useState<Record<string, string>>({}); // nome camera CSV (Octorate) -> id camera Xenora (o "__new__")

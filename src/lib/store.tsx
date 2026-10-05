@@ -290,7 +290,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // 2) Salvataggio ad ogni cambiamento, solo dopo il caricamento iniziale.
   useEffect(() => {
     if (!ready || isPublicMode()) return; // in pubblico non si scrive nel browser del visitatore
-    try { localStorage.setItem(KEY, JSON.stringify({ structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews, _deleted: deletedRef.current, _deletedLeads: deletedLeadsRef.current })); } catch {}
+    try { localStorage.setItem(KEY, JSON.stringify({ structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews, _deleted: deletedRef.current, _deletedLeads: deletedLeadsRef.current })); } catch { try { window.dispatchEvent(new Event("xenora:storage-full")); } catch { /* ambiente senza window */ } }
   }, [ready, structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews]);
 
   // Ri-idratazione IN-PLACE: quando la sincronizzazione col server aggiorna i dati (anche solo
