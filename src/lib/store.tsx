@@ -76,6 +76,7 @@ interface DataContextValue {
   addGuest: (g: { fullName?: string; firstName?: string; lastName?: string; email?: string; phone?: string; country?: string }) => string;
   updateGuest: (id: string, patch: Partial<Guest>) => void;
   deleteGuest: (id: string) => void;
+  mergeGuestGroups: (groups: { keepId: string; dropIds: string[]; patch?: Partial<Guest> }[]) => void; // unisce molti gruppi di doppioni in un colpo solo (una sola voce nel registro)
   mergeGuests: (keepId: string, dropIds: string[]) => void; // accorpa doppioni: sposta le prenotazioni e rimuove le voci duplicate
   addBooking: (b: Omit<Booking, "id">) => Booking;
   updateBooking: (id: string, patch: Partial<Booking>) => void;
@@ -486,6 +487,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (g && !hasRealBooking) tombLeadContact(g);
         setBookings((prev) => prev.map((b) => (b.guestId === id ? { ...b, guestId: "", primaryGuest: b.primaryGuest ?? snap } : b)));
         setGuests((prev) => prev.filter((x) => x.id !== id));
+      },
+      mergeGuestGroups: (groups) => {
+        const dropToKeep = new Map<string, string>();
+        const patches = new Map<string, Partial<Guest>>();
+        for (const g of groups) {
+          for (const d of g.dropIds) if (d && d !== g.keepId) dropToKeep.set(d, g.keepId);
+          if (g.patch) patches.set(g.keepId, g.patch);
+        }
+        if (dropToKeep.size === 0) return;
+        const now = Date.now();
+        tomb("guests", ...dropToKeep.keys());
+        setBookings((prev) => prev.map((b) => (dropToKeep.has(b.guestId) ? { ...b, guestId: dropToKeep.get(b.guestId)!, updatedAt: now } : b)));
+        setGuests((prev) => prev.filter((g) => !dropToKeep.has(g.id)).map((g) => (patches.has(g.id) ? { ...g, ...patches.get(g.id), updatedAt: now } : g)));
+        logAct("config", `Anagrafica: ${dropToKeep.size} doppioni uniti in ${groups.length} schede`);
       },
       mergeGuests: (keepId, dropIds) => {
         const drop = new Set(dropIds.filter((d) => d && d !== keepId));

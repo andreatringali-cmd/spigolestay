@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { guestKey } from "@/lib/guest-key";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { AV_COLORS, initials } from "@/lib/users";
@@ -25,31 +26,28 @@ type SortKey = "name" | "stays" | "nights" | "avg" | "spent" | "comm" | "last";
 export default function OspitiPage() {
   const router = useRouter();
   const { t } = useLang();
-  const { guests, bookings, structures, activeStructureId, mergeGuests, updateGuest, deleteGuest } = useData();
-  // Rileva doppioni SOLO su un contatto forte (stessa email o stesso telefono): due omonimi
-  // senza contatto NON vengono mai uniti (rischio di fondere persone diverse).
+  const { guests, bookings, structures, activeStructureId, mergeGuestGroups, updateGuest, deleteGuest } = useData();
+  // Doppioni = stessa persona con più schede: stessa email, stesso telefono oppure (solo se non c'è nessun contatto) stesso nome e paese.
+  // Una scheda per ospite, con dentro tutto lo storico delle prenotazioni.
   const dupGroups = useMemo(() => {
-    const nrm = (s?: string) => (s ?? "").trim().toLowerCase();
-    // Confronta solo le ultime 9 cifre: ignora differenze di prefisso internazionale (+39/0039) o trunk (0).
-    const nrmPhone = (s?: string) => { const d = (s ?? "").replace(/\D/g, ""); return d.length >= 9 ? d.slice(-9) : ""; };
     const byKey = new Map<string, typeof guests>();
-    guests.forEach((g) => { const key = nrm(g.email) || (nrmPhone(g.phone) ? "tel:" + nrmPhone(g.phone) : ""); if (!key) return; const arr = byKey.get(key) ?? []; arr.push(g); byKey.set(key, arr); });
+    guests.forEach((g) => { const key = guestKey(g); if (!key) return; const arr = byKey.get(key) ?? []; arr.push(g); byKey.set(key, arr); });
     return [...byKey.values()].filter((a) => a.length > 1);
   }, [guests]);
   const dupCount = dupGroups.reduce((a, g) => a + g.length - 1, 0);
-  // Unisce i doppioni in automatico: all'apertura e ogni volta che ne compaiono di nuovi
-  // (es. dopo un import). Tiene la voce con più prenotazioni e completa i campi mancanti.
+  // Li unisce in automatico, in un solo passaggio: all'apertura e quando ne compaiono di nuovi (es. dopo un import).
+  // Tiene la scheda con più prenotazioni e completa i campi mancanti con quelli delle altre.
   useEffect(() => {
     if (dupCount === 0) return;
     const fields = ["email", "phone", "country", "firstName", "lastName", "birthDate", "birthPlace", "citizenship", "docType", "docNumber", "docPlace", "address"] as const;
-    dupGroups.forEach((group) => {
-      const bookCount = (id: string) => bookings.filter((b) => b.guestId === id).length;
-      const keeper = [...group].sort((a, b) => bookCount(b.id) - bookCount(a.id))[0];
-      const merged: Record<string, unknown> = { ...keeper };
-      group.forEach((g) => fields.forEach((k) => { if (!merged[k] && g[k]) merged[k] = g[k]; }));
-      updateGuest(keeper.id, merged);
-      mergeGuests(keeper.id, group.filter((g) => g.id !== keeper.id).map((g) => g.id));
-    });
+    const cnt = new Map<string, number>();
+    bookings.forEach((b) => cnt.set(b.guestId, (cnt.get(b.guestId) ?? 0) + 1));
+    mergeGuestGroups(dupGroups.map((group) => {
+      const keeper = [...group].sort((x, y) => (cnt.get(y.id) ?? 0) - (cnt.get(x.id) ?? 0))[0];
+      const patch: Record<string, unknown> = {};
+      group.forEach((g) => fields.forEach((k) => { if (!keeper[k] && !patch[k] && g[k]) patch[k] = g[k]; }));
+      return { keepId: keeper.id, dropIds: group.filter((g) => g.id !== keeper.id).map((g) => g.id), patch: patch as never };
+    }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dupCount]);
   const [q, setQ] = useState("");

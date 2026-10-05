@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { guestKey } from "@/lib/guest-key";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
@@ -326,6 +327,9 @@ export default function ImportaPage() {
     bookings.filter((b) => b.structureId === structureId).forEach((b) => { const k = bookingDedupeKey(b.structureId, guestNameOf(b.guestId), b.checkIn, b.checkOut); existingCnt.set(k, (existingCnt.get(k) ?? 0) + 1); });
     const usedCnt = new Map<string, number>(); // quante righe del file hanno già "coperto" una prenotazione esistente
     const seenInFile = new Set<string>();     // riga identica (stessa camera) ripetuta nel file = doppione vero
+    // Una scheda per ospite: se la stessa persona (email, telefono o nome+paese) c'è già, si riusa invece di crearne una per prenotazione.
+    const guestByKey = new Map<string, string>();
+    guests.forEach((g) => { const k = guestKey(g); if (k && !guestByKey.has(k)) guestByKey.set(k, g.id); });
     const seenExt = new Map(bookings.filter((b) => b.extId).map((b) => [b.extId as string, b])); // già importate da Octorate (stesso ID)
     let fixed = 0; // prenotazioni già importate ma rimaste "Da assegnare": ora ricevono la camera
 
@@ -367,7 +371,10 @@ export default function ImportaPage() {
         if (seenInFile.has(rowKey)) { dup++; return; } // stessa riga due volte nel file
         seenInFile.add(rowKey);
       }
-      const guestId = addGuest({ fullName: name, email: val(r, "email") || undefined, phone: val(r, "phone") || undefined, country: val(r, "country") || undefined });
+      const gInfo = { fullName: name, email: val(r, "email") || undefined, phone: val(r, "phone") || undefined, country: val(r, "country") || undefined };
+      const gk = guestKey(gInfo);
+      let guestId = gk ? guestByKey.get(gk) : undefined;
+      if (!guestId) { guestId = addGuest(gInfo); if (gk) guestByKey.set(gk, guestId); }
       const roomTxt = val(r, "room");
       const { unitId, roomTypeId } = resolveUnit(roomTxt, ci, co);
       const bookedOn = toISO(val(r, "bookedOn"));
