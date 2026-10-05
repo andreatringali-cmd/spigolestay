@@ -23,21 +23,26 @@ export default function CalendarioPage() {
     setView(v);
   }, []);
   const choose = (v: Vista) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch {} };
+  // Selettore della vista: stesso aspetto di "Compatta / Dettagliata" in Prenotazioni. Nella griglia sta nella riga dei filtri,
+  // prima del pulsante dei grafici; nella vista dettagliata (che non ha quella riga) resta in alto accanto al meteo.
+  const viewSwitch = (
+    <div className="no-print flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold" role="group" aria-label={t("Vista")}>
+      {([["grid", t("Griglia")], ["detail", t("Dettagliata")]] as const).map(([k, l]) => (
+        <button key={k} onClick={() => choose(k)} aria-pressed={view === k} className={`rounded-md px-2.5 py-1.5 transition ${view === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{l}</button>
+      ))}
+    </div>
+  );
   return (
     <div>
       <PageHeader
         title={t("Calendario")}
         subtitle={st ? `${st.name} · ${t("Disponibilità, prenotazioni e tariffe, giorno per giorno")}` : t("Disponibilità, prenotazioni e tariffe di tutte le strutture, giorno per giorno")}
         actions={<>
-          <div className="no-print inline-flex rounded-lg border border-line bg-wash p-0.5" role="group" aria-label="Vista del calendario">
-            {([["grid", "Griglia"], ["detail", "Dettagliato"]] as const).map(([k, l]) => (
-              <button key={k} onClick={() => choose(k)} aria-pressed={view === k} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${view === k ? "bg-surface text-focus shadow-sm" : "text-dim hover:text-txt"}`}>{l}</button>
-            ))}
-          </div>
+          {view === "detail" && viewSwitch}
           <WeatherWidget compact />
         </>}
       />
-      {view === "grid" && <CalendarGrid />}
+      {view === "grid" && <CalendarGrid viewSwitch={viewSwitch} />}
       {view === "detail" && <CalendarioDettaglio />}
     </div>
   );

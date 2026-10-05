@@ -94,7 +94,7 @@ interface DragView {
   y: number;
 }
 
-export default function CalendarGrid() {
+export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactNode } = {}) {
   const { structures, units, roomTypes, bookings, guests, events: allEvents, rateOverrides, moveBooking, openBooking, addBooking, updateBooking, deleteBooking, addEvent, updateEvent, deleteEvent, setDayRates, clearDayRates, activeStructureId, updateUnit, deleteUnit, addUnit } = useData();
   // Eventi: con una struttura selezionata solo i suoi (quelli senza struttura valgono per tutte).
   const events = activeStructureId === "all" ? allEvents : allEvents.filter((e) => !e.structureId || e.structureId === activeStructureId);
@@ -1019,6 +1019,7 @@ export default function CalendarGrid() {
           <button onClick={() => setStart((d) => addDays(d, 1))} title="Giorno successivo" aria-label="Giorno successivo" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">›</button>
         </div>
         <div className="order-4 ml-auto flex items-center gap-2">
+          {viewSwitch}
           {/* Selettore card Insights (mostra/nascondi) */}
           {/* Toggle card: un click mostra tutte / nasconde tutte (come le altre sezioni) */}
           <button onClick={() => (INSIGHT_CARDS.some((c) => showCard(c.key)) ? persistCards(new Set(INSIGHT_CARDS.map((c) => c.key))) : persistCards(new Set()))} title={INSIGHT_CARDS.some((c) => showCard(c.key)) ? "Nascondi le card" : "Mostra le card"} className={`grid h-9 w-9 place-items-center rounded-lg border border-line transition ${INSIGHT_CARDS.some((c) => showCard(c.key)) ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
