@@ -85,7 +85,7 @@ export default function PrenotazioniPage() {
   // Default: oggi e futuro. Si vede chi è in casa oggi, chi parte oggi e tutto ciò che arriva (lo storico si apre cambiando le date).
   const [from, setFrom] = useState(() => toISO(new Date()));
   const [to, setTo] = useState("");
-  const [dateField, setDateField] = useState<"attive" | "arrivo" | "prenotazione" | "incasa">("attive");
+  const [dateField, setDateField] = useState<"attive" | "arrivo" | "prenotazione" | "incasa" | "tutte">("attive");
   const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "checkIn", dir: "asc" });
   const toggleSort = (key: string) => setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
   // Selettore grafici (icona prima di "Nuova")
@@ -107,7 +107,7 @@ export default function PrenotazioniPage() {
 
   const now = new Date();
   const todayISO = toISO(now);
-  const pastActive = !!(from && from < todayISO); // stiamo guardando lo storico
+  const pastActive = dateField === "tutte" || !!(from && from < todayISO); // stiamo guardando lo storico
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -128,6 +128,8 @@ export default function PrenotazioniPage() {
       // è la stessa logica di "chi occupa quel giorno" usata nel Registro di Statistiche, così le
       // due viste mostrano le stesse prenotazioni per lo stesso periodo.
       // "In corso e future": il soggiorno tocca il periodo (chi parte oggi compare ancora, chi è già partito no).
+      // "Tutte": nessun filtro di data, tutto lo storico da sempre.
+      if (dateField === "tutte") return true;
       if (dateField === "attive") {
         if (from && b.checkOut < from) return false;
         if (to && b.checkIn > to) return false;
@@ -191,6 +193,10 @@ export default function PrenotazioniPage() {
     }
     return out;
   })();
+  const PAGE = 150;
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => { setLimit(PAGE); }, [q, channel, loc, from, to, dateField, activeStructureId]); // cambia filtro: si riparte dalla prima pagina
+  const shownList = displayList.slice(0, limit);
   const gSum = (ms: typeof sorted, f: (b: typeof sorted[number]) => number) => ms.reduce((a, b) => a + f(b), 0);
   const grand = (b: typeof sorted[number]) => bookingPaidTotal(b); // quanto ha pagato l'ospite (soggiorno+pulizia+extra), SENZA tassa di soggiorno — torna con l'OTA
   // Celle di una riga prenotazione (riusate per righe singole e per le camere di un gruppo).
@@ -372,8 +378,9 @@ export default function PrenotazioniPage() {
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca nome o codice…")} className="w-full" />
         <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
         <div className="flex items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
-          <Select value={dateField} onChange={(v) => setDateField(v as "attive" | "arrivo" | "prenotazione" | "incasa")} label={t("Tipo data")}>
+          <Select value={dateField} onChange={(v) => { const f = v as "attive" | "arrivo" | "prenotazione" | "incasa" | "tutte"; setDateField(f); if (f === "tutte") { setFrom(""); setTo(""); } else if (!from) setFrom(toISO(new Date())); }} label={t("Tipo data")}>
             <option value="attive">{t("In corso e future")}</option>
+            <option value="tutte">{t("Tutte (da sempre)")}</option>
             <option value="arrivo">{t("Arrivo / check-in")}</option>
             <option value="prenotazione">{t("Data prenotazione")}</option>
             <option value="incasa">{t("In casa (occupazione)")}</option>
@@ -404,7 +411,7 @@ export default function PrenotazioniPage() {
       {pastActive && (
         <div className="mb-3 flex items-center gap-2 rounded-lg border border-focus bg-[color:color-mix(in_srgb,var(--focus)_8%,transparent)] px-3 py-2 text-xs text-dim">
           <span className="rounded-full bg-focus px-2 py-0.5 text-[10px] font-bold uppercase text-white">{t("Storico")}</span>
-          {t("Stai consultando prenotazioni passate (dal")} {fmt(from)}{to ? ` ${t("al")} ${fmt(to)}` : ""}{t("). Card e grafici si riferiscono a questo periodo.")}
+          {dateField === "tutte" ? t("Stai vedendo tutte le prenotazioni, da sempre. Card e grafici si riferiscono a tutto lo storico.") : <>{t("Stai consultando prenotazioni passate (dal")} {fmt(from)}{to ? ` ${t("al")} ${fmt(to)}` : ""}{t("). Card e grafici si riferiscono a questo periodo.")}</>}
           <button onClick={clearFilters} className="ml-auto font-semibold text-focus hover:underline">{t("Torna a in corso e futuri")}</button>
         </div>
       )}
@@ -412,7 +419,7 @@ export default function PrenotazioniPage() {
       {/* Telefono: lista a schede (la tabella qui sotto è nascosta) */}
       {view === "detail" && <PrenotazioniDettaglio bookings={filtered} guestName={guestName} unitLabel={unitLabel} showStructure={activeStructureId === "all"} />}
       <div className="flex flex-col gap-2 md:hidden" style={view === "detail" ? { display: "none" } : undefined}>
-        {displayList.map((item) => {
+        {shownList.map((item) => {
           if (item.kind === "group") {
             const { gid, members } = item; const b = members[0]; const ch = CHANNELS[b.channel]; const open = groupOpen.has(gid);
             return (
@@ -495,7 +502,7 @@ export default function PrenotazioniPage() {
             </tr>
           </thead>
           <tbody>
-            {displayList.map((item) => {
+            {shownList.map((item) => {
               if (item.kind === "single") {
                 const b = item.b;
                 return <tr key={b.id} onClick={() => openBooking(b.id)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">{renderCells(b)}</tr>;
@@ -547,6 +554,13 @@ export default function PrenotazioniPage() {
           )}
         </table>
       </div>
+      {displayList.length > limit && (
+        <div className="no-print mt-3 flex items-center justify-center gap-3 text-xs text-dim">
+          <span>{t("Mostrate")} {limit} {t("di")} {displayList.length}</span>
+          <button onClick={() => setLimit((l) => l + PAGE)} className="rounded-lg border border-line px-3 py-1.5 font-semibold text-txt hover:bg-wash">{t("Mostra altre")} {Math.min(PAGE, displayList.length - limit)}</button>
+          <button onClick={() => setLimit(displayList.length)} className="rounded-lg px-2 py-1.5 font-semibold text-focus hover:underline">{t("Mostra tutte")}</button>
+        </div>
+      )}
     </div>
   );
 }
