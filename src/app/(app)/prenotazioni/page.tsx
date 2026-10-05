@@ -222,7 +222,7 @@ export default function PrenotazioniPage() {
       {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
       <td className={`whitespace-nowrap px-3 py-2.5 text-dim ${indent ? "pl-8" : ""}`}>{indent && <span className="text-faint">↳ </span>}{unitLabel(b) ?? <span className="italic font-medium text-[color:var(--err)]">{t("Da assegnare")}</span>}</td>
       <td className="px-3 py-2.5"><ChannelWordmark channel={b.channel} height={16} title={b.channel === "direct" ? "xenora.it" : ch.label} /></td>
-      <td className="px-3 py-2.5 font-medium text-txt">{guestName(b)}</td>
+      <td className="px-3 py-2.5 font-medium text-txt"><span className="block max-w-[200px] truncate" title={guestName(b)}>{guestName(b)}</span></td>
       <td className="px-3 py-2.5 font-mono text-dim">{b.adults + b.children}</td>
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkOut)}</td>
@@ -407,12 +407,12 @@ export default function PrenotazioniPage() {
           <option value="all">{t("Tutti i canali")}</option>
           {(Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => (<option key={c} value={c}>{CHANNELS[c].label}</option>))}
         </Select>
+        {/* Vista compatta / dettagliata */}
+        <div className="flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold" role="group" aria-label={t("Vista")}>
+          <button onClick={() => pickView("compact")} aria-pressed={view === "compact"} className={`rounded-md px-2.5 py-1.5 transition ${view === "compact" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Compatta")}</button>
+          <button onClick={() => pickView("detail")} aria-pressed={view === "detail"} className={`rounded-md px-2.5 py-1.5 transition ${view === "detail" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Dettagliata")}</button>
+        </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {/* Vista compatta / dettagliata */}
-          <div className="flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold" role="group" aria-label={t("Vista")}>
-            <button onClick={() => pickView("compact")} aria-pressed={view === "compact"} className={`rounded-md px-2.5 py-1.5 transition ${view === "compact" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Compatta")}</button>
-            <button onClick={() => pickView("detail")} aria-pressed={view === "detail"} className={`rounded-md px-2.5 py-1.5 transition ${view === "detail" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Dettagliata")}</button>
-          </div>
           {/* Toggle grafici: un click mostra tutti / nasconde tutti */}
           <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${shownCharts.length > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
           <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
@@ -530,7 +530,7 @@ export default function PrenotazioniPage() {
                     {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
                     <td className="whitespace-nowrap px-3 py-2.5"><span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-2 py-0.5 text-[11px] font-semibold text-focus">{members.length} {t("camere")} {open ? "▾" : "▸"}</span></td>
                     <td className="px-3 py-2.5"><ChannelWordmark channel={b.channel} height={16} title={b.channel === "direct" ? "xenora.it" : ch.label} /></td>
-                    <td className="px-3 py-2.5 font-medium text-txt">{guestName(b)}</td>
+                    <td className="px-3 py-2.5 font-medium text-txt"><span className="block max-w-[200px] truncate" title={guestName(b)}>{guestName(b)}</span></td>
                     <td className="px-3 py-2.5 font-mono text-dim">{gSum(members, (x) => x.adults + x.children)}</td>
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkOut)}</td>
