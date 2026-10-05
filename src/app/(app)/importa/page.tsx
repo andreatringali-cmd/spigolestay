@@ -84,12 +84,14 @@ export default function ImportaPage() {
   const [icsUrl, setIcsUrl] = useState("");
   const [fetching, setFetching] = useState(false);
   const [confirmUndo, setConfirmUndo] = useState(false);
+  const [undoText, setUndoText] = useState(""); // con molte prenotazioni la cancellazione va confermata scrivendo ELIMINA
 
   // Prenotazioni importate in precedenza (qualsiasi import, CSV o ICS, tagga sempre la nota
   // con "Importato da …"): permette di ANNULLARLE in un click, senza cercarle a mano.
   // Solo quelle della struttura scelta qui sopra: l'annullamento non tocca gli import delle altre strutture.
   const importedBookings = useMemo(() => bookings.filter((b) => b.structureId === structureId && (b.note || "").includes("Importato da")), [bookings, structureId]);
-  const undoImport = () => { importedBookings.forEach((b) => deleteBooking(b.id)); setConfirmUndo(false); };
+  const undoNeedsWord = importedBookings.length > 10;
+  const undoImport = () => { if (undoNeedsWord && undoText.trim().toUpperCase() !== "ELIMINA") return; importedBookings.forEach((b) => deleteBooking(b.id)); setConfirmUndo(false); setUndoText(""); };
 
   const icsRooms = useMemo(() => { const set = new Set<string>(); events.forEach((e) => { if (e.room) set.add(e.room.trim()); }); return [...set]; }, [events]);
   // Auto-mappatura camere ICS → tipologie esistenti (riempie solo le mancanti, così non fa loop).
@@ -400,7 +402,7 @@ export default function ImportaPage() {
               <div className="text-sm font-semibold text-txt">{importedBookings.length} {t("prenotazioni importate in precedenza")}{structures.length > 1 ? ` · ${structures.find((x) => x.id === structureId)?.name ?? ""}` : ""}</div>
               <div className="text-xs text-dim">{t("Se qualcosa non va, puoi eliminarle tutte in un click e ripartire da capo.")}</div>
             </div>
-            <button onClick={() => setConfirmUndo(true)} className="shrink-0 rounded-lg border border-[color:var(--err)] px-3 py-2 text-sm font-semibold text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_10%,transparent)]">{t("Elimina l'importazione")}</button>
+            <button onClick={() => { setUndoText(""); setConfirmUndo(true); }} className="shrink-0 rounded-lg border border-[color:var(--err)] px-3 py-2 text-sm font-semibold text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_10%,transparent)]">{t("Elimina l'importazione")}</button>
           </div>
         </Card>
       )}
@@ -408,12 +410,20 @@ export default function ImportaPage() {
       {confirmUndo && (
         <ConfirmDialog
           title={t("Eliminare tutte le prenotazioni importate?")}
-          message={`${importedBookings.length} ${t("prenotazioni verranno eliminate definitivamente (ospiti collegati restano). Le prenotazioni create a mano non vengono toccate.")}`}
+          message={<>
+            <div>{`${importedBookings.length} ${t("prenotazioni verranno eliminate definitivamente (ospiti collegati restano). Le prenotazioni create a mano non vengono toccate.")}`}</div>
+            {undoNeedsWord && (
+              <label className="mt-3 block text-xs text-dim">{t("Per confermare scrivi ELIMINA")}
+                <input id="undo-confirm-word" value={undoText} onChange={(e) => setUndoText(e.target.value)} autoComplete="off" className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt" />
+              </label>
+            )}
+          </>}
+          disabled={undoNeedsWord && undoText.trim().toUpperCase() !== "ELIMINA"}
           warning={t("Azione irreversibile.")}
           confirmLabel={t("Elimina")}
           tone="var(--err)"
           onConfirm={undoImport}
-          onClose={() => setConfirmUndo(false)}
+          onClose={() => { setConfirmUndo(false); setUndoText(""); }}
         />
       )}
 
