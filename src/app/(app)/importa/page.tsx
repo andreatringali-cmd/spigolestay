@@ -322,7 +322,10 @@ export default function ImportaPage() {
     // Anti-duplicato: chiavi (struttura+ospite+date) delle prenotazioni GIÀ presenti,
     // più quelle create in questa stessa passata (evita doppioni anche interni al file).
     const guestNameOf = (id: string) => guests.find((g) => g.id === id)?.fullName ?? "";
-    const seen = new Set(bookings.filter((b) => b.structureId === structureId).map((b) => bookingDedupeKey(b.structureId, guestNameOf(b.guestId), b.checkIn, b.checkOut)));
+    const existingCnt = new Map<string, number>();
+    bookings.filter((b) => b.structureId === structureId).forEach((b) => { const k = bookingDedupeKey(b.structureId, guestNameOf(b.guestId), b.checkIn, b.checkOut); existingCnt.set(k, (existingCnt.get(k) ?? 0) + 1); });
+    const usedCnt = new Map<string, number>(); // quante righe del file hanno già "coperto" una prenotazione esistente
+    const seenInFile = new Set<string>();     // riga identica (stessa camera) ripetuta nel file = doppione vero
     const seenExt = new Map(bookings.filter((b) => b.extId).map((b) => [b.extId as string, b])); // già importate da Octorate (stesso ID)
     let fixed = 0; // prenotazioni già importate ma rimaste "Da assegnare": ora ricevono la camera
 
@@ -357,7 +360,13 @@ export default function ImportaPage() {
         dup++; return;
       }
       // Con l'ID Octorate ogni riga è una prenotazione a sé (anche più camere con stesso ospite e date). Il controllo ospite+date serve solo senza ID.
-      if (!extId) { if (seen.has(key)) { dup++; return; } seen.add(key); }
+      if (!extId) {
+        const used = usedCnt.get(key) ?? 0;
+        if (used < (existingCnt.get(key) ?? 0)) { usedCnt.set(key, used + 1); dup++; return; } // già presente
+        const rowKey = key + "|" + val(r, "room").trim().toLowerCase();
+        if (seenInFile.has(rowKey)) { dup++; return; } // stessa riga due volte nel file
+        seenInFile.add(rowKey);
+      }
       const guestId = addGuest({ fullName: name, email: val(r, "email") || undefined, phone: val(r, "phone") || undefined, country: val(r, "country") || undefined });
       const roomTxt = val(r, "room");
       const { unitId, roomTypeId } = resolveUnit(roomTxt, ci, co);
@@ -383,6 +392,8 @@ export default function ImportaPage() {
     });
     setDone(n);
     const msgs: string[] = [];
+    const multiGroups = [...grpCount.values()].filter((c) => c >= 2);
+    if (multiGroups.length) msgs.push(`${multiGroups.length} ${t("prenotazioni di più camere riconosciute")} (${multiGroups.reduce((a, c) => a + c, 0)} ${t("camere in tutto")}).`);
     if (skipped) msgs.push(`${skipped} ${t("righe saltate (date o nome mancanti).")}`);
     if (dup) msgs.push(`${dup} ${t("doppioni ignorati (già presenti).")}`);
     if (fixed) msgs.push(`${fixed} ${t("prenotazioni già importate hanno cambiato camera.")}`);

@@ -6,6 +6,7 @@ import { STRUCTURE_TYPES, ROOM_TYPE_OPTIONS } from "@/lib/types";
 import { blankUser, fullPerms, USER_LANGS } from "@/lib/users";
 import { isOnboardingActive, markOnboarded } from "@/lib/onboarding";
 import { useAuth } from "@/lib/authsync";
+import { TIERS as PLAN_TIERS, TRIAL_DAYS } from "@/lib/plans";
 
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `id-${Math.random().toString(36).slice(2)}`);
 const emailOk = (s: string) => /\S+@\S+\.\S+/.test(s);
@@ -36,11 +37,8 @@ const MODULE_LABELS: Record<string, string> = {
   team: "Utenti & permessi · multi-utente",
 };
 
-const TIERS = [
-  { key: "basic", name: "Basic", price: 29, structures: 1, desc: "1 struttura · l'essenziale per iniziare", includes: ["pms", "cm", "booking", "cassa"] },
-  { key: "pro", name: "Pro", price: 49, structures: 3, desc: "fino a 3 strutture · marketing e automazioni", includes: ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi"] },
-  { key: "ultimate", name: "Ultimate", price: 89, structures: 8, desc: "fino a 8 strutture · tutto incluso", includes: ["pms", "cm", "booking", "cassa", "concierge", "housekeeping", "messaging", "meta", "bi", "site", "rms", "ratecheck", "team"] },
-];
+// Piani, prezzi e moduli arrivano da lib/plans.ts (fonte unica con la pagina Abbonamento): qui non si ridefiniscono.
+const TIERS = PLAN_TIERS.map((t) => ({ ...t, desc: `${t.structures === 1 ? "1 struttura" : `fino a ${t.structures} strutture`} · ${t.tagline.toLowerCase()}` }));
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-txt outline-none transition focus:border-focus";
 const lbl = "mb-1 block text-xs font-medium text-dim";
@@ -66,9 +64,6 @@ export default function OnboardingWizard() {
   const [language, setLanguage] = useState("it");
   // Account
   const [username, setUsername] = useState("");
-  const [pw, setPw] = useState("");
-  const [pw2, setPw2] = useState("");
-  const [showPw, setShowPw] = useState(false);
   // Struttura
   const [sName, setSName] = useState("");
   const [sType, setSType] = useState(STRUCTURE_TYPES[0]);
@@ -97,14 +92,14 @@ export default function OnboardingWizard() {
     { title: "Il tuo accesso", sub: "Crea le credenziali con cui entrerai nel gestionale." },
     { title: "La tua struttura", sub: "La prima struttura da gestire (potrai aggiungerne altre)." },
     { title: "Le camere", sub: "Le tipologie di camera e quante ne hai per ciascuna." },
-    { title: "Scegli il piano", sub: "Nessuna carta ora: 7 giorni di prova gratuita, paghi quando vuoi da Abbonamento." },
+    { title: "Scegli il piano", sub: `${TRIAL_DAYS} giorni di prova gratuita. Il piano si attiva e si paga dall'area Abbonamento, e lo cambi quando vuoi.` },
     { title: "Tutto pronto!", sub: "Controlla il riepilogo e inizia. Poi potrai importare il calendario da Octorate." },
   ];
 
   const canNext = (() => {
     switch (step) {
       case 1: return !!(firstName.trim() && lastName.trim() && emailOk(email) && phone.trim());
-      case 2: return !!(username.trim().length >= 3 && pw.length >= 6 && pw === pw2);
+      case 2: return !!(username.trim().length >= 3);
       case 3: return !!(sName.trim() && sType && sCity.trim());
       case 4: return camere.some((c) => c.name.trim() && Number(c.count) > 0);
       case 5: return !!plan;
@@ -133,7 +128,6 @@ export default function OnboardingWizard() {
       u.language = language; u.username = username.trim(); u.status = "Attivo"; u.allStructures = true; u.perms = fullPerms();
       localStorage.setItem("spigolestay:users", JSON.stringify([u]));
       localStorage.setItem("spigolestay:currentuser", u.id);
-      localStorage.setItem("spigolestay:account", JSON.stringify({ username: username.trim(), password: pw }));
       // Moduli dal piano scelto
       const tier = TIERS.find((t) => t.key === plan) ?? TIERS[0];
       const mods: Record<string, boolean> = {};
@@ -208,14 +202,7 @@ export default function OnboardingWizard() {
           {step === 2 && (
             <div className="space-y-3">
               <label className="block"><span className={lbl}>Nome utente *</span><input value={username} onChange={(e) => setUsername(e.target.value)} className={inp} placeholder="mario.rossi" autoCapitalize="none" /></label>
-              <div className="grid grid-cols-2 gap-3">
-                <label><span className={lbl}>Password *</span><input value={pw} onChange={(e) => setPw(e.target.value)} type={showPw ? "text" : "password"} className={inp} placeholder="min 6 caratteri" /></label>
-                <label><span className={lbl}>Conferma password *</span><input value={pw2} onChange={(e) => setPw2(e.target.value)} type={showPw ? "text" : "password"} className={inp} placeholder="ripeti" /></label>
-              </div>
-              <label className="flex items-center gap-2 text-xs text-dim"><input type="checkbox" checked={showPw} onChange={(e) => setShowPw(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" /> Mostra password</label>
-              {pw && pw2 && pw !== pw2 && <p className="text-xs font-medium text-[color:var(--err)]">Le password non coincidono.</p>}
-              <p className="text-[11px] text-faint">Per recuperare l&apos;accesso useremo l&apos;email inserita al passo precedente.</p>
-              <p className="rounded-lg bg-wash px-3 py-2 text-[11px] text-faint">Prototipo: le credenziali restano salvate solo su questo dispositivo, non è un'autenticazione reale.</p>
+              <p className="text-[11px] text-faint">È il nome con cui compari nel registro attività. Per accedere usi sempre la tua email e la password dell&apos;account; per recuperarla useremo l&apos;email del passo precedente.</p>
             </div>
           )}
 
@@ -293,7 +280,7 @@ export default function OnboardingWizard() {
 
           {step === 6 && (
             <div className="rounded-xl border border-line bg-surface p-5 text-sm">
-              {[["Profilo", `${firstName} ${lastName} · ${email}`], ["Accesso", username], ["Struttura", `${sName} · ${sType} · ${sCity}`], ["Camere", `${totalRooms} camere · ${camere.filter((c) => c.name.trim()).length} tipologie`], ["Piano", `${TIERS.find((t) => t.key === plan)?.name ?? "—"} · prova 7 giorni`]].map(([k, v]) => (
+              {[["Profilo", `${firstName} ${lastName} · ${email}`], ["Accesso", username], ["Struttura", `${sName} · ${sType} · ${sCity}`], ["Camere", `${totalRooms} camere · ${camere.filter((c) => c.name.trim()).length} tipologie`], ["Piano", `${TIERS.find((t) => t.key === plan)?.name ?? "—"} · prova ${TRIAL_DAYS} giorni`]].map(([k, v]) => (
                 <div key={k} className="flex items-start justify-between gap-3 border-b border-line py-2 last:border-0">
                   <span className="text-xs font-semibold uppercase tracking-wide text-faint">{k}</span>
                   <span className="min-w-0 flex-1 text-right text-txt">{v}</span>
