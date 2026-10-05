@@ -38,12 +38,11 @@ export default function CalendarioPage() {
         title={t("Calendario")}
         subtitle={st ? `${st.name} · ${t("Disponibilità, prenotazioni e tariffe, giorno per giorno")}` : t("Disponibilità, prenotazioni e tariffe di tutte le strutture, giorno per giorno")}
         actions={<>
-          {view === "detail" && viewSwitch}
           <WeatherWidget compact />
         </>}
       />
       {view === "grid" && <CalendarGrid viewSwitch={viewSwitch} />}
-      {view === "detail" && <CalendarioDettaglio />}
+      {view === "detail" && <CalendarioDettaglio viewSwitch={viewSwitch} />}
     </div>
   );
 }

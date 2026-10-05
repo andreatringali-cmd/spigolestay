@@ -14,7 +14,10 @@ import { toISO, shiftISO, parseISO } from "@/lib/dates";
 import { bookingPaidTotal } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { journeyOf, isLiveBooking, type JourneyStep } from "@/lib/booking-journey";
-import type { Booking } from "@/lib/types";
+import { CHANNELS, type Booking, type Channel } from "@/lib/types";
+import SearchInput from "@/components/SearchInput";
+import { bookingCode } from "@/lib/bookingCode";
+import { normName } from "@/lib/guest-key";
 import EmptyState from "@/components/EmptyState";
 import StepActions from "@/app/(app)/prenotazioni/_azioni";
 import SchedaGiorno, { type Avviso, type Journey } from "./_scheda";
@@ -44,7 +47,7 @@ function Vuoto({ title, sub }: { title: string; sub?: string }) {
   );
 }
 
-export default function CalendarioDettaglio() {
+export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React.ReactNode } = {}) {
   const router = useRouter();
   const { bookings, guests, units, roomTypes, structures, events, getStructure, openBooking, openNewBooking, activeStructureId } = useData();
   const dati = useDatiPercorso();
@@ -58,6 +61,11 @@ export default function CalendarioDettaglio() {
   // Colonne lunghe: mostra le prime 6 schede, poi "Mostra tutte" (e, aperta, scorre dentro la colonna invece di allungare la pagina).
   const [openCols, setOpenCols] = useState<Record<string, boolean>>({});
   const COL_LIMIT = 6;
+  // Riga dei filtri: ricerca (ospite, camera, codice), canale, camera, stato. Valgono sia per le colonne del giorno sia per i risultati.
+  const [q, setQ] = useState("");
+  const [chan, setChan] = useState<"all" | Channel>("all");
+  const [loc, setLoc] = useState("all");
+  const [stato, setStato] = useState<"all" | "late" | "todo">("all");
   const [cleanDone, setCleanDone] = useState<Record<string, boolean>>({});
   useEffect(() => {
     const h = () => setCleanDone(readCleanDone());
@@ -94,6 +102,24 @@ export default function CalendarioDettaglio() {
     return g?.fullName || [b.primaryGuest?.firstName, b.primaryGuest?.lastName].filter(Boolean).join(" ") || "Ospite";
   }, [guestById]);
 
+  const qTokens = useMemo(() => normName(q).split(" ").filter(Boolean), [q]);
+  const filtersOn = qTokens.length > 0 || chan !== "all" || loc !== "all" || stato !== "all";
+  // Una prenotazione passa i filtri? La ricerca accetta le parole in qualsiasi ordine (nome, cognome, camera, codice, contatti).
+  const passes = useCallback((r: { b: Booking; j: Journey }) => {
+    const { b, j } = r;
+    if (chan !== "all" && b.channel !== chan) return false;
+    if (loc !== "all" && b.unitId !== loc) return false;
+    if (stato === "late" && !j.steps.some((s) => s.state === "late")) return false;
+    if (stato === "todo" && !j.steps.some((s) => s.state === "todo" || s.state === "late")) return false;
+    if (qTokens.length) {
+      const g = guestById.get(b.guestId);
+      const u = b.unitId ? unitById.get(b.unitId) : undefined;
+      const hay = normName([guestName(b), g?.email, g?.phone, bookingCode(b), b.code, b.extId, u?.name].filter(Boolean).join(" "));
+      if (!qTokens.every((tk) => hay.includes(tk))) return false;
+    }
+    return true;
+  }, [chan, loc, stato, qTokens, guestById, unitById, guestName]);
+
   // ── Prenotazioni del periodo con il loro percorso ──
   const gSizes = useMemo(() => groupSizes(bookings), [bookings]);
   const remLog = useReminderLog(live); // cronologia dei solleciti (da chat)
@@ -116,12 +142,31 @@ export default function CalendarioDettaglio() {
   const cols = useMemo(() => {
     const pos = (b: Booking) => (b.unitId ? unitPos.get(b.unitId) ?? 9999 : 10000);
     const eta = (b: Booking) => (/^\d{1,2}:\d{2}$/.test(b.arrivalTime ?? "") ? b.arrivalTime!.padStart(5, "0") : "99:99");
-    const all = [...rows.values()];
+    const all = [...rows.values()].filter(passes);
     const arr = all.filter((r) => r.b.checkIn >= from && r.b.checkIn <= to).sort((a, b) => a.b.checkIn.localeCompare(b.b.checkIn) || eta(a.b).localeCompare(eta(b.b)) || pos(a.b) - pos(b.b));
     const dep = all.filter((r) => r.b.checkOut >= from && r.b.checkOut <= to).sort((a, b) => a.b.checkOut.localeCompare(b.b.checkOut) || pos(a.b) - pos(b.b));
     const stay = all.filter((r) => r.b.checkIn < from && r.b.checkOut > to).sort((a, b) => pos(a.b) - pos(b.b) || a.b.checkOut.localeCompare(b.b.checkOut));
     return { arr, stay, dep };
-  }, [rows, from, to, unitPos]);
+  }, [rows, from, to, unitPos, passes]);
+
+  const results = useMemo(() => {
+    if (!filtersOn) return null;
+    const near = (b: Booking) => Math.abs(Date.parse(b.checkIn) - Date.parse(today));
+    const out: Row[] = [];
+    for (const b of [...live].sort((a, c) => near(a) - near(c))) {
+      const j = journeyOf(b, {
+        today, guest: guestById.get(b.guestId), structure: getStructure(b.structureId),
+        schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
+        guideSent: isGuideSent(b, threads[b.guestId], remLog[b.id]),
+        invoiceStato: docBy.get(b.id),
+        reminderNotes: reminderNotes(remLog[b.id]),
+      });
+      const r = { b, j };
+      if (passes(r)) out.push(r);
+      if (out.length >= 60) break;
+    }
+    return out;
+  }, [filtersOn, live, today, guestById, getStructure, schedBy, istatBy, threads, remLog, docBy, passes]);
 
   // ── Avvisi per scheda ──
   const avvisiFor = useCallback((r: Row, col: Col): Avviso[] => {
@@ -211,6 +256,25 @@ export default function CalendarioDettaglio() {
 
   return (
     <div>
+      {/* Riga dei filtri: cerca una prenotazione, filtra per canale/camera/stato; a destra la scelta della vista */}
+      <div className="no-print mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
+        <SearchInput value={q} onChange={setQ} placeholder="Cerca ospite, camera o codice…" className="w-full sm:w-72" />
+        <select aria-label="Canale" value={chan} onChange={(e) => setChan(e.target.value as "all" | Channel)} className="rounded-lg border border-line bg-surface px-2 py-2 text-sm text-txt outline-none focus:border-focus">
+          <option value="all">Tutti i canali</option>
+          {(Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => <option key={c} value={c}>{CHANNELS[c].label}</option>)}
+        </select>
+        <select aria-label="Camera" value={loc} onChange={(e) => setLoc(e.target.value)} className="max-w-[11rem] rounded-lg border border-line bg-surface px-2 py-2 text-sm text-txt outline-none focus:border-focus">
+          <option value="all">Tutte le camere</option>
+          {activeUnits.map((u) => <option key={u.id} value={u.id}>{showStructure ? `${getStructure(u.structureId)?.name ?? ""} · ` : ""}{u.name}</option>)}
+        </select>
+        <select aria-label="Stato" value={stato} onChange={(e) => setStato(e.target.value as "all" | "late" | "todo")} className="rounded-lg border border-line bg-surface px-2 py-2 text-sm text-txt outline-none focus:border-focus">
+          <option value="all">Tutti gli stati</option>
+          <option value="todo">Da fare</option>
+          <option value="late">In ritardo</option>
+        </select>
+        {filtersOn && <button onClick={() => { setQ(""); setChan("all"); setLoc("all"); setStato("all"); }} className="rounded-lg px-2 py-2 text-xs font-semibold text-focus hover:underline">Azzera filtri</button>}
+        <div className="ml-auto">{viewSwitch}</div>
+      </div>
       <StriscaGiorni days={stripDays} sel={sel} mode={mode} today={today} rangeLabel={rangeLabel} onSelect={selectDay} onShift={shift} onToday={goToday} onMode={setMode} onPick={pick} />
 
       {/* Eventi e riepilogo del periodo */}
@@ -223,7 +287,37 @@ export default function CalendarioDettaglio() {
         {pills.length > 0 ? pills : <span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ color: "var(--ok)", background: "color-mix(in srgb, var(--ok) 13%, transparent)" }}>Nessuna anomalia in questo periodo ✓</span>}
       </div>
 
+      {results && (
+        <section className="mt-5 min-w-0">
+          <div className="mb-3">
+            <h2 className="flex items-center gap-2 font-display text-lg font-bold text-txt">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: "var(--focus)" }} />
+              Risultati
+              <span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ color: "var(--focus)", background: "color-mix(in srgb, var(--focus) 14%, transparent)" }}>{results.length}{results.length >= 60 ? "+" : ""}</span>
+            </h2>
+            <p className="text-xs text-faint">Tutte le prenotazioni che corrispondono, anche fuori dal periodo mostrato: le più vicine a oggi per prime</p>
+          </div>
+          {results.length === 0 ? <Vuoto title="Nessuna prenotazione trovata" sub="Prova con meno parole, oppure azzera i filtri." /> : (
+            <div className="flex flex-col gap-3">
+              {results.map((r) => {
+                const unit = r.b.unitId ? unitById.get(r.b.unitId) : undefined;
+                return (
+                  <SchedaGiorno
+                    key={r.b.id} b={r.b} j={r.j} guestName={guestName(r.b)} groupSize={r.b.groupId ? gSizes.get(r.b.groupId) : undefined}
+                    unit={unit} roomType={typeById.get(unit?.roomTypeId ?? r.b.roomTypeId)}
+                    structure={getStructure(r.b.structureId)} showStructure={showStructure}
+                    tag={`${dayShort(r.b.checkIn)} → ${dayShort(r.b.checkOut)}`} tagTone="var(--focus)" avvisi={avvisiFor(r, "stay")}
+                    onOpen={() => openBooking(r.b.id)} onStep={(s) => openStep(r, s)}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Arrivi / In casa / Partenze */}
+      {!results && (
       <div className="mt-5 flex flex-col gap-8">
         {COLS.map((c) => {
           // In modalità 7 giorni arrivi e partenze sono raggruppati per giorno.
@@ -276,7 +370,9 @@ export default function CalendarioDettaglio() {
           );
         })}
       </div>
+      )}
 
+      {!results && (<>
       {/* Camere libere */}
       <section className="mt-8">
         <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
@@ -325,6 +421,8 @@ export default function CalendarioDettaglio() {
           </div>
         </section>
       )}
+
+      </>)}
 
       {modal && modalRow && modalStep && (
         <StepActions
