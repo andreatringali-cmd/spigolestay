@@ -21,6 +21,8 @@ interface LogEntry { id: string; ts: number; text: string; color: string; struct
 // Tavolozza di colori predefiniti per canale (dieci toni distinti, pensati per restare
 // leggibili sia su barre calendario chiare che scure). Il picker nativo resta disponibile
 // per chi vuole personalizzare oltre questi.
+// Colori di marca per canale: compaiono per primi nei colori proposti (es. il blu Booking.com), così si torna al colore ufficiale con un clic.
+const CHANNEL_BRAND_COLORS: Partial<Record<Channel, string>> = { booking: "#003B95" };
 const CHANNEL_PRESET_COLORS = ["#2563EB", "#7C3AED", "#DB2777", "#E11D48", "#EA580C", "#D97706", "#65A30D", "#0D9488", "#0891B2", "#475569"];
 
 const LOG_KEY = "spigolestay:canali:log";
@@ -466,7 +468,7 @@ export default function CanaliPage() {
                     <div className="rounded-xl border border-line bg-paper p-3">
                       <div className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-txt">{t("Colore")}<span title={t("Colora le prenotazioni di questo canale nel Calendario")} className="grid h-3.5 w-3.5 cursor-help place-items-center rounded-full bg-wash text-[9px] font-bold text-faint">?</span></div>
                       <div className="flex flex-wrap items-center gap-1.5">
-                        {CHANNEL_PRESET_COLORS.map((hex) => (
+                        {[...(CHANNEL_BRAND_COLORS[chKey] ? [CHANNEL_BRAND_COLORS[chKey] as string] : []), ...CHANNEL_PRESET_COLORS].map((hex) => (
                           <button key={hex} onClick={() => saveChannelColor(chKey, hex)} title={hex} className="h-5 w-5 shrink-0 rounded-full" style={{ backgroundColor: hex, boxShadow: pickerColor.toLowerCase() === hex.toLowerCase() ? "0 0 0 2px var(--surface), 0 0 0 3.5px var(--focus)" : "0 0 0 1px rgba(0,0,0,.12)" }} />
                         ))}
                         <label className="relative grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded-full border border-dashed border-line text-[10px] text-faint" title={t("Colore personalizzato")}>
