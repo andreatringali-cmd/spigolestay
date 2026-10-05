@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { requireUser, isErr } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -11,7 +12,9 @@ export async function GET(req: Request) {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return NextResponse.json({ configured: false, invoices: [] });
 
-  const email = new URL(req.url).searchParams.get("email");
+  const who = await requireUser(req);
+  if (isErr(who)) return who;
+  const email = who.email; // dal login, non dall'URL
   if (!email) return NextResponse.json({ error: "missing_email" }, { status: 400 });
 
   try {

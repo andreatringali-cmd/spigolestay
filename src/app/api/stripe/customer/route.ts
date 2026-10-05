@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { requireUser, isErr } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -10,10 +11,11 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return NextResponse.json({ error: "stripe_not_configured" }, { status: 503 });
-
-  const url = new URL(req.url);
-  const email = url.searchParams.get("email");
-  const userId = url.searchParams.get("userId") || "";
+  const who = await requireUser(req);
+  if (isErr(who)) return who;
+  // Email e id arrivano dal login, non dall'URL: ognuno vede solo il proprio abbonamento.
+  const email = who.email;
+  const userId = who.userId;
   if (!email) return NextResponse.json({ error: "missing_email" }, { status: 400 });
 
   try {

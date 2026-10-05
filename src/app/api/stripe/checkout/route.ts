@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { requireUser, isErr } from "@/lib/server-auth";
 import { siteOrigin } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { annualAmount, lookupKeyFor, planByKey, type BillingInterval, type StripePlan } from "@/lib/stripe-plans";
@@ -36,6 +37,8 @@ async function getPriceId(stripe: Stripe, plan: StripePlan, interval: BillingInt
 export async function POST(req: Request) {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return NextResponse.json({ error: "stripe_not_configured" }, { status: 503 });
+  const who = await requireUser(req);
+  if (isErr(who)) return who;
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -51,11 +54,11 @@ export async function POST(req: Request) {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price, quantity: 1 }],
-      customer_email: body?.email || undefined,
-      client_reference_id: body?.userId || undefined,
+      customer_email: who.email || undefined, // dal login, non dal corpo della richiesta
+      client_reference_id: who.userId,
       allow_promotion_codes: true,
-      subscription_data: { trial_period_days: TRIAL_DAYS, metadata: { userId: body?.userId || "", plan: plan.key, interval } },
-      metadata: { userId: body?.userId || "", plan: plan.key, interval },
+      subscription_data: { trial_period_days: TRIAL_DAYS, metadata: { userId: who.userId, plan: plan.key, interval } },
+      metadata: { userId: who.userId, plan: plan.key, interval },
       success_url: `${origin}/abbonamento?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/abbonamento?checkout=cancel`,
     });

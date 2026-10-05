@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { propertyTakenByOthers } from "@/lib/channex-guard";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { saveChannexMap } from "@/lib/channex-inbound";
 
@@ -16,6 +17,7 @@ export async function POST(req: Request) {
   const propertyId = String(b?.propertyId || "").trim();
   const rooms = (b?.rooms && typeof b.rooms === "object") ? b.rooms as Record<string, string> : {};
   if (!structureId || !propertyId) return NextResponse.json({ error: "missing_params" }, { status: 400 });
+  if (await propertyTakenByOthers(auth.admin, auth.tenantId, propertyId)) return NextResponse.json({ ok: false, error: "property_gia_collegata" }, { status: 403 });
   const res = await saveChannexMap(auth.admin, auth.tenantId, structureId, propertyId, rooms);
   return NextResponse.json({ ok: res.ok, error: res.error });
 }

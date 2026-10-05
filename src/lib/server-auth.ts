@@ -46,6 +46,8 @@ export function siteOrigin(req: Request): string {
 const OWNER_EMAILS = (process.env.ADMIN_EMAILS || "spigolehouse@gmail.com,andreatringali.spi@gmail.com")
   .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
 
+export const isOwnerEmail = (email: string) => OWNER_EMAILS.includes((email || "").toLowerCase());
+
 // Cache breve: evita 4 query a ogni chiamata API dello stesso utente.
 const allowCache = new Map<string, { ok: boolean; at: number }>();
 const ALLOW_TTL_MS = 60_000;

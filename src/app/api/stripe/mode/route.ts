@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { requireUser, isErr, isOwnerEmail } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -7,7 +8,10 @@ export const dynamic = "force-dynamic";
 // Diagnostica sicura: modalità della chiave (test/live) e IDENTITÀ dell'account piattaforma
 // (id, nome pubblico, email) — così si capisce a QUALE account Stripe è collegata la chiave
 // `STRIPE_SECRET_KEY` (dove finiscono abbonamenti e commissioni). Non espone la chiave.
-export async function GET() {
+export async function GET(req: Request) {
+  const who = await requireUser(req);
+  if (isErr(who)) return who;
+  if (!isOwnerEmail(who.email)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const key = process.env.STRIPE_SECRET_KEY || "";
   const mode = key.startsWith("sk_live_") || key.startsWith("rk_live_")
     ? "live"

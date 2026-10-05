@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { requireUser, isErr } from "@/lib/server-auth";
 import { channexEnabled, channexBase, listProperties } from "@/lib/channex";
 
 // Test di connessione a Channex: verifica che la API key funzioni.
 // GET /api/channex/ping  →  { enabled, connected, properties, base } — non espone mai la chiave.
-export async function GET() {
+export async function GET(req: Request) {
+  const who = await requireUser(req);
+  if (isErr(who)) return who;
   if (!channexEnabled()) {
     return NextResponse.json({ enabled: false, connected: false, message: "CHANNEX_API_KEY non configurata" }, { status: 200 });
   }

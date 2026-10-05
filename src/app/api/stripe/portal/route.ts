@@ -1,4 +1,6 @@
 import Stripe from "stripe";
+import { customerBelongsToUser } from "@/lib/stripe-guard";
+import { requireUser, isErr } from "@/lib/server-auth";
 import { siteOrigin } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 
@@ -9,6 +11,8 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return NextResponse.json({ error: "stripe_not_configured" }, { status: 503 });
+  const who = await requireUser(req);
+  if (isErr(who)) return who;
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -16,6 +20,8 @@ export async function POST(req: Request) {
     if (!customerId) return NextResponse.json({ error: "missing_customer" }, { status: 400 });
 
     const stripe = new Stripe(key);
+    // Solo il proprio cliente: prima chiunque poteva aprire il portale di fatturazione di un altro.
+    if (!(await customerBelongsToUser(stripe, String(customerId), who.userId, who.email))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
     const origin = siteOrigin(req);
     const open = () => stripe.billingPortal.sessions.create({ customer: customerId, return_url: `${origin}/abbonamento` });
     try {
