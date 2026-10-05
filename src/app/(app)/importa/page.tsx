@@ -321,6 +321,20 @@ export default function ImportaPage() {
     let n = 0, skipped = 0, dup = 0;
     // In ordine di arrivo: l'assegnazione delle camere funziona meglio e il risultato non dipende dall'ordine del file (Octorate esporta dal più recente).
     const ordered = [...dataRows].sort((x, y) => toISO(val(x, "checkIn")).localeCompare(toISO(val(y, "checkIn"))));
+    // Prenotazione di PIÙ CAMERE (stesso numero OTA, ospite e date: es. 6 camere per una notte): le righe condividono un gruppo, come fa Channex.
+    const grpKeyOf = (r: string[]) => {
+      const ch = toChannel(val(r, "channel"));
+      const oc = (ch === "booking" || ch === "expedia") ? val(r, "code").split("_")[0].trim() : "";
+      return oc ? `${ch}|${oc}|${val(r, "guest")}|${toISO(val(r, "checkIn"))}|${toISO(val(r, "checkOut"))}` : "";
+    };
+    const grpCount = new Map<string, number>();
+    ordered.forEach((r) => { const k = grpKeyOf(r); if (k) grpCount.set(k, (grpCount.get(k) ?? 0) + 1); });
+    const grpIds = new Map<string, string>();
+    const groupFor = (r: string[]): string | undefined => {
+      const k = grpKeyOf(r); if (!k || (grpCount.get(k) ?? 0) < 2) return undefined;
+      if (!grpIds.has(k)) grpIds.set(k, typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `g${Date.now()}${grpIds.size}`);
+      return grpIds.get(k);
+    };
     ordered.forEach((r) => {
       const ci = toISO(val(r, "checkIn")), co = toISO(val(r, "checkOut")), name = val(r, "guest");
       if (!ci || !co || !name || ci >= co) { skipped++; return; } // campi obbligatori mancanti o date incoerenti
@@ -331,10 +345,11 @@ export default function ImportaPage() {
       if (known) {
         // Già importata: se non ha ancora una camera, la assegna adesso (senza ricrearla).
         if (!known.unitId) { const res = resolveUnit(val(r, "room"), ci, co); if (res.unitId) { updateBooking(known.id, { unitId: res.unitId, roomTypeId: res.roomTypeId }); fixed++; } }
+        const gid = groupFor(r); if (gid && !known.groupId) updateBooking(known.id, { groupId: gid });
         dup++; return;
       }
-      if (seen.has(key)) { dup++; return; } // già presente / doppione nel file
-      seen.add(key);
+      // Con l'ID Octorate ogni riga è una prenotazione a sé (anche più camere con stesso ospite e date). Il controllo ospite+date serve solo senza ID.
+      if (!extId) { if (seen.has(key)) { dup++; return; } seen.add(key); }
       const guestId = addGuest({ fullName: name, email: val(r, "email") || undefined, phone: val(r, "phone") || undefined, country: val(r, "country") || undefined });
       const roomTxt = val(r, "room");
       const { unitId, roomTypeId } = resolveUnit(roomTxt, ci, co);
@@ -348,7 +363,7 @@ export default function ImportaPage() {
       addBooking({
         structureId, roomTypeId, unitId, guestId,
         channel, status: "confirmed",
-        ...(otaCode ? { code: otaCode } : {}), ...(extId ? { extId } : {}),
+        ...(otaCode ? { code: otaCode } : {}), ...(extId ? { extId } : {}), ...(groupFor(r) ? { groupId: groupFor(r) } : {}),
         ...(paidN !== undefined && paidN > 0 ? { paid: paidN } : {}), ...(commN !== undefined && commN > 0 ? { commissionAmount: commN } : {}),
         checkIn: ci, checkOut: co, ...(bookedOn ? { bookedOn } : {}),
         adults: Math.max(1, Math.round(toNum(val(r, "adults")) ?? 2)),
