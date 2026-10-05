@@ -12,7 +12,7 @@ type Kind = "arr" | "dep" | "stay" | "free" | "clean";
 const MOVES: { key: Kind; color: string; name: (n: number) => string }[] = [
   { key: "arr", color: "var(--ok)", name: (n) => (n === 1 ? "arrivo" : "arrivi") },
   { key: "dep", color: "var(--warn)", name: (n) => (n === 1 ? "partenza" : "partenze") },
-  { key: "stay", color: "var(--focus)", name: (n) => (n === 1 ? "resta" : "restano") },
+  { key: "stay", color: "var(--focus)", name: () => "in casa" },
 ];
 const svgP = { width: 12, height: 12, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.4, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 

@@ -187,17 +187,27 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     } catch {}
   }, []);
   // Stato REALE da Channex: unica fonte per la legenda (niente più flag locale finto).
+  // La richiesta a Channex impiega 1-3 secondi: si mostra SUBITO l'ultimo stato noto (salvato su questo dispositivo) e lo si aggiorna appena arriva la risposta.
   useEffect(() => {
+    type ByStructure = Record<string, { channel: string; title: string; active: boolean }[]>;
+    const CACHE_KEY = "xn-chx-status"; // fuori dal prefisso sincronizzato: resta su questo dispositivo
+    const toReal = (by: ByStructure) => {
+      const lists = activeStructureId === "all" ? Object.values(by) : [by[activeStructureId] ?? []];
+      const real: Record<string, boolean> = {};
+      lists.flat().forEach((c) => { real[c.channel] = !!real[c.channel] || c.active; });
+      return real;
+    };
+    try { const c = localStorage.getItem(CACHE_KEY); if (c) setRealChannels(toReal(JSON.parse(c) as ByStructure)); } catch {}
+    let alive = true;
     (async () => {
       try {
-        const res = await apiPost<{ ok: boolean; byStructure?: Record<string, { channel: string; title: string; active: boolean }[]> }>("channex/status", {});
-        if (!res?.ok || !res.byStructure) return;
-        const lists = activeStructureId === "all" ? Object.values(res.byStructure) : [res.byStructure[activeStructureId] ?? []];
-        const real: Record<string, boolean> = {};
-        lists.flat().forEach((c) => { real[c.channel] = !!real[c.channel] || c.active; });
-        setRealChannels(real); // anche vuoto: la legenda non deve restare quella della struttura precedente
+        const res = await apiPost<{ ok: boolean; byStructure?: ByStructure }>("channex/status", {});
+        if (!alive || !res?.ok || !res.byStructure) return;
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(res.byStructure)); } catch {}
+        setRealChannels(toReal(res.byStructure)); // anche vuoto: la legenda non deve restare quella della struttura precedente
       } catch {}
     })();
+    return () => { alive = false; };
   }, [activeStructureId]);
   // Mini sito Xenora pubblicato: quali strutture (tra quelle visibili) hanno uno slug in
   // public_sites — stessa fonte usata da Widget/Xenosite. Nessun flag locale: letto dal DB.
