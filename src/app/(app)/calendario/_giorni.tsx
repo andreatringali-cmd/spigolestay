@@ -41,7 +41,7 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
   const atToday = days[0]?.iso === today && (mode === "week" || sel === today);
   const nav = "grid h-8 w-8 place-items-center rounded-lg border border-line bg-surface text-dim transition hover:border-focus hover:text-focus";
   return (
-    <div className="rounded-2xl border border-line bg-surface p-3 shadow-sm sm:p-4">
+    <div className="rounded-2xl border border-line p-3 shadow-sm sm:p-4" style={{ background: "color-mix(in srgb, var(--wash) 70%, var(--surface))" }}>
       <div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-4">
         <div className="inline-flex items-center gap-1">
           <button onClick={() => onShift(-1)} className={nav} aria-label="7 giorni indietro" title="7 giorni indietro">‹</button>
@@ -71,8 +71,8 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
             <button
               key={iso} onClick={() => onSelect(iso)} aria-pressed={isSel} aria-current={isToday ? "date" : undefined}
               title={d.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}
-              className={`flex min-w-0 flex-col items-stretch gap-1 rounded-xl border px-1 py-1.5 text-center transition sm:px-2 sm:py-2 ${isSel ? "border-focus shadow-md ring-1 ring-[color:var(--focus)]" : inRange ? "border-line hover:border-focus" : "border-transparent hover:border-line hover:bg-wash"}`}
-              style={isSel ? { background: "color-mix(in srgb, var(--focus) 12%, transparent)" } : inRange ? { background: "color-mix(in srgb, var(--focus) 5%, transparent)" } : undefined}
+              className={`flex min-w-0 flex-col items-stretch gap-1 rounded-xl border px-1 py-1.5 text-center transition sm:px-2 sm:py-2 ${isSel ? "border-focus shadow-md ring-1 ring-[color:var(--focus)]" : "border-line shadow-sm hover:border-focus"}`}
+              style={isSel ? { background: "color-mix(in srgb, var(--focus) 14%, var(--surface))" } : { background: d.getDay() === 0 || d.getDay() === 6 ? "color-mix(in srgb, var(--wash) 45%, var(--surface))" : "var(--surface)" }}
             >
               <span className="block truncate text-[10px] font-semibold uppercase tracking-wide" style={{ color: d.getDay() === 0 ? "var(--err)" : d.getDay() === 6 ? "var(--warn)" : "var(--faint)" }}>{wk}</span>
               <span className="mx-auto grid h-7 min-w-7 place-items-center rounded-full px-1 font-mono text-sm font-bold tabular-nums sm:h-8 sm:min-w-8 sm:text-base" style={isToday ? { background: "var(--focus)", color: "#fff" } : { color: "var(--txt)" }}>{d.getDate()}</span>
