@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useDeferredValue } from "react";
-import { guestKey, normName } from "@/lib/guest-key";
+import { groupDuplicates, normName } from "@/lib/guest-key";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { AV_COLORS, initials } from "@/lib/users";
@@ -27,13 +27,9 @@ export default function OspitiPage() {
   const router = useRouter();
   const { t } = useLang();
   const { guests, bookings, structures, activeStructureId, mergeGuestGroups, updateGuest, deleteGuest } = useData();
-  // Doppioni = stessa persona con più schede: stessa email, stesso telefono oppure (solo se non c'è nessun contatto) stesso nome e paese.
+  // Doppioni = stessa persona con più schede: stessa email reale, stesso telefono oppure stesso nome (se il paese o l'email reale non dicono il contrario; le email anonime di Booking/Airbnb non contano).
   // Una scheda per ospite, con dentro tutto lo storico delle prenotazioni.
-  const dupGroups = useMemo(() => {
-    const byKey = new Map<string, typeof guests>();
-    guests.forEach((g) => { const key = guestKey(g); if (!key) return; const arr = byKey.get(key) ?? []; arr.push(g); byKey.set(key, arr); });
-    return [...byKey.values()].filter((a) => a.length > 1);
-  }, [guests]);
+  const dupGroups = useMemo(() => groupDuplicates(guests), [guests]);
   const dupCount = dupGroups.reduce((a, g) => a + g.length - 1, 0);
   // Li unisce in automatico, in un solo passaggio: all'apertura e quando ne compaiono di nuovi (es. dopo un import).
   // Tiene la scheda con più prenotazioni e completa i campi mancanti con quelli delle altre.
