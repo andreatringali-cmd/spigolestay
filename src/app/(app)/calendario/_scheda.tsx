@@ -4,6 +4,7 @@
 // "Prenotazioni · Dettagliata" (anteprima camera, ospite, date, passaggi con pallini, segnalazioni, avanzamento),
 // impaginata in riga (anteprima a sinistra, dati al centro, importo a destra), una sotto l'altra per categoria.
 import type { Booking, Structure, Unit, RoomType } from "@/lib/types";
+import BookingAmounts from "@/components/BookingAmounts";
 import { CHANNELS } from "@/lib/types";
 import { parseISO, nights } from "@/lib/dates";
 import { bookingPaidTotal } from "@/lib/booking";
@@ -108,12 +109,12 @@ export default function SchedaGiorno({ groupSize, b, j, guestName, unit, roomTyp
         )}
       </div>
 
-      {/* Importo e avanzamento */}
-      <div className="flex shrink-0 flex-row items-center justify-between gap-3 border-t border-line pt-2 md:w-44 md:flex-col md:items-end md:justify-between md:border-l md:border-t-0 md:pl-4 md:pt-0">
-        <div className="min-w-0 md:text-right">
-          <div className="font-mono text-lg font-bold text-txt">{total ? eur(total) : "—"}</div>
-          <div className="truncate text-[11px] text-faint">{total ? (resid <= 0.005 ? "Saldato" : `Mancano ${eur(resid)}`) : ""}</div>
+      {/* Importi e avanzamento: stessa colonna di Prenotazioni · Dettagliata (totale, incassato, tassa, commissione e netto) */}
+      <div className="flex shrink-0 flex-col gap-1.5 border-t border-line pt-2 md:w-72 md:justify-center md:border-l md:border-t-0 md:pl-4 md:pt-0">
+        <div className="md:text-right">
+          <div className="font-mono text-lg font-bold text-txt">{total ? eur(total) : "—"}{total > 0 && <span className="ml-1.5 font-sans text-[11px] font-normal text-faint">{(b.cleaningFee ?? 0) > 0 || (b.extras ?? []).length > 0 ? "totale" : `soggiorno · ${n} ${n === 1 ? "notte" : "notti"}`}</span>}</div>
         </div>
+        <BookingAmounts b={b} structure={structure} />
         {j.total > 0 && (
           <div className="min-w-[110px] md:w-full">
             <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-dim"><span>{j.done} di {j.total}</span><span>{pct}%</span></div>

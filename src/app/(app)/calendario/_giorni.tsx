@@ -2,6 +2,7 @@
 
 // Striscia dei giorni della vista Calendario · Dettagliato: 7 giorni navigabili con i contatori di ciascuno.
 import type { ReactNode } from "react";
+import DateField from "@/components/DateField";
 import { parseISO } from "@/lib/dates";
 import type { DayStats } from "./_modello";
 
@@ -40,19 +41,21 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
   const atToday = days[0]?.iso === today && (mode === "week" || sel === today);
   const nav = "grid h-8 w-8 place-items-center rounded-lg border border-line bg-surface text-dim transition hover:border-focus hover:text-focus";
   return (
-    <div className="rounded-2xl border border-line bg-surface p-3 shadow-sm">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <button onClick={() => onShift(-1)} className={nav} aria-label="7 giorni indietro" title="7 giorni indietro">‹</button>
-        <button onClick={() => onShift(1)} className={nav} aria-label="7 giorni avanti" title="7 giorni avanti">›</button>
+    <div className="rounded-2xl border border-line bg-surface p-3 shadow-sm sm:p-4">
+      <div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-4">
+        <div className="inline-flex items-center gap-1">
+          <button onClick={() => onShift(-1)} className={nav} aria-label="7 giorni indietro" title="7 giorni indietro">‹</button>
+          <button onClick={() => onShift(1)} className={nav} aria-label="7 giorni avanti" title="7 giorni avanti">›</button>
+        </div>
         <button onClick={onToday} disabled={atToday} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt transition hover:border-focus hover:text-focus disabled:opacity-50">Oggi</button>
-        <div className="min-w-0 flex-1 truncate font-display text-sm font-bold text-txt sm:text-base">{rangeLabel}</div>
+        <div className="min-w-0 flex-1 truncate font-display text-base font-bold capitalize text-txt sm:text-lg">{rangeLabel}</div>
         <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-lg border border-line bg-wash p-0.5" role="group" aria-label="Periodo mostrato">
+          <div className="flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold" role="group" aria-label="Periodo mostrato">
             {([["day", "Giorno"], ["week", "7 giorni"]] as const).map(([k, l]) => (
-              <button key={k} onClick={() => onMode(k)} aria-pressed={mode === k} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${mode === k ? "bg-surface text-focus shadow-sm" : "text-dim hover:text-txt"}`}>{l}</button>
+              <button key={k} onClick={() => onMode(k)} aria-pressed={mode === k} className={`rounded-md px-2.5 py-1.5 transition ${mode === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{l}</button>
             ))}
           </div>
-          <input type="date" value={sel} onChange={(e) => { if (e.target.value) onPick(e.target.value); }} aria-label="Vai alla data" title="Vai alla data" className="h-8 w-[118px] rounded-lg border border-line bg-paper px-1.5 text-xs text-txt outline-none focus:border-focus" />
+          <DateField value={sel} onChange={(v) => { if (v) onPick(v); }} title="Vai alla data" className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm transition hover:border-focus" />
         </div>
       </div>
 
@@ -68,10 +71,10 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
             <button
               key={iso} onClick={() => onSelect(iso)} aria-pressed={isSel} aria-current={isToday ? "date" : undefined}
               title={d.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}
-              className={`flex min-w-0 flex-col items-stretch gap-1 rounded-xl border px-1 py-1.5 text-center transition sm:px-2 sm:py-2 ${isSel ? "border-focus shadow-sm" : inRange ? "border-line hover:border-focus" : "border-transparent hover:border-line hover:bg-wash"}`}
+              className={`flex min-w-0 flex-col items-stretch gap-1 rounded-xl border px-1 py-1.5 text-center transition sm:px-2 sm:py-2 ${isSel ? "border-focus shadow-md ring-1 ring-[color:var(--focus)]" : inRange ? "border-line hover:border-focus" : "border-transparent hover:border-line hover:bg-wash"}`}
               style={isSel ? { background: "color-mix(in srgb, var(--focus) 12%, transparent)" } : inRange ? { background: "color-mix(in srgb, var(--focus) 5%, transparent)" } : undefined}
             >
-              <span className="block truncate text-[10px] font-semibold uppercase tracking-wide text-faint">{wk}</span>
+              <span className="block truncate text-[10px] font-semibold uppercase tracking-wide" style={{ color: d.getDay() === 0 ? "var(--err)" : d.getDay() === 6 ? "var(--warn)" : "var(--faint)" }}>{wk}</span>
               <span className="mx-auto grid h-7 min-w-7 place-items-center rounded-full px-1 font-mono text-sm font-bold tabular-nums sm:h-8 sm:min-w-8 sm:text-base" style={isToday ? { background: "var(--focus)", color: "#fff" } : { color: "var(--txt)" }}>{d.getDate()}</span>
               <span className="block truncate text-[10px] text-faint">{d.getDate() === 1 || iso === days[0].iso ? mon : " "}</span>
               {/* Movimenti del giorno: solo quelli che ci sono, con il nome per esteso (icona e numero stanno insieme) */}
@@ -94,9 +97,18 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
                 )}
                 {MOVES.every((k) => valueOf(stats, k.key) === 0) && stats.closed === 0 && <span className="py-1 text-[11px] text-faint">Nessun movimento</span>}
               </span>
-              <span className="mt-1 block truncate border-t border-line pt-1.5 text-[10px] text-faint sm:text-[11px]" title={`Camere libere nella notte: ${stats.free} su ${stats.totalUnits} · Pulizie${stats.cleanDone > 0 ? ` fatte ${stats.cleanDone} su ${stats.clean}` : `: ${stats.clean}`}`}>
-                <b className="font-semibold text-dim">{stats.free}</b> libere · <b className="font-semibold text-dim">{stats.cleanDone > 0 ? `${stats.cleanDone}/${stats.clean}` : stats.clean}</b> pulizie
-              </span>
+              {(() => {
+                const occ = stats.totalUnits > 0 ? Math.round(((stats.totalUnits - stats.free) / stats.totalUnits) * 100) : 0;
+                return (
+                  <span className="mt-1 block border-t border-line pt-1.5" title={`Camere occupate nella notte: ${stats.totalUnits - stats.free} su ${stats.totalUnits} (${occ}%) · Pulizie${stats.cleanDone > 0 ? ` fatte ${stats.cleanDone} su ${stats.clean}` : `: ${stats.clean}`}`}>
+                    <span className="mb-1.5 block h-1.5 overflow-hidden rounded-full bg-wash"><span className="block h-full rounded-full" style={{ width: `${occ}%`, background: occ >= 100 ? "var(--ok)" : "var(--focus)" }} /></span>
+                    <span className="flex items-center justify-between gap-1 text-[10px] text-faint sm:text-[11px]">
+                      <span className="truncate"><b className="font-semibold text-dim">{stats.free}</b> libere</span>
+                      <span className="inline-flex shrink-0 items-center gap-0.5"><KindIcon k="clean" /><b className="font-semibold text-dim">{stats.cleanDone > 0 ? `${stats.cleanDone}/${stats.clean}` : stats.clean}</b></span>
+                    </span>
+                  </span>
+                );
+              })()}
             </button>
           );
         })}
