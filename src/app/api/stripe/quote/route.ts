@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { siteOrigin } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { computePlatformFee, estimatedStripeFeeCents, type PaymentSource } from "@/lib/payments/fee";
 
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
     }
     const acct = typeof body?.acct === "string" && body.acct.trim() ? body.acct.trim() : "";
     const stripe = new Stripe(key);
-    const origin = req.headers.get("origin") || new URL(req.url).origin;
+    const origin = siteOrigin(req);
     const success = String(body?.successUrl || `${origin}/preventivo`);
     const cancel = String(body?.cancelUrl || `${origin}/preventivo`);
 

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { siteOrigin } from "@/lib/server-auth";
+import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { findBookingStore, writeBookingPatch } from "@/lib/manage-booking";
 
@@ -42,9 +44,9 @@ export async function POST(req: Request) {
     const code = s(b.code) || s(b.id).slice(0, 8).toUpperCase();
     const hostEmail = s(st.email);
     if (hostEmail) {
-      const origin = req.headers.get("origin") || new URL(req.url).origin;
+      const origin = siteOrigin(req);
       try {
-        await fetch(`${origin}/api/email`, {
+        await internalFetch(`${origin}/api/email`, {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({
             kind: "quote", to: hostEmail, subject: `Richiesta modifica ${code} · ${s(st.name)}`,

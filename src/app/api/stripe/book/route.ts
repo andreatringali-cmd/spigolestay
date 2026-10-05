@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { siteOrigin } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { estimatedStripeFeeCents } from "@/lib/payments/fee";
@@ -75,7 +76,7 @@ export async function POST(req: Request) {
       gn: `${g.firstName || ""} ${g.lastName || ""}`.trim(), ge: g.email || "", gp: g.phone || "", gc: g.country || "",
     };
     const stripe = new Stripe(key);
-    const origin = req.headers.get("origin") || new URL(req.url).origin;
+    const origin = siteOrigin(req);
     // "(caparra)" solo se è un acconto PARZIALE; se si paga l'intero importo non è una caparra.
     const isPartial = deposit > 0 && deposit < total;
     const label = `${st?.name || "Prenotazione"} · ${ci} → ${co}${isPartial ? " (caparra)" : ""}`;

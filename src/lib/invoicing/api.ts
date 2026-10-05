@@ -1,6 +1,7 @@
 // Helper condiviso per le route API di fatturazione: verifica il bearer token e
 // restituisce il client service-role + il tenantId (= utente proprietario).
 import { NextResponse } from "next/server";
+import { isUserAllowed } from "@/lib/server-auth";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export interface AuthOk { admin: SupabaseClient; tenantId: string }
@@ -14,6 +15,8 @@ export async function authTenant(req: Request): Promise<AuthOk | NextResponse> {
   const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: who, error } = await admin.auth.getUser(token);
   if (error || !who?.user?.id) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  try { if (!(await isUserAllowed(admin, who.user))) return NextResponse.json({ error: "not_approved" }, { status: 403 }); }
+  catch { return NextResponse.json({ error: "access_check_failed" }, { status: 503 }); }
   return { admin, tenantId: who.user.id };
 }
 

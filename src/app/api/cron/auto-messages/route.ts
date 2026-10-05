@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalFetch } from "@/lib/server-auth";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { sendWhatsapp } from "@/lib/whatsapp";
 
@@ -143,7 +144,7 @@ export async function GET(req: Request) {
         // Canale 1: EMAIL (se l'ospite ha email).
         if (email) {
           try {
-            const r = await fetch(`${origin}/api/email`, {
+            const r = await internalFetch(`${origin}/api/email`, {
               method: "POST", headers: { "content-type": "application/json" },
               body: JSON.stringify({ kind: "guest_message", to: email, subject: tp.name || s(st.name) || "Messaggio", text, booking: { structureName: s(st.name), structureEmail: s(st.email), color: s(st.photoColor), logo: s(st.logo), website: s(st.website), address: [s(st.address), s(st.streetNumber), s(st.city)].filter(Boolean).join(" "), phone: s(st.phone), cin: s(st.cin), vat: s(st.vat) }, replyTo: s(st.email) || undefined }),
             });

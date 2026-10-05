@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { siteOrigin } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
@@ -136,7 +137,7 @@ export async function POST(req: Request) {
     });
 
     // Invia l'email con il link per accettare.
-    const origin = req.headers.get("origin") || new URL(req.url).origin;
+    const origin = siteOrigin(req);
     const link = `${origin}/accetta-invito?code=${code}`;
     let emailSent = false;
     if (RESEND) {

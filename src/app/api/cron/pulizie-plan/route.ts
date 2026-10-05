@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { sendWhatsapp } from "@/lib/whatsapp";
 import { computePuliziePlan, buildPuliziePlanText } from "@/lib/puliziePlan";
@@ -98,7 +99,7 @@ export async function GET(req: Request) {
 
       if (cfg.email && cfg.emailTo) {
         try {
-          const r = await fetch(`${origin}/api/email`, {
+          const r = await internalFetch(`${origin}/api/email`, {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify({ kind: "guest_message", to: cfg.emailTo, subject, text, booking: { structureName: s((st as unknown as Json)?.name), color: s((st as unknown as Json)?.photoColor), logo: s((st as unknown as Json)?.logo) } }),
           });

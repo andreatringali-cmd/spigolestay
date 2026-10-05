@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { siteOrigin } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
     if (!customerId) return NextResponse.json({ error: "missing_customer" }, { status: 400 });
 
     const stripe = new Stripe(key);
-    const origin = req.headers.get("origin") || new URL(req.url).origin;
+    const origin = siteOrigin(req);
     const open = () => stripe.billingPortal.sessions.create({ customer: customerId, return_url: `${origin}/abbonamento` });
     try {
       const ps = await open();

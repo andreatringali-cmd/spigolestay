@@ -1,4 +1,6 @@
 import Stripe from "stripe";
+import { siteOrigin } from "@/lib/server-auth";
+import { internalFetch } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { handleSubscriptionPaid, type SubscriptionPaidInput } from "@/lib/invoicing/subscription-billing";
@@ -27,7 +29,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "bad_signature", message: (e as Error)?.message }, { status: 400 });
   }
 
-  const origin = req.headers.get("origin") || new URL(req.url).origin;
+  const origin = siteOrigin(req);
   try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
@@ -240,7 +242,7 @@ async function notifyAdmins(origin: string, subject: string, text: string) {
     .split(",").map((s) => s.trim()).filter(Boolean);
   for (const to of admins) {
     try {
-      await fetch(`${origin}/api/email`, {
+      await internalFetch(`${origin}/api/email`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ kind: "quote", to, subject, text, accent: "#285f92" }),

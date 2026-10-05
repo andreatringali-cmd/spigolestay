@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { siteOrigin } from "@/lib/server-auth";
+import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manage-booking";
 import { cityTaxOf } from "@/lib/booking";
@@ -176,9 +178,9 @@ export async function POST(req: Request) {
       const b = store.booking as Json;
       const hostEmail = s(st.email);
       if (hostEmail) {
-        const origin = req.headers.get("origin") || new URL(req.url).origin;
+        const origin = siteOrigin(req);
         const guests = [{ firstName: s(doc.firstName), lastName: s(doc.lastName), sex: doc.sex, birthDate: doc.birthDate, birthPlace: doc.birthPlace, citizenship: doc.citizenship, docType: doc.docType, docNumber: doc.docNumber, docPlace: doc.docPlace }, ...extraGuests];
-        await fetch(`${origin}/api/email`, {
+        await internalFetch(`${origin}/api/email`, {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({ kind: "checkin", operatorEmail: hostEmail, arrival, guests, booking: { code: s(b.code) || s(b.id).slice(0, 8).toUpperCase(), structureName: s(st.name), structureEmail: hostEmail, color: s(st.photoColor), guestName: `${s(doc.firstName)} ${s(doc.lastName)}`.trim(), guestEmail: s((store.guest as Json)?.email), roomType: s(rt.name), checkIn: s(b.checkIn), checkOut: s(b.checkOut) } }),
         });

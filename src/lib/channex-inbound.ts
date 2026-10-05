@@ -6,6 +6,7 @@
 //  Tutto server-side (service role). Idempotente per booking_id (extId).
 // ============================================================
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { internalFetch } from "@/lib/server-auth";
 import { bookingRevisionsFeed, ackBookingRevision, listProperties, type ChxRevision } from "@/lib/channex";
 import { upsertGcalEvent, deleteGcalEvent, gcalEventId } from "@/lib/googleCalendarSync";
 import { CHANNELS, type Channel } from "@/lib/types";
@@ -267,7 +268,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         `Canale: ${chLabel}`,
         typeof b.total === "number" ? `Totale: € ${b.total}` : "",
       ].filter(Boolean) as string[];
-      void fetch(`${origin}/api/email`, {
+      void internalFetch(`${origin}/api/email`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind: "notify", to, subject, text: lines.join("\n") }),
       }).catch(() => {});

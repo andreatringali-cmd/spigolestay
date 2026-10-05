@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { siteOrigin } from "@/lib/server-auth";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { ficConfigured, signState, ficAuthorizeUrl } from "@/lib/invoicing/fic-oauth";
 
@@ -13,7 +14,7 @@ export async function POST(req: Request) {
   if (!ficConfigured()) {
     return NextResponse.json({ error: "fic_not_configured", message: "Fatture in Cloud non è configurato sul server (FIC_CLIENT_ID/SECRET mancanti)." }, { status: 503 });
   }
-  const origin = req.headers.get("origin") || new URL(req.url).origin;
+  const origin = siteOrigin(req);
   const redirectUri = process.env.FIC_REDIRECT_URI || `${origin}/api/invoicing/fic/callback`;
   const state = signState(auth.tenantId);
   const url = ficAuthorizeUrl(redirectUri, state);

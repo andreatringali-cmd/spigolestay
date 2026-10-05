@@ -10,6 +10,7 @@
 // Cliente = tenant_invoice_settings dell'abbonato (dati raccolti in abbonamento/pagamento).
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { internalFetch } from "@/lib/server-auth";
 import { buildDocumentDraft, toCents, type FolioLine, type Regime } from "./folio";
 
 // Input normalizzato ricavato dall'evento Stripe (invoice.paid / checkout subscription).
@@ -260,7 +261,7 @@ export async function createSubscriberInvoice(
 
 // Invia la ricevuta di pagamento dell'abbonamento (kind sub_receipt su /api/email).
 async function sendSubReceipt(origin: string, input: SubscriptionPaidInput): Promise<void> {
-  const res = await fetch(`${origin}/api/email`, {
+  const res = await internalFetch(`${origin}/api/email`, {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({
       kind: "sub_receipt",

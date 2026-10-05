@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { parseNotifPrefs } from "@/lib/notifPrefs";
 
@@ -105,7 +106,7 @@ export async function POST(req: Request) {
         if (st?.email) {
           const origin = process.env.NEXT_PUBLIC_SITE_URL || "https://xenora.it";
           const stars = Math.round(rating / 2);
-          fetch(`${origin}/api/email`, {
+          internalFetch(`${origin}/api/email`, {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               kind: "notify", to: st.email, accent: st.photoColor,

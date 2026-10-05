@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { siteOrigin } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { findBookingStore, findBookingStoreById } from "@/lib/manage-booking";
 import { buildWalletSaveUrl, googleWalletConfigured } from "@/lib/googleWallet";
@@ -41,7 +42,7 @@ export async function GET(req: Request) {
     const g = (store.guest ?? {}) as Json;
     const unit = arr(store.data.units).find((x) => (x as { id?: string }).id === s(b.unitId)) as Json | undefined;
 
-    const origin = req.headers.get("origin") || new URL(req.url).origin;
+    const origin = siteOrigin(req);
     const guestName = s(g.firstName) || s(g.fullName).split(" ")[0] || "";
     const address = [s(st.address), s(st.streetNumber)].filter(Boolean).join(" ") + (s(st.city) ? `, ${s(st.city)}` : "");
 

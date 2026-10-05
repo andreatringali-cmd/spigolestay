@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isInternalRequest, requireUser, isErr, rateLimited, safeHttpUrl, safeColor } from "@/lib/server-auth";
 import QRCode from "qrcode";
 import { buildVoucherPdf } from "@/lib/voucher-pdf";
 import { buildQuotePdf, type QuotePdfRoom, type QuotePdfExtra } from "@/lib/quote-pdf";
@@ -10,7 +11,7 @@ export const runtime = "nodejs";
 const FROM = process.env.RESEND_FROM || "onboarding@resend.dev";
 const KEY = process.env.RESEND_API_KEY || "";
 
-const esc = (s: unknown) => String(s ?? "").replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] || c));
+const esc = (s: unknown) => String(s ?? "").replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }[c] || c));
 const fmtDate = (iso?: string) => {
   if (!iso) return "";
   try { return new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }); } catch { return iso; }
@@ -305,6 +306,12 @@ async function send(to: string, subject: string, html: string, replyTo?: string,
 
 export async function POST(req: Request) {
   if (!KEY) return NextResponse.json({ ok: false, error: "RESEND_API_KEY non configurata" }, { status: 500 });
+  // Niente relay aperto: serve un utente loggato e ammesso (browser) oppure la firma interna (webhook, cron, conferme).
+  if (!isInternalRequest(req)) {
+    const who = await requireUser(req);
+    if (isErr(who)) return who;
+    if (rateLimited("email:" + who.userId, 60, 60_000)) return NextResponse.json({ ok: false, error: "troppe_richieste" }, { status: 429 });
+  }
   let body: {
     kind?: string; booking?: BookingPayload; brand?: Brand; checkinUrl?: string; manageUrl?: string; guests?: CheckinGuest[]; arrival?: string; operatorEmail?: string;
     to?: string; subject?: string; text?: string; accent?: string; replyTo?: string; ctaUrl?: string; ctaLabel?: string; subscription?: SubReceiptPayload;
@@ -318,6 +325,11 @@ export async function POST(req: Request) {
   };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "JSON non valido" }, { status: 400 }); }
   const b = body.booking || {};
+  // URL e colori finiscono dentro href/src/style: si accettano solo http(s) ed esadecimali (niente javascript:, niente stili iniettati).
+  body.ctaUrl = safeHttpUrl(body.ctaUrl); body.checkinUrl = safeHttpUrl(body.checkinUrl) ?? ""; body.manageUrl = safeHttpUrl(body.manageUrl);
+  body.accent = safeColor(body.accent);
+  if (body.brand) { body.brand = { ...body.brand, accent: safeColor(body.brand.accent), website: safeHttpUrl(body.brand.website) }; }
+  b.color = safeColor(b.color); b.mapsUrl = safeHttpUrl(b.mapsUrl); b.website = safeHttpUrl(b.website);
   try {
     if (body.kind === "voucher") {
       if (!b.guestEmail) return NextResponse.json({ ok: false, error: "Email ospite mancante" }, { status: 400 });

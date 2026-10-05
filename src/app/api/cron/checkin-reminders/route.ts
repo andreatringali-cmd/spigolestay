@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { DATA_KEY } from "@/lib/manage-booking";
 import type { Booking, Structure, Guest } from "@/lib/types";
@@ -129,7 +130,7 @@ export async function GET(req: Request) {
           },
         };
 
-        const res = await fetch(`${origin}/api/email`, {
+        const res = await internalFetch(`${origin}/api/email`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),

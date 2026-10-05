@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { siteOrigin } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { annualAmount, lookupKeyFor, planByKey, type BillingInterval, type StripePlan } from "@/lib/stripe-plans";
 import { TRIAL_DAYS } from "@/lib/plans";
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
     const interval: BillingInterval = body?.interval === "year" ? "year" : "month";
 
     const stripe = new Stripe(key);
-    const origin = req.headers.get("origin") || new URL(req.url).origin;
+    const origin = siteOrigin(req);
     const price = await getPriceId(stripe, plan, interval);
 
     const session = await stripe.checkout.sessions.create({

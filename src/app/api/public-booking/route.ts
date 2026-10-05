@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { siteOrigin } from "@/lib/server-auth";
+import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
@@ -172,14 +174,14 @@ export async function POST(req: Request) {
         }
       }
       if (gEmail && st) {
-        const origin = req.headers.get("origin") || new URL(req.url).origin;
+        const origin = siteOrigin(req);
         const nN = Math.max(1, Math.round((Date.parse(co) - Date.parse(ci)) / 86400000));
         const g = (k: string) => (st[k] as string) || undefined;
         // Testo della politica di cancellazione (per email + pagina di gestione).
         const cancelPolicy = refundable
           ? (cancelDays > 0 ? `Cancellazione gratuita fino a ${cancelDays} giorni prima dell'arrivo.` : "Cancellazione gratuita.")
           : "Tariffa non rimborsabile.";
-        await fetch(`${origin}/api/email`, {
+        await internalFetch(`${origin}/api/email`, {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({
             kind: "voucher",

@@ -1,4 +1,6 @@
 import Stripe from "stripe";
+import { siteOrigin } from "@/lib/server-auth";
+import { internalFetch } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { findBookingStore, refundEligible, writeBookingPatch } from "@/lib/manage-booking";
@@ -70,7 +72,7 @@ export async function POST(req: Request) {
     if (!wrote) return NextResponse.json({ ok: false, error: "write_conflict" }, { status: 409 });
 
     // Email all'ospite (best-effort) + notifica al gestore.
-    const origin = req.headers.get("origin") || new URL(req.url).origin;
+    const origin = siteOrigin(req);
     const cancelPolicy = b.refundable
       ? (n(b.cancelDays) > 0 ? `Cancellazione gratuita fino a ${n(b.cancelDays)} giorni prima.` : "Cancellazione gratuita.")
       : "Tariffa non rimborsabile.";
@@ -79,7 +81,7 @@ export async function POST(req: Request) {
     const currency = s(st.currency) || "€";
     try {
       if (gEmail) {
-        await fetch(`${origin}/api/email`, {
+        await internalFetch(`${origin}/api/email`, {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({
             kind: "cancel",
@@ -95,7 +97,7 @@ export async function POST(req: Request) {
       // Notifica al gestore (usa il kind "quote" = testo semplice verso la struttura).
       const hostEmail = s(st.email);
       if (hostEmail) {
-        await fetch(`${origin}/api/email`, {
+        await internalFetch(`${origin}/api/email`, {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({
             kind: "quote", to: hostEmail, subject: `Annullamento ${code} · ${s(st.name)}`,

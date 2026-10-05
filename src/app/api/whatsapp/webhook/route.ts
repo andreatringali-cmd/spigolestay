@@ -1,4 +1,5 @@
 import { NextResponse, after } from "next/server";
+import { internalFetch } from "@/lib/server-auth";
 import { fetchWaMedia, transcribeAudio, transcriptionConfigured } from "@/lib/whatsapp-media";
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -287,7 +288,7 @@ export async function POST(req: Request) {
                 const st = structures.find((s) => s.email) ?? structures[0];
                 if (st?.email) {
                   const origin = process.env.NEXT_PUBLIC_SITE_URL || "https://xenora.it";
-                  fetch(`${origin}/api/email`, {
+                  internalFetch(`${origin}/api/email`, {
                     method: "POST", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ kind: "notify", to: st.email, accent: st.photoColor, subject: `Nuovo messaggio WhatsApp${res.guestName ? ` · ${res.guestName}` : ""}`, text }),
                   }).catch(() => {});

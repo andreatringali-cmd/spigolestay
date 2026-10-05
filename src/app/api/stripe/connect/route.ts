@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { siteOrigin } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -13,7 +14,7 @@ export async function POST(req: Request) {
   if (!key) return NextResponse.json({ error: "stripe_not_configured" }, { status: 503 });
   try {
     const body = await req.json().catch(() => ({}));
-    const origin = req.headers.get("origin") || new URL(req.url).origin;
+    const origin = siteOrigin(req);
     const structureId = String(body?.structureId || "");
     const email = typeof body?.email === "string" ? body.email : undefined;
     const returnBase = String(body?.returnUrl || `${origin}/strutture/${structureId}`);

@@ -1,4 +1,6 @@
 import Stripe from "stripe";
+import { siteOrigin } from "@/lib/server-auth";
+import { internalFetch } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manage-booking";
@@ -57,10 +59,10 @@ export async function POST(req: Request) {
         const g = (store.guest ?? {}) as Json;
         const hostEmail = s(st.email);
         if (hostEmail) {
-          const origin = req.headers.get("origin") || new URL(req.url).origin;
+          const origin = siteOrigin(req);
           const code = s(b.code) || s(b.id).slice(0, 8).toUpperCase();
           const guestName = s(g.fullName) || `${s(g.firstName)} ${s(g.lastName)}`.trim();
-          await fetch(`${origin}/api/email`, {
+          await internalFetch(`${origin}/api/email`, {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify({ kind: "quote", to: hostEmail, subject: `Pagamento ricevuto ${code} · ${s(st.name)}`, text: `Hai ricevuto un pagamento di € ${amount.toLocaleString("it-IT")} per la prenotazione ${code}${guestName ? ` di ${guestName}` : ""} (${s(b.checkIn)} → ${s(b.checkOut)}).`, booking: { structureName: s(st.name), structureEmail: hostEmail, color: s(st.photoColor) } }),
           });

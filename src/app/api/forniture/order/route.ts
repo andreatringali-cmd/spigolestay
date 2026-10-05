@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { siteOrigin } from "@/lib/server-auth";
 import Stripe from "stripe";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 
@@ -72,7 +73,7 @@ export async function POST(req: Request) {
   if (!key) return NextResponse.json({ ok: true, orderId: order.id, subtotal, vat, total, warning: "stripe_not_configured" });
   try {
     const stripe = new Stripe(key);
-    const origin = req.headers.get("origin") || new URL(req.url).origin;
+    const origin = siteOrigin(req);
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [{ price_data: { currency: "eur", unit_amount: total, product_data: { name: `Forniture Xenora · ordine ${order.id.slice(0, 8)}` } }, quantity: 1 }],
