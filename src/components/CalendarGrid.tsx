@@ -740,9 +740,9 @@ export default function CalendarGrid() {
     const linenEl = <span className="shrink-0" style={{ color: linenColor }} title={linenTitle}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8v10" /><path d="M3 14h18" /><path d="M21 18v-5a3 3 0 0 0-3-3H9v4" /><path d="M6 11.5h.01" /></svg></span>;
     return (
       <div key={unit.id} className="flex border-b border-line" style={hasConflict ? { backgroundColor: "color-mix(in srgb, var(--warn) 7%, transparent)" } : undefined}>
-        <div className="sticky left-0 z-10 flex min-w-0 shrink-0 items-center gap-1.5 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: unitRowH, backgroundColor: hasConflict ? "color-mix(in srgb, var(--warn) 7%, var(--surface))" : undefined }}>
+        <div className="sticky left-0 z-10 flex min-w-0 shrink-0 items-center gap-1.5 border-r border-line bg-surface px-3" style={{ width: LABEL_W, height: unitRowH, boxShadow: "6px 0 8px -6px rgba(0,0,0,.14)", backgroundColor: hasConflict ? "color-mix(in srgb, var(--warn) 7%, var(--surface))" : undefined }}>
           {showRoomIcons && <>{statusEl}{cleanEl}{linenEl}</>}
-          <button onClick={() => setRoomInfoId(unit.id)} title="Apri scheda camera" className={`min-w-0 flex-1 truncate whitespace-nowrap text-left text-[13px] font-medium hover:text-focus hover:underline ${unit.outOfService ? "text-faint line-through" : "text-txt"}`}>{unit.name}</button>
+          <button onClick={() => setRoomInfoId(unit.id)} title="Apri scheda camera" className={`min-w-0 flex-1 truncate whitespace-nowrap text-left text-[13px] font-semibold tracking-[-0.01em] hover:text-focus hover:underline ${unit.outOfService ? "text-faint line-through" : "text-txt"}`}>{unit.name}</button>
           {hasConflict && <span title="Sovrapposizione: due prenotazioni sulla stessa camera" className="shrink-0 text-[11px] leading-none" style={{ color: "var(--warn)" }}>⚠</span>}
           {vw.group === "type" && <span className="shrink-0 rounded px-1 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, ${s.photoColor ?? "var(--faint)"} 20%, transparent)`, color: s.photoColor ?? "var(--dim)" }} title={s.name}>{initials(s.name)}</span>}
         </div>
@@ -756,8 +756,8 @@ export default function CalendarGrid() {
                 onClick={unit.outOfService ? undefined : () => clickCell(unit, s.id, iso)}
                 onMouseEnter={() => { if (sel?.kind === "booking" && sel.unitId === unit.id) setSelHover(iso); }}
                 title={unit.outOfService ? undefined : sel?.kind === "booking" && sel.unitId === unit.id ? "Clicca il giorno di partenza" : "Clicca per iniziare (poi clicca il giorno finale)"}
-                className={`group absolute top-0 border-r border-line ${unit.outOfService ? "" : "cursor-pointer"}`}
-                style={{ left: i * cellW, width: cellW, height: unitRowH, ...(inSel ? { backgroundColor: "color-mix(in srgb, var(--focus) 20%, transparent)" } : {}), ...(iso === todayISO ? { boxShadow: "inset 1px 0 0 var(--focus)" } : {}) }}
+                className={`group absolute top-0 border-r ${unit.outOfService ? "" : "cursor-pointer"}`}
+                style={{ left: i * cellW, width: cellW, height: unitRowH, borderColor: "color-mix(in srgb, var(--line) 55%, transparent)", ...(isWeekendISO(iso) ? { backgroundColor: "color-mix(in srgb, var(--wash) 38%, transparent)" } : {}), ...(iso === todayISO ? { backgroundColor: "color-mix(in srgb, var(--focus) 7%, transparent)", boxShadow: "inset 1px 0 0 var(--focus)" } : {}), ...(inSel ? { backgroundColor: "color-mix(in srgb, var(--focus) 20%, transparent)" } : {}) }}
               >
                 {!unit.outOfService && !inSel && (
                   <span className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100" style={{ background: "color-mix(in srgb, var(--focus) 10%, transparent)" }} />
@@ -787,8 +787,8 @@ export default function CalendarGrid() {
             const tentative = !blocked && b.status === "tentative";
             const sotto = barStyle === "sotto";
             const barColor = blocked
-              ? { backgroundColor: "#1f1f1f", backgroundImage: "repeating-linear-gradient(45deg, #3a3a3a 0 6px, #0d0d0d 6px 12px)", color: "#e8e8e8", boxShadow: "inset 3px 0 0 rgba(0,0,0,.6), 0 1px 1px rgba(0,0,0,.3)" }
-              : { backgroundColor: isHexColor(b.color) ? b.color : `var(${meta.cssVar})`, color: isHexColor(b.color) ? textOn(b.color) : meta.text, boxShadow: "inset 3px 0 0 rgba(0,0,0,.28), 0 1px 1px rgba(0,0,0,.14)" };
+              ? { backgroundColor: "#1f1f1f", backgroundImage: "repeating-linear-gradient(45deg, #3a3a3a 0 6px, #0d0d0d 6px 12px)", color: "#e8e8e8", boxShadow: "inset 0 0 0 1px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.25)" }
+              : { backgroundColor: isHexColor(b.color) ? b.color : `var(${meta.cssVar})`, backgroundImage: "linear-gradient(180deg, rgba(255,255,255,.17) 0%, rgba(255,255,255,0) 62%)", color: isHexColor(b.color) ? textOn(b.color) : meta.text, boxShadow: "inset 0 1px 0 rgba(255,255,255,.22), inset 0 0 0 1px rgba(0,0,0,.10), 0 1px 3px rgba(0,0,0,.20)" };
             const label = blocked ? "Fuori servizio" : guestName(b.guestId);
             const pay = payStatusOf(b);
             const bday = !blocked && bdayInStay(b.guestId, b.checkIn, b.checkOut);
@@ -821,7 +821,7 @@ export default function CalendarGrid() {
                 onPointerDown={(e) => onBarPointerDown(e, b.id)}
                 title={`${blocked ? `Fuori servizio${b.note ? ` · ${b.note}` : ""}` : `${guestName(b.guestId)} · ${pax} ospiti${gtot ? ` · €${Math.round(gtot)}` : ""}`} · ${b.checkIn} → ${b.checkOut}${tentative ? " · opzione" : ""}${underprice?.flagged ? ` · ⚠ ${underpriceReason(b, underprice)}` : ""}`}
                 className={`absolute overflow-hidden ${sotto ? "flex cursor-grab flex-col justify-end active:cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
-                style={{ left: g.left + 1, width: g.width - 2, top: lane * rowH + 1, height: rowH - 2, opacity: dragging ? 0.35 : tentative ? 0.72 : 1, pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
+                style={{ left: g.left + (sotto ? 1 : 2), width: g.width - (sotto ? 2 : 4), top: lane * rowH + (sotto ? 1 : 3), height: rowH - (sotto ? 2 : 6), opacity: dragging ? 0.35 : tentative ? 0.72 : 1, pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
               >
                 {sotto ? (
                   <>
@@ -841,16 +841,16 @@ export default function CalendarGrid() {
                     <div className="mt-px w-full" style={{ height: 11, borderRadius: 3, ...barColor, ...(tentative ? { outline: "1px dashed rgba(255,255,255,.75)", outlineOffset: -2 } : {}) }} />
                   </>
                 ) : (
-                  <div className="flex h-full items-center overflow-hidden text-[11px] font-medium" style={{ borderRadius: 3, ...barColor, ...(tentative ? { outline: "1px dashed rgba(255,255,255,.75)", outlineOffset: -3 } : {}) }}>
-                    {chChip && <span className="pl-1.5">{chChip}</span>}
-                    <span className={`min-w-0 flex-1 truncate ${chChip ? "pl-1" : "pl-2.5"} pr-1 ${blocked ? "italic" : ""}`}>
+                  <div className="flex h-full items-center overflow-hidden text-[11px] font-medium" style={{ borderRadius: 8, ...barColor, ...(tentative ? { outline: "1px dashed rgba(255,255,255,.75)", outlineOffset: -3 } : {}) }}>
+                    {chChip && <span className="pl-1">{chChip}</span>}
+                    <span className={`min-w-0 flex-1 truncate ${chChip ? "pl-1.5" : "pl-2.5"} pr-1 font-semibold tracking-[-0.01em] ${blocked ? "italic" : ""}`}>
                       {blocked ? (
                         <span className="inline-flex items-center gap-1 font-semibold not-italic">
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-6 6a2 2 0 1 0 2.8 2.8l6-6a4 4 0 0 0 5.4-5.4l-2.3 2.3-2.1-2.1z" /></svg>
                           {b.note ?? "Fuori servizio"}
                         </span>
                       ) : guestName(b.guestId)}
-                      {extra && <span className="opacity-80"> · {extra}</span>}
+                      {extra && <span className="font-normal opacity-75"> · {extra}</span>}
                     </span>
                     {icons}
                   </div>
