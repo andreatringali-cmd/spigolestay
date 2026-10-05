@@ -51,6 +51,15 @@ function saveJSON(key: string, value: unknown) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage pieno/negato: si riprova al prossimo giro */ }
 }
 
+// Lo snapshot pesa centinaia di KB: sta in sessionStorage (quota separata) e NON nel localStorage, che è quasi pieno
+// e sincronizzato col server. Se manca (nuova sessione) si fa un full-sync, che comunque si fa ogni 24h.
+function loadSnapshots(): SnapshotStore {
+  try { const r = sessionStorage.getItem(SNAPSHOT_KEY); return r ? (JSON.parse(r) as SnapshotStore) : {}; } catch { return {}; }
+}
+function saveSnapshots(v: SnapshotStore) {
+  try { sessionStorage.setItem(SNAPSHOT_KEY, JSON.stringify(v)); } catch { /* storage pieno: si ripete il full-sync */ }
+}
+
 // Chiave/valore per il diff.
 const availKey = (r: { property_id: string; room_type_id: string; date: string }) => `${r.property_id}|${r.room_type_id}|${r.date}`;
 const availVal = (r: { availability: number }) => String(r.availability);
@@ -86,7 +95,7 @@ export default function ChannexAutoSync() {
         try { ctd = JSON.parse(localStorage.getItem(CTD_KEY) || "{}"); } catch {}
         const { roomTypes: rt, units: un, bookings: bk, rateOverrides: ro } = dataRef.current;
 
-        const snapshots = loadJSON<SnapshotStore>(SNAPSHOT_KEY, {});
+        const snapshots = loadSnapshots();
         const lastFull = loadJSON<Record<string, number>>(LASTFULL_KEY, {});
         const now = Date.now();
 
@@ -143,7 +152,7 @@ export default function ChannexAutoSync() {
             if (restrOk) for (const r of sendRestr) nextSnap.restrictions[restrKey(r)] = restrVal(r);
           }
           snapshots[sid] = nextSnap;
-          saveJSON(SNAPSHOT_KEY, snapshots);
+          saveSnapshots(snapshots);
         }
       }, DEBOUNCE_MS);
     };
