@@ -5,6 +5,7 @@
 // arriverà dall'autenticazione; qui è simulato con uno switch per provare i ruoli.
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { kvGet } from "./bigstore";
 import { usePathname } from "next/navigation";
 import { loadUsers, saveUsers, allowedStructureIds, type User, type PermLevel } from "./users";
 import { useData } from "./store";
@@ -111,7 +112,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
       try {
         const act = localStorage.getItem("spigolestay:activestruct") || "all";
         if (act === "all") { setActiveOrgId(""); return; }
-        const raw = localStorage.getItem("spigolestay:data:v1");
+        const raw = kvGet("spigolestay:data:v1");
         const d = raw ? JSON.parse(raw) : {};
         const s = (Array.isArray(d.structures) ? d.structures : []).find((x: { id?: string }) => x.id === act);
         setActiveOrgId((s?.orgId as string) || "");

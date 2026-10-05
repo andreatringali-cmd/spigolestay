@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { kvGet, kvSet, kvKeys, kvFlush } from "@/lib/bigstore";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useTheme } from "@/lib/theme";
@@ -132,10 +133,10 @@ export default function ImpostazioniPage() {
   // Backup: esporta/importa tutte le chiavi "spigolestay:*".
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState("");
-  const keysOf = () => { const ks: string[] = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith("spigolestay:")) ks.push(k); } return ks; };
+  const keysOf = () => kvKeys().filter((k) => k.startsWith("spigolestay:"));
   const doExport = () => {
     const dump: Record<string, string> = {};
-    keysOf().forEach((k) => { dump[k] = localStorage.getItem(k)!; });
+    keysOf().forEach((k) => { dump[k] = kvGet(k)!; });
     const blob = new Blob([JSON.stringify({ app: "Xenora", exportedAt: new Date().toISOString(), data: dump }, null, 2)], { type: "application/json" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `spigolestay-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(a.href);
   };
@@ -147,8 +148,8 @@ export default function ImpostazioniPage() {
         const parsed = JSON.parse(String(r.result));
         const data = (parsed.data ?? parsed) as Record<string, unknown>;
         let n = 0;
-        Object.entries(data).forEach(([k, v]) => { if (k.startsWith("spigolestay:")) { localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v)); n++; } });
-        setMsg(`${t("Ripristinati")} ${n} ${t("blocchi di dati. Ricarico…")}`); setTimeout(() => location.reload(), 900);
+        Object.entries(data).forEach(([k, v]) => { if (k.startsWith("spigolestay:")) { kvSet(k, typeof v === "string" ? v : JSON.stringify(v)); n++; } });
+        setMsg(`${t("Ripristinati")} ${n} ${t("blocchi di dati. Ricarico…")}`); setTimeout(() => { void kvFlush().then(() => location.reload()); }, 900);
       } catch { setMsg(t("File di backup non valido.")); }
     };
     r.readAsText(file);

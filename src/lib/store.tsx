@@ -4,6 +4,7 @@
 // In produzione questi dati arriveranno da Supabase.
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { kvGet, kvSet, kvRemove, kvKeys, kvFlush } from "./bigstore";
 import type { Structure, RoomType, Unit, Guest, Booking, Channel, CalEvent, DirectReview } from "./types";
 import { CHANNELS } from "./types";
 import { playSound } from "./sound";
@@ -246,17 +247,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Reset forzato una-tantum: alla prima apertura dopo questo aggiornamento azzera TUTTO
       // (cancella ogni dato locale) e riparte dal primo accesso. Poi imposta un flag e non si ripete.
       if (localStorage.getItem("spigolestay:forcereset:v1") !== "1") {
-        Object.keys(localStorage).filter((k) => k.startsWith("spigolestay:")).forEach((k) => localStorage.removeItem(k));
+        kvKeys().filter((k) => k.startsWith("spigolestay:")).forEach((k) => kvRemove(k));
         localStorage.setItem("spigolestay:forcereset:v1", "1");
         localStorage.setItem("spigolestay:onboarded", "0");
-        location.reload();
+        void kvFlush().then(() => location.reload());
         return;
       }
     } catch {}
     try {
       // Prima di configurare (onboarding non completato) NON si caricano i dati demo.
       const onboarded = localStorage.getItem("spigolestay:onboarded") === "1";
-      const raw = onboarded ? localStorage.getItem(KEY) : null;
+      const raw = onboarded ? kvGet(KEY) : null;
       // Migrazione una-tantum: azzera i prezzi dei dati già esistenti (basePrice + tariffe forzate).
       // Si esegue una sola volta, poi imposta un flag e non interviene più.
       const zeroPrices = localStorage.getItem("spigolestay:zeroprices:v1") !== "1";
@@ -290,7 +291,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // 2) Salvataggio ad ogni cambiamento, solo dopo il caricamento iniziale.
   useEffect(() => {
     if (!ready || isPublicMode()) return; // in pubblico non si scrive nel browser del visitatore
-    try { localStorage.setItem(KEY, JSON.stringify({ structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews, _deleted: deletedRef.current, _deletedLeads: deletedLeadsRef.current })); } catch { try { window.dispatchEvent(new Event("xenora:storage-full")); } catch { /* ambiente senza window */ } }
+    try { kvSet(KEY, JSON.stringify({ structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews, _deleted: deletedRef.current, _deletedLeads: deletedLeadsRef.current })); } catch { try { window.dispatchEvent(new Event("xenora:storage-full")); } catch { /* ambiente senza window */ } }
   }, [ready, structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews]);
 
   // Ri-idratazione IN-PLACE: quando la sincronizzazione col server aggiorna i dati (anche solo
@@ -302,7 +303,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const rehydrate = () => {
       if (!readyRef.current) return;
       try {
-        const raw = localStorage.getItem(KEY);
+        const raw = kvGet(KEY);
         if (!raw) return;
         const d = JSON.parse(raw);
         if (Array.isArray(d.structures)) setStructures(d.structures);

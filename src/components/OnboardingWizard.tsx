@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { kvGet, kvSet, kvFlush } from "@/lib/bigstore";
 import Image from "next/image";
 import { STRUCTURE_TYPES, ROOM_TYPE_OPTIONS } from "@/lib/types";
 import { blankUser, fullPerms, USER_LANGS } from "@/lib/users";
@@ -50,7 +51,7 @@ export default function OnboardingWizard() {
   const [hasData, setHasData] = useState(false); // utente di ritorno con dati già presenti
   useEffect(() => {
     setActive(isOnboardingActive());
-    try { const d = JSON.parse(localStorage.getItem("spigolestay:data:v1") || "{}"); setHasData(Array.isArray(d.structures) && d.structures.length > 0); } catch {}
+    try { const d = JSON.parse(kvGet("spigolestay:data:v1") || "{}"); setHasData(Array.isArray(d.structures) && d.structures.length > 0); } catch {}
   }, []);
   const skipOnboarding = () => { markOnboarded(); setActive(false); };
   const { enabled: authEnabled, signOut } = useAuth();
@@ -121,7 +122,7 @@ export default function OnboardingWizard() {
       for (let i = 1; i <= n; i++) units.push({ id: uid(), structureId: sid, roomTypeId: rtId, name: String(i), code: `${name.replace(/\s+/g, "").slice(0, 3).toUpperCase()}${i}` });
     });
     try {
-      localStorage.setItem("spigolestay:data:v1", JSON.stringify({ structures: [structure], roomTypes, units, guests: [], bookings: [], events: [], rateOverrides: {} }));
+      kvSet("spigolestay:data:v1", JSON.stringify({ structures: [structure], roomTypes, units, guests: [], bookings: [], events: [], rateOverrides: {} }));
       // Utente / profilo
       const u = blankUser();
       u.firstName = firstName.trim(); u.lastName = lastName.trim(); u.email = email.trim(); u.phone = phone.trim();
@@ -137,7 +138,7 @@ export default function OnboardingWizard() {
       localStorage.setItem("spigolestay:activestruct", sid);
       markOnboarded();
     } catch {}
-    window.location.href = "/";
+    void kvFlush().then(() => { window.location.href = "/"; });
   };
 
   if (!active) return null;

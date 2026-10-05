@@ -1,3 +1,4 @@
+import { kvSet, kvRemove, kvKeys, kvFlush } from "./bigstore";
 // Stato "primo accesso" + reset dei dati (prototipo, localStorage).
 // onboarded: "1" = configurato · "0" = reset in corso (mostra il wizard) · assente = demo (nessun wizard).
 
@@ -23,12 +24,12 @@ const EMPTY_DATA = { structures: [], roomTypes: [], units: [], guests: [], booki
 // Svuota tutto e riparte come primo accesso: dati vuoti + wizard attivo.
 export function resetAll(): void {
   try {
-    Object.keys(localStorage).filter((k) => k.startsWith("spigolestay:")).forEach((k) => localStorage.removeItem(k));
+    kvKeys().filter((k) => k.startsWith("spigolestay:")).forEach((k) => kvRemove(k));
     // Dati vuoti così il seed demo non ricompare, poi attivo il wizard.
-    localStorage.setItem("spigolestay:data:v1", JSON.stringify(EMPTY_DATA));
+    kvSet("spigolestay:data:v1", JSON.stringify(EMPTY_DATA));
     localStorage.setItem("spigolestay:users", JSON.stringify([]));
     localStorage.setItem("spigolestay:activestruct", "all");
     localStorage.setItem(ONBOARDED_KEY, "0");
   } catch {}
-  window.location.href = "/";
+  void kvFlush().then(() => { window.location.href = "/"; });
 }

@@ -17,6 +17,7 @@
 // fiscali della struttura.
 
 import { supabase } from "./supabase";
+import { kvGet } from "./bigstore";
 
 export const DATA_KEY = "spigolestay:data:v1";
 export const AUX_KEYS = [
@@ -117,7 +118,7 @@ export async function loadPublicSite(slug: string): Promise<boolean> {
 // Lettura unificata: in modalità pubblica legge dallo snapshot, altrimenti dal localStorage.
 export function lsGet(key: string): string | null {
   if (SNAP) return key in SNAP ? SNAP[key] : null;
-  try { return localStorage.getItem(key); } catch { return null; }
+  try { return kvGet(key); } catch { return null; }
 }
 
 // Campi struttura da NON pubblicare (dati fiscali/bancari privati).
@@ -136,7 +137,7 @@ export function buildPublishData(structureId: string): Record<string, string> | 
     rateOverrides?: Record<string, number>;
     directReviews?: Record<string, unknown>[];
   } = {};
-  try { blob = JSON.parse(localStorage.getItem(DATA_KEY) || "{}"); } catch { return null; }
+  try { blob = JSON.parse(kvGet(DATA_KEY) || "{}"); } catch { return null; }
 
   const structures = (blob.structures ?? []).filter((s) => s.id === structureId);
   if (!structures.length) return null;
