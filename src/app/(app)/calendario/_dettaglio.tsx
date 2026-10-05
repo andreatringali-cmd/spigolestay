@@ -14,7 +14,7 @@ import { toISO, shiftISO, parseISO } from "@/lib/dates";
 import { bookingPaidTotal } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import { journeyOf, isLiveBooking, type JourneyStep } from "@/lib/booking-journey";
-import { CHANNELS, type Booking, type Channel } from "@/lib/types";
+import type { Booking } from "@/lib/types";
 import SearchInput from "@/components/SearchInput";
 import { bookingCode } from "@/lib/bookingCode";
 import { normName } from "@/lib/guest-key";
@@ -61,11 +61,9 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   // Colonne lunghe: mostra le prime 6 schede, poi "Mostra tutte" (e, aperta, scorre dentro la colonna invece di allungare la pagina).
   const [openCols, setOpenCols] = useState<Record<string, boolean>>({});
   const COL_LIMIT = 6;
-  // Riga dei filtri: ricerca (ospite, camera, codice), canale, camera, stato. Valgono sia per le colonne del giorno sia per i risultati.
+  // Riga sotto il calendario: ricerca (ospite, camera, codice) e tre badge (Arrivi / In casa / Partenze) che mostrano una sola sezione.
   const [q, setQ] = useState("");
-  const [chan, setChan] = useState<"all" | Channel>("all");
-  const [loc, setLoc] = useState("all");
-  const [stato, setStato] = useState<"all" | "late" | "todo">("all");
+  const [only, setOnly] = useState<Col | null>(null);
   const [cleanDone, setCleanDone] = useState<Record<string, boolean>>({});
   useEffect(() => {
     const h = () => setCleanDone(readCleanDone());
@@ -103,14 +101,10 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   }, [guestById]);
 
   const qTokens = useMemo(() => normName(q).split(" ").filter(Boolean), [q]);
-  const filtersOn = qTokens.length > 0 || chan !== "all" || loc !== "all" || stato !== "all";
+  const filtersOn = qTokens.length > 0;
   // Una prenotazione passa i filtri? La ricerca accetta le parole in qualsiasi ordine (nome, cognome, camera, codice, contatti).
   const passes = useCallback((r: { b: Booking; j: Journey }) => {
-    const { b, j } = r;
-    if (chan !== "all" && b.channel !== chan) return false;
-    if (loc !== "all" && b.unitId !== loc) return false;
-    if (stato === "late" && !j.steps.some((s) => s.state === "late")) return false;
-    if (stato === "todo" && !j.steps.some((s) => s.state === "todo" || s.state === "late")) return false;
+    const { b } = r;
     if (qTokens.length) {
       const g = guestById.get(b.guestId);
       const u = b.unitId ? unitById.get(b.unitId) : undefined;
@@ -118,7 +112,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
       if (!qTokens.every((tk) => hay.includes(tk))) return false;
     }
     return true;
-  }, [chan, loc, stato, qTokens, guestById, unitById, guestName]);
+  }, [qTokens, guestById, unitById, guestName]);
 
   // ── Prenotazioni del periodo con il loro percorso ──
   const gSizes = useMemo(() => groupSizes(bookings), [bookings]);
@@ -195,17 +189,6 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   // Eventi segnalati nel periodo (sagre, ponti…): come nel calendario a griglia, solo per la struttura attiva.
   const evs = useMemo(() => scopeFilter(events, activeStructureId).filter((e) => e.from <= to && e.to > from), [events, activeStructureId, from, to]);
 
-  // ── Riepilogo anomalie del periodo (sulle schede mostrate) ──
-  const summary = useMemo(() => {
-    const all = new Map([...cols.arr, ...cols.stay, ...cols.dep].map((r) => [r.b.id, r]));
-    const noUnit = [...all.values()].filter((r) => !r.b.unitId).length;
-    const noCheckin = cols.arr.filter((r) => r.j.steps.find((s) => s.key === "checkin")?.state !== "done").length;
-    const turnovers = cols.arr.filter((r) => turn.arr.has(r.b.id)).length;
-    const saldo = cols.dep.filter((r) => bookingPaidTotal(r.b) - (r.b.paid ?? 0) > 0.005).length;
-    const late = [...all.values()].filter((r) => r.j.steps.some((s) => s.state === "late")).length;
-    return { noUnit, noCheckin, turnovers, saldo, late };
-  }, [cols, turn]);
-
   const openStep = (r: Row, s: JourneyStep) => {
     if (s.state !== "done" && s.state !== "na") setModal({ id: r.b.id, key: s.key });
     else if (s.href) router.push(s.href);
@@ -241,16 +224,6 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   const freeTitle = week ? "Camere libere nel periodo" : sel === today ? "Camere libere stasera" : `Camere libere la notte di ${dayShort(sel)}`;
   const nothingAtAll = !scopedUnits.length && !live.length;
 
-  const pill = (n: number, label: string, tone: "err" | "warn") => n > 0 ? (
-    <span key={label} className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ color: tone === "err" ? "var(--err)" : "var(--warn)", background: `color-mix(in srgb, ${tone === "err" ? "var(--err)" : "var(--warn)"} 13%, transparent)` }}>{n} {label}</span>
-  ) : null;
-  const pills = [
-    pill(summary.noUnit, summary.noUnit === 1 ? "prenotazione senza camera" : "prenotazioni senza camera", "err"),
-    pill(summary.noCheckin, summary.noCheckin === 1 ? "arrivo senza check-in" : "arrivi senza check-in", "warn"),
-    pill(summary.turnovers, summary.turnovers === 1 ? "turnover" : "turnover", "warn"),
-    pill(summary.saldo, summary.saldo === 1 ? "partenza con saldo aperto" : "partenze con saldo aperto", "warn"),
-    pill(summary.late, summary.late === 1 ? "prenotazione con passaggi in ritardo" : "prenotazioni con passaggi in ritardo", "err"),
-  ].filter(Boolean);
 
   if (nothingAtAll) return <div className="rounded-xl border border-line bg-surface"><EmptyState title="Nessuna camera né prenotazione da mostrare" sub="Aggiungi le camere della struttura e le prime prenotazioni: qui vedrai arrivi, soggiorni e partenze giorno per giorno." /></div>;
 
@@ -261,32 +234,33 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
       {/* Riga dei filtri, subito sotto il calendario: cerca, filtra per canale/camera/stato; a destra la scelta della vista */}
       <div className="no-print mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <SearchInput value={q} onChange={setQ} placeholder="Cerca ospite, camera o codice…" className="w-full sm:w-72" />
-        <select aria-label="Canale" value={chan} onChange={(e) => setChan(e.target.value as "all" | Channel)} className="rounded-lg border border-line bg-surface px-2 py-2 text-sm text-txt outline-none focus:border-focus">
-          <option value="all">Tutti i canali</option>
-          {(Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => <option key={c} value={c}>{CHANNELS[c].label}</option>)}
-        </select>
-        <select aria-label="Camera" value={loc} onChange={(e) => setLoc(e.target.value)} className="max-w-[11rem] rounded-lg border border-line bg-surface px-2 py-2 text-sm text-txt outline-none focus:border-focus">
-          <option value="all">Tutte le camere</option>
-          {activeUnits.map((u) => <option key={u.id} value={u.id}>{showStructure ? `${getStructure(u.structureId)?.name ?? ""} · ` : ""}{u.name}</option>)}
-        </select>
-        <select aria-label="Stato" value={stato} onChange={(e) => setStato(e.target.value as "all" | "late" | "todo")} className="rounded-lg border border-line bg-surface px-2 py-2 text-sm text-txt outline-none focus:border-focus">
-          <option value="all">Tutti gli stati</option>
-          <option value="todo">Da fare</option>
-          <option value="late">In ritardo</option>
-        </select>
-        {filtersOn && <button onClick={() => { setQ(""); setChan("all"); setLoc("all"); setStato("all"); }} className="rounded-lg px-2 py-2 text-xs font-semibold text-focus hover:underline">Azzera filtri</button>}
+        {/* Tre badge: Arrivi / In casa / Partenze del periodo mostrato (o della ricerca). Un clic mostra solo quella sezione, un secondo clic le rimostra tutte. */}
+        {COLS.map((c) => {
+          const on = only === c.key;
+          return (
+            <button key={c.key} type="button" onClick={() => setOnly((o) => (o === c.key ? null : c.key))} aria-pressed={on} title={on ? "Mostra tutte le sezioni" : `Mostra solo: ${c.title}`}
+              className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:border-focus"
+              style={{ borderColor: on ? c.tone : "var(--line)", background: on ? `color-mix(in srgb, ${c.tone} 14%, var(--surface))` : "var(--surface)", color: "var(--txt)" }}>
+              <span className="h-2 w-2 rounded-full" style={{ background: c.tone }} />
+              {c.title}
+              <span className="rounded-full px-1.5 py-0.5 font-mono text-[11px] tabular-nums" style={{ color: c.tone, background: `color-mix(in srgb, ${c.tone} 14%, transparent)` }}>{c.list.length}</span>
+            </button>
+          );
+        })}
+        {filtersOn && <button onClick={() => setQ("")} className="rounded-lg px-2 py-2 text-xs font-semibold text-focus hover:underline">Azzera ricerca</button>}
         <div className="ml-auto">{viewSwitch}</div>
       </div>
 
-      {/* Eventi e riepilogo del periodo */}
+      {/* Eventi segnalati nel periodo (sagre, ponti…) */}
+      {evs.length > 0 && (
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         {evs.map((e) => (
           <span key={e.id} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-txt" title={`${dayShort(e.from)} → ${dayShort(shiftISO(e.to, -1))}`}>
             <span className="h-2 w-2 rounded-full" style={{ background: e.color }} />{e.name}
           </span>
         ))}
-        {pills.length > 0 ? pills : <span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ color: "var(--ok)", background: "color-mix(in srgb, var(--ok) 13%, transparent)" }}>Nessuna anomalia in questo periodo ✓</span>}
       </div>
+      )}
 
       {results && (
         <section className="mt-5 min-w-0">
@@ -298,7 +272,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
             </h2>
             <p className="text-xs text-faint">Tutte le prenotazioni che corrispondono, anche fuori dal periodo mostrato: le più vicine a oggi per prime</p>
           </div>
-          {results.length === 0 ? <Vuoto title="Nessuna prenotazione trovata" sub="Prova con meno parole, oppure azzera i filtri." /> : (
+          {results.length === 0 ? <Vuoto title="Nessuna prenotazione trovata" sub="Prova con meno parole, oppure azzera la ricerca." /> : (
             <div className="flex flex-col gap-3">
               {results.map((r) => {
                 const unit = r.b.unitId ? unitById.get(r.b.unitId) : undefined;
@@ -320,7 +294,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
       {/* Arrivi / In casa / Partenze */}
       {!results && (
       <div className="mt-5 flex flex-col gap-8">
-        {COLS.map((c) => {
+        {COLS.filter((c) => !only || c.key === only).map((c) => {
           // In modalità 7 giorni arrivi e partenze sono raggruppati per giorno.
           const groups: { day: string; items: Row[] }[] = [];
           if (week && c.key !== "stay") {
