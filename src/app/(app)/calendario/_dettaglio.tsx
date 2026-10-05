@@ -256,8 +256,10 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
 
   return (
     <div>
-      {/* Riga dei filtri: cerca una prenotazione, filtra per canale/camera/stato; a destra la scelta della vista */}
-      <div className="no-print mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
+      <StriscaGiorni days={stripDays} sel={sel} mode={mode} today={today} rangeLabel={rangeLabel} onSelect={selectDay} onShift={shift} onToday={goToday} onMode={setMode} onPick={pick} />
+
+      {/* Riga dei filtri, subito sotto il calendario: cerca, filtra per canale/camera/stato; a destra la scelta della vista */}
+      <div className="no-print mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <SearchInput value={q} onChange={setQ} placeholder="Cerca ospite, camera o codice…" className="w-full sm:w-72" />
         <select aria-label="Canale" value={chan} onChange={(e) => setChan(e.target.value as "all" | Channel)} className="rounded-lg border border-line bg-surface px-2 py-2 text-sm text-txt outline-none focus:border-focus">
           <option value="all">Tutti i canali</option>
@@ -275,7 +277,6 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
         {filtersOn && <button onClick={() => { setQ(""); setChan("all"); setLoc("all"); setStato("all"); }} className="rounded-lg px-2 py-2 text-xs font-semibold text-focus hover:underline">Azzera filtri</button>}
         <div className="ml-auto">{viewSwitch}</div>
       </div>
-      <StriscaGiorni days={stripDays} sel={sel} mode={mode} today={today} rangeLabel={rangeLabel} onSelect={selectDay} onShift={shift} onToday={goToday} onMode={setMode} onPick={pick} />
 
       {/* Eventi e riepilogo del periodo */}
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
