@@ -796,12 +796,12 @@ export default function CalendarGrid() {
             const turn = !blocked && isTurnover(b);
             const grp = !blocked && !!b.groupId;
             const underprice = !blocked ? checkUnderpriced(b, roomTypes, rateOverrides, weekendPct) : null;
-            const chLetter = ({ booking: "B", airbnb: "A", expedia: "E", other: "O", direct: "D", blocked: "" } as Record<string, string>)[b.channel] ?? "";
-            const chChip = !blocked && chLetter ? (
-              <span className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[3px] bg-white text-[8px] font-extrabold leading-none" style={{ color: `var(${meta.cssVar})` }} title={meta.label}>{chLetter}</span>
+            // Logo piccolo del canale a inizio riga (con un anello bianco: così si vede anche sul colore del canale).
+            const chChip = !blocked ? (
+              <span className="inline-flex shrink-0 rounded-full bg-white p-px" title={meta.label}><ChannelLogo channel={b.channel} size={13} title={meta.label} /></span>
             ) : null;
-            const chChipSotto = !blocked && chLetter ? (
-              <span className="grid h-3 w-3 shrink-0 place-items-center rounded-[2px] text-[7px] font-extrabold leading-none text-white" style={{ backgroundColor: `var(${meta.cssVar})` }} title={meta.label}>{chLetter}</span>
+            const chChipSotto = !blocked ? (
+              <span className="inline-flex shrink-0 rounded-full bg-white p-px" title={meta.label}><ChannelLogo channel={b.channel} size={11} title={meta.label} /></span>
             ) : null;
             const icons = !blocked && wide ? (
               <span className="flex shrink-0 items-center gap-1 pr-1.5" style={{ color: meta.text }}>
