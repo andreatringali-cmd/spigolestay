@@ -92,20 +92,22 @@ export function parseICS(text: string): IcsEvent[] {
 // CSV (quando la colonna "Camera" del file è la sola TIPOLOGIA, come nell'export Octorate: mappare
 // tutte le righe a UNA camera specifica le sovrapporrebbe tutte lì).
 export function makeUnitAssigner(units: Unit[], bookings: Booking[], structureId: string, excludeIds: Set<string> = new Set()) {
-  const slots: Record<string, { unitId: string; last: string }[]> = {};
+  // Per ogni camera si tengono gli intervalli occupati: una camera è libera se NESSUN intervallo si sovrappone (checkout = check-in non è
+  // sovrapposizione). Funziona con le prenotazioni in qualunque ordine, anche con quelle già presenti a metà periodo.
+  const slots: Record<string, { unitId: string; busy: [string, string][] }[]> = {};
   units.filter((u) => u.structureId === structureId).forEach((u) => {
-    const last = bookings.filter((b) => b.unitId === u.id && !excludeIds.has(b.id)).reduce((mx, b) => (b.checkOut > mx ? b.checkOut : mx), "0000-00-00");
-    (slots[u.roomTypeId] ||= []).push({ unitId: u.id, last });
+    const busy = bookings.filter((b) => b.unitId === u.id && !excludeIds.has(b.id) && b.status !== "cancelled").map((b) => [b.checkIn, b.checkOut] as [string, string]);
+    (slots[u.roomTypeId] ||= []).push({ unitId: u.id, busy });
   });
   return (typeId: string, ci: string, co: string, addUnit: (u: { structureId: string; roomTypeId: string; name: string }) => string, t: (s: string) => string): string | null => {
     const arr = (slots[typeId] ||= []);
-    let s = arr.find((x) => x.last <= ci);
+    let s = arr.find((x) => !x.busy.some(([a, b]) => ci < b && co > a));
     if (!s) {
       if (arr.length > 0) return null; // camere reali già tutte occupate → overbooking, lascia da assegnare
       const id = addUnit({ structureId, roomTypeId: typeId, name: `${t("Camera")} 1` });
-      s = { unitId: id, last: "0000-00-00" }; arr.push(s);
+      s = { unitId: id, busy: [] }; arr.push(s);
     }
-    s.last = co; return s.unitId;
+    s.busy.push([ci, co]); return s.unitId;
   };
 }
 

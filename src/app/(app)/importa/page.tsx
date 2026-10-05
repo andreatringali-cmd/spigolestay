@@ -315,17 +315,25 @@ export default function ImportaPage() {
     // più quelle create in questa stessa passata (evita doppioni anche interni al file).
     const guestNameOf = (id: string) => guests.find((g) => g.id === id)?.fullName ?? "";
     const seen = new Set(bookings.filter((b) => b.structureId === structureId).map((b) => bookingDedupeKey(b.structureId, guestNameOf(b.guestId), b.checkIn, b.checkOut)));
-    const seenExt = new Set(bookings.map((b) => b.extId).filter(Boolean) as string[]); // già importate da Octorate (stesso ID)
+    const seenExt = new Map(bookings.filter((b) => b.extId).map((b) => [b.extId as string, b])); // già importate da Octorate (stesso ID)
+    let fixed = 0; // prenotazioni già importate ma rimaste "Da assegnare": ora ricevono la camera
 
     let n = 0, skipped = 0, dup = 0;
-    dataRows.forEach((r) => {
+    // In ordine di arrivo: l'assegnazione delle camere funziona meglio e il risultato non dipende dall'ordine del file (Octorate esporta dal più recente).
+    const ordered = [...dataRows].sort((x, y) => toISO(val(x, "checkIn")).localeCompare(toISO(val(y, "checkIn"))));
+    ordered.forEach((r) => {
       const ci = toISO(val(r, "checkIn")), co = toISO(val(r, "checkOut")), name = val(r, "guest");
       if (!ci || !co || !name || ci >= co) { skipped++; return; } // campi obbligatori mancanti o date incoerenti
       const key = bookingDedupeKey(structureId, name, ci, co);
       const dbId = val(r, "dbId");
       const extId = dbId ? `octorate:${dbId}` : undefined;
-      if ((extId && seenExt.has(extId)) || seen.has(key)) { dup++; return; } // già presente / doppione nel file
-      if (extId) seenExt.add(extId);
+      const known = extId ? seenExt.get(extId) : undefined;
+      if (known) {
+        // Già importata: se non ha ancora una camera, la assegna adesso (senza ricrearla).
+        if (!known.unitId) { const res = resolveUnit(val(r, "room"), ci, co); if (res.unitId) { updateBooking(known.id, { unitId: res.unitId, roomTypeId: res.roomTypeId }); fixed++; } }
+        dup++; return;
+      }
+      if (seen.has(key)) { dup++; return; } // già presente / doppione nel file
       seen.add(key);
       const guestId = addGuest({ fullName: name, email: val(r, "email") || undefined, phone: val(r, "phone") || undefined, country: val(r, "country") || undefined });
       const roomTxt = val(r, "room");
@@ -354,6 +362,7 @@ export default function ImportaPage() {
     const msgs: string[] = [];
     if (skipped) msgs.push(`${skipped} ${t("righe saltate (date o nome mancanti).")}`);
     if (dup) msgs.push(`${dup} ${t("doppioni ignorati (già presenti).")}`);
+    if (fixed) msgs.push(`${fixed} ${t("prenotazioni già importate hanno ricevuto la camera.")}`);
     setErr(msgs.join(" "));
   };
 
