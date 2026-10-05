@@ -72,6 +72,7 @@ export default function ImportaPage() {
   const [structureId, setStructureId] = useState<string>(() => (activeStructureId !== "all" ? activeStructureId : structures[0]?.id ?? ""));
   const [includeBlocked, setIncludeBlocked] = useState(false);
   const [propertyFilter, setPropertyFilter] = useState(""); // "" = tutte le righe; altrimenti solo la struttura del file scelta (export Octorate con più strutture)
+  const [reassign, setReassign] = useState(false); // rifà da zero le camere delle prenotazioni già importate che non sono ancora finite
   const [futureOnly, setFutureOnly] = useState(true); // importa solo le prenotazioni con partenza da oggi in poi (lo storico non serve)
   const [replacePrev, setReplacePrev] = useState(true);
   const [targetUnit, setTargetUnit] = useState<string>(""); // "" = auto per tipologia; altrimenti id camera specifica
@@ -289,7 +290,12 @@ export default function ImportaPage() {
     //  - "__new__"                   → crea UNA camera nuova con questo nome esatto (riusata per
     //    le righe successive con lo stesso testo, via cache locale) — per i rari file con codici
     //    camera specifici (es. "SH_#1") non ancora presenti in Xenora.
-    const assignInType = makeUnitAssigner(sUnitsHere, bookings, structureId);
+    // Con "riassegna": le camere delle prenotazioni già importate (stesso ID Octorate) non ancora finite si ricalcolano da capo, in ordine di arrivo,
+    // così si ricompongono i buchi lasciati da un'assegnazione fatta in ordine sbagliato.
+    const todayCut = todayLocal;
+    const rowExt = new Set(dataRows.map((r) => (val(r, "dbId") ? `octorate:${val(r, "dbId")}` : "")).filter(Boolean));
+    const reIds = new Set<string>(reassign ? bookings.filter((b) => b.extId && rowExt.has(b.extId) && b.checkOut >= todayCut).map((b) => b.id) : []);
+    const assignInType = makeUnitAssigner(sUnitsHere, bookings, structureId, reIds);
     const createdUnits = new Map<string, { id: string; roomTypeId: string }>();
     const resolveUnit = (roomTxt: string, ci: string, co: string): { unitId: string | null; roomTypeId: string } => {
       if (!roomTxt) return { unitId: null, roomTypeId: rtFallback };
@@ -344,7 +350,7 @@ export default function ImportaPage() {
       const known = extId ? seenExt.get(extId) : undefined;
       if (known) {
         // Già importata: se non ha ancora una camera, la assegna adesso (senza ricrearla).
-        if (!known.unitId) { const res = resolveUnit(val(r, "room"), ci, co); if (res.unitId) { updateBooking(known.id, { unitId: res.unitId, roomTypeId: res.roomTypeId }); fixed++; } }
+        if (!known.unitId || reIds.has(known.id)) { const res = resolveUnit(val(r, "room"), ci, co); if (res.unitId && res.unitId !== known.unitId) { updateBooking(known.id, { unitId: res.unitId, roomTypeId: res.roomTypeId }); fixed++; } else if (!res.unitId && reIds.has(known.id) && known.unitId) { updateBooking(known.id, { unitId: null }); fixed++; } }
         const gid = groupFor(r); if (gid && !known.groupId) updateBooking(known.id, { groupId: gid });
         dup++; return;
       }
@@ -377,7 +383,7 @@ export default function ImportaPage() {
     const msgs: string[] = [];
     if (skipped) msgs.push(`${skipped} ${t("righe saltate (date o nome mancanti).")}`);
     if (dup) msgs.push(`${dup} ${t("doppioni ignorati (già presenti).")}`);
-    if (fixed) msgs.push(`${fixed} ${t("prenotazioni già importate hanno ricevuto la camera.")}`);
+    if (fixed) msgs.push(`${fixed} ${t("prenotazioni già importate hanno cambiato camera.")}`);
     setErr(msgs.join(" "));
   };
 
@@ -477,6 +483,9 @@ export default function ImportaPage() {
                   <option value="">{t("Tutte (mescola le strutture)")}</option>
                 </select>
               </label>
+            )}
+            {mode === "csv" && rows.length > 1 && (
+              <label className="mt-2 flex items-center gap-2 text-xs text-txt"><input type="checkbox" checked={reassign} onChange={(e) => setReassign(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" />{t("Riassegna le camere delle prenotazioni già importate (solo quelle non ancora finite): ricompone le sovrapposizioni")}</label>
             )}
             {mode === "csv" && rows.length > 1 && (
               <label className="mt-2 flex items-center gap-2 text-xs text-txt"><input type="checkbox" checked={futureOnly} onChange={(e) => setFutureOnly(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" />{t("Solo prenotazioni future (partenza da oggi in poi): lo storico non viene importato")}</label>
