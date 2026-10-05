@@ -798,10 +798,10 @@ export default function CalendarGrid() {
             const underprice = !blocked ? checkUnderpriced(b, roomTypes, rateOverrides, weekendPct) : null;
             // Logo piccolo del canale a inizio riga (con un anello bianco: così si vede anche sul colore del canale).
             const chChip = !blocked ? (
-              <span className="inline-flex shrink-0 rounded-full bg-white p-px" title={meta.label}><ChannelLogo channel={b.channel} size={13} title={meta.label} /></span>
+              <span className="inline-flex shrink-0 rounded-full bg-white p-px" title={meta.label}><ChannelLogo channel={b.channel} size={vw.dense ? 18 : 22} title={meta.label} /></span>
             ) : null;
             const chChipSotto = !blocked ? (
-              <span className="inline-flex shrink-0 rounded-full bg-white p-px" title={meta.label}><ChannelLogo channel={b.channel} size={11} title={meta.label} /></span>
+              <span className="inline-flex shrink-0 rounded-full bg-white p-px" title={meta.label}><ChannelLogo channel={b.channel} size={vw.dense ? 15 : 18} title={meta.label} /></span>
             ) : null;
             const icons = !blocked && wide ? (
               <span className="flex shrink-0 items-center gap-1 pr-1.5" style={{ color: meta.text }}>
