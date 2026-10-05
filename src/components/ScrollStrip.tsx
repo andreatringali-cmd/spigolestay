@@ -125,3 +125,46 @@ export default function ScrollStrip({ items, onReorder, gap = "gap-4" }: { items
     </div>
   );
 }
+
+// Striscia scorrevole con le stesse frecce ‹ › di ScrollStrip, per righe di card con contenuto libero (es. le card del Calendario).
+// Stesso aspetto e stesso comportamento: ogni click porta al blocco successivo/precedente; spariscono quando non c'è altro da scorrere.
+export function ArrowScroller({ children, className = "", wrapperClassName = "", onDoubleClick }: { children: React.ReactNode; className?: string; wrapperClassName?: string; onDoubleClick?: React.MouseEventHandler<HTMLDivElement> }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [canL, setCanL] = useState(false);
+  const [canR, setCanR] = useState(false);
+  const update = () => {
+    const el = ref.current; if (!el) return;
+    setCanL(el.scrollLeft > 4);
+    setCanR(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+  };
+  useEffect(() => {
+    update();
+    const el = ref.current; if (!el) return;
+    const ro = new ResizeObserver(update); ro.observe(el);
+    const mo = new MutationObserver(update); mo.observe(el, { childList: true });
+    return () => { ro.disconnect(); mo.disconnect(); };
+  }, []);
+  const nudge = (dir: -1 | 1) => {
+    const el = ref.current; if (!el) return;
+    const kids = ([...el.children] as HTMLElement[]).sort((a, b) => a.offsetLeft - b.offsetLeft); if (!kids.length) return;
+    const cur = el.scrollLeft, eps = 4;
+    if (dir === 1) {
+      const next = kids.find((k) => k.offsetLeft > cur + eps);
+      el.scrollTo({ left: next ? next.offsetLeft : el.scrollWidth, behavior: "smooth" });
+    } else {
+      const prevs = kids.filter((k) => k.offsetLeft < cur - eps);
+      el.scrollTo({ left: prevs.length ? prevs[prevs.length - 1].offsetLeft : 0, behavior: "smooth" });
+    }
+  };
+  const arrowCls = "absolute top-1/2 z-20 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-focus text-lg font-bold leading-none text-white shadow-md transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-0";
+  return (
+    <div className={`relative ${wrapperClassName}`}>
+      <button type="button" onClick={() => nudge(-1)} disabled={!canL} aria-label="Scorri a sinistra" className={`${arrowCls} left-0 -translate-x-1/3`}>‹</button>
+      <button type="button" onClick={() => nudge(1)} disabled={!canR} aria-label="Scorri a destra" className={`${arrowCls} right-0 translate-x-1/3`}>›</button>
+      <div ref={ref} onScroll={update} onDoubleClick={onDoubleClick} className={`ss-strip overflow-x-auto scroll-smooth ${className}`} style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}>
+        {children}
+      </div>
+      <style>{`.ss-strip::-webkit-scrollbar{display:none}`}</style>
+    </div>
+  );
+}

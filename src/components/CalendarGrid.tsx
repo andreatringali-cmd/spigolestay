@@ -26,6 +26,7 @@ import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import Icon from "@/components/Icon";
 import ChannelLogo from "@/components/ChannelLogo";
+import { ArrowScroller } from "@/components/ScrollStrip";
 import DateField from "@/components/DateField";
 
 // Scheda camera: opzioni frequenza servizio e giorni della settimana.
@@ -1033,31 +1034,40 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       </div>
 
       {/* Legenda OTA — solo i canali aggiunti su Channex; contorno verde = collegato, rosso = non collegato */}
-      <div className="order-[-1] flex flex-wrap items-center gap-x-2.5 gap-y-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        {/* Sito ufficiale e mini sito Xenora: SEMPRE presenti, verdi se c'è/è pubblicato, rossi se no. */}
-        <div title={siteStruct ? `Sito ufficiale collegato · ${siteStruct.name}` : "Nessun sito ufficiale impostato"} className="grid h-[26px] w-[26px] shrink-0 place-items-center overflow-hidden rounded-full border-2" style={{ borderColor: siteStruct ? "var(--ok)" : "var(--err)" }}>
-          {siteStruct ? (
-            siteStruct.logo
-              ? <img src={siteStruct.logo} alt="" className="h-full w-full object-cover" />
-              : <span className="grid h-full w-full place-items-center text-[10px] font-bold text-white" style={{ backgroundColor: siteStruct.photoColor ?? "var(--focus)" }}>{(siteStruct.name || "?")[0]?.toUpperCase()}</span>
-          ) : <Icon name="globe" size={14} />}
-        </div>
-        <div title={miniSiteStruct ? `Mini sito Xenora pubblicato · ${miniSiteStruct.name}` : "Mini sito Xenora non ancora pubblicato"} className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full border-2 p-1" style={{ borderColor: miniSiteStruct ? "var(--ok)" : "var(--err)" }}>
-          <Image src="/xenora-mark.png" alt="" width={18} height={18} className="h-full w-full object-contain" style={{ opacity: miniSiteStruct ? 1 : 0.45 }} />
-        </div>
+      <div className="order-[-1] flex flex-wrap items-center gap-x-2 gap-y-1.5 px-0.5">
+        <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wide text-faint">Canali</span>
+        {/* Sito ufficiale e Xenosite: SEMPRE presenti, con pallino verde se ci sono/sono pubblicati, rosso se no. */}
+        <span title={siteStruct ? `Sito ufficiale collegato · ${siteStruct.name}` : "Nessun sito ufficiale impostato"} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-txt">
+          <span className="grid h-[22px] w-[22px] shrink-0 place-items-center overflow-hidden rounded-full bg-wash text-dim">
+            {siteStruct ? (
+              siteStruct.logo
+                ? <img src={siteStruct.logo} alt="" className="h-full w-full object-cover" />
+                : <span className="grid h-full w-full place-items-center text-[10px] font-bold text-white" style={{ backgroundColor: siteStruct.photoColor ?? "var(--focus)" }}>{(siteStruct.name || "?")[0]?.toUpperCase()}</span>
+            ) : <Icon name="globe" size={13} />}
+          </span>
+          Sito
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: siteStruct ? "var(--ok)" : "var(--err)" }} />
+        </span>
+        <span title={miniSiteStruct ? `Xenosite pubblicato · ${miniSiteStruct.name}` : "Xenosite non ancora pubblicato"} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-txt">
+          <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full bg-white p-[3px] shadow-[0_0_0_1px_rgba(0,0,0,.08)]"><Image src="/xenora-mark.png" alt="" width={16} height={16} className="h-full w-full object-contain" style={{ opacity: miniSiteStruct ? 1 : 0.45 }} /></span>
+          Xenosite
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: miniSiteStruct ? "var(--ok)" : "var(--err)" }} />
+        </span>
         {(Object.keys(realChannels) as (keyof typeof CHANNELS)[]).map((c) => {
           const active = realChannels[c];
           const label = CHANNELS[c]?.label ?? c;
           return (
-            <div key={c} title={`${label} · ${active ? "collegato" : "non collegato"}`} className="grid place-items-center rounded-full p-0.5" style={{ border: `2px solid ${active ? "var(--ok)" : "var(--err)"}` }}>
-              <ChannelLogo channel={c} size={24} title={label} />
-            </div>
+            <span key={c} title={`${label} · ${active ? "collegato" : "non collegato"}`} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-txt">
+              <ChannelLogo channel={c} size={22} title={label} />
+              {label}
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: active ? "var(--ok)" : "var(--err)" }} />
+            </span>
           );
         })}
-        <div className="ml-auto flex items-center gap-3">
-          {lastRun && <span className="text-xs text-faint" title="Data e ora dell'ultima sincronizzazione">Ultimo processo · {lastRun}</span>}
-          <button onClick={syncNow} disabled={syncing} title={syncing ? "Sincronizzazione in corso…" : "Sincronizza ora con i canali collegati"} className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt disabled:opacity-60">
-            <svg className={syncing ? "animate-spin" : ""} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></svg>
+        <div className="ml-auto flex items-center gap-2">
+          {lastRun && <span className="text-[11px] text-faint" title="Data e ora dell'ultima sincronizzazione">Aggiornato · {lastRun}</span>}
+          <button onClick={syncNow} disabled={syncing} title={syncing ? "Sincronizzazione in corso…" : "Sincronizza ora con i canali collegati"} aria-label="Sincronizza ora con i canali collegati" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt disabled:opacity-60">
+            <svg className={syncing ? "animate-spin" : ""} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></svg>
           </button>
         </div>
       </div>
@@ -1073,7 +1083,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           </div>
         </div>
       )}
-      <div className="order-first flex gap-3 overflow-x-auto pb-1" onDoubleClick={onCardsDblClick}>
+      <ArrowScroller wrapperClassName="order-first" className="flex gap-3 pb-1" onDoubleClick={onCardsDblClick}>
         {showCard("copilot") && (
         <div data-cardkey="copilot" onDrop={() => onCardDrop("copilot")} style={{ order: orderOf("copilot") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "copilot" ? "opacity-40" : ""} ${dragCard && dragCard !== "copilot" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🤖</span> Copilota revenue</div>
@@ -1310,7 +1320,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           <div className="mt-2 flex justify-between text-[10px] text-faint"><span>{soldNights} notti vendute</span><span>occ. {avgOcc}%</span></div>
         </div>
         )}
-      </div>
+      </ArrowScroller>
 
       {/* Occupazione — pannello separato sopra il calendario */}
       {vw.occ && (
