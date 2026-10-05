@@ -42,7 +42,7 @@ const FIELDS: { key: string; label: string; req?: boolean; kw: RegExp; strict?: 
   { key: "total", label: "Importo totale", kw: /totale|total|importo|amount|prezzo|price|revenue|incasso|ricavo/i, strict: /^totale camera$/i },
   { key: "email", label: "Email", kw: /email|mail/i },
   { key: "phone", label: "Telefono", kw: /telefono|phone|tel\b|cell|mobile/i },
-  { key: "bookedOn", label: "Data prenotazione", kw: /prenotat|booked|creat|created|data.?pren/i },
+  { key: "bookedOn", label: "Data prenotazione", kw: /prenotat|booked|creat|creaz|created|data.?pren/i },
   { key: "note", label: "Note", kw: /note|nota|remark|comment|richiest/i },
   { key: "code", label: "Codice prenotazione (OTA)", kw: /^codice$|reservation|booking.?(id|number)|n\.? ?prenotazione/i, strict: /^codice$/i },
   { key: "dbId", label: "ID Octorate (anti-doppioni)", kw: /^database id$/i },
@@ -183,7 +183,9 @@ export default function ImportaPage() {
 
   const val = (r: string[], key: string) => { const i = map[key]; return i === undefined || i < 0 ? "" : (r[i] ?? "").trim(); };
   const todayLocal = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
-  const dataRows = useMemo(() => (!futureOnly ? allRows : allRows.filter((r) => { const co = toISO(val(r, "checkOut")); return !co || co >= todayLocal; })), [allRows, futureOnly, map, todayLocal]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Con "solo future" restano le prenotazioni che partono da oggi in poi (si legge la colonna del check-out scelta nella mappatura).
+  const coIdx = map.checkOut;
+  const dataRows = useMemo(() => (!futureOnly || coIdx === undefined ? allRows : allRows.filter((r) => { const co = toISO((r[coIdx] ?? "").trim()); return !co || co >= todayLocal; })), [allRows, futureOnly, coIdx, todayLocal]);
   const ready = structureId && map.guest !== undefined && map.checkIn !== undefined && map.checkOut !== undefined && dataRows.length > 0;
 
   // Camere distinte trovate nel file (colonna "Camera"), per la mappatura ESPLICITA: per ognuna
@@ -419,6 +421,9 @@ export default function ImportaPage() {
               </div>
             )}
             {fileName && <p className="mt-2 text-xs text-faint">{fileName} · {dataRows.length} {t("righe")}{futureOnly && allRows.length !== dataRows.length ? ` ${t("da importare")} (${t("su")} ${allRows.length} ${t("nel file")})` : ""}</p>}
+            {mode === "csv" && rows.length > 1 && (
+              <p className="mt-2 text-sm font-semibold text-txt">{futureOnly ? `${dataRows.length} ${t("prenotazioni future da importare")} (${t("su")} ${allRows.length} ${t("nel file")})` : `${allRows.length} ${t("prenotazioni (tutto lo storico)")}`}</p>
+            )}
             {mode === "csv" && rows.length > 1 && (
               <label className="mt-2 flex items-center gap-2 text-xs text-txt"><input type="checkbox" checked={futureOnly} onChange={(e) => setFutureOnly(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" />{t("Solo prenotazioni future (partenza da oggi in poi): lo storico non viene importato")}</label>
             )}
