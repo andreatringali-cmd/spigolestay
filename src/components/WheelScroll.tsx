@@ -11,6 +11,8 @@ export default function WheelScroll() {
       if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return; // gesto già orizzontale (trackpad) → nativo
       let el = e.target as HTMLElement | null;
       while (el && el !== document.body && el !== document.documentElement) {
+        // Aree che NON vogliono la conversione (es. il calendario): la rotella scorre la pagina, in verticale.
+        if (el.hasAttribute("data-no-wheel-x")) return;
         const style = getComputedStyle(el);
         // 1) Priorità: se un box può scorrere in VERTICALE nella direzione della rotella, lascialo fare (nativo).
         const oy = style.overflowY;
