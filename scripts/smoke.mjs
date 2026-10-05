@@ -27,6 +27,13 @@ const checks = [
   { name: "public-booking incompleta", method: "POST", path: "/api/public-booking", body: {}, ok: [400, 404, 429] },
   { name: "public-lead incompleta", method: "POST", path: "/api/public-lead", body: {}, ok: [400, 404, 429] },
   { name: "checkin senza id", method: "GET", path: "/api/checkin", ok: [400, 404] },
+  // Xenosite per assistenti AI e motori di ricerca (usa un sito pubblicato: SMOKE_SLUG, di default spigolehouse)
+  { name: "robots.txt", method: "GET", path: "/robots.txt", ok: [200] },
+  { name: "sitemap.xml", method: "GET", path: "/sitemap.xml", ok: [200] },
+  { name: "scheda AI del sito", method: "GET", path: `/api/ai/${process.env.SMOKE_SLUG || "spigolehouse"}`, ok: [200] },
+  { name: "llms.txt del sito", method: "GET", path: `/${process.env.SMOKE_SLUG || "spigolehouse"}/llms.txt`, ok: [200] },
+  { name: "preventivo AI con date errate", method: "GET", path: `/api/ai/${process.env.SMOKE_SLUG || "spigolehouse"}/quote?checkin=2026-12-16&checkout=2026-12-14`, ok: [400] },
+  { name: "scheda AI di un sito che non esiste", method: "GET", path: "/api/ai/non-esiste-xyz", ok: [404] },
 ];
 
 let failed = 0;
