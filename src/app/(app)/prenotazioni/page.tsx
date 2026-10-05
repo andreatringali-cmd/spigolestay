@@ -90,8 +90,19 @@ export default function PrenotazioniPage() {
   const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "checkIn", dir: "asc" });
   const toggleSort = (key: string) => setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
   // Selettore grafici (icona prima di "Nuova")
-  const [hiddenPren, setHiddenPren] = useState<Set<string> | null>(null);
-  const persistPren = (n: Set<string>) => { setHiddenPren(n); try { localStorage.setItem("spigolestay:prenchart:v2", JSON.stringify([...n])); } catch {} };
+  // Si salva l'elenco dei grafici VISIBILI (non quello dei nascosti): così un grafico che in quel momento non esiste (es. "per struttura"
+  // con una sola struttura selezionata) o aggiunto in seguito non compare da solo, e "nascondi tutti" resta valido in ogni vista.
+  const ALL_CHART_KEYS = ["ch-mix", "str-mix", "stay", "month", "rev-month", "rt-mix", "country"];
+  const [visiblePren, setVisiblePren] = useState<Set<string>>(() => new Set());
+  const persistPren = (hiddenNow: Set<string>) => {
+    const vis = new Set<string>();
+    ALL_CHART_KEYS.forEach((k) => {
+      const available = charts.some((c) => c.key === k);
+      if (available ? !hiddenNow.has(k) : visiblePren.has(k)) vis.add(k); // se non è disponibile ora, mantiene la scelta di prima
+    });
+    setVisiblePren(vis);
+    try { localStorage.setItem("spigolestay:prenchart:v3", JSON.stringify([...vis])); } catch {}
+  };
   // Ordine dei grafici (riordino via drag&drop), persistito.
   const [chartOrder, setChartOrder] = useState<string[]>([]);
   const persistChartOrder = (o: string[]) => { setChartOrder(o); try { localStorage.setItem("spigolestay:prenchartorder", JSON.stringify(o)); } catch {} };
@@ -104,7 +115,7 @@ export default function PrenotazioniPage() {
   useEffect(() => { setLoc("all"); }, [activeStructureId]);
   const chartRef = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (chartRef.current && !chartRef.current.contains(e.target as Node)) setChartMenu(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:prenchart:v2"); if (r) setHiddenPren(new Set(JSON.parse(r))); } catch {} try { const o = localStorage.getItem("spigolestay:prenchartorder"); if (o) setChartOrder(JSON.parse(o)); } catch {} }, []);
+  useEffect(() => { try { const r = localStorage.getItem("spigolestay:prenchart:v3"); if (r) setVisiblePren(new Set(JSON.parse(r))); } catch {} try { const o = localStorage.getItem("spigolestay:prenchartorder"); if (o) setChartOrder(JSON.parse(o)); } catch {} }, []);
 
   const now = new Date();
   const todayISO = toISO(now);
@@ -286,8 +297,8 @@ export default function PrenotazioniPage() {
   ].filter((c) => !(singleStruct && c.perStructure));
   // I primi 4 (PREN_DEFAULTS) sono l'ordine e la vista iniziale; tutti restano nascondibili (mostra/nascondi tutti).
   const PREN_DEFAULTS = ["ch-mix", "month", "rev-month"];
-  const defaultHidden = () => new Set(charts.map((c) => c.key)); // all'apertura tutti i grafici nascosti
-  const hidden = hiddenPren ?? defaultHidden();
+  // All'apertura tutti i grafici sono nascosti, finché non li mostri tu: sono "nascosti" tutti quelli non presenti tra i visibili.
+  const hidden = new Set(charts.map((c) => c.key).filter((k) => !visiblePren.has(k)));
   const chartRank = (c: { key: string }) => { const i = PREN_DEFAULTS.indexOf(c.key); return i < 0 ? 100 + charts.findIndex((x) => x.key === c.key) : i; };
   const orderedCharts = [...charts].sort((a, b) => chartRank(a) - chartRank(b));
   const shownCharts = orderedCharts.filter((c) => !hidden.has(c.key)).sort((a, b) => {

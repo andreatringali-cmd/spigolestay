@@ -286,7 +286,7 @@ export default function Dashboard2() {
     return ia - ib;
   });
   const showAllCharts = () => { setChartWarn(""); persistHidden(new Set()); };
-  const hideAllCharts = () => { setChartWarn(""); persistHidden(new Set(availCharts.map((c) => c.key))); };
+  const hideAllCharts = () => { setChartWarn(""); persistHidden(new Set(dashCharts.map((c) => c.key))); }; // TUTTI i grafici, anche quelli "per struttura" non disponibili ora: altrimenti riappaiono da soli cambiando struttura
 
   // Liste per la data selezionata
   const term = search.trim().toLowerCase();

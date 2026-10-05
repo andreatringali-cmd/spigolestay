@@ -20,6 +20,10 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 let flushing: Promise<void> = Promise.resolve();
 let db: IDBDatabase | null = null;
 let initPromise: Promise<void> | null = null;
+let version = 0; // sale a ogni scrittura: permette di accorgersi che qualcosa è cambiato senza rileggere i dati
+
+/** Contatore delle modifiche locali (vedi sopra). */
+export function kvVersion(): number { return version; }
 
 const isBig = (k: string) => enabled && BIG_KEYS.has(k);
 
@@ -111,11 +115,13 @@ export function kvGet(key: string): string | null {
 
 /** Scrive. Per le chiavi normali può lanciare (quota localStorage) come localStorage.setItem. */
 export function kvSet(key: string, value: string): void {
+  version++;
   if (isBig(key)) { mem.set(key, value); pending.set(key, value); schedule(); return; }
   localStorage.setItem(key, value);
 }
 
 export function kvRemove(key: string): void {
+  version++;
   if (isBig(key)) { mem.delete(key); pending.set(key, null); schedule(); return; }
   try { localStorage.removeItem(key); } catch { /* ignora */ }
 }
