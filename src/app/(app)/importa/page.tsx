@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { ImportOutcome, ImportReport } from "@/lib/import/reconcile";
+import RiepilogoImport from "./_riepilogo";
 import { guestKey } from "@/lib/guest-key";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
@@ -81,6 +83,7 @@ export default function ImportaPage() {
   const [unitMap, setUnitMap] = useState<Record<string, string>>({}); // nome camera CSV (Octorate) -> id camera Xenora (o "__new__")
   const [unitMapType, setUnitMapType] = useState<Record<string, string>>({}); // nome camera CSV -> tipologia sotto cui creare la nuova camera
   const [done, setDone] = useState<number | null>(null);
+  const [report, setReport] = useState<ImportReport | null>(null); // riconciliazione dell'ultima importazione da file
   const [err, setErr] = useState("");
   const [icsUrl, setIcsUrl] = useState("");
   const [fetching, setFetching] = useState(false);
@@ -135,7 +138,7 @@ export default function ImportaPage() {
 
   const onFile = async (f: File | undefined) => {
     if (!f) return;
-    setErr(""); setDone(null); setFileName(f.name);
+    setErr(""); setDone(null); setReport(null); setFileName(f.name);
     let parsed: string[][];
     if (/\.xlsx?$/i.test(f.name)) {
       // Excel (anche l'export di Octorate, che ha estensione .xls ma è un .xlsx)
@@ -278,6 +281,24 @@ export default function ImportaPage() {
   // Quante righe (su TUTTO il file, non solo l'anteprima) hanno una data non riconosciuta:
   // se il conteggio è alto, l'import sembrerebbe "non fare nulla" (0 importate) senza questo avviso.
   const dateIssues = useMemo(() => dataRows.filter((r) => !toISO(val(r, "checkIn")) || !toISO(val(r, "checkOut")) || !val(r, "guest")).length, [dataRows, map]);
+  // Cosa contiene il file, PRIMA di importare: quante future/passate, quante prenotazioni di più camere, quante ci sono già in Xenora.
+  const preStats = useMemo(() => {
+    const seen = new Set(bookings.filter((b) => b.structureId === structureId && b.extId).map((b) => b.extId as string));
+    let already = 0, fut = 0, past = 0;
+    const g = new Map<string, number>();
+    for (const r of dataRows) {
+      const co = toISO(val(r, "checkOut"));
+      if (co) { if (co >= todayLocal) fut++; else past++; }
+      const d = val(r, "dbId");
+      if (d && seen.has(`octorate:${d}`)) already++;
+      const ch = toChannel(val(r, "channel"));
+      const oc = (ch === "booking" || ch === "expedia") ? val(r, "code").split("_")[0].trim() : "";
+      if (oc) { const k = `${ch}|${oc}|${val(r, "guest")}|${toISO(val(r, "checkIn"))}|${toISO(val(r, "checkOut"))}`; g.set(k, (g.get(k) ?? 0) + 1); }
+    }
+    const multi = [...g.values()].filter((c) => c >= 2);
+    return { already, fut, past, groups: multi.length, rooms: multi.reduce((a, c) => a + c, 0) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataRows, bookings, structureId, map, todayLocal]);
 
   const runImport = () => {
     if (!ready) return;
@@ -336,6 +357,9 @@ export default function ImportaPage() {
     let fixed = 0; // prenotazioni già importate ma rimaste "Da assegnare": ora ricevono la camera
 
     let n = 0, skipped = 0, dup = 0;
+    const outcomes: ImportOutcome[] = [];
+    const rowNo = new Map(dataRows.map((r, i) => [r, i + 2])); // riga nel file (la 1 è l'intestazione)
+    let guestsNew = 0, guestsReused = 0, noRoom = 0;
     // In ordine di arrivo: l'assegnazione delle camere funziona meglio e il risultato non dipende dall'ordine del file (Octorate esporta dal più recente).
     const ordered = [...dataRows].sort((x, y) => toISO(val(x, "checkIn")).localeCompare(toISO(val(y, "checkIn"))));
     // Prenotazione di PIÙ CAMERE (stesso numero OTA, ospite e date: es. 6 camere per una notte): le righe condividono un gruppo, come fa Channex.
@@ -354,7 +378,14 @@ export default function ImportaPage() {
     };
     ordered.forEach((r) => {
       const ci = toISO(val(r, "checkIn")), co = toISO(val(r, "checkOut")), name = val(r, "guest");
-      if (!ci || !co || !name || ci >= co) { skipped++; return; } // campi obbligatori mancanti o date incoerenti
+      const note = (status: ImportOutcome["status"], reason?: string, extId?: string) => outcomes.push({
+        row: rowNo.get(r) ?? 0, guest: name, checkIn: ci, checkOut: co, room: val(r, "room"), code: val(r, "code"), extId, total: toNum(val(r, "total")), status, reason,
+      });
+      if (!ci || !co || !name || ci >= co) { // campi obbligatori mancanti o date incoerenti
+        skipped++;
+        note("scartata", !name ? "nome ospite mancante" : (!ci || !co) ? "date non riconosciute" : "il check-out non è dopo il check-in");
+        return;
+      }
       const key = bookingDedupeKey(structureId, name, ci, co);
       const dbId = val(r, "dbId");
       const extId = dbId ? `octorate:${dbId}` : undefined;
@@ -371,22 +402,24 @@ export default function ImportaPage() {
           if (!g2) { g2 = addGuest(gi); if (k2) guestByKey.set(k2, g2); }
           updateBooking(known.id, { guestId: g2 }); relinked++;
         }
+        note("gia_presente", undefined, extId);
         dup++; return;
       }
       // Con l'ID Octorate ogni riga è una prenotazione a sé (anche più camere con stesso ospite e date). Il controllo ospite+date serve solo senza ID.
       if (!extId) {
         const used = usedCnt.get(key) ?? 0;
-        if (used < (existingCnt.get(key) ?? 0)) { usedCnt.set(key, used + 1); dup++; return; } // già presente
+        if (used < (existingCnt.get(key) ?? 0)) { usedCnt.set(key, used + 1); note("gia_presente"); dup++; return; } // già presente
         const rowKey = key + "|" + val(r, "room").trim().toLowerCase();
-        if (seenInFile.has(rowKey)) { dup++; return; } // stessa riga due volte nel file
+        if (seenInFile.has(rowKey)) { note("scartata", "riga identica ripetuta nel file"); dup++; return; } // stessa riga due volte nel file
         seenInFile.add(rowKey);
       }
       const gInfo = { fullName: name, email: val(r, "email") || undefined, phone: val(r, "phone") || undefined, country: val(r, "country") || undefined };
       const gk = guestKey(gInfo);
       let guestId = gk ? guestByKey.get(gk) : undefined;
-      if (!guestId) { guestId = addGuest(gInfo); if (gk) guestByKey.set(gk, guestId); }
+      if (!guestId) { guestId = addGuest(gInfo); guestsNew++; if (gk) guestByKey.set(gk, guestId); } else guestsReused++;
       const roomTxt = val(r, "room");
       const { unitId, roomTypeId } = resolveUnit(roomTxt, ci, co);
+      if (!unitId) noRoom++;
       const bookedOn = toISO(val(r, "bookedOn"));
       const noteTxt = val(r, "note");
       const channel = toChannel(val(r, "channel"));
@@ -405,7 +438,13 @@ export default function ImportaPage() {
         ...(toNum(val(r, "total")) !== undefined ? { total: toNum(val(r, "total")) } : {}),
         note: (t(/\.xlsx?$/i.test(fileName) ? "Importato da Octorate" : "Importato da CSV") + (noteTxt ? " · " + noteTxt : "")).slice(0, 280),
       });
+      note("nuova", undefined, extId);
       n++;
+    });
+    const multi = [...grpCount.values()].filter((c) => c >= 2);
+    setReport({
+      at: Date.now(), fileName, structureId, outcomes,
+      stats: { fileRows: dataRows.length, created: n, already: outcomes.filter((o) => o.status === "gia_presente").length, skipped: outcomes.filter((o) => o.status === "scartata").length, multiGroups: multi.length, multiRooms: multi.reduce((a, c) => a + c, 0), guestsNew, guestsReused, relinked, noRoom },
     });
     setDone(n);
     const msgs: string[] = [];
@@ -464,9 +503,10 @@ export default function ImportaPage() {
             </div>
             <div className="font-display text-xl font-bold text-txt">{done} {t("prenotazioni importate")}</div>
             {err && <p className="mt-2 text-sm text-[color:var(--warn)]">{err}</p>}
+            {report && <RiepilogoImport report={report} bookings={bookings} guests={guests} />}
             <div className="mt-5 flex justify-center gap-2">
               <button onClick={() => router.push("/calendario")} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Vai al calendario")}</button>
-              <button onClick={() => { setRows([]); setMap({}); setDone(null); setErr(""); setFileName(""); }} className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-txt hover:bg-wash">{t("Importa un altro file")}</button>
+              <button onClick={() => { setRows([]); setMap({}); setDone(null); setReport(null); setErr(""); setFileName(""); }} className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-txt hover:bg-wash">{t("Importa un altro file")}</button>
             </div>
           </div>
         </Card>
@@ -660,6 +700,12 @@ export default function ImportaPage() {
                   ⚠️ {dateIssues} {t("righe su")} {dataRows.length} {t("hanno una data non riconosciuta o l'ospite mancante e NON verranno importate. Controlla il formato delle colonne Check-in/Check-out nel file (atteso GG/MM/AAAA o AAAA-MM-GG).")}
                 </div>
               )}
+              <div className="mt-3 rounded-lg border border-line bg-wash/50 px-3 py-2.5 text-[12px] text-dim">
+                <b className="text-txt">{t("Nel file")}:</b> {dataRows.length} {t("righe")} · {preStats.fut} {t("future")} · {preStats.past} {t("passate")}
+                {preStats.groups > 0 && <> · {preStats.groups} {t("prenotazioni di più camere")} ({preStats.rooms} {t("camere")})</>}
+                {preStats.already > 0 && <> · <span style={{ color: "var(--ok)" }}>{preStats.already} {t("sono già in Xenora e non verranno duplicate")}</span></>}
+                <div className="mt-1 text-faint">{t("A fine importazione vedrai un riepilogo che confronta il file con Xenora, riga per riga.")}</div>
+              </div>
               <button onClick={runImport} className="mt-4 rounded-lg bg-focus px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90">{t("Importa")} {dataRows.length - dateIssues} {t("prenotazioni")}</button>
             </Card>
           )}
