@@ -25,7 +25,7 @@ import DateField from "@/components/DateField";
 import { flagColor, flagGradient } from "@/lib/flags";
 import Icon from "@/components/Icon";
 import ExportMenu, { type ExportField } from "@/components/ExportMenu";
-import ChannelLogo from "@/components/ChannelLogo";
+import ChannelLogo, { ChannelWordmark } from "@/components/ChannelLogo";
 import WeatherWidget from "@/components/WeatherWidget";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
@@ -221,7 +221,7 @@ export default function PrenotazioniPage() {
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.bookedOn ? fmt(b.bookedOn) : "—"}</td>
       {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
       <td className={`whitespace-nowrap px-3 py-2.5 text-dim ${indent ? "pl-8" : ""}`}>{indent && <span className="text-faint">↳ </span>}{unitLabel(b) ?? <span className="italic font-medium text-[color:var(--err)]">{t("Da assegnare")}</span>}</td>
-      <td className="px-3 py-2.5"><span className="inline-flex" role="img" aria-label={b.channel === "direct" ? "xenora.it" : ch.label}><ChannelLogo channel={b.channel} size={22} title={b.channel === "direct" ? "xenora.it" : ch.label} /></span></td>
+      <td className="px-3 py-2.5"><ChannelWordmark channel={b.channel} height={16} title={b.channel === "direct" ? "xenora.it" : ch.label} /></td>
       <td className="px-3 py-2.5 font-medium text-txt">{guestName(b)}</td>
       <td className="px-3 py-2.5 font-mono text-dim">{b.adults + b.children}</td>
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>
@@ -529,7 +529,7 @@ export default function PrenotazioniPage() {
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{b.bookedOn ? fmt(b.bookedOn) : "—"}</td>
                     {activeStructureId === "all" && <td className="px-3 py-2.5 text-dim"><span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} /><span className="truncate">{getStructure(b.structureId)?.name}</span></span></td>}
                     <td className="whitespace-nowrap px-3 py-2.5"><span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] px-2 py-0.5 text-[11px] font-semibold text-focus">{members.length} {t("camere")} {open ? "▾" : "▸"}</span></td>
-                    <td className="px-3 py-2.5"><span className="inline-flex" role="img" aria-label={b.channel === "direct" ? "xenora.it" : ch.label}><ChannelLogo channel={b.channel} size={22} title={b.channel === "direct" ? "xenora.it" : ch.label} /></span></td>
+                    <td className="px-3 py-2.5"><ChannelWordmark channel={b.channel} height={16} title={b.channel === "direct" ? "xenora.it" : ch.label} /></td>
                     <td className="px-3 py-2.5 font-medium text-txt">{guestName(b)}</td>
                     <td className="px-3 py-2.5 font-mono text-dim">{gSum(members, (x) => x.adults + x.children)}</td>
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkIn)}</td>
