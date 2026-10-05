@@ -49,6 +49,7 @@ const FIELDS: { key: string; label: string; req?: boolean; kw: RegExp; strict?: 
   { key: "paid", label: "Importo incassato", kw: /incassato|\bpaid\b/i, strict: /^importo incassato$/i },
   { key: "commission", label: "Commissione OTA (€)", kw: /^commissione$|commission/i, strict: /^commissione$/i },
   { key: "country", label: "Nazione ospite", kw: /^nazione$|country|paese/i },
+  { key: "property", label: "Struttura nel file (per filtrare)", kw: /^nome della struttura$/i, strict: /^nome della struttura$/i },
 ];
 
 // Auto-mappatura: prima il nome ESATTO della colonna (campo "strict"), poi le parole chiave.
@@ -70,6 +71,7 @@ export default function ImportaPage() {
   const [map, setMap] = useState<Record<string, number>>({});
   const [structureId, setStructureId] = useState<string>(() => (activeStructureId !== "all" ? activeStructureId : structures[0]?.id ?? ""));
   const [includeBlocked, setIncludeBlocked] = useState(false);
+  const [propertyFilter, setPropertyFilter] = useState(""); // "" = tutte le righe; altrimenti solo la struttura del file scelta (export Octorate con più strutture)
   const [futureOnly, setFutureOnly] = useState(true); // importa solo le prenotazioni con partenza da oggi in poi (lo storico non serve)
   const [replacePrev, setReplacePrev] = useState(true);
   const [targetUnit, setTargetUnit] = useState<string>(""); // "" = auto per tipologia; altrimenti id camera specifica
@@ -183,9 +185,29 @@ export default function ImportaPage() {
 
   const val = (r: string[], key: string) => { const i = map[key]; return i === undefined || i < 0 ? "" : (r[i] ?? "").trim(); };
   const todayLocal = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  // Strutture presenti nel file (se c'è la colonna): serve a non mescolare, per esempio, Spigolehouse e Central Perk.
+  const propIdx = map.property;
+  const propertyOptions = useMemo(() => {
+    if (propIdx === undefined) return [] as { name: string; n: number }[];
+    const m = new Map<string, number>();
+    allRows.forEach((r) => { const v = (r[propIdx] ?? "").trim(); if (v) m.set(v, (m.get(v) ?? 0) + 1); });
+    return [...m.entries()].map(([name, n]) => ({ name, n })).sort((x, y) => y.n - x.n);
+  }, [allRows, propIdx]);
   // Con "solo future" restano le prenotazioni che partono da oggi in poi (si legge la colonna del check-out scelta nella mappatura).
   const coIdx = map.checkOut;
-  const dataRows = useMemo(() => (!futureOnly || coIdx === undefined ? allRows : allRows.filter((r) => { const co = toISO((r[coIdx] ?? "").trim()); return !co || co >= todayLocal; })), [allRows, futureOnly, coIdx, todayLocal]);
+  const dataRows = useMemo(() => allRows.filter((r) => {
+    if (propIdx !== undefined && propertyFilter && (r[propIdx] ?? "").trim() !== propertyFilter) return false;
+    if (!futureOnly || coIdx === undefined) return true;
+    const co = toISO((r[coIdx] ?? "").trim());
+    return !co || co >= todayLocal;
+  }), [allRows, futureOnly, coIdx, todayLocal, propIdx, propertyFilter]);
+  // Se il file ha più strutture, parte da quella col nome simile alla struttura scelta in Xenora (altrimenti la più numerosa).
+  useEffect(() => {
+    if (propertyOptions.length < 2) { setPropertyFilter(""); return; }
+    const sName = normName(structures.find((x) => x.id === structureId)?.name ?? "");
+    const hit = sName ? propertyOptions.find((o) => normName(o.name).includes(sName) || sName.includes(normName(o.name))) : undefined;
+    setPropertyFilter(hit?.name ?? propertyOptions[0].name);
+  }, [propertyOptions, structureId, structures]);
   const ready = structureId && map.guest !== undefined && map.checkIn !== undefined && map.checkOut !== undefined && dataRows.length > 0;
 
   // Camere distinte trovate nel file (colonna "Camera"), per la mappatura ESPLICITA: per ognuna
@@ -423,6 +445,14 @@ export default function ImportaPage() {
             {fileName && <p className="mt-2 text-xs text-faint">{fileName} · {dataRows.length} {t("righe")}{futureOnly && allRows.length !== dataRows.length ? ` ${t("da importare")} (${t("su")} ${allRows.length} ${t("nel file")})` : ""}</p>}
             {mode === "csv" && rows.length > 1 && (
               <p className="mt-2 text-sm font-semibold text-txt">{futureOnly ? `${dataRows.length} ${t("prenotazioni future da importare")} (${t("su")} ${allRows.length} ${t("nel file")})` : `${allRows.length} ${t("prenotazioni (tutto lo storico)")}`}</p>
+            )}
+            {mode === "csv" && propertyOptions.length > 1 && (
+              <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-txt">{t("Il file contiene più strutture: importa solo")}
+                <select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-xs text-txt outline-none focus:border-focus">
+                  {propertyOptions.map((o) => <option key={o.name} value={o.name}>{o.name} ({o.n})</option>)}
+                  <option value="">{t("Tutte (mescola le strutture)")}</option>
+                </select>
+              </label>
             )}
             {mode === "csv" && rows.length > 1 && (
               <label className="mt-2 flex items-center gap-2 text-xs text-txt"><input type="checkbox" checked={futureOnly} onChange={(e) => setFutureOnly(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" />{t("Solo prenotazioni future (partenza da oggi in poi): lo storico non viene importato")}</label>
