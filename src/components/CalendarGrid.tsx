@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type DragEvent as RDragEvent, type MouseEvent as RMouseEvent } from "react";
+import { isHexColor, textOn } from "@/lib/booking-color";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -787,7 +788,7 @@ export default function CalendarGrid() {
             const sotto = barStyle === "sotto";
             const barColor = blocked
               ? { backgroundColor: "#1f1f1f", backgroundImage: "repeating-linear-gradient(45deg, #3a3a3a 0 6px, #0d0d0d 6px 12px)", color: "#e8e8e8", boxShadow: "inset 3px 0 0 rgba(0,0,0,.6), 0 1px 1px rgba(0,0,0,.3)" }
-              : { backgroundColor: `var(${meta.cssVar})`, color: meta.text, boxShadow: "inset 3px 0 0 rgba(0,0,0,.28), 0 1px 1px rgba(0,0,0,.14)" };
+              : { backgroundColor: isHexColor(b.color) ? b.color : `var(${meta.cssVar})`, color: isHexColor(b.color) ? textOn(b.color) : meta.text, boxShadow: "inset 3px 0 0 rgba(0,0,0,.28), 0 1px 1px rgba(0,0,0,.14)" };
             const label = blocked ? "Fuori servizio" : guestName(b.guestId);
             const pay = payStatusOf(b);
             const bday = !blocked && bdayInStay(b.guestId, b.checkIn, b.checkOut);

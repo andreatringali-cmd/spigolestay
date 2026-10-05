@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { BOOKING_COLORS, isHexColor } from "@/lib/booking-color";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { sortUnitsByName } from "@/lib/sortUnits";
@@ -54,7 +55,7 @@ interface Form {
   total: number; cleaningFee: number; commissionPct: number; commissionAmount: number | null; paid: number;
   code: string;
   cityTaxExempt: boolean; cityTaxPaid: boolean; depositPaid: boolean; parking: boolean;
-  note: string;
+  note: string; color: string;
   lastName: string; firstName: string; email: string; phone: string; country: string;
 }
 
@@ -109,7 +110,7 @@ export default function BookingDrawer() {
       commissionAmount: booking.commissionAmount ?? null,
       paid: booking.paid ?? 0, code: booking.code ?? "",
       cityTaxExempt: !!booking.cityTaxExempt, cityTaxPaid: !!booking.cityTaxPaid, depositPaid: !!booking.depositPaid, parking: !!booking.parking,
-      note: booking.note ?? "",
+      note: booking.note ?? "", color: booking.color ?? "",
       lastName: g?.lastName ?? (g?.fullName ? g.fullName.split(" ").slice(1).join(" ") : ""),
       firstName: g?.firstName ?? (g?.fullName ? g.fullName.split(" ")[0] : ""),
       email: g?.email ?? "", phone: g?.phone ?? "", country: g?.country ?? "",
@@ -708,7 +709,7 @@ export default function BookingDrawer() {
       total: form.total, cleaningFee: form.cleaningFee, commissionPct: form.commissionPct,
       commissionAmount: form.commissionAmount ?? undefined, paid: form.paid,
       cityTaxExempt: form.cityTaxExempt, cityTaxPaid: form.cityTaxPaid, depositPaid: form.depositPaid, parking: form.parking,
-      note: form.note.trim() || undefined, code: form.code.trim() || undefined,
+      note: form.note.trim() || undefined, code: form.code.trim() || undefined, color: isHexColor(form.color) ? form.color : undefined,
     });
     updateGuest(booking.guestId, {
       firstName: form.firstName.trim() || undefined, lastName: form.lastName.trim() || undefined, fullName: `${form.firstName} ${form.lastName}`.trim() || undefined, email: form.email.trim() || undefined,
@@ -812,6 +813,20 @@ export default function BookingDrawer() {
           <span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span>
           <span className="font-mono text-lg font-bold text-txt">{eur(totalEdit)}</span>
         </div>
+      </Section>
+
+      <Section title={t("Colore nel calendario")}>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => set({ color: "" })} aria-label={t("Colore predefinito del canale")} title={t("Colore predefinito del canale")} className={`h-7 rounded-full border px-3 text-xs font-semibold ${!isHexColor(form.color) ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}>{t("Predefinito")}</button>
+          {BOOKING_COLORS.map((c) => (
+            <button key={c} type="button" onClick={() => set({ color: c })} aria-label={`${t("Colore")} ${c}`} title={c} className="h-7 w-7 rounded-full border-2 transition hover:scale-110" style={{ backgroundColor: c, borderColor: form.color === c ? "var(--txt)" : "transparent" }} />
+          ))}
+          <label className="flex items-center gap-1.5 text-xs text-dim">
+            <input id="booking-color-custom" type="color" value={isHexColor(form.color) ? form.color : "#2563eb"} onChange={(e) => set({ color: e.target.value })} className="h-7 w-9 cursor-pointer rounded border border-line bg-transparent p-0.5" />
+            {t("Personalizzato")}
+          </label>
+        </div>
+        <p className="mt-1.5 text-[11px] text-faint">{t("Cambia solo il colore di questa prenotazione nel calendario. Premi Salva per applicarlo.")}</p>
       </Section>
 
       <Section title={t("Note")}>

@@ -332,6 +332,7 @@ export interface Booking {
   total?: number; // € (soggiorno, per il prototipo)
   nightlyRates?: Record<string, number>; // data ISO -> prezzo di quella notte, da OTA (es. Booking.com manda il dettaglio notte per notte)
   note?: string;
+  color?: string; // colore personalizzato della barra nel calendario (esadecimale); assente = colore del canale
   extId?: string; // id esterno (es. UID iCal/Octorate) per import idempotente
   cleaningFee?: number; // € pulizia finale
   cityTaxExempt?: boolean; // esente tassa di soggiorno
