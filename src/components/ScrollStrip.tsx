@@ -18,7 +18,7 @@ export default function ScrollStrip({ items, onReorder, gap = "gap-4" }: { items
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // (Lo scroll orizzontale con la rotella è gestito globalmente da <WheelScroll />.)
+  // (La rotella scorre sempre la pagina in verticale: per i grafici ci sono le frecce ‹ › e il trascinamento.)
 
   // Pan col mouse (per il touch resta lo scroll nativo).
   const onDown = (e: React.PointerEvent) => {

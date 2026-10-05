@@ -1314,7 +1314,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
 
       {/* Occupazione — pannello separato sopra il calendario */}
       {vw.occ && (
-      <div ref={occScrollRef} data-no-wheel-x onScroll={() => syncScroll(occScrollRef.current, gridScrollRef.current)} className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+      <div ref={occScrollRef} onScroll={() => syncScroll(occScrollRef.current, gridScrollRef.current)} className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <div className="relative" style={{ width: gridW + LABEL_W }}>
           {/* Fascia mese con frecce */}
           <div className="relative flex border-b border-line bg-wash">
@@ -1391,7 +1391,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       )}
 
       {/* Calendario */}
-      <div ref={gridScrollRef} data-no-wheel-x onScroll={() => syncScroll(gridScrollRef.current, occScrollRef.current)} className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+      <div ref={gridScrollRef} onScroll={() => syncScroll(gridScrollRef.current, occScrollRef.current)} className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <div
           className="relative"
           style={{ width: gridW + LABEL_W }}
