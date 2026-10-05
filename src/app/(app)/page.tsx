@@ -16,6 +16,7 @@ import { toISO, parseISO, nights, addDays } from "@/lib/dates";
 import { eur } from "@/lib/format";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { journeyOf, isLiveBooking, type JourneyStep } from "@/lib/booking-journey";
+import { channelPulse } from "@/lib/channel-pulse";
 import { isGuideSent, readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import { PageHeader } from "@/components/ui";
 import ScrollStrip from "@/components/ScrollStrip";
@@ -381,6 +382,7 @@ export default function Dashboard2() {
   // Centro di comando: stato cross-modulo (dati salvati dalle altre sezioni).
   const relTime = (ts: number) => { const d = Math.floor((Date.now() - ts) / 60000); if (d < 1) return t("adesso"); if (d < 60) return `${d} ${t("min fa")}`; if (d < 1440) return `${Math.floor(d / 60)} ${t("h fa")}`; return `${Math.floor(d / 1440)} ${t("g fa")}`; };
   const [cc, setCc] = useState<{ invii: number; canali: number; tot: number; sync: string }>({ invii: 0, canali: 0, tot: 0, sync: "—" });
+  const [chConn, setChConn] = useState<Record<string, boolean>>({}); // collegamento reale per canale (Channex), per la struttura attiva
   useEffect(() => {
     try {
       const addD = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -415,6 +417,7 @@ export default function Dashboard2() {
         lists.flat().forEach((c) => { byCh[c.channel] = !!byCh[c.channel] || c.active; });
         const tot = Object.keys(byCh).length;
         if (tot > 0 || sFilter !== "all") setCc((p) => ({ ...p, canali: Object.values(byCh).filter(Boolean).length, tot }));
+        setChConn(byCh);
       } catch {}
     })();
     return () => { alive = false; };
@@ -485,6 +488,17 @@ export default function Dashboard2() {
     .sort((a, b) => (b.bookedOn! > a.bookedOn! ? 1 : -1))
     .slice(0, 6);
 
+  // Salute dei canali: dal flusso di prenotazioni (per data di ricezione) si vede se un portale ti porta meno clienti del solito.
+  // Solo i portali (non diretto/altro). Non legge posizioni o livelli dai portali: segnala il sintomo, non la causa.
+  const OTA_CH = ["booking", "airbnb", "expedia", "hotelbeds"];
+  const pulse = channelPulse({
+    bookings: bookings.filter((b) => OTA_CH.includes(b.channel) && (sFilter === "all" || b.structureId === sFilter)).map((b) => ({ channel: b.channel, bookedOn: b.bookedOn })),
+    today: todayISO,
+    connected: Object.fromEntries(Object.entries(chConn).filter(([k]) => OTA_CH.includes(k))),
+    labels: Object.fromEntries(OTA_CH.map((k) => [k, CHANNELS[k as Channel]?.label ?? k])),
+  });
+  const pulseBad = pulse.filter((p) => p.level === "err" || p.level === "warn");
+  const pulseColor = (l: string) => l === "err" ? "var(--err)" : l === "warn" ? "var(--warn)" : l === "info" ? "var(--focus)" : "var(--ok)";
   const alertCount = alerts.length + (adempimentiCount ? 1 : 0);
   const channelsColor = cc.tot > 0 && cc.canali >= cc.tot ? "var(--ok)" : cc.canali > 0 ? "var(--warn)" : "var(--err)";
 
@@ -638,6 +652,25 @@ export default function Dashboard2() {
               ))}
             </div>
           </OpsCard>
+
+          {/* Salute dei canali: allarme visibilità */}
+          {pulse.length > 0 && (
+            <OpsCard title={t("Salute dei canali")} icon="chart" color={pulseBad.length ? "var(--warn)" : "var(--ok)"} right={pulseBad.length ? <Pill color={pulseBad.some((p) => p.level === "err") ? "var(--err)" : "var(--warn)"}>{pulseBad.length} {pulseBad.length === 1 ? t("da controllare") : t("da controllare")}</Pill> : <Pill color="var(--ok)">{t("ok")}</Pill>}>
+              <div className="flex flex-col gap-2">
+                {pulse.map((p) => (
+                  <Link key={p.channel} href="/canali" title={p.detail} className="flex items-center gap-3 rounded-xl border border-line p-2.5 transition hover:border-focus hover:bg-wash">
+                    <ChannelLogo channel={p.channel as Channel} size={28} title={p.label} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-txt">{p.label}</span>
+                      <span className="block truncate text-xs text-dim">{p.detail}</span>
+                    </span>
+                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: tint(pulseColor(p.level), 16), color: pulseColor(p.level) }}>{t(p.headline)}</span>
+                  </Link>
+                ))}
+                <p className="px-1 text-[11px] leading-snug text-faint">{t("Calcolato dalle prenotazioni ricevute negli ultimi 7 giorni rispetto alle 4 settimane precedenti. I portali non comunicano posizione o livello Genius: questo segnala il sintomo, non la causa.")}</p>
+              </div>
+            </OpsCard>
+          )}
 
           {/* Pulizie di oggi */}
           <OpsCard title={t("Pulizie di oggi")} icon="sparkles" color="#0891B2" count={cleanRooms.length} right={<Link href="/pulizie" className="text-[11px] font-semibold text-focus hover:underline">{t("Apri")} →</Link>}>
