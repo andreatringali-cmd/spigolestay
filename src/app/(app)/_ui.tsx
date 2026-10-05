@@ -1,6 +1,6 @@
 "use client";
 
-// Primitive grafiche di Dashboard 2: stesso linguaggio visivo di "Prenotazioni · Dettagliata"
+// Primitive grafiche della Dashboard: stesso linguaggio visivo di "Prenotazioni · Dettagliata"
 // (card rounded-2xl, intestazioni con contatore, pill/pallini tinti, anteprima camera, barre sottili).
 // Qui non c'è logica di business: solo presentazione.
 import type { CSSProperties, ReactNode } from "react";

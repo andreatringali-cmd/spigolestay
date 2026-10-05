@@ -1,6 +1,6 @@
 "use client";
 
-// Liste di Dashboard 2: movimenti del giorno (In struttura / Partenze / Arrivi) e checklist "Da fare oggi".
+// Liste della Dashboard: movimenti del giorno (In struttura / Partenze / Arrivi) e checklist "Da fare oggi".
 // Stessi dati e stessa logica della dashboard attuale; cambia solo la grafica (righe alte con anteprima camera).
 import { useMemo } from "react";
 import { useData } from "@/lib/store";

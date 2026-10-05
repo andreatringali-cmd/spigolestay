@@ -1,16 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+// Dashboard (ex "Dashboard 2", ora la principale) = la dashboard di sempre (stesse sezioni, stessi dati, stessa logica, stesso ordine),
+// con la grafica di "Prenotazioni · Dettagliata": card rounded-2xl, intestazioni con contatore, tessere KPI con tinta,
+// righe alte con anteprima camera, pill/pallini di stato, barre di avanzamento sottili.
+// Le sezioni sono nello stesso ordine della vecchia dashboard, che è stata eliminata.
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { apiPost } from "@/lib/invoicing/client";
 import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { toISO, parseISO, nights, addDays } from "@/lib/dates";
-import { eur, num } from "@/lib/format";
+import { eur } from "@/lib/format";
 import { exportExcel, exportPdf } from "@/lib/export";
-import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import { journeyOf, isLiveBooking, type JourneyStep } from "@/lib/booking-journey";
+import { isGuideSent, readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
+import { PageHeader } from "@/components/ui";
 import ScrollStrip from "@/components/ScrollStrip";
 import Donut from "@/components/Donut";
 import LineChart from "@/components/LineChart";
@@ -26,7 +33,10 @@ import SearchInput from "@/components/SearchInput";
 import ExportMenu from "@/components/ExportMenu";
 import WeatherWidget from "@/components/WeatherWidget";
 import DayNotes from "@/components/DayNotes";
-import { flagColor, flagGradient, flagEmoji } from "@/lib/flags";
+import StepActions from "@/app/(app)/prenotazioni/_azioni";
+import { flagColor, flagGradient } from "@/lib/flags";
+import { Bar, EmptyLine, EYEBROW, IconTile, KpiTile, Panel, PanelHead, Pill, RoomThumb, SectionHead, StructureLabel, tint } from "./_ui";
+import { MoveList, TodoGroup } from "./_liste";
 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
 const fmtFull = (iso: string) => parseISO(iso).toLocaleDateString("it-IT");
@@ -60,22 +70,25 @@ const CLEAN_ACT: Record<string, { label: string; color: string }> = {
   riassetto: { label: "Riassetto", color: "var(--ok)" },
 };
 
-export default function Dashboard() {
-  const { bookings, guests, units, structures, getUnit, getStructure, openBooking, openNewBooking, activeStructureId } = useData();
+const GUIDE_RE = /guest-guide|\/guida|guida ospiti/i;
+type StatoRow = { booking_id: string | null; stato: string };
+
+export default function Dashboard2() {
+  const router = useRouter();
+  const { bookings, guests, units, structures, getUnit, getStructure, openBooking, activeStructureId } = useData();
   const { t } = useLang();
   const today = new Date();
   const todayISO = toISO(today);
   const guestName = (id: string) => guests.find((g) => g.id === id)?.fullName ?? t("Ospite");
 
   // Personalizzazione grafici Dashboard: quali nascondere (persistito nel browser). Minimo 4 visibili.
-  const MIN_CHARTS = 4;
   const [hiddenCharts, setHiddenCharts] = useState<Set<string> | null>(null); // null = non ancora inizializzato
   const persistHidden = (next: Set<string>) => { setHiddenCharts(next); try { localStorage.setItem("spigolestay:dashcharts:v6", JSON.stringify([...next])); } catch {} };
   // Ordine dei grafici (riordino via drag&drop), persistito.
   const [chartOrder, setChartOrder] = useState<string[]>([]);
   const persistChartOrder = (o: string[]) => { setChartOrder(o); try { localStorage.setItem("spigolestay:dashchartorder:v3", JSON.stringify(o)); } catch {} };
-  const [chartWarn, setChartWarn] = useState("");
-  const [chartMenuOpen, setChartMenuOpen] = useState(false);
+  const [, setChartWarn] = useState("");
+  const [, setChartMenuOpen] = useState(false);
   const chartMenuRef = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (chartMenuRef.current && !chartMenuRef.current.contains(e.target as Node)) setChartMenuOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
 
@@ -193,13 +206,10 @@ export default function Dashboard() {
 
   // Prenotazioni presenti nel giorno selezionato (in struttura + in arrivo)
   const daySet = scoped.filter((b) => b.checkIn <= date && date < b.checkOut);
-  const bookingsDonut = channels.map((c) => ({ label: CHANNELS[c].label, value: daySet.filter((b) => b.channel === c).length, color: chColor(c) })).filter((x) => x.value > 0);
-  const revenueDonut = channels.map((c) => ({ label: CHANNELS[c].label, value: Math.round(daySet.filter((b) => b.channel === c).reduce((a, b) => a + nightly(b), 0)), color: chColor(c) })).filter((x) => x.value > 0);
   // Dati unici per canale: prenotazioni + ricavi insieme (un solo grafico a barre)
   const channelRows = channels.map((c) => ({ label: CHANNELS[c].label, color: chColor(c), count: daySet.filter((b) => b.channel === c).length, revenue: Math.round(daySet.filter((b) => b.channel === c).reduce((a, b) => a + nightly(b), 0)) })).filter((r) => r.count > 0 || r.revenue > 0);
   // Prezzo a notte (ADR) per canale → density plot
   const priceByChannel = channels.map((c) => ({ label: CHANNELS[c].label, color: chColor(c), values: scoped.filter((b) => b.channel === c && b.total && nights(b.checkIn, b.checkOut) > 0).map((b) => Math.round((b.total ?? 0) / nights(b.checkIn, b.checkOut))) })).filter((s) => s.values.length > 0);
-  const dayRevTotal = Math.round(daySet.reduce((a, b) => a + nightly(b), 0));
 
   // Occupazione per struttura (giorno selezionato) — a torta
   const occByStructureDay = structuresToShow.map((s, i) => {
@@ -250,7 +260,7 @@ export default function Dashboard() {
     { key: "rooms", title: t("Camere occupate vs libere (giorno)"), node: <Donut data={roomsDonut} center={`${occRooms}/${scopedUnits.length}`} showPercent={false} /> },
     { key: "guests-str", title: t("Ospiti per struttura (giorno)"), perStructure: true, node: <Bars items={guestsByStruct} /> },
     { key: "prov-day", title: t("Provenienza ospiti (giorno)"), node: <ColumnChart bars={provDay} allLabels /> },
-    { key: "rev-day", title: t("Incassi attesi · prossimi 7 giorni"), node: <ColumnChart bars={revDaily} format={(n) => eur(n)} />, extra: <span className="shrink-0 rounded-md bg-wash px-2 py-0.5 font-mono text-xs font-bold text-txt" title={t("Totale atteso sui 7 giorni")}>{eur(revTotal7)}</span> },
+    { key: "rev-day", title: t("Incassi attesi · prossimi 7 giorni"), node: <ColumnChart bars={revDaily} format={(n) => eur(n)} />, extra: <span className="shrink-0 rounded-full bg-wash px-2.5 py-0.5 font-mono text-xs font-bold text-txt" title={t("Totale atteso sui 7 giorni")}>{eur(revTotal7)}</span> },
   ];
   // Di default sono VISIBILI i grafici principali; restano nascosti solo gli opzionali.
   const defaultHidden = () => new Set(dashCharts.map((c) => c.key).filter((k) => !DEFAULT_CHART_KEYS.includes(k)));
@@ -262,8 +272,10 @@ export default function Dashboard() {
   const hidden = hiddenCharts ?? defaultHidden();
   // Con una sola struttura selezionata i grafici "per struttura" non hanno senso: si nascondono da soli.
   const singleStruct = sFilter !== "all" || !multi;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chartAvailable = (c: any) => !(singleStruct && c.perStructure);
   // Ordine: prima i 4 di default, poi gli altri; sopra si applica l'ordine scelto dall'utente (drag&drop).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chartRank = (c: any) => { const i = DEFAULT_CHART_KEYS.indexOf(c.key); return i < 0 ? 100 + dashCharts.findIndex((x) => x.key === c.key) : i; };
   const availCharts = dashCharts.filter(chartAvailable).sort((a, b) => chartRank(a) - chartRank(b));
   const shownCharts = availCharts.filter((c) => !hidden.has(c.key)).sort((a, b) => {
@@ -273,7 +285,6 @@ export default function Dashboard() {
     if (ib < 0) return -1;
     return ia - ib;
   });
-  const toggleChart = (key: string) => { const n = new Set(hidden); if (n.has(key)) n.delete(key); else n.add(key); persistHidden(n); };
   const showAllCharts = () => { setChartWarn(""); persistHidden(new Set()); };
   const hideAllCharts = () => { setChartWarn(""); persistHidden(new Set(availCharts.map((c) => c.key))); };
 
@@ -304,11 +315,71 @@ export default function Dashboard() {
     );
   };
 
-  const listProps = { guestName, getStructure, getUnit, openBooking, structures: structuresToShow, groupByStructure, alloggiatiOk, payStatus };
+  // ===== Aggiunta non invasiva: passaggi della prenotazione + finestra "Risolvi" (stessa logica di Prenotazioni · Dettagliata) =====
+  const [sched, setSched] = useState<StatoRow[]>([]);
+  const [istat, setIstat] = useState<StatoRow[]>([]);
+  const [docs, setDocs] = useState<StatoRow[]>([]);
+  const [threads, setThreads] = useState<Record<string, { dir: string; text: string }[]>>({});
+  const [rems, setRems] = useState<Record<string, Record<string, number>>>({});
+  const [modal, setModal] = useState<{ id: string; key: string } | null>(null);
+  const loadJourney = useCallback(async () => {
+    try { setThreads(JSON.parse(localStorage.getItem("spigolestay:threads:v1") || "{}")); } catch { setThreads({}); }
+    setRems(readReminders());
+    if (!supabase) return;
+    const [a, i, d] = await Promise.all([
+      supabase.from("alloggiati_schedine").select("booking_id, stato"),
+      supabase.from("istat_rows").select("booking_id, stato"),
+      supabase.from("documents").select("booking_id, stato").not("booking_id", "is", null),
+    ]);
+    setSched((a.data ?? []) as StatoRow[]); setIstat((i.data ?? []) as StatoRow[]); setDocs((d.data ?? []) as StatoRow[]);
+  }, []);
+  useEffect(() => { void loadJourney(); }, [loadJourney]);
+  useEffect(() => {
+    const h = () => { void loadJourney(); };
+    window.addEventListener("focus", h);
+    window.addEventListener("spigolestay:datasync", h);
+    window.addEventListener("spigolestay:reminders", h);
+    window.addEventListener("spigolestay:threads", h);
+    return () => { window.removeEventListener("focus", h); window.removeEventListener("spigolestay:datasync", h); window.removeEventListener("spigolestay:reminders", h); window.removeEventListener("spigolestay:threads", h); };
+  }, [loadJourney]);
+  const schedBy = useMemo(() => {
+    const m = new Map<string, "da_validare" | "pronta" | "inviata">();
+    const rank = { da_validare: 3, pronta: 2, inviata: 1 } as const;
+    for (const s of sched) {
+      if (!s.booking_id || !(s.stato in rank)) continue;
+      const st = s.stato as keyof typeof rank;
+      const cur = m.get(s.booking_id);
+      if (!cur || rank[st] > rank[cur]) m.set(s.booking_id, st);
+    }
+    return m;
+  }, [sched]);
+  const istatBy = useMemo(() => {
+    const m = new Map<string, "pending" | "sent">();
+    for (const r of istat) {
+      if (!r.booking_id || (r.stato !== "pending" && r.stato !== "sent")) continue;
+      if (m.get(r.booking_id) !== "pending") m.set(r.booking_id, r.stato);
+    }
+    return m;
+  }, [istat]);
+  const docBy = useMemo(() => { const m = new Map<string, string>(); for (const d of docs) if (d.booking_id && d.stato !== "scartata") { const cur = m.get(d.booking_id); if (!cur || cur === "bozza") m.set(d.booking_id, d.stato); } /* un documento emesso batte la bozza */ return m; }, [docs]);
+  const remLog = useReminderLog(bookings); // cronologia dei solleciti (da chat)
+  const journeyFor = (b: (typeof bookings)[number]) => isLiveBooking(b) ? journeyOf(b, {
+    today: todayISO, guest: guests.find((g) => g.id === b.guestId), structure: getStructure(b.structureId),
+    schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
+    guideSent: isGuideSent(b, threads[b.guestId], remLog[b.id]),
+    invoiceStato: docBy.get(b.id),
+    reminderNotes: reminderNotes(remLog[b.id]),
+  }) : null;
+  // Un passaggio da fare apre "Risolvi"; uno già fatto porta alla pagina di dettaglio.
+  const onStep = (b: { id: string }, s: JourneyStep) => {
+    if (s.state !== "done" && s.state !== "na") setModal({ id: b.id, key: s.key });
+    else if (s.href) router.push(s.href);
+  };
+
+  const listProps = { guestName, getStructure, openBooking, structures: structuresToShow, groupByStructure, alloggiatiOk, payStatus, journeyFor, onStep, date, today: todayISO };
 
   // Centro di comando: stato cross-modulo (dati salvati dalle altre sezioni).
   const relTime = (ts: number) => { const d = Math.floor((Date.now() - ts) / 60000); if (d < 1) return t("adesso"); if (d < 60) return `${d} ${t("min fa")}`; if (d < 1440) return `${Math.floor(d / 60)} ${t("h fa")}`; return `${Math.floor(d / 1440)} ${t("g fa")}`; };
-  const daIncassare = scoped.filter((b) => b.checkOut >= todayISO).reduce((a, b) => a + Math.max(0, (b.total ?? 0) + (b.cleaningFee ?? 0) - (b.paid ?? 0)), 0);
   const [cc, setCc] = useState<{ invii: number; canali: number; tot: number; sync: string }>({ invii: 0, canali: 0, tot: 0, sync: "—" });
   useEffect(() => {
     try {
@@ -414,26 +485,28 @@ export default function Dashboard() {
     .sort((a, b) => (b.bookedOn! > a.bookedOn! ? 1 : -1))
     .slice(0, 6);
 
+  const alertCount = alerts.length + (adempimentiCount ? 1 : 0);
+  const channelsColor = cc.tot > 0 && cc.canali >= cc.tot ? "var(--ok)" : cc.canali > 0 ? "var(--warn)" : "var(--err)";
+
   return (
     <div>
       <PageHeader title={t("Dashboard")} subtitle={`${t("Riferito a")} ${parseISO(date).toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}`} actions={<WeatherWidget compact />} />
 
       {/* KPI stato attuale — cliccabili per filtrare i movimenti sotto */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi label={t("Prenotazioni attive")} value={String(activeSel)} color="var(--focus)" onClick={() => toggleFocus("attive")} active={focus === "attive"} />
-        <Kpi label={t("In struttura")} value={String(inHouseSel)} color="var(--ok)" onClick={() => toggleFocus("inhouse")} active={focus === "inhouse"} />
-        <Kpi label={t("Arrivi")} value={String(arrivalsSel)} color="var(--txt)" onClick={() => toggleFocus("arrivi")} active={focus === "arrivi"} />
-        <Kpi label={t("Partenze")} value={String(departuresSel)} color="var(--warn)" onClick={() => toggleFocus("partenze")} active={focus === "partenze"} />
+        <KpiTile label={t("Prenotazioni attive")} value={String(activeSel)} color="var(--focus)" icon="clipboard" onClick={() => toggleFocus("attive")} active={focus === "attive"} />
+        <KpiTile label={t("In struttura")} value={String(inHouseSel)} color="var(--ok)" icon="bed" onClick={() => toggleFocus("inhouse")} active={focus === "inhouse"} />
+        <KpiTile label={t("Arrivi")} value={String(arrivalsSel)} color="var(--ok)" valueColor="var(--txt)" icon="login" onClick={() => toggleFocus("arrivi")} active={focus === "arrivi"} />
+        <KpiTile label={t("Partenze")} value={String(departuresSel)} color="var(--warn)" icon="logout" onClick={() => toggleFocus("partenze")} active={focus === "partenze"} />
       </div>
 
       {/* KPI del giorno selezionato */}
       <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi label={t("Camere occupate")} value={`${occNight}/${scopedUnits.length}`} color="var(--txt)" small />
-        <Kpi label={t("ADR (prezzo medio/notte)")} value={eur(adrDay)} color="var(--txt)" small />
-        <Kpi label={t("RevPAR (giorno)")} value={eur(revparDay)} color="var(--txt)" small />
-        <Kpi label={t("Incassi del giorno")} value={eur(dayRevenue)} color="var(--txt)" small />
+        <KpiTile small label={t("Camere occupate")} value={`${occNight}/${scopedUnits.length}`} color="var(--ok)" valueColor="var(--txt)" icon="bed" bar={{ pct: scopedUnits.length ? (occNight / scopedUnits.length) * 100 : 0 }} />
+        <KpiTile small label={t("ADR (prezzo medio/notte)")} value={eur(adrDay)} color="var(--focus)" valueColor="var(--txt)" icon="tag" />
+        <KpiTile small label={t("RevPAR (giorno)")} value={eur(revparDay)} color="var(--focus)" valueColor="var(--txt)" icon="chart" />
+        <KpiTile small label={t("Incassi del giorno")} value={eur(dayRevenue)} color="var(--ok)" valueColor="var(--txt)" icon="card" />
       </div>
-
 
       {/* Grafici: una riga scorrevole con frecce ‹ › · mostra/nascondi dal selettore */}
       {shownCharts.length > 0 && (
@@ -445,13 +518,13 @@ export default function Dashboard() {
               key: c.key,
               className: `flex-none snap-start ${(c as { wide?: boolean }).wide ? "w-[520px] max-w-[92vw] lg:w-[calc((100%-2.25rem)/2+0.75rem)]" : "w-[280px] lg:w-[calc((100%-2.25rem)/4)]"}`,
               node: (
-                <Card className="flex h-full flex-col">
+                <Panel className="flex h-full flex-col">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold uppercase tracking-wide text-faint">{c.title}</span>
                     {"extra" in c ? c.extra : null}
                   </div>
                   <div className="flex-1">{c.node}</div>
-                </Card>
+                </Panel>
               ),
             }))}
           />
@@ -459,21 +532,21 @@ export default function Dashboard() {
       )}
 
       {/* Sezione giorno — la ricerca sta nella STESSA griglia dei KPI: larga quanto una card e allineata */}
-      <div className="mt-6 mb-4 grid grid-cols-2 items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm lg:grid-cols-4">
+      <div className="mt-6 mb-4 grid grid-cols-2 items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-sm lg:grid-cols-4">
         <SearchInput value={search} onChange={setSearch} placeholder={t("Cerca ospite…")} className="no-print col-span-2 w-full lg:col-span-1" />
         <div className="col-span-2 flex flex-wrap items-center gap-2 lg:col-span-3">
           <div className="no-print flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1">
-              <button onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash hover:text-txt">‹</button>
-              <DateField value={date} onChange={setDate} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-focus" />
-              <button onClick={() => setDate(toISO(addDays(parseISO(date), 1)))} title={t("Giorno successivo")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash hover:text-txt">›</button>
+              <button onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} className="grid h-9 w-9 place-items-center rounded-xl border border-line text-base leading-none text-dim transition hover:border-focus hover:text-focus">‹</button>
+              <DateField value={date} onChange={setDate} className="rounded-xl border border-line bg-surface px-3 py-1.5 text-sm font-semibold transition hover:border-focus" />
+              <button onClick={() => setDate(toISO(addDays(parseISO(date), 1)))} title={t("Giorno successivo")} className="grid h-9 w-9 place-items-center rounded-xl border border-line text-base leading-none text-dim transition hover:border-focus hover:text-focus">›</button>
             </div>
-            {focus && <span className="rounded-full bg-wash px-2.5 py-0.5 text-[11px] font-semibold text-focus">{t("Filtro")}: {focus === "attive" ? t("attive") : focus === "inhouse" ? t("in struttura") : focus === "arrivi" ? t("arrivi") : t("partenze")}</span>}
-            {hasFilters && <button onClick={() => { setSearch(""); setDate(todayISO); setFocus(null); }} className="rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-wash" style={{ borderColor: "var(--err)", color: "var(--err)" }}>{t("Rimuovi filtri")}</button>}
+            {focus && <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-focus" style={{ backgroundColor: tint("var(--focus)", 12) }}>{t("Filtro")}: {focus === "attive" ? t("attive") : focus === "inhouse" ? t("in struttura") : focus === "arrivi" ? t("arrivi") : t("partenze")}</span>}
+            {hasFilters && <button onClick={() => { setSearch(""); setDate(todayISO); setFocus(null); }} className="rounded-xl border px-3 py-1.5 text-xs font-semibold transition hover:bg-wash" style={{ borderColor: "var(--err)", color: "var(--err)" }}>{t("Rimuovi filtri")}</button>}
           </div>
           <div className="no-print ml-auto flex items-center gap-2">
             {/* Toggle grafici: un click mostra tutti / nasconde tutti (neutro) */}
-            <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border border-line transition ${shownCharts.length > 0 ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
+            <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-xl border border-line transition ${shownCharts.length > 0 ? "bg-wash text-txt" : "text-dim hover:border-focus hover:text-focus"}`}>
               <Icon name="chart" size={16} />
             </button>
             <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
@@ -485,22 +558,22 @@ export default function Dashboard() {
 
       <div className={`grid gap-4 ${gridCols}`}>
         {showInhouse && (
-          <Card>
-            <ListHeader icon="bed" color="var(--focus)">{t("In struttura")} ({inHouse.length})</ListHeader>
-            <MoveList items={inHouse} empty={t("Nessun ospite presente")} {...listProps} />
-          </Card>
+          <Panel hover={false}>
+            <PanelHead icon="bed" color="var(--focus)" title={t("In struttura")} count={inHouse.length} />
+            <MoveList items={inHouse} kind="stay" empty={t("Nessun ospite presente")} {...listProps} />
+          </Panel>
         )}
         {showPart && (
-          <Card>
-            <ListHeader icon="logout" color="var(--err)">{t("Partenze")} ({departures.length})</ListHeader>
-            <MoveList items={departures} empty={t("Nessuna partenza")} {...listProps} />
-          </Card>
+          <Panel hover={false}>
+            <PanelHead icon="logout" color="var(--err)" title={t("Partenze")} count={departures.length} />
+            <MoveList items={departures} kind="dep" empty={t("Nessuna partenza")} {...listProps} />
+          </Panel>
         )}
         {showArr && (
-          <Card>
-            <ListHeader icon="login" color="var(--ok)">{t("Arrivi")} ({arrivals.length})</ListHeader>
-            <MoveList items={arrivals} empty={t("Nessun arrivo")} {...listProps} />
-          </Card>
+          <Panel hover={false}>
+            <PanelHead icon="login" color="var(--ok)" title={t("Arrivi")} count={arrivals.length} />
+            <MoveList items={arrivals} kind="arr" empty={t("Nessun arrivo")} {...listProps} />
+          </Panel>
         )}
       </div>
 
@@ -521,19 +594,18 @@ export default function Dashboard() {
         const planningDone = todoDone.has(planningKey);
         return (
           <div className="mt-8">
-            <div className="mb-3 flex flex-wrap items-center gap-3">
-              <h3 className="font-display text-lg font-bold text-txt">{t("Da fare oggi")}</h3>
-              <span className="text-sm text-dim">{doneCount}/{keys.length} {t("completate")}</span>
-              <div className="ml-1 h-1.5 w-40 overflow-hidden rounded-full bg-wash">
-                <div className="h-full rounded-full transition-all" style={{ width: `${keys.length ? (doneCount / keys.length) * 100 : 0}%`, backgroundColor: "var(--ok)" }} />
-              </div>
-              <Link href="/messaggi?tab=modelli" className="ml-auto flex items-center gap-1.5 rounded-lg border border-focus bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)] px-3 py-1.5 text-xs font-semibold text-focus transition hover:bg-[color:color-mix(in_srgb,var(--focus)_18%,transparent)]">{t("Gestisci automazioni")} →</Link>
-            </div>
+            <SectionHead
+              title={t("Da fare oggi")}
+              right={<Link href="/messaggi?tab=modelli" className="flex items-center gap-1.5 rounded-xl border border-focus px-3 py-1.5 text-xs font-semibold text-focus transition hover:shadow-md" style={{ backgroundColor: tint("var(--focus)", 10) }}>{t("Gestisci automazioni")} →</Link>}
+            >
+              <span className="rounded-full bg-wash px-2.5 py-0.5 font-mono text-xs font-bold text-dim">{doneCount}/{keys.length} <span className="font-sans font-medium">{t("completate")}</span></span>
+              <Bar pct={keys.length ? (doneCount / keys.length) * 100 : 0} color="var(--ok)" className="w-40" />
+            </SectionHead>
 
-            <label className="mb-4 flex items-center gap-2.5 rounded-xl border border-line bg-surface p-3 text-sm shadow-sm">
-              <input type="checkbox" checked={planningDone} onChange={() => toggleTodo(planningKey)} className="h-4 w-4 cursor-pointer accent-[color:var(--ok)]" />
-              <span className="text-[color:var(--warn)]"><Icon name="sparkles" size={16} /></span>
-              <span className={planningDone ? "text-faint line-through" : "font-medium text-txt"}>{t("Inviare il planning alla signora delle pulizie")}</span>
+            <label className="mb-4 flex cursor-pointer items-center gap-3 rounded-2xl border border-line bg-surface p-3.5 text-sm shadow-sm transition hover:border-focus hover:shadow-md">
+              <input type="checkbox" checked={planningDone} onChange={() => toggleTodo(planningKey)} className="h-4 w-4 shrink-0 cursor-pointer accent-[color:var(--ok)]" />
+              <IconTile icon="sparkles" color="var(--warn)" size="sm" />
+              <span className={planningDone ? "text-faint line-through" : "font-semibold text-txt"}>{t("Inviare il planning alla signora delle pulizie")}</span>
             </label>
             <div className="grid gap-4 lg:grid-cols-3">
               <TodoGroup title={t("In struttura")} icon="bed" color="var(--focus)" items={todoStay} tasks={INHOUSE_TASKS} done={todoDone} onToggle={toggleTodo} autoOf={autoOf} guestName={guestName} getUnit={getUnit} getStructure={getStructure} multi={multi} openBooking={openBooking} />
@@ -546,70 +618,69 @@ export default function Dashboard() {
 
       {/* Panoramica operativa */}
       <div className="mt-8">
-        <SectionTitle>{t("Panoramica operativa")}</SectionTitle>
+        <SectionHead title={t("Panoramica operativa")} />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {/* Da controllare */}
-          <OpsCard title={t("Da controllare")} icon="eye" color={(alerts.length || adempimentiCount) ? "var(--warn)" : "var(--ok)"} right={<span className="text-[11px] text-faint">{(alerts.length || adempimentiCount) ? `${alerts.length + (adempimentiCount ? 1 : 0)} ${t("avvisi")}` : t("ok")}</span>}>
-            <div className="flex flex-col gap-1.5">
+          <OpsCard title={t("Da controllare")} icon="eye" color={(alerts.length || adempimentiCount) ? "var(--warn)" : "var(--ok)"} right={(alerts.length || adempimentiCount) ? <Pill color="var(--warn)">{alertCount} {t("avvisi")}</Pill> : <Pill color="var(--ok)">{t("ok")}</Pill>}>
+            <div className="flex flex-col gap-2">
               {/* Riepilogo adempimenti PA/fiscali → pagina dedicata (evita doppioni sulla dashboard) */}
-              <Link href="/adempimenti" className="flex items-center gap-2.5 rounded-lg border px-2.5 py-2 hover:bg-wash" style={{ borderColor: adempimentiCount ? "color-mix(in srgb, var(--focus) 45%, var(--line))" : "var(--line)" }}>
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-xs font-bold text-white" style={{ backgroundColor: adempimentiCount ? "var(--focus)" : "var(--ok)" }}>{adempimentiCount || "✓"}</span>
-                <span className="min-w-0 flex-1 text-sm font-medium text-txt">{t("Adempimenti oggi")}{adempimentiCount ? ` · ${t("da gestire")}` : ` · ${t("tutto in ordine")}`}</span>
-                <Icon name="chevron" size={14} />
+              <Link href="/adempimenti" className="flex items-center gap-3 rounded-xl border p-2.5 transition hover:border-focus hover:bg-wash" style={{ borderColor: adempimentiCount ? "color-mix(in srgb, var(--focus) 45%, var(--line))" : "var(--line)" }}>
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg font-mono text-sm font-bold" style={{ backgroundColor: tint(adempimentiCount ? "var(--focus)" : "var(--ok)", 16), color: adempimentiCount ? "var(--focus)" : "var(--ok)" }}>{adempimentiCount || "✓"}</span>
+                <span className="min-w-0 flex-1 text-sm font-semibold text-txt">{t("Adempimenti oggi")}{adempimentiCount ? ` · ${t("da gestire")}` : ` · ${t("tutto in ordine")}`}</span>
+                <span className="text-faint"><Icon name="chevron" size={14} /></span>
               </Link>
               {alerts.map((a, i) => (
-                <Link key={i} href={a.href} className="flex items-center gap-2.5 rounded-lg border border-line px-2.5 py-2 hover:bg-wash">
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-xs font-bold text-white" style={{ backgroundColor: a.color }}>{a.n}</span>
-                  <span className="min-w-0 flex-1 text-sm text-txt">{t(a.label)}</span>
-                  <Icon name="chevron" size={14} />
+                <Link key={i} href={a.href} className="flex items-center gap-3 rounded-xl border border-line p-2.5 transition hover:border-focus hover:bg-wash">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg font-mono text-sm font-bold" style={{ backgroundColor: tint(a.color, 16), color: a.color }}>{a.n}</span>
+                  <span className="min-w-0 flex-1 text-sm font-medium text-txt">{t(a.label)}</span>
+                  <span className="text-faint"><Icon name="chevron" size={14} /></span>
                 </Link>
               ))}
             </div>
           </OpsCard>
 
           {/* Pulizie di oggi */}
-          <OpsCard title={t("Pulizie di oggi")} icon="sparkles" color="#0891B2" right={<Link href="/pulizie" className="text-[11px] font-semibold text-focus hover:underline">{t("Apri")} →</Link>}>
+          <OpsCard title={t("Pulizie di oggi")} icon="sparkles" color="#0891B2" count={cleanRooms.length} right={<Link href="/pulizie" className="text-[11px] font-semibold text-focus hover:underline">{t("Apri")} →</Link>}>
             {cleanRooms.length === 0 ? (
-              <div className="py-2 text-sm text-faint">{t("Nessuna camera da preparare oggi.")}</div>
+              <EmptyLine icon="sparkles">{t("Nessuna camera da preparare oggi.")}</EmptyLine>
             ) : (
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-3">
                 {turnoverCount > 0 && (
-                  <div className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[color:var(--err)]" style={{ backgroundColor: "color-mix(in srgb, var(--err) 12%, transparent)" }}>⚡ {turnoverCount} {t("turnover · check-out e check-in nella stessa camera")}</div>
+                  <div className="rounded-xl px-3 py-2 text-xs font-semibold text-[color:var(--err)]" style={{ backgroundColor: tint("var(--err)", 12) }}>⚡ {turnoverCount} {t("turnover · check-out e check-in nella stessa camera")}</div>
                 )}
                 {cleanByStruct.map((g) => (
                   <div key={g.s.id}>
-                    <div className="mb-1 flex items-center gap-1.5">
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: g.s.photoColor ?? "var(--faint)" }} />
-                      <span className="truncate text-[11px] font-semibold uppercase tracking-wide" style={{ color: g.s.photoColor ?? "var(--dim)" }}>{g.s.name}</span>
-                      <span className="text-[11px] text-faint">· {g.list.length}</span>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
+                    <StructureLabel name={g.s.name} color={g.s.photoColor} count={g.list.length} />
+                    <div className="flex flex-col gap-2">
                       {g.list.map((r) => {
                         const a = CLEAN_ACT[r.action];
                         return (
-                          <div key={r.u.id} className="rounded-lg border border-line py-1.5 pl-2 pr-2" style={{ borderLeft: `3px solid ${a.color}` }}>
-                            <div className="mb-0.5 flex items-center justify-between gap-2">
-                              <span className="truncate text-sm font-semibold text-txt">{r.u.name}</span>
-                              <span className="shrink-0 text-[10px] font-semibold uppercase" style={{ color: a.color }}>{t(a.label)}</span>
+                          <div key={r.u.id} className="flex gap-2.5 rounded-xl border border-line p-2 transition hover:border-focus">
+                            <RoomThumb unitId={r.u.id} structureId={r.u.structureId} compact className="h-12 w-12 rounded-lg" />
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-0.5 flex items-center justify-between gap-2">
+                                <span className="truncate text-sm font-medium text-txt">{r.u.name}</span>
+                                <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: tint(a.color, 14), color: a.color }}>{t(a.label)}</span>
+                              </div>
+                              {r.dep && (
+                                <button onClick={() => openBooking(r.dep!.id)} className="flex w-full items-center gap-1.5 text-left text-xs text-dim hover:text-focus">
+                                  <Icon name="logout" size={12} /><span className="truncate font-medium">{guestName(r.dep.guestId)}</span>
+                                  <span className="shrink-0 text-faint">· {np(r.dep)} {t("osp")} · out {fmt(r.dep.checkOut)}</span>
+                                </button>
+                              )}
+                              {r.arr && (
+                                <button onClick={() => openBooking(r.arr!.id)} className="flex w-full items-center gap-1.5 text-left text-xs text-dim hover:text-focus">
+                                  <Icon name="login" size={12} /><span className="truncate font-medium">{guestName(r.arr.guestId)}</span>
+                                  <span className="shrink-0 text-faint">· {np(r.arr)} {t("osp")} · in {r.arr.arrivalTime || fmt(r.arr.checkIn)}</span>
+                                </button>
+                              )}
+                              {r.action === "riassetto" && r.stay && (
+                                <button onClick={() => openBooking(r.stay!.id)} className="flex w-full items-center gap-1.5 text-left text-xs text-dim hover:text-focus">
+                                  <Icon name="bed" size={12} /><span className="truncate font-medium">{guestName(r.stay.guestId)}</span>
+                                  <span className="shrink-0 text-faint">· {np(r.stay)} {t("osp")} · {t("in casa fino al")} {fmt(r.stay.checkOut)}</span>
+                                </button>
+                              )}
                             </div>
-                            {r.dep && (
-                              <button onClick={() => openBooking(r.dep!.id)} className="flex w-full items-center gap-1.5 text-left text-xs text-dim hover:text-focus">
-                                <Icon name="logout" size={12} /><span className="truncate">{guestName(r.dep.guestId)}</span>
-                                <span className="shrink-0 text-faint">· {np(r.dep)} {t("osp")} · out {fmt(r.dep.checkOut)}</span>
-                              </button>
-                            )}
-                            {r.arr && (
-                              <button onClick={() => openBooking(r.arr!.id)} className="flex w-full items-center gap-1.5 text-left text-xs text-dim hover:text-focus">
-                                <Icon name="login" size={12} /><span className="truncate">{guestName(r.arr.guestId)}</span>
-                                <span className="shrink-0 text-faint">· {np(r.arr)} {t("osp")} · in {r.arr.arrivalTime || fmt(r.arr.checkIn)}</span>
-                              </button>
-                            )}
-                            {r.action === "riassetto" && r.stay && (
-                              <button onClick={() => openBooking(r.stay!.id)} className="flex w-full items-center gap-1.5 text-left text-xs text-dim hover:text-focus">
-                                <Icon name="bed" size={12} /><span className="truncate">{guestName(r.stay.guestId)}</span>
-                                <span className="shrink-0 text-faint">· {np(r.stay)} {t("osp")} · {t("in casa fino al")} {fmt(r.stay.checkOut)}</span>
-                              </button>
-                            )}
                           </div>
                         );
                       })}
@@ -621,7 +692,7 @@ export default function Dashboard() {
           </OpsCard>
 
           {/* Ospiti speciali oggi */}
-          <OpsCard title={t("Ospiti speciali oggi")} icon="sparkles" color="#7C3AED" right={<span className="text-[11px] text-faint">{t("arrivi")}</span>}>
+          <OpsCard title={t("Ospiti speciali oggi")} icon="sparkles" color="#7C3AED" right={<span className={EYEBROW}>{t("arrivi")}</span>}>
             {(() => {
               const rows: { id: string; name: string; badge: string; col: string; icon?: string }[] = [];
               arrBirthday.forEach((b) => rows.push({ id: b.id, name: guestName(b.guestId), badge: t("compleanno"), col: "#DB2777", icon: "cake" }));
@@ -629,13 +700,14 @@ export default function Dashboard() {
               arrToday.filter((b) => guestOf(b.guestId)?.vip).forEach((b) => { if (!rows.some((r) => r.id === b.id)) rows.push({ id: b.id, name: guestName(b.guestId), badge: "VIP", col: "#7C3AED" }); });
               arrToday.filter((b) => guestOf(b.guestId)?.tags?.includes("Animali")).forEach((b) => rows.push({ id: b.id + "-pet", name: guestName(b.guestId), badge: t("con animali"), col: "#0891B2", icon: "paw" }));
               return rows.length === 0 ? (
-                <div className="py-2 text-sm text-faint">{t("Nessuna segnalazione tra gli arrivi di oggi.")}</div>
+                <EmptyLine icon="sparkles">{t("Nessuna segnalazione tra gli arrivi di oggi.")}</EmptyLine>
               ) : (
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-2">
                   {rows.slice(0, 6).map((r, i) => (
-                    <div key={r.id + i} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="min-w-0 truncate text-txt">{r.name}</span>
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${r.col} 14%, transparent)`, color: r.col }}>{r.icon && <Icon name={r.icon} size={11} />}{r.badge}</span>
+                    <div key={r.id + i} className="flex items-center gap-2.5 rounded-xl border border-line p-2 text-sm">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-xs font-bold" style={{ backgroundColor: tint(r.col, 14), color: r.col }}>{r.icon ? <Icon name={r.icon} size={15} /> : (r.name.trim()[0] ?? "?").toUpperCase()}</span>
+                      <span className="min-w-0 flex-1 truncate font-medium text-txt">{r.name}</span>
+                      <Pill color={r.col} icon={r.icon}>{r.badge}</Pill>
                     </div>
                   ))}
                 </div>
@@ -645,11 +717,12 @@ export default function Dashboard() {
 
           {/* Stato canali */}
           <OpsCard title={t("Stato canali OTA")} icon="share" color="#5B74E6" right={<Link href="/canali" className="text-[11px] font-semibold text-focus hover:underline">{t("Gestisci")} →</Link>}>
-            <div className="flex items-center gap-3">
-              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cc.tot > 0 && cc.canali >= cc.tot ? "var(--ok)" : cc.canali > 0 ? "var(--warn)" : "var(--err)" }} />
-              <div>
-                <div className="font-mono text-xl font-bold text-txt">{cc.canali}{cc.tot > 0 ? `/${cc.tot}` : ""} <span className="text-sm font-medium text-dim">{t("connessi")}</span></div>
-                <div className="text-[11px] text-faint">{t("ultima sincronizzazione")} · {cc.sync}</div>
+            <div className="flex items-center gap-4">
+              <span className="h-3.5 w-3.5 shrink-0 rounded-full" style={{ backgroundColor: channelsColor, boxShadow: `0 0 0 5px ${tint(channelsColor, 18)}` }} />
+              <div className="min-w-0 flex-1">
+                <div className="font-mono text-2xl font-bold leading-none tabular-nums text-txt">{cc.canali}{cc.tot > 0 ? <span className="text-base text-faint">/{cc.tot}</span> : ""} <span className="font-sans text-sm font-medium text-dim">{t("connessi")}</span></div>
+                {cc.tot > 0 && <Bar pct={(cc.canali / cc.tot) * 100} color={channelsColor} className="mt-2.5" />}
+                <div className="mt-1.5 text-[11px] text-faint">{t("ultima sincronizzazione")} · {cc.sync}</div>
               </div>
             </div>
           </OpsCard>
@@ -665,29 +738,30 @@ export default function Dashboard() {
 
           {/* Riepilogo mese */}
           <OpsCard title={t("Riepilogo del mese")} icon="chart" color="#2C8A8A" right={<Link href="/statistiche" className="text-[11px] font-semibold text-focus hover:underline">{t("Statistiche")} →</Link>}>
-            <div className="flex items-end gap-4">
+            <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
               <div>
-                <div className="font-mono text-2xl font-bold text-txt">{eur(revMonth)}</div>
-                <div className="text-[11px] text-faint">{t("ricavi confermati")} · {bkOfMonth} {t("prenotazioni")}</div>
+                <div className="font-mono text-2xl font-bold leading-none tabular-nums text-txt">{eur(revMonth)}</div>
+                <div className="mt-1.5 text-[11px] text-faint">{t("ricavi confermati")} · {bkOfMonth} {t("prenotazioni")}</div>
               </div>
               {revMonthDelta !== null && (
-                <span className="mb-1 rounded-full px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${revMonthDelta >= 0 ? "var(--ok)" : "var(--err)"} 14%, transparent)`, color: revMonthDelta >= 0 ? "var(--ok)" : "var(--err)" }}>{revMonthDelta >= 0 ? "+" : ""}{revMonthDelta}% {t("vs mese prec.")}</span>
+                <span className="mb-1 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ backgroundColor: tint(revMonthDelta >= 0 ? "var(--ok)" : "var(--err)", 14), color: revMonthDelta >= 0 ? "var(--ok)" : "var(--err)" }}>{revMonthDelta >= 0 ? "+" : ""}{revMonthDelta}% {t("vs mese prec.")}</span>
               )}
             </div>
           </OpsCard>
 
           {/* Attività recente */}
-          <OpsCard title={t("Attività recente")} icon="clipboard" color="var(--dim)" right={<span className="text-[11px] text-faint">{t("ultime")}</span>}>
+          <OpsCard title={t("Attività recente")} icon="clipboard" color="var(--dim)" right={<span className={EYEBROW}>{t("ultime")}</span>}>
             {feed.length === 0 ? (
-              <div className="py-2 text-sm text-faint">{t("Nessuna attività.")}</div>
+              <EmptyLine icon="clipboard">{t("Nessuna attività.")}</EmptyLine>
             ) : (
               <div className="flex flex-col gap-1">
                 {feed.map((b) => {
                   const cancelled = b.status === "cancelled";
+                  const col = cancelled ? "var(--err)" : "var(--ok)";
                   return (
-                    <button key={b.id} onClick={() => openBooking(b.id)} className="flex items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-wash">
-                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: cancelled ? "var(--err)" : "var(--ok)" }}>{cancelled ? "✕" : "+"}</span>
-                      <span className="min-w-0 flex-1 truncate text-sm text-txt">{guestName(b.guestId)}</span>
+                    <button key={b.id} onClick={() => openBooking(b.id)} className="flex items-center gap-2.5 rounded-xl px-1.5 py-1.5 text-left transition hover:bg-wash">
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold" style={{ backgroundColor: tint(col, 16), color: col }}>{cancelled ? "✕" : "+"}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-txt">{guestName(b.guestId)}</span>
                       <span className="grid w-[18px] shrink-0 place-items-center">{b.channel !== "blocked" && <ChannelLogo channel={b.channel} size={18} />}</span>
                       <span className="w-12 shrink-0 text-right text-[11px] text-faint">{b.bookedOn ? fmt(b.bookedOn) : ""}</span>
                     </button>
@@ -697,18 +771,35 @@ export default function Dashboard() {
             )}
           </OpsCard>
 
-          {/* Promemoria */}
-          <DayNotes />
+          {/* Promemoria (componente condiviso: qui ne adatto solo contenitore e raggio) */}
+          <div className="[&>div]:rounded-2xl [&>div]:p-4 [&>div]:transition [&>div]:hover:border-focus [&>div]:hover:shadow-md sm:[&>div]:p-5"><DayNotes /></div>
         </div>
       </div>
 
+      {/* Finestra "Risolvi" per i passaggi non completati (aggiunta non invasiva) */}
+      {modal && (() => {
+        const mb = bookings.find((x) => x.id === modal.id);
+        const mj = mb ? journeyFor(mb) : null;
+        const ms = mj?.steps.find((x) => x.key === modal.key);
+        if (!mb || !mj || !ms) return null;
+        return (
+          <StepActions
+            key={`${modal.id}:${modal.key}`}
+            b={mb} step={ms}
+            guest={guests.find((g) => g.id === mb.guestId)} structure={getStructure(mb.structureId)}
+            checkinDone={mj.steps.find((x) => x.key === "checkin")?.state === "done"}
+            schedina={schedBy.get(mb.id) ?? "none"} istat={istatBy.get(mb.id) ?? "none"}
+            paySentInChat={(threads[mb.guestId] ?? []).some((m) => m.dir === "out" && m.text.includes("chat-pay/go"))}
+            onClose={() => setModal(null)} onSwitch={(key) => setModal({ id: modal.id, key })} onChanged={() => { void loadJourney(); }}
+          />
+        );
+      })()}
     </div>
   );
 }
 
 // Banner "Sei in regola" (verde) / avviso adempimenti PA in sospeso (ambra) — link a /adempimenti.
 // `pending` arriva da un controllo reale su Supabase (schedine Alloggiati + ISTAT), non da un valore finto.
-// Card a piena larghezza (non più un badge minuscolo in testata) per dargli il peso visivo giusto.
 function ComplianceBanner({ pending, checkinPending, loading }: { pending: number; checkinPending: number; loading: boolean }) {
   const { t } = useLang();
   if (loading) return null;
@@ -717,15 +808,13 @@ function ComplianceBanner({ pending, checkinPending, loading }: { pending: numbe
   return (
     <Link
       href="/adempimenti"
-      className="anim-in mb-4 flex items-center gap-3 rounded-xl border p-3.5 shadow-sm transition hover:-translate-y-0.5"
+      className="anim-in mb-4 flex items-center gap-3.5 rounded-2xl border p-4 shadow-sm transition hover:border-focus hover:shadow-md"
       style={{
         borderColor: `color-mix(in srgb, ${color} 30%, var(--line))`,
         backgroundColor: `color-mix(in srgb, ${color} 6%, var(--surface))`,
       }}
     >
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)`, color }}>
-        <Icon name={ok ? "id" : "alertTriangle"} size={19} />
-      </span>
+      <IconTile icon={ok ? "id" : "alertTriangle"} color={color} size="lg" />
       <div className="min-w-0 flex-1">
         <div className="text-sm font-bold" style={{ color }}>{ok ? t("Sei in regola con gli adempimenti") : t("Adempimenti PA in sospeso")}</div>
         <div className="truncate text-xs text-dim">
@@ -736,203 +825,29 @@ function ComplianceBanner({ pending, checkinPending, loading }: { pending: numbe
               : `${pending} ${t("tra schedine Alloggiati e movimenti ISTAT da controllare")}`}
         </div>
       </div>
-      <span className="shrink-0" style={{ color: "var(--faint)" }}><Icon name="chevron" size={16} /></span>
+      {!ok && <span className="shrink-0 rounded-full px-2.5 py-0.5 font-mono text-sm font-bold" style={{ backgroundColor: tint(color, 16), color }}>{pending}</span>}
+      <span className="shrink-0 text-faint"><Icon name="chevron" size={16} /></span>
     </Link>
   );
 }
 
-function OpsCard({ title, icon, color, right, children }: { title: string; icon: string; color: string; right?: React.ReactNode; children: React.ReactNode }) {
+function OpsCard({ title, icon, color, right, count, children }: { title: string; icon: string; color: string; right?: React.ReactNode; count?: number; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)`, color }}><Icon name={icon} size={15} /></span>
-          <span className="truncate text-sm font-bold text-txt">{title}</span>
-        </div>
-        {right}
-      </div>
+    <Panel>
+      <PanelHead icon={icon} color={color} title={title} count={count} right={right} />
       {children}
-    </div>
+    </Panel>
   );
 }
 
 function MoneyRow({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="min-w-0 truncate text-sm text-dim">{label}</span>
-      <span className="shrink-0 font-mono text-sm font-bold" style={{ color }}>{value}</span>
+    <div className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: tint(color, 8) }}>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+        <span className="min-w-0 truncate text-sm text-dim">{label}</span>
+      </span>
+      <span className="shrink-0 font-mono text-sm font-bold tabular-nums" style={{ color }}>{value}</span>
     </div>
   );
-}
-
-function CmdAction({ href, icon, label, newTab }: { href: string; icon: string; label: string; newTab?: boolean }) {
-  const cls = "flex items-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm font-medium text-txt transition hover:border-focus hover:text-focus";
-  const inner = <><Icon name={icon} size={16} />{label}{newTab && <span className="text-faint">↗</span>}</>;
-  return newTab
-    ? <a href={href} target="_blank" rel="noreferrer" className={cls}>{inner}</a>
-    : <Link href={href} className={cls}>{inner}</Link>;
-}
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-function TodoGroup({ title, icon, color, items, tasks, done, onToggle, autoOf, guestName, getUnit, getStructure, openBooking, multi }: any) {
-  const { t } = useLang();
-  const renderItem = (b: any, showStruct: boolean) => {
-    const st = getStructure?.(b.structureId);
-    const stColor = st?.photoColor ?? "var(--faint)";
-    return (
-      <div key={b.id} className="rounded-lg border border-line py-2 pl-2.5 pr-2" style={{ borderLeft: `3px solid ${stColor}` }}>
-        <div className="mb-1.5 flex items-center justify-between gap-2">
-          <button onClick={() => openBooking(b.id)} className="truncate text-sm font-semibold text-txt hover:text-focus hover:underline">{guestName(b.guestId)}</button>
-          <span className="flex min-w-0 shrink items-center gap-1 text-xs text-dim">
-            {showStruct && <span className="max-w-[90px] truncate font-medium" style={{ color: stColor }}>{st?.name}</span>}
-            {showStruct && <span className="text-faint">·</span>}
-            <span className="truncate">{getUnit(b.unitId)?.name ?? t("Da assegnare")}</span>
-          </span>
-        </div>
-        <div className="flex flex-col gap-1">
-          {tasks.map((task: any) => {
-            const key = `${b.id}:${task.id}`;
-            const auto = autoOf?.(task.id) as string | null;
-            if (auto) return (
-              <div key={task.id} className="flex items-center gap-2 text-sm">
-                <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full text-[9px] text-white" style={{ backgroundColor: "var(--ok)" }}>✓</span>
-                <span className="text-txt">{t(task.label)}</span>
-                <span className="ml-auto rounded-full bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--ok)]">{t("auto")} · {auto}</span>
-              </div>
-            );
-            const isDone = done.has(key);
-            return (
-              <label key={task.id} className="flex cursor-pointer items-center gap-2 text-sm">
-                <input type="checkbox" checked={isDone} onChange={() => onToggle(key)} className="h-4 w-4 accent-[color:var(--ok)]" />
-                <span className={isDone ? "text-faint line-through" : "text-txt"}>{t(task.label)}</span>
-              </label>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  // Raggruppa per struttura (stesso stile delle liste movimenti) quando ci sono più strutture.
-  const groups = multi ? (() => {
-    const map = new Map<string, { s: any; list: any[] }>();
-    for (const b of items) { if (!map.has(b.structureId)) map.set(b.structureId, { s: getStructure?.(b.structureId), list: [] }); map.get(b.structureId)!.list.push(b); }
-    return [...map.values()].sort((a, b) => (a.s?.name ?? "").localeCompare(b.s?.name ?? "", "it"));
-  })() : null;
-
-  return (
-    <Card>
-      <ListHeader icon={icon} color={color}>{title} ({items.length})</ListHeader>
-      {items.length === 0 ? (
-        <div className="py-3 text-sm text-faint">{t("Niente in programma.")}</div>
-      ) : groups && groups.length > 1 ? (
-        <div className="flex flex-col gap-3">
-          {groups.map((g) => {
-            const col = g.s?.photoColor ?? "var(--faint)";
-            return (
-              <div key={g.s?.id ?? "x"} className="rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${col} 6%, transparent)` }}>
-                <div className="flex items-center gap-2 px-1.5 pb-1.5 pt-1.5">
-                  <span className="h-3.5 w-3.5 rounded-md" style={{ backgroundColor: col }} />
-                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color: col }}>{g.s?.name}</span>
-                  <span className="text-[11px] text-faint">· {g.list.length}</span>
-                </div>
-                <div className="flex flex-col gap-2 px-1.5 pb-1.5">{g.list.map((b) => renderItem(b, false))}</div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2.5">{items.map((b: any) => renderItem(b, multi))}</div>
-      )}
-    </Card>
-  );
-}
-
-function StatusIcon({ icon, color, title }: { icon: string; color: string; title: string }) {
-  return (
-    <span title={title} className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-md" style={{ backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)`, color }}>
-      <Icon name={icon} size={13} />
-    </span>
-  );
-}
-
-function ListHeader({ icon, color, children }: { icon: string; color: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-faint">
-      <span style={{ color }}><Icon name={icon} size={15} /></span>
-      {children}
-    </div>
-  );
-}
-
-function Kpi({ label, value, color, small, onClick, active }: { label: string; value: string; color: string; small?: boolean; onClick?: () => void; active?: boolean }) {
-  const cls = `anim-in rounded-xl border bg-surface p-4 shadow-sm transition-transform hover:-translate-y-0.5 ${active ? "border-focus ring-2 ring-[color:var(--focus)]" : "border-line"} ${onClick ? "cursor-pointer text-left" : ""}`;
-  const inner = (
-    <>
-      <div className="flex items-center justify-between">
-        <div className="text-xs font-medium uppercase tracking-wide text-dim">{label}</div>
-        {onClick && <Icon name={active ? "eye" : "chevron"} size={13} />}
-      </div>
-      <div className={`mt-1 font-mono font-bold tabular-nums ${small ? "text-lg" : "text-2xl"}`} style={{ color }}>{value}</div>
-    </>
-  );
-  return onClick ? <button onClick={onClick} className={`${cls} w-full`}>{inner}</button> : <div className={cls}>{inner}</div>;
-}
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-function MoveList({ items, empty, groupByStructure, structures, guestName, getUnit, getStructure, openBooking, alloggiatiOk, payStatus }: any) {
-  const { t } = useLang();
-  if (!items.length) return <div className="py-4 text-sm text-faint">{empty}</div>;
-
-  const PAY: Record<string, [string, string]> = {
-    paid: ["var(--ok)", t("Pagato")],
-    partial: ["var(--warn)", t("Acconto ricevuto · saldo da incassare")],
-    unpaid: ["var(--err)", t("Da pagare")],
-  };
-
-  const rows = (list: any[]) => (
-    <div className="flex flex-col gap-2">
-      {list.map((b: any) => {
-        const ch = CHANNELS[b.channel as keyof typeof CHANNELS];
-        const alOk = alloggiatiOk?.(b) ?? false;
-        const pay = (payStatus?.(b) ?? "unpaid") as "paid" | "partial" | "unpaid";
-        const stColor = getStructure?.(b.structureId)?.photoColor ?? "var(--faint)";
-        return (
-          <button key={b.id} onClick={() => openBooking(b.id)} className="flex items-center justify-between gap-3 rounded-lg border border-line py-2 pl-2.5 pr-2 text-left transition hover:bg-wash" style={{ borderLeft: `3px solid ${stColor}` }}>
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium text-txt">{guestName(b.guestId)}</div>
-              <div className="flex items-center gap-1 truncate text-xs text-dim">{getUnit(b.unitId)?.name ?? t("Da assegnare")} · <span className="font-mono text-faint">{fmt(b.checkIn)} → {fmt(b.checkOut)}</span> · <span className="inline-flex items-center gap-0.5"><Icon name="users" size={12} />{b.adults + b.children}</span> · <span className="font-mono">{b.total ? eur(b.total) : "—"}</span></div>
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              <StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--err)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} />
-              <StatusIcon icon="card" color={PAY[pay][0]} title={PAY[pay][1]} />
-              {b.channel !== "blocked" && <ChannelLogo channel={b.channel} size={18} title={ch.label} />}
-            </div>
-          </button>
-        );
-      })}
-    </div>
-  );
-
-  if (groupByStructure) {
-    const groups = structures.map((s: any) => ({ s, list: items.filter((i: any) => i.structureId === s.id) })).filter((g: any) => g.list.length);
-    return (
-      <div className="flex flex-col gap-3">
-        {groups.map((g: any) => {
-          const col = g.s.photoColor ?? "var(--faint)";
-          return (
-            <div key={g.s.id} className="rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${col} 6%, transparent)` }}>
-              <div className="flex items-center gap-2 px-1.5 pb-1.5 pt-1.5">
-                <span className="h-3.5 w-3.5 rounded-md" style={{ backgroundColor: col }} />
-                <span className="text-xs font-bold uppercase tracking-wide" style={{ color: col }}>{g.s.name}</span>
-                <span className="text-[11px] text-faint">· {g.list.length}</span>
-              </div>
-              <div className="px-1.5 pb-1.5">{rows(g.list)}</div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-  return rows(items);
 }
