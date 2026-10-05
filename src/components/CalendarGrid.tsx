@@ -998,6 +998,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           )}
         </div>
         {/* Selettore mese (tendina) */}
+        <div className="order-3">{viewSwitch}</div>
         <div ref={monthRef} className="relative order-1">
           <button onClick={() => setMonthOpen((o) => !o)} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${monthOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
             <Icon name="calendar" size={15} /> <span className="capitalize">{monthLabel(start)}</span> <span className="text-xs">▾</span>
@@ -1020,7 +1021,6 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           <button onClick={() => setStart((d) => addDays(d, 1))} title="Giorno successivo" aria-label="Giorno successivo" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">›</button>
         </div>
         <div className="order-4 ml-auto flex items-center gap-2">
-          {viewSwitch}
           {/* Selettore card Insights (mostra/nascondi) */}
           {/* Toggle card: un click mostra tutte / nasconde tutte (come le altre sezioni) */}
           <button onClick={() => (INSIGHT_CARDS.some((c) => showCard(c.key)) ? persistCards(new Set(INSIGHT_CARDS.map((c) => c.key))) : persistCards(new Set()))} title={INSIGHT_CARDS.some((c) => showCard(c.key)) ? "Nascondi le card" : "Mostra le card"} className={`grid h-9 w-9 place-items-center rounded-lg border border-line transition ${INSIGHT_CARDS.some((c) => showCard(c.key)) ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
@@ -1359,9 +1359,10 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           {/* Grafico occupazione */}
           <div className="flex items-stretch">
             <div className="sticky left-0 z-10 flex shrink-0 flex-col justify-center border-r border-line bg-surface px-3 py-2" style={{ width: LABEL_W }}>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">Occupazione media periodo</span>
-              <span className="font-mono text-2xl font-bold leading-tight text-txt">{avgOcc}%</span>
-              <button onClick={() => router.push("/statistiche")} className="mt-1 inline-flex w-fit items-center gap-1 text-[11px] font-semibold text-focus transition hover:gap-1.5 hover:underline">Altre statistiche →</button>
+              <button type="button" onClick={() => router.push("/statistiche")} title="Apri le statistiche" className="group flex w-full flex-col items-start text-left">
+                <span className="flex w-full items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-faint">Occupazione media periodo<span aria-hidden className="text-sm leading-none transition group-hover:translate-x-0.5 group-hover:text-focus">›</span></span>
+                <span className="font-mono text-2xl font-bold leading-tight text-txt">{avgOcc}%</span>
+              </button>
             </div>
             <div className="relative" style={{ width: gridW, height: OCC_H + 14 }}>
               {/* Linea "oggi": solo sull'area del grafico, sotto la riga dei giorni (non sopra). */}
