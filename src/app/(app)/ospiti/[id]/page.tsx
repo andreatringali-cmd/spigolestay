@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { withSplitNames } from "@/lib/guest-key";
 import { useParams, useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import type { Guest } from "@/lib/types";
@@ -53,7 +54,7 @@ export default function OspiteSchedaPage() {
   const ask = useConfirm();
 
   const existing = guests.find((g) => g.id === params.id);
-  const [g, setG] = useState<Guest>(() => existing ?? { id: "", fullName: "", firstName: "", lastName: "", language: "it", tags: [] });
+  const [g, setG] = useState<Guest>(() => (existing ? withSplitNames(existing) : { id: "", fullName: "", firstName: "", lastName: "", language: "it", tags: [] }));
   const set = <K extends keyof Guest>(k: K, v: Guest[K]) => setG((p) => ({ ...p, [k]: v }));
   // Telefono scomposto in prefisso + numero; salvo sempre il formato internazionale in g.phone.
   const [dial, setDial] = useState(() => parsePhone(existing?.phone).dial);
@@ -76,7 +77,7 @@ export default function OspiteSchedaPage() {
     const version = `${existing.id}:${existing.updatedAt ?? 0}`;
     if (loadedVersionRef.current === version) return;
     loadedVersionRef.current = version;
-    setG(existing);
+    setG(withSplitNames(existing));
     const p = parsePhone(existing.phone); setDial(p.dial); setLocalPhone(p.local);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existing, isNew]);
@@ -188,6 +189,7 @@ export default function OspiteSchedaPage() {
             <div className="grid grid-cols-2 gap-3">
               <label className={lbl}>{t("Nome")} *<input value={g.firstName ?? ""} onChange={(e) => set("firstName", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Cognome")} *<input value={g.lastName ?? ""} onChange={(e) => set("lastName", e.target.value)} className={`${inp} mt-1`} /></label>
+              <button type="button" onClick={() => setG((p) => ({ ...p, firstName: p.lastName ?? "", lastName: p.firstName ?? "" }))} className="col-span-2 -mt-1 w-fit text-[11px] font-semibold text-focus hover:underline">⇄ {t("Inverti nome e cognome")}</button>
               <label className={lbl}>{t("Sesso")}<select value={g.sex ?? ""} onChange={(e) => set("sex", e.target.value as Guest["sex"])} className={`${inp} mt-1`}><option value="">—</option><option value="M">{t("Maschile")}</option><option value="F">{t("Femminile")}</option></select></label>
               <label className={lbl}>{t("Data di nascita")}<input type="date" value={g.birthDate ?? ""} onChange={(e) => set("birthDate", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Luogo di nascita")}<input value={g.birthPlace ?? ""} onChange={(e) => set("birthPlace", e.target.value)} className={`${inp} mt-1`} placeholder={t("Comune o Stato")} /></label>

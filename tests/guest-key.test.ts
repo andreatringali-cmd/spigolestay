@@ -81,3 +81,14 @@ test("ricerca per parole: 'luigi rotondo' trova 'Rotondo Luigi' (l'ordine non co
   assert.equal(match("luigi bianchi"), false);
   assert.equal(match("  "), true);           // nessun testo = nessun filtro
 });
+
+test("splitName / withSplitNames: le schede importate riempiono Nome e Cognome dal nome completo", async () => {
+  const { splitName, withSplitNames } = await import("../src/lib/guest-key.ts");
+  assert.deepEqual(splitName("ALDO BAIO"), { firstName: "ALDO", lastName: "BAIO" });
+  assert.deepEqual(splitName("  Maria  De Luca "), { firstName: "Maria", lastName: "De Luca" });
+  assert.deepEqual(splitName("papo"), { firstName: "", lastName: "papo" });
+  assert.deepEqual(splitName(""), { firstName: "", lastName: "" });
+  assert.equal(withSplitNames({ fullName: "ALDO BAIO" }).lastName, "BAIO");
+  const done = { fullName: "ALDO BAIO", firstName: "Aldo", lastName: "Baio" };
+  assert.equal(withSplitNames(done), done); // già compilata: non si tocca
+});

@@ -88,3 +88,18 @@ export function groupDuplicates<T extends GuestLike & { id: string }>(guests: T[
   for (const g of guests) { const r = find(g.id); const arr = groups.get(r); if (arr) arr.push(g); else groups.set(r, [g]); }
   return [...groups.values()].filter((a) => a.length > 1);
 }
+
+/** Scompone il nome completo in Nome e Cognome: la prima parola è il nome, il resto il cognome (stessa regola della scheda prenotazione).
+ *  Con una sola parola va nel cognome. L'ordine nei dati importati non è sempre quello: la scheda ha il pulsante "Inverti". */
+export function splitName(fullName?: string): { firstName: string; lastName: string } {
+  const t = (fullName ?? "").trim().split(/\s+/).filter(Boolean);
+  if (t.length === 0) return { firstName: "", lastName: "" };
+  if (t.length === 1) return { firstName: "", lastName: t[0] };
+  return { firstName: t[0], lastName: t.slice(1).join(" ") };
+}
+
+/** Le schede create dall'importazione hanno solo il nome completo: per mostrarle nei campi Nome e Cognome li ricava da lì. */
+export function withSplitNames<T extends { fullName?: string; firstName?: string; lastName?: string }>(g: T): T {
+  if ((g.firstName ?? "").trim() || (g.lastName ?? "").trim() || !(g.fullName ?? "").trim()) return g;
+  return { ...g, ...splitName(g.fullName) };
+}
