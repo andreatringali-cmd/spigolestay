@@ -31,3 +31,13 @@ test("nomi generici o troppo corti non si uniscono mai", () => {
   assert.equal(guestKey({ fullName: "Li" }), null);
   assert.equal(guestKey({ fullName: "" }), null);
 });
+
+test("ricerca per parole: 'luigi rotondo' trova 'Rotondo Luigi' (l'ordine non conta)", () => {
+  const hay = normName("Rotondo Luigi luigi@x.it IT");
+  const match = (q: string) => normName(q).split(" ").filter(Boolean).every((tk) => hay.includes(tk));
+  assert.equal(match("luigi rotondo"), true);
+  assert.equal(match("Rotondo   LUIGI"), true);
+  assert.equal(match("rot lui"), true);      // anche pezzi di parola
+  assert.equal(match("luigi bianchi"), false);
+  assert.equal(match("  "), true);           // nessun testo = nessun filtro
+});

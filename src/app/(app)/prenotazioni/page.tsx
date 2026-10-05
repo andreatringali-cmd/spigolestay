@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { normName } from "@/lib/guest-key";
 import Link from "next/link";
 import { useData } from "@/lib/store";
 import { bookingCode } from "@/lib/bookingCode";
@@ -111,6 +112,7 @@ export default function PrenotazioniPage() {
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
+    const qTokens = normName(q).split(" ").filter(Boolean);
     return bookings.filter((b) => {
       // Le camere "fuori servizio"/blocchi calendario (channel = "blocked") NON sono prenotazioni:
       // non compaiono nell'elenco.
@@ -119,7 +121,7 @@ export default function PrenotazioniPage() {
       // azzerando i filtri si vede tutto.
       // Filtro globale struttura (selettore in alto a destra)
       if (activeStructureId !== "all" && b.structureId !== activeStructureId) return false;
-      if (term && !guestName(b).toLowerCase().includes(term) && !b.id.toLowerCase().includes(term) && !bookingCode(b).toLowerCase().includes(term)) return false;
+      if (term && !(() => { const h = normName(guestName(b)); return qTokens.length > 0 && qTokens.every((tk) => h.includes(tk)); })() && !b.id.toLowerCase().includes(term) && !bookingCode(b).toLowerCase().includes(term)) return false;
       if (channel !== "all" && b.channel !== channel) return false;
       if (loc.startsWith("str:") && b.structureId !== loc.slice(4)) return false;
       if (loc.startsWith("unit:") && b.unitId !== loc.slice(5)) return false;

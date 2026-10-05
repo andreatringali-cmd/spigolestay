@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { guestKey } from "@/lib/guest-key";
+import { useState, useEffect, useMemo, useDeferredValue } from "react";
+import { guestKey, normName } from "@/lib/guest-key";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { AV_COLORS, initials } from "@/lib/users";
@@ -52,7 +52,7 @@ export default function OspitiPage() {
   }, [dupCount]);
   const [q, setQ] = useState("");
   const [seg, setSeg] = useState<string>("all"); // segmento CRM: all|repeat|vip|new|ch:<canale>
-  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "stays", dir: "desc" });
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "name", dir: "asc" });
   const [sel, setSel] = useState<Set<string>>(new Set());
   // Cambiando struttura attiva la selezione multipla non ha più senso (potrebbe includere ospiti non visibili).
   useEffect(() => { setSel(new Set()); }, [activeStructureId]);
@@ -62,35 +62,54 @@ export default function OspitiPage() {
   useEffect(() => { setPromos(promosForStructure(loadPromos(), activeStructureId)); }, [activeStructureId]);
   const [confirmClearNl, setConfirmClearNl] = useState(false);
   const [openReg, setOpenReg] = useState({ ospiti: true, nl: true });
+  const PAGE = 100;
+  const [regLim, setRegLim] = useState({ ospiti: PAGE, nl: PAGE });
 
-  const term = q.trim().toLowerCase();
-  const rows = guests
-    .map((g) => {
-      const list = bookings.filter((b) => b.guestId === g.id && (activeStructureId === "all" || b.structureId === activeStructureId) && b.status !== "cancelled" && b.channel !== "blocked");
-      const nightsTot = list.reduce((a, b) => a + Math.max(0, nights(b.checkIn, b.checkOut)), 0);
-      const spent = list.reduce((a, b) => a + (b.total ?? 0), 0);
-      const avg = nightsTot > 0 ? Math.round(spent / nightsTot) : 0;
-      const comm = list.reduce((a, b) => a + commissionOf(b), 0);
-      const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), "");
-      const chCount: Record<string, number> = {};
-      list.forEach((b) => { chCount[b.channel] = (chCount[b.channel] ?? 0) + 1; });
-      const topCh = Object.entries(chCount).sort((a, b) => b[1] - a[1])[0]?.[0] as Channel | undefined;
-      // Ha prenotazioni reali in QUALSIASI struttura? Se sì è un ospite; se no è un contatto/lead (newsletter).
-      const anyBookings = bookings.some((b) => b.guestId === g.id && b.status !== "cancelled" && b.channel !== "blocked");
-      return { guest: g, list, stays: list.length, nightsTot, spent, avg, comm, last, topCh, anyBookings };
-    })
-    // Mostra: chi ha prenotazioni in questa struttura; con "Tutte" tutti; e SEMPRE
-    // i contatti senza prenotazioni (es. iscritti newsletter/lead), che non sono legati a una struttura.
-    .filter((r) => activeStructureId === "all" || r.list.length > 0 || !bookings.some((b) => b.guestId === r.guest.id && b.status !== "cancelled" && b.channel !== "blocked"))
-    .filter((r) => !term || r.guest.fullName.toLowerCase().includes(term) || (r.guest.email ?? "").toLowerCase().includes(term) || (r.guest.country ?? "").toLowerCase().includes(term));
-
+  // La digitazione resta fluida: l'elenco si aggiorna un attimo dopo.
+  const dq = useDeferredValue(q);
+  // Prenotazioni valide raggruppate per ospite, UNA volta sola (prima era un giro completo su tutte le prenotazioni per ogni ospite).
+  const bookingsByGuest = useMemo(() => {
+    const m = new Map<string, typeof bookings>();
+    for (const b of bookings) {
+      if (b.status === "cancelled" || b.channel === "blocked") continue;
+      const arr = m.get(b.guestId);
+      if (arr) arr.push(b); else m.set(b.guestId, [b]);
+    }
+    return m;
+  }, [bookings]);
+  const rowsAll = useMemo(() => guests.map((g) => {
+    const allB = bookingsByGuest.get(g.id) ?? [];
+    const list = activeStructureId === "all" ? allB : allB.filter((b) => b.structureId === activeStructureId);
+    const nightsTot = list.reduce((a, b) => a + Math.max(0, nights(b.checkIn, b.checkOut)), 0);
+    const spent = list.reduce((a, b) => a + (b.total ?? 0), 0);
+    const avg = nightsTot > 0 ? Math.round(spent / nightsTot) : 0;
+    const comm = list.reduce((a, b) => a + commissionOf(b), 0);
+    const last = list.reduce((m, b) => (b.checkIn > m ? b.checkIn : m), "");
+    const chCount: Record<string, number> = {};
+    list.forEach((b) => { chCount[b.channel] = (chCount[b.channel] ?? 0) + 1; });
+    const topCh = Object.entries(chCount).sort((x, y) => y[1] - x[1])[0]?.[0] as Channel | undefined;
+    // Ha prenotazioni reali in QUALSIASI struttura? Se sì è un ospite; se no è un contatto/lead (newsletter).
+    const anyBookings = allB.length > 0;
+    // Testo di ricerca: nome, cognome, email, paese — senza accenti né maiuscole, così l'ordine delle parole non conta.
+    const hay = normName([g.fullName, g.firstName, g.lastName, g.email, g.country].filter(Boolean).join(" "));
+    return { guest: g, list, stays: list.length, nightsTot, spent, avg, comm, last, topCh, anyBookings, hay };
+  }), [guests, bookingsByGuest, activeStructureId]);
+  // Mostra: chi ha prenotazioni in questa struttura; con "Tutte" tutti; e SEMPRE i contatti senza prenotazioni
+  // (es. iscritti newsletter/lead), che non sono legati a una struttura.
+  const rowsScope = useMemo(() => rowsAll.filter((r) => activeStructureId === "all" || r.list.length > 0 || !r.anyBookings), [rowsAll, activeStructureId]);
+  // "luigi rotondo" e "rotondo luigi" trovano la stessa persona: ogni parola scritta deve comparire, in qualsiasi ordine.
+  const rows = useMemo(() => {
+    const tokens = normName(dq).split(" ").filter(Boolean);
+    return tokens.length ? rowsScope.filter((r) => tokens.every((tk) => r.hay.includes(tk))) : rowsScope;
+  }, [rowsScope, dq]);
   // Anagrafiche visibili nella struttura attiva (ospiti con prenotazioni lì + contatti senza prenotazioni), senza ricerca.
-  const totalVisible = activeStructureId === "all" ? guests.length : guests.filter((g) => bookings.some((b) => b.guestId === g.id && b.structureId === activeStructureId && b.status !== "cancelled" && b.channel !== "blocked") || !bookings.some((b) => b.guestId === g.id && b.status !== "cancelled" && b.channel !== "blocked")).length;
+  const totalVisible = rowsScope.length;
+
 
   const sorted = [...rows].sort((a, b) => {
     const d = sort.dir === "asc" ? 1 : -1;
     switch (sort.key) {
-      case "name": return a.guest.fullName.localeCompare(b.guest.fullName) * d;
+      case "name": return a.guest.fullName.localeCompare(b.guest.fullName, "it", { sensitivity: "base" }) * d;
       case "nights": return (a.nightsTot - b.nightsTot) * d;
       case "avg": return (a.avg - b.avg) * d;
       case "spent": return (a.spent - b.spent) * d;
@@ -163,6 +182,8 @@ export default function OspitiPage() {
     setExportPick(false);
   };
 
+  useEffect(() => { setRegLim({ ospiti: PAGE, nl: PAGE }); }, [dq, seg, activeStructureId, sort.key, sort.dir]); // cambia filtro o ordine: si riparte dalla prima pagina
+
   // Selezione multipla → invio promo
   const selEmails = sorted.filter((r) => sel.has(r.guest.id)).map((r) => r.guest.email).filter(Boolean) as string[];
   const sendPromoTo = (p: Promo) => {
@@ -177,6 +198,8 @@ export default function OspitiPage() {
   // Registro riutilizzabile: variante "lead" (newsletter) con colonne ridotte.
   const Register = ({ title, list, empty, lead, onClear, open, onToggle }: { title: string; list: typeof sorted; empty: string; lead?: boolean; onClear?: () => void; open: boolean; onToggle: () => void }) => {
     const ids = list.map((r) => r.guest.id);
+    const lim = regLim[lead ? "nl" : "ospiti"];
+    const shown = list.slice(0, lim);
     const clearBtn = onClear && list.length > 0 && (
       <button onClick={onClear} className={`ml-2 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition ${confirmClearNl ? "border-[color:var(--err)] bg-[color:var(--err)] text-white" : "border-line text-dim hover:border-[color:var(--err)] hover:text-[color:var(--err)]"}`}>
         {confirmClearNl ? t("Conferma svuota") : `🗑 ${t("Svuota")}`}
@@ -202,7 +225,7 @@ export default function OspitiPage() {
             {clearBtn}{confirmClearNl && onClear && <button onClick={() => setConfirmClearNl(false)} className="ml-1.5 text-[10px] font-normal normal-case text-faint hover:text-txt">{t("annulla")}</button>}
           </div>
           {open && <div className="flex flex-col gap-2">
-            {list.map(({ guest, stays, nightsTot, spent, last, topCh }) => (
+            {shown.map(({ guest, stays, nightsTot, spent, last, topCh }) => (
               <div key={guest.id} className="flex items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm">
                 <input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: "var(--focus)" }} className="shrink-0" />
                 <button onClick={() => router.push(`/ospiti/${guest.id}`)} className="min-w-0 flex-1 text-left">
@@ -259,7 +282,7 @@ export default function OspitiPage() {
               </tr>
             </thead>
             <tbody>
-              {list.map(({ guest, stays, nightsTot, avg, spent, comm, last, topCh }) => (
+              {shown.map(({ guest, stays, nightsTot, avg, spent, comm, last, topCh }) => (
                 <tr key={guest.id} onClick={() => router.push(`/ospiti/${guest.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)]">
                   <td onClick={(e) => e.stopPropagation()} className="px-3 py-2"><input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} style={{ accentColor: "var(--focus)" }} /></td>
                   <td className="whitespace-nowrap px-3 py-2">{nameCell(guest)}</td>
@@ -283,6 +306,13 @@ export default function OspitiPage() {
           </table>
           </div>}
         </div>
+        {open && list.length > lim && (
+          <div className="no-print mt-3 flex items-center justify-center gap-3 text-xs text-dim">
+            <span>{t("Mostrati")} {lim} {t("di")} {list.length}</span>
+            <button onClick={() => setRegLim((v) => ({ ...v, [lead ? "nl" : "ospiti"]: lim + PAGE }))} className="rounded-lg border border-line px-3 py-1.5 font-semibold text-txt hover:bg-wash">{t("Mostra altri")} {Math.min(PAGE, list.length - lim)}</button>
+            <button onClick={() => setRegLim((v) => ({ ...v, [lead ? "nl" : "ospiti"]: list.length }))} className="rounded-lg px-2 py-1.5 font-semibold text-focus hover:underline">{t("Mostra tutti")}</button>
+          </div>
+        )}
       </div>
     );
   };

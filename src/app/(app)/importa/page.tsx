@@ -328,6 +328,8 @@ export default function ImportaPage() {
     const usedCnt = new Map<string, number>(); // quante righe del file hanno già "coperto" una prenotazione esistente
     const seenInFile = new Set<string>();     // riga identica (stessa camera) ripetuta nel file = doppione vero
     // Una scheda per ospite: se la stessa persona (email, telefono o nome+paese) c'è già, si riusa invece di crearne una per prenotazione.
+    const guestIdSet = new Set(guests.map((g) => g.id));
+    let relinked = 0; // prenotazioni già importate rimaste senza ospite: ricollegate usando il nome del file
     const guestByKey = new Map<string, string>();
     guests.forEach((g) => { const k = guestKey(g); if (k && !guestByKey.has(k)) guestByKey.set(k, g.id); });
     const seenExt = new Map(bookings.filter((b) => b.extId).map((b) => [b.extId as string, b])); // già importate da Octorate (stesso ID)
@@ -361,6 +363,14 @@ export default function ImportaPage() {
         // Già importata: se non ha ancora una camera, la assegna adesso (senza ricrearla).
         if (!known.unitId || reIds.has(known.id)) { const res = resolveUnit(val(r, "room"), ci, co); if (res.unitId && res.unitId !== known.unitId) { updateBooking(known.id, { unitId: res.unitId, roomTypeId: res.roomTypeId }); fixed++; } else if (!res.unitId && reIds.has(known.id) && known.unitId) { updateBooking(known.id, { unitId: null }); fixed++; } }
         const gid = groupFor(r); if (gid && !known.groupId) updateBooking(known.id, { groupId: gid });
+        // Ospite scomparso (scheda eliminata o unita male): lo si ricrea/ricollega dal nome presente nel file.
+        if (!known.guestId || !guestIdSet.has(known.guestId)) {
+          const gi = { fullName: name, email: val(r, "email") || undefined, phone: val(r, "phone") || undefined, country: val(r, "country") || undefined };
+          const k2 = guestKey(gi);
+          let g2 = k2 ? guestByKey.get(k2) : undefined;
+          if (!g2) { g2 = addGuest(gi); if (k2) guestByKey.set(k2, g2); }
+          updateBooking(known.id, { guestId: g2 }); relinked++;
+        }
         dup++; return;
       }
       // Con l'ID Octorate ogni riga è una prenotazione a sé (anche più camere con stesso ospite e date). Il controllo ospite+date serve solo senza ID.
@@ -401,6 +411,7 @@ export default function ImportaPage() {
     const msgs: string[] = [];
     const multiGroups = [...grpCount.values()].filter((c) => c >= 2);
     if (multiGroups.length) msgs.push(`${multiGroups.length} ${t("prenotazioni di più camere riconosciute")} (${multiGroups.reduce((a, c) => a + c, 0)} ${t("camere in tutto")}).`);
+    if (relinked) msgs.push(`${relinked} ${t("prenotazioni senza ospite sono state ricollegate al loro ospite.")}`);
     if (skipped) msgs.push(`${skipped} ${t("righe saltate (date o nome mancanti).")}`);
     if (dup) msgs.push(`${dup} ${t("doppioni ignorati (già presenti).")}`);
     if (fixed) msgs.push(`${fixed} ${t("prenotazioni già importate hanno cambiato camera.")}`);

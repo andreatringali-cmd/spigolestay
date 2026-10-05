@@ -24,6 +24,15 @@ export default function SearchInput({
         <Icon name="search" size={16} />
       </span>
       <input
+        type="search"
+        name="xn-search"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        enterKeyHint="search"
+        data-lpignore="true"
+        data-form-type="other"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
