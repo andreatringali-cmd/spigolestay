@@ -9,6 +9,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { CHANNELS } from "@/lib/types";
 import { parseICS, importIcsEvents, toChannel, toISO, toNum, normName, makeUnitAssigner, type IcsEvent } from "@/lib/ics";
 import { buildTemplateCsv, bookingDedupeKey } from "@/lib/import/template";
+import { readXlsxRows } from "@/lib/import/xlsx-lite";
 
 // ── Parsing CSV robusto (virgolette, delimitatore auto ; , o tab) ──
 function parseCSV(text: string): string[][] {
@@ -30,20 +31,33 @@ function parseCSV(text: string): string[][] {
 }
 
 // Campi di destinazione + parole chiave per l'auto-mappatura (IT/EN)
-const FIELDS: { key: string; label: string; req?: boolean; kw: RegExp }[] = [
+const FIELDS: { key: string; label: string; req?: boolean; kw: RegExp; strict?: RegExp }[] = [
   { key: "guest", label: "Ospite (nome)", req: true, kw: /ospite|nome|guest|cliente|name|intestatario/i },
   { key: "checkIn", label: "Check-in", req: true, kw: /check.?in|arrivo|arrival|dal\b|from|inizio|data.?in/i },
   { key: "checkOut", label: "Check-out", req: true, kw: /check.?out|partenza|departure|al\b|to\b|fine|data.?out/i },
   { key: "room", label: "Camera / tipologia", kw: /camera|room|tipolog|unit|alloggio|appartamento|systemato/i },
-  { key: "channel", label: "Canale", kw: /canale|channel|portale|source|origine|\bota\b|provenienza/i },
-  { key: "adults", label: "Ospiti / adulti", kw: /adult|ospiti|pax|persone|guests?/i },
+  { key: "channel", label: "Canale", kw: /canale|channel|portale|source|origine|\bota\b|provenienza/i, strict: /^sorgente$/i },
+  { key: "adults", label: "Ospiti / adulti", kw: /adult|ospiti|pax|persone|guests?/i, strict: /^adulti$/i },
   { key: "children", label: "Bambini", kw: /bambin|child|kids|minor/i },
-  { key: "total", label: "Importo totale", kw: /totale|total|importo|amount|prezzo|price|revenue|incasso|ricavo/i },
+  { key: "total", label: "Importo totale", kw: /totale|total|importo|amount|prezzo|price|revenue|incasso|ricavo/i, strict: /^totale camera$/i },
   { key: "email", label: "Email", kw: /email|mail/i },
   { key: "phone", label: "Telefono", kw: /telefono|phone|tel\b|cell|mobile/i },
   { key: "bookedOn", label: "Data prenotazione", kw: /prenotat|booked|creat|created|data.?pren/i },
   { key: "note", label: "Note", kw: /note|nota|remark|comment|richiest/i },
+  { key: "code", label: "Codice prenotazione (OTA)", kw: /^codice$|reservation|booking.?(id|number)|n\.? ?prenotazione/i, strict: /^codice$/i },
+  { key: "dbId", label: "ID Octorate (anti-doppioni)", kw: /^database id$/i },
+  { key: "paid", label: "Importo incassato", kw: /incassato|\bpaid\b/i, strict: /^importo incassato$/i },
+  { key: "commission", label: "Commissione OTA (€)", kw: /^commissione$|commission/i, strict: /^commissione$/i },
+  { key: "country", label: "Nazione ospite", kw: /^nazione$|country|paese/i },
 ];
+
+// Auto-mappatura: prima il nome ESATTO della colonna (campo "strict"), poi le parole chiave.
+function autoMap(headers: string[]): Record<string, number> {
+  const auto: Record<string, number> = {};
+  FIELDS.forEach((f) => { if (f.strict) { const i = headers.findIndex((h) => f.strict!.test((h || "").trim())); if (i >= 0) auto[f.key] = i; } });
+  headers.forEach((h, i) => { FIELDS.forEach((f2) => { if (auto[f2.key] === undefined && f2.kw.test(h)) auto[f2.key] = i; }); });
+  return auto;
+}
 
 export default function ImportaPage() {
   const router = useRouter();
@@ -56,6 +70,7 @@ export default function ImportaPage() {
   const [map, setMap] = useState<Record<string, number>>({});
   const [structureId, setStructureId] = useState<string>(() => (activeStructureId !== "all" ? activeStructureId : structures[0]?.id ?? ""));
   const [includeBlocked, setIncludeBlocked] = useState(false);
+  const [futureOnly, setFutureOnly] = useState(true); // importa solo le prenotazioni con partenza da oggi in poi (lo storico non serve)
   const [replacePrev, setReplacePrev] = useState(true);
   const [targetUnit, setTargetUnit] = useState<string>(""); // "" = auto per tipologia; altrimenti id camera specifica
   const [roomMap, setRoomMap] = useState<Record<string, string>>({}); // nome camera ICS -> id tipologia (o "__new__")
@@ -103,7 +118,7 @@ export default function ImportaPage() {
   useEffect(() => { setTargetUnit(""); setRoomMap({}); setUnitMap({}); setUnitMapType({}); }, [structureId]);
 
   const headers = rows[0] ?? [];
-  const dataRows = useMemo(() => rows.slice(1).filter((r) => r.some((c) => (c || "").trim())), [rows]);
+  const allRows = useMemo(() => rows.slice(1).filter((r) => r.some((c) => (c || "").trim())), [rows]);
 
   // Carica testo iCal (da file o da URL) → anteprima eventi.
   const loadIcsText = (text: string, label: string) => {
@@ -115,16 +130,22 @@ export default function ImportaPage() {
   const onFile = async (f: File | undefined) => {
     if (!f) return;
     setErr(""); setDone(null); setFileName(f.name);
-    const text = await f.text();
-    if (/BEGIN:VCALENDAR/i.test(text) || /\.ics$/i.test(f.name)) { loadIcsText(text, f.name); return; }
+    let parsed: string[][];
+    if (/\.xlsx?$/i.test(f.name)) {
+      // Excel (anche l'export di Octorate, che ha estensione .xls ma è un .xlsx)
+      try { parsed = await readXlsxRows(await f.arrayBuffer()); }
+      catch { setErr(t("Non riesco a leggere questo file Excel. Salvalo come .xlsx oppure come CSV e riprova.")); setRows([]); return; }
+    } else {
+      const text = await f.text();
+      if (/BEGIN:VCALENDAR/i.test(text) || /\.ics$/i.test(f.name)) { loadIcsText(text, f.name); return; }
+      parsed = parseCSV(text);
+    }
     setMode("csv"); setEvents([]);
-    const parsed = parseCSV(text);
     if (parsed.length < 2) { setErr(t("Il file sembra vuoto o non valido.")); setRows([]); return; }
     setRows(parsed);
-    const auto: Record<string, number> = {};
-    parsed[0].forEach((h, i) => { FIELDS.forEach((f2) => { if (auto[f2.key] === undefined && f2.kw.test(h)) auto[f2.key] = i; }); });
-    setMap(auto);
+    setMap(autoMap(parsed[0]));
   };
+
 
   // Scarica il template CSV da compilare (con colonne attese + 2 righe d'esempio).
   const downloadTemplate = () => {
@@ -161,6 +182,8 @@ export default function ImportaPage() {
   };
 
   const val = (r: string[], key: string) => { const i = map[key]; return i === undefined || i < 0 ? "" : (r[i] ?? "").trim(); };
+  const todayLocal = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  const dataRows = useMemo(() => (!futureOnly ? allRows : allRows.filter((r) => { const co = toISO(val(r, "checkOut")); return !co || co >= todayLocal; })), [allRows, futureOnly, map, todayLocal]); // eslint-disable-line react-hooks/exhaustive-deps
   const ready = structureId && map.guest !== undefined && map.checkIn !== undefined && map.checkOut !== undefined && dataRows.length > 0;
 
   // Camere distinte trovate nel file (colonna "Camera"), per la mappatura ESPLICITA: per ognuna
@@ -268,27 +291,38 @@ export default function ImportaPage() {
     // più quelle create in questa stessa passata (evita doppioni anche interni al file).
     const guestNameOf = (id: string) => guests.find((g) => g.id === id)?.fullName ?? "";
     const seen = new Set(bookings.filter((b) => b.structureId === structureId).map((b) => bookingDedupeKey(b.structureId, guestNameOf(b.guestId), b.checkIn, b.checkOut)));
+    const seenExt = new Set(bookings.map((b) => b.extId).filter(Boolean) as string[]); // già importate da Octorate (stesso ID)
 
     let n = 0, skipped = 0, dup = 0;
     dataRows.forEach((r) => {
       const ci = toISO(val(r, "checkIn")), co = toISO(val(r, "checkOut")), name = val(r, "guest");
       if (!ci || !co || !name || ci >= co) { skipped++; return; } // campi obbligatori mancanti o date incoerenti
       const key = bookingDedupeKey(structureId, name, ci, co);
-      if (seen.has(key)) { dup++; return; } // già presente / doppione nel file
+      const dbId = val(r, "dbId");
+      const extId = dbId ? `octorate:${dbId}` : undefined;
+      if ((extId && seenExt.has(extId)) || seen.has(key)) { dup++; return; } // già presente / doppione nel file
+      if (extId) seenExt.add(extId);
       seen.add(key);
-      const guestId = addGuest({ fullName: name, email: val(r, "email") || undefined, phone: val(r, "phone") || undefined });
+      const guestId = addGuest({ fullName: name, email: val(r, "email") || undefined, phone: val(r, "phone") || undefined, country: val(r, "country") || undefined });
       const roomTxt = val(r, "room");
       const { unitId, roomTypeId } = resolveUnit(roomTxt, ci, co);
       const bookedOn = toISO(val(r, "bookedOn"));
       const noteTxt = val(r, "note");
+      const channel = toChannel(val(r, "channel"));
+      // Numero di prenotazione dell'OTA: per Booking.com l'export Octorate dà "1234567890_9876543210": il primo pezzo è il numero che manda anche Channex.
+      const codeRaw = val(r, "code");
+      const otaCode = (channel === "booking" || channel === "expedia") ? codeRaw.split("_")[0].trim() : codeRaw.trim();
+      const paidN = toNum(val(r, "paid")), commN = toNum(val(r, "commission"));
       addBooking({
         structureId, roomTypeId, unitId, guestId,
-        channel: toChannel(val(r, "channel")), status: "confirmed",
+        channel, status: "confirmed",
+        ...(otaCode ? { code: otaCode } : {}), ...(extId ? { extId } : {}),
+        ...(paidN !== undefined && paidN > 0 ? { paid: paidN } : {}), ...(commN !== undefined && commN > 0 ? { commissionAmount: commN } : {}),
         checkIn: ci, checkOut: co, ...(bookedOn ? { bookedOn } : {}),
         adults: Math.max(1, Math.round(toNum(val(r, "adults")) ?? 2)),
         children: Math.max(0, Math.round(toNum(val(r, "children")) ?? 0)),
         ...(toNum(val(r, "total")) !== undefined ? { total: toNum(val(r, "total")) } : {}),
-        note: (t("Importato da CSV") + (noteTxt ? " · " + noteTxt : "")).slice(0, 280),
+        note: (t(/\.xlsx?$/i.test(fileName) ? "Importato da Octorate" : "Importato da CSV") + (noteTxt ? " · " + noteTxt : "")).slice(0, 280),
       });
       n++;
     });
@@ -365,8 +399,8 @@ export default function ImportaPage() {
                     </select>
                   </label>
                 )}
-                <label className={activeStructureId === "all" ? "" : "sm:col-span-2"}><span className="mb-1 block text-xs font-medium text-dim">{t("File CSV o ICS")}</span>
-                  <input type="file" accept=".csv,.ics,text/csv,text/calendar,text/plain" onChange={(e) => onFile(e.target.files?.[0])} className="block w-full text-sm text-dim file:mr-3 file:rounded-lg file:border-0 file:bg-focus file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:opacity-90" />
+                <label className={activeStructureId === "all" ? "" : "sm:col-span-2"}><span className="mb-1 block text-xs font-medium text-dim">{t("File Excel, CSV o ICS")}</span>
+                  <input type="file" accept=".csv,.ics,.xls,.xlsx,text/csv,text/calendar,text/plain" onChange={(e) => onFile(e.target.files?.[0])} className="block w-full text-sm text-dim file:mr-3 file:rounded-lg file:border-0 file:bg-focus file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:opacity-90" />
                 </label>
                 <label className="sm:col-span-2"><span className="mb-1 block text-xs font-medium text-dim">{t("…oppure incolla un URL iCal (.ics)")}</span>
                   <div className="flex gap-2">
@@ -384,7 +418,10 @@ export default function ImportaPage() {
                 </label>
               </div>
             )}
-            {fileName && <p className="mt-2 text-xs text-faint">{fileName} · {dataRows.length} {t("righe")}</p>}
+            {fileName && <p className="mt-2 text-xs text-faint">{fileName} · {dataRows.length} {t("righe")}{futureOnly && allRows.length !== dataRows.length ? ` ${t("da importare")} (${t("su")} ${allRows.length} ${t("nel file")})` : ""}</p>}
+            {mode === "csv" && rows.length > 1 && (
+              <label className="mt-2 flex items-center gap-2 text-xs text-txt"><input type="checkbox" checked={futureOnly} onChange={(e) => setFutureOnly(e.target.checked)} className="h-4 w-4 accent-[color:var(--focus)]" />{t("Solo prenotazioni future (partenza da oggi in poi): lo storico non viene importato")}</label>
+            )}
             {err && done === null && <p className="mt-2 text-sm text-[color:var(--err)]">{err}</p>}
           </Card>
 

@@ -287,6 +287,10 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       if (r.booking_id) candidates.add(`channex:${r.booking_id}`);
       if (r.id) candidates.add(`channex:${r.id}`);
       const prevIdx = bookings.map((b, i) => (b.extId && candidates.has(b.extId) ? i : -1)).filter((i) => i >= 0);
+      // Prenotazione già presente perché importata PRIMA del collegamento (es. da Octorate, con extId diverso): si riconosce dal numero di prenotazione
+      // dell'OTA (stesso codice, stessa struttura). Così una modifica o cancellazione la aggiorna invece di creare un doppione.
+      const otaCode = String(r.ota_reservation_code || "").trim();
+      if (!prevIdx.length && otaCode) bookings.forEach((b, i) => { if (b.structureId === map.structure_id && String(b.code || "").trim() === otaCode && !String(b.extId || "").startsWith("channex:")) prevIdx.push(i); });
       const bidLog = r.booking_id || r.id;
       if (r.status === "cancelled") {
         const cancelledGuestName = prevIdx.length ? guests.find((g) => g.id === bookings[prevIdx[0]].guestId)?.fullName : undefined;
