@@ -1,4 +1,6 @@
 import Stripe from "stripe";
+import { loadOwnerStructureData, stayFloor, hasFreeUnit, clientIp } from "@/lib/server-booking-guard";
+import { rateLimited } from "@/lib/server-auth";
 import { siteOrigin } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -65,8 +67,19 @@ export async function POST(req: Request) {
 
     const st = await findStructure(admin, ownerId, sid);
     const acct = st && typeof st.stripeAccount === "string" ? st.stripeAccount : "";
-    const amount = deposit > 0 ? deposit : total; // caparra se prevista, altrimenti totale
+    const amount = total > 0 ? Math.min(deposit > 0 ? deposit : total, total) : (deposit > 0 ? deposit : total); // caparra se prevista, altrimenti totale; mai oltre il totale
     if (!key || !acct || amount <= 0) return NextResponse.json({ ok: true, payment: false, token });
+
+    // Controlli sul server prima di far pagare: i numeri arrivano dal browser dell'ospite e non sono affidabili.
+    if (rateLimited("book:" + clientIp(req), 15, 60_000)) return NextResponse.json({ ok: false, error: "troppe_richieste" }, { status: 429 });
+    const nNights = Math.round((Date.parse(co) - Date.parse(ci)) / 86400000);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ci) || !/^\d{4}-\d{2}-\d{2}$/.test(co) || !(nNights >= 1 && nNights <= 60)) return NextResponse.json({ ok: false, error: "bad_dates" }, { status: 400 });
+    const od = await loadOwnerStructureData(admin, ownerId, sid);
+    if (od) {
+      const floor = stayFloor(od, rt, ci, co);
+      if (floor !== null && total < floor) return NextResponse.json({ ok: false, error: "price_mismatch" }, { status: 400 });
+      if (hasFreeUnit(od, rt, ci, co) === false) return NextResponse.json({ ok: false, error: "no_availability" }, { status: 409 });
+    }
 
     // Metadata: portano l'intera prenotazione fino alla conferma post-pagamento.
     const meta: Record<string, string> = {

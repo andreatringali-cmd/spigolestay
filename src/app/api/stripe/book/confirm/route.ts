@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { internalFetch } from "@/lib/server-auth";
 import { siteOrigin } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
 
     // Registra la prenotazione tramite public-booking (scrittura idempotente + email).
     const origin = siteOrigin(req);
-    const pb = await fetch(`${origin}/api/public-booking`, {
+    const pb = await internalFetch(`${origin}/api/public-booking`, {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
         slug, rt: m.rt, ci: m.ci, co: m.co,

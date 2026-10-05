@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { stayFloor, hasFreeUnit, clientIp, type OwnerStructureData } from "@/lib/server-booking-guard";
+import { isInternalRequest, rateLimited } from "@/lib/server-auth";
 import { siteOrigin } from "@/lib/server-auth";
 import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
@@ -26,6 +28,10 @@ export async function POST(req: Request) {
   const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!sbUrl || !service) return NextResponse.json({ error: "supabase_not_configured" }, { status: 503 });
+  // Chiamate interne (webhook Stripe / conferma pagamento, firmate): sono le uniche di cui ci si fida per incassi e riferimenti Stripe.
+  // Chiamate anonime (il browser dell'ospite): niente "pagato", niente riferimenti Stripe, niente rimborsi, con limite di frequenza.
+  const internal = isInternalRequest(req);
+  if (!internal && rateLimited("pb:" + clientIp(req), 10, 60_000)) return NextResponse.json({ error: "troppe_richieste" }, { status: 429 });
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -36,17 +42,17 @@ export async function POST(req: Request) {
     const adults = Math.max(1, parseInt(String(body?.adults ?? "1"), 10) || 1);
     const children = Math.max(0, parseInt(String(body?.children ?? "0"), 10) || 0);
     const childAges = Array.isArray(body?.childAges) ? (body.childAges as unknown[]).map((x) => Number(x)).filter((x) => !isNaN(x)) : [];
-    const total = Math.round(Number(body?.total) || 0) || undefined;
-    const deposit = Math.round(Number(body?.deposit) || 0) || 0;
+    const total = Math.min(1_000_000, Math.max(0, Math.round(Number(body?.total) || 0))) || undefined;
+    const deposit = internal ? Math.max(0, Math.round(Number(body?.deposit) || 0)) || 0 : 0;
     const note = String(body?.note || "").slice(0, 500);
     const token = String(body?.token || "").trim().slice(0, 80);
     // Politica di cancellazione + riferimenti pagamento Stripe (per rimborso self-service)
     const planName = String(body?.planName || "").slice(0, 60);
-    const refundable = body?.refundable === true;
+    const refundable = internal && body?.refundable === true;
     const cancelDays = Math.max(0, parseInt(String(body?.cancelDays ?? "0"), 10) || 0);
-    const stripePaymentIntent = String(body?.stripePaymentIntent || "").slice(0, 120);
-    const stripeSessionId = String(body?.stripeSessionId || "").slice(0, 120);
-    const stripeAccountId = String(body?.stripeAccountId || "").slice(0, 120);
+    const stripePaymentIntent = internal ? String(body?.stripePaymentIntent || "").slice(0, 120) : "";
+    const stripeSessionId = internal ? String(body?.stripeSessionId || "").slice(0, 120) : "";
+    const stripeAccountId = internal ? String(body?.stripeAccountId || "").slice(0, 120) : "";
     const g = (body?.guest ?? {}) as Record<string, string>;
     const gFirst = String(g.firstName || "").trim();
     const gLast = String(g.lastName || "").trim();
@@ -55,6 +61,13 @@ export async function POST(req: Request) {
     const gCountry = String(g.country || "").trim();
 
     if (!slug || !rt || !isISO(ci) || !isISO(co) || co <= ci) return NextResponse.json({ error: "bad_request" }, { status: 400 });
+    // Date ragionevoli: soggiorno fino a 60 notti, non nel passato (ieri è tollerato per i fusi), non oltre 2 anni.
+    const nNights = Math.round((Date.parse(co) - Date.parse(ci)) / 86400000);
+    const todayUtc = new Date().toISOString().slice(0, 10);
+    const yesterdayUtc = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const limitUtc = new Date(Date.now() + 2 * 365 * 86400000).toISOString().slice(0, 10);
+    if (!internal && (nNights > 60 || ci < yesterdayUtc || ci > limitUtc)) return NextResponse.json({ error: "bad_dates" }, { status: 400 });
+    void todayUtc;
 
     const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
@@ -93,10 +106,25 @@ export async function POST(req: Request) {
       data.guests = guests;
     }
 
-    // Camera: prima unità libera della tipologia, altrimenti la prima della tipologia
+    // Camera: prima unità libera della tipologia. Se non ce ne sono: dal sito anonimo si rifiuta (409); se invece il pagamento
+    // è già avvenuto (chiamata interna) si registra comunque, senza camera e con un avviso, invece di sovrapporla a un'altra prenotazione.
     const ofType = units.filter((u) => u.roomTypeId === rt && !u.outOfService);
     const free = ofType.find((u) => !bookings.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)));
-    const unitId = (free ?? ofType[0])?.id ?? null;
+    let overbooked = false;
+    let unitId: string | null = free?.id ?? null;
+    if (!free && ofType.length) {
+      if (!internal) return NextResponse.json({ error: "no_availability" }, { status: 409 });
+      overbooked = true; unitId = null;
+    }
+    // Prezzo minimo (metà del listino): impedisce soggiorni "regalati" scrivendo un totale basso nella richiesta.
+    if (!internal && total !== undefined) {
+      const od: OwnerStructureData | null = (Array.isArray(data.structures) ? data.structures : []).some((x) => (x as { id?: string }).id === sid)
+        ? { roomTypes: (Array.isArray(data.roomTypes) ? data.roomTypes : []) as never, units: units as never, bookings: bookings as never, rateOverrides: ((data.rateOverrides ?? {}) as Record<string, number>) }
+        : null;
+      const floor = od ? stayFloor(od, rt, ci, co) : null;
+      if (floor !== null && total < floor) return NextResponse.json({ error: "price_mismatch" }, { status: 400 });
+    }
+    void hasFreeUnit;
 
     const groupId = (globalThis.crypto?.randomUUID?.() ?? `grp_${Date.now()}`);
     const booking: Booking = {
@@ -121,7 +149,7 @@ export async function POST(req: Request) {
       updatedAt: Date.now(),
       extId,
       code: String((body as { code?: string })?.code || "").trim().slice(0, 40) || undefined,
-      note: note || "Prenotazione dal sito",
+      note: (note || "Prenotazione dal sito") + (overbooked ? " · ⚠ nessuna camera libera in quelle date: da assegnare a mano" : ""),
       ratePlanName: planName || undefined,
       refundable: refundable || undefined,
       cancelDays: cancelDays || undefined,

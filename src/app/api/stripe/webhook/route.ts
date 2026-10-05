@@ -37,7 +37,7 @@ export async function POST(req: Request) {
       if (session.payment_status === "paid" && m.kind === "book" && m.slug) {
         const pi = typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent?.id || "");
         // Registra la prenotazione (idempotente sul token) — stessa logica del ritorno pagina.
-        await fetch(`${origin}/api/public-booking`, {
+        const pbRes = await internalFetch(`${origin}/api/public-booking`, {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({
             slug: m.slug, rt: m.rt, ci: m.ci, co: m.co,
@@ -49,6 +49,8 @@ export async function POST(req: Request) {
             guest: { firstName: (m.gn || "").split(" ")[0] || "", lastName: (m.gn || "").split(" ").slice(1).join(" "), email: m.ge || "", phone: m.gp || "", country: m.gc || "" },
           }),
         });
+        // Pagamento incassato ma prenotazione non scritta: si risponde con errore così Stripe riprova (la scrittura è idempotente).
+        if (!pbRes.ok) return NextResponse.json({ ok: false, error: "booking_write_failed" }, { status: 500 });
       }
       // Link di pagamento in chat (kind "chatpay"): registra l'incasso sulla prenotazione e scrive
       // "Pagamento ricevuto" nel thread. Idempotente (paidSessions + id messaggio pay:<sessione>),
