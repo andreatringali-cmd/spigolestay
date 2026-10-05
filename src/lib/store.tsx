@@ -120,6 +120,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Lapidi (tombstone): id delle entità cancellate qui. Servono a impedire che la fusione a 3 vie
   // con il server le "resusciti" al refresh (la base di fusione è vuota alla prima idratazione).
   const deletedRef = useRef<Record<string, string[]>>({});
+  const notifyTimes = useRef<number[]>([]); // orari delle ultime email di notifica inviate da questo browser (freno per le operazioni di massa)
   const tomb = (key: string, ...ids: (string | undefined | null)[]) => {
     const set = new Set(deletedRef.current[key] ?? []);
     for (const i of ids) if (i) set.add(i);
@@ -178,6 +179,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Fire-and-forget come syncGcal: non deve mai bloccare né far fallire l'azione locale.
   const notifyOwner = (ev: "newBooking" | "modified" | "cancel" | "payment", b: Booking, extra?: { amount?: number }) => {
     if (b.channel === "blocked") return; // "fuori servizio" non sono prenotazioni ospiti
+    // Operazioni di massa (importazioni, cancellazioni in blocco): al massimo 5 email ogni 2 minuti da questo browser.
+    const nowMs = Date.now();
+    notifyTimes.current = notifyTimes.current.filter((t) => nowMs - t < 120000);
+    if (notifyTimes.current.length >= 5) return;
+    notifyTimes.current.push(nowMs);
     const prefs = loadNotifPrefs();
     if (!prefs[ev]) return;
     const st = structures.find((s) => s.id === b.structureId);

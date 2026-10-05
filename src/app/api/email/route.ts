@@ -413,6 +413,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, id: data?.id });
     }
     if (body.kind === "notify") {
+      // FRENO: massimo 8 notifiche al minuto per destinatario (per istanza). Oltre, si scartano in silenzio: un import o una cancellazione di massa
+      // non deve mai produrre centinaia di email. Per fermare tutto subito: variabile NOTIFY_EMAILS_PAUSED=1.
+      if (process.env.NOTIFY_EMAILS_PAUSED === "1" || notifyThrottled(String(body.to || ""))) return NextResponse.json({ ok: true, skipped: "throttled" });
       // Notifica interna alla struttura (nuova prenotazione/modifica/cancellazione/pagamento):
       // email semplice non brandizzata, niente PDF/allegati, niente risoluzione logo.
       if (!body.to) return NextResponse.json({ ok: false, error: "Email destinatario mancante" }, { status: 400 });
@@ -440,4 +443,15 @@ export async function POST(req: Request) {
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Errore invio" }, { status: 502 });
   }
+}
+
+
+// Contatore in memoria (per istanza serverless): finestra di 60 secondi, massimo 8 notifiche per destinatario.
+const NOTIFY_HITS = new Map<string, number[]>();
+function notifyThrottled(to: string): boolean {
+  const now = Date.now();
+  const list = (NOTIFY_HITS.get(to) ?? []).filter((t) => now - t < 60000);
+  if (list.length >= 8) { NOTIFY_HITS.set(to, list); return true; }
+  list.push(now); NOTIFY_HITS.set(to, list);
+  return false;
 }
