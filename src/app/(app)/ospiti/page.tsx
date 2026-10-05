@@ -269,7 +269,7 @@ export default function OspitiPage() {
                   <td className="whitespace-nowrap px-3 py-2 text-txt">{guest.email ?? "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-txt">{guest.country ?? "—"}</td>
                   {!lead && <>
-                    <td className="whitespace-nowrap px-3 py-2">{topCh ? <span className="inline-flex items-center gap-1.5"><ChannelLogo channel={topCh} size={16} title={topCh === "direct" ? "xenora.it" : CHANNELS[topCh].label} /><span className="text-xs text-dim">{topCh === "direct" ? "xenora.it" : CHANNELS[topCh].label}</span></span> : "—"}</td>
+                    <td className="whitespace-nowrap px-3 py-2">{topCh ? <span className="inline-flex" role="img" aria-label={topCh === "direct" ? "xenora.it" : CHANNELS[topCh].label}><ChannelLogo channel={topCh} size={22} title={topCh === "direct" ? "xenora.it" : CHANNELS[topCh].label} /></span> : "—"}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{stays}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{nightsTot}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-txt">{avg > 0 ? eur(avg) : "—"}</td>
