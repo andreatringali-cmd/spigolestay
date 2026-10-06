@@ -3,6 +3,7 @@ import { internalFetch } from "@/lib/server-auth";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { sendWhatsapp } from "@/lib/whatsapp";
 import { logInvio } from "@/lib/invii-log";
+import { waTemplateFrom } from "@/lib/wa-template";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -160,7 +161,10 @@ export async function GET(req: Request) {
         const phone = s(g.phone);
         if (phone) {
           try {
-            const w = await sendWhatsapp(admin, tenantId, { to: phone, country: s(g.country), text, templateName: tp.waTemplate || undefined, lang });
+            // Col modello approvato: i valori delle variabili {{1}}, {{2}}… sono i segnaposto del testo, in ordine di apparizione (vedi lib/wa-template).
+            const rawText = tp.texts?.[lang] || tp.texts?.it || "";
+            const params = tp.waTemplate ? waTemplateFrom(rawText).tokens.map((k) => ctx[k] || "-") : undefined;
+            const w = await sendWhatsapp(admin, tenantId, { to: phone, country: s(g.country), text, templateName: tp.waTemplate || undefined, lang, params });
             if (w.ok) { okAny = true; waSent++; await logInvio(admin, tenantId, { job: "messaggi", ref: s(b.id), channel: "whatsapp", ok: true, wamid: w.id, detail: `${tp.name || tp.id} → ${phone}` }); }
             else if (w.message && !/non collegato/i.test(w.message)) { errors.push(`wa ${s(b.id)}/${tp.id}: ${w.message}`); await logInvio(admin, tenantId, { job: "messaggi", ref: s(b.id), channel: "whatsapp", ok: false, detail: `${tp.name || tp.id} → ${phone}: ${w.message}` }); }
           } catch (e) { errors.push(`wa ${s(b.id)}: ${e instanceof Error ? e.message : "err"}`); }

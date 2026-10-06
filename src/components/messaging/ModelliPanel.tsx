@@ -6,6 +6,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useData } from "@/lib/store";
 import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
+import { waTemplateFrom } from "@/lib/wa-template";
 import VarLegend, { MSG_VARS } from "@/components/VarLegend";
 
 type Lang = "it" | "en" | "fr" | "de" | "es";
@@ -188,6 +189,19 @@ export default function ModelliPanel() {
               {editing.trigger !== "manual" && (
                 <label className="mt-2 block text-xs font-medium text-dim">{t("Template WhatsApp approvato")} <span className="font-normal text-faint">{t("(facoltativo · nome del template Meta per l'invio automatico WhatsApp; senza, WhatsApp parte solo entro 24h)")}</span>
                   <input value={editing.waTemplate ?? ""} onChange={(e) => setEditing({ ...editing, waTemplate: e.target.value || undefined })} placeholder={t("es. benvenuto_prearrivo")} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" />
+                  {(() => {
+                    const d = waTemplateFrom(editing.texts[editLang] ?? "");
+                    if (!d.body) return null;
+                    return (
+                      <div className="mt-2 rounded-lg border border-line bg-wash px-2.5 py-2 text-[11px] font-normal text-dim">
+                        <div className="mb-1 font-semibold text-txt">{t("Per scrivere per primo a un ospite WhatsApp richiede un modello approvato da Meta. Crealo (categoria Utility) con questo testo, lingua")} {editLang.toUpperCase()}:</div>
+                        <pre className="whitespace-pre-wrap break-words font-sans text-txt">{d.body}</pre>
+                        {d.tokens.length > 0 && <div className="mt-1">{t("Le variabili sono, in ordine")}: {d.tokens.map((k, i) => `{{${i + 1}}} = {${k}}`).join(" · ")}</div>}
+                        {d.warnings.map((w) => <div key={w} className="mt-1" style={{ color: "var(--warn)" }}>⚠ {w}</div>)}
+                        <button type="button" onClick={() => { try { void navigator.clipboard.writeText(d.body); } catch {} }} className="mt-1.5 rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-semibold text-txt hover:bg-paper">{t("Copia il testo")}</button>
+                      </div>
+                    );
+                  })()}
                 </label>
               )}
             </div>
