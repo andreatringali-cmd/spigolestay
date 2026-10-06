@@ -25,6 +25,10 @@ export default function Donut({
   const r = (size - thickness) / 2;
   const c = 2 * Math.PI * r;
   let acc = 0;
+  // Il testo al centro deve stare dentro il buco dell'anello: il corpo si riduce in base alla lunghezza (cifre in grassetto ≈ 0,6 volte il corpo).
+  const centerText = center ?? String(total);
+  const hole = size - 2 * thickness - 16;
+  const centerSize = Math.max(11, Math.min(22, hole / (Math.max(centerText.length, 1) * 0.6)));
 
   // Al montaggio i segmenti "si disegnano": dash da 0 alla lunghezza reale.
   const [drawn, setDrawn] = useState(false);
@@ -63,8 +67,8 @@ export default function Donut({
               return seg;
             })}
         </g>
-        <text x="50%" y="49%" textAnchor="middle" dominantBaseline="middle" style={{ fill: "var(--txt)", fontSize: 22, fontWeight: 700 }}>
-          {center ?? String(total)}
+        <text x="50%" y="49%" textAnchor="middle" dominantBaseline="middle" style={{ fill: "var(--txt)", fontSize: centerSize, fontWeight: 700 }}>
+          {centerText}
         </text>
         <text x="50%" y="63%" textAnchor="middle" style={{ fill: "var(--faint)", fontSize: 10 }}>
           totale
