@@ -27,6 +27,9 @@ const daysTo = (iso: string, today: string) => Math.round((Date.parse(iso) - Dat
 const eurRound = (n: number) => `€ ${Math.round(n * 100) % 100 === 0 ? Math.round(n) : n.toFixed(2).replace(".", ",")}`;
 const fmtShort = (iso: string) => { const [, m, d] = iso.split("-"); return `${+d}/${+m}`; };
 
+/** Nota interna della prenotazione, senza la dicitura "Importato da…" messa dall'importazione. Vuota se resta solo quella. Non è una nota dell'ospite: quelle sono le richieste (guestRequests). */
+export const internalNote = (note?: string) => (note ?? "").replace(/^s*Importato da (Octorate|CSV)s*·?s*/i, "").trim();
+
 export const isLiveBooking = (b: Booking) => b.status !== "cancelled" && b.status !== "no_show" && b.channel !== "blocked";
 
 export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; done: number; total: number; next?: JourneyStep; chips: Chip[] } {
@@ -134,7 +137,8 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   if (b.depositPaid) chips.push({ key: "dep", label: "Caparra ricevuta", tone: "info" });
   if (b.refundable === false) chips.push({ key: "nr", label: "Non rimborsabile", tone: "info" });
   if (b.movedFrom) chips.push({ key: "moved", label: `Spostata da ${b.movedFrom.structureName}`, tone: "warn" });
-  if (b.note) chips.push({ key: "note", label: `Nota: ${b.note.length > 40 ? b.note.slice(0, 40) + "…" : b.note}`, tone: "info" });
+  const inote = internalNote(b.note);
+  if (inote) chips.push({ key: "note", label: `Nota interna: ${inote.length > 40 ? inote.slice(0, 40) + "…" : inote}`, tone: "info" });
 
   return { steps, done, total: relevant.length, next, chips };
 }
