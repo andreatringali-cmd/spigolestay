@@ -14,6 +14,7 @@
     "@supabase/supabase-js": "^2.115.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
+    "libphonenumber-js": "^1.13.14",
     "next": "16.3.0",
     "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",

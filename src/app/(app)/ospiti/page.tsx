@@ -17,6 +17,7 @@ import ChannelLogo, { ChannelWordmark } from "@/components/ChannelLogo";
 import { type Promo, loadPromos, promosForStructure, promoMailto } from "@/lib/promos";
 import Icon from "@/components/Icon";
 import { exportExcel } from "@/lib/export";
+import ContattiDaCorreggere from "./_contatti";
 
 const avColor = (n: string) => AV_COLORS[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 const fmtD = (iso: string) => { try { return parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" }); } catch { return iso; } };
@@ -323,6 +324,8 @@ export default function OspitiPage() {
           <StatCard key={lab} label={lab} value={val} />
         ))}
       </div>
+
+      <ContattiDaCorreggere />
 
       {/* Ricerca + segmenti CRM + azioni, tutto in un'unica riga. Stessa griglia dei riepiloghi
           sopra: la ricerca è larga quanto una card e allineata con essa. */}

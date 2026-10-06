@@ -3,6 +3,7 @@
 // Scheda alta di una prenotazione per la vista Calendario · Dettagliato. Stesso linguaggio di
 // "Prenotazioni · Dettagliata" (anteprima camera, ospite, date, passaggi con pallini, segnalazioni, avanzamento),
 // impaginata in riga (anteprima a sinistra, dati al centro, importo a destra), una sotto l'altra per categoria.
+import Link from "next/link";
 import type { Booking, Structure, Unit, RoomType } from "@/lib/types";
 import BookingAmounts from "@/components/BookingAmounts";
 import { CHANNELS } from "@/lib/types";
@@ -13,7 +14,7 @@ import { type JourneyStep, type StepState, type journeyOf } from "@/lib/booking-
 import { ChannelWordmark } from "@/components/ChannelLogo";
 
 export type Journey = ReturnType<typeof journeyOf>;
-export interface Avviso { key: string; label: string; tone: "err" | "warn" | "info"; title?: string }
+export interface Avviso { key: string; label: string; tone: "err" | "warn" | "info"; title?: string; href?: string }
 
 const STATE_COLOR: Record<StepState, string> = { done: "var(--ok)", todo: "var(--warn)", late: "var(--err)", na: "var(--faint)" };
 const STATE_GLYPH: Record<StepState, string> = { done: "✓", todo: "", late: "!", na: "–" };
@@ -89,12 +90,14 @@ export default function SchedaGiorno({ groupSize, b, j: jIn, code, dim, typeLabe
           <span className="text-faint">·</span><span>{people} {people === 1 ? "ospite" : "ospiti"}</span>
           {tag && <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: tagTone, background: `color-mix(in srgb, ${tagTone} 12%, transparent)` }}>{tag}</span>}
           {/* Avvisi: le cose da non perdere di vista, sulla stessa riga delle date */}
-          {avvisi.map((a) => (
-            <span key={a.key} title={a.title} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-[11px] font-semibold leading-snug" style={{ color: TONE[a.tone], background: `color-mix(in srgb, ${a.tone === "info" ? "var(--faint)" : TONE[a.tone]} 13%, transparent)` }}>
-              <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: TONE[a.tone] }} />
-              <span className="min-w-0">{a.label}</span>
-            </span>
-          ))}
+          {avvisi.map((a) => {
+            const cls = "inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-[11px] font-semibold leading-snug";
+            const st = { color: TONE[a.tone], background: `color-mix(in srgb, ${a.tone === "info" ? "var(--faint)" : TONE[a.tone]} 13%, transparent)` };
+            const inner = (<><span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: TONE[a.tone] }} /><span className="min-w-0">{a.label}</span>{a.href && <span aria-hidden>→</span>}</>);
+            return a.href
+              ? <Link key={a.key} href={a.href} title={a.title} onClick={(ev) => ev.stopPropagation()} className={`${cls} underline-offset-2 hover:underline`} style={st}>{inner}</Link>
+              : <span key={a.key} title={a.title} className={cls} style={st}>{inner}</span>;
+          })}
         </div>
 
         {/* Passaggi */}

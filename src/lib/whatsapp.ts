@@ -5,6 +5,7 @@
 // per i messaggi "a freddo" serve un template approvato (name + lang).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { encryptCred, decryptCred } from "@/lib/crypto-creds";
+import { waDigits } from "@/lib/contacts-check";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 const digits = (s: string) => (s || "").replace(/\D/g, "");
@@ -47,11 +48,11 @@ export async function whatsappTest(admin: SupabaseClient, tenantId: string): Pro
   } catch (e) { return { ok: false, message: (e as Error)?.message ?? "Errore di connessione." }; }
 }
 
-export interface SendArgs { to: string; text?: string; templateName?: string; lang?: string; params?: string[] }
+export interface SendArgs { to: string; country?: string; text?: string; templateName?: string; lang?: string; params?: string[] }
 export async function sendWhatsapp(admin: SupabaseClient, tenantId: string, args: SendArgs): Promise<{ ok: boolean; message: string; id?: string }> {
   const cfg = await readCfg(admin, tenantId);
   if (!cfg) return { ok: false, message: "WhatsApp non collegato." };
-  const to = digits(args.to);
+  const to = waDigits(args.to, args.country) || digits(args.to); // "3473824353" senza prefisso → 393473824353
   if (!to) return { ok: false, message: "Numero destinatario mancante." };
 
   const body: Record<string, unknown> = { messaging_product: "whatsapp", to };

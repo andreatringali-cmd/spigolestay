@@ -9,6 +9,7 @@ import { DOC_TYPES, GUEST_TAGS, CHANNELS } from "@/lib/types";
 import { USER_LANGS, AV_COLORS, initials } from "@/lib/users";
 import { eur } from "@/lib/format";
 import { useLang } from "@/lib/i18n";
+import { contactReportCached } from "@/lib/contacts-check";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { type Promo, loadPromos, promosForStructure, promoMailto } from "@/lib/promos";
@@ -45,6 +46,17 @@ function parsePhone(raw?: string): { dial: string; local: string } {
 }
 const combinePhone = (dial: string, local: string) => { const loc = local.trim(); return loc ? `${dial} ${loc}` : ""; };
 
+// Esito del controllo sotto il campo: cosa non va, o conferma che va bene. "Usa…" applica la correzione proposta.
+function Hint({ tone, children, action }: { tone: "ok" | "warn" | "err" | "dim"; children: React.ReactNode; action?: { label: string; onClick: () => void } }) {
+  const col = tone === "ok" ? "var(--ok)" : tone === "warn" ? "var(--warn)" : tone === "err" ? "var(--err)" : "var(--faint)";
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium" style={{ color: col }}>
+      <span>{children}</span>
+      {action && <button type="button" onClick={action.onClick} className="rounded-md bg-focus px-2 py-0.5 text-[11px] font-semibold text-white hover:opacity-90">{action.label}</button>}
+    </div>
+  );
+}
+
 export default function OspiteSchedaPage() {
   const router = useRouter();
   const { t } = useLang();
@@ -56,6 +68,7 @@ export default function OspiteSchedaPage() {
   const existing = guests.find((g) => g.id === params.id);
   const [g, setG] = useState<Guest>(() => (existing ? withSplitNames(existing) : { id: "", fullName: "", firstName: "", lastName: "", language: "it", tags: [] }));
   const set = <K extends keyof Guest>(k: K, v: Guest[K]) => setG((p) => ({ ...p, [k]: v }));
+  const cr = contactReportCached({ phone: g.phone, email: g.email, country: g.country }); // controllo di telefono ed email mentre si scrive
   // Telefono scomposto in prefisso + numero; salvo sempre il formato internazionale in g.phone.
   const [dial, setDial] = useState(() => parsePhone(existing?.phone).dial);
   const [localPhone, setLocalPhone] = useState(() => parsePhone(existing?.phone).local);
@@ -203,7 +216,12 @@ export default function OspiteSchedaPage() {
           <Card>
             <SectionTitle>{t("Contatti")}</SectionTitle>
             <div className="grid grid-cols-2 gap-3">
-              <label className={`${lbl} col-span-2`}>{t("Email")}<input value={g.email ?? ""} onChange={(e) => set("email", e.target.value)} className={`${inp} mt-1`} /></label>
+              <label className={`${lbl} col-span-2`}>{t("Email")}<input value={g.email ?? ""} onChange={(e) => set("email", e.target.value)} inputMode="email" className={`${inp} mt-1`} />
+                {cr.email.status === "ok" && <Hint tone="ok">✓ {t("Indirizzo valido")}</Hint>}
+                {cr.email.status === "relay" && <Hint tone="ok">✓ {t("Indirizzo della piattaforma (OTA): i messaggi arrivano all'ospite tramite la piattaforma")}</Hint>}
+                {cr.email.status === "typo" && <Hint tone="warn" action={{ label: `${t("Usa")} ${cr.email.suggestion}`, onClick: () => set("email", cr.email.suggestion!) }}>{t("Probabile errore di battitura")}: {cr.email.reason}</Hint>}
+                {cr.email.status === "invalid" && <Hint tone="err">{t("Email non valida")}: {cr.email.reason}</Hint>}
+              </label>
               <label className={`${lbl} col-span-2`}>{t("Telefono")} <span className="font-normal text-faint">· {t("prefisso + numero (serve a WhatsApp)")}</span>
                 <div className="mt-1 flex gap-1.5">
                   <select value={dial} onChange={(e) => setDialCode(e.target.value)} className="w-[7.5rem] shrink-0 rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">
@@ -211,6 +229,13 @@ export default function OspiteSchedaPage() {
                   </select>
                   <input value={localPhone} onChange={(e) => setLocalPhoneVal(e.target.value)} inputMode="tel" className={inp} placeholder="333 1234567" />
                 </div>
+                {cr.phone.status === "ok" && <Hint tone="ok">✓ {t("Numero valido")} · {cr.phone.pretty} · {t("se abbia WhatsApp si vede al primo invio")}</Hint>}
+                {cr.phone.status === "landline" && <Hint tone="warn">{t("Numero fisso: di solito non ha WhatsApp")}</Hint>}
+                {cr.phone.status === "invalid" && (
+                  <Hint tone="err" action={cr.phone.fix ? { label: `${t("Usa")} ${cr.phone.fix.value}`, onClick: () => { const v = cr.phone.fix!.value; set("phone", v); const pp = parsePhone(v); setDial(pp.dial); setLocalPhone(pp.local); } } : undefined}>
+                    {t("Numero non valido")}: {cr.phone.reason}{cr.phone.fix ? ` · ${cr.phone.fix.reason}` : ""}
+                  </Hint>
+                )}
               </label>
               <label className={`${lbl} col-span-2`}>{t("Paese")}<input value={g.country ?? ""} onChange={(e) => set("country", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={`${lbl} col-span-2`}>{t("Lingua")}<select value={g.language ?? "it"} onChange={(e) => set("language", e.target.value)} className={`${inp} mt-1`}>{USER_LANGS.map((l) => <option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}</select></label>

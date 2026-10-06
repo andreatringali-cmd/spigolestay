@@ -138,7 +138,7 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
         unit={unit} roomType={rt} typeLabel={unitLabel(b) ?? undefined}
         structure={getStructure(b.structureId)} showStructure={showStructure}
         tag={t.tag} tagTone={t.tone}
-        avvisi={live && j ? avvisiOf(b, j, colonnaOggi(b, today), { today, unit }) : []}
+        avvisi={live && j ? avvisiOf(b, j, colonnaOggi(b, today), { today, unit, guest: guests.find((g) => g.id === b.guestId) }) : []}
         onOpen={() => openBooking(b.id)}
         onStep={(s) => { if (s.state !== "done" && s.state !== "na") setModal({ id: b.id, key: s.key }); else if (s.href) router.push(s.href); }}
       />

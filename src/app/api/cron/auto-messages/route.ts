@@ -159,7 +159,7 @@ export async function GET(req: Request) {
         const phone = s(g.phone);
         if (phone) {
           try {
-            const w = await sendWhatsapp(admin, tenantId, { to: phone, text, templateName: tp.waTemplate || undefined, lang });
+            const w = await sendWhatsapp(admin, tenantId, { to: phone, country: s(g.country), text, templateName: tp.waTemplate || undefined, lang });
             if (w.ok) { okAny = true; waSent++; }
             else if (w.message && !/non collegato/i.test(w.message)) errors.push(`wa ${s(b.id)}/${tp.id}: ${w.message}`);
           } catch (e) { errors.push(`wa ${s(b.id)}: ${e instanceof Error ? e.message : "err"}`); }

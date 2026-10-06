@@ -17,6 +17,8 @@ import { eur } from "@/lib/format";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { journeyOf, isLiveBooking, type JourneyStep } from "@/lib/booking-journey";
 import { channelPulse } from "@/lib/channel-pulse";
+import { contactReportCached } from "@/lib/contacts-check";
+import { upcomingContactIssues } from "@/lib/contacts-upcoming";
 import { isGuideSent, readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import { PageHeader } from "@/components/ui";
 import ScrollStrip from "@/components/ScrollStrip";
@@ -440,8 +442,12 @@ export default function Dashboard2() {
   const alOos = scopedUnitsAll.filter((u) => u.outOfService);
   // NB: check-in/schedina, saldo aperto e tassa sono ora gestiti in "Adempimenti oggi" (niente doppione):
   // qui restano solo gli alert operativi NON coperti dagli adempimenti.
+  // Ospiti in arrivo con numero o email che non permettono ai messaggi automatici di partire (avviso in tempo per correggere).
+  const contactIssues = upcomingContactIssues(scoped, guests, todayISO, contactReportCached);
+  const contactUrgent = contactIssues.filter((x) => x.urgent).length;
   const alerts = [
     { n: alUnassigned.length, label: "arrivi senza camera assegnata", color: "var(--err)", href: "/prenotazioni" },
+    { n: contactUrgent || contactIssues.length, label: contactUrgent ? "arrivi entro 10 giorni con contatti da correggere" : "arrivi in programma con contatti da correggere", color: contactUrgent ? "var(--err)" : "var(--warn)", href: "/ospiti" },
     { n: alOos.length, label: "camere fuori servizio", color: "var(--dim)", href: "/camere" },
   ].filter((a) => a.n > 0);
   // Riepilogo adempimenti del giorno (rimanda alla pagina dedicata): proxy lato client.

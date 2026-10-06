@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Guest } from "./types";
 import { apiPost } from "./invoicing/client";
+import { waDigits } from "./contacts-check";
 
 export type Lang = "it" | "en" | "fr" | "de" | "es";
 
@@ -77,7 +78,7 @@ export type SendResult = { ok: boolean; how: "api" | "link" | "none"; message: s
 
 /** WhatsApp: se la Cloud API è collegata invia davvero (e registra in chat); altrimenti apre wa.me col testo pronto. */
 export async function sendWhatsAppToGuest(g: Guest | undefined, text: string, meta?: SendMeta): Promise<SendResult> {
-  const digits = (g?.phone ?? "").replace(/\D/g, "");
+  const digits = waDigits(g?.phone, g?.country); // con il prefisso del Paese anche se il numero è stato scritto senza
   if (!g || !digits) return { ok: false, how: "none", message: "L'ospite non ha un numero di telefono." };
   const wa = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
   if (await whatsappConnected()) {
