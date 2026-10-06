@@ -111,13 +111,14 @@ export async function GET(req: Request) {
       }
       if (cfg.whatsapp && cfg.whatsappTo) {
         try {
-          let w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, text });
-          const firstErr = w.ok ? "" : w.message;
-          // Fuori dalla finestra di 24h il testo libero viene rifiutato da Meta: ripiego sul modello approvato
-          // (corpo con 3 variabili: {{1}} struttura, {{2}} data, {{3}} planning in una riga).
-          if (!w.ok) w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, templateName: process.env.WHATSAPP_PULIZIE_TEMPLATE || "planning_pulizie", lang: "it", params: [s((st as unknown as Json).name), todayRome, text] });
-          if (w.ok) { waSent++; await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "whatsapp", ok: true, wamid: w.id, detail: firstErr ? `con il modello (il testo libero era stato rifiutato: ${firstErr})` : cfg.whatsappTo }); }
-          else { errors.push(`wa ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${w.message}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "whatsapp", ok: false, detail: `testo libero: ${firstErr} · modello: ${w.message}` }); }
+          // Il planning parte ogni mattina senza che il destinatario abbia scritto: per Meta è un messaggio "a freddo" e VA mandato col modello approvato.
+          // Il testo libero viene accettato dall'API ma poi NON consegnato (errore 131047) se il destinatario non ha scritto negli ultimi 24 ore: per questo non è più il primo tentativo.
+          // (corpo del modello con 3 variabili: {{1}} struttura, {{2}} data, {{3}} planning in una riga)
+          let w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, country: "IT", templateName: process.env.WHATSAPP_PULIZIE_TEMPLATE || "planning_pulizie", lang: "it", params: [s((st as unknown as Json).name), todayRome, text] });
+          const tplErr = w.ok ? "" : w.message;
+          if (!w.ok) w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, country: "IT", text }); // ripiego: arriva solo se il destinatario ha scritto nelle ultime 24 ore
+          if (w.ok) { waSent++; await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "whatsapp", ok: true, wamid: w.id, detail: tplErr ? `testo libero (il modello non è partito: ${tplErr}): consegnato solo se hai scritto negli ultimi 24 ore` : `modello a ${cfg.whatsappTo}` }); }
+          else { errors.push(`wa ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${w.message}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "whatsapp", ok: false, detail: `modello: ${tplErr} · testo libero: ${w.message}` }); }
         } catch (e) { errors.push(`wa ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "whatsapp", ok: false, detail: e instanceof Error ? e.message : "errore" }); }
       }
     }
