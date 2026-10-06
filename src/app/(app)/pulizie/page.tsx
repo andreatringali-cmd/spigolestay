@@ -882,7 +882,7 @@ function RoomRow({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle,
 function TypeHeader({ name, color, total, todo, className = "", flat = false }: { name: string; color: string; total: number; todo: number; className?: string; flat?: boolean }) {
   const { t } = useLang();
   return (
-    <div className={`flex items-center gap-2.5 bg-surface px-3 py-2 ${flat ? "" : "rounded-lg border border-line shadow-sm"} ${className}`} style={{ borderLeft: `5px solid ${color}`, backgroundImage: `linear-gradient(90deg, color-mix(in srgb, ${color} 30%, transparent), color-mix(in srgb, ${color} 6%, transparent) 75%, transparent)` }}>
+    <div className={`flex items-center gap-2.5 bg-surface px-3 py-2 ${flat ? "" : "rounded-lg border border-line shadow-sm"} ${className}`} style={{ borderLeft: `5px solid ${color}`, backgroundImage: `linear-gradient(90deg, color-mix(in srgb, ${color} 44%, transparent), color-mix(in srgb, ${color} 18%, transparent) 45%, color-mix(in srgb, ${color} 7%, transparent) 85%, transparent)` }}>
       <span className="font-display text-base font-bold text-txt">{name}</span>
       <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-medium text-dim">{total} {total === 1 ? t("camera") : t("camere")}</span>
       {todo > 0 && <span className="text-[11px] text-faint">· {todo} {t("da fare")}</span>}
