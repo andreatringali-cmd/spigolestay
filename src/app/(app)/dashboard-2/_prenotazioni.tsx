@@ -35,8 +35,8 @@ export default function Prenotazioni({ lead, stay, delay = 0 }: { lead: Histo; s
     <Tile label="Anticipo e durata" delay={delay}>
       <TileHead title="Prenotazioni" sub="Anticipo e durata, 12 mesi" />
       <div className="grid gap-5 sm:grid-cols-2">
-        {lead.total > 0 && <Mini title="Anticipo" unit="giorni" histo={lead} color={P.ind} delay={150} fmtAvg={(v) => String(Math.round(v))} />}
-        {stay.total > 0 && <Mini title="Durata" unit="notti" histo={stay} color={P.amb} delay={250} fmtAvg={(v) => (Math.round(v * 10) / 10).toString().replace(".", ",")} />}
+        {lead.total > 0 && <Mini title="Anticipo" unit="giorni" histo={lead} color={P.vi} delay={150} fmtAvg={(v) => String(Math.round(v))} />}
+        {stay.total > 0 && <Mini title="Durata" unit="notti" histo={stay} color={P.cy} delay={250} fmtAvg={(v) => (Math.round(v * 10) / 10).toString().replace(".", ",")} />}
       </div>
     </Tile>
   );

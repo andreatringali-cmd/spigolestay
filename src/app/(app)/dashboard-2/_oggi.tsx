@@ -20,7 +20,7 @@ export interface MoveRow {
 const KIND = {
   arr: { title: "Arrivi", color: "var(--ok)" },
   dep: { title: "Partenze", color: "var(--err)" },
-  stay: { title: "In casa", color: P.ind },
+  stay: { title: "In casa", color: P.vi },
 } as const;
 const STAY_VISIBLE = 4;
 

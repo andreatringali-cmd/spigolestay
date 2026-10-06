@@ -7,16 +7,17 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import { tint } from "../_ui";
 
-// ── Palette: definita qui, in un punto solo. Meno blu: smeraldo, indaco, ambra, corallo, acqua.
-// I valori cambiano col tema (vedi CSS sotto); i colori semantici dell'app restano var(--ok) arrivo, var(--err) partenza.
-export const P = { em: "var(--d2-em)", ind: "var(--d2-in)", amb: "var(--d2-am)", cor: "var(--d2-co)", aq: "var(--d2-aq)" } as const;
-export const SERIES = [P.em, P.ind, P.amb, P.cor, P.aq];
+// ── Palette Xenora (logo e login): ciano, azzurro, viola, lilla; ambra per gli avvisi, corallo per i ritardi.
+// Il blu pieno non domina: si usano gradienti ciano → viola e trasparenze. Il verde resta solo semantico (var(--ok): arrivi, fatto, positivo)
+// e il rosso (var(--err)) per partenze. I valori cambiano col tema (vedi CSS sotto).
+export const P = { cy: "var(--d2-cy)", az: "var(--d2-az)", vi: "var(--d2-vi)", li: "var(--d2-li)", amb: "var(--d2-am)", cor: "var(--d2-co)" } as const;
+export const SERIES = [P.cy, P.vi, P.az, P.li, P.amb];
 // Colori per il fondo scuro dell'hero (fissi: l'hero è scuro in entrambi i temi).
-export const HERO = { mint: "#6EE7B7", coral: "#FF9C94", lilac: "#C9BDFF", aqua: "#5EEAD4", ink: "#F4F7FF", inkDim: "rgba(235,241,255,.78)" } as const;
+export const HERO = { mint: "#6EE7B7", coral: "#FF9C94", lilac: "#CDBBFF", cyan: "#5FD8FF", ink: "#F4F7FF", inkDim: "rgba(235,241,255,.8)" } as const;
 
 const CSS = `
-.d2-root{--d2-em:#0E9F77;--d2-in:#6A58D0;--d2-am:#C98419;--d2-co:#D9534A;--d2-aq:#0F9AAE}
-.dark .d2-root{--d2-em:#34D3A0;--d2-in:#A596F8;--d2-am:#F2B24C;--d2-co:#FF8F86;--d2-aq:#4FD1DD}
+.d2-root{--d2-cy:#00A6E6;--d2-az:#2F72D8;--d2-vi:#7C4FE0;--d2-li:#B85BD0;--d2-am:#C98419;--d2-co:#D9534A}
+.dark .d2-root{--d2-cy:#3CCBFF;--d2-az:#6AA6FF;--d2-vi:#A98BFF;--d2-li:#DA9CF0;--d2-am:#F2B24C;--d2-co:#FF8F86}
 @keyframes d2-drift{0%{background-position:0% 30%}50%{background-position:100% 70%}100%{background-position:0% 30%}}
 @keyframes d2-ping{0%{transform:scale(1);opacity:.5}80%,100%{transform:scale(2.8);opacity:0}}
 @keyframes d2-float{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(18px,-12px,0)}}
@@ -25,8 +26,8 @@ const CSS = `
 .d2-live{position:relative;display:inline-block;border-radius:9999px}
 .d2-live::after{content:"";position:absolute;inset:0;border-radius:inherit;background:currentColor;animation:d2-ping 1.9s ease-out infinite}
 .d2-tile{position:relative;transition:opacity .75s cubic-bezier(.22,1,.36,1),translate .75s cubic-bezier(.22,1,.36,1),transform .28s ease,box-shadow .28s ease,border-color .28s ease}
-.d2-tile:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--d2-em) 38%,var(--line))}
-.d2-spot{pointer-events:none;position:absolute;inset:0;border-radius:inherit;opacity:0;transition:opacity .3s;background:radial-gradient(280px circle at var(--mx,50%) var(--my,50%),color-mix(in srgb,var(--d2-em) 13%,transparent),transparent 70%)}
+.d2-tile:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--d2-vi) 40%,var(--line))}
+.d2-spot{pointer-events:none;position:absolute;inset:0;border-radius:inherit;opacity:0;transition:opacity .3s;background:radial-gradient(280px circle at var(--mx,50%) var(--my,50%),color-mix(in srgb,var(--d2-cy) 14%,transparent),transparent 70%)}
 .d2-tile:hover .d2-spot{opacity:1}
 .d2-fade{animation:fadeUp .55s cubic-bezier(.22,1,.36,1) both}
 @media (prefers-reduced-motion:reduce){.d2-drift,.d2-float,.d2-live::after,.d2-fade{animation:none!important}.d2-tile,.d2-tile:hover{transition:none!important;transform:none!important}.d2-spot{display:none}}

@@ -12,8 +12,9 @@ export default function Pickup({ pickup, delay = 0 }: { pickup: PickupStats; del
   const n = pickup.days.length;
   const { idx, bind } = useChartHover(n, "bin");
   const d = pickup.deltaPct;
-  const dColor = d === null ? "" : d >= 0 ? P.em : P.cor;
-  const colors = pickup.days.map((_, i) => (i >= n - 7 ? P.ind : tint(P.ind, 38)));
+  const dColor = d === null ? "" : d >= 0 ? "var(--ok)" : P.cor;
+  // sfumatura ciano → viola lungo i 30 giorni; i giorni più vecchi sono più tenui
+  const colors = pickup.days.map((_, i) => { const c = `color-mix(in srgb, ${P.cy} ${Math.round(100 - (i / Math.max(1, n - 1)) * 100)}%, ${P.vi})`; return i >= n - 7 ? c : tint(c, 42); });
   const hc = idx !== null ? pickup.days[idx] : null;
   return (
     <Tile label="Prenotazioni ricevute" delay={delay} className="flex flex-col">

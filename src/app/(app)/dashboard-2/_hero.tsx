@@ -56,15 +56,15 @@ export default function Hero(p: HeroProps) {
       className="d2-drift relative isolate overflow-hidden rounded-3xl p-4 sm:px-7 sm:py-6"
       style={{
         color: HERO.ink,
-        boxShadow: "0 1px 2px rgba(3,24,22,.3), 0 24px 48px -24px rgba(8,110,96,.6)",
-        background: "linear-gradient(120deg, #031B1D 0%, #05403F 28%, #0A6B5B 52%, #0F9288 76%, #1BB4A9 100%)",
+        boxShadow: "0 1px 2px rgba(10,8,50,.3), 0 24px 48px -24px rgba(70,70,230,.55)",
+        background: "linear-gradient(120deg, #0E0A34 0%, #251A7A 28%, #3B3FCF 54%, #1B86E6 78%, #12BDF4 100%)",
       }}
     >
       {/* Luci morbide e forme decorative (solo sfondo) */}
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-        <div className="d2-float absolute -left-24 -top-28 h-80 w-80 rounded-full opacity-50 blur-3xl" style={{ background: "radial-gradient(circle, #34D3A0 0%, transparent 70%)" }} />
-        <div className="d2-float absolute -bottom-32 right-[-60px] h-96 w-96 rounded-full opacity-45 blur-3xl" style={{ background: "radial-gradient(circle, #5EEAD4 0%, transparent 68%)", animationDelay: "-9s" }} />
-        <div className="absolute left-[38%] top-1/2 h-56 w-56 -translate-y-1/2 rounded-full opacity-30 blur-3xl" style={{ background: "radial-gradient(circle, #8B6CFF 0%, transparent 70%)" }} />
+        <div className="d2-float absolute -left-24 -top-28 h-80 w-80 rounded-full opacity-50 blur-3xl" style={{ background: "radial-gradient(circle, #9B6BFF 0%, transparent 70%)" }} />
+        <div className="d2-float absolute -bottom-32 right-[-60px] h-96 w-96 rounded-full opacity-45 blur-3xl" style={{ background: "radial-gradient(circle, #00B6FC 0%, transparent 68%)", animationDelay: "-9s" }} />
+        <div className="absolute left-[38%] top-1/2 h-56 w-56 -translate-y-1/2 rounded-full opacity-30 blur-3xl" style={{ background: "radial-gradient(circle, #D06BF0 0%, transparent 70%)" }} />
         <svg className="absolute inset-x-0 bottom-0 h-16 w-full opacity-[.16]" viewBox="0 0 800 100" preserveAspectRatio="none">
           <path d="M0 62 C 120 20, 240 100, 400 56 S 680 8, 800 52 L800 100 L0 100 Z" fill="none" stroke="#fff" strokeWidth="1.2" />
           <path d="M0 78 C 140 40, 260 108, 420 74 S 700 30, 800 70" fill="none" stroke="#fff" strokeWidth="1" />
@@ -79,7 +79,7 @@ export default function Hero(p: HeroProps) {
             <p className="text-[11px] font-semibold uppercase tracking-wide sm:text-xs" style={{ color: HERO.inkDim }}>{p.dateLabel}{p.scopeLabel && <span style={{ color: "rgba(235,241,255,.62)" }}> · {p.scopeLabel}</span>}</p>
             <Link href="/" className="rounded-md text-[11px] font-medium underline-offset-2 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-white md:hidden" style={{ color: "rgba(235,241,255,.7)" }}>Torna alla classica</Link>
           </div>
-          <h1 className="mt-1.5 font-display text-[1.75rem] font-bold leading-[1.05] tracking-tight sm:text-4xl" style={{ color: "#fff" }}>{p.greeting}<span style={{ color: HERO.mint }}>.</span></h1>
+          <h1 className="mt-1.5 font-display text-[1.75rem] font-bold leading-[1.05] tracking-tight sm:text-4xl" style={{ color: "#fff" }}>{p.greeting}<span style={{ color: HERO.cyan }}>.</span></h1>
           <p className="mt-1.5 max-w-xl text-sm leading-snug sm:text-base" style={{ color: HERO.inkDim }}>
             {p.sentence.map((s, i) => s.tone ? <strong key={i} className="font-bold" style={{ color: PART_COLOR[s.tone] }}>{s.text}</strong> : <span key={i}>{s.text}</span>)}
           </p>
@@ -110,7 +110,7 @@ export default function Hero(p: HeroProps) {
           ))}
           <div className="d2-fade ml-1 md:ml-2" style={{ animationDelay: "120ms" }} title={`${p.occupied} ${plural(p.occupied, "camera occupata", "camere occupate")}${p.totalRooms ? ` · ${free} ${plural(free, "libera", "libere")} su ${p.totalRooms}` : ""}`}>
             <Ring
-              pct={p.pct} color={HERO.aqua} colorTo={HERO.lilac} track="rgba(255,255,255,.14)" glow="rgba(94,234,212,.5)"
+              pct={p.pct} color={HERO.cyan} colorTo={HERO.lilac} track="rgba(255,255,255,.14)" glow="rgba(95,216,255,.55)"
               size="clamp(76px, 22vw, 124px)" stroke={8} label={`Occupazione di stanotte: ${p.pct}% (${p.occupied} camere su ${p.totalRooms})`}
             >
               <div className="text-center">

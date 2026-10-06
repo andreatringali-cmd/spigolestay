@@ -7,7 +7,7 @@ import { tint } from "../_ui";
 import { MoreLink, P, ThinBar, Tile, TileHead } from "./_kit";
 
 const FLAG_CODE: Record<string, string> = { IT: "it", FR: "fr", DE: "de", ES: "es", GB: "gb" };
-const BAR = [P.em, P.ind, P.amb, P.cor, P.aq];
+const BAR = [P.cy, P.vi, P.az, P.li, P.cy];
 
 function Country({ code }: { code: string }) {
   const f = FLAG_CODE[code];

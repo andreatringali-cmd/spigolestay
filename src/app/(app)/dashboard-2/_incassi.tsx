@@ -24,7 +24,7 @@ export default function Incassi({ monthName, prevName, cur, prev, todayIdx, adr,
   const earnedPath = path(cc, 0, ti);
   const area = `${earnedPath} L${x(ti, n).toFixed(1)},${H - PAD} L0,${H - PAD} Z`;
   const delta = prev.total > 0 ? Math.round(((cur.total - prev.total) / prev.total) * 100) : null;
-  const dColor = delta === null ? "" : delta >= 0 ? P.em : P.cor;
+  const dColor = delta === null ? "" : delta >= 0 ? "var(--ok)" : P.cor;
   const hasData = cur.total > 0 || prev.total > 0;
   const hi = idx !== null ? Math.min(idx, n - 1) : null;
   return (
@@ -41,16 +41,17 @@ export default function Incassi({ monthName, prevName, cur, prev, todayIdx, adr,
           <div className="relative mt-3" {...bind} role="img" aria-label={`Ricavi cumulati di ${monthName} a confronto con ${prevName}`}>
             <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block h-24 w-full overflow-visible" aria-hidden style={{ clipPath: on || reduced ? "inset(-6px 0 -6px 0)" : "inset(-6px 100% -6px 0)", transition: reduced ? "none" : "clip-path 1.2s cubic-bezier(.22,1,.36,1) .25s" }}>
               <defs>
-                <linearGradient id="d2-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--d2-em)" stopOpacity="0.3" /><stop offset="100%" stopColor="var(--d2-em)" stopOpacity="0" /></linearGradient>
+                <linearGradient id="d2-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--d2-cy)" stopOpacity="0.3" /><stop offset="100%" stopColor="var(--d2-cy)" stopOpacity="0" /></linearGradient>
+              <linearGradient id="d2-curve" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="var(--d2-cy)" /><stop offset="100%" stopColor="var(--d2-vi)" /></linearGradient>
               </defs>
               <line x1="0" x2={W} y1={H - PAD} y2={H - PAD} stroke="var(--line)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
               {pc.length > 1 && <path d={path(pc, 0, pc.length - 1)} fill="none" stroke="var(--faint)" strokeWidth="1.5" strokeDasharray="3 4" strokeLinecap="round" vectorEffect="non-scaling-stroke" opacity="0.75" />}
-              {ti < n - 1 && <path d={path(cc, ti, n - 1)} fill="none" stroke="var(--d2-in)" strokeWidth="2" strokeDasharray="1 5" strokeLinecap="round" vectorEffect="non-scaling-stroke" opacity="0.8" />}
+              {ti < n - 1 && <path d={path(cc, ti, n - 1)} fill="none" stroke="var(--d2-vi)" strokeWidth="2" strokeDasharray="1 5" strokeLinecap="round" vectorEffect="non-scaling-stroke" opacity="0.8" />}
               <path d={area} fill="url(#d2-area)" />
-              <path d={earnedPath} fill="none" stroke="var(--d2-em)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              <path d={earnedPath} fill="none" stroke="url(#d2-curve)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
               {hi !== null && <line x1={x(hi, n)} x2={x(hi, n)} y1="0" y2={H - PAD} stroke="var(--txt)" strokeWidth="1" opacity=".35" vectorEffect="non-scaling-stroke" />}
             </svg>
-            <span className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: `${(x(ti, n) / W) * 100}%`, top: `${(y(cc[ti] ?? 0) / H) * 100}%`, backgroundColor: "var(--d2-em)", boxShadow: `0 0 0 4px ${tint(P.em, 24)}`, opacity: on ? 1 : 0, transition: reduced ? "none" : "opacity .4s ease 1.2s" }} />
+            <span className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: `${(x(ti, n) / W) * 100}%`, top: `${(y(cc[ti] ?? 0) / H) * 100}%`, backgroundColor: "var(--d2-cy)", boxShadow: `0 0 0 4px ${tint(P.cy, 24)}`, opacity: on ? 1 : 0, transition: reduced ? "none" : "opacity .4s ease 1.2s" }} />
             {hi !== null && (
               <Tip xPct={(x(hi, n) / W) * 100}>
                 <div className="font-semibold">{hi + 1} {monthName.slice(0, 3)}{hi > ti ? " · previsto" : ""}</div>
@@ -60,14 +61,14 @@ export default function Incassi({ monthName, prevName, cur, prev, todayIdx, adr,
             )}
           </div>
           <div className="mt-2.5">
-            <ThinBar pct={cur.total ? (cur.earned / cur.total) * 100 : 0} color={P.em} delay={300} />
+            <ThinBar pct={cur.total ? (cur.earned / cur.total) * 100 : 0} color={P.cy} delay={300} />
             <div className="mt-1.5 flex items-center justify-between gap-3 text-[11px] text-dim">
-              <span className="flex min-w-0 items-center gap-1.5"><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: P.em }} />Maturati <strong className="font-mono text-txt">€ {num(cur.earned)}</strong></span>
-              <span className="flex min-w-0 items-center gap-1.5"><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: tint(P.em, 30) }} />Da vivere <strong className="font-mono text-txt">€ {num(cur.ahead)}</strong></span>
+              <span className="flex min-w-0 items-center gap-1.5"><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: P.cy }} />Maturati <strong className="font-mono text-txt">€ {num(cur.earned)}</strong></span>
+              <span className="flex min-w-0 items-center gap-1.5"><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: tint(P.cy, 30) }} />Da vivere <strong className="font-mono text-txt">€ {num(cur.ahead)}</strong></span>
             </div>
           </div>
           <div className="mt-3.5 grid grid-cols-2 gap-2.5">
-            {([["ADR", adr, P.ind, "Prezzo medio a notte"], ["RevPAR", revpar, P.amb, "Ricavo per camera disponibile"]] as const).map(([label, t, color, hint]) => (
+            {([["ADR", adr, P.vi, "Prezzo medio a notte"], ["RevPAR", revpar, P.az, "Ricavo per camera disponibile"]] as const).map(([label, t, color, hint]) => (
               <div key={label} className="rounded-xl px-3 pb-2 pt-2" style={{ backgroundColor: tint(color, 9) }} title={`${hint} · ultimi 14 giorni`}>
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color }}>{label}</span>

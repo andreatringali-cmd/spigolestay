@@ -9,6 +9,7 @@ import type { ControlloItem } from "@/lib/dashboard2";
 import { tint } from "../_ui";
 import { LiveDot, P, Tile, TileHead } from "./_kit";
 
+const OK = "var(--ok)";
 const ICON = (k: string) => (k.startsWith("invio") ? "mail" : k === "senzacamera" ? "bed" : k === "contatti" ? "chat" : k === "oos" ? "lock" : "alertTriangle");
 const COLOR = { err: P.cor, warn: P.amb, dim: "var(--faint)" } as const;
 
@@ -17,8 +18,8 @@ export default function Controllo({ items, delay = 0 }: { items: ControlloItem[]
     <Tile label="Da controllare" delay={delay}>
       <TileHead title="Da controllare" count={items.length || undefined} />
       {items.length === 0 ? (
-        <div className="flex items-center gap-3 rounded-xl px-3 py-3.5" style={{ backgroundColor: tint(P.em, 9) }}>
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold" style={{ backgroundColor: tint(P.em, 16), color: P.em }}>✓</span>
+        <div className="flex items-center gap-3 rounded-xl px-3 py-3.5" style={{ backgroundColor: tint(OK, 9) }}>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold" style={{ backgroundColor: tint(OK, 16), color: OK }}>✓</span>
           <span className="text-sm font-semibold text-txt">Niente da segnalare</span>
         </div>
       ) : (

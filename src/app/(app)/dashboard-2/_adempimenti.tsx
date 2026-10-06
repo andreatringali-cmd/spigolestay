@@ -8,14 +8,15 @@ import { num } from "@/lib/format";
 import { tint } from "../_ui";
 import { CountUp, HalfGauge, LiveDot, P, Tile, TileHead } from "./_kit";
 
+const OK = "var(--ok)";
 const ICON: Record<string, string> = { checkin: "login", questura: "id", qerr: "alertTriangle", pay: "card", tax: "receipt", istat: "chart", guide: "chat" };
 
 export default function Adempimenti({ items, total, urgent, loading, health, delay = 0 }: {
   items: AdempimentoItem[]; total: number; urgent: number; loading: boolean; health: { done: number; total: number; pct: number }; delay?: number;
 }) {
   const ok = total === 0;
-  const gaugeColor = health.pct >= 90 ? P.em : health.pct >= 60 ? P.amb : P.cor;
-  const stateColor = ok ? P.em : urgent > 0 ? P.cor : P.amb;
+  const gaugeColor = health.pct >= 90 ? OK : health.pct >= 60 ? P.amb : P.cor;
+  const stateColor = ok ? OK : urgent > 0 ? P.cor : P.amb;
   return (
     <Tile id="adempimenti" label="Adempimenti" delay={delay} className="scroll-mt-4">
       <TileHead
@@ -41,8 +42,8 @@ export default function Adempimenti({ items, total, urgent, loading, health, del
           </div>
 
           {ok ? (
-            <div className="flex items-center gap-3 rounded-xl px-3 py-3.5" style={{ backgroundColor: tint(P.em, 9) }}>
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full" style={{ backgroundColor: tint(P.em, 16), color: P.em }}><Icon name="id" size={20} /></span>
+            <div className="flex items-center gap-3 rounded-xl px-3 py-3.5" style={{ backgroundColor: tint(OK, 9) }}>
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full" style={{ backgroundColor: tint(OK, 16), color: OK }}><Icon name="id" size={20} /></span>
               <span className="font-display text-lg font-bold leading-tight text-txt">Tutto in regola</span>
             </div>
           ) : (
