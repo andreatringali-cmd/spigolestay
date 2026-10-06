@@ -297,7 +297,7 @@ export default function PrenotazioniPage() {
     { key: "month", title: "Prenotazioni per mese", node: <ColumnChart bars={byMonth} barWidth={26} /> },
     { key: "rev-month", title: "Ricavi per mese", wide: true, node: <LineChart points={revByMonth} format={(n) => eur(n)} color="var(--ok)" everyLabel={1} /> },
     { key: "rt-mix", title: "Prenotazioni e ricavi per tipologia", wide: true, node: <ChannelBars rows={roomTypeRows} fmtEur={eur} /> },
-    { key: "country", title: "Provenienza per paese", wide: true, node: <RankBars items={byCountry} top={8} /> },
+    { key: "country", title: "Provenienza per paese", wide: true, node: <RankBars items={byCountry} top={6} /> },
   ].filter((c) => !(singleStruct && c.perStructure));
   // I primi 4 (PREN_DEFAULTS) sono l'ordine e la vista iniziale; tutti restano nascondibili (mostra/nascondi tutti).
   const PREN_DEFAULTS = ["ch-mix", "month", "rev-month"];

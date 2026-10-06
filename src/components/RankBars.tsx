@@ -18,9 +18,9 @@ export default function RankBars({ items, top = 8, unknownLabel = "Non indicato"
   const rows: (RankItem & { muted?: boolean })[] = [...shown, ...(restSum > 0 ? [{ label: `${othersLabel} (${rest.length})`, value: restSum, color: "var(--faint)", muted: true }] : [])];
   const max = Math.max(...rows.map((r) => r.value));
   return (
-    <div className="flex flex-col gap-2.5 pt-1">
+    <div className="flex max-h-[210px] flex-col gap-2 overflow-hidden pt-1">
       {rows.map((r, i) => (
-        <div key={r.label} className="flex items-center gap-2.5 text-xs" title={r.title ?? r.label}>
+        <div key={r.label} className="flex h-4 items-center gap-2.5 text-xs" title={r.title ?? r.label}>
           <span className="flex w-[4.5rem] shrink-0 items-center gap-1.5 font-medium text-txt">
             {r.flag ? <span className="text-[15px] leading-none">{r.flag}</span> : <span className="h-2.5 w-2.5 rounded-full" style={{ background: r.color ?? "var(--faint)" }} />}
             <span className="truncate">{r.label}</span>
@@ -31,7 +31,7 @@ export default function RankBars({ items, top = 8, unknownLabel = "Non indicato"
           <span className="w-16 shrink-0 text-right font-mono text-dim"><b className="text-txt">{format(r.value)}</b> <span className="text-faint">{Math.round((r.value / total) * 100)}%</span></span>
         </div>
       ))}
-      {unknown > 0 && <div className="mt-0.5 text-[11px] text-faint">{unknownLabel}: {format(unknown)} {unknown === 1 ? "prenotazione" : "prenotazioni"} senza paese</div>}
+      {unknown > 0 && <div className="text-[11px] leading-none text-faint">{unknownLabel}: {format(unknown)} {unknown === 1 ? "prenotazione" : "prenotazioni"} senza paese</div>}
     </div>
   );
 }
