@@ -1,7 +1,7 @@
 "use client";
 
 // Occupazione: ultimi 30 giorni (smeraldo) e prossimi 30 (indaco) in un solo grafico ad area, con fascia weekend, linea "oggi" e tooltip.
-import { type DayCell } from "@/lib/dashboard2";
+import { type DayCell } from "@/lib/dashboard";
 import { tint } from "../_ui";
 import { CountUp, P, Tile, TileHead, Tip, useChartHover, useEnter } from "./_kit";
 

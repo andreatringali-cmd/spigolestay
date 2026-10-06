@@ -1,7 +1,7 @@
 "use client";
 
 // Ricavi del mese (per competenza, cioè per notte): numero grande, curva cumulata contro il mese scorso, ADR e RevPAR con mini-trend.
-import { cumulative, type MonthStats } from "@/lib/dashboard2";
+import { cumulative, type MonthStats } from "@/lib/dashboard";
 import { num } from "@/lib/format";
 import { tint } from "../_ui";
 import { CountUp, MoreLink, P, Sparkline, ThinBar, Tile, TileHead, Tip, useChartHover, useEnter } from "./_kit";

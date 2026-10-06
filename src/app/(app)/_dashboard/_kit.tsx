@@ -1,6 +1,6 @@
 "use client";
 
-// Mattoncini della Dashboard 2: palette, riquadro con comparsa allo scroll e "spotlight", conteggio animato, anello, mezzo anello,
+// Mattoncini della Dashboard: palette, riquadro con comparsa allo scroll e "spotlight", conteggio animato, anello, mezzo anello,
 // sparkline, tooltip dei grafici. Le animazioni sono sobrie e si spengono con prefers-reduced-motion.
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent, type ReactNode } from "react";
 import Link from "next/link";

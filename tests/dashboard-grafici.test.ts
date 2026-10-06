@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   adempimentiHealth, histogram, LEAD_LABELS, LEAD_UPPER, leadDays, normCountry, occupancyStrip, pickupDaily, rateSeries, stayNights,
   STAY_LABELS, STAY_UPPER, topCountries, type DBooking, type DUnit,
-} from "../src/lib/dashboard2.ts";
+} from "../src/lib/dashboard.ts";
 
 const T = "2026-10-06";
 let n = 0;

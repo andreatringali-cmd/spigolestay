@@ -1,12 +1,12 @@
 "use client";
 
-// Dati "esterni" della Dashboard 2: schedine Questura, ISTAT, errori di invio, conversazioni, invii non consegnati, collegamenti dei canali.
+// Dati "esterni" della Dashboard: schedine Questura, ISTAT, errori di invio, conversazioni, invii non consegnati, collegamenti dei canali.
 // Query mirate e leggere (solo ciò che serve agli adempimenti). Ogni errore di rete lascia i dati già caricati.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { apiPost } from "@/lib/invoicing/client";
 import { spiegaErroreWa } from "@/lib/invii-log";
-import { addDaysISO } from "@/lib/dashboard2";
+import { addDaysISO } from "@/lib/dashboard";
 
 type SchedRow = { booking_id: string | null; stato: string };
 export type Threads = Record<string, { dir: string; text: string }[]>;

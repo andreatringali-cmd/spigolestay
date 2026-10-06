@@ -1,7 +1,7 @@
 "use client";
 
 // Pickup: prenotazioni ricevute ogni giorno negli ultimi 30 giorni. Colonne sottili, ultimi 7 giorni evidenziati, confronto con la settimana prima.
-import { type PickupStats } from "@/lib/dashboard2";
+import { type PickupStats } from "@/lib/dashboard";
 import { tint } from "../_ui";
 import { Columns, CountUp, P, Tile, TileHead, Tip, useChartHover } from "./_kit";
 

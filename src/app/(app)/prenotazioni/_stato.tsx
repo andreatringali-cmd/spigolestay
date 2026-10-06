@@ -148,13 +148,13 @@ export function StatoCell({ b }: { b: Booking }) {
   const clickable = !!nextSlot?.step;
   return (
     <div
-      className={`flex min-w-[9rem] items-center gap-2 ${clickable ? "cursor-pointer" : ""}`}
+      className={`flex items-center gap-1.5 ${clickable ? "cursor-pointer" : ""}`}
       title={`${pr.tip}${pr.next ? `
 → Prossimo: ${pr.next.label}` : ""}`}
       onClick={clickable ? (e) => { e.stopPropagation(); ctx.open(b, nextSlot!); } : undefined}
     >
-      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-wash"><span className="block h-full rounded-full transition-[width]" style={{ width: `${pr.pct}%`, background: col }} /></span>
-      <span className="w-9 shrink-0 text-right font-mono text-xs font-semibold tabular-nums" style={{ color: col }}>{pr.pct}%</span>
+      <span className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-wash"><span className="block h-full rounded-full transition-[width]" style={{ width: `${pr.pct}%`, background: col }} /></span>
+      <span className="shrink-0 font-mono text-xs font-semibold tabular-nums" style={{ color: col }}>{pr.pct}%</span>
     </div>
   );
 }

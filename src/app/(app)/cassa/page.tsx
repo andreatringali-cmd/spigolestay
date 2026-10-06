@@ -138,8 +138,7 @@ export default function CassaPage() {
   const months = useMemo(() => { const s = new Set(all.map((m) => monthKey(m.date))); s.add(monthKey(today)); return Array.from(s).sort().reverse(); }, [all, today]);
   const [month, setMonth] = useState<string>("all");
   const [chartsOn, setChartsOn] = useState(true);
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:cassacharts:on"); if (r !== null) setChartsOn(r === "1"); } catch {} }, []);
-  const toggleCharts = () => setChartsOn((v) => { const n = !v; try { localStorage.setItem("spigolestay:cassacharts:on", n ? "1" : "0"); } catch {} return n; });
+  const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
 
   const rows = all.filter((m) => month === "all" || monthKey(m.date) === month);
   const entrate = rows.filter((m) => m.kind === "in").reduce((a, m) => a + m.amount, 0);

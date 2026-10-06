@@ -5,7 +5,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import ChannelLogo from "@/components/ChannelLogo";
 import type { Channel } from "@/lib/types";
-import type { ControlloItem } from "@/lib/dashboard2";
+import type { ControlloItem } from "@/lib/dashboard";
 import { tint } from "../_ui";
 import { LiveDot, P, Tile, TileHead } from "./_kit";
 

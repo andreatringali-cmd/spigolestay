@@ -34,11 +34,9 @@ export default function StatistichePage() {
   const persistChartOrder = (keys: string[]) => { setChartOrder(keys); try { localStorage.setItem("spigolestay:statscharts", JSON.stringify(keys)); } catch {} };
   // Mostra/nascondi grafici (un click, tutti o nessuno) — indipendente per Mensile e Annuale.
   const [chartsOn, setChartsOn] = useState(true);
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:statscharts:on"); if (r !== null) setChartsOn(r === "1"); } catch {} }, []);
-  const toggleCharts = () => setChartsOn((v) => { const n = !v; try { localStorage.setItem("spigolestay:statscharts:on", n ? "1" : "0"); } catch {} return n; });
+  const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
   const [chartsOnY, setChartsOnY] = useState(true);
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:statscharts:on:annuale"); if (r !== null) setChartsOnY(r === "1"); } catch {} }, []);
-  const toggleChartsY = () => setChartsOnY((v) => { const n = !v; try { localStorage.setItem("spigolestay:statscharts:on:annuale", n ? "1" : "0"); } catch {} return n; });
+  const toggleChartsY = () => setChartsOnY((v) => !v);
   // Report attivo: i tanti report di Octorate condensati in 2 (Mensile, Annuale). Mensile e
   // Previsionale erano diventati sostanzialmente uguali (stessa tabella giorno per giorno, stesse
   // colonne) quindi sono stati uniti in un'unica scheda — KPI+grafici+tabella insieme.

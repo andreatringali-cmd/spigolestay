@@ -28,6 +28,9 @@ import Icon from "@/components/Icon";
 import ChannelLogo from "@/components/ChannelLogo";
 import { ArrowScroller } from "@/components/ScrollStrip";
 import DateField from "@/components/DateField";
+import SearchInput from "@/components/SearchInput";
+import { normName } from "@/lib/guest-key";
+import { bookingCode } from "@/lib/bookingCode";
 
 // Scheda camera: opzioni frequenza servizio e giorni della settimana.
 const FREQ_OPTS = ["Ogni partenza", "1 Giorno", "2 Giorni", "3 Giorni", "4 Giorni", "5 Giorni", "7 Giorni"];
@@ -258,8 +261,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   // Insights: simulatore what-if (± prezzo).
   const [whatIf, setWhatIf] = useState(0);
   // Selettore card Insights (mostra/nascondi, persistito) — all'apertura tutte nascoste, come Dashboard/Prenotazioni.
-  const [hiddenCards, setHiddenCards] = useState<Set<string>>(() => { const saved = readLS<string[] | null>("spigolestay:calcards", null); return new Set(saved ?? INSIGHT_CARDS.map((c) => c.key)); });
-  const persistCards = (n: Set<string>) => { setHiddenCards(n); try { localStorage.setItem("spigolestay:calcards", JSON.stringify([...n])); } catch {} };
+  const [hiddenCards, setHiddenCards] = useState<Set<string>>(() => new Set()); // le card dei grafici sono SEMPRE aperte all'apertura: nasconderle vale solo finché la pagina resta aperta
+  const persistCards = (n: Set<string>) => { setHiddenCards(n); };
   const toggleCard = (k: string) => { const n = new Set(hiddenCards); if (n.has(k)) n.delete(k); else n.add(k); persistCards(n); };
   const showCard = (k: string) => !hiddenCards.has(k);
   const [cardsMenuOpen, setCardsMenuOpen] = useState(false);
@@ -456,6 +459,21 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     () => units.filter((u) => visibleStructures.some((s) => s.id === u.structureId)),
     [units, visibleStructures]
   );
+  // Cerca nel calendario: ospite o codice prenotazione. Un clic sul risultato porta alla data e apre la prenotazione.
+  const [calQuery, setCalQuery] = useState("");
+  const calHits = useMemo(() => {
+    const toks = normName(calQuery).split(" ").filter(Boolean);
+    if (!toks.length) return [];
+    const gById = new Map(guests.map((g) => [g.id, g]));
+    const today = toISO(new Date());
+    const near = (b: { checkIn: string }) => Math.abs(Date.parse(b.checkIn) - Date.parse(today));
+    return bookings
+      .filter((b) => b.channel !== "blocked" && b.status !== "cancelled" && visibleStructures.some((st) => st.id === b.structureId))
+      .filter((b) => { const g = gById.get(b.guestId); const hay = normName([g?.fullName, bookingCode(b), b.code, b.extId].filter(Boolean).join(" ")); return toks.every((t) => hay.includes(t)); })
+      .sort((a, b) => near(a) - near(b)).slice(0, 8);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calQuery, bookings, guests, activeStructureId]);
+  const goToHit = (b: { id: string; checkIn: string }) => { setStart(addDays(parseISO(b.checkIn), -2)); setCalQuery(""); openBooking(b.id); };
 
   // ─── Refs per i listener di drag (leggono sempre i dati aggiornati) ───
   const dragRef = useRef<{ id: string; startX: number; startY: number; moved: boolean } | null>(null);
@@ -639,12 +657,33 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   const hotDay = futureDemand.filter((x) => x.occ >= 80 && x.occ < 100).sort((a, b) => b.occ - a.occ)[0];
   const coldDay = futureDemand.filter((x) => x.occ <= 25).sort((a, b) => a.occ - b.occ)[0];
   const firstType = roomTypes.find((rt) => visibleStructures.some((s) => s.id === rt.structureId) && units.some((u) => u.roomTypeId === rt.id));
-  type Sugg = { icon: string; color: string; text: string; apply?: () => void; cta: string; dir?: "up" | "down"; subject?: string; detail?: string; from?: number; to?: number };
+  type Sugg = { pct?: number; icon: string; color: string; text: string; apply?: () => void; cta: string; dir?: "up" | "down"; subject?: string; detail?: string; from?: number; to?: number };
   const suggestions: Sugg[] = [];
-  if (hotDay && firstType) { const cur = rateFor(firstType.id, hotDay.iso); const nw = Math.round(cur * 1.15); suggestions.push({ icon: "▲", color: "var(--ok)", text: `${fmtDM(hotDay.d)} quasi pieno (${hotDay.occ}%): alza ${firstType.name} a €${nw} (+15%).`, cta: "Applica +15%", dir: "up", subject: firstType.name, detail: fmtDM(hotDay.d), from: cur, to: nw, apply: () => setDayRates({ [`${firstType.id}|${hotDay.iso}`]: nw }) }); }
-  if (gaps[0]) { const g = gaps[0]; const rt = g.unit.roomTypeId; const cur = rateFor(rt, g.from); const nw = Math.round(cur * 0.85); suggestions.push({ icon: "🕳️", color: "var(--warn)", text: `Buco di ${g.nights} ${g.nights === 1 ? "notte" : "notti"} in ${g.unit.name} (${fmtRange(g.from, g.to)}): abbassa il prezzo del 15% per riempire.`, cta: "Applica −15%", dir: "down", subject: g.unit.name, detail: fmtRange(g.from, g.to), from: cur, to: nw, apply: () => applyPctRange(rt, g.from, g.to, -15) }); }
-  if (coldDay && firstType) { const cur = rateFor(firstType.id, coldDay.iso); const nw = Math.round(cur * 0.9); suggestions.push({ icon: "▼", color: "var(--err)", text: `${fmtDM(coldDay.d)} scarica (${coldDay.occ}%): abbassa ${firstType.name} a €${nw} (−10%) per riempire.`, cta: "Applica −10%", dir: "down", subject: firstType.name, detail: fmtDM(coldDay.d), from: cur, to: nw, apply: () => setDayRates({ [`${firstType.id}|${coldDay.iso}`]: nw }) }); }
+  if (hotDay && firstType) { const cur = rateFor(firstType.id, hotDay.iso); const nw = Math.round(cur * 1.15); suggestions.push({ pct: 15, icon: "▲", color: "var(--ok)", text: `${fmtDM(hotDay.d)} quasi pieno (${hotDay.occ}%): alza ${firstType.name} a €${nw} (+15%).`, cta: "Applica +15%", dir: "up", subject: firstType.name, detail: fmtDM(hotDay.d), from: cur, to: nw, apply: () => setDayRates({ [`${firstType.id}|${hotDay.iso}`]: nw }) }); }
+  if (gaps[0]) { const g = gaps[0]; const rt = g.unit.roomTypeId; const cur = rateFor(rt, g.from); const nw = Math.round(cur * 0.85); suggestions.push({ pct: -15, icon: "🕳️", color: "var(--warn)", text: `Buco di ${g.nights} ${g.nights === 1 ? "notte" : "notti"} in ${g.unit.name} (${fmtRange(g.from, g.to)}): abbassa il prezzo del 15% per riempire.`, cta: "Applica −15%", dir: "down", subject: g.unit.name, detail: fmtRange(g.from, g.to), from: cur, to: nw, apply: () => applyPctRange(rt, g.from, g.to, -15) }); }
+  if (coldDay && firstType) { const cur = rateFor(firstType.id, coldDay.iso); const nw = Math.round(cur * 0.9); suggestions.push({ pct: -10, icon: "▼", color: "var(--err)", text: `${fmtDM(coldDay.d)} scarica (${coldDay.occ}%): abbassa ${firstType.name} a €${nw} (−10%) per riempire.`, cta: "Applica −10%", dir: "down", subject: firstType.name, detail: fmtDM(coldDay.d), from: cur, to: nw, apply: () => setDayRates({ [`${firstType.id}|${coldDay.iso}`]: nw }) }); }
   if (!suggestions.length) suggestions.push({ icon: "✓", color: "var(--ok)", text: "Nel periodo visibile è tutto in equilibrio: nessuna azione urgente.", cta: "" });
+  // Simulatore: all'apertura lo slider parte da 0 e SCORRE fino alla variazione consigliata (quella del primo suggerimento), poi si ferma.
+  // Se l'utente lo tocca prima, l'animazione si interrompe. Con "riduci animazioni" salta direttamente al valore. Una sola volta per apertura.
+  const simRecommended = Math.max(-20, Math.min(30, suggestions[0]?.pct ?? 0));
+  const simAnimDone = useRef(false);
+  const simTouched = useRef(false);
+  useEffect(() => {
+    if (simAnimDone.current || !simRecommended) return;
+    simAnimDone.current = true;
+    const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) { setWhatIf(simRecommended); return; }
+    const t0 = performance.now(), dur = 1400, target = simRecommended;
+    const step = (now: number) => {
+      if (simTouched.current) return;
+      const k = Math.min(1, (now - t0) / dur);
+      const eased = 1 - Math.pow(1 - k, 3); // rallenta in arrivo
+      setWhatIf(Math.round(target * eased));
+      if (k < 1) requestAnimationFrame(step);
+    };
+    window.setTimeout(() => requestAnimationFrame(step), 500); // dopo l'entrata delle card (si ferma da sola: nessuna pulizia necessaria)
+  }, [simRecommended]);
+
   // What-if: ricavi previsti del periodo + impatto stimato dello slider prezzo.
   const periodRevenue = Math.round(bookings.filter((b) => b.channel !== "blocked" && b.status !== "cancelled" && b.checkOut > periodFrom && b.checkIn < periodTo && visibleStructures.some((s) => s.id === b.structureId)).reduce((a, b) => { const s = b.checkIn > periodFrom ? b.checkIn : periodFrom; const e = b.checkOut < periodTo ? b.checkOut : periodTo; const n = daysBetween(s, e); return a + (b.total ?? 0) * (n / Math.max(1, nights(b.checkIn, b.checkOut))); }, 0));
   // Elasticità: ogni -1% di prezzo riempie ~0,8 punti di occupazione (e viceversa), con tetto 0-100.
@@ -974,6 +1013,22 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     <div ref={wrapRef} className="flex flex-col gap-3 select-none">
       {/* Riga filtri — data (jump), navigazione, menu Visualizza */}
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
+        {/* Cerca ospite o codice: prima del mese */}
+        <div className="relative order-first w-full sm:w-56">
+          <SearchInput value={calQuery} onChange={setCalQuery} placeholder="Cerca ospite o codice…" className="w-full" />
+          {calQuery.trim() && (
+            <div className="absolute left-0 top-full z-40 mt-1 w-full min-w-[17rem] overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
+              {calHits.length === 0
+                ? <div className="px-2.5 py-2 text-xs text-faint">Nessuna prenotazione trovata</div>
+                : calHits.map((b) => (
+                  <button key={b.id} onClick={() => goToHit(b)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition hover:bg-wash">
+                    <span className="min-w-0 flex-1 truncate font-semibold text-txt">{guestName(b.guestId)}</span>
+                    <span className="shrink-0 font-mono text-[11px] text-faint">{fmtDM(parseISO(b.checkIn))} → {fmtDM(parseISO(b.checkOut))}</span>
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
         {/* Menu Visualizza — spostato dopo i mesi (order) */}
         <div ref={vizRef} className="relative order-3">
           <button onClick={() => setVizOpen((o) => !o)} title="Visualizza" className={`grid h-9 w-9 place-items-center rounded-lg border transition ${vizOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
@@ -1190,7 +1245,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
             <span className="text-[11px] text-faint">Ricavi previsti periodo</span>
             <span className="font-mono text-sm font-bold text-txt">{eur(periodRevenue)}</span>
           </div>
-          <input type="range" min={-20} max={30} value={whatIf} onChange={(e) => setWhatIf(Number(e.target.value))} className="mt-2 w-full accent-[color:var(--focus)]" />
+          <input type="range" min={-20} max={30} value={whatIf} onChange={(e) => { simTouched.current = true; setWhatIf(Number(e.target.value)); }} className="mt-2 w-full accent-[color:var(--focus)]" />
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-txt">{whatIf >= 0 ? "+" : ""}{whatIf}% prezzo</span>
             <span className="flex items-center gap-1 text-faint">occ. {Math.round(avgOcc)}% <span style={{ color: simOcc > avgOcc ? "var(--ok)" : simOcc < avgOcc ? "var(--err)" : "var(--faint)" }}>→ {simOcc}%</span></span>

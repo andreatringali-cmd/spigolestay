@@ -2,7 +2,7 @@
 
 // Provenienza: i primi 5 Paesi degli ospiti (ultimi 12 mesi) con bandiera e barre sottili.
 import Flag from "@/components/Flag";
-import type { CountryRow } from "@/lib/dashboard2";
+import type { CountryRow } from "@/lib/dashboard";
 import { tint } from "../_ui";
 import { MoreLink, P, ThinBar, Tile, TileHead } from "./_kit";
 

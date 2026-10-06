@@ -95,7 +95,8 @@ export default function PrenotazioniPage() {
   // Si salva l'elenco dei grafici VISIBILI (non quello dei nascosti): così un grafico che in quel momento non esiste (es. "per struttura"
   // con una sola struttura selezionata) o aggiunto in seguito non compare da solo, e "nascondi tutti" resta valido in ogni vista.
   const ALL_CHART_KEYS = ["ch-mix", "str-mix", "stay", "month", "rev-month", "rt-mix", "country"];
-  const [visiblePren, setVisiblePren] = useState<Set<string>>(() => new Set());
+  // I grafici sono SEMPRE aperti quando si apre la pagina: nasconderli vale solo finché la pagina resta aperta (non si ricorda).
+  const [visiblePren, setVisiblePren] = useState<Set<string>>(() => new Set(ALL_CHART_KEYS));
   const persistPren = (hiddenNow: Set<string>) => {
     const vis = new Set<string>();
     ALL_CHART_KEYS.forEach((k) => {
@@ -103,7 +104,6 @@ export default function PrenotazioniPage() {
       if (available ? !hiddenNow.has(k) : visiblePren.has(k)) vis.add(k); // se non è disponibile ora, mantiene la scelta di prima
     });
     setVisiblePren(vis);
-    try { localStorage.setItem("spigolestay:prenchart:v3", JSON.stringify([...vis])); } catch {}
   };
   // Ordine dei grafici (riordino via drag&drop), persistito.
   const [chartOrder, setChartOrder] = useState<string[]>([]);
@@ -117,7 +117,7 @@ export default function PrenotazioniPage() {
   useEffect(() => { setLoc("all"); }, [activeStructureId]);
   const chartRef = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (chartRef.current && !chartRef.current.contains(e.target as Node)) setChartMenu(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:prenchart:v3"); if (r) setVisiblePren(new Set(JSON.parse(r))); } catch {} try { const o = localStorage.getItem("spigolestay:prenchartorder"); if (o) setChartOrder(JSON.parse(o)); } catch {} }, []);
+  useEffect(() => { try { const o = localStorage.getItem("spigolestay:prenchartorder"); if (o) setChartOrder(JSON.parse(o)); } catch {} }, []);
 
   const now = new Date();
   const todayISO = toISO(now);

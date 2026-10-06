@@ -1,7 +1,7 @@
-// Logica pura della Dashboard 2: movimenti del giorno, occupazione a 14 giorni, ricavi del mese,
+// Logica pura della Dashboard: movimenti del giorno, occupazione a 14 giorni, ricavi del mese,
 // adempimenti ordinati per urgenza, "da controllare". Nessuna dipendenza da React né da altri moduli:
 // i calcoli che servono dall'esterno (journey, tassa, saldo, ricavo a notte) arrivano come funzioni passate dal chiamante,
-// così il modulo resta collaudabile con Node (tests/dashboard2.test.ts).
+// così il modulo resta collaudabile con Node (tests/dashboard.test.ts).
 
 export interface DBooking {
   id: string; guestId: string; structureId: string; unitId: string | null; channel: string; status: string;

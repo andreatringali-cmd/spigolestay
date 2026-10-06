@@ -1,11 +1,10 @@
 "use client";
 
-// Hero della Dashboard 2: l'unico punto "osato". Fascia compatta, verde petrolio → smeraldo → acqua con deriva lentissima,
+// Hero della Dashboard: l'unico punto "osato". Fascia compatta, verde petrolio → smeraldo → acqua con deriva lentissima,
 // uguale in tema chiaro e scuro; testo chiaro, numeri "di vetro" con sparkline, anello luminoso, filigrana Xenora attenuata.
-import Link from "next/link";
 import type { CSSProperties } from "react";
 import Icon from "@/components/Icon";
-import { plural, type SentencePart } from "@/lib/dashboard2";
+import { plural, type SentencePart } from "@/lib/dashboard";
 import { CountUp, HERO, Ring, Sparkline } from "./_kit";
 
 export interface HeroProps {
@@ -77,12 +76,9 @@ export default function Hero(p: HeroProps) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-0.5">
             <p className="text-[11px] font-semibold uppercase tracking-wide sm:text-xs" style={{ color: HERO.inkDim }}>{p.dateLabel}{p.scopeLabel && <span style={{ color: "rgba(235,241,255,.62)" }}> · {p.scopeLabel}</span>}</p>
-            <Link href="/" className="rounded-md text-[11px] font-medium underline-offset-2 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-white md:hidden" style={{ color: "rgba(235,241,255,.7)" }}>Torna alla classica</Link>
           </div>
           <h1 className="mt-1.5 font-display text-[1.75rem] font-bold leading-[1.05] tracking-tight sm:text-4xl" style={{ color: "#fff" }}>{p.greeting}<span style={{ color: HERO.cyan }}>.</span></h1>
-          <p className="mt-1.5 max-w-xl text-sm leading-snug sm:text-base" style={{ color: HERO.inkDim }}>
-            {p.sentence.map((s, i) => s.tone ? <strong key={i} className="font-bold" style={{ color: PART_COLOR[s.tone] }}>{s.text}</strong> : <span key={i}>{s.text}</span>)}
-          </p>
+          
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
             <a
               href="#adempimenti"
@@ -93,7 +89,6 @@ export default function Hero(p: HeroProps) {
               <span className="min-w-0 truncate">{p.statusText}</span>
               <Icon name="chevron" size={11} />
             </a>
-            <Link href="/" className="hidden rounded-md text-[11px] font-medium underline-offset-2 transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-white md:inline" style={{ color: "rgba(235,241,255,.7)" }}>Torna alla classica</Link>
           </div>
         </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 // Anticipo e durata: due mini istogrammi (quanti giorni prima si prenota, quante notti si resta) sulle prenotazioni degli ultimi 12 mesi.
-import { type Histo } from "@/lib/dashboard2";
+import { type Histo } from "@/lib/dashboard";
 import { Columns, CountUp, P, Tile, TileHead, Tip, useChartHover } from "./_kit";
 
 function Mini({ title, unit, histo, color, delay, fmtAvg }: { title: string; unit: string; histo: Histo; color: string; delay: number; fmtAvg: (n: number) => string }) {

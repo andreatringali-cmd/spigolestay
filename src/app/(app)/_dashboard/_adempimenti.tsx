@@ -3,7 +3,7 @@
 // Adempimenti: il cuore operativo. Mezzo anello con la % di passaggi completati e righe a icone ordinate per urgenza.
 import Link from "next/link";
 import Icon from "@/components/Icon";
-import { type AdempimentoItem } from "@/lib/dashboard2";
+import { type AdempimentoItem } from "@/lib/dashboard";
 import { num } from "@/lib/format";
 import { tint } from "../_ui";
 import { CountUp, HalfGauge, LiveDot, P, Tile, TileHead } from "./_kit";
