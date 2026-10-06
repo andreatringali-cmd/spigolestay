@@ -155,7 +155,6 @@ export function StatoCell({ b }: { b: Booking }) {
     >
       <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-wash"><span className="block h-full rounded-full transition-[width]" style={{ width: `${pr.pct}%`, background: col }} /></span>
       <span className="w-9 shrink-0 text-right font-mono text-xs font-semibold tabular-nums" style={{ color: col }}>{pr.pct}%</span>
-      {pr.late ? <span aria-label="Passaggio in ritardo" className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--err)" }} /> : pr.next ? <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--warn)" }} /> : <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--ok)" }} />}
     </div>
   );
 }
