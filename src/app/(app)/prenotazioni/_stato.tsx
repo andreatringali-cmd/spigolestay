@@ -143,21 +143,19 @@ export function StatoCell({ b }: { b: Booking }) {
   if (!pr || pr.total <= 0) return <span className="text-[11px] text-faint">{ctx.slots(b.id)[0]?.detail === "Prenotazione annullata" ? "Annullata" : "—"}</span>;
   const col = pr.pct >= 100 ? "var(--ok)" : pr.late ? "var(--err)" : "var(--focus)";
   const nextSlot = pr.next ? ctx.slots(b.id).find((x) => x.key === pr.next!.key) : undefined;
-  const nextCol = pr.next?.state === "late" ? "var(--err)" : "var(--warn)";
-  // Avanzamento: barra sottile con la percentuale e, sotto, il prossimo passaggio da fare (clic = finestra "Risolvi"). Il passaggio per passaggio sta nel tooltip.
+  // Avanzamento su UNA riga: barra sottile + percentuale (+ puntino se c'è un passaggio in ritardo). Il passaggio per passaggio sta nel tooltip;
+  // un clic apre la finestra "Risolvi" sul prossimo passaggio da fare.
+  const clickable = !!nextSlot?.step;
   return (
-    <div className="min-w-[10.5rem]" title={pr.tip}>
-      <div className="flex items-center gap-2">
-        <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-wash"><span className="block h-full rounded-full transition-[width]" style={{ width: `${pr.pct}%`, background: col }} /></span>
-        <span className="w-9 shrink-0 text-right font-mono text-xs font-semibold tabular-nums" style={{ color: col }}>{pr.pct}%</span>
-      </div>
-      <div className="mt-1 truncate text-[11px]">
-        {pr.next
-          ? (nextSlot?.step
-            ? <button type="button" onClick={(e) => { e.stopPropagation(); ctx.open(b, nextSlot); }} className="max-w-full truncate rounded px-0.5 text-left font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[color:var(--focus)]" style={{ color: nextCol }}>{pr.next.label}{pr.next.state === "late" ? " · in ritardo" : " · da fare"}</button>
-            : <span className="font-medium" style={{ color: nextCol }}>{pr.next.label}{pr.next.state === "late" ? " · in ritardo" : " · da fare"}</span>)
-          : <span className="font-medium" style={{ color: "var(--ok)" }}>Tutto in ordine ✓</span>}
-      </div>
+    <div
+      className={`flex min-w-[9rem] items-center gap-2 ${clickable ? "cursor-pointer" : ""}`}
+      title={`${pr.tip}${pr.next ? `
+→ Prossimo: ${pr.next.label}` : ""}`}
+      onClick={clickable ? (e) => { e.stopPropagation(); ctx.open(b, nextSlot!); } : undefined}
+    >
+      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-wash"><span className="block h-full rounded-full transition-[width]" style={{ width: `${pr.pct}%`, background: col }} /></span>
+      <span className="w-9 shrink-0 text-right font-mono text-xs font-semibold tabular-nums" style={{ color: col }}>{pr.pct}%</span>
+      {pr.late ? <span aria-label="Passaggio in ritardo" className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--err)" }} /> : pr.next ? <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--warn)" }} /> : <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--ok)" }} />}
     </div>
   );
 }
