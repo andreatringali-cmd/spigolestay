@@ -107,8 +107,9 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
 
   const remLog = useReminderLog(ordered); // cronologia dei solleciti (da chat)
   const auto = useAutoCtx(); // invii automatici: "invio previsto alle 10:00"
+  const guestById = useMemo(() => new Map(guests.map((g) => [g.id, g])), [guests]);
   const rows = useMemo(() => ordered.map((b) => {
-    const guest = guests.find((g) => g.id === b.guestId);
+    const guest = guestById.get(b.guestId);
     const j = isLiveBooking(b) ? journeyOf(b, {
       today, guest, structure: getStructure(b.structureId),
       schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
@@ -117,10 +118,15 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
       reminderNotes: reminderNotes(remLog[b.id]), auto,
     }) : null;
     return { b, j, buckets: j ? journeyBucket(b, today, j) : [] };
-  }), [ordered, guests, getStructure, today, schedBy, istatBy, threads, docBy, rems, remLog, auto]);
+  }), [ordered, guestById, getStructure, today, schedBy, istatBy, threads, docBy, rems, remLog, auto]);
 
   const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.key, f.key === "all" ? rows.length : rows.filter((r) => r.buckets.includes(f.key)).length])), [rows]);
-  const shown = filter === "all" ? rows : rows.filter((r) => r.buckets.includes(filter));
+  const filteredRows = filter === "all" ? rows : rows.filter((r) => r.buckets.includes(filter));
+  // Con migliaia di prenotazioni (es. "Tutte da sempre") si disegnano poche schede alla volta: le altre si caricano con "Mostra altre".
+  const PAGE = 40;
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => { setLimit(PAGE); }, [filter, bookings]);
+  const shown = filteredRows.slice(0, limit);
 
   const modalRow = modal ? rows.find((r) => r.b.id === modal.id) : undefined;
   const modalStep = modalRow?.j?.steps.find((x) => x.key === modal?.key);
@@ -179,7 +185,8 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
 
       {!sections && <div className="flex flex-col gap-3">
         {renderRows(shown)}
-        {!shown.length && <div className="rounded-xl border border-line bg-surface"><EmptyState title={filter === "all" ? "Nessuna prenotazione con questi filtri" : "Nessuna prenotazione in questa categoria"} /></div>}
+        {filteredRows.length > limit && <button onClick={() => setLimit((l) => l + PAGE)} className="rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-focus transition hover:border-focus">Mostra altre {Math.min(PAGE, filteredRows.length - limit)} · {filteredRows.length - limit} restanti</button>}
+        {!filteredRows.length && <div className="rounded-xl border border-line bg-surface"><EmptyState title={filter === "all" ? "Nessuna prenotazione con questi filtri" : "Nessuna prenotazione in questa categoria"} /></div>}
       </div>}
       {modal && modalRow && modalRow.j && modalStep && (
         <StepActions

@@ -76,9 +76,9 @@ export function ElaboraButton({ busy, onClick }: { busy: boolean; onClick: () =>
     <button
       type="button" onClick={onClick} disabled={busy}
       title="Prepara schedine Questura, movimenti ISTAT e tassa di soggiorno. Prima di inviare agli enti ti chiede conferma."
-      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-txt shadow-sm transition hover:border-focus hover:text-focus focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus)] disabled:opacity-60"
+      className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt shadow-sm transition hover:border-focus hover:text-focus focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus)] disabled:opacity-60"
     >
-      <span className="text-focus"><Icon name="sparkles" size={16} /></span>
+      <span className="text-focus"><Icon name="sparkles" size={14} /></span>
       {busy ? "Elaboro…" : "Elabora tutto"}
     </button>
   );
@@ -89,7 +89,7 @@ export function ElaboraPanel({ busy, steps, onClose }: { busy: boolean; steps: R
   if (!busy && !steps) return null;
   if (busy && !steps) {
     return (
-      <Panel className="p-4 sm:p-5" label="Elaborazione in corso">
+      <Panel className="p-3" label="Elaborazione in corso">
         <div className="flex items-center gap-3" role="status" aria-live="polite">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl motion-safe:animate-pulse" style={{ backgroundColor: tint("var(--focus)", 14), color: "var(--focus)" }}><Icon name="sparkles" size={17} /></span>
           <div className="min-w-0 flex-1">
@@ -103,19 +103,19 @@ export function ElaboraPanel({ busy, steps, onClose }: { busy: boolean; steps: R
   }
   const trial = steps!.some((s) => s.status === "prova");
   return (
-    <Panel className="p-4 sm:p-5" label="Esito di Elabora tutto">
-      <div className="mb-3 flex items-start justify-between gap-3">
+    <Panel className="p-3" label="Esito di Elabora tutto">
+      <div className="mb-2 flex items-start justify-between gap-3">
         <div>
           <h2 className="font-display text-base font-bold leading-tight text-txt">Esito di «Elabora tutto»</h2>
           {trial && <p className="mt-0.5 text-xs text-dim">Prova: l&apos;invio reale non è attivo, agli enti non è stato mandato nulla.</p>}
         </div>
         <button type="button" onClick={onClose} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-faint transition hover:bg-wash hover:text-txt focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]" aria-label="Chiudi l'esito">✕</button>
       </div>
-      <ul className="flex flex-col gap-1.5">
+      <ul className="flex flex-col gap-1">
         {steps!.map((s) => {
           const m = STEP_META[s.status];
           return (
-            <li key={s.key} className="flex items-start gap-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: tint(m.tone, 8) }}>
+            <li key={s.key} className="flex items-start gap-2.5 rounded-lg px-2.5 py-2" style={{ backgroundColor: tint(m.tone, 8) }}>
               <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[13px] font-bold" style={{ backgroundColor: tint(m.tone, 16), color: m.tone }}>{s.status === "fatto" ? "✓" : s.status === "errore" ? "!" : s.status === "prova" ? "·" : "–"}</span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">

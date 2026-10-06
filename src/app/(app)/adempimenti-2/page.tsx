@@ -8,7 +8,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
-import { PageHeader } from "@/components/ui";
 import { apiPost } from "@/lib/invoicing/client";
 import { toISO, nights, parseISO } from "@/lib/dates";
 import { bookingPaidTotal, cityTaxOf } from "@/lib/booking";
@@ -160,43 +159,43 @@ export default function Adempimenti2() {
   const loading = !dati.ready;
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Adempimenti"
-        subtitle="Versione 2 · tutto ciò che va gestito o inviato, per ente e per urgenza"
-        actions={
-          <>
-            <Link href="/adempimenti" className="rounded-lg px-2.5 py-2 text-xs font-semibold text-dim transition hover:bg-wash hover:text-txt focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]">Torna alla versione classica</Link>
-            <ElaboraButton busy={elabora.busy} onClick={elabora.start} />
-          </>
-        }
-      />
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <div className="min-w-0">
+          <h1 className="font-display text-xl font-bold leading-tight tracking-tight text-txt">Adempimenti <span className="ml-1 align-middle rounded-full bg-wash px-1.5 py-0.5 font-sans text-[10px] font-semibold uppercase tracking-wide text-dim">v2</span></h1>
+          <p className="truncate text-xs text-dim">{dateLabel}{scopeLabel ? ` · ${scopeLabel}` : ""}</p>
+        </div>
+        <div className="flex items-center gap-1">
+          <Link href="/adempimenti" className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-dim transition hover:bg-wash hover:text-txt focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]">Versione classica</Link>
+          <ElaboraButton busy={elabora.busy} onClick={elabora.start} />
+        </div>
+      </div>
 
       {notice && (
-        <div role="status" className="flex items-start justify-between gap-3 rounded-xl px-4 py-3 text-sm font-medium" style={{ backgroundColor: tint(notice.ok ? "var(--ok)" : "var(--err)", 12), color: notice.ok ? "var(--ok)" : "var(--err)" }}>
+        <div role="status" className="flex items-start justify-between gap-3 rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: tint(notice.ok ? "var(--ok)" : "var(--err)", 12), color: notice.ok ? "var(--ok)" : "var(--err)" }}>
           <span>{notice.text}</span>
           <button type="button" onClick={() => setNotice(null)} className="shrink-0 rounded-md px-1.5 text-xs opacity-70 transition hover:opacity-100" aria-label="Chiudi">✕</button>
         </div>
       )}
 
       <Hero
-        summary={summary} next={next} nextStruct={next ? structName(next.structureId) : undefined} dateLabel={dateLabel} scopeLabel={scopeLabel}
+        summary={summary} next={next} nextStruct={next ? structName(next.structureId) : undefined}
         loading={loading} onAction={runAction} busyId={busyId} onEnte={onEnte}
       />
 
       {dati.ready && dati.failed && (
-        <div role="status" className="rounded-xl px-4 py-3 text-xs font-medium" style={{ backgroundColor: tint("var(--warn)", 12), color: "var(--warn)" }}>
+        <div role="status" className="rounded-lg px-3 py-2 text-xs font-medium" style={{ backgroundColor: tint("var(--warn)", 12), color: "var(--warn)" }}>
           Alcuni dati (Questura, ISTAT, fatture) non si sono caricati: i numeri qui sotto potrebbero essere incompleti. Riprova tra un attimo.
         </div>
       )}
 
       <ElaboraPanel busy={elabora.busy} steps={elabora.steps} onClose={elabora.closeSteps} />
 
-      <div className="grid items-start gap-4 lg:grid-cols-12">
-        <div className="flex min-w-0 flex-col gap-4 lg:col-span-8">
+      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_17rem]">
+        <div className="flex min-w-0 flex-col gap-2.5">
           {!loading && res.tasks.length > 0 && <Toolbar view={view} onView={setView} filter={filter} onFilter={setFilter} summary={summary} totalSoon={summary.soon} />}
           {loading ? (
-            <div className="flex flex-col gap-3" aria-busy="true">{[0, 1].map((i) => <div key={i} className="h-40 rounded-2xl border border-line bg-surface motion-safe:animate-pulse" style={{ opacity: 0.8 - i * 0.2 }} />)}</div>
+            <div className="flex flex-col gap-2.5" aria-busy="true">{[0, 1].map((i) => <div key={i} className="h-28 rounded-2xl border border-line bg-surface motion-safe:animate-pulse" style={{ opacity: 0.8 - i * 0.2 }} />)}</div>
           ) : (
             <>
               {res.tasks.length > 0 && shown.length === 0 && <EmptyFilter onReset={() => setFilter("all")} />}
@@ -207,7 +206,7 @@ export default function Adempimenti2() {
             </>
           )}
         </div>
-        <aside className="flex min-w-0 flex-col gap-4 lg:col-span-4" aria-label="Calendario e cronologia">
+        <aside className="flex min-w-0 flex-col gap-3" aria-label="Calendario e cronologia">
           <Calendario days={calendar} loading={loading} />
           <Cronologia entries={timeline} structOf={(id) => structName(id)} nameOf={(bid) => { const b = bid ? byId.get(bid) : undefined; return b ? nameOf(b) : undefined; }} loading={loading} />
         </aside>

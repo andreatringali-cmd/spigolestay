@@ -66,7 +66,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   const COL_LIMIT = 6;
   // Riga sotto il calendario: ricerca (ospite, camera, codice) e tre badge (Arrivi / In casa / Partenze) che mostrano una sola sezione.
   const [q, setQ] = useState("");
-  const [only, setOnly] = useState<Col | null>(null);
+  const only: Col | null = null;
   const [cleanDone, setCleanDone] = useState<Record<string, boolean>>({});
   useEffect(() => {
     const h = () => setCleanDone(readCleanDone());
@@ -249,24 +249,6 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
           <button onClick={() => stepDay(1)} title="Giorno successivo" aria-label="Giorno successivo" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">›</button>
         </div>
         {viewSwitch}
-        <div className="flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold" role="group" aria-label="Periodo mostrato">
-          {([["day", "Giorno"], ["week", "7 giorni"]] as const).map(([k, l]) => (
-            <button key={k} onClick={() => setMode(k)} aria-pressed={mode === k} className={`rounded-md px-2.5 py-1.5 transition ${mode === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{l}</button>
-          ))}
-        </div>
-        {/* Tre badge: Arrivi / In casa / Partenze del periodo mostrato (o della ricerca). Un clic mostra solo quella sezione, un secondo clic le rimostra tutte. */}
-        {COLS.map((c) => {
-          const on = only === c.key;
-          return (
-            <button key={c.key} type="button" onClick={() => setOnly((o) => (o === c.key ? null : c.key))} aria-pressed={on} title={on ? "Mostra tutte le sezioni" : `Mostra solo: ${c.title}`}
-              className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:border-focus"
-              style={{ borderColor: on ? c.tone : "var(--line)", background: on ? `color-mix(in srgb, ${c.tone} 14%, var(--surface))` : "var(--surface)", color: "var(--txt)" }}>
-              <span className="h-2 w-2 rounded-full" style={{ background: c.tone }} />
-              {c.title}
-              <span className="rounded-full px-1.5 py-0.5 font-mono text-[11px] tabular-nums" style={{ color: c.tone, background: `color-mix(in srgb, ${c.tone} 14%, transparent)` }}>{c.list.length}</span>
-            </button>
-          );
-        })}
         {filtersOn && <button onClick={() => setQ("")} className="rounded-lg px-2 py-2 text-xs font-semibold text-focus hover:underline">Azzera ricerca</button>}
         <div className="ml-auto flex items-center gap-2">
           <Link href="/importa" title="Importa prenotazioni" aria-label="Importa prenotazioni" className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt">

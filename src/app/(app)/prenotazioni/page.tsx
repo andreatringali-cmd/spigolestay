@@ -185,29 +185,37 @@ export default function PrenotazioniPage() {
       default: return "";
     }
   };
-  const sorted = [...filtered].sort((a, b) => {
-    const va = sortVal(a, sort.key), vb = sortVal(b, sort.key);
-    const c = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
-    return sort.dir === "asc" ? c : -c;
-  });
+  // Ordinamento: la chiave di ogni riga si calcola UNA volta (non a ogni confronto) e il tutto si rifà solo se cambiano i dati.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const sorted = useMemo(() => {
+    const keyed = filtered.map((b) => ({ b, v: sortVal(b, sort.key) }));
+    keyed.sort((x, y) => {
+      const c = typeof x.v === "number" && typeof y.v === "number" ? x.v - y.v : String(x.v).localeCompare(String(y.v));
+      return sort.dir === "asc" ? c : -c;
+    });
+    return keyed.map((k) => k.b);
+  }, [filtered, sort.key, sort.dir, guests, structures, units]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Raggruppa in un'unica riga le prenotazioni con lo stesso groupId (prenotazione di più camere).
   const [groupOpen, setGroupOpen] = useState<Set<string>>(() => new Set());
   const toggleGroup = (gid: string) => setGroupOpen((s) => { const n = new Set(s); if (n.has(gid)) n.delete(gid); else n.add(gid); return n; });
-  const displayList = (() => {
+  const displayList = useMemo(() => {
+    const byGroup = new Map<string, typeof sorted>();
+    for (const b of sorted) if (b.groupId) { const l = byGroup.get(b.groupId); if (l) l.push(b); else byGroup.set(b.groupId, [b]); }
     const seen = new Set<string>();
     const out: ({ kind: "single"; b: typeof sorted[number] } | { kind: "group"; gid: string; members: typeof sorted })[] = [];
     for (const b of sorted) {
       if (b.groupId) {
         if (seen.has(b.groupId)) continue;
         seen.add(b.groupId);
-        const members = sorted.filter((x) => x.groupId === b.groupId);
+        const members = byGroup.get(b.groupId) ?? [b];
         if (members.length > 1) { out.push({ kind: "group", gid: b.groupId, members }); continue; }
       }
       out.push({ kind: "single", b });
     }
     return out;
-  })();
+  }, [sorted]);
   const PAGE = 150;
   const [limit, setLimit] = useState(PAGE);
   useEffect(() => { setLimit(PAGE); }, [q, channel, loc, from, to, dateField, activeStructureId]); // cambia filtro: si riparte dalla prima pagina
@@ -259,6 +267,12 @@ export default function PrenotazioniPage() {
 
   // Dati grafici (sui risultati filtrati)
   const chColor = (c: Channel) => `var(${CHANNELS[c].cssVar})`;
+  // Tutti i dati dei grafici in un'unica passata memorizzata: con "Tutte (da sempre)" sono migliaia di prenotazioni e non si devono rifare a ogni clic.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const { byChannel, channelRows, structureRows, stayDist, byMonth, revByMonth, roomTypeRows, byCountry } = useMemo(() => {
+    const guestMap = new Map(guests.map((g) => [g.id, g]));
+    const unitMap = new Map(units.map((u) => [u.id, u]));
+    const rtMap = new Map(roomTypes.map((r) => [r.id, r.name]));
   const byChannel = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => ({ label: CHANNELS[c].label, value: filtered.filter((b) => b.channel === c).length, color: chColor(c) })).filter((x) => x.value > 0);
   const byStructure = structures.map((s, i) => ({ label: s.name, value: filtered.filter((b) => b.structureId === s.id).length, color: PALETTE[i % PALETTE.length] })).filter((x) => x.value > 0);
   const revByChannel = (Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => ({ label: CHANNELS[c].label, value: filtered.filter((b) => b.channel === c).reduce((a, b) => a + (b.total ?? 0), 0), color: chColor(c) })).filter((x) => x.value > 0);
@@ -279,14 +293,17 @@ export default function PrenotazioniPage() {
   const revByMonth = Object.keys(revMonthAgg).map(Number).sort((a, b) => a - b).map((mo) => ({ label: MONTHS[mo], value: Math.round(revMonthAgg[mo]), color: "var(--ok)", fmt: eur }));
   // Per tipologia (somma le camere con lo stesso nome tipologia) e per paese di provenienza.
   const rtAgg: Record<string, { n: number; rev: number }> = {};
-  filtered.forEach((b) => { const u = getUnit(b.unitId); const name = u ? roomTypes.find((r) => r.id === u.roomTypeId)?.name : null; if (!name) return; if (!rtAgg[name]) rtAgg[name] = { n: 0, rev: 0 }; rtAgg[name].n++; rtAgg[name].rev += b.total ?? 0; });
+  filtered.forEach((b) => { const u = b.unitId ? unitMap.get(b.unitId) : undefined; const name = u ? rtMap.get(u.roomTypeId) : null; if (!name) return; if (!rtAgg[name]) rtAgg[name] = { n: 0, rev: 0 }; rtAgg[name].n++; rtAgg[name].rev += b.total ?? 0; });
   const byRoomType = Object.entries(rtAgg).map(([k, v], i) => ({ label: k, value: v.n, color: PALETTE[i % PALETTE.length] }));
   const revByRoomType = Object.entries(rtAgg).map(([k, v]) => ({ label: k, value: Math.round(v.rev), color: "var(--ok)", fmt: eur }));
   // Dati unici per tipologia: prenotazioni + ricavi insieme (un solo grafico)
   const roomTypeRows = Object.entries(rtAgg).map(([k, v], i) => ({ label: k, color: PALETTE[i % PALETTE.length], count: v.n, revenue: Math.round(v.rev) })).filter((r) => r.count > 0 || r.revenue > 0);
   const countryAgg: Record<string, number> = {};
-  filtered.forEach((b) => { const c = guests.find((g) => g.id === b.guestId)?.country ?? "—"; countryAgg[c] = (countryAgg[c] || 0) + 1; });
+  filtered.forEach((b) => { const c = guestMap.get(b.guestId)?.country ?? "—"; countryAgg[c] = (countryAgg[c] || 0) + 1; });
   const byCountry = Object.entries(countryAgg).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v, color: flagColor(k), fill: flagGradient(k) }));
+    return { byChannel, channelRows, structureRows, stayDist, byMonth, revByMonth, roomTypeRows, byCountry };
+  }, [filtered, guests, units, roomTypes, structures]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Con una sola struttura selezionata i grafici "per struttura" non hanno senso: si nascondono.
   const singleStruct = activeStructureId !== "all" || structures.length <= 1;

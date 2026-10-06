@@ -88,6 +88,6 @@ export function Panel({ children, className = "", delay = 0, style, id, label }:
 }
 
 /** Pulsante primario piccolo (azione di una voce). */
-export const BTN_PRIMARY = "inline-flex min-h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-focus px-3.5 py-1.5 text-xs font-semibold text-surface shadow-sm transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus)] disabled:opacity-60";
+export const BTN_PRIMARY = "inline-flex min-h-8 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-focus px-2.5 py-1 text-[11px] font-semibold text-surface shadow-sm transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus)] disabled:opacity-60";
 /** Azione secondaria discreta. */
-export const BTN_QUIET = "inline-flex min-h-9 items-center justify-center whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold text-dim transition hover:bg-wash hover:text-txt focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)] disabled:opacity-60";
+export const BTN_QUIET = "inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded-lg px-2 py-1 text-[11px] font-semibold text-dim transition hover:bg-wash hover:text-txt focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)] disabled:opacity-60";
