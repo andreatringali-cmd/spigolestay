@@ -6,8 +6,10 @@
 // Per le prenotazioni usa journeyOf/journeyBucket-style (booking-journey) e la finestra "Risolvi" (StepActions).
 import { groupSizes } from "@/lib/groups";
 import { isGuideSent, reminderNotes, useReminderLog } from "@/lib/guest-messages";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Icon from "@/components/Icon";
 import { useData } from "@/lib/store";
 import { inScope as inScopeOf, scopeFilter } from "@/lib/scope";
 import { toISO, shiftISO, parseISO } from "@/lib/dates";
@@ -188,6 +190,13 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   const shift = (dir: -1 | 1) => { setWinStart((w) => shiftISO(w, 7 * dir)); setSel((s) => shiftISO(s, 7 * dir)); };
   const goToday = () => { setSel(today); setWinStart(today); };
   const pick = (iso: string) => { setSel(iso); setWinStart(iso); setMode("day"); };
+  // Selettore mese e frecce ±1 giorno: stessi controlli della riga filtri del calendario a griglia
+  const [monthOpen, setMonthOpen] = useState(false);
+  const monthRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { const h = (e: MouseEvent) => { if (monthRef.current && !monthRef.current.contains(e.target as Node)) setMonthOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
+  const monthList = useMemo(() => { const base = new Date(); const first = new Date(base.getFullYear(), base.getMonth() - 2, 1); return Array.from({ length: 18 }, (_, i) => { const d = new Date(first.getFullYear(), first.getMonth() + i, 1); return { y: d.getFullYear(), m: d.getMonth(), iso: toISO(d), label: d.toLocaleDateString("it-IT", { month: "long", year: "numeric" }) }; }); }, []);
+  const selDate = parseISO(sel);
+  const stepDay = (n: number) => { const next = shiftISO(sel, n); setSel(next); if (!winDays.includes(next)) setWinStart(next); };
   const selectDay = (iso: string) => { setSel(iso); setMode("day"); };
 
   const COLS: { key: Col; title: string; tone: string; sub: string; empty: string; emptySub: string; list: Row[] }[] = [
@@ -216,11 +225,30 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
     <div>
       <StriscaGiorni days={stripDays} sel={sel} mode={mode} today={today} rangeLabel={rangeLabel} onSelect={selectDay} onShift={shift} onToday={goToday} />
 
-      {/* Riga dei filtri, subito sotto il calendario: cerca, filtra per canale/camera/stato; a destra la scelta della vista */}
-      <div className="no-print mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        <SearchInput value={q} onChange={setQ} placeholder="Cerca ospite, camera o codice…" className="w-full sm:w-72" />
-        {/* Data da mostrare e periodo (un giorno o 7 giorni), subito dopo la ricerca */}
-        <DateField value={sel} onChange={(v) => { if (v) pick(v); }} title="Vai alla data" className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm transition hover:border-focus" />
+      {/* Riga dei filtri: stessa del calendario a griglia (cerca, mese, data con frecce, scelta della vista) + periodo e badge di questa vista; a destra Importa e Nuova */}
+      <div className="no-print mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
+        <div className="relative w-full sm:w-[calc(25%-2.5px)] sm:min-w-[240px] sm:shrink-0">
+          <SearchInput value={q} onChange={setQ} placeholder="Cerca ospite, camera o codice…" className="w-full" />
+        </div>
+        <div ref={monthRef} className="relative">
+          <button onClick={() => setMonthOpen((o) => !o)} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${monthOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
+            <Icon name="calendar" size={15} /> <span className="capitalize">{selDate.toLocaleDateString("it-IT", { month: "long", year: "numeric" })}</span> <span className="text-xs">▾</span>
+          </button>
+          {monthOpen && (
+            <div className="absolute left-0 top-full z-40 mt-1 max-h-72 w-52 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-xl">
+              {monthList.map((mm) => {
+                const active = selDate.getFullYear() === mm.y && selDate.getMonth() === mm.m;
+                return <button key={mm.iso} onClick={() => { pick(mm.iso); setMonthOpen(false); }} className={`block w-full truncate rounded-md px-2.5 py-1.5 text-left text-sm capitalize ${active ? "bg-focus text-white" : "text-txt hover:bg-wash"}`}>{mm.label}</button>;
+              })}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <button onClick={() => stepDay(-1)} title="Giorno precedente" aria-label="Giorno precedente" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">‹</button>
+          <DateField value={sel} onChange={(v) => { if (v) pick(v); }} title="Salta a una data" className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm transition hover:border-focus" />
+          <button onClick={() => stepDay(1)} title="Giorno successivo" aria-label="Giorno successivo" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">›</button>
+        </div>
+        {viewSwitch}
         <div className="flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold" role="group" aria-label="Periodo mostrato">
           {([["day", "Giorno"], ["week", "7 giorni"]] as const).map(([k, l]) => (
             <button key={k} onClick={() => setMode(k)} aria-pressed={mode === k} className={`rounded-md px-2.5 py-1.5 transition ${mode === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{l}</button>
@@ -240,7 +268,12 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
           );
         })}
         {filtersOn && <button onClick={() => setQ("")} className="rounded-lg px-2 py-2 text-xs font-semibold text-focus hover:underline">Azzera ricerca</button>}
-        <div className="ml-auto">{viewSwitch}</div>
+        <div className="ml-auto flex items-center gap-2">
+          <Link href="/importa" title="Importa prenotazioni" aria-label="Importa prenotazioni" className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12" /><path d="m8 11 4 4 4-4" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>
+          </Link>
+          <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Nuova</Link>
+        </div>
       </div>
 
       {/* Eventi segnalati nel periodo (sagre, ponti…) */}

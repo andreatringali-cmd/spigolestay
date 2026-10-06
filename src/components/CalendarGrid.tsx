@@ -1014,7 +1014,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       {/* Riga filtri — data (jump), navigazione, menu Visualizza */}
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
         {/* Cerca ospite o codice: prima del mese */}
-        <div className="relative order-first w-full sm:w-56">
+        <div className="relative order-first w-full sm:w-[calc(25%-2.5px)] sm:min-w-[240px] sm:shrink-0">
           <SearchInput value={calQuery} onChange={setCalQuery} placeholder="Cerca ospite o codice…" className="w-full" />
           {calQuery.trim() && (
             <div className="absolute left-0 top-full z-40 mt-1 w-full min-w-[17rem] overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
