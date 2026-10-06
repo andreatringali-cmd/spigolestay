@@ -533,7 +533,7 @@ export default function Dashboard2() {
 
   return (
     <div>
-      <PageHeader title={t("Dashboard")} subtitle={`${t("Riferito a")} ${parseISO(date).toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}`} actions={<WeatherWidget compact />} />
+      <PageHeader title={t("Dashboard")} subtitle={`${t("Riferito a")} ${parseISO(date).toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}`} actions={<><Link href="/dashboard-2" className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-dim transition hover:border-focus hover:text-focus focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]">Prova la Dashboard 2</Link><WeatherWidget compact /></>} />
 
       {/* KPI stato attuale — cliccabili per filtrare i movimenti sotto */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
