@@ -82,3 +82,34 @@ export async function sendWhatsapp(admin: SupabaseClient, tenantId: string, args
 export async function getWhatsappToken(admin: SupabaseClient, tenantId: string): Promise<string | null> {
   return (await readCfg(admin, tenantId))?.token ?? null;
 }
+
+/** Diagnosi del collegamento WhatsApp: stato del numero, modello usato per i messaggi "a freddo" e perché un invio potrebbe essere rifiutato. Non invia nulla. */
+export async function whatsappDiagnose(admin: SupabaseClient, tenantId: string): Promise<Record<string, unknown>> {
+  const cfg = await readCfg(admin, tenantId);
+  if (!cfg) return { ok: false, message: "WhatsApp non collegato." };
+  const out: Record<string, unknown> = { ok: true };
+  const get = async (path: string) => {
+    try {
+      const r = await fetch(`${GRAPH}/${path}`, { headers: { Authorization: `Bearer ${cfg.token}` } });
+      const j = await r.json().catch(() => ({}));
+      return r.ok ? { ok: true, data: j } : { ok: false, error: j?.error?.message || `Errore ${r.status}`, code: j?.error?.code };
+    } catch (e) { return { ok: false, error: (e as Error)?.message ?? "rete" }; }
+  };
+  out.phone = await get(`${cfg.phoneId}?fields=display_phone_number,verified_name,quality_rating,account_mode,messaging_limit_tier,code_verification_status,name_status,status`);
+  // Modelli del WABA: serve l'id dell'account WhatsApp Business, ricavato dal token con le credenziali dell'app Meta.
+  const appId = process.env.META_APP_ID, appSecret = process.env.META_APP_SECRET;
+  let wabaId = "";
+  if (appId && appSecret) {
+    const dbg = await (async () => { try { const r = await fetch(`${GRAPH}/debug_token?input_token=${encodeURIComponent(cfg.token)}&access_token=${appId}|${appSecret}`); return await r.json(); } catch { return null; } })();
+    const scopes = (dbg?.data?.granular_scopes ?? []) as { scope: string; target_ids?: string[] }[];
+    wabaId = scopes.find((x) => x.scope === "whatsapp_business_management")?.target_ids?.[0] ?? "";
+    out.token = { valid: dbg?.data?.is_valid ?? null, expires: dbg?.data?.expires_at ?? null, type: dbg?.data?.type ?? null };
+  } else out.token = { note: "META_APP_ID/META_APP_SECRET non impostate: impossibile controllare il token" };
+  if (wabaId) {
+    out.wabaId = wabaId;
+    const t = await get(`${wabaId}/message_templates?fields=name,status,language,category,components&limit=50`);
+    out.templates = t.ok ? (((t as { data: { data?: { name: string; status: string; language: string; category: string }[] } }).data.data ?? []).map((x) => ({ name: x.name, status: x.status, language: x.language, category: x.category }))) : t;
+  }
+  out.expectedTemplate = process.env.WHATSAPP_PULIZIE_TEMPLATE || "planning_pulizie";
+  return out;
+}

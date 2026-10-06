@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
-import { saveWhatsappCfg, whatsappStatus, whatsappTest } from "@/lib/whatsapp";
+import { saveWhatsappCfg, whatsappStatus, whatsappTest, whatsappDiagnose } from "@/lib/whatsapp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ export async function POST(req: Request) {
     const b = await req.json().catch(() => ({}));
     const action = String(b?.action || "status").trim();
     if (action === "save") return NextResponse.json(await saveWhatsappCfg(auth.admin, auth.tenantId, { token: b?.token || undefined, phoneId: b?.phoneId ?? undefined }));
+    if (action === "diagnose") return NextResponse.json(await whatsappDiagnose(auth.admin, auth.tenantId));
     if (action === "test") return NextResponse.json(await whatsappTest(auth.admin, auth.tenantId));
     return NextResponse.json({ ok: true, ...(await whatsappStatus(auth.admin, auth.tenantId)) });
   } catch (e) { return NextResponse.json({ error: "wa_failed", message: (e as Error)?.message ?? "errore" }, { status: 400 }); }
