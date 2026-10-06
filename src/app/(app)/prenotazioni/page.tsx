@@ -30,6 +30,7 @@ import WeatherWidget from "@/components/WeatherWidget";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import PrenotazioniDettaglio from "./_dettaglio";
+import { StatoProvider, StatoCell, StatoLegenda } from "./_stato";
 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit" });
 
@@ -210,11 +211,13 @@ export default function PrenotazioniPage() {
   const [limit, setLimit] = useState(PAGE);
   useEffect(() => { setLimit(PAGE); }, [q, channel, loc, from, to, dateField, activeStructureId]); // cambia filtro: si riparte dalla prima pagina
   const shownList = displayList.slice(0, limit);
+  // Righe per cui la colonna Stato calcola il percorso: solo quelle visibili (singole + camere dei gruppi aperti).
+  const visibleIds = shownList.flatMap((it) => (it.kind === "single" ? [it.b.id] : groupOpen.has(it.gid) ? it.members.map((m) => m.id) : []));
   const gSum = (ms: typeof sorted, f: (b: typeof sorted[number]) => number) => ms.reduce((a, b) => a + f(b), 0);
   const grand = (b: typeof sorted[number]) => bookingPaidTotal(b); // quanto ha pagato l'ospite (soggiorno+pulizia+extra), SENZA tassa di soggiorno — torna con l'OTA
   // Celle di una riga prenotazione (riusate per righe singole e per le camere di un gruppo).
   const renderCells = (b: typeof sorted[number], indent = false) => {
-    const ch = CHANNELS[b.channel]; const alOk = alloggiatiOk(b); const pay = payStatus(b);
+    const ch = CHANNELS[b.channel];
     const underprice = underpriceOf(b);
     return (<>
       <td className="px-3 py-2.5 font-mono text-xs text-dim">{bookingCode(b)}</td>
@@ -235,7 +238,7 @@ export default function PrenotazioniPage() {
       </td>
       <td className="px-3 py-2.5 font-mono text-dim">{commissionOf(b) ? <>{eur(commissionOf(b))} <span className="text-faint">({commissionPctOf(b)}%)</span></> : "—"}</td>
       <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{b.total ? eur(nettoOf(b)) : "—"}</td>
-      <td className="px-3 py-2.5"><div className="flex items-center gap-1.5"><StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--err)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} /><StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} /></div></td>
+      <td className="px-3 py-2.5"><StatoCell b={b} /></td>
     </>);
   };
 
@@ -494,6 +497,7 @@ export default function PrenotazioniPage() {
       </div>
 
       {/* Tabella (tablet/desktop) */}
+      <StatoGate on={view === "compact"} ids={visibleIds}>
       <div className="hidden max-h-[60vh] overflow-auto rounded-xl border border-line bg-surface shadow-sm md:block" style={view === "detail" ? { display: "none" } : undefined}>
         <table className="w-max min-w-full whitespace-nowrap text-sm">
           <thead className="sticky top-0 z-20">
@@ -567,6 +571,8 @@ export default function PrenotazioniPage() {
           )}
         </table>
       </div>
+      {view === "compact" && filtered.length > 0 && <div className="hidden md:block"><StatoLegenda /></div>}
+      </StatoGate>
       {displayList.length > limit && (
         <div className="no-print mt-3 flex items-center justify-center gap-3 text-xs text-dim">
           <span>{t("Mostrate")} {limit} {t("di")} {displayList.length}</span>
@@ -576,6 +582,11 @@ export default function PrenotazioniPage() {
       )}
     </div>
   );
+}
+
+// La colonna Stato della compatta carica i dati dei percorsi (schedine, ISTAT, documenti…) solo quando la vista è attiva.
+function StatoGate({ on, ids, children }: { on: boolean; ids: string[]; children: React.ReactNode }) {
+  return on ? <StatoProvider ids={ids}>{children}</StatoProvider> : <>{children}</>;
 }
 
 function StatusIcon({ icon, color, title }: { icon: string; color: string; title: string }) {
