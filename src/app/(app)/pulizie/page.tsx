@@ -667,7 +667,7 @@ export default function PuliziePage() {
                     const showHeader = idx === 0 || (list[idx - 1].typeName || "") !== (r.typeName || "");
                     const card = <RoomCard key={r.unit.id} r={r} k={keyOf(r.unit.id)} done={!!done[keyOf(r.unit.id)]} doneAt={doneTime(keyOf(r.unit.id))} hasIssue={roomHasIssue(r.unit.id)} guestName={guestName} hasDog={hasDog} note={noteInput(keyOf(r.unit.id))} onToggle={() => toggleDone(keyOf(r.unit.id))} onIssue={() => setIssueDraft({ unitId: r.unit.id, unitName: r.unit.name, structureName: r.structure.name, type: "guasto", note: "", photo: undefined })} />;
                     return showHeader
-                      ? [<div key={`h-${idx}`} className="col-span-full mt-1 flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, ${r.typeColor} 12%, transparent)`, color: r.typeColor }}><span className="h-2 w-2 rounded-full" style={{ backgroundColor: r.typeColor }} />{r.typeName || t("Senza tipologia")}</div>, card]
+                      ? [<TypeHeader key={`h-${idx}`} className="col-span-full mt-2" name={r.typeName || t("Senza tipologia")} color={r.typeColor} {...typeCounts(list, r.typeName, done, keyOf)} />, card]
                       : [card];
                   })}
                 </div>
@@ -685,7 +685,7 @@ export default function PuliziePage() {
                       lastType = r.typeName || "";
                       return (
                         <div key={r.unit.id}>
-                          {showHeader && <div className="flex items-center gap-1.5 border-t border-line px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, ${r.typeColor} 12%, transparent)`, color: r.typeColor }}><span className="h-2 w-2 rounded-full" style={{ backgroundColor: r.typeColor }} />{r.typeName || t("Senza tipologia")}</div>}
+                          {showHeader && <TypeHeader flat className="border-t border-line" name={r.typeName || t("Senza tipologia")} color={r.typeColor} {...typeCounts(list, r.typeName, done, keyOf)} />}
                           <div className={`flex flex-wrap items-start gap-3 border-t border-line p-3 ${isDone ? "opacity-60" : ""}`}>
                             <div className="w-24 shrink-0"><div className={`font-display text-base font-bold ${isDone ? "text-dim line-through" : "text-txt"}`}>{r.unit.name}</div></div>
                             <div className="w-32 shrink-0"><span className="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ color: cleanText(r.action), background: cleanTint(r.action) }}>{t(a.label)}</span></div>
@@ -834,6 +834,22 @@ function GuestLine({ dir, label, name, b, dog }: { dir: "in" | "out" | "stay"; l
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// Intestazione della tipologia: barra colorata a sinistra, nome ben leggibile e quante camere ci sono (e quante restano da fare).
+function TypeHeader({ name, color, total, todo, className = "", flat = false }: { name: string; color: string; total: number; todo: number; className?: string; flat?: boolean }) {
+  const { t } = useLang();
+  return (
+    <div className={`flex items-center gap-2.5 bg-surface px-3 py-2 ${flat ? "" : "rounded-lg border border-line shadow-sm"} ${className}`} style={{ borderLeft: `4px solid ${color}`, backgroundImage: `linear-gradient(90deg, color-mix(in srgb, ${color} 11%, transparent), transparent 60%)` }}>
+      <span className="font-display text-base font-bold text-txt">{name}</span>
+      <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-medium text-dim">{total} {total === 1 ? t("camera") : t("camere")}</span>
+      {todo > 0 && <span className="text-[11px] text-faint">· {todo} {t("da fare")}</span>}
+    </div>
+  );
+}
+function typeCounts(list: { typeName?: string; oos?: boolean; action: string; unit: { id: string } }[], typeName: string | undefined, done: Record<string, unknown>, keyOf: (id: string) => string) {
+  const g = list.filter((x) => (x.typeName || "") === (typeName || "") && !x.oos);
+  return { total: g.length, todo: g.filter((x) => x.action !== "niente" && !done[keyOf(x.unit.id)]).length };
+}
+
 function RoomCard({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle, onIssue }: { r: any; k: string; done: boolean; doneAt?: string; hasIssue?: boolean; guestName: (id: string) => string; hasDog: (id: string) => boolean; note: React.ReactNode; onToggle: () => void; onIssue: () => void }) {
   const { t } = useLang();
   const a = ACT[r.action as ActionKey];
