@@ -1,7 +1,7 @@
 "use client";
 
 // Striscia dei giorni della vista Calendario · Dettagliato: 7 giorni navigabili con i contatori di ciascuno.
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { parseISO } from "@/lib/dates";
 import type { DayStats } from "./_modello";
 
@@ -36,6 +36,10 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
   onToday: () => void;
 }) {
   const atToday = days[0]?.iso === today && (mode === "week" || sel === today);
+  // PROVA STILI (temporaneo): "0" = attuale, A–E = proposte. Si ricorda la scelta.
+  const [variant, setVariant] = useState("0");
+  useEffect(() => { try { const v = localStorage.getItem("xn-strip-variant"); if (v) setVariant(v); } catch {} }, []);
+  const pickVariant = (v: string) => { setVariant(v); try { localStorage.setItem("xn-strip-variant", v); } catch {} };
   const nav = "grid h-8 w-8 place-items-center rounded-lg border border-line bg-surface text-dim transition hover:border-focus hover:text-focus";
   return (
     <div className="rounded-2xl border border-line p-3 shadow-sm sm:p-4" style={{ background: "color-mix(in srgb, var(--wash) 70%, var(--surface))" }}>
@@ -46,6 +50,12 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
         </div>
         <button onClick={onToday} disabled={atToday} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt transition hover:border-focus hover:text-focus disabled:opacity-50">Oggi</button>
         <div className="min-w-0 flex-1 truncate font-display text-base font-bold capitalize text-txt sm:text-lg">{rangeLabel}</div>
+        <div className="flex items-center gap-1 text-[11px]" role="group" aria-label="Stile della striscia">
+          <span className="mr-1 text-faint">Stile</span>
+          {["0", "A", "B", "C", "D", "E"].map((v) => (
+            <button key={v} onClick={() => pickVariant(v)} aria-pressed={variant === v} className={`rounded-md border px-2 py-1 font-semibold transition ${variant === v ? "border-focus bg-focus text-white" : "border-line bg-surface text-dim hover:border-focus"}`}>{v === "0" ? "Attuale" : v}</button>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-7 gap-1 sm:gap-2">
@@ -66,6 +76,7 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
               <span className="block truncate text-[10px] font-semibold uppercase tracking-wide" style={{ color: d.getDay() === 0 ? "var(--err)" : d.getDay() === 6 ? "var(--warn)" : "var(--faint)" }}>{wk}</span>
               <span className="mx-auto grid h-7 min-w-7 place-items-center rounded-full px-1 font-mono text-sm font-bold tabular-nums sm:h-8 sm:min-w-8 sm:text-base" style={isToday ? { background: "var(--focus)", color: "#fff" } : { color: "var(--txt)" }}>{d.getDate()}</span>
               <span className="block truncate text-[10px] text-faint">{d.getDate() === 1 || iso === days[0].iso ? mon : " "}</span>
+              {variant === "0" ? (<>
               {/* Movimenti del giorno: solo quelli che ci sono, con il nome per esteso (icona e numero stanno insieme) */}
               <span className="mt-1 flex min-h-[3.4rem] flex-col items-stretch justify-start gap-1">
                 {MOVES.filter((k) => valueOf(stats, k.key) > 0).map((k) => {
@@ -98,6 +109,7 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
                   </span>
                 );
               })()}
+              </>) : <VariantBody v={variant} stats={stats} />}
             </button>
           );
         })}
@@ -105,4 +117,55 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
 
     </div>
   );
+}
+
+// ── Proposte di stile (temporanee) ──
+const C = { arr: "var(--ok)", dep: "var(--err)", stay: "var(--focus)" };
+const tint = (c: string, p = 15) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
+function VariantBody({ v, stats }: { v: string; stats: DayStats }) {
+  const total = stats.totalUnits, free = stats.free;
+  const occ = total > 0 ? Math.round(((total - free) / total) * 100) : 0;
+  const barCol = free === 0 ? "var(--ok)" : "var(--focus)";
+  const bar = (<span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-wash"><span className="block h-full rounded-full" style={{ width: `${occ}%`, background: barCol }} /></span>);
+  const foot = (<span className="mt-1.5 flex items-center justify-between text-[11px] text-faint"><span style={free === 0 ? { color: "var(--err)", fontWeight: 600 } : undefined}>{free === 0 ? "0 libere" : `${free} ${free === 1 ? "libera" : "libere"}`}</span><span>{total}</span></span>);
+  const pillBase = "inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[12px] font-semibold tabular-nums";
+  const kinds = [["arr", stats.arrivals, "arrivi"], ["dep", stats.departures, "partenze"], ["stay", stats.stay, "in casa"]] as const;
+
+  if (v === "A") return (<>
+    <span className="mt-1 flex items-center justify-center gap-1">{kinds.map(([k, n]) => <span key={k} className={pillBase} style={{ color: C[k], background: tint(C[k]) }}><KindIcon k={k} />{n}</span>)}</span>
+    {bar}{foot}
+  </>);
+  if (v === "B") return (<>
+    <span className="mt-1 flex flex-col gap-1">{kinds.map(([k, n, lab]) => (
+      <span key={k} className="flex items-center gap-1.5 text-left">
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg" style={{ color: C[k], background: tint(C[k]) }}><KindIcon k={k} /></span>
+        <span className="font-mono text-base font-bold leading-none text-txt">{n}</span>
+        <span className="hidden truncate text-[11px] text-dim sm:inline">{lab}</span>
+      </span>))}</span>
+    {bar}{foot}
+  </>);
+  if (v === "C") return (<>
+    <span className="mt-1 grid grid-cols-2 gap-1">
+      {([["arr", stats.arrivals, "arrivi"], ["dep", stats.departures, "partenze"]] as const).map(([k, n, lab]) => (
+        <span key={k} className="rounded-lg py-1" style={{ background: tint(C[k]) }}>
+          <span className="block font-mono text-lg font-bold leading-none" style={{ color: C[k] }}>{n}</span>
+          <span className="block text-[11px]" style={{ color: C[k] }}>{lab}</span>
+        </span>))}
+    </span>
+    <span className={`mt-1 flex items-center justify-center gap-1 rounded-lg py-0.5 text-[12px] font-semibold`} style={{ color: C.stay, background: tint(C.stay) }}><KindIcon k="stay" />{stats.stay} in casa</span>
+    {bar}{foot}
+  </>);
+  if (v === "D") return (<>
+    <span className="mt-1 flex flex-col gap-1">{kinds.map(([k, n, lab]) => <span key={k} className={pillBase} style={{ color: C[k], border: `1.5px solid ${C[k]}` }}><KindIcon k={k} />{n}<span className="hidden sm:inline"> {lab}</span></span>)}</span>
+    {foot}
+  </>);
+  // E: barra verticale a fianco + testo semplice
+  return (<>
+    <span className="mt-1 flex items-stretch gap-2">
+      <span className="flex w-1.5 shrink-0 items-end overflow-hidden rounded-full bg-wash"><span className="block w-full rounded-full" style={{ height: `${occ}%`, background: barCol }} /></span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1 text-left">{kinds.map(([k, n, lab]) => (
+        <span key={k} className="flex items-center gap-1.5 text-[12px]" style={{ color: C[k] }}><KindIcon k={k} /><b className="font-semibold">{n}</b><span className="hidden truncate text-[11px] text-dim sm:inline">{lab}</span></span>))}</span>
+    </span>
+    {foot}
+  </>);
 }
