@@ -63,3 +63,9 @@ test("riga presente in un'altra struttura: non è 'mancante' e non conta negli i
   assert.deepEqual(v.missing.map((m) => m.row), [4]);
   assert.equal(v.fileTotal, 170); assert.equal(v.systemTotal, 100);
 });
+
+test("importo diverso su riga già presente = modificato dopo, non anomalia", () => {
+  const out: ImportOutcome[] = [{ row: 2, guest: "Papo", checkIn: "2026-10-13", checkOut: "2026-10-21", room: "", code: "", extId: "octorate:9", total: 616, status: "gia_presente" }];
+  const v = verifyOutcomes(out, [{ extId: "octorate:9", guestName: "Papo", checkIn: "2026-10-13", checkOut: "2026-10-21", total: 0 }]);
+  assert.equal(v.amountDiffs.length, 0); assert.equal(v.editedLater.length, 1);
+});

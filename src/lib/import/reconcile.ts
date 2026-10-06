@@ -36,7 +36,8 @@ export interface Verification {
   elsewhere: { outcome: ImportOutcome; structure: string }[]; // righe che non sono in questa struttura ma ci sono in un'altra (non perse)
   fileTotal: number;                // somma importi del file (righe attese)
   systemTotal: number;              // somma importi in Xenora (righe trovate)
-  amountDiffs: { outcome: ImportOutcome; system: number }[]; // righe con importo diverso
+  amountDiffs: { outcome: ImportOutcome; system: number }[]; // righe importate ora con importo diverso dal file (anomalia)
+  editedLater: { outcome: ImportOutcome; system: number }[];  // righe già presenti con importo diverso: di norma corretti a mano dopo un'importazione precedente
 }
 
 const key = (name: string, ci: string, co: string) => `${normName(name)}|${ci}|${co}`;
@@ -58,6 +59,7 @@ export function verifyOutcomes(outcomes: ImportOutcome[], bookings: VerifyBookin
   const missing: ImportOutcome[] = [];
   const elsewhere: Verification["elsewhere"] = [];
   const amountDiffs: Verification["amountDiffs"] = [];
+  const editedLater: Verification["editedLater"] = [];
   let found = 0, fileTotal = 0, systemTotal = 0;
   for (const o of expected) {
     let hit: VerifyBooking | undefined;
@@ -75,9 +77,9 @@ export function verifyOutcomes(outcomes: ImportOutcome[], bookings: VerifyBookin
     used.add(hit);
     found++;
     systemTotal += hit.total ?? 0;
-    if (o.total !== undefined && !eq(o.total, hit.total ?? 0)) amountDiffs.push({ outcome: o, system: hit.total ?? 0 });
+    if (o.total !== undefined && !eq(o.total, hit.total ?? 0)) (o.status === "gia_presente" ? editedLater : amountDiffs).push({ outcome: o, system: hit.total ?? 0 });
   }
-  return { expected: expected.length - elsewhere.length, found, missing, elsewhere, fileTotal, systemTotal, amountDiffs };
+  return { expected: expected.length - elsewhere.length, found, missing, elsewhere, fileTotal, systemTotal, amountDiffs, editedLater };
 }
 
 /** Quante righe scartate per ciascun motivo. */

@@ -62,7 +62,7 @@ export default function RiepilogoImport({ report, bookings, guests, structureNam
         <div className="rounded-xl px-4 py-3 text-sm" style={{ color: "var(--warn)", background: "color-mix(in srgb, var(--warn) 12%, transparent)" }}>
           <div className="font-semibold">⚠ Trovate {v.found} righe su {v.expected} del file.</div>
           {v.missing.length > 0 && <div className="mt-0.5">Mancano {v.missing.length} righe: sotto trovi quali. Puoi rilanciare l&apos;importazione dello stesso file, aggiunge solo quelle che mancano.</div>}
-          {v.amountDiffs.length > 0 && <div className="mt-0.5">{v.amountDiffs.length} prenotazioni hanno un importo diverso dal file (file {eur(v.fileTotal)} · Xenora {eur(v.systemTotal)}).</div>}
+          {v.amountDiffs.length > 0 && <div className="mt-0.5">{v.amountDiffs.length} prenotazioni importate ora hanno un importo diverso dal file (file {eur(v.fileTotal)} · Xenora {eur(v.systemTotal)}).</div>}
         </div>
       )}
 
@@ -90,6 +90,14 @@ export default function RiepilogoImport({ report, bookings, guests, structureNam
           {v.elsewhere.slice(0, 8).map((m) => <div key={m.outcome.row}>Riga {m.outcome.row} · {m.outcome.guest || "—"} · {fmtD(m.outcome.checkIn)} → {fmtD(m.outcome.checkOut)} · in {m.structure}</div>)}
           {v.elsewhere.length > 8 && <div className="text-faint">…e altre {v.elsewhere.length - 8} nel file scaricabile</div>}
           <div className="mt-1 text-faint">Se devono stare in questa struttura, spostale dal calendario.</div>
+        </div>
+      )}
+
+      {v && v.editedLater.length > 0 && (
+        <div className="mt-3 rounded-xl border border-line bg-surface px-4 py-3 text-xs text-dim">
+          <div className="mb-1 font-semibold text-txt">{v.editedLater.length} importi diversi dal file, già presenti prima di questa importazione</div>
+          {v.editedLater.slice(0, 8).map((d) => <div key={d.outcome.row}>Riga {d.outcome.row} · {d.outcome.guest || "—"} · {fmtD(d.outcome.checkIn)} → {fmtD(d.outcome.checkOut)} · file {eur(d.outcome.total ?? 0)} · Xenora {eur(d.system)}</div>)}
+          <div className="mt-1 text-faint">Di solito sono importi corretti a mano dopo un&apos;importazione precedente: l&apos;importazione non li sovrascrive.</div>
         </div>
       )}
 
