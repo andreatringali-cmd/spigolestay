@@ -16,6 +16,7 @@ import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
 import { computePuliziePlan, buildPuliziePlanText, ACT_LABEL, fmtLongIT, type PlanRoom } from "@/lib/puliziePlan";
 import AutoShareSettings from "@/components/pulizie/AutoShareSettings";
+import { cleanBar, cleanTint, cleanText, cleanSolid } from "@/lib/pulizie-colors";
 import PulizieDoc, { type PulizieRow } from "@/components/pdf/PulizieDoc";
 import { captureA4ToPdfBlob } from "@/lib/pdf-capture";
 
@@ -31,11 +32,11 @@ type ActionKey = "turnover" | "arrivo" | "partenza" | "riassetto" | "niente";
 // primaria (stesso blu dei pulsanti), confondibile con le camere che richiedono davvero
 // attenzione: ora è neutro (grigio), coerente col fatto che non c'è nulla da fare.
 const ACT: Record<ActionKey, { label: string; color: string }> = {
-  turnover: { label: "Partenza + Arrivo", color: "#7C3AED" },
-  arrivo: { label: "Arrivo", color: "var(--ok)" },
-  partenza: { label: "Partenza", color: "var(--err)" },
-  riassetto: { label: "Riassetto", color: "#FB923C" },
-  niente: { label: "Niente", color: "var(--faint)" },
+  turnover: { label: "Partenza + Arrivo", color: cleanSolid("turnover") },
+  arrivo: { label: "Arrivo", color: cleanSolid("arrivo") },
+  partenza: { label: "Partenza", color: cleanSolid("partenza") },
+  riassetto: { label: "Riassetto", color: cleanSolid("riassetto") },
+  niente: { label: "Niente", color: cleanSolid("niente") },
 };
 
 interface Issue { id: string; unitId: string; unitName: string; structureName: string; structureId?: string; date: string; type: string; note: string; photo?: string; createdAt: string; resolved?: boolean; resolvedAt?: string; updatedAt?: number; _deleted?: boolean }
@@ -641,7 +642,7 @@ export default function PuliziePage() {
       <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim">
         {(Object.keys(ACT) as ActionKey[]).map((k) => (
           <span key={k} className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: ACT[k].color }} />
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: cleanBar(k) }} />
             {t(ACT[k].label)}
           </span>
         ))}
@@ -687,7 +688,7 @@ export default function PuliziePage() {
                           {showHeader && <div className="flex items-center gap-1.5 border-t border-line px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, ${r.typeColor} 12%, transparent)`, color: r.typeColor }}><span className="h-2 w-2 rounded-full" style={{ backgroundColor: r.typeColor }} />{r.typeName || t("Senza tipologia")}</div>}
                           <div className={`flex flex-wrap items-start gap-3 border-t border-line p-3 ${isDone ? "opacity-60" : ""}`}>
                             <div className="w-24 shrink-0"><div className={`font-display text-base font-bold ${isDone ? "text-dim line-through" : "text-txt"}`}>{r.unit.name}</div></div>
-                            <div className="w-32 shrink-0"><span className="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ color: a.color, background: `color-mix(in srgb, ${a.color} 14%, transparent)` }}>{t(a.label)}</span></div>
+                            <div className="w-32 shrink-0"><span className="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ color: cleanText(r.action), background: cleanTint(r.action) }}>{t(a.label)}</span></div>
                             <div className="min-w-0 flex-1 basis-64 text-sm">
                               {details(r)}
                               <div className="mt-2 flex items-center gap-2">
@@ -863,14 +864,14 @@ function RoomCard({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle
   return (
     <div className={`flex h-full min-h-[160px] flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-sm transition ${done ? "opacity-70" : ""}`}>
       {/* Intestazione sobria: barra sottile del colore dell'azione, nome camera e pillola tenue (stesso linguaggio delle schede Camere e Prenotazioni) */}
-      <div className="h-1.5 w-full shrink-0" style={{ backgroundColor: accent }} />
+      <div className="h-1.5 w-full shrink-0" style={{ background: cleanBar(r.action) }} />
       <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className={`truncate font-display text-[15px] font-bold text-txt ${done ? "line-through opacity-70" : ""}`}>{r.unit.name}</span>
           {r.typeName && <span className="shrink-0 text-[10px] font-medium text-faint">· {r.typeName}</span>}
           {hasIssue && <span title={t("Segnalazione aperta")} className="shrink-0" style={{ color: "var(--err)" }}><Icon name="alertTriangle" size={13} /></span>}
         </span>
-        <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide" style={{ backgroundColor: `color-mix(in srgb, ${accent} 14%, transparent)`, color: accent }}>{t(a.label)}</span>
+        <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide" style={{ background: cleanTint(r.action), color: cleanText(r.action) }}>{t(a.label)}</span>
       </div>
 
       {/* Chi parte / arriva / alloggia */}

@@ -18,6 +18,7 @@ import { exportExcel, exportPdf } from "@/lib/export";
 import { journeyOf, isLiveBooking, type JourneyStep } from "@/lib/booking-journey";
 import { channelPulse } from "@/lib/channel-pulse";
 import { contactReportCached } from "@/lib/contacts-check";
+import { cleanTint, cleanText } from "@/lib/pulizie-colors";
 import { upcomingContactIssues } from "@/lib/contacts-upcoming";
 import { isGuideSent, readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import { PageHeader } from "@/components/ui";
@@ -66,11 +67,12 @@ const INHOUSE_TASKS = [
 const DEFAULT_CHART_KEYS = ["occ-gauge", "occ-str", "guests-str", "ch-mix", "occ-trend", "rev-day", "prov-day", "rooms"];
 
 // Azioni pulizia del giorno (stessa semantica della pagina Pulizie).
-const CLEAN_ACT: Record<string, { label: string; color: string }> = {
-  turnover: { label: "Turnover", color: "var(--err)" },
-  partenza: { label: "Partenza", color: "var(--warn)" },
-  arrivo: { label: "Arrivo", color: "var(--focus)" },
-  riassetto: { label: "Riassetto", color: "var(--ok)" },
+// Stessi colori e stesso significato del planning Pulizie (vedi lib/pulizie-colors): rosso partenza, verde arrivo, metà e metà turnover, azzurro riassetto.
+const CLEAN_ACT: Record<string, { label: string }> = {
+  turnover: { label: "Turnover" },
+  partenza: { label: "Partenza" },
+  arrivo: { label: "Arrivo" },
+  riassetto: { label: "Riassetto" },
 };
 
 const GUIDE_RE = /guest-guide|\/guida|guida ospiti/i;
@@ -699,7 +701,7 @@ export default function Dashboard2() {
                             <div className="min-w-0 flex-1">
                               <div className="mb-0.5 flex items-center justify-between gap-2">
                                 <span className="truncate text-sm font-medium text-txt">{r.u.name}</span>
-                                <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ backgroundColor: tint(a.color, 14), color: a.color }}>{t(a.label)}</span>
+                                <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ background: cleanTint(r.action as never), color: cleanText(r.action as never) }}>{t(a.label)}</span>
                               </div>
                               {r.dep && (
                                 <button onClick={() => openBooking(r.dep!.id)} className="flex w-full items-center gap-1.5 text-left text-xs text-dim hover:text-focus">
