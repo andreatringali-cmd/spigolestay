@@ -13,7 +13,8 @@ import { inScope } from "@/lib/scope";
 import { buildChanges, recordBatches } from "@/lib/revenue-history";
 
 export default function AutopilotRunner() {
-  const { bookings, roomTypes, units, events, rateOverrides, setDayRates, structures, addActivity } = useData();
+  const { raw, rateOverrides, setDayRates, addActivity } = useData(); // dati completi: l'autopilot non dipende dalle strutture selezionate in alto
+  const { bookings, roomTypes, units, events, structures } = raw;
   const done = useRef(false);
 
   useEffect(() => {

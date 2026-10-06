@@ -55,8 +55,16 @@ interface DataContextValue {
   closeNewBooking: () => void;
 
   // Struttura attiva (globale, condivisa tra le pagine). "all" = tutte.
+  // Selezione multipla: con 2 o più strutture scelte (ma non tutte) `activeStructureId` resta "all" e le liste esposte
+  // (strutture, tipologie, camere, prenotazioni, eventi, attività) contengono SOLO le strutture scelte: tutte le pagine
+  // ne mostrano così solo i dati senza dover conoscere la selezione. `allStructures` è l'elenco completo.
   activeStructureId: string;
   setActiveStructure: (id: string) => void;
+  allStructures: Structure[];
+  selectedStructureIds: string[];                 // strutture effettivamente selezionate (tutte, se "Tutte")
+  setActiveStructures: (ids: string[]) => void;
+  /** Dati COMPLETI, non filtrati dalla selezione: per i lavori in background (sincronizzazioni, autopilot) che non devono dipendere da ciò che si sta guardando. */
+  raw: { structures: Structure[]; roomTypes: RoomType[]; units: Unit[]; bookings: Booking[]; events: CalEvent[] };
 
   // Azioni inventario
   addStructure: (s: { name: string; groupName: string; city?: string; address?: string; services?: string[] }) => string;
@@ -340,11 +348,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [newBooking, setNewBooking] = useState<NewBookingPrefill | null>(null);
   const [activeStructureId, setActiveStructureId] = useState<string>("all");
+  // Sottoinsieme di 2+ strutture (vuoto = nessun sottoinsieme: vale activeStructureId).
+  const [subsetIds, setSubsetIds] = useState<string[]>([]);
+  useEffect(() => { try { const v = localStorage.getItem("spigolestay:activestructs"); if (v) setSubsetIds(v.split(",").filter(Boolean)); } catch {} }, []);
   // Se la struttura selezionata non esiste più (eliminata), torna a "Tutte".
   useEffect(() => {
     if (!ready) return;
     if (activeStructureId !== "all" && !structures.some((s) => s.id === activeStructureId)) setActiveStructureId("all");
-  }, [ready, structures, activeStructureId]);
+    // Strutture del sottoinsieme eliminate: si tolgono; se ne resta meno di 2 il sottoinsieme decade.
+    if (subsetIds.length && subsetIds.some((id) => !structures.some((s) => s.id === id))) {
+      const kept = subsetIds.filter((id) => structures.some((s) => s.id === id));
+      if (kept.length >= 2) setSubsetIds(kept); else { setSubsetIds([]); if (kept.length === 1) setActiveStructureId(kept[0]); }
+    }
+  }, [ready, structures, activeStructureId, subsetIds]);
 
   const value = useMemo<DataContextValue>(() => {
     // Strutture ordinate secondo la preferenza dell'utente (campo order), poi per nome.
@@ -358,15 +374,39 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const ob = typeof b.order === "number" ? b.order : 1e9;
       return oa !== ob ? oa - ob : (a.name || "").localeCompare(b.name || "", "it");
     });
+    const sub = subsetIds.length >= 2 ? new Set(subsetIds) : null;
+    const inSub = (sid?: string | null) => !sub || !sid || sub.has(sid);
+    const xStructures = sub ? sortedStructures.filter((x) => sub.has(x.id)) : sortedStructures;
+    const xRoomTypes = sub ? roomTypes.filter((x) => inSub(x.structureId)) : roomTypes;
+    const xUnits = sub ? units.filter((x) => inSub(x.structureId)) : units;
+    // La prenotazione aperta si deve poter vedere anche se è di una struttura non selezionata (da una ricerca o da un link).
+    const xBookings = sub ? bookings.filter((x) => inSub(x.structureId) || x.id === selectedBookingId) : bookings;
+    const xEvents = sub ? events.filter((x) => inSub(x.structureId)) : events;
+    const xActivities = sub ? activities.filter((x) => inSub((x as { structureId?: string }).structureId)) : activities;
     return {
-      structures: sortedStructures,
-      roomTypes,
-      units,
+      structures: xStructures,
+      allStructures: sortedStructures,
+      raw: { structures: sortedStructures, roomTypes, units, bookings, events },
+      selectedStructureIds: sub ? subsetIds : activeStructureId === "all" ? sortedStructures.map((x) => x.id) : [activeStructureId],
+      setActiveStructures: (ids) => {
+        const valid = ids.filter((id) => structures.some((x) => x.id === id));
+        const all = valid.length === 0 || valid.length >= structures.length;
+        const single = !all && valid.length === 1;
+        setActiveStructureId(all ? "all" : single ? valid[0] : "all");
+        setSubsetIds(!all && !single ? valid : []);
+        try {
+          localStorage.setItem("spigolestay:activestruct", all ? "all" : single ? valid[0] : "all");
+          localStorage.setItem("spigolestay:activestructs", !all && !single ? valid.join(",") : "");
+          window.dispatchEvent(new Event("spigolestay:activestruct"));
+        } catch {}
+      },
+      roomTypes: xRoomTypes,
+      units: xUnits,
       guests,
-      bookings,
-      events,
+      bookings: xBookings,
+      events: xEvents,
       rateOverrides,
-      activities,
+      activities: xActivities,
       directReviews,
       addActivity: logAct,
       setDirectReviewReply: (id, reply) => setDirectReviews((prev) => prev.map((r) => (r.id === id ? { ...r, reply, updatedAt: Date.now() } : r))),
@@ -380,7 +420,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       closeNewBooking: () => setNewBooking(null),
 
       activeStructureId,
-      setActiveStructure: (id) => { setActiveStructureId(id); try { localStorage.setItem("spigolestay:activestruct", id); window.dispatchEvent(new Event("spigolestay:activestruct")); } catch {} },
+      setActiveStructure: (id) => { setSubsetIds([]); try { localStorage.setItem("spigolestay:activestructs", ""); } catch {} setActiveStructureId(id); try { localStorage.setItem("spigolestay:activestruct", id); window.dispatchEvent(new Event("spigolestay:activestruct")); } catch {} },
 
       addStructure: (s) => { const id = uid(); setStructures((prev) => [...prev, { id, city: "Siracusa", checkOutBy: "10:30", ...s, updatedAt: Date.now() }]); logAct("config", `Struttura creata — ${s.name}`); return id; },
       updateStructure: (id, patch) => setStructures((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch, updatedAt: Date.now() } : x))),
@@ -627,7 +667,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       getGuest: (id) => guests.find((g) => g.id === id),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews, selectedBookingId, newBooking, activeStructureId]);
+  }, [structures, roomTypes, units, guests, bookings, events, rateOverrides, activities, directReviews, selectedBookingId, newBooking, activeStructureId, subsetIds]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }

@@ -69,7 +69,8 @@ const restrVal = (r: { rate?: string; min_stay_arrival?: number; max_stay?: numb
   JSON.stringify({ rate: r.rate, min_stay_arrival: r.min_stay_arrival, max_stay: r.max_stay, stop_sell: r.stop_sell, closed_to_arrival: r.closed_to_arrival, closed_to_departure: r.closed_to_departure });
 
 export default function ChannexAutoSync() {
-  const { roomTypes, units, bookings, rateOverrides } = useData();
+  const { raw, rateOverrides } = useData(); // dati completi: la sincronizzazione non dipende dalle strutture selezionate in alto
+  const { roomTypes, units, bookings } = raw;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ultimi dati "vivi" a disposizione del push (aggiornati a ogni render): così anche il push
   // avviato da un evento esterno (chiusure vendita) usa lo stato corrente.
