@@ -141,7 +141,7 @@ export function StatoCell({ b }: { b: Booking }) {
   if (!ctx) return null;
   const pr = ctx.progress(b.id);
   if (!pr || pr.total <= 0) return <span className="text-[11px] text-faint">{ctx.slots(b.id)[0]?.detail === "Prenotazione annullata" ? "Annullata" : "—"}</span>;
-  const col = pr.pct >= 100 ? "var(--ok)" : pr.late ? "var(--err)" : "var(--focus)";
+  const col = "var(--ok)"; // avanzamento sempre verde: il ritardo lo segnala il puntino a destra
   const nextSlot = pr.next ? ctx.slots(b.id).find((x) => x.key === pr.next!.key) : undefined;
   // Avanzamento su UNA riga: barra sottile + percentuale (+ puntino se c'è un passaggio in ritardo). Il passaggio per passaggio sta nel tooltip;
   // un clic apre la finestra "Risolvi" sul prossimo passaggio da fare.
