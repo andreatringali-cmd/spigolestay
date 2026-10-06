@@ -113,32 +113,19 @@ export function KpiTile({ label, value, color, valueColor, hint, bar, small, onC
   return onClick ? <button onClick={onClick} className={`${cls} w-full`}>{inner}</button> : <div className={cls}>{inner}</div>;
 }
 
-/** Anteprima camera: foto (Unit.photos[0]) oppure riquadro colorato col numero camera, come in Prenotazioni · Dettagliata. */
-export function RoomThumb({ unitId, roomTypeId, structureId, className = "", compact = false, overlayStructure = false }: {
+/** Targa camera: numero su fondo tenue del colore della tipologia. Volutamente leggera: la scheda con foto resta solo in Prenotazioni e Calendario. */
+export function RoomThumb({ unitId, roomTypeId, structureId, className = "" }: {
   unitId?: string; roomTypeId?: string; structureId?: string; className?: string; compact?: boolean; overlayStructure?: boolean;
 }) {
   const { units, roomTypes, getStructure } = useData();
   const unit = units.find((u) => u.id === unitId);
   const rt = roomTypes.find((r) => r.id === (unit?.roomTypeId ?? roomTypeId));
   const st = getStructure(structureId ?? unit?.structureId ?? "");
-  const photo = unit?.photos?.[0];
   const col = rt?.color || st?.photoColor || "var(--focus)";
   const num = unit ? unit.name.replace(/^camera\s*/i, "") : null;
   return (
-    <div className={`relative shrink-0 overflow-hidden rounded-xl ${className}`} style={photo ? undefined : { background: `linear-gradient(145deg, color-mix(in srgb, ${col} 85%, #fff), color-mix(in srgb, ${col} 70%, #000))` }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      {photo && <img src={photo} alt="" className="absolute inset-0 h-full w-full object-cover" />}
-      {compact ? (
-        <div className="absolute inset-0 grid place-items-center bg-gradient-to-t from-black/45 to-transparent text-white">
-          <span className="truncate px-1 text-sm font-bold leading-none drop-shadow">{num ?? "—"}</span>
-        </div>
-      ) : (
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 pb-1.5 pt-6 text-white">
-          <div className="truncate text-sm font-bold leading-tight">{num ?? <span className="italic">Da assegnare</span>}</div>
-          {rt?.name && <div className="truncate text-[11px] opacity-90">{rt.name}</div>}
-        </div>
-      )}
-      {overlayStructure && st && <span className="absolute left-1.5 top-1.5 max-w-[calc(100%-12px)] truncate rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold text-white">{st.name}</span>}
+    <div className={`grid shrink-0 place-items-center overflow-hidden ${className}`} title={rt?.name ?? undefined} style={{ background: tint(col, 16), color: col }}>
+      <span className="truncate px-1 text-sm font-bold leading-none">{num ?? "—"}</span>
     </div>
   );
 }

@@ -62,7 +62,7 @@ export function MoveList({ items, empty, kind, date, today, groupByStructure, st
         const late = !!j?.steps.some((s) => s.state === "late");
         return (
           <article key={b.id} role="button" tabIndex={0} onClick={() => openBooking(b.id)} onKeyDown={(e) => { if (e.key === "Enter") openBooking(b.id); }} className="group flex cursor-pointer gap-3 rounded-2xl border border-line bg-surface p-2.5 shadow-sm transition hover:border-focus hover:shadow-md">
-            <RoomThumb unitId={b.unitId} roomTypeId={b.roomTypeId} structureId={b.structureId} className="min-h-[104px] w-20 self-stretch sm:w-24" />
+            <RoomThumb unitId={b.unitId} roomTypeId={b.roomTypeId} structureId={b.structureId} className="h-11 w-11 self-start rounded-lg" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h4 className="min-w-0 flex-1 truncate text-sm font-medium text-txt">{guestName(b.guestId)}</h4>

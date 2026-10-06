@@ -99,7 +99,6 @@ export default function RigaPulizia({ r, act, keyOf, guests, guestName, doneIso,
   const a = act[r.action];
   const isDone = !!doneIso;
   const tint = r.typeColor || r.structure.photoColor || "var(--focus)";
-  const photo = r.unit.photos?.[0];
   const guestOf = (b: Booking) => guests.find((g) => g.id === b.guestId);
   const dl = deadlineOf(r);
   const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -116,15 +115,9 @@ export default function RigaPulizia({ r, act, keyOf, guests, guestName, doneIso,
 
   return (
     <article className={`flex flex-col gap-3 rounded-2xl border bg-surface p-3 shadow-sm transition md:flex-row md:items-stretch md:gap-4 ${isDone ? "border-line opacity-75" : "border-line hover:border-focus hover:shadow-md"}`} style={issues.length ? { borderColor: "color-mix(in srgb, var(--err) 45%, var(--line))" } : undefined}>
-      {/* Anteprima camera */}
-      <div className="relative h-28 w-full shrink-0 overflow-hidden rounded-xl md:h-auto md:min-h-[7rem] md:w-40" style={photo ? undefined : { background: `linear-gradient(145deg, color-mix(in srgb, ${tint} 85%, #fff), color-mix(in srgb, ${tint} 70%, #000))` }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {photo && <img src={photo} alt="" className="absolute inset-0 h-full w-full object-cover" />}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 text-white">
-          <div className={`truncate text-sm font-bold leading-tight ${isDone ? "line-through opacity-80" : ""}`}>{r.unit.name.replace(/^camera\s*/i, "")}</div>
-          <div className="truncate text-[11px] opacity-90">{r.typeName || "Senza tipologia"}</div>
-        </div>
-        {isDone && <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full text-xs font-extrabold text-white shadow" style={{ background: "var(--ok)" }}>✓</span>}
+      {/* Targa camera: numero su fondo tenue del colore della tipologia (nessuna anteprima) */}
+      <div className="grid h-12 w-12 shrink-0 place-items-center self-start rounded-lg text-base font-bold" title={r.typeName || "Senza tipologia"} style={{ background: `color-mix(in srgb, ${tint} 16%, transparent)`, color: tint }}>
+        {isDone ? "✓" : r.unit.name.replace(/^camera\s*/i, "")}
       </div>
 
       {/* Intervento, ospiti, note, segnalazioni */}
