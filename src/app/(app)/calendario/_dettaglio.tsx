@@ -21,6 +21,7 @@ import StepActions from "@/app/(app)/prenotazioni/_azioni";
 import SchedaGiorno, { type Avviso, type Journey } from "./_scheda";
 import StriscaGiorni, { type Modo } from "./_giorni";
 import { avvisiOf } from "./_avvisi";
+import { useAutoCtx } from "@/lib/use-auto-ctx";
 import { CameraLibera, BloccoRiga, FuoriServizioRiga } from "./_libere";
 import { readCleanDone, useDatiPercorso } from "./_dati";
 import { blocksIn, daysBetween, dayStats, freeUnits, nightOf, occupies } from "./_modello";
@@ -115,6 +116,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   // ── Prenotazioni del periodo con il loro percorso ──
   const gSizes = useMemo(() => groupSizes(bookings), [bookings]);
   const remLog = useReminderLog(live); // cronologia dei solleciti (da chat)
+  const auto = useAutoCtx(); // invii automatici: "invio previsto alle 10:00"
   const rows = useMemo(() => {
     const out = new Map<string, Row>();
     for (const b of live) {
@@ -124,12 +126,12 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
         schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
         guideSent: isGuideSent(b, threads[b.guestId], remLog[b.id]),
         invoiceStato: docBy.get(b.id),
-        reminderNotes: reminderNotes(remLog[b.id]),
+        reminderNotes: reminderNotes(remLog[b.id]), auto,
       });
       out.set(b.id, { b, j });
     }
     return out;
-  }, [live, from, to, today, guestById, getStructure, schedBy, istatBy, rems, threads, docBy, remLog]);
+  }, [live, from, to, today, guestById, getStructure, schedBy, istatBy, rems, threads, docBy, remLog, auto]);
 
   const cols = useMemo(() => {
     const pos = (b: Booking) => (b.unitId ? unitPos.get(b.unitId) ?? 9999 : 10000);
@@ -151,14 +153,14 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
         schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
         guideSent: isGuideSent(b, threads[b.guestId], remLog[b.id]),
         invoiceStato: docBy.get(b.id),
-        reminderNotes: reminderNotes(remLog[b.id]),
+        reminderNotes: reminderNotes(remLog[b.id]), auto,
       });
       const r = { b, j };
       if (passes(r)) out.push(r);
       if (out.length >= 60) break;
     }
     return out;
-  }, [filtersOn, live, today, guestById, getStructure, schedBy, istatBy, threads, remLog, docBy, passes]);
+  }, [filtersOn, live, today, guestById, getStructure, schedBy, istatBy, threads, remLog, docBy, passes, auto]);
 
   // ── Avvisi per scheda ──
   const avvisiFor = useCallback((r: Row, col: Col): Avviso[] => avvisiOf(r.b, r.j, col, { today, unit: r.b.unitId ? unitById.get(r.b.unitId) : undefined, guest: guestById.get(r.b.guestId) }), [unitById, today, guestById]);

@@ -29,7 +29,7 @@ const ASK: Record<string, (name: string, place: string) => string> = {
 };
 
 export default function ContattiDaCorreggere() {
-  const { guests, bookings, activeStructureId, updateGuest, getStructure } = useData();
+  const { guests, bookings, activeStructureId, updateGuest, updateGuests, getStructure } = useData();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const today = toISO(new Date());
@@ -39,10 +39,17 @@ export default function ContattiDaCorreggere() {
     guests, today, contactReportCached,
   ), [bookings, guests, activeStructureId, today]);
 
-  // Numeri validi scritti in modo diverso dal formato internazionale (es. 3473824353 o 39-335-6314360-): si riscrivono in un clic.
-  const tidy = useMemo(() => list.filter((x) => x.report.phone.pretty && x.guest.phone && x.guest.phone !== x.report.phone.pretty), [list]);
   const urgent = list.filter((x) => x.urgent).length;
-  if (list.length === 0) return null;
+  // Tutti i numeri validi scritti in modo diverso (trattini, spazi, senza prefisso): si uniformano in un solo passaggio.
+  const tidyAll = useMemo(() => guests.filter((g) => { if (!g.phone) return false; const p = contactReportCached({ phone: g.phone, country: g.country }).phone; return !!p.pretty && p.pretty !== g.phone; }), [guests]);
+  const uniforma = () => updateGuests(tidyAll.map((g) => ({ id: g.id, patch: { phone: contactReportCached({ phone: g.phone, country: g.country }).phone.pretty! } })));
+  const tidyBar = tidyAll.length > 0 && (
+    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs text-dim shadow-sm">
+      <span><b className="text-txt">{tidyAll.length}</b> numeri di telefono sono scritti in formati diversi (trattini, spazi, con o senza prefisso).</span>
+      <button onClick={uniforma} className="ml-auto rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">Uniforma i numeri</button>
+    </div>
+  );
+  if (list.length === 0) return tidyBar || null;
 
   const shown = open ? list : list.slice(0, LIMIT);
   const apply = (x: UpcomingIssue, field: "phone" | "email", value: string) => updateGuest(x.guest.id, { [field]: value });
@@ -53,17 +60,13 @@ export default function ContattiDaCorreggere() {
     try { await navigator.clipboard.writeText((ASK[lang] ?? ASK.it)(first || "ospite", place)); setCopied(x.guest.id); setTimeout(() => setCopied((c) => (c === x.guest.id ? null : c)), 2500); } catch { /* clipboard non disponibile */ }
   };
 
-  return (
+  return (<>
+    {tidyBar}
     <section className="mb-4 rounded-xl border bg-surface p-3 shadow-sm" style={{ borderColor: urgent ? "color-mix(in srgb, var(--err) 45%, var(--line))" : "color-mix(in srgb, var(--warn) 45%, var(--line))" }}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h2 className="font-display text-base font-bold text-txt">Contatti da correggere</h2>
         <span className="rounded-full px-2 py-0.5 text-xs font-bold tabular-nums" style={{ color: urgent ? "var(--err)" : "var(--warn)", background: `color-mix(in srgb, ${urgent ? "var(--err)" : "var(--warn)"} 14%, transparent)` }}>{list.length}</span>
         {urgent > 0 && <span className="text-xs font-semibold" style={{ color: "var(--err)" }}>{urgent} {urgent === 1 ? "arriva" : "arrivano"} entro {URGENT_DAYS} giorni</span>}
-        {tidy.length > 0 && (
-          <button onClick={() => tidy.forEach((x) => apply(x, "phone", x.report.phone.pretty!))} title="Riscrive i numeri validi in formato internazionale (+39 347 382 4353)" className="ml-auto rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-txt hover:bg-wash">
-            Sistema il formato di {tidy.length} {tidy.length === 1 ? "numero" : "numeri"}
-          </button>
-        )}
       </div>
       <p className="mt-1 text-xs text-dim">I messaggi automatici partono solo con un numero valido o un&apos;email. Correggi il dato adesso, chiedilo all&apos;ospite o cerca un&apos;alternativa mentre c&apos;è ancora tempo.</p>
 
@@ -98,5 +101,5 @@ export default function ContattiDaCorreggere() {
       {list.length > LIMIT && <button onClick={() => setOpen((v) => !v)} className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-focus hover:bg-wash">{open ? "Mostra meno" : `Mostra tutti i ${list.length}`}</button>}
       <p className="mt-2 text-[11px] text-faint">Un numero può essere valido ma senza WhatsApp: non è possibile saperlo in anticipo, lo si scopre al primo invio.</p>
     </section>
-  );
+  </>);
 }

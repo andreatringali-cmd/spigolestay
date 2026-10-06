@@ -75,6 +75,7 @@ interface DataContextValue {
   // Azioni prenotazioni / ospiti
   addGuest: (g: { fullName?: string; firstName?: string; lastName?: string; email?: string; phone?: string; country?: string }) => string;
   updateGuest: (id: string, patch: Partial<Guest>) => void;
+  updateGuests: (patches: { id: string; patch: Partial<Guest> }[]) => void; // molte schede in un colpo solo (es. uniformare i numeri di telefono)
   deleteGuest: (id: string) => void;
   mergeGuestGroups: (groups: { keepId: string; dropIds: string[]; patch?: Partial<Guest> }[]) => void; // unisce molti gruppi di doppioni in un colpo solo (una sola voce nel registro)
   mergeGuests: (keepId: string, dropIds: string[]) => void; // accorpa doppioni: sposta le prenotazioni e rimuove le voci duplicate
@@ -476,6 +477,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return id;
       },
       updateGuest: (id, patch) => setGuests((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch, updatedAt: Date.now() } : g))),
+      updateGuests: (patches) => { if (!patches.length) return; const by = new Map(patches.map((x) => [x.id, x.patch])); const ts = Date.now(); setGuests((prev) => prev.map((g) => (by.has(g.id) ? { ...g, ...by.get(g.id), updatedAt: ts } : g))); },
       deleteGuest: (id) => {
         // Conserva i dati dell'ospite sulla prenotazione (per Alloggiati Web) prima di sganciarlo.
         const g = guests.find((x) => x.id === id);

@@ -18,6 +18,7 @@ import { type Promo, loadPromos, promosForStructure, promoMailto } from "@/lib/p
 import Icon from "@/components/Icon";
 import { exportExcel } from "@/lib/export";
 import ContattiDaCorreggere from "./_contatti";
+import { phoneShown } from "@/lib/contacts-check";
 
 const avColor = (n: string) => AV_COLORS[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 const fmtD = (iso: string) => { try { return parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" }); } catch { return iso; } };
@@ -161,7 +162,7 @@ export default function OspitiPage() {
   const EXPORT_COLUMNS: { key: string; label: string; get: (r: (typeof guestSorted)[number]) => string | number }[] = [
     { key: "nome", label: t("Nome"), get: (r) => r.guest.fullName },
     { key: "email", label: t("Email"), get: (r) => r.guest.email ?? "" },
-    { key: "telefono", label: t("Telefono"), get: (r) => r.guest.phone ?? "" },
+    { key: "telefono", label: t("Telefono"), get: (r) => (r.guest.phone ? phoneShown(r.guest) : "") },
     { key: "paese", label: t("Paese"), get: (r) => r.guest.country ?? "" },
     { key: "prenotazioni", label: t("Prenotazioni"), get: (r) => r.stays },
     { key: "notti", label: t("Notti"), get: (r) => r.nightsTot },
@@ -231,7 +232,7 @@ export default function OspitiPage() {
                     {!lead && <span className="shrink-0 font-mono font-semibold text-txt">{eur(spent)}</span>}
                   </div>
                   {lead ? (
-                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-dim">{guest.email || guest.phone || "—"}{guest.email && guest.phone ? ` · ${guest.phone}` : ""}{guest.country ? ` · ${guest.country}` : ""}</div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-dim">{guest.email || phoneShown(guest) || "—"}{guest.email && guest.phone ? ` · ${phoneShown(guest)}` : ""}{guest.country ? ` · ${guest.country}` : ""}</div>
                   ) : (
                     <>
                       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-dim">
@@ -239,7 +240,7 @@ export default function OspitiPage() {
                         <span>{stays} {t("pren.")} · {nightsTot} {t("notti")}</span>
                         {guest.country && <><span className="text-faint">·</span><span>{guest.country}</span></>}
                       </div>
-                      <div className="mt-0.5 text-[11px] text-faint">{t("Ultimo")}: {last ? fmtD(last) : "—"}{guest.phone ? ` · ${guest.phone}` : ""}</div>
+                      <div className="mt-0.5 text-[11px] text-faint">{t("Ultimo")}: {last ? fmtD(last) : "—"}{guest.phone ? ` · ${phoneShown(guest)}` : ""}</div>
                     </>
                   )}
                 </button>
@@ -283,7 +284,7 @@ export default function OspitiPage() {
                 <tr key={guest.id} onClick={() => router.push(`/ospiti/${guest.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)]">
                   <td onClick={(e) => e.stopPropagation()} className="px-3 py-2"><input type="checkbox" checked={sel.has(guest.id)} onChange={() => toggleSel(guest.id)} style={{ accentColor: "var(--focus)" }} /></td>
                   <td className="whitespace-nowrap px-3 py-2">{nameCell(guest)}</td>
-                  <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-txt">{guest.phone ?? "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-txt">{guest.phone ? phoneShown(guest) : "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-txt">{guest.email ?? "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-txt">{guest.country ?? "—"}</td>
                   {!lead && <>

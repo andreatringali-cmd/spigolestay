@@ -140,6 +140,7 @@ function StepButton({ s, onStep }: { s: JourneyStep; onStep: (s: JourneyStep) =>
       <span className="min-w-0">
         <span className="block truncate text-xs font-semibold text-txt">{s.label}</span>
         <span className="block truncate text-[11px]" style={{ color: s.state === "late" ? "var(--err)" : "var(--faint)" }}>{s.detail}</span>
+        {s.auto && <span className="block truncate text-[11px] font-medium" title={s.auto.text} style={{ color: s.auto.tone === "warn" ? "var(--warn)" : "var(--focus)" }}>⏱ {s.auto.text}</span>}
       </span>
     </button>
   );

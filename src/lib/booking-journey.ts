@@ -3,9 +3,10 @@
 
 import type { Booking, Guest, Structure } from "./types";
 import { bookingPaidTotal, cityTaxOf } from "./booking";
+import { autoLineFor, type AutoCtx, type AutoLine, type AutoStepKey } from "./auto-schedule";
 
 export type StepState = "done" | "todo" | "late" | "na";
-export interface JourneyStep { key: string; label: string; state: StepState; detail: string; href?: string }
+export interface JourneyStep { key: string; label: string; state: StepState; detail: string; href?: string; auto?: AutoLine /* invio automatico: "Non inviato · invio previsto alle 10:00" */ }
 export interface Chip { key: string; label: string; tone: "info" | "warn" | "err" }
 
 export interface JourneyCtx {
@@ -16,6 +17,7 @@ export interface JourneyCtx {
   istat?: "pending" | "sent" | "none";
   guideSent: boolean;                              // guida ospiti già inviata in chat
   invoiceStato?: string;                           // stato del documento fiscale collegato (se esiste)
+  auto?: AutoCtx;                                  // invii automatici (modelli attivi, interruttori del server): per scrivere "invio previsto alle 10:00"
   reminderNotes?: Partial<Record<"checkin" | "pay" | "tax" | "guide" | "review", string>>; // "inviato 2 volte · ultimo oggi 10:12", dalla cronologia dei solleciti
 }
 
@@ -114,6 +116,18 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   // Ordine di lettura voluto: check-in, pagamento, guida, schedina, osservatorio, tassa, fattura, check-out (recensione per ultima).
   const ORDER = ["checkin", "pay", "guide", "alloggiati", "istat", "tax", "invoice", "checkout", "review"];
   steps.sort((a, b2) => ORDER.indexOf(a.key) - ORDER.indexOf(b2.key));
+
+  // Invii automatici: sotto il passaggio ancora da fare, se ne esiste uno programmato, quando parte.
+  if (c.auto) {
+    const AUTO_KEYS: string[] = ["checkin", "guide", "pay", "review", "alloggiati"];
+    for (const st of steps) {
+      if (st.state === "done" || st.state === "na" || !AUTO_KEYS.includes(st.key)) continue;
+      const line = autoLineFor(st.key as AutoStepKey, { structureId: b.structureId, checkIn: b.checkIn, checkOut: b.checkOut }, g ? { email: g.email, phone: g.phone } : undefined, c.auto, {
+        today: c.today, wasSent: !!c.reminderNotes?.[st.key as "checkin" | "pay" | "guide" | "review"], schedina: sc, checkinDone: complete,
+      });
+      if (line) st.auto = line;
+    }
+  }
 
   const relevant = steps.filter((s) => s.state !== "na");
   const done = relevant.filter((s) => s.state === "done").length;

@@ -204,3 +204,9 @@ export function contactReportCached(g: { phone?: string; email?: string; country
   if (!r) { r = contactReport(g); if (reportCache.size > 5000) reportCache.clear(); reportCache.set(k, r); }
   return r;
 }
+
+/** Telefono come si mostra ovunque: se il numero è valido, sempre in formato internazionale (+39 347 382 4353); altrimenti com'è stato scritto. */
+export function phoneShown(g: { phone?: string; country?: string }): string {
+  if (!g.phone) return "";
+  return contactReportCached({ phone: g.phone, country: g.country }).phone.pretty ?? g.phone;
+}

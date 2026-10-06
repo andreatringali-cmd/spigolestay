@@ -14,6 +14,7 @@ import EmptyState from "@/components/EmptyState";
 import { groupSizes, isRealGroup } from "@/lib/groups";
 import { isGuideSent, readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import StepActions from "./_azioni";
+import { useAutoCtx } from "@/lib/use-auto-ctx";
 import SchedaGiorno from "@/app/(app)/calendario/_scheda";
 import { avvisiOf, colonnaOggi, etichettaOggi } from "@/app/(app)/calendario/_avvisi";
 
@@ -105,6 +106,7 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
   }, [bookings, today]);
 
   const remLog = useReminderLog(ordered); // cronologia dei solleciti (da chat)
+  const auto = useAutoCtx(); // invii automatici: "invio previsto alle 10:00"
   const rows = useMemo(() => ordered.map((b) => {
     const guest = guests.find((g) => g.id === b.guestId);
     const j = isLiveBooking(b) ? journeyOf(b, {
@@ -112,10 +114,10 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
       schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
       guideSent: isGuideSent(b, threads[b.guestId], remLog[b.id]),
       invoiceStato: docBy.get(b.id),
-      reminderNotes: reminderNotes(remLog[b.id]),
+      reminderNotes: reminderNotes(remLog[b.id]), auto,
     }) : null;
     return { b, j, buckets: j ? journeyBucket(b, today, j) : [] };
-  }), [ordered, guests, getStructure, today, schedBy, istatBy, threads, docBy, rems, remLog]);
+  }), [ordered, guests, getStructure, today, schedBy, istatBy, threads, docBy, rems, remLog, auto]);
 
   const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.key, f.key === "all" ? rows.length : rows.filter((r) => r.buckets.includes(f.key)).length])), [rows]);
   const shown = filter === "all" ? rows : rows.filter((r) => r.buckets.includes(filter));
