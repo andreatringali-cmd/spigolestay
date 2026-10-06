@@ -99,12 +99,14 @@ export async function whatsappDiagnose(admin: SupabaseClient, tenantId: string):
   // Modelli del WABA: serve l'id dell'account WhatsApp Business, ricavato dal token con le credenziali dell'app Meta.
   const appId = process.env.META_APP_ID, appSecret = process.env.META_APP_SECRET;
   let wabaId = "";
-  if (appId && appSecret) {
-    const dbg = await (async () => { try { const r = await fetch(`${GRAPH}/debug_token?input_token=${encodeURIComponent(cfg.token)}&access_token=${appId}|${appSecret}`); return await r.json(); } catch { return null; } })();
+  {
+    const accessTok = appId && appSecret ? `${appId}|${appSecret}` : cfg.token; // senza credenziali dell'app si prova col token stesso
+    const dbg = await (async () => { try { const r = await fetch(`${GRAPH}/debug_token?input_token=${encodeURIComponent(cfg.token)}&access_token=${encodeURIComponent(accessTok)}`); return await r.json(); } catch { return null; } })();
     const scopes = (dbg?.data?.granular_scopes ?? []) as { scope: string; target_ids?: string[] }[];
     wabaId = scopes.find((x) => x.scope === "whatsapp_business_management")?.target_ids?.[0] ?? "";
     out.token = { valid: dbg?.data?.is_valid ?? null, expires: dbg?.data?.expires_at ?? null, type: dbg?.data?.type ?? null };
-  } else out.token = { note: "META_APP_ID/META_APP_SECRET non impostate: impossibile controllare il token" };
+    if (dbg?.error) out.tokenError = dbg.error.message;
+  }
   if (wabaId) {
     out.wabaId = wabaId;
     const t = await get(`${wabaId}/message_templates?fields=name,status,language,category,components&limit=50`);
