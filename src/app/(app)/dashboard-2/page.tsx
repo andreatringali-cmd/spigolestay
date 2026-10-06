@@ -16,8 +16,9 @@ import { contactReportCached } from "@/lib/contacts-check";
 import { upcomingContactIssues } from "@/lib/contacts-upcoming";
 import { isGuideSent, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import {
-  addDaysISO, adempimentiStato, buildAdempimenti, buildControlli, diffDays, greetingFor, isLive, monthStats, occupancyStrip,
-  splitDay, statusSentence, todaySentence, unassignedArrivals,
+  addDaysISO, adempimentiHealth, adempimentiStato, buildAdempimenti, buildControlli, diffDays, greetingFor, histogram, isLive, LEAD_LABELS, LEAD_UPPER,
+  leadDays, monthStats, occupancyStrip, pickupDaily, rateSeries, splitDay, statusSentence, STAY_LABELS, STAY_UPPER, stayNights, todaySentence, topCountries,
+  unassignedArrivals,
 } from "@/lib/dashboard2";
 import Hero from "./_hero";
 import Adempimenti from "./_adempimenti";
@@ -26,6 +27,10 @@ import Giorni from "./_giorni";
 import Incassi from "./_incassi";
 import Canali, { type ChannelRow } from "./_canali";
 import Controllo from "./_controllo";
+import Pickup from "./_pickup";
+import Provenienza from "./_provenienza";
+import Prenotazioni from "./_prenotazioni";
+import { D2Styles } from "./_kit";
 import { useDashboard2Dati } from "./_dati";
 
 const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
@@ -74,8 +79,10 @@ export default function Dashboard2() {
 
   // --- Giornata ---
   const split = useMemo(() => splitDay(live, today), [live, today]);
-  const strip = useMemo(() => occupancyStrip(live, scopedUnits, today, 14), [live, scopedUnits, today]);
-  const tonight = strip[0];
+  // 61 giorni: i 30 passati, oggi (posizione 30) e i 30 a venire. Dalla striscia escono anche le sparkline dell'hero.
+  const strip = useMemo(() => occupancyStrip(live, scopedUnits, addDaysISO(today, -30), 61, today), [live, scopedUnits, today]);
+  const tonight = strip[30];
+  const last14 = strip.slice(17, 31);
 
   // --- Adempimenti ---
   const items = useMemo(() => buildAdempimenti({
@@ -91,6 +98,9 @@ export default function Dashboard2() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [live, today, dati.schedBy, dati.istatPendingIds, dati.threads, dati.questuraErrors, remLog, structMap, guestMap]);
   const stato = adempimentiStato(items);
+  const health = useMemo(() => adempimentiHealth(live, today, (b) => stepsOf(b)),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [live, today, dati.schedBy, dati.istatPendingIds, dati.threads, remLog, structMap, guestMap]);
   const loadingAdem = !dati.ready;
 
   // --- Da controllare ---
@@ -121,6 +131,20 @@ export default function Dashboard2() {
     channel: r.channel as Channel, label: CHANNELS[r.channel as Channel].label, color: `var(${CHANNELS[r.channel as Channel].cssVar})`,
     revenue: Math.round(r.revenue), count: r.count, share: cur.total ? Math.round((r.revenue / cur.total) * 100) : 0,
   })), [cur]);
+
+  // ADR e RevPAR degli ultimi 14 giorni (ricavo per notte / camere occupate, e / camere disponibili).
+  const rates = useMemo(() => {
+    const rev = monthStats(live, addDaysISO(today, -13), addDaysISO(today, 1), today, nightlyRevenue).daily;
+    return rateSeries(rev, last14.map((c) => c.occupied), tonight?.total ?? 0);
+  }, [live, today, last14, tonight]);
+
+  // Pickup, anticipo, durata e provenienza (ultimi 12 mesi di arrivi).
+  const pickup = useMemo(() => pickupDaily(live, today, 30), [live, today]);
+  const yearAgo = addDaysISO(today, -365);
+  const lastYear = useMemo(() => live.filter((b) => b.checkIn >= yearAgo && b.checkIn <= today), [live, yearAgo, today]);
+  const leadHisto = useMemo(() => histogram(lastYear.map(leadDays).filter((v): v is number => v !== null), LEAD_UPPER, LEAD_LABELS), [lastYear]);
+  const stayHisto = useMemo(() => histogram(lastYear.map(stayNights), STAY_UPPER, STAY_LABELS), [lastYear]);
+  const countries = useMemo(() => topCountries(lastYear.map((b) => guestMap.get(b.guestId)?.country), 5), [lastYear, guestMap]);
 
   // --- Righe di "Oggi" ---
   const multiAll = sFilter === "all" && structures.length > 1;
@@ -167,22 +191,34 @@ export default function Dashboard2() {
 
   const controlliOnTop = controlli.length > 0;
   const wrap = "min-w-0 [&>section]:h-full";
+  const SPAN: Record<number, string> = { 1: "lg:col-span-12", 2: "lg:col-span-6", 3: "lg:col-span-4" };
+  const hasPickup = pickup.total > 0;
+  const hasPren = leadHisto.total > 0 || stayHisto.total > 0;
+  const rowC = 1 + (channelRows.length > 0 ? 1 : 0) + (countries.rows.length > 0 ? 1 : 0);
   return (
-    <div className="flex flex-col gap-4">
-      <Hero
-        greeting={greetingFor(clock.hour)} dateLabel={dateLabel} scopeLabel={scopeLabel}
-        sentence={todaySentence(split.arrivals.length, split.departures.length, split.inHouse.length)}
-        statusText={statusText} statusTone={statusTone} statusCount={stato.total}
-        arrivals={split.arrivals.length} departures={split.departures.length} stays={split.inHouse.length}
-        occupied={tonight?.occupied ?? 0} totalRooms={tonight?.total ?? 0} pct={tonight?.pct ?? 0}
-      />
-      <div className="grid gap-4 lg:grid-cols-12">
-        <div className={`order-1 lg:order-none lg:col-span-7 ${wrap}`}><Adempimenti items={items} total={stato.total} urgent={stato.urgent} loading={loadingAdem} delay={120} /></div>
-        <div className={`order-2 lg:order-none lg:col-span-5 ${wrap}`}><Oggi rows={rows} turnovers={split.turnoverUnits.size} onOpen={openBooking} delay={180} /></div>
-        <div className={`order-4 lg:order-none lg:col-span-8 ${wrap}`}><Giorni cells={strip} delay={240} /></div>
-        <div className={`order-5 lg:order-none lg:col-span-4 ${wrap}`}><Incassi monthName={MESI[mIdx]} prevName={MESI[(mIdx + 11) % 12]} cur={cur} prev={prev} todayIdx={diffDays(today, monthStart)} delay={300} /></div>
-        <div className={`${controlliOnTop ? "order-3" : "order-6"} lg:order-none ${channelRows.length ? "lg:col-span-7" : "lg:col-span-12"} ${wrap}`}><Controllo items={controlli} delay={360} /></div>
-        {channelRows.length > 0 && <div className={`order-6 lg:order-none lg:col-span-5 ${wrap}`}><Canali rows={channelRows} monthName={MESI[mIdx]} delay={420} /></div>}
+    <div className="d2-root">
+      <D2Styles />
+      {/* key = struttura: cambiando struttura tutto si ridisegna con una transizione morbida */}
+      <div key={sFilter} className="d2-fade flex flex-col gap-4">
+        <Hero
+          greeting={greetingFor(clock.hour)} dateLabel={dateLabel} scopeLabel={scopeLabel}
+          sentence={todaySentence(split.arrivals.length, split.departures.length, split.inHouse.length)}
+          statusText={statusText} statusTone={statusTone} statusCount={stato.total}
+          arrivals={split.arrivals.length} departures={split.departures.length} stays={split.inHouse.length}
+          arrSpark={last14.map((c) => c.arrivals)} depSpark={last14.map((c) => c.departures)} staySpark={last14.map((c) => c.stay)}
+          occupied={tonight?.occupied ?? 0} totalRooms={tonight?.total ?? 0} pct={tonight?.pct ?? 0}
+        />
+        <div className="grid gap-4 lg:grid-cols-12">
+          <div className={`order-1 lg:order-none lg:col-span-7 ${wrap}`}><Adempimenti items={items} total={stato.total} urgent={stato.urgent} loading={loadingAdem} health={health} delay={60} /></div>
+          <div className={`order-2 lg:order-none lg:col-span-5 ${wrap}`}><Oggi rows={rows} turnovers={split.turnoverUnits.size} onOpen={openBooking} delay={120} /></div>
+          <div className={`order-4 lg:order-none ${hasPickup ? "lg:col-span-8" : "lg:col-span-12"} ${wrap}`}><Giorni cells={strip} delay={60} /></div>
+          {hasPickup && <div className={`order-5 lg:order-none lg:col-span-4 ${wrap}`}><Pickup pickup={pickup} delay={120} /></div>}
+          <div className={`order-6 lg:order-none ${SPAN[rowC]} ${wrap}`}><Incassi monthName={MESI[mIdx]} prevName={MESI[(mIdx + 11) % 12]} cur={cur} prev={prev} todayIdx={diffDays(today, monthStart)} adr={{ avg: rates.adrAvg, series: rates.adr }} revpar={{ avg: rates.revparAvg, series: rates.revpar }} delay={60} /></div>
+          {channelRows.length > 0 && <div className={`order-7 lg:order-none ${SPAN[rowC]} ${wrap}`}><Canali rows={channelRows} total={cur.total} monthName={MESI[mIdx]} delay={120} /></div>}
+          {countries.rows.length > 0 && <div className={`order-8 lg:order-none ${SPAN[rowC]} ${wrap}`}><Provenienza rows={countries.rows} known={countries.known} delay={180} /></div>}
+          {hasPren && <div className={`order-9 lg:order-none lg:col-span-5 ${wrap}`}><Prenotazioni lead={leadHisto} stay={stayHisto} delay={60} /></div>}
+          <div className={`${controlliOnTop ? "order-3" : "order-10"} lg:order-none ${hasPren ? "lg:col-span-7" : "lg:col-span-12"} ${wrap}`}><Controllo items={controlli} delay={120} /></div>
+        </div>
       </div>
     </div>
   );

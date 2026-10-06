@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { cleanTint } from "@/lib/pulizie-colors";
 import { tint } from "../_ui";
-import { Tile, TileHead, MoreLink, toneColor } from "./_kit";
+import { MoreLink, P, Tile, TileHead, toneColor } from "./_kit";
 
 export interface MoveRow {
   id: string;
@@ -20,7 +20,7 @@ export interface MoveRow {
 const KIND = {
   arr: { title: "Arrivi", color: "var(--ok)" },
   dep: { title: "Partenze", color: "var(--err)" },
-  stay: { title: "In casa", color: "var(--focus)" },
+  stay: { title: "In casa", color: P.ind },
 } as const;
 const STAY_VISIBLE = 4;
 
@@ -52,9 +52,9 @@ export default function Oggi({ rows, turnovers, onOpen, delay = 0 }: { rows: Mov
   const groups = (["arr", "dep", "stay"] as const).map((k) => ({ k, list: rows.filter((r) => r.kind === k) })).filter((g) => g.list.length);
   return (
     <Tile label="Oggi" delay={delay}>
-      <TileHead title="Oggi" sub={turnovers > 0 ? `${turnovers} ${turnovers === 1 ? "camera cambia ospite" : "camere cambiano ospite"} in giornata` : "Arrivi, partenze e ospiti in casa"} right={<MoreLink href="/prenotazioni">Prenotazioni</MoreLink>} />
+      <TileHead title="Oggi" sub={turnovers > 0 ? `${turnovers} turnover` : undefined} right={<MoreLink href="/prenotazioni">Prenotazioni</MoreLink>} />
       {groups.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-faint">Nessun movimento oggi e nessun ospite in casa.</div>
+        <div className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-faint">Nessun movimento, nessun ospite in casa.</div>
       ) : (
         <div className="flex flex-col gap-4">
           {groups.map((g) => {
