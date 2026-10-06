@@ -19,7 +19,6 @@ import { amenityIcon } from "@/lib/amenities";
 import { byUnitName } from "@/lib/sortUnits";
 import { ROOMS_PER_STRUCT, ROOM_OVERAGE } from "@/lib/plan";
 import { useLang } from "@/lib/i18n";
-import SchedaCamera, { useSnapshots } from "./_scheda";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
@@ -58,11 +57,6 @@ export default function CamerePage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   // Tendine delle camere: SEMPRE chiuse all'apertura della pagina (non si ricordano più aperte).
   const [opened, setOpened] = useState<Set<string>>(new Set());
-  // Vista: "Compatta" (tabelle per tipologia, per creare e modificare) oppure "Dettagliata" (una scheda per camera). Si ricorda l'ultima scelta.
-  const [view, setView] = useState<"compact" | "detail">("compact");
-  const pickView = (v: "compact" | "detail") => { setView(v); try { localStorage.setItem("spigolestay:camere:view", v); } catch {} };
-  useEffect(() => { try { if (localStorage.getItem("spigolestay:camere:view") === "detail") setView("detail"); } catch {} }, []);
-  const snaps = useSnapshots();
   const toggleOpen = (id: string) => setOpened((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   // Selezione multipla camere (modifica in blocco)
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -167,10 +161,6 @@ export default function CamerePage() {
         title={t("Camere")}
         subtitle={t("Tipologie e singole camere di ogni struttura")}
         actions={<>
-          <div className="no-print inline-flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold" role="group" aria-label={t("Vista")}>
-            <button onClick={() => pickView("compact")} aria-pressed={view === "compact"} className={`rounded-md px-2.5 py-1.5 transition ${view === "compact" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Compatta")}</button>
-            <button onClick={() => pickView("detail")} aria-pressed={view === "detail"} className={`rounded-md px-2.5 py-1.5 transition ${view === "detail" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Dettagliata")}</button>
-          </div>
           <WeatherWidget compact />
         </>}
       />
@@ -279,7 +269,7 @@ export default function CamerePage() {
                     const g = sortUnits(sUnits.filter((u) => u.roomTypeId === rt.id && (typeMatchQ(rt) || unitMatchQ(u))), types);
                     if (!g.length) return null;
                     const color = typeColor(rt, i);
-                    const open = view === "detail" || !!search.trim() || opened.has(rt.id); // dettagliata: sempre aperti; cercando, apriamo i gruppi che corrispondono
+                    const open = !!search.trim() || opened.has(rt.id); // cercando, apriamo i gruppi che corrispondono
                     return (
                       <div key={rt.id} className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
                         <div className={`flex items-center justify-between gap-2 px-3 py-2.5 ${open ? "border-b border-line" : ""}`} style={{ borderLeft: `4px solid ${color}` }}>
@@ -292,12 +282,7 @@ export default function CamerePage() {
                           </button>
                           <button onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="shrink-0 whitespace-nowrap text-[11px] font-medium text-focus hover:underline">{t("Apri tipologia")} →</button>
                         </div>
-                        {open && view === "detail" && (
-                          <div className="flex flex-col gap-2 p-3">
-                            {g.map((u) => <SchedaCamera key={u.id} u={u} rt={rt} color={color} snap={snaps.get(u.id)} onEdit={() => setRoomModal({ structureId: s.id, unit: u })} />)}
-                          </div>
-                        )}
-                        {open && view !== "detail" && (
+                        {open && (
                           <div className="overflow-x-auto">
                             <table className="w-full min-w-[820px] table-fixed text-sm"><colgroup><col style={{ width: 40 }} /><col style={{ width: "26%" }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} /><col style={{ width: "12%" }} /><col style={{ width: "10%" }} /><col style={{ width: "18%" }} /><col style={{ width: "12%" }} /><col style={{ width: 44 }} /></colgroup>
                               <thead>
