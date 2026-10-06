@@ -18,6 +18,7 @@ import { exportExcel, exportPdf } from "@/lib/export";
 import { journeyOf, isLiveBooking, type JourneyStep } from "@/lib/booking-journey";
 import { channelPulse } from "@/lib/channel-pulse";
 import { contactReportCached } from "@/lib/contacts-check";
+import { spiegaErroreWa } from "@/lib/invii-log";
 import { cleanTint, cleanText } from "@/lib/pulizie-colors";
 import { upcomingContactIssues } from "@/lib/contacts-upcoming";
 import { isGuideSent, readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
@@ -409,6 +410,25 @@ export default function Dashboard2() {
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoMap, sFilter]);
+  // Invii automatici che NON sono arrivati (ultime 48 ore, senza un invio riuscito dopo): avviso in Da controllare, con il motivo.
+  const [inviiKo, setInviiKo] = useState<{ label: string; href: string }[]>([]);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/invii-log").then((r) => r.json()).then((j) => {
+      if (!alive) return;
+      const rows = ((j?.rows ?? []) as { at: string; job: string; ref?: string; channel: string; ok: boolean; detail?: string }[]).filter((x) => Date.now() - Date.parse(x.at) < 48 * 3600000);
+      const latest = new Map<string, (typeof rows)[number]>();
+      for (const r of rows) { const k = `${r.job}|${r.channel}|${r.job === "pulizie" ? r.ref ?? "" : ""}`; const cur = latest.get(k); if (!cur || r.at > cur.at) latest.set(k, r); }
+      const out: { label: string; href: string }[] = [];
+      const bad = [...latest.values()].filter((x) => !x.ok);
+      const pul = bad.filter((x) => x.job === "pulizie"), msg = bad.filter((x) => x.job === "messaggi");
+      for (const x of pul) out.push({ label: `Planning pulizie non consegnato su ${x.channel === "whatsapp" ? "WhatsApp" : "email"}${spiegaErroreWa(x.detail) ? `: ${spiegaErroreWa(x.detail)}` : x.detail ? `: ${x.detail}` : ""}`, href: "/pulizie" });
+      if (msg.length) out.push({ label: `${msg.length} messaggi automatici agli ospiti non consegnati${spiegaErroreWa(msg[0].detail) ? `: ${spiegaErroreWa(msg[0].detail)}` : ""}`, href: "/messaggi" });
+      setInviiKo(out);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
   // Stato canali REALE (Channex) per la struttura attiva: sostituisce il conteggio locale globale.
   useEffect(() => {
     let alive = true;
@@ -448,6 +468,7 @@ export default function Dashboard2() {
   const contactIssues = upcomingContactIssues(scoped, guests, todayISO, contactReportCached);
   const contactUrgent = contactIssues.filter((x) => x.urgent).length;
   const alerts = [
+    ...inviiKo.map((x) => ({ n: 1, label: x.label, color: "var(--err)", href: x.href })),
     { n: alUnassigned.length, label: "arrivi senza camera assegnata", color: "var(--err)", href: "/prenotazioni" },
     { n: contactUrgent || contactIssues.length, label: contactUrgent ? "arrivi entro 10 giorni con contatti da correggere" : "arrivi in programma con contatti da correggere", color: contactUrgent ? "var(--err)" : "var(--warn)", href: "/ospiti" },
     { n: alOos.length, label: "camere fuori servizio", color: "var(--dim)", href: "/camere" },

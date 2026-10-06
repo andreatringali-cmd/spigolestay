@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { sendWhatsapp } from "@/lib/whatsapp";
+import { logInvio } from "@/lib/invii-log";
 import { computePuliziePlan, buildPuliziePlanText } from "@/lib/puliziePlan";
 import type { Booking, Unit, RoomType, Structure, Guest } from "@/lib/types";
 
@@ -104,19 +105,20 @@ export async function GET(req: Request) {
             body: JSON.stringify({ kind: "guest_message", to: cfg.emailTo, subject, text, booking: { structureName: s((st as unknown as Json)?.name), color: s((st as unknown as Json)?.photoColor), logo: s((st as unknown as Json)?.logo) } }),
           });
           const j = await r.json().catch(() => ({}));
-          if (r.ok && j?.ok) sent++;
-          else errors.push(`mail ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${j?.error || r.status}`);
-        } catch (e) { errors.push(`mail ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); }
+          if (r.ok && j?.ok) { sent++; await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "email", ok: true, detail: cfg.emailTo }); }
+          else { errors.push(`mail ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${j?.error || r.status}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "email", ok: false, detail: String(j?.error || r.status) }); }
+        } catch (e) { errors.push(`mail ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "email", ok: false, detail: e instanceof Error ? e.message : "errore" }); }
       }
       if (cfg.whatsapp && cfg.whatsappTo) {
         try {
           let w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, text });
+          const firstErr = w.ok ? "" : w.message;
           // Fuori dalla finestra di 24h il testo libero viene rifiutato da Meta: ripiego sul modello approvato
           // (corpo con 3 variabili: {{1}} struttura, {{2}} data, {{3}} planning in una riga).
           if (!w.ok) w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, templateName: process.env.WHATSAPP_PULIZIE_TEMPLATE || "planning_pulizie", lang: "it", params: [s((st as unknown as Json).name), todayRome, text] });
-          if (w.ok) waSent++;
-          else errors.push(`wa ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${w.message}`);
-        } catch (e) { errors.push(`wa ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); }
+          if (w.ok) { waSent++; await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "whatsapp", ok: true, wamid: w.id, detail: firstErr ? `con il modello (il testo libero era stato rifiutato: ${firstErr})` : cfg.whatsappTo }); }
+          else { errors.push(`wa ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${w.message}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "whatsapp", ok: false, detail: `testo libero: ${firstErr} · modello: ${w.message}` }); }
+        } catch (e) { errors.push(`wa ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "whatsapp", ok: false, detail: e instanceof Error ? e.message : "errore" }); }
       }
     }
   };

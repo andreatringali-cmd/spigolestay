@@ -31,7 +31,7 @@ const DATA_KEY = "spigolestay:data:v1";
 const THREADS_KEY = "spigolestay:threads:v1";
 type MsgSt = "sent" | "delivered" | "read" | "failed";
 type Msg = { id: string; dir: "in" | "out"; text: string; ts: number; via?: string; wid?: string; st?: MsgSt; media?: { kind: "audio"; id: string; transcribed: boolean } };
-interface WaStatus { id?: string; status?: string }
+interface WaStatus { id?: string; status?: string; errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[] }
 const ST_RANK: Record<string, number> = { sent: 1, failed: 1.5, delivered: 2, read: 3 };
 
 // Handshake di verifica richiesto da Meta alla configurazione del webhook.
@@ -113,6 +113,18 @@ async function applyIncoming(admin: SupabaseClient<any>, tenantId: string, fromD
     // Conflitto di rev: un altro processo ha scritto nel mentre, riprova una volta.
   }
   return { ok: false };
+}
+
+// Un messaggio accettato da Meta può comunque non essere consegnato (numero senza WhatsApp, destinatario che ha bloccato, finestra di 24 ore scaduta…):
+// Meta lo comunica DOPO con lo stato "failed" e il codice. Lo scriviamo nel registro degli invii, così "non è arrivato" ha una spiegazione.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function recordDeliveryFailures(admin: SupabaseClient<any>, tenantId: string, statuses: WaStatus[]) {
+  for (const s of statuses) {
+    if (s.status !== "failed" || !s.id) continue;
+    const e = s.errors?.[0];
+    const detail = `non consegnato: ${[e?.code, e?.title, e?.error_data?.details || e?.message].filter(Boolean).join(" · ") || "motivo non indicato da Meta"}`.slice(0, 500);
+    try { await admin.from("invii_log").update({ ok: false, detail }).eq("tenant_id", tenantId).eq("wamid", s.id); } catch { /* registro non disponibile */ }
+  }
 }
 
 // Spunte di consegna: Meta manda gli aggiornamenti di stato (sent/delivered/read/failed) dei messaggi
@@ -257,6 +269,7 @@ export async function POST(req: Request) {
         if (!match) continue; // numero non collegato a nessun tenant Xenora
         const tenantId = match.tenant_id as string;
 
+        if (statuses.length) await recordDeliveryFailures(admin, tenantId, statuses); // "non consegnato" e perché
         if (statuses.length) await applyStatuses(admin, tenantId, statuses); // spunte di consegna/lettura
 
         for (const m of messages) {

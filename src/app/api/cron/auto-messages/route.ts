@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { internalFetch } from "@/lib/server-auth";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { sendWhatsapp } from "@/lib/whatsapp";
+import { logInvio } from "@/lib/invii-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -149,8 +150,8 @@ export async function GET(req: Request) {
               body: JSON.stringify({ kind: "guest_message", to: email, subject: tp.name || s(st.name) || "Messaggio", text, booking: { structureName: s(st.name), structureEmail: s(st.email), color: s(st.photoColor), logo: s(st.logo), website: s(st.website), address: [s(st.address), s(st.streetNumber), s(st.city)].filter(Boolean).join(" "), phone: s(st.phone), cin: s(st.cin), vat: s(st.vat) }, replyTo: s(st.email) || undefined }),
             });
             const j = await r.json().catch(() => ({}));
-            if (r.ok && j?.ok) { okAny = true; sent++; }
-            else errors.push(`mail ${s(b.id)}/${tp.id}: ${j?.error || r.status}`);
+            if (r.ok && j?.ok) { okAny = true; sent++; await logInvio(admin, tenantId, { job: "messaggi", ref: s(b.id), channel: "email", ok: true, detail: `${tp.name || tp.id} → ${email}` }); }
+            else { errors.push(`mail ${s(b.id)}/${tp.id}: ${j?.error || r.status}`); await logInvio(admin, tenantId, { job: "messaggi", ref: s(b.id), channel: "email", ok: false, detail: `${tp.name || tp.id} → ${email}: ${j?.error || r.status}` }); }
           } catch (e) { errors.push(`mail ${s(b.id)}: ${e instanceof Error ? e.message : "err"}`); }
         }
         // Canale 2: WHATSAPP (se WA collegato per il tenant e l'ospite ha numero). Per i messaggi
@@ -160,8 +161,8 @@ export async function GET(req: Request) {
         if (phone) {
           try {
             const w = await sendWhatsapp(admin, tenantId, { to: phone, country: s(g.country), text, templateName: tp.waTemplate || undefined, lang });
-            if (w.ok) { okAny = true; waSent++; }
-            else if (w.message && !/non collegato/i.test(w.message)) errors.push(`wa ${s(b.id)}/${tp.id}: ${w.message}`);
+            if (w.ok) { okAny = true; waSent++; await logInvio(admin, tenantId, { job: "messaggi", ref: s(b.id), channel: "whatsapp", ok: true, wamid: w.id, detail: `${tp.name || tp.id} → ${phone}` }); }
+            else if (w.message && !/non collegato/i.test(w.message)) { errors.push(`wa ${s(b.id)}/${tp.id}: ${w.message}`); await logInvio(admin, tenantId, { job: "messaggi", ref: s(b.id), channel: "whatsapp", ok: false, detail: `${tp.name || tp.id} → ${phone}: ${w.message}` }); }
           } catch (e) { errors.push(`wa ${s(b.id)}: ${e instanceof Error ? e.message : "err"}`); }
         }
         // Se nessun canale è andato a buon fine, libera il claim così si riprova al prossimo giro.
