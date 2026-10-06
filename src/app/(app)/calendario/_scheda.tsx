@@ -119,7 +119,7 @@ export default function SchedaGiorno({ groupSize, b, j: jIn, code, dim, typeLabe
         </div>
         <BookingAmounts b={b} structure={structure} />
         {j.total > 0 && (
-          <div className="min-w-[110px] md:w-full">
+          <div className="mt-2 min-w-[110px] border-t border-line pt-2.5 md:w-full">
             <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-dim"><span>{j.done} di {j.total}</span><span>{pct}%</span></div>
             <div className="h-1.5 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: anyLate ? "var(--err)" : pct === 100 ? "var(--ok)" : "var(--focus)" }} /></div>
             {!j.next && <div className="mt-1.5 text-[11px] font-semibold md:text-right" style={{ color: "var(--ok)" }}>Tutto in ordine ✓</div>}
