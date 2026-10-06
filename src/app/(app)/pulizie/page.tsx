@@ -673,33 +673,22 @@ export default function PuliziePage() {
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+                  {/* Intestazione delle colonne: le righe sotto sono allineate */}
+                  <div className="hidden gap-x-4 border-b border-line bg-wash px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint md:grid md:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)_15rem]">
+                    <span>{t("Camera")}</span><span>{t("Esce")}</span><span>{t("Entra")}</span><span>{t("Da fare")}</span>
+                  </div>
                   {(() => {
                     const rows = list.filter((r) => !r.oos);
                     let lastType: string | null = null;
                     return rows.map((r) => {
-                      const a = ACT[r.action];
                       const k = keyOf(r.unit.id);
-                      const isDone = !!done[k];
-                      const clickable = r.action !== "niente";
                       const showHeader = (r.typeName || "") !== (lastType || "");
                       lastType = r.typeName || "";
                       return (
                         <div key={r.unit.id}>
-                          {showHeader && <TypeHeader flat className="border-t border-line" name={r.typeName || t("Senza tipologia")} color={r.typeColor} {...typeCounts(list, r.typeName, done, keyOf)} />}
-                          <div className={`flex flex-wrap items-start gap-3 border-t border-line p-3 ${isDone ? "opacity-60" : ""}`}>
-                            <div className="w-24 shrink-0"><div className={`font-display text-base font-bold ${isDone ? "text-dim line-through" : "text-txt"}`}>{r.unit.name}</div></div>
-                            <div className="w-32 shrink-0"><span className="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ color: cleanText(r.action), background: cleanTint(r.action) }}>{t(a.label)}</span></div>
-                            <div className="min-w-0 flex-1 basis-64 text-sm">
-                              {details(r)}
-                              <div className="mt-2 flex items-center gap-2">
-                                <div className="min-w-0 flex-1">{noteInput(k)}</div>
-                                {clickable && (
-                                  <button onClick={() => toggleDone(k)} className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition ${isDone ? "bg-[color:var(--ok)] text-white" : "border border-line text-dim hover:border-[color:var(--ok)] hover:text-[color:var(--ok)]"}`}>{isDone ? <><span>✓</span> {t("Fatta")}{doneTime(k) ? ` · ${doneTime(k)}` : ""}</> : t("Segna come fatta")}</button>
-                                )}
-                                <button onClick={() => setIssueDraft({ unitId: r.unit.id, unitName: r.unit.name, structureName: r.structure.name, type: "guasto", note: "", photo: undefined })} title={t("Segnala un problema")} className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition ${roomHasIssue(r.unit.id) ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:border-[color:var(--err)] hover:text-[color:var(--err)]"}`}><Icon name="alertTriangle" size={15} /></button>
-                              </div>
-                            </div>
-                          </div>
+                          {showHeader && <TypeHeader flat className="border-t border-line first:border-t-0" name={r.typeName || t("Senza tipologia")} color={r.typeColor} {...typeCounts(list, r.typeName, done, keyOf)} />}
+                          <RoomRow r={r} done={!!done[k]} doneAt={doneTime(k)} hasIssue={roomHasIssue(r.unit.id)} guestName={guestName} hasDog={hasDog} note={noteInput(k)} onToggle={() => toggleDone(k)}
+                            onIssue={() => setIssueDraft({ unitId: r.unit.id, unitName: r.unit.name, structureName: r.structure.name, type: "guasto", note: "", photo: undefined })} />
                         </div>
                       );
                     });
@@ -834,6 +823,61 @@ function GuestLine({ dir, label, name, b, dog }: { dir: "in" | "out" | "stay"; l
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// Una colonna della riga (chi esce / chi entra / chi è in casa): nome, ospiti, date, animale e richiesta. Vuota: "nessuna partenza/arrivo".
+function RowGuest({ label, color, b, name, dog, empty }: { label: string; color: string; b?: Booking; name?: string; dog?: boolean; empty: string }) {
+  const { t } = useLang();
+  if (!b) return <div className="min-w-0 text-xs"><div className="text-[11px] font-semibold uppercase tracking-wide text-faint md:hidden">{label}</div><div className="text-faint">{empty}</div></div>;
+  return (
+    <div className="min-w-0 text-xs">
+      <div className="text-[11px] font-semibold uppercase tracking-wide md:hidden" style={{ color }}>{label}</div>
+      <div className="truncate text-sm font-semibold text-txt">{name || "—"}</div>
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-dim">
+        <span className="inline-flex items-center gap-0.5"><Icon name="users" size={11} />{b.adults + b.children}</span>
+        <span className="font-mono text-[11px]">{fmtShort(b.checkIn)} → {fmtShort(b.checkOut)}</span>
+        <span className="text-faint">· {CHANNELS[b.channel]?.label ?? b.channel}</span>
+        {dog && <span title={t("Ospite con animale")} className="inline-flex items-center gap-0.5 font-semibold" style={{ color: "var(--warn)" }}><Icon name="paw" size={12} /> {t("Animale")}</span>}
+      </div>
+      {b.guestRequests && <div className="mt-1 truncate rounded-md px-1.5 py-0.5 text-[11px] text-txt" title={b.guestRequests} style={{ background: "color-mix(in srgb, var(--focus) 10%, transparent)" }}><b className="text-focus">{t("Richiesta")}:</b> {b.guestRequests}</div>}
+    </div>
+  );
+}
+
+// Riga della vista lista: camera e tipo di intervento, chi esce, chi entra, nota e azioni. Colonne allineate tra le righe, barra colorata a sinistra col significato dell'intervento.
+function RoomRow({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle, onIssue }: { r: any; done: boolean; doneAt?: string; hasIssue?: boolean; guestName: (id: string) => string; hasDog: (id: string) => boolean; note: React.ReactNode; onToggle: () => void; onIssue: () => void }) {
+  const { t } = useLang();
+  const a = ACT[r.action as ActionKey];
+  const clickable = r.action !== "niente";
+  const stayOnly = !r.dep && !r.arr && !!r.stay;
+  return (
+    <div className={`relative grid gap-x-4 gap-y-2.5 border-t border-line px-4 py-3 md:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)_15rem] md:items-center ${done ? "opacity-60" : ""}`}>
+      <span aria-hidden className="absolute inset-y-0 left-0 w-[3px]" style={{ background: cleanBar(r.action) }} />
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className={`font-display text-base font-bold ${done ? "text-dim line-through" : "text-txt"}`}>{r.unit.name}</span>
+          {hasIssue && <span title={t("Segnalazione aperta")} style={{ color: "var(--err)" }}><Icon name="alertTriangle" size={13} /></span>}
+        </div>
+        <span className="mt-1 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ color: cleanText(r.action), background: cleanTint(r.action) }}>{t(a.label)}</span>
+        {r.oosFrom && <div className="mt-1 text-[11px] text-faint">{t("Poi fuori servizio")}{r.oosNote ? `: ${r.oosNote}` : ""}</div>}
+      </div>
+      {stayOnly
+        ? <RowGuest label={t("In casa")} color="var(--focus)" b={r.stay} name={guestName(r.stay.guestId)} dog={hasDog(r.stay.guestId)} empty="" />
+        : <RowGuest label={t("Esce")} color="var(--err)" b={r.dep} name={r.dep ? guestName(r.dep.guestId) : undefined} dog={r.dep ? hasDog(r.dep.guestId) : false} empty={t("nessuna partenza")} />}
+      {stayOnly
+        ? <div className="hidden md:block" />
+        : <RowGuest label={t("Entra")} color="var(--ok)" b={r.arr} name={r.arr ? guestName(r.arr.guestId) : undefined} dog={r.arr ? hasDog(r.arr.guestId) : false} empty={t("nessun arrivo")} />}
+      <div className="flex flex-col gap-1.5">
+        {note}
+        <div className="flex items-center gap-1.5">
+          {clickable && (
+            <button onClick={onToggle} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12px] font-semibold transition ${done ? "bg-[color:color-mix(in_srgb,var(--ok)_14%,transparent)] text-[color:var(--ok)]" : "border border-line text-dim hover:border-[color:var(--ok)] hover:text-[color:var(--ok)]"}`}>{done ? <><span>✓</span> {t("Fatta")}{doneAt ? ` · ${doneAt}` : ""}</> : t("Segna come fatta")}</button>
+          )}
+          <button onClick={onIssue} title={t("Segnala un problema")} className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border transition ${hasIssue ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:border-[color:var(--err)] hover:text-[color:var(--err)]"}`}><Icon name="alertTriangle" size={15} /></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Intestazione della tipologia: barra colorata a sinistra, nome ben leggibile e quante camere ci sono (e quante restano da fare).
 function TypeHeader({ name, color, total, todo, className = "", flat = false }: { name: string; color: string; total: number; todo: number; className?: string; flat?: boolean }) {
   const { t } = useLang();
