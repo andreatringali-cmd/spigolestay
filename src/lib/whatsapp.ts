@@ -107,6 +107,21 @@ export async function whatsappDiagnose(admin: SupabaseClient, tenantId: string):
     out.token = { valid: dbg?.data?.is_valid ?? null, expires: dbg?.data?.expires_at ?? null, type: dbg?.data?.type ?? null };
     if (dbg?.error) out.tokenError = dbg.error.message;
   }
+  if (!wabaId) {
+    // Ricerca alternativa dell'account WhatsApp Business: dal numero e dall'utente di sistema.
+    const viaPhone = await get(`${cfg.phoneId}?fields=whatsapp_business_account`);
+    wabaId = (viaPhone as { data?: { whatsapp_business_account?: { id?: string } } }).data?.whatsapp_business_account?.id ?? "";
+    if (!wabaId) {
+      const biz = await get("me/businesses?fields=id,name&limit=5");
+      const bid = (biz as { data?: { data?: { id: string }[] } }).data?.data?.[0]?.id;
+      out.business = biz;
+      if (bid) {
+        const owned = await get(`${bid}/owned_whatsapp_business_accounts?fields=id,name&limit=5`);
+        wabaId = (owned as { data?: { data?: { id: string }[] } }).data?.data?.[0]?.id ?? "";
+        if (!wabaId) out.owned = owned;
+      }
+    }
+  }
   if (wabaId) {
     out.wabaId = wabaId;
     const t = await get(`${wabaId}/message_templates?fields=name,status,language,category,components&limit=50`);
