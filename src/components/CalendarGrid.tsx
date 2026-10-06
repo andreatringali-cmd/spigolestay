@@ -40,8 +40,6 @@ const INSIGHT_CARDS = [
   { key: "pickup", label: "Ritmo prenotazioni" },
   { key: "gaps", label: "Buchi da riempire" },
   { key: "sim", label: "Simulatore prezzi" },
-  { key: "alerts", label: "Da controllare" },
-  { key: "moves", label: "Prossimi movimenti" },
   { key: "channels", label: "Mix canali & commissioni" },
   { key: "kpi", label: "ADR & RevPAR" },
 ];
@@ -1210,73 +1208,6 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
             {whatIf ? `Applica ${whatIf > 0 ? "+" : ""}${whatIf}% ai prezzi` : "Sposta lo slider per applicare"}
           </button>
           <p className="mt-1.5 text-[10px] leading-snug text-faint">Meno prezzo riempie più camere: con spazio libero i ricavi possono salire; oltre un certo sconto no.</p>
-        </div>
-        )}
-        {showCard("alerts") && (
-        <div data-cardkey="alerts" onDrop={() => onCardDrop("alerts")} style={{ order: orderOf("alerts"), animationDelay: `${orderOf("alerts") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "alerts" ? "opacity-40" : ""} ${dragCard && dragCard !== "alerts" ? "border-dashed border-focus" : "border-line"}`}>
-          <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>⚠️</span> Da controllare</div>
-          {calAlerts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 rounded-lg py-5 text-center" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 8%, transparent)" }}>
-              <span className="grid h-9 w-9 place-items-center rounded-full text-lg font-bold text-white" style={{ backgroundColor: "var(--ok)" }}>✓</span>
-              <span className="text-xs font-semibold text-[color:var(--ok)]">Tutto in ordine</span>
-              <span className="text-[10px] text-dim">Nessuna anomalia nel periodo.</span>
-            </div>
-          ) : (
-            <>
-              <div className="mb-2 flex items-center gap-2 rounded-lg px-2.5 py-2" style={{ backgroundColor: `color-mix(in srgb, ${alertWorst} 10%, transparent)` }}>
-                <span className="font-mono text-2xl font-bold leading-none" style={{ color: alertWorst }}>{alertTotal}</span>
-                <span className="text-[11px] leading-tight text-dim">cose da<br />sistemare</span>
-              </div>
-              <div className="flex flex-col gap-1">
-                {calAlerts.map((a, i) => (
-                  <button key={i} onClick={() => router.push(a.href)} className="group flex items-center gap-2 overflow-hidden rounded-lg border border-line py-1 pl-0 pr-2 text-left transition hover:bg-wash" style={{ borderColor: `color-mix(in srgb, ${a.color} 30%, var(--line))` }}>
-                    <span className="w-1 self-stretch shrink-0" style={{ backgroundColor: a.color }} />
-                    <span className="text-sm leading-none">{a.icon}</span>
-                    <span className="min-w-0 flex-1 truncate text-xs text-txt">{a.label}</span>
-                    <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ backgroundColor: a.color }}>{a.n}</span>
-                    <span className="shrink-0 text-faint transition group-hover:text-txt">›</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-        )}
-        {showCard("moves") && (
-        <div data-cardkey="moves" onDrop={() => onCardDrop("moves")} style={{ order: orderOf("moves"), animationDelay: `${orderOf("moves") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "moves" ? "opacity-40" : ""} ${dragCard && dragCard !== "moves" ? "border-dashed border-focus" : "border-line"}`}>
-          <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🔑</span> Prossimi movimenti</div>
-          {moves.length === 0 ? (
-            <div className="flex items-center gap-2 py-1 text-xs text-dim">Nessun arrivo o partenza nei prossimi 7 giorni.</div>
-          ) : (
-            <>
-              <div className="mb-2 grid grid-cols-3 gap-1.5 text-center">
-                <div className="rounded-lg py-1.5" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 10%, transparent)" }}>
-                  <div className="font-mono text-lg font-bold leading-none" style={{ color: "var(--ok)" }}>{arrivalsN}</div>
-                  <div className="mt-0.5 text-[10px] text-dim">arrivi</div>
-                </div>
-                <div className="rounded-lg py-1.5" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 10%, transparent)" }}>
-                  <div className="font-mono text-lg font-bold leading-none" style={{ color: "var(--warn)" }}>{departuresN}</div>
-                  <div className="mt-0.5 text-[10px] text-dim">partenze</div>
-                </div>
-                <div className="rounded-lg py-1.5" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)" }}>
-                  <div className="font-mono text-lg font-bold leading-none" style={{ color: "var(--focus)" }}>{turnoverN}</div>
-                  <div className="mt-0.5 text-[10px] text-dim">turnover</div>
-                </div>
-              </div>
-              <div className="flex max-h-[116px] flex-col gap-1 overflow-y-auto pr-0.5">
-                {moves.map((m, i) => (
-                  <button key={i} onClick={() => openBooking(m.b.id)} className="group flex shrink-0 items-center gap-2 rounded-lg border border-line px-2 py-1 text-left transition hover:bg-wash">
-                    <span className="grid h-5 w-8 shrink-0 place-items-center rounded-md text-[9px] font-bold text-white" style={{ backgroundColor: m.kind === "in" ? "var(--ok)" : "var(--warn)" }}>{m.kind === "in" ? "IN" : "OUT"}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs font-semibold text-txt">{guestName(m.b.guestId)}{m.turn && <span title="Turnover in giornata"> ⚡</span>}</span>
-                      <span className="block truncate text-[10px] text-faint">{unitNameOf(m.b.unitId)}</span>
-                    </span>
-                    <span className="shrink-0 text-[10px] font-semibold capitalize text-dim">{relDay(m.iso)}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
         </div>
         )}
         {showCard("channels") && (
