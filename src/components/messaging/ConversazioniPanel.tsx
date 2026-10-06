@@ -106,11 +106,19 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const saveSent = (list: typeof sent) => { setSent(list); try { localStorage.setItem(SENT_KEY, JSON.stringify(list)); } catch {} };
 
   // Archiviazione conversazioni (come WhatsApp): nasconde dalla lista principale, viste a parte.
+  // Manuale (pulsante) oppure automatica: una chat senza messaggi da più di 5 giorni si archivia da sola, a prescindere dal check-in.
+  // Non si archiviano da sole le chat fissate in alto né quelle con un messaggio dell'ospite ancora da leggere. "Ripristina" la tiene in lista per altri 5 giorni.
+  const AUTO_ARCHIVE_DAYS = 5;
   const [archived, setArchived] = useState<string[]>([]);
+  const [pinned, setPinned] = useState<string[]>([]);
+  const [restoredAt, setRestoredAt] = useState<Record<string, number>>({});
   const [showArchived, setShowArchived] = useState(false);
-  useEffect(() => { try { const a = localStorage.getItem("spigolestay:archived"); if (a) setArchived(JSON.parse(a)); } catch {} }, []);
-  const isArch = (id: string) => archived.includes(id);
-  const toggleArch = (id: string) => setArchived((a) => { const next = a.includes(id) ? a.filter((x) => x !== id) : [...a, id]; try { localStorage.setItem("spigolestay:archived", JSON.stringify(next)); } catch {} return next; });
+  useEffect(() => {
+    try { const a = localStorage.getItem("spigolestay:archived"); if (a) setArchived(JSON.parse(a)); } catch {}
+    try { const a = localStorage.getItem("spigolestay:pinned"); if (a) setPinned(JSON.parse(a)); } catch {}
+    try { const a = localStorage.getItem("spigolestay:archived-restored"); if (a) setRestoredAt(JSON.parse(a)); } catch {}
+  }, []);
+  const persist = (key: string, v: unknown) => { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} };
 
   const [sel, setSel] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -125,7 +133,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const [aiUnavailable, setAiUnavailable] = useState(false);
 
   // Ospiti con almeno una prenotazione (nella struttura attiva), ordinati per struttura poi alfabetico.
-  const people = useMemo(() => {
+  const allPeople = useMemo(() => {
     const map = new Map<string, { id: string; name: string; phone?: string; email?: string; struct: string; lastCheckIn: string; b?: Booking; isReturning?: boolean; lastPastStay?: { date: string; structName: string } }>();
     for (const b of bookings) {
       if (b.channel === "blocked" || b.status === "cancelled") continue;
@@ -169,16 +177,51 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       const phone = key.startsWith("wa:") ? key.slice(3) : key;
       map.set(key, { id: key, name: phone, phone, struct: "", lastCheckIn: "" });
     }
-    let arr = [...map.values()];
+    return [...map.values()];
+  }, [bookings, guests, activeStructureId, getStructure, threads]);
+
+  // Una chat è archiviata se lo ha deciso l'utente, oppure se è inattiva da più di 5 giorni (e non è fissata né da leggere).
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const autoArchived = (p: { id: string; b?: Booking }) => {
+    if (pinned.includes(p.id)) return false;
+    const th = threads[p.id] ?? []; const last = th[th.length - 1];
+    if (last && last.dir === "in" && isThreadUnread(p.id, th)) return false;
+    const ref = last ? last.ts : (p.b && p.b.checkOut < todayIso ? Date.parse(p.b.checkOut) : 0); // senza messaggi conta la fine del soggiorno; chi deve ancora arrivare o è in casa non si archivia
+    if (!ref) return false;
+    return Date.now() - Math.max(ref, restoredAt[p.id] ?? 0) > AUTO_ARCHIVE_DAYS * 86400000;
+  };
+  const byId = useMemo(() => new Map(allPeople.map((p) => [p.id, p])), [allPeople]);
+  const isArch = (id: string) => archived.includes(id) || (byId.has(id) && autoArchived(byId.get(id)!));
+  const isPinned = (id: string) => pinned.includes(id);
+  const toggleArch = (id: string) => {
+    if (isArch(id)) {
+      // Ripristina: toglie l'archiviazione manuale e tiene la chat in lista per altri 5 giorni.
+      const nextA = archived.filter((x) => x !== id); setArchived(nextA); persist("spigolestay:archived", nextA);
+      const nextR = { ...restoredAt, [id]: Date.now() }; setRestoredAt(nextR); persist("spigolestay:archived-restored", nextR);
+    } else {
+      // Archivia: una chat archiviata non resta fissata.
+      const nextA = [...archived, id]; setArchived(nextA); persist("spigolestay:archived", nextA);
+      if (pinned.includes(id)) { const nextP = pinned.filter((x) => x !== id); setPinned(nextP); persist("spigolestay:pinned", nextP); }
+    }
+  };
+  const togglePin = (id: string) => {
+    if (pinned.includes(id)) { const nextP = pinned.filter((x) => x !== id); setPinned(nextP); persist("spigolestay:pinned", nextP); return; }
+    const nextP = [...pinned, id]; setPinned(nextP); persist("spigolestay:pinned", nextP);
+    // Fissare una chat archiviata la riporta in lista.
+    if (archived.includes(id)) { const nextA = archived.filter((x) => x !== id); setArchived(nextA); persist("spigolestay:archived", nextA); }
+  };
+  const people = useMemo(() => {
+    let arr = allPeople;
     if (q.trim()) { const s = q.toLowerCase(); arr = arr.filter((p) => p.name.toLowerCase().includes(s) || (threads[p.id] ?? []).some((m) => m.text.toLowerCase().includes(s))); }
-    arr = arr.filter((p) => (showArchived ? archived.includes(p.id) : !archived.includes(p.id)));
-    return arr.sort((a, b) => (a.struct || "").localeCompare(b.struct || "") || a.name.localeCompare(b.name));
-  }, [bookings, guests, activeStructureId, q, getStructure, archived, showArchived, threads]);
-  const archivedCount = useMemo(() => {
-    const ids = new Set<string>();
-    for (const b of bookings) { if (b.channel === "blocked" || b.status === "cancelled") continue; if (activeStructureId !== "all" && b.structureId !== activeStructureId) continue; if (archived.includes(b.guestId)) ids.add(b.guestId); }
-    return ids.size;
-  }, [bookings, activeStructureId, archived]);
+    arr = arr.filter((p) => (showArchived ? isArch(p.id) : !isArch(p.id)));
+    const lastTs = (id: string) => { const th = threads[id] ?? []; return th.length ? th[th.length - 1].ts : 0; };
+    // Prima le chat fissate (la più recente in alto), poi per struttura e nome.
+    return [...arr].sort((a, b) => Number(isPinned(b.id)) - Number(isPinned(a.id)) || (isPinned(a.id) && isPinned(b.id) ? lastTs(b.id) - lastTs(a.id) : (a.struct || "").localeCompare(b.struct || "") || a.name.localeCompare(b.name)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPeople, q, archived, pinned, restoredAt, showArchived, threads]);
+  const archivedCount = useMemo(() => allPeople.filter((p) => isArch(p.id)).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allPeople, archived, pinned, restoredAt, threads]);
 
   const current = useMemo(() => {
     if (!sel) return null;
@@ -545,7 +588,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
           {people.map((p, i) => {
             const th = threads[p.id] ?? []; const last = th[th.length - 1];
             const needsReply = !!last && last.dir === "in" && isThreadUnread(p.id, threads[p.id]); // pallino verde = messaggio ricevuto e non ancora letto
-            const showHeader = activeStructureId === "all" && (i === 0 || people[i - 1].struct !== p.struct);
+            const pin = isPinned(p.id);
+            const showPinHeader = pin && !showArchived && (i === 0 || !isPinned(people[i - 1].id));
+            const showHeader = activeStructureId === "all" && !pin && (i === 0 || isPinned(people[i - 1].id) || people[i - 1].struct !== p.struct);
             const isSelected = sel === p.id;
             const sub = last
               ? preview(last, t)
@@ -554,6 +599,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 : (p.isReturning && p.lastPastStay ? `↩ ${t("Ospite di ritorno")} · ${t("ultimo soggiorno")} ${fmtD(p.lastPastStay.date)}` : t("Nessuna prenotazione")));
             return (
               <div key={p.id}>
+                {showPinHeader && <div className="sticky top-0 z-10 border-b border-line bg-wash px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">📌 {t("Fissate")}</div>}
                 {showHeader && <div className="sticky top-0 z-10 border-b border-line bg-wash px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">{p.struct || "—"}</div>}
                 <div className={`group relative flex w-full items-center border-b border-[color:color-mix(in_srgb,var(--line)_55%,transparent)] pr-1 transition-colors ${isSelected ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : "hover:bg-wash"}`}>
                   {isSelected && <span className="absolute inset-y-1 left-0 w-[3px] rounded-full" style={{ backgroundColor: "var(--focus)" }} />}
@@ -570,6 +616,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                       <span className={`mt-0.5 block truncate text-xs ${needsReply ? "font-medium text-txt" : "text-dim"}`}>{sub}</span>
                     </span>
                   </button>
+                  <button onClick={() => togglePin(p.id)} title={pin ? t("Togli dalle fissate") : t("Fissa in alto")} aria-pressed={pin} className={`shrink-0 rounded-lg px-1.5 py-1.5 text-sm transition hover:bg-line ${pin ? "text-focus opacity-100" : "text-faint opacity-0 hover:text-txt group-hover:opacity-100"}`}>📌</button>
                   <button onClick={() => toggleArch(p.id)} title={isArch(p.id) ? t("Ripristina dalla archiviazione") : t("Archivia conversazione")} className={`shrink-0 rounded-lg px-1.5 py-1.5 text-sm text-faint transition hover:bg-line hover:text-txt ${isArch(p.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>{isArch(p.id) ? "⬆" : "🗄"}</button>
                 </div>
               </div>
@@ -651,6 +698,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                     <span className="truncate text-[11px] font-medium" style={{ color: "var(--focus)" }}>↩ {t("Ospite di ritorno")} · {t("ultimo soggiorno")} {fmtD(current.lastPastStay.date)}{current.lastPastStay.structName ? ` · ${current.lastPastStay.structName}` : ""}</span>
                   )}
                 </div>
+                <button onClick={() => togglePin(current.id)} title={isPinned(current.id) ? t("Togli dalle fissate") : t("Fissa in alto")} aria-pressed={isPinned(current.id)} className={`shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition hover:bg-wash ${isPinned(current.id) ? "border-focus text-focus" : "border-line text-dim"}`}>📌 {isPinned(current.id) ? t("Fissata") : t("Fissa")}</button>
                 <button onClick={() => toggleArch(current.id)} title={isArch(current.id) ? t("Ripristina") : t("Archivia")} className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim transition hover:bg-wash">{isArch(current.id) ? `⬆ ${t("Ripristina")}` : `🗄 ${t("Archivia")}`}</button>
               </div>
               {current.b && (() => {
