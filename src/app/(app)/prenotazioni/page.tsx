@@ -30,7 +30,7 @@ import WeatherWidget from "@/components/WeatherWidget";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import PrenotazioniDettaglio from "./_dettaglio";
-import { StatoProvider, StatoCell, StatoLegenda } from "./_stato";
+import { StatoProvider, StatoCell } from "./_stato";
 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit" });
 
@@ -571,7 +571,6 @@ export default function PrenotazioniPage() {
           )}
         </table>
       </div>
-      {view === "compact" && filtered.length > 0 && <div className="hidden md:block"><StatoLegenda /></div>}
       </StatoGate>
       {displayList.length > limit && (
         <div className="no-print mt-3 flex items-center justify-center gap-3 text-xs text-dim">

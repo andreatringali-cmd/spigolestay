@@ -22,7 +22,8 @@ const STATE_COLOR: Record<StepState, string> = { done: "var(--ok)", todo: "var(-
 const STATE_WORD: Record<StepState, string> = { done: "fatto", todo: "da fare", late: "in ritardo", na: "non applicabile" };
 
 const SEP = "\u0001";
-interface Ctx { slots: (id: string) => Slot[]; open: (b: Booking, s: Slot) => void }
+interface Progress { done: number; total: number; pct: number; late: boolean; next?: { key: string; label: string; state: StepState }; tip: string }
+interface Ctx { slots: (id: string) => Slot[]; progress: (id: string) => Progress | null; open: (b: Booking, s: Slot) => void }
 const StatoCtx = createContext<Ctx | null>(null);
 
 /** Carica i dati dei percorsi e la finestra "Risolvi" per le righe indicate (`ids`). Va montato solo nella vista Compatta. */
@@ -40,6 +41,25 @@ export function StatoProvider({ ids, children }: { ids: string[]; children: Reac
   const visible = useMemo(() => idsKey ? idsKey.split(SEP).map((id) => byId.get(id)).filter((b): b is Booking => !!b) : [], [idsKey, byId]);
   const remLog = useReminderLog(visible);
   const auto = useAutoCtx();
+
+  const progMap = useMemo(() => {
+    // Avanzamento come nella scheda dettagliata: passaggi fatti su quelli che valgono per la prenotazione.
+    const m = new Map<string, Progress>();
+    for (const b of visible) {
+      if (!isLiveBooking(b)) continue;
+      const j = journeyOf(b, {
+        today, guest: guestById.get(b.guestId), structure: getStructure(b.structureId),
+        schedina: schedBy.get(b.id) ?? "none", istat: istatBy.get(b.id) ?? "none",
+        guideSent: isGuideSent(b, threads[b.guestId], remLog[b.id]),
+        invoiceStato: docBy.get(b.id),
+        reminderNotes: reminderNotes(remLog[b.id]), auto,
+      });
+      const mark = (st: StepState) => (st === "done" ? "✓" : st === "late" ? "!" : st === "na" ? "–" : "○");
+      const tip = SLOT_KEYS.map((k) => j.steps.find((x) => x.key === k)).filter((x): x is NonNullable<typeof x> => !!x).map((x) => `${mark(x.state)} ${x.label}: ${x.detail}`).join("\n");
+      m.set(b.id, { done: j.done, total: j.total, pct: j.total ? Math.round((j.done / j.total) * 100) : 0, late: j.steps.some((x) => x.state === "late"), next: j.next ? { key: j.next.key, label: j.next.label, state: j.next.state } : undefined, tip });
+    }
+    return m;
+  }, [visible, guestById, getStructure, today, schedBy, istatBy, threads, docBy, rems, remLog, auto]);
 
   const slotMap = useMemo(() => {
     const m = new Map<string, Slot[]>();
@@ -59,13 +79,14 @@ export function StatoProvider({ ids, children }: { ids: string[]; children: Reac
 
   const ctx = useMemo<Ctx>(() => ({
     slots: (id) => slotMap.get(id) ?? slotsOf(null),
+    progress: (id) => progMap.get(id) ?? null,
     // Stesso comportamento della Dettagliata: non ancora fatto → finestra "Risolvi"; fatto/non applicabile → pagina collegata.
     open: (b, s) => {
       if (!s.step) return;
       if (s.state !== "done" && s.state !== "na") setModal({ id: b.id, key: s.key });
       else if (s.step.href) router.push(s.step.href);
     },
-  }), [slotMap, router]);
+  }), [slotMap, progMap, router]);
 
   const mb = modal ? byId.get(modal.id) : undefined;
   const mSlots = modal ? slotMap.get(modal.id) : undefined;
@@ -118,9 +139,25 @@ export function SlotIcon({ slot, onClick }: { slot: Slot; onClick?: () => void }
 export function StatoCell({ b }: { b: Booking }) {
   const ctx = useContext(StatoCtx);
   if (!ctx) return null;
+  const pr = ctx.progress(b.id);
+  if (!pr || pr.total <= 0) return <span className="text-[11px] text-faint">{ctx.slots(b.id)[0]?.detail === "Prenotazione annullata" ? "Annullata" : "—"}</span>;
+  const col = pr.pct >= 100 ? "var(--ok)" : pr.late ? "var(--err)" : "var(--focus)";
+  const nextSlot = pr.next ? ctx.slots(b.id).find((x) => x.key === pr.next!.key) : undefined;
+  const nextCol = pr.next?.state === "late" ? "var(--err)" : "var(--warn)";
+  // Avanzamento: barra sottile con la percentuale e, sotto, il prossimo passaggio da fare (clic = finestra "Risolvi"). Il passaggio per passaggio sta nel tooltip.
   return (
-    <div className="flex items-center gap-[5px]">
-      {ctx.slots(b.id).map((s) => <SlotIcon key={s.key} slot={s} onClick={() => ctx.open(b, s)} />)}
+    <div className="min-w-[10.5rem]" title={pr.tip}>
+      <div className="flex items-center gap-2">
+        <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-wash"><span className="block h-full rounded-full transition-[width]" style={{ width: `${pr.pct}%`, background: col }} /></span>
+        <span className="w-9 shrink-0 text-right font-mono text-xs font-semibold tabular-nums" style={{ color: col }}>{pr.pct}%</span>
+      </div>
+      <div className="mt-1 truncate text-[11px]">
+        {pr.next
+          ? (nextSlot?.step
+            ? <button type="button" onClick={(e) => { e.stopPropagation(); ctx.open(b, nextSlot); }} className="max-w-full truncate rounded px-0.5 text-left font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[color:var(--focus)]" style={{ color: nextCol }}>{pr.next.label}{pr.next.state === "late" ? " · in ritardo" : " · da fare"}</button>
+            : <span className="font-medium" style={{ color: nextCol }}>{pr.next.label}{pr.next.state === "late" ? " · in ritardo" : " · da fare"}</span>)
+          : <span className="font-medium" style={{ color: "var(--ok)" }}>Tutto in ordine ✓</span>}
+      </div>
     </div>
   );
 }
