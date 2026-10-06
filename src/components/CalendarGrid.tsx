@@ -1512,14 +1512,15 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
             })()
           )}
 
-          {/* Prenotazioni da assegnare (senza unità) — una sola riga per tutte le strutture */}
-          {(() => {
-            const unassigned = bookings.filter((b) => !b.unitId && visibleStructures.some((s) => s.id === b.structureId));
+          {/* Prenotazioni da assegnare (senza unità): una riga PER OGNI struttura visibile (con più strutture selezionate ognuna ha la sua riga, col nome) */}
+          {visibleStructures.map((st) => {
+            const unassigned = bookings.filter((b) => !b.unitId && b.structureId === st.id);
             if (!unassigned.length) return null;
             return (
-              <div className="flex border-b border-line bg-wash/40">
-                <div className="sticky left-0 z-10 flex shrink-0 items-center border-r border-line px-3 text-xs italic text-faint" style={{ width: LABEL_W, height: rowH }}>
-                  Da assegnare
+              <div key={"da-assegnare-" + st.id} className="flex border-b border-line bg-wash/40">
+                <div className="sticky left-0 z-10 flex shrink-0 flex-col justify-center border-r border-line px-3 leading-tight" style={{ width: LABEL_W, height: rowH }}>
+                  <span className="text-xs italic text-faint">Da assegnare</span>
+                  {visibleStructures.length > 1 && <span className="truncate text-[10px] font-semibold text-dim">{st.name}</span>}
                 </div>
                 <div className="relative" style={{ width: gridW, height: rowH }}>
                   {unassigned.map((b) => {
@@ -1531,7 +1532,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                       <div
                         key={b.id}
                         onPointerDown={(e) => onBarPointerDown(e, b.id)}
-                        title={`${guestName(b.guestId)} · da assegnare`}
+                        title={`${guestName(b.guestId)} · da assegnare${visibleStructures.length > 1 ? " · " + st.name : ""}`}
                         className="absolute flex cursor-grab items-center overflow-hidden border-2 border-dashed px-2 text-xs font-semibold active:cursor-grabbing"
                         style={{ left: g.left, width: g.width, top: 0, height: rowH, borderColor: `var(${meta.cssVar})`, color: `var(${meta.cssVar})`, background: "color-mix(in srgb, var(--surface) 85%, transparent)", opacity: dragging ? 0.35 : 1, pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
                       >
@@ -1542,7 +1543,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 </div>
               </div>
             );
-          })()}
+          })}
         </div>
       </div>
 
