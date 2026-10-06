@@ -1,27 +1,24 @@
 // Segnalazioni e etichetta di una prenotazione, uguali ovunque compaia la scheda (Calendario · Dettagliato e Prenotazioni · Dettagliata).
-import type { Booking, Structure, Unit } from "@/lib/types";
+import type { Booking, Unit } from "@/lib/types";
 import { shiftISO } from "@/lib/dates";
 import { bookingPaidTotal } from "@/lib/booking";
 import { eur } from "@/lib/format";
 import type { Avviso, Journey } from "./_scheda";
-import { turnoverLabel, type Turnover } from "./_modello";
 
 export type Colonna = "arr" | "stay" | "dep";
 
-/** Le cose da non perdere di vista su una prenotazione, in base alla colonna in cui sta (arrivo, in casa, partenza). */
+/** Le cose da non perdere di vista su una prenotazione, in base alla colonna in cui sta (arrivo, in casa, partenza). Solo cose della prenotazione: il turnover e la pulizia sono informazioni della camera e stanno in Pulizie. */
 export function avvisiOf(
   b: Booking, j: Journey, col: Colonna,
-  ctx: { today: string; unit?: Unit; turn: { arr: Map<string, Turnover>; dep: Map<string, Turnover> }; getStructure: (id: string) => Structure | undefined },
+  ctx: { today: string; unit?: Unit },
 ): Avviso[] {
-  const { today, unit, turn, getStructure } = ctx;
+  const { today, unit } = ctx;
   const out: Avviso[] = [];
   if (!b.unitId) out.push({ key: "nounit", label: "Camera da assegnare", tone: b.checkIn <= shiftISO(today, 3) ? "err" : "warn", title: "La prenotazione non ha ancora una camera fisica" });
   else if (unit?.outOfService) out.push({ key: "oos", label: "Camera fuori servizio: serve un'altra camera", tone: "err" });
   if (col === "arr" && j.steps.find((s) => s.key === "checkin")?.state !== "done") {
     out.push({ key: "nocheckin", label: b.checkIn <= today ? "Arrivo senza check-in online" : "Check-in online non ancora fatto", tone: b.checkIn <= today ? "err" : "warn" });
   }
-  const t = col === "arr" ? turn.arr.get(b.id) : col === "dep" ? turn.dep.get(b.id) : undefined;
-  if (t) { const l = turnoverLabel(t, getStructure); out.push({ key: "turnover", label: l.label, tone: "warn", title: l.title }); }
   if (col === "dep") {
     const resid = Math.max(0, bookingPaidTotal(b) - (b.paid ?? 0));
     if (resid > 0.005) out.push({ key: "saldo", label: `Parte con saldo aperto: ${eur(resid)}`, tone: b.checkOut <= today ? "err" : "warn" });

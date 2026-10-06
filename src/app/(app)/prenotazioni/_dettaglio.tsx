@@ -16,7 +16,6 @@ import { isGuideSent, readReminders, reminderNotes, useReminderLog } from "@/lib
 import StepActions from "./_azioni";
 import SchedaGiorno from "@/app/(app)/calendario/_scheda";
 import { avvisiOf, colonnaOggi, etichettaOggi } from "@/app/(app)/calendario/_avvisi";
-import { turnoverIndex } from "@/app/(app)/calendario/_modello";
 
 type SchedRow = { booking_id: string | null; stato: string };
 type IstatRow = { booking_id: string | null; stato: string };
@@ -124,8 +123,6 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
   const modalRow = modal ? rows.find((r) => r.b.id === modal.id) : undefined;
   const modalStep = modalRow?.j?.steps.find((x) => x.key === modal?.key);
 
-  // Turnover (partenza e arrivo lo stesso giorno sulla stessa camera) calcolato su tutte le prenotazioni vive, come nel calendario.
-  const turn = useMemo(() => turnoverIndex(allBookings.filter((b) => b.channel !== "blocked" && isLiveBooking(b))), [allBookings]);
   const dayShort = (iso: string) => dayLabel(iso);
 
   // La scheda è la stessa del Calendario · Dettagliato (stesso componente), così le due viste non possono più differire.
@@ -141,7 +138,7 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
         unit={unit} roomType={rt} typeLabel={unitLabel(b) ?? undefined}
         structure={getStructure(b.structureId)} showStructure={showStructure}
         tag={t.tag} tagTone={t.tone}
-        avvisi={live && j ? avvisiOf(b, j, colonnaOggi(b, today), { today, unit, turn, getStructure }) : []}
+        avvisi={live && j ? avvisiOf(b, j, colonnaOggi(b, today), { today, unit }) : []}
         onOpen={() => openBooking(b.id)}
         onStep={(s) => { if (s.state !== "done" && s.state !== "na") setModal({ id: b.id, key: s.key }); else if (s.href) router.push(s.href); }}
       />

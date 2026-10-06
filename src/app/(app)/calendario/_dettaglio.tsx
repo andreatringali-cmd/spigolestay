@@ -23,7 +23,7 @@ import StriscaGiorni, { type Modo } from "./_giorni";
 import { avvisiOf } from "./_avvisi";
 import { CameraLibera, BloccoRiga, FuoriServizioRiga } from "./_libere";
 import { readCleanDone, useDatiPercorso } from "./_dati";
-import { blocksIn, daysBetween, dayStats, freeUnits, nightOf, occupies, turnoverIndex } from "./_modello";
+import { blocksIn, daysBetween, dayStats, freeUnits, nightOf, occupies } from "./_modello";
 
 type Row = { b: Booking; j: Journey };
 type Col = "arr" | "stay" | "dep";
@@ -86,7 +86,6 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   const guestById = useMemo(() => new Map(guests.map((g) => [g.id, g])), [guests]);
   const unitById = useMemo(() => new Map(units.map((u) => [u.id, u])), [units]);
   const typeById = useMemo(() => new Map(roomTypes.map((r) => [r.id, r])), [roomTypes]);
-  const turn = useMemo(() => turnoverIndex(live), [live]);
 
   // ── Periodo mostrato ──
   const winDays = useMemo(() => daysBetween(winStart, shiftISO(winStart, 6)), [winStart]);
@@ -162,7 +161,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   }, [filtersOn, live, today, guestById, getStructure, schedBy, istatBy, threads, remLog, docBy, passes]);
 
   // ── Avvisi per scheda ──
-  const avvisiFor = useCallback((r: Row, col: Col): Avviso[] => avvisiOf(r.b, r.j, col, { today, unit: r.b.unitId ? unitById.get(r.b.unitId) : undefined, turn, getStructure }), [unitById, today, turn, getStructure]);
+  const avvisiFor = useCallback((r: Row, col: Col): Avviso[] => avvisiOf(r.b, r.j, col, { today, unit: r.b.unitId ? unitById.get(r.b.unitId) : undefined }), [unitById, today]);
 
   // ── Camere libere e blocchi ──
   const free = useMemo(() => freeUnits(activeUnits, busy, from, to), [activeUnits, busy, from, to]);
