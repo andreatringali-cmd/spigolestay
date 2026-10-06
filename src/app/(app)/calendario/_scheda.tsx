@@ -20,10 +20,17 @@ const STATE_GLYPH: Record<StepState, string> = { done: "✓", todo: "", late: "!
 const TONE: Record<Avviso["tone"], string> = { err: "var(--err)", warn: "var(--warn)", info: "var(--dim)" };
 const dayLabel = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
 
-export default function SchedaGiorno({ groupSize, b, j, guestName, unit, roomType, structure, showStructure, tag, tagTone, avvisi, onOpen, onStep }: {
+// Prenotazione non più "viva" (annullata, no-show, passata): nessun percorso da mostrare.
+const NO_JOURNEY = { steps: [], chips: [], done: 0, total: 0, next: null } as unknown as Journey;
+
+export default function SchedaGiorno({ groupSize, b, j: jIn, code, dim, typeLabel, guestName, unit, roomType, structure, showStructure, tag, tagTone, avvisi, onOpen, onStep }: {
   groupSize?: number; // quante camere attive ha il gruppo (il badge compare solo da 2 in su)
   b: Booking;
-  j: Journey;
+  j: Journey | null;
+  code?: string;      // codice prenotazione, accanto al canale
+  dim?: boolean;      // prenotazione conclusa o annullata: scheda attenuata
+  typeLabel?: string; // nome da mostrare sotto la camera se la tipologia non è nota
+  
   guestName: string;
   unit?: Unit;
   roomType?: RoomType;
@@ -35,11 +42,11 @@ export default function SchedaGiorno({ groupSize, b, j, guestName, unit, roomTyp
   onOpen: () => void;
   onStep: (s: JourneyStep) => void;
 }) {
+  const j = jIn ?? NO_JOURNEY;
   const photo = unit?.photos?.[0];
   const tint = roomType?.color || structure?.photoColor || "var(--focus)";
   const n = nights(b.checkIn, b.checkOut);
   const total = bookingPaidTotal(b);
-  const resid = Math.max(0, total - (b.paid ?? 0));
   const people = b.adults + b.children;
   const steps = j.steps.filter((s) => s.state !== "na" || s.key === "checkout");
   const pct = j.total ? Math.round((j.done / j.total) * 100) : 0;
@@ -53,7 +60,7 @@ export default function SchedaGiorno({ groupSize, b, j, guestName, unit, roomTyp
       role="button" tabIndex={0}
       onClick={onOpen}
       onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onOpen(); } }}
-      className="group flex min-w-0 cursor-pointer flex-col gap-3 rounded-2xl border border-line bg-surface p-3 shadow-sm transition hover:border-focus hover:shadow-md focus-visible:border-focus focus-visible:outline-none md:flex-row md:items-stretch md:gap-4"
+      className={`group flex min-w-0 cursor-pointer flex-col gap-3 rounded-2xl border border-line bg-surface p-3 shadow-sm transition hover:border-focus hover:shadow-md focus-visible:border-focus focus-visible:outline-none md:flex-row md:items-stretch md:gap-4 ${dim ? "opacity-70" : ""}`}
       style={anyLate || hasErr ? { borderLeft: "3px solid var(--err)" } : undefined}
     >
       {/* Anteprima camera */}
@@ -62,7 +69,7 @@ export default function SchedaGiorno({ groupSize, b, j, guestName, unit, roomTyp
         {photo && <img src={photo} alt="" className="absolute inset-0 h-full w-full object-cover" />}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 text-white">
           <div className="truncate text-sm font-bold leading-tight">{unitName ?? <span className="italic">Da assegnare</span>}</div>
-          <div className="truncate text-[11px] opacity-90">{roomType?.name ?? ""}</div>
+          <div className="truncate text-[11px] opacity-90">{roomType?.name ?? typeLabel ?? ""}</div>
         </div>
         {showStructure && structure && <span className="absolute left-2 top-2 max-w-[90%] truncate rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white">{structure.name}</span>}
       </div>
@@ -72,6 +79,7 @@ export default function SchedaGiorno({ groupSize, b, j, guestName, unit, roomTyp
         <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
           <h3 className="min-w-0 truncate text-base font-bold text-txt">{guestName}</h3>
           <span className="shrink-0"><ChannelWordmark channel={b.channel} height={18} title={b.channel === "direct" ? "xenora.it" : CHANNELS[b.channel].label} /></span>
+          {code && <span className="shrink-0 font-mono text-[11px] text-faint">{code}</span>}
           {(groupSize ?? 0) > 1 && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-focus">Gruppo · {groupSize} camere</span>}
           {b.status === "tentative" && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]">Opzione</span>}
         </div>

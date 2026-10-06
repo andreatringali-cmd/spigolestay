@@ -11,8 +11,6 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { inScope as inScopeOf, scopeFilter } from "@/lib/scope";
 import { toISO, shiftISO, parseISO } from "@/lib/dates";
-import { bookingPaidTotal } from "@/lib/booking";
-import { eur } from "@/lib/format";
 import { journeyOf, isLiveBooking, type JourneyStep } from "@/lib/booking-journey";
 import type { Booking } from "@/lib/types";
 import SearchInput from "@/components/SearchInput";
@@ -22,9 +20,10 @@ import EmptyState from "@/components/EmptyState";
 import StepActions from "@/app/(app)/prenotazioni/_azioni";
 import SchedaGiorno, { type Avviso, type Journey } from "./_scheda";
 import StriscaGiorni, { type Modo } from "./_giorni";
+import { avvisiOf } from "./_avvisi";
 import { CameraLibera, BloccoRiga, FuoriServizioRiga } from "./_libere";
-import { GUIDE_RE, readCleanDone, useDatiPercorso } from "./_dati";
-import { blocksIn, daysBetween, dayStats, freeUnits, nightOf, occupies, turnoverIndex, turnoverLabel } from "./_modello";
+import { readCleanDone, useDatiPercorso } from "./_dati";
+import { blocksIn, daysBetween, dayStats, freeUnits, nightOf, occupies, turnoverIndex } from "./_modello";
 
 type Row = { b: Booking; j: Journey };
 type Col = "arr" | "stay" | "dep";
@@ -163,23 +162,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   }, [filtersOn, live, today, guestById, getStructure, schedBy, istatBy, threads, remLog, docBy, passes]);
 
   // ── Avvisi per scheda ──
-  const avvisiFor = useCallback((r: Row, col: Col): Avviso[] => {
-    const { b, j } = r;
-    const out: Avviso[] = [];
-    const unit = b.unitId ? unitById.get(b.unitId) : undefined;
-    if (!b.unitId) out.push({ key: "nounit", label: "Camera da assegnare", tone: b.checkIn <= shiftISO(today, 3) ? "err" : "warn", title: "La prenotazione non ha ancora una camera fisica" });
-    else if (unit?.outOfService) out.push({ key: "oos", label: "Camera fuori servizio: serve un'altra camera", tone: "err" });
-    if (col === "arr" && j.steps.find((s) => s.key === "checkin")?.state !== "done") {
-      out.push({ key: "nocheckin", label: b.checkIn <= today ? "Arrivo senza check-in online" : "Check-in online non ancora fatto", tone: b.checkIn <= today ? "err" : "warn" });
-    }
-    const t = col === "arr" ? turn.arr.get(b.id) : col === "dep" ? turn.dep.get(b.id) : undefined;
-    if (t) { const l = turnoverLabel(t, getStructure); out.push({ key: "turnover", label: l.label, tone: "warn", title: l.title }); }
-    if (col === "dep") {
-      const resid = Math.max(0, bookingPaidTotal(b) - (b.paid ?? 0));
-      if (resid > 0.005) out.push({ key: "saldo", label: `Parte con saldo aperto: ${eur(resid)}`, tone: b.checkOut <= today ? "err" : "warn" });
-    }
-    return out;
-  }, [unitById, today, turn, getStructure]);
+  const avvisiFor = useCallback((r: Row, col: Col): Avviso[] => avvisiOf(r.b, r.j, col, { today, unit: r.b.unitId ? unitById.get(r.b.unitId) : undefined, turn, getStructure }), [unitById, today, turn, getStructure]);
 
   // ── Camere libere e blocchi ──
   const free = useMemo(() => freeUnits(activeUnits, busy, from, to), [activeUnits, busy, from, to]);
@@ -278,7 +261,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
                 const unit = r.b.unitId ? unitById.get(r.b.unitId) : undefined;
                 return (
                   <SchedaGiorno
-                    key={r.b.id} b={r.b} j={r.j} guestName={guestName(r.b)} groupSize={r.b.groupId ? gSizes.get(r.b.groupId) : undefined}
+                    key={r.b.id} b={r.b} j={r.j} code={bookingCode(r.b)} guestName={guestName(r.b)} groupSize={r.b.groupId ? gSizes.get(r.b.groupId) : undefined}
                     unit={unit} roomType={typeById.get(unit?.roomTypeId ?? r.b.roomTypeId)}
                     structure={getStructure(r.b.structureId)} showStructure={showStructure}
                     tag={`${dayShort(r.b.checkIn)} → ${dayShort(r.b.checkOut)}`} tagTone="var(--focus)" avvisi={avvisiFor(r, "stay")}
@@ -305,7 +288,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
             const t = tagFor(r, c.key);
             return (
               <SchedaGiorno
-                key={r.b.id} b={r.b} j={r.j} guestName={guestName(r.b)} groupSize={r.b.groupId ? gSizes.get(r.b.groupId) : undefined}
+                key={r.b.id} b={r.b} j={r.j} code={bookingCode(r.b)} guestName={guestName(r.b)} groupSize={r.b.groupId ? gSizes.get(r.b.groupId) : undefined}
                 unit={unit} roomType={typeById.get(unit?.roomTypeId ?? r.b.roomTypeId)}
                 structure={getStructure(r.b.structureId)} showStructure={showStructure}
                 tag={t.tag} tagTone={t.tone} avvisi={avvisiFor(r, c.key)}
