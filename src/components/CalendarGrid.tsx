@@ -1102,7 +1102,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       )}
       <ArrowScroller wrapperClassName="order-first" className="flex gap-3 pb-1" onDoubleClick={onCardsDblClick}>
         {showCard("copilot") && (
-        <div data-cardkey="copilot" onDrop={() => onCardDrop("copilot")} style={{ order: orderOf("copilot") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "copilot" ? "opacity-40" : ""} ${dragCard && dragCard !== "copilot" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="copilot" onDrop={() => onCardDrop("copilot")} style={{ order: orderOf("copilot"), animationDelay: `${orderOf("copilot") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "copilot" ? "opacity-40" : ""} ${dragCard && dragCard !== "copilot" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🤖</span> Copilota revenue</div>
           <div className="flex flex-col gap-2">
             {suggestions.slice(0, 3).map((s, i) => (
@@ -1118,7 +1118,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         </div>
         )}
         {showCard("pickup") && (
-        <div data-cardkey="pickup" onDrop={() => onCardDrop("pickup")} style={{ order: orderOf("pickup") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "pickup" ? "opacity-40" : ""} ${dragCard && dragCard !== "pickup" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="pickup" onDrop={() => onCardDrop("pickup")} style={{ order: orderOf("pickup"), animationDelay: `${orderOf("pickup") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "pickup" ? "opacity-40" : ""} ${dragCard && dragCard !== "pickup" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>📈</span> Ritmo prenotazioni</div>
             <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: `color-mix(in srgb, ${pickVerdict.c} 15%, transparent)`, color: pickVerdict.c }}>{pickDelta >= 0 ? "▲ +" : "▼ "}{pickDelta} vs 7gg</span>
@@ -1133,7 +1133,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           <div className="mt-3 flex items-end gap-[3px]" style={{ height: 60 }} title="Nuove prenotazioni per data prenotazione (ultimi 14 giorni)">
             {pickupDays.map((x, i) => { const recent = i >= 7; return (
               <div key={x.iso} className="relative flex-1 rounded-[3px]" style={{ height: "100%", backgroundColor: "color-mix(in srgb, var(--faint) 12%, transparent)" }} title={`${fmtDM(x.d)}: ${x.n} nuove`}>
-                <div className="absolute inset-x-0 bottom-0 rounded-[3px] transition-all" style={{ height: `${x.n ? Math.max(14, (x.n / pickupMax) * 100) : 0}%`, backgroundColor: recent ? "var(--focus)" : "color-mix(in srgb, var(--focus) 36%, transparent)" }} />
+                <div className="anim-barY absolute inset-x-0 bottom-0 rounded-[3px] transition-all" style={{ animationDelay: `${i * 0.035}s`, height: `${x.n ? Math.max(14, (x.n / pickupMax) * 100) : 0}%`, backgroundColor: recent ? "var(--focus)" : "color-mix(in srgb, var(--focus) 36%, transparent)" }} />
               </div>
             ); })}
           </div>
@@ -1151,7 +1151,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         </div>
         )}
         {showCard("gaps") && (
-        <div data-cardkey="gaps" onDrop={() => onCardDrop("gaps")} style={{ order: orderOf("gaps") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "gaps" ? "opacity-40" : ""} ${dragCard && dragCard !== "gaps" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="gaps" onDrop={() => onCardDrop("gaps")} style={{ order: orderOf("gaps"), animationDelay: `${orderOf("gaps") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "gaps" ? "opacity-40" : ""} ${dragCard && dragCard !== "gaps" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🕳️</span> Buchi da riempire</div>
           {gaps.length === 0 ? (
             <div className="flex items-center gap-2 py-1 text-xs text-dim"><span className="font-bold text-[color:var(--ok)]">✓</span> Nessun buco di 1–2 notti nel periodo.</div>
@@ -1186,7 +1186,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         </div>
         )}
         {showCard("sim") && (
-        <div data-cardkey="sim" onDrop={() => onCardDrop("sim")} style={{ order: orderOf("sim") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "sim" ? "opacity-40" : ""} ${dragCard && dragCard !== "sim" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="sim" onDrop={() => onCardDrop("sim")} style={{ order: orderOf("sim"), animationDelay: `${orderOf("sim") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "sim" ? "opacity-40" : ""} ${dragCard && dragCard !== "sim" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🎚️</span> Simulatore prezzi</div>
           <div className="flex items-baseline justify-between">
             <span className="text-[11px] text-faint">Ricavi previsti periodo</span>
@@ -1213,7 +1213,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         </div>
         )}
         {showCard("alerts") && (
-        <div data-cardkey="alerts" onDrop={() => onCardDrop("alerts")} style={{ order: orderOf("alerts") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "alerts" ? "opacity-40" : ""} ${dragCard && dragCard !== "alerts" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="alerts" onDrop={() => onCardDrop("alerts")} style={{ order: orderOf("alerts"), animationDelay: `${orderOf("alerts") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "alerts" ? "opacity-40" : ""} ${dragCard && dragCard !== "alerts" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>⚠️</span> Da controllare</div>
           {calAlerts.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 rounded-lg py-5 text-center" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 8%, transparent)" }}>
@@ -1243,7 +1243,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         </div>
         )}
         {showCard("moves") && (
-        <div data-cardkey="moves" onDrop={() => onCardDrop("moves")} style={{ order: orderOf("moves") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "moves" ? "opacity-40" : ""} ${dragCard && dragCard !== "moves" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="moves" onDrop={() => onCardDrop("moves")} style={{ order: orderOf("moves"), animationDelay: `${orderOf("moves") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "moves" ? "opacity-40" : ""} ${dragCard && dragCard !== "moves" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🔑</span> Prossimi movimenti</div>
           {moves.length === 0 ? (
             <div className="flex items-center gap-2 py-1 text-xs text-dim">Nessun arrivo o partenza nei prossimi 7 giorni.</div>
@@ -1280,7 +1280,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         </div>
         )}
         {showCard("channels") && (
-        <div data-cardkey="channels" onDrop={() => onCardDrop("channels")} style={{ order: orderOf("channels") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "channels" ? "opacity-40" : ""} ${dragCard && dragCard !== "channels" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="channels" onDrop={() => onCardDrop("channels")} style={{ order: orderOf("channels"), animationDelay: `${orderOf("channels") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "channels" ? "opacity-40" : ""} ${dragCard && dragCard !== "channels" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🔀</span> Mix canali</div>
           {chTotalN === 0 ? (
             <div className="flex items-center gap-2 py-1 text-xs text-faint">Nessuna prenotazione nel periodo.</div>
@@ -1296,7 +1296,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                   <div className="font-mono text-sm font-bold" style={{ color: chCommission > 0 ? "var(--warn)" : "var(--faint)" }}>{chCommission > 0 ? `−${eur(chCommission)}` : "—"}</div>
                 </div>
               </div>
-              <div className="mb-2 flex h-2.5 overflow-hidden rounded-full">
+              <div className="anim-grow mb-2 flex h-2.5 overflow-hidden rounded-full">
                 {chAgg.map((x) => (<div key={x.ch} style={{ width: `${(x.n / chTotalN) * 100}%`, backgroundColor: `var(${x.meta.cssVar})` }} title={`${x.meta.label}: ${x.n}`} />))}
               </div>
               <div className="flex flex-col gap-1">
@@ -1314,7 +1314,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         </div>
         )}
         {showCard("kpi") && (
-        <div data-cardkey="kpi" onDrop={() => onCardDrop("kpi")} style={{ order: orderOf("kpi") }} className={`rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "kpi" ? "opacity-40" : ""} ${dragCard && dragCard !== "kpi" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="kpi" onDrop={() => onCardDrop("kpi")} style={{ order: orderOf("kpi"), animationDelay: `${orderOf("kpi") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "kpi" ? "opacity-40" : ""} ${dragCard && dragCard !== "kpi" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>📊</span> ADR &amp; RevPAR</div>
           <div className="flex flex-col gap-2">
             <div className="rounded-lg border border-line p-2">
