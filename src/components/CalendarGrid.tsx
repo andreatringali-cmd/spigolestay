@@ -95,6 +95,10 @@ interface DragView {
   y: number;
 }
 
+// Preferenze salvate nel browser lette SUBITO alla creazione dello stato (non in un effetto dopo il primo disegno): la pagina nasce già nella forma
+// definitiva e non "scatta" quando le preferenze arrivano. Il calendario si monta solo dopo il caricamento dei dati (mai sul server).
+const readLS = <T,>(key: string, fallback: T): T => { try { const r = localStorage.getItem(key); return r ? (JSON.parse(r) as T) : fallback; } catch { return fallback; } };
+
 export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactNode } = {}) {
   const { structures, units, roomTypes, bookings, guests, events: allEvents, rateOverrides, moveBooking, openBooking, addBooking, updateBooking, deleteBooking, addEvent, updateEvent, deleteEvent, setDayRates, clearDayRates, activeStructureId, updateUnit, deleteUnit, addUnit } = useData();
   // Eventi: con una struttura selezionata solo i suoi (quelli senza struttura valgono per tutte).
@@ -134,7 +138,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   const monthList = useMemo(() => { const base = new Date(); const first = new Date(base.getFullYear(), base.getMonth() - 2, 1); return Array.from({ length: 18 }, (_, i) => { const d = new Date(first.getFullYear(), first.getMonth() + i, 1); return { y: d.getFullYear(), m: d.getMonth(), label: d.toLocaleDateString("it-IT", { month: "long", year: "numeric" }) }; }); }, []);
   const rowH = vw.dense ? 31 : 42;
   // Stato pulizie di oggi (dalla pagina Pulizie): chiave = `unitId:YYYY-MM-DD`.
-  const [cleanDone, setCleanDone] = useState<Record<string, string>>({});
+  const [cleanDone, setCleanDone] = useState<Record<string, string>>(() => readLS("spigolestay:pulizie:done", {}));
   const [linenDone, setLinenDone] = useState<Record<string, string>>({});
   useEffect(() => { try { const d = localStorage.getItem("spigolestay:pulizie:done"); if (d) setCleanDone(JSON.parse(d)); const l = localStorage.getItem("spigolestay:pulizie:linen"); if (l) setLinenDone(JSON.parse(l)); } catch {} }, []);
   const [roomInfoId, setRoomInfoId] = useState<string | null>(null); // scheda camera in pannello (senza cambiare pagina)
@@ -157,18 +161,16 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     });
   };
   // Su cellulare la colonna con i nomi camera è molto più stretta, così si vede più calendario.
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => { const f = () => setIsMobile(window.innerWidth < 640); f(); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 640);
+  useEffect(() => { const f = () => setIsMobile(window.innerWidth < 640); window.addEventListener("resize", f); return () => window.removeEventListener("resize", f); }, []);
   const LABEL_W = isMobile ? 104 : 212;
   // Stile etichetta barra: "dentro" (nome nella barra) o "sotto" (barra sottile + nome sotto).
-  const [barStyle, setBarStyle] = useState<"dentro" | "sotto">("dentro");
-  useEffect(() => { try { const s = localStorage.getItem("spigolestay:calbars"); if (s === "sotto" || s === "dentro") setBarStyle(s); } catch {} }, []);
+  const [barStyle, setBarStyle] = useState<"dentro" | "sotto">(() => { try { const v = localStorage.getItem("spigolestay:calbars"); return v === "sotto" || v === "dentro" ? v : "dentro"; } catch { return "dentro"; } });
   const setBars = (s: "dentro" | "sotto") => { setBarStyle(s); try { localStorage.setItem("spigolestay:calbars", s); } catch {} };
 
   // Icone di stato camera (arrivo/partenza, pulizia, lenzuola) nell'etichetta riga: nascoste di
   // default (si vede solo il nome/numero), mostrabili con un interruttore. Preferenza per-dispositivo.
-  const [showRoomIcons, setShowRoomIcons] = useState(false);
-  useEffect(() => { try { setShowRoomIcons(localStorage.getItem("spigolestay:cal:roomicons") === "1"); } catch {} }, []);
+  const [showRoomIcons, setShowRoomIcons] = useState(() => { try { return localStorage.getItem("spigolestay:cal:roomicons") === "1"; } catch { return false; } });
   const toggleRoomIcons = () => setShowRoomIcons((v) => { const n = !v; try { localStorage.setItem("spigolestay:cal:roomicons", n ? "1" : "0"); } catch {} return n; });
   // Ultimo aggiornamento + stato connessione dei canali OTA (per legenda e spunte).
   const [lastRun, setLastRun] = useState<string>("");
@@ -176,7 +178,16 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   // I canali REALMENTE aggiunti su Channex (chiave = channel normalizzato Xenora, valore = attivo
   // o no) — usato per la legenda, che deve mostrare solo le OTA collegate al channel manager, non
   // l'elenco completo di CHANNELS.
-  const [realChannels, setRealChannels] = useState<Record<string, boolean>>({});
+  const [realChannels, setRealChannels] = useState<Record<string, boolean>>(() => {
+    try {
+      const by = JSON.parse(localStorage.getItem("xn-chx-status") || "null") as Record<string, { channel: string; active: boolean }[]> | null;
+      if (!by) return {};
+      const lists = activeStructureId === "all" ? Object.values(by) : [by[activeStructureId] ?? []];
+      const real: Record<string, boolean> = {};
+      lists.flat().forEach((c) => { real[c.channel] = !!real[c.channel] || c.active; });
+      return real;
+    } catch { return {}; }
+  });
   useEffect(() => {
     try {
       const raw = localStorage.getItem("spigolestay:canali:conn");
@@ -249,15 +260,13 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   // Insights: simulatore what-if (± prezzo).
   const [whatIf, setWhatIf] = useState(0);
   // Selettore card Insights (mostra/nascondi, persistito) — all'apertura tutte nascoste, come Dashboard/Prenotazioni.
-  const [hiddenCards, setHiddenCards] = useState<Set<string>>(() => new Set(INSIGHT_CARDS.map((c) => c.key)));
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:calcards"); if (r) setHiddenCards(new Set(JSON.parse(r))); } catch {} }, []);
+  const [hiddenCards, setHiddenCards] = useState<Set<string>>(() => { const saved = readLS<string[] | null>("spigolestay:calcards", null); return new Set(saved ?? INSIGHT_CARDS.map((c) => c.key)); });
   const persistCards = (n: Set<string>) => { setHiddenCards(n); try { localStorage.setItem("spigolestay:calcards", JSON.stringify([...n])); } catch {} };
   const toggleCard = (k: string) => { const n = new Set(hiddenCards); if (n.has(k)) n.delete(k); else n.add(k); persistCards(n); };
   const showCard = (k: string) => !hiddenCards.has(k);
   const [cardsMenuOpen, setCardsMenuOpen] = useState(false);
   // Ordine delle card (persistito) — riordino via drag&drop diretto sulle card.
-  const [cardOrder, setCardOrder] = useState<string[]>(INSIGHT_CARDS.map((c) => c.key));
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:calcardorder"); if (r) { const saved: string[] = JSON.parse(r); const valid = saved.filter((k) => INSIGHT_CARDS.some((c) => c.key === k)); const missing = INSIGHT_CARDS.map((c) => c.key).filter((k) => !valid.includes(k)); setCardOrder([...valid, ...missing]); } } catch {} }, []);
+  const [cardOrder, setCardOrder] = useState<string[]>(() => { const all = INSIGHT_CARDS.map((c) => c.key); const saved = readLS<string[] | null>("spigolestay:calcardorder", null); if (!saved) return all; const valid = saved.filter((k) => all.includes(k)); return [...valid, ...all.filter((k) => !valid.includes(k))]; });
   const persistOrder = (o: string[]) => { setCardOrder(o); try { localStorage.setItem("spigolestay:calcardorder", JSON.stringify(o)); } catch {} };
   const orderOf = (k: string) => { const i = cardOrder.indexOf(k); return i < 0 ? 50 : i; };
   const [dragCard, setDragCard] = useState<string | null>(null);
@@ -278,8 +287,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   // Conferma correzione prezzo (Copilota = prezzo singolo, Simulatore = variazione % massiva su un periodo scelto).
   const [priceConfirm, setPriceConfirm] = useState<null | { kind: "single"; subject: string; detail?: string; from: number; to: number; onOk: () => void } | { kind: "bulk"; pct: number; from: string; to: string }>(null);
   // Suggerimenti del Copilota revenue già applicati (spunta permanente, salvata nel browser).
-  const [tipDone, setTipDone] = useState<Set<string>>(new Set());
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:caltips"); if (r) setTipDone(new Set(JSON.parse(r))); } catch {} }, []);
+  const [tipDone, setTipDone] = useState<Set<string>>(() => new Set(readLS<string[]>("spigolestay:caltips", [])));
   const markTip = (k: string) => setTipDone((p) => { const n = new Set(p).add(k); try { localStorage.setItem("spigolestay:caltips", JSON.stringify([...n])); } catch {} return n; });
   const tipKey = (s: { dir?: string; subject?: string; detail?: string }) => `${activeStructureId === "all" ? "" : activeStructureId + "#"}${s.dir ?? ""}|${s.subject ?? ""}|${s.detail ?? ""}`;
   // Conferma spostamento prenotazione (drag su un'altra camera/data).
@@ -299,13 +307,12 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   const [availEdit, setAvailEdit] = useState<null | { typeId: string; from: string; to: string; closed: number; cta: boolean; ctd: boolean }>(null);
   const [availStr, setAvailStr] = useState<string | null>(null); // valore digitato manualmente nel campo camere (null = usa il derivato)
   // Chiusure vendita manuali per (tipologia, giorno): quante camere chiudere. Persistite.
-  const [closes, setCloses] = useState<Record<string, number>>({});
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:calcloses"); if (r) setCloses(JSON.parse(r)); } catch {} }, []);
+  const [closes, setCloses] = useState<Record<string, number>>(() => readLS("spigolestay:calcloses", {}));
   const persistCloses = (next: Record<string, number>) => { setCloses(next); try { localStorage.setItem("spigolestay:calcloses", JSON.stringify(next)); } catch {} try { window.dispatchEvent(new Event("spigolestay:channex-dirty")); } catch {} };
   const closeKey = (typeId: string, iso: string) => `${typeId}|${iso}`;
   // Restrizioni OTA per (tipologia, giorno): chiuso all'arrivo (CTA) e chiuso alla partenza (CTD).
   // Stessa chiave delle chiusure vendita (`${roomTypeId}|${iso}`); mappa Record<string, true> = solo giorni chiusi.
-  const [cta, setCta] = useState<Record<string, true>>({});
+  const [cta, setCta] = useState<Record<string, true>>(() => readLS("spigolestay:calcta", {}));
   const [ctd, setCtd] = useState<Record<string, true>>({});
   useEffect(() => { try { const r = localStorage.getItem("spigolestay:calcta"); if (r) setCta(JSON.parse(r)); } catch {} try { const r = localStorage.getItem("spigolestay:calctd"); if (r) setCtd(JSON.parse(r)); } catch {} }, []);
   const persistCta = (next: Record<string, true>) => { setCta(next); try { localStorage.setItem("spigolestay:calcta", JSON.stringify(next)); } catch {} try { window.dispatchEvent(new Event("spigolestay:channex-dirty")); } catch {} };
@@ -1044,7 +1051,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       </div>
 
       {/* Legenda OTA — solo i canali aggiunti su Channex; contorno verde = collegato, rosso = non collegato */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-0.5">
+      <div className="flex min-h-[30px] flex-wrap items-center gap-x-2 gap-y-1.5 px-0.5">
         <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wide text-faint">Canali</span>
         {/* Sito ufficiale e Xenosite: SEMPRE presenti, con pallino verde se ci sono/sono pubblicati, rosso se no. */}
         <span title={siteStruct ? `Sito ufficiale collegato · ${siteStruct.name}` : "Nessun sito ufficiale impostato"} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-txt">

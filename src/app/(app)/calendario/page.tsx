@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import CalendarGrid from "@/components/CalendarGrid";
 import { PageHeader } from "@/components/ui";
 import WeatherWidget from "@/components/WeatherWidget";
@@ -16,12 +16,7 @@ export default function CalendarioPage() {
   const { activeStructureId, getStructure } = useData();
   const st = activeStructureId !== "all" ? getStructure(activeStructureId) : undefined;
   // Vista scelta (ricordata): null finché non è letta dal browser, per non montare la griglia se si preferisce il dettaglio.
-  const [view, setView] = useState<Vista | null>(null);
-  useEffect(() => {
-    let v: Vista = "grid";
-    try { if (localStorage.getItem(VIEW_KEY) === "detail") v = "detail"; } catch {}
-    setView(v);
-  }, []);
+  const [view, setView] = useState<Vista>(() => { try { return localStorage.getItem(VIEW_KEY) === "detail" ? "detail" : "grid"; } catch { return "grid"; } });
   const choose = (v: Vista) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch {} };
   // Selettore della vista: stesso aspetto di "Compatta / Dettagliata" in Prenotazioni. Nella griglia sta nella riga dei filtri,
   // prima del pulsante dei grafici; nella vista dettagliata (che non ha quella riga) resta in alto accanto al meteo.

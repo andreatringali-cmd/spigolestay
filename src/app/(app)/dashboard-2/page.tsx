@@ -209,8 +209,6 @@ export default function Dashboard2() {
           occupied={tonight?.occupied ?? 0} totalRooms={tonight?.total ?? 0} pct={tonight?.pct ?? 0}
         />
         <div className="grid gap-4 lg:grid-cols-12">
-          <div className={`order-1 lg:order-none lg:col-span-7 ${wrap}`}><Adempimenti items={items} total={stato.total} urgent={stato.urgent} loading={loadingAdem} health={health} delay={60} /></div>
-          <div className={`order-2 lg:order-none lg:col-span-5 ${wrap}`}><Oggi rows={rows} turnovers={split.turnoverUnits.size} onOpen={openBooking} delay={120} /></div>
           <div className={`order-4 lg:order-none ${hasPickup ? "lg:col-span-8" : "lg:col-span-12"} ${wrap}`}><Giorni cells={strip} delay={60} /></div>
           {hasPickup && <div className={`order-5 lg:order-none lg:col-span-4 ${wrap}`}><Pickup pickup={pickup} delay={120} /></div>}
           <div className={`order-6 lg:order-none ${SPAN[rowC]} ${wrap}`}><Incassi monthName={MESI[mIdx]} prevName={MESI[(mIdx + 11) % 12]} cur={cur} prev={prev} todayIdx={diffDays(today, monthStart)} adr={{ avg: rates.adrAvg, series: rates.adr }} revpar={{ avg: rates.revparAvg, series: rates.revpar }} delay={60} /></div>
@@ -218,6 +216,8 @@ export default function Dashboard2() {
           {countries.rows.length > 0 && <div className={`order-8 lg:order-none ${SPAN[rowC]} ${wrap}`}><Provenienza rows={countries.rows} known={countries.known} delay={180} /></div>}
           {hasPren && <div className={`order-9 lg:order-none lg:col-span-5 ${wrap}`}><Prenotazioni lead={leadHisto} stay={stayHisto} delay={60} /></div>}
           <div className={`${controlliOnTop ? "order-3" : "order-10"} lg:order-none ${hasPren ? "lg:col-span-7" : "lg:col-span-12"} ${wrap}`}><Controllo items={controlli} delay={120} /></div>
+          <div className={`order-11 lg:order-none lg:col-span-7 ${wrap}`}><Adempimenti items={items} total={stato.total} urgent={stato.urgent} loading={loadingAdem} health={health} delay={60} /></div>
+          <div className={`order-12 lg:order-none lg:col-span-5 ${wrap}`}><Oggi rows={rows} turnovers={split.turnoverUnits.size} onOpen={openBooking} delay={120} /></div>
         </div>
       </div>
     </div>
