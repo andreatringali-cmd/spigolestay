@@ -64,9 +64,9 @@ export default function Gauge({
         {/* traccia */}
         <path d={track} fill="none" stroke="var(--wash)" strokeWidth={stroke} strokeLinecap="round" />
         {/* valore */}
-        <path d={arc} fill="none" stroke={`url(#${uid})`} strokeWidth={stroke} strokeLinecap="round" filter={`url(#${uid}s)`} />
+        <path d={arc} pathLength={1} className="anim-arc" fill="none" stroke={`url(#${uid})`} strokeWidth={stroke} strokeLinecap="round" filter={`url(#${uid}s)`} />
         {/* lancetta + perno (tenue) */}
-        <path d={needle} fill="var(--dim)" fillOpacity={0.7} />
+        <path d={needle} className="anim-needle" style={{ ["--ox" as string]: `${cx}px`, ["--oy" as string]: `${cy}px` }} fill="var(--dim)" fillOpacity={0.7} />
         <circle cx={cx} cy={cy} r={6} fill="var(--dim)" />
         <circle cx={cx} cy={cy} r={2.5} fill="var(--surface)" />
         {/* estremi */}

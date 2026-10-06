@@ -1044,7 +1044,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       </div>
 
       {/* Legenda OTA — solo i canali aggiunti su Channex; contorno verde = collegato, rosso = non collegato */}
-      <div className="order-[-1] flex flex-wrap items-center gap-x-2 gap-y-1.5 px-0.5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-0.5">
         <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wide text-faint">Canali</span>
         {/* Sito ufficiale e Xenosite: SEMPRE presenti, con pallino verde se ci sono/sono pubblicati, rosso se no. */}
         <span title={siteStruct ? `Sito ufficiale collegato · ${siteStruct.name}` : "Nessun sito ufficiale impostato"} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pl-0.5 pr-2.5 text-xs font-semibold text-txt">

@@ -113,6 +113,13 @@ body {
   60% { opacity: 1; }
   100% { r: 4; opacity: 1; }
 }
+/* Effetti d'entrata dei grafici ad arco/area: l'arco si disegna, la lancetta ruota, l'area sale dalla base e la linea si traccia */
+@keyframes drawArc { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes sweepNeedle { from { transform: rotate(-180deg); } to { transform: rotate(0deg); } }
+@keyframes riseArea { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.anim-arc { stroke-dasharray: 1; animation: drawArc 1s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-needle { transform-box: view-box; transform-origin: var(--ox) var(--oy); animation: sweepNeedle 1s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-rise { transform-box: view-box; transform-origin: 50% 100%; animation: riseArea 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .anim-in { animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .anim-pop { animation: popIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .anim-grow { transform-origin: left center; animation: growX 0.85s cubic-bezier(0.22, 1, 0.36, 1) both; }
@@ -125,7 +132,8 @@ body {
 .stagger > *:nth-child(6) { animation-delay: 0.25s; }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim-in, .anim-pop, .anim-grow, .stagger > * { animation: none !important; }
+  .anim-in, .anim-pop, .anim-grow, .anim-arc, .anim-needle, .anim-rise, .stagger > * { animation: none !important; }
+  .anim-arc { stroke-dasharray: none; }
   .anim-grow { transform: none !important; }
 }
 

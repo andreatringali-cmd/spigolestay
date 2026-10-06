@@ -66,10 +66,10 @@ export default function DensityChart({
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height }}>
         <line x1={0} y1={baseY} x2={W} y2={baseY} stroke="var(--line)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
         {dens.map((s, i) => (
-          <path key={`a${i}`} d={areaPath(s.d)} fill={s.color} fillOpacity={0.28} stroke="none" />
+          <path key={`a${i}`} d={areaPath(s.d)} className="anim-rise" style={{ animationDelay: `${i * 0.1}s` }} fill={s.color} fillOpacity={0.28} stroke="none" />
         ))}
         {dens.map((s, i) => (
-          <path key={`l${i}`} d={linePath(s.d)} fill="none" stroke={s.color} strokeWidth={1.6} strokeOpacity={0.9} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          <path key={`l${i}`} d={linePath(s.d)} pathLength={1} className="anim-arc" style={{ animationDelay: `${0.15 + i * 0.1}s` }} fill="none" stroke={s.color} strokeWidth={1.6} strokeOpacity={0.9} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         ))}
       </svg>
       {/* asse X in HTML (niente distorsione del testo) */}
