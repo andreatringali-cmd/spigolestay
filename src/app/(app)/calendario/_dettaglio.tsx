@@ -14,6 +14,7 @@ import { toISO, shiftISO, parseISO } from "@/lib/dates";
 import { journeyOf, isLiveBooking, type JourneyStep } from "@/lib/booking-journey";
 import type { Booking } from "@/lib/types";
 import SearchInput from "@/components/SearchInput";
+import DateField from "@/components/DateField";
 import { bookingCode } from "@/lib/bookingCode";
 import { normName } from "@/lib/guest-key";
 import EmptyState from "@/components/EmptyState";
@@ -213,11 +214,18 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
 
   return (
     <div>
-      <StriscaGiorni days={stripDays} sel={sel} mode={mode} today={today} rangeLabel={rangeLabel} onSelect={selectDay} onShift={shift} onToday={goToday} onMode={setMode} onPick={pick} />
+      <StriscaGiorni days={stripDays} sel={sel} mode={mode} today={today} rangeLabel={rangeLabel} onSelect={selectDay} onShift={shift} onToday={goToday} />
 
       {/* Riga dei filtri, subito sotto il calendario: cerca, filtra per canale/camera/stato; a destra la scelta della vista */}
       <div className="no-print mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm">
         <SearchInput value={q} onChange={setQ} placeholder="Cerca ospite, camera o codice…" className="w-full sm:w-72" />
+        {/* Data da mostrare e periodo (un giorno o 7 giorni), subito dopo la ricerca */}
+        <DateField value={sel} onChange={(v) => { if (v) pick(v); }} title="Vai alla data" className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm transition hover:border-focus" />
+        <div className="flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold" role="group" aria-label="Periodo mostrato">
+          {([["day", "Giorno"], ["week", "7 giorni"]] as const).map(([k, l]) => (
+            <button key={k} onClick={() => setMode(k)} aria-pressed={mode === k} className={`rounded-md px-2.5 py-1.5 transition ${mode === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{l}</button>
+          ))}
+        </div>
         {/* Tre badge: Arrivi / In casa / Partenze del periodo mostrato (o della ricerca). Un clic mostra solo quella sezione, un secondo clic le rimostra tutte. */}
         {COLS.map((c) => {
           const on = only === c.key;

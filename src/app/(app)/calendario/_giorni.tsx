@@ -2,7 +2,6 @@
 
 // Striscia dei giorni della vista Calendario · Dettagliato: 7 giorni navigabili con i contatori di ciascuno.
 import type { ReactNode } from "react";
-import DateField from "@/components/DateField";
 import { parseISO } from "@/lib/dates";
 import type { DayStats } from "./_modello";
 
@@ -26,7 +25,7 @@ export function KindIcon({ k }: { k: Kind }): ReactNode {
 
 const valueOf = (s: DayStats, k: Kind) => k === "arr" ? s.arrivals : k === "dep" ? s.departures : k === "stay" ? s.stay : k === "free" ? s.free : s.clean;
 
-export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSelect, onShift, onToday, onMode, onPick }: {
+export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSelect, onShift, onToday }: {
   days: { iso: string; stats: DayStats }[];
   sel: string;
   mode: Modo;
@@ -35,8 +34,6 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
   onSelect: (iso: string) => void;
   onShift: (dir: -1 | 1) => void;
   onToday: () => void;
-  onMode: (m: Modo) => void;
-  onPick: (iso: string) => void;
 }) {
   const atToday = days[0]?.iso === today && (mode === "week" || sel === today);
   const nav = "grid h-8 w-8 place-items-center rounded-lg border border-line bg-surface text-dim transition hover:border-focus hover:text-focus";
@@ -49,14 +46,6 @@ export default function StriscaGiorni({ days, sel, mode, today, rangeLabel, onSe
         </div>
         <button onClick={onToday} disabled={atToday} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-txt transition hover:border-focus hover:text-focus disabled:opacity-50">Oggi</button>
         <div className="min-w-0 flex-1 truncate font-display text-base font-bold capitalize text-txt sm:text-lg">{rangeLabel}</div>
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold" role="group" aria-label="Periodo mostrato">
-            {([["day", "Giorno"], ["week", "7 giorni"]] as const).map(([k, l]) => (
-              <button key={k} onClick={() => onMode(k)} aria-pressed={mode === k} className={`rounded-md px-2.5 py-1.5 transition ${mode === k ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{l}</button>
-            ))}
-          </div>
-          <DateField value={sel} onChange={(v) => { if (v) onPick(v); }} title="Vai alla data" className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm transition hover:border-focus" />
-        </div>
       </div>
 
       <div className="grid grid-cols-7 gap-1 sm:gap-2">
