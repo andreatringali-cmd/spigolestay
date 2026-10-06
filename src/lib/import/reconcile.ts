@@ -32,7 +32,8 @@ export interface VerifyBooking { extId?: string; guestName: string; checkIn: str
 export interface Verification {
   expected: number;                 // righe del file che dovevano esserci (nuove + già presenti)
   found: number;                    // quelle trovate in Xenora
-  missing: ImportOutcome[];         // righe del file che in Xenora non si trovano
+  missing: ImportOutcome[];         // righe del file che in Xenora non si trovano da nessuna parte
+  elsewhere: { outcome: ImportOutcome; structure: string }[]; // righe che non sono in questa struttura ma ci sono in un'altra (non perse)
   fileTotal: number;                // somma importi del file (righe attese)
   systemTotal: number;              // somma importi in Xenora (righe trovate)
   amountDiffs: { outcome: ImportOutcome; system: number }[]; // righe con importo diverso
@@ -42,7 +43,9 @@ const key = (name: string, ci: string, co: string) => `${normName(name)}|${ci}|$
 const eq = (a: number, b: number) => Math.abs(a - b) < 0.01;
 
 /** Confronta gli esiti con le prenotazioni presenti ORA nella struttura. Prima per identificativo, poi (se manca) per ospite+date contando le copie. */
-export function verifyOutcomes(outcomes: ImportOutcome[], bookings: VerifyBooking[]): Verification {
+export function verifyOutcomes(outcomes: ImportOutcome[], bookings: VerifyBooking[], others: (VerifyBooking & { structure: string })[] = []): Verification {
+  const otherByExt = new Map<string, string>();
+  for (const b of others) if (b.extId) otherByExt.set(b.extId, b.structure);
   const byExt = new Map<string, VerifyBooking>();
   const byKey = new Map<string, VerifyBooking[]>();
   for (const b of bookings) {
@@ -53,23 +56,28 @@ export function verifyOutcomes(outcomes: ImportOutcome[], bookings: VerifyBookin
   const used = new Set<VerifyBooking>();
   const expected = outcomes.filter((o) => o.status !== "scartata");
   const missing: ImportOutcome[] = [];
+  const elsewhere: Verification["elsewhere"] = [];
   const amountDiffs: Verification["amountDiffs"] = [];
   let found = 0, fileTotal = 0, systemTotal = 0;
   for (const o of expected) {
-    fileTotal += o.total ?? 0;
     let hit: VerifyBooking | undefined;
     if (o.extId && byExt.has(o.extId)) hit = byExt.get(o.extId);
     else {
       const arr = byKey.get(key(o.guest, o.checkIn, o.checkOut));
       hit = arr?.find((b) => !used.has(b));
     }
-    if (!hit) { missing.push(o); continue; }
+    if (!hit) {
+      const st = o.extId ? otherByExt.get(o.extId) : undefined;
+      if (st !== undefined) elsewhere.push({ outcome: o, structure: st }); else { missing.push(o); fileTotal += o.total ?? 0; }
+      continue;
+    }
+    fileTotal += o.total ?? 0;
     used.add(hit);
     found++;
     systemTotal += hit.total ?? 0;
     if (o.total !== undefined && !eq(o.total, hit.total ?? 0)) amountDiffs.push({ outcome: o, system: hit.total ?? 0 });
   }
-  return { expected: expected.length, found, missing, fileTotal, systemTotal, amountDiffs };
+  return { expected: expected.length - elsewhere.length, found, missing, elsewhere, fileTotal, systemTotal, amountDiffs };
 }
 
 /** Quante righe scartate per ciascun motivo. */
@@ -82,12 +90,12 @@ export function skipReasons(outcomes: ImportOutcome[]): { reason: string; count:
 const STATUS_LABEL: Record<OutcomeStatus, string> = { nuova: "importata", gia_presente: "già presente", scartata: "scartata" };
 
 /** CSV (separatore ;, con BOM per Excel) con una riga per ogni riga del file e il suo esito; con `missingKeys` marca le righe che non si trovano. */
-export function outcomesToCsv(outcomes: ImportOutcome[], missing?: Set<ImportOutcome>): string {
+export function outcomesToCsv(outcomes: ImportOutcome[], missing?: Set<ImportOutcome>, elsewhere?: Map<ImportOutcome, string>): string {
   const esc = (v: unknown) => { const s = String(v ?? ""); return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const head = ["riga", "ospite", "check-in", "check-out", "camera nel file", "codice", "importo", "esito", "motivo"];
   const lines = outcomes.map((o) => [
     o.row, o.guest, o.checkIn, o.checkOut, o.room, o.code, o.total ?? "",
-    missing?.has(o) ? "NON TROVATA in Xenora" : STATUS_LABEL[o.status], o.reason ?? "",
+    missing?.has(o) ? "NON TROVATA in Xenora" : elsewhere?.has(o) ? `presente in ${elsewhere.get(o)}` : STATUS_LABEL[o.status], o.reason ?? "",
   ].map(esc).join(";"));
   return "﻿" + [head.join(";"), ...lines].join("\r\n");
 }

@@ -115,6 +115,7 @@ export default function ImportaPage() {
     });
   }, [icsRooms, structureId, mode, roomTypes]);
 
+  const structureNames = useMemo(() => Object.fromEntries(structures.map((s) => [s.id, s.name])), [structures]);
   // Se la struttura non è ancora impostata (store caricato dopo il mount), aggancia la prima disponibile.
   useEffect(() => {
     if ((!structureId || !structures.some((s) => s.id === structureId)) && structures[0]) setStructureId(structures[0].id);
@@ -503,7 +504,7 @@ export default function ImportaPage() {
             </div>
             <div className="font-display text-xl font-bold text-txt">{done} {t("prenotazioni importate")}</div>
             {err && <p className="mt-2 text-sm text-[color:var(--warn)]">{err}</p>}
-            {report && <RiepilogoImport report={report} bookings={bookings} guests={guests} />}
+            {report && <RiepilogoImport report={report} bookings={bookings} guests={guests} structureNames={structureNames} />}
             <div className="mt-5 flex justify-center gap-2">
               <button onClick={() => router.push("/calendario")} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90">{t("Vai al calendario")}</button>
               <button onClick={() => { setRows([]); setMap({}); setDone(null); setReport(null); setErr(""); setFileName(""); }} className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-txt hover:bg-wash">{t("Importa un altro file")}</button>

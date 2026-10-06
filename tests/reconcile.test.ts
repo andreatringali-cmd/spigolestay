@@ -48,3 +48,18 @@ test("CSV: intestazione, BOM, virgolette e righe non trovate", () => {
   assert.ok(csv.includes("NON TROVATA in Xenora"));
   assert.ok(outcomesToCsv([a]).includes("importata"));
 });
+
+test("riga presente in un'altra struttura: non è 'mancante' e non conta negli importi", () => {
+  const out: ImportOutcome[] = [
+    { row: 2, guest: "Mario Rossi", checkIn: "2026-10-01", checkOut: "2026-10-03", room: "", code: "", extId: "octorate:1", total: 100, status: "gia_presente" },
+    { row: 3, guest: "Anna Verdi", checkIn: "2026-10-05", checkOut: "2026-10-06", room: "", code: "", extId: "octorate:2", total: 50, status: "gia_presente" },
+    { row: 4, guest: "Luca Neri", checkIn: "2026-10-07", checkOut: "2026-10-08", room: "", code: "", extId: "octorate:3", total: 70, status: "gia_presente" },
+  ];
+  const mine = [{ extId: "octorate:1", guestName: "Mario Rossi", checkIn: "2026-10-01", checkOut: "2026-10-03", total: 100 }];
+  const others = [{ extId: "octorate:2", guestName: "Anna Verdi", checkIn: "2026-10-05", checkOut: "2026-10-06", total: 50, structure: "Spigolerooms" }];
+  const v = verifyOutcomes(out, mine, others);
+  assert.equal(v.found, 1); assert.equal(v.expected, 2);
+  assert.deepEqual(v.elsewhere.map((e) => [e.outcome.row, e.structure]), [[3, "Spigolerooms"]]);
+  assert.deepEqual(v.missing.map((m) => m.row), [4]);
+  assert.equal(v.fileTotal, 170); assert.equal(v.systemTotal, 100);
+});

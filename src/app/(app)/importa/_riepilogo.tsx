@@ -9,7 +9,7 @@ import { eur } from "@/lib/format";
 
 const fmtD = (iso: string) => (iso ? iso.split("-").reverse().join("/") : "—");
 
-export default function RiepilogoImport({ report, bookings, guests }: { report: ImportReport; bookings: Booking[]; guests: Guest[] }) {
+export default function RiepilogoImport({ report, bookings, guests, structureNames = {} }: { report: ImportReport; bookings: Booking[]; guests: Guest[]; structureNames?: Record<string, string> }) {
   // Si attende un attimo che l'archivio abbia assorbito le nuove prenotazioni, poi si confronta.
   const [ready, setReady] = useState(false);
   useEffect(() => { const id = setTimeout(() => setReady(true), 350); return () => clearTimeout(id); }, []);
@@ -20,8 +20,11 @@ export default function RiepilogoImport({ report, bookings, guests }: { report: 
     const mine = bookings
       .filter((b) => b.structureId === report.structureId)
       .map((b) => ({ extId: b.extId, guestName: gname.get(b.guestId) ?? "", checkIn: b.checkIn, checkOut: b.checkOut, total: b.total }));
-    return verifyOutcomes(report.outcomes, mine);
-  }, [ready, bookings, guests, report]);
+    const others = bookings
+      .filter((b) => b.structureId !== report.structureId && b.extId)
+      .map((b) => ({ extId: b.extId, guestName: gname.get(b.guestId) ?? "", checkIn: b.checkIn, checkOut: b.checkOut, total: b.total, structure: structureNames[b.structureId] ?? "un'altra struttura" }));
+    return verifyOutcomes(report.outcomes, mine, others);
+  }, [ready, bookings, guests, report, structureNames]);
 
   const reasons = useMemo(() => skipReasons(report.outcomes), [report]);
   const s = report.stats;
@@ -29,7 +32,8 @@ export default function RiepilogoImport({ report, bookings, guests }: { report: 
 
   const download = () => {
     const miss = new Set(v?.missing ?? []);
-    const blob = new Blob([outcomesToCsv(report.outcomes, miss)], { type: "text/csv;charset=utf-8" });
+    const els = new Map((v?.elsewhere ?? []).map((e) => [e.outcome, e.structure] as [typeof e.outcome, string]));
+    const blob = new Blob([outcomesToCsv(report.outcomes, miss, els)], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `riepilogo-importazione-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -77,6 +81,22 @@ export default function RiepilogoImport({ report, bookings, guests }: { report: 
         <div className="mt-3 rounded-xl border border-line bg-surface px-4 py-3 text-xs text-dim">
           <div className="mb-1 font-semibold text-txt">Righe scartate, per motivo</div>
           {reasons.map((r) => <div key={r.reason}>{r.count} · {r.reason}</div>)}
+        </div>
+      )}
+
+      {v && v.elsewhere.length > 0 && (
+        <div className="mt-3 rounded-xl border border-line bg-surface px-4 py-3 text-xs text-dim">
+          <div className="mb-1 font-semibold text-txt">{v.elsewhere.length} righe del file sono già in un&apos;altra struttura (non perse)</div>
+          {v.elsewhere.slice(0, 8).map((m) => <div key={m.outcome.row}>Riga {m.outcome.row} · {m.outcome.guest || "—"} · {fmtD(m.outcome.checkIn)} → {fmtD(m.outcome.checkOut)} · in {m.structure}</div>)}
+          {v.elsewhere.length > 8 && <div className="text-faint">…e altre {v.elsewhere.length - 8} nel file scaricabile</div>}
+          <div className="mt-1 text-faint">Se devono stare in questa struttura, spostale dal calendario.</div>
+        </div>
+      )}
+
+      {v && v.amountDiffs.length > 0 && (
+        <div className="mt-3 rounded-xl border border-line bg-surface px-4 py-3 text-xs text-dim">
+          <div className="mb-1 font-semibold text-txt">Importi diversi dal file</div>
+          {v.amountDiffs.slice(0, 8).map((d) => <div key={d.outcome.row}>Riga {d.outcome.row} · {d.outcome.guest || "—"} · {fmtD(d.outcome.checkIn)} → {fmtD(d.outcome.checkOut)} · file {eur(d.outcome.total ?? 0)} · Xenora {eur(d.system)}</div>)}
         </div>
       )}
 
