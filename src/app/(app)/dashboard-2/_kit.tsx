@@ -2,7 +2,7 @@
 
 // Mattoncini della Dashboard 2: riquadro, conteggio animato, anello, intestazioni.
 // Tutte le animazioni sono sobrie e si spengono con prefers-reduced-motion.
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import { tint } from "../_ui";
@@ -45,17 +45,19 @@ export function CountUp({ value, format = (n) => String(Math.round(n)), duration
 }
 
 /** Anello di avanzamento che si disegna all'apertura. */
-export function Ring({ pct, color, size = 168, stroke = 9, label, children }: { pct: number; color: string; size?: number | string; stroke?: number; label: string; children?: ReactNode }) {
+export function Ring({ pct, color, colorTo, track, glow, size = 168, stroke = 9, label, children }: { pct: number; color: string; colorTo?: string; track?: string; glow?: string; size?: number | string; stroke?: number; label: string; children?: ReactNode }) {
   const { on, reduced } = useEnter();
+  const gid = useId();
   const r = 50 - stroke / 2 - 1;
   const C = 2 * Math.PI * r;
   const p = Math.max(0, Math.min(100, pct));
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }} role="img" aria-label={label}>
-      <svg viewBox="0 0 100 100" className="h-full w-full" aria-hidden>
-        <circle cx="50" cy="50" r={r} fill="none" stroke={tint(color, 14)} strokeWidth={stroke} />
+      <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible" aria-hidden style={glow ? { filter: `drop-shadow(0 0 6px ${glow})` } : undefined}>
+        {colorTo && <defs><linearGradient id={gid} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={color} /><stop offset="100%" stopColor={colorTo} /></linearGradient></defs>}
+        <circle cx="50" cy="50" r={r} fill="none" stroke={track ?? tint(color, 14)} strokeWidth={stroke} />
         <circle
-          cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+          cx="50" cy="50" r={r} fill="none" stroke={colorTo ? `url(#${gid})` : color} strokeWidth={stroke} strokeLinecap="round"
           strokeDasharray={C} strokeDashoffset={on ? C * (1 - p / 100) : C} transform="rotate(-90 50 50)" opacity={p > 0 ? 1 : 0}
           style={{ transition: reduced ? "none" : "stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1) .2s" }}
         />
