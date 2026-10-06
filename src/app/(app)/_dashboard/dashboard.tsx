@@ -21,6 +21,7 @@ import {
   unassignedArrivals,
 } from "@/lib/dashboard";
 import Hero from "./_hero";
+import { useAuth } from "@/lib/authsync";
 import Adempimenti from "./_adempimenti";
 import Oggi, { type MoveRow } from "./_oggi";
 import Giorni from "./_giorni";
@@ -191,6 +192,8 @@ export default function Dashboard2() {
 
   const controlliOnTop = controlli.length > 0;
   const wrap = "min-w-0 [&>section]:h-full";
+  const { user: authUser } = useAuth();
+  const firstName = ((authUser?.user_metadata as Record<string, unknown> | undefined)?.full_name as string | undefined)?.trim().split(/\s+/)[0] || "";
   const SPAN: Record<number, string> = { 1: "lg:col-span-12", 2: "lg:col-span-6", 3: "lg:col-span-4" };
   const hasPickup = pickup.total > 0;
   const hasPren = leadHisto.total > 0 || stayHisto.total > 0;
@@ -201,7 +204,7 @@ export default function Dashboard2() {
       {/* key = struttura: cambiando struttura tutto si ridisegna con una transizione morbida */}
       <div key={sFilter} className="d2-fade flex flex-col gap-4">
         <Hero
-          greeting={greetingFor(clock.hour)} dateLabel={dateLabel} scopeLabel={scopeLabel}
+          greeting={`${greetingFor(clock.hour)}${firstName ? " " + firstName : ""}`} dateLabel={dateLabel} scopeLabel={scopeLabel}
           sentence={todaySentence(split.arrivals.length, split.departures.length, split.inHouse.length)}
           statusText={statusText} statusTone={statusTone} statusCount={stato.total}
           arrivals={split.arrivals.length} departures={split.departures.length} stays={split.inHouse.length}
@@ -214,10 +217,10 @@ export default function Dashboard2() {
           <div className={`order-6 lg:order-none ${SPAN[rowC]} ${wrap}`}><Incassi monthName={MESI[mIdx]} prevName={MESI[(mIdx + 11) % 12]} cur={cur} prev={prev} todayIdx={diffDays(today, monthStart)} adr={{ avg: rates.adrAvg, series: rates.adr }} revpar={{ avg: rates.revparAvg, series: rates.revpar }} delay={60} /></div>
           {channelRows.length > 0 && <div className={`order-7 lg:order-none ${SPAN[rowC]} ${wrap}`}><Canali rows={channelRows} total={cur.total} monthName={MESI[mIdx]} delay={120} /></div>}
           {countries.rows.length > 0 && <div className={`order-8 lg:order-none ${SPAN[rowC]} ${wrap}`}><Provenienza rows={countries.rows} known={countries.known} delay={180} /></div>}
-          {hasPren && <div className={`order-9 lg:order-none lg:col-span-5 ${wrap}`}><Prenotazioni lead={leadHisto} stay={stayHisto} delay={60} /></div>}
-          <div className={`${controlliOnTop ? "order-3" : "order-10"} lg:order-none ${hasPren ? "lg:col-span-7" : "lg:col-span-12"} ${wrap}`}><Controllo items={controlli} delay={120} /></div>
+          {hasPren && <div className={`order-9 lg:order-none lg:col-span-12 ${wrap}`}><Prenotazioni lead={leadHisto} stay={stayHisto} delay={60} /></div>}
           <div className={`order-11 lg:order-none lg:col-span-7 ${wrap}`}><Adempimenti items={items} total={stato.total} urgent={stato.urgent} loading={loadingAdem} health={health} delay={60} /></div>
-          <div className={`order-12 lg:order-none lg:col-span-5 ${wrap}`}><Oggi rows={rows} turnovers={split.turnoverUnits.size} onOpen={openBooking} delay={120} /></div>
+          <div className={`${controlliOnTop ? "order-3" : "order-10"} lg:order-none lg:col-span-5 ${wrap}`}><Controllo items={controlli} delay={120} /></div>
+          <div className="order-12 min-w-0 lg:order-none lg:col-span-12"><Oggi rows={rows} turnovers={split.turnoverUnits.size} onOpen={openBooking} delay={120} /></div>
         </div>
       </div>
     </div>

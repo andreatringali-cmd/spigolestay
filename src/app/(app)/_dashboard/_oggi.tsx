@@ -47,38 +47,45 @@ function Row({ r, onOpen }: { r: MoveRow; onOpen: (id: string) => void }) {
   );
 }
 
-export default function Oggi({ rows, turnovers, onOpen, delay = 0 }: { rows: MoveRow[]; turnovers: number; onOpen: (id: string) => void; delay?: number }) {
+const EMPTY = { arr: "Nessun arrivo oggi", dep: "Nessuna partenza oggi", stay: "Nessun ospite in casa" } as const;
+const ORDER = ["arr", "stay", "dep"] as const; // da sinistra a destra: arrivi, in casa, partenze
+const VISIBLE = { arr: 5, dep: 5, stay: STAY_VISIBLE } as const;
+
+function Colonna({ k, list, onOpen, delay }: { k: "arr" | "dep" | "stay"; list: MoveRow[]; onOpen: (id: string) => void; delay: number }) {
   const [all, setAll] = useState(false);
-  const groups = (["arr", "dep", "stay"] as const).map((k) => ({ k, list: rows.filter((r) => r.kind === k) })).filter((g) => g.list.length);
+  const meta = KIND[k];
+  const limit = VISIBLE[k];
+  const hidden = !all && list.length > limit + 1;
+  const shown = hidden ? list.slice(0, limit) : list;
+  const turn = k !== "stay" ? list.filter((r) => r.turnover).length : 0;
   return (
-    <Tile label="Oggi" delay={delay}>
-      <TileHead title="Oggi" sub={turnovers > 0 ? `${turnovers} turnover` : undefined} right={<MoreLink href="/prenotazioni">Prenotazioni</MoreLink>} />
-      {groups.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-faint">Nessun movimento, nessun ospite in casa.</div>
+    <Tile label={meta.title} delay={delay}>
+      <TileHead
+        title={<span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: meta.color }} />{meta.title}</span>}
+        count={list.length}
+        sub={turn > 0 ? `${turn} turnover` : undefined}
+        right={k === "arr" ? <MoreLink href="/prenotazioni">Prenotazioni</MoreLink> : undefined}
+      />
+      {list.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-line px-3 py-5 text-center text-sm text-faint">{EMPTY[k]}</div>
       ) : (
-        <div className="flex flex-col gap-4">
-          {groups.map((g) => {
-            const meta = KIND[g.k];
-            const hidden = g.k === "stay" && !all && g.list.length > STAY_VISIBLE + 1;
-            const list = hidden ? g.list.slice(0, STAY_VISIBLE) : g.list;
-            return (
-              <div key={g.k}>
-                <div className="mb-1 flex items-center gap-2 px-2">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: meta.color }} />
-                  <h3 className="text-[11px] font-bold uppercase tracking-wide" style={{ color: meta.color }}>{meta.title}</h3>
-                  <span className="font-mono text-[11px] text-faint">{g.list.length}</span>
-                </div>
-                <ul>{list.map((r) => <Row key={r.id} r={r} onOpen={onOpen} />)}</ul>
-                {hidden && (
-                  <button type="button" onClick={() => setAll(true)} className="ml-2 mt-1 rounded-lg px-2 py-1 text-xs font-semibold text-focus transition hover:bg-wash focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]">
-                    Mostra tutti ({g.list.length})
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <>
+          <ul>{shown.map((r) => <Row key={r.id} r={r} onOpen={onOpen} />)}</ul>
+          {hidden && (
+            <button type="button" onClick={() => setAll(true)} className="ml-2 mt-1 rounded-lg px-2 py-1 text-xs font-semibold text-focus transition hover:bg-wash focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus)]">
+              Mostra tutti ({list.length})
+            </button>
+          )}
+        </>
       )}
     </Tile>
+  );
+}
+
+export default function Oggi({ rows, onOpen, delay = 0 }: { rows: MoveRow[]; turnovers?: number; onOpen: (id: string) => void; delay?: number }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-3">
+      {ORDER.map((k, i) => <Colonna key={k} k={k} list={rows.filter((r) => r.kind === k)} onOpen={onOpen} delay={delay + i * 60} />)}
+    </div>
   );
 }
