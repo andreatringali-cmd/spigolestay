@@ -83,24 +83,19 @@ export default function SchedaGiorno({ groupSize, b, j: jIn, code, dim, typeLabe
           {(groupSize ?? 0) > 1 && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-focus">Gruppo · {groupSize} camere</span>}
           {b.status === "tentative" && <span className="rounded-full bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--warn)]">Opzione</span>}
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-dim">
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-dim">
           <span className="font-medium capitalize text-txt">{dayLabel(b.checkIn)}</span><span className="text-faint">→</span><span className="font-medium capitalize text-txt">{dayLabel(b.checkOut)}</span>
           <span className="text-faint">·</span><span>{n} {n === 1 ? "notte" : "notti"}</span>
           <span className="text-faint">·</span><span>{people} {people === 1 ? "ospite" : "ospiti"}</span>
           {tag && <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: tagTone, background: `color-mix(in srgb, ${tagTone} 12%, transparent)` }}>{tag}</span>}
+          {/* Avvisi: le cose da non perdere di vista, sulla stessa riga delle date */}
+          {avvisi.map((a) => (
+            <span key={a.key} title={a.title} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-[11px] font-semibold leading-snug" style={{ color: TONE[a.tone], background: `color-mix(in srgb, ${a.tone === "info" ? "var(--faint)" : TONE[a.tone]} 13%, transparent)` }}>
+              <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: TONE[a.tone] }} />
+              <span className="min-w-0">{a.label}</span>
+            </span>
+          ))}
         </div>
-
-        {/* Avvisi: le cose da non perdere di vista */}
-        {avvisi.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {avvisi.map((a) => (
-              <div key={a.key} title={a.title} className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold leading-snug" style={{ color: TONE[a.tone], background: `color-mix(in srgb, ${a.tone === "info" ? "var(--faint)" : TONE[a.tone]} 13%, transparent)` }}>
-                <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: TONE[a.tone] }} />
-                <span className="min-w-0">{a.label}</span>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* Passaggi */}
         {steps.length > 0 && (
