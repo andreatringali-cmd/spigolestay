@@ -767,7 +767,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
               })()}
             </div>
 
-            <div ref={scrollRef} className="flex-1 space-y-0.5 overflow-y-auto px-4 py-4" style={{ background: "color-mix(in srgb, var(--focus) 4%, var(--wash))" }}>
+            <div ref={scrollRef} className="flex-1 space-y-0.5 overflow-x-hidden overflow-y-auto px-4 py-4" style={{ background: "color-mix(in srgb, var(--focus) 4%, var(--wash))" }}>
               {msgs.length === 0 && <div className="mt-6 text-center text-xs text-faint">{t("Nessun messaggio. Scrivi qui sotto per iniziare.")}</div>}
               {msgs.map((m, i) => {
                 const prev = msgs[i - 1];
@@ -798,9 +798,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                   <div key={m.id}>
                     {showDay && <div className="my-4 flex justify-center"><span className="rounded-full border border-line bg-surface px-3 py-1 text-[10px] font-semibold capitalize text-dim shadow-sm">{dayLabel(m.ts, t)}</span></div>}
                     <div className={`flex ${groupEnd ? "mb-2.5" : "mb-0.5"} ${out ? "justify-end" : "justify-start"}`}>
-                      <div className={`flex max-w-[78%] flex-col ${out ? "items-end" : "items-start"}`}>
+                      <div className={`flex min-w-0 max-w-[min(78%,34rem)] flex-col ${out ? "items-end" : "items-start"}`}>
                         <div
-                          className={`relative rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-sm ${out ? `text-white ${groupEnd ? "rounded-br-sm" : ""}` : `border border-line bg-surface text-txt ${groupEnd ? "rounded-bl-sm" : ""}`}`}
+                          className={`relative min-w-0 max-w-full rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-sm ${out ? `text-white ${groupEnd ? "rounded-br-sm" : ""}` : `border border-line bg-surface text-txt ${groupEnd ? "rounded-bl-sm" : ""}`}`}
                           style={out ? { backgroundColor: "var(--focus)" } : undefined}
                         >
                           {groupEnd && (
@@ -810,7 +810,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                           )}
                           {isAiReply && <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold">🤖 {t("Risposta automatica")}</div>}
                           {m.media?.kind === "audio" && <VoiceNote mediaId={m.media.id} transcribed={m.media.transcribed} />}
-                          <div className="whitespace-pre-wrap break-words">{m.text}</div>
+                          <div className="whitespace-pre-wrap [overflow-wrap:anywhere]">{m.text}</div>
                           <LinkPreview text={m.text} />
                         </div>
                         {groupEnd && <div className="mt-1 px-1 text-[10px] text-faint">{hhmm}{m.via ? ` · ${m.via}` : ""}{out && m.st && (
