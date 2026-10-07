@@ -24,7 +24,7 @@ export default function StackedColumns({ bars, height = 132, barWidth = 26, form
   if (!bars.length) return <div className="py-6 text-center text-sm text-faint">Nessun dato nel periodo</div>;
 
   return (
-    <div className="pt-1">
+    <div className="flex flex-1 flex-col pt-1">
       <div className="flex gap-2">
         <div className="flex w-8 shrink-0 flex-col justify-between py-[1px] text-right font-mono text-[9px] tabular-nums text-faint" style={{ height }}>
           {ticks.map((t, i) => (<span key={i} className="-translate-y-1/2 leading-none first:translate-y-0 last:translate-y-0">{compact(t)}</span>))}
@@ -53,7 +53,7 @@ export default function StackedColumns({ bars, height = 132, barWidth = 26, form
           </div>
         </div>
       </div>
-      <div className="mt-1.5 flex gap-2">
+      <div className="mb-2 mt-1.5 flex gap-2">
         <div className="w-8 shrink-0" />
         <div className="flex flex-1 justify-between gap-[6px]">
           {bars.map((b, i) => (
@@ -62,7 +62,7 @@ export default function StackedColumns({ bars, height = 132, barWidth = 26, form
         </div>
       </div>
       {present.length > 1 && (
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-dim">
+        <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-2 text-[10px] text-dim">
           {present.map((c) => (<span key={c} className="inline-flex items-center gap-1"><ChannelLogo channel={c} size={14} />{CHANNELS[c].label}</span>))}
         </div>
       )}

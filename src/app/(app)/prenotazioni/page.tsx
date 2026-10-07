@@ -413,7 +413,7 @@ export default function PrenotazioniPage() {
               node: (
                 <Card className="flex h-full flex-col">
                   <SectionTitle>{t(c.title)}</SectionTitle>
-                  <div className="flex-1">{c.node}</div>
+                  <div className="flex flex-1 flex-col">{c.node}</div>
                 </Card>
               ),
             }))}

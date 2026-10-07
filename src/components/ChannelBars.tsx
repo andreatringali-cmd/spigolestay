@@ -13,8 +13,8 @@ export default function ChannelBars({ rows, fmtEur }: { rows: Row[]; fmtEur: (n:
   const maxR = Math.max(1, ...rows.map((r) => r.revenue));
   const present = (Object.keys(CHANNELS) as Channel[]).filter((c) => rows.some((r) => r.parts?.some((p) => p.channel === c && (p.revenue > 0 || p.count > 0))));
   return (
-    <div>
-    <div className={`flex ${present.length > 0 ? "max-h-[180px]" : "max-h-[210px]"} flex-col gap-3 overflow-y-auto pr-1 pt-1`} style={{ scrollbarWidth: "thin" }}>
+    <div className="flex flex-1 flex-col">
+    <div className={`mb-2 flex ${present.length > 0 ? "max-h-[180px]" : "max-h-[210px]"} flex-col gap-3 overflow-y-auto pr-1 pt-1`} style={{ scrollbarWidth: "thin" }}>
       {rows.map((r, i) => (
         <div key={i}>
           <div className="mb-1 flex items-center justify-between gap-2 text-xs">
@@ -32,7 +32,7 @@ export default function ChannelBars({ rows, fmtEur }: { rows: Row[]; fmtEur: (n:
       ))}
     </div>
       {present.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-2 text-[10px] text-dim">
+        <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-2 text-[10px] text-dim">
           {present.map((c) => (<span key={c} className="inline-flex items-center gap-1"><ChannelLogo channel={c} size={14} />{CHANNELS[c].label}</span>))}
         </div>
       )}
