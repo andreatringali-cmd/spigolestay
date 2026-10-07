@@ -1,7 +1,7 @@
 // Registro degli invii automatici: ogni tentativo lascia una riga con l'esito, così un messaggio non arrivato ha sempre una spiegazione.
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export interface InvioLog { job: "pulizie" | "messaggi"; ref?: string; channel: "whatsapp" | "email"; ok: boolean; detail?: string; wamid?: string }
+export interface InvioLog { job: "pulizie" | "messaggi" | "ota_msg"; ref?: string; channel: "whatsapp" | "email"; ok: boolean; detail?: string; wamid?: string }
 
 /** Scrive l'esito di un invio. Non solleva mai errori: il registro non deve rompere l'invio. */
 export async function logInvio(admin: SupabaseClient, tenantId: string, e: InvioLog): Promise<void> {

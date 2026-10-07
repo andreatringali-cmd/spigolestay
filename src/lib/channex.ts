@@ -101,10 +101,10 @@ export async function setChannelPriceCorrection(channelId: string, steps: [strin
 export async function listWebhooks(propertyId: string) {
   return channex<{ data: { id: string; attributes?: { callback_url?: string; is_active?: boolean } }[] }>(`/webhooks?filter[property_id]=${encodeURIComponent(propertyId)}`);
 }
-export async function createWebhook(propertyId: string, callbackUrl: string) {
+export async function createWebhook(propertyId: string, callbackUrl: string, eventMask = "booking", headers?: Record<string, string>) {
   return channex<Created>("/webhooks", {
     method: "POST",
-    body: JSON.stringify({ webhook: { property_id: propertyId, callback_url: callbackUrl, event_mask: "booking", is_active: true, send_data: true } }),
+    body: JSON.stringify({ webhook: { property_id: propertyId, callback_url: callbackUrl, event_mask: eventMask, is_active: true, send_data: true, ...(headers ? { headers } : {}) } }),
   });
 }
 

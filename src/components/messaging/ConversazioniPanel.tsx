@@ -256,14 +256,14 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
         const seenSet = new Set(seen);
         const nuovi = r.messages.filter((m) => m.sender === "guest" && m.id && !seenSet.has(m.id) && (m.message || "").trim());
         if (nuovi.length) {
-          nuovi.forEach((m) => addTo(gid, "in", m.message || "", "Booking.com"));
+          nuovi.forEach((m) => addTo(gid, "in", m.message || "", "Booking.com", `chx:${m.id}`));
           try { localStorage.setItem(seenKey, JSON.stringify([...seen, ...nuovi.map((m) => m.id)].slice(-300))); } catch {}
         }
       })
       .catch(() => {});
   }, [chxBookingId, sel]);
 
-  const addTo = (gid: string, dir: "out" | "in", text: string, via?: string): string | undefined => { if (!text.trim()) return undefined; const id = uid(); setThreads((tt) => ({ ...tt, [gid]: [...(tt[gid] ?? []), { id, dir, text: text.trim(), ts: Date.now(), via }] })); playSound(dir === "out" ? "sent" : "received"); return id; };
+  const addTo = (gid: string, dir: "out" | "in", text: string, via?: string, fixedId?: string): string | undefined => { if (!text.trim()) return undefined; const id = fixedId ?? uid(); setThreads((tt) => (fixedId && (tt[gid] ?? []).some((m) => m.id === fixedId) ? tt : { ...tt, [gid]: [...(tt[gid] ?? []), { id, dir, text: text.trim(), ts: Date.now(), via }] })); playSound(dir === "out" ? "sent" : "received"); return id; };
   const add = (dir: "out" | "in", text: string, via?: string) => (sel ? addTo(sel, dir, text, via) : undefined);
   // Collega a un messaggio in uscita l'id WhatsApp (wamid): serve per le spunte di consegna/lettura.
   const markSent = (gid: string, id: string, wid: string) => setThreads((tt) => ({ ...tt, [gid]: (tt[gid] ?? []).map((m) => (m.id === id ? { ...m, wid, st: m.st ?? "sent" } : m)) }));
