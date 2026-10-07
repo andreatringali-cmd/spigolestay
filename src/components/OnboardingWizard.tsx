@@ -54,7 +54,19 @@ export default function OnboardingWizard() {
     try { const d = JSON.parse(kvGet("spigolestay:data:v1") || "{}"); setHasData(Array.isArray(d.structures) && d.structures.length > 0); } catch {}
   }, []);
   const skipOnboarding = () => { markOnboarded(); setActive(false); };
-  const { enabled: authEnabled, signOut } = useAuth();
+  const { enabled: authEnabled, signOut, user: authUser } = useAuth();
+
+  // Username scelto nel primo passo (pagina di login, arrivo dall'email di benvenuto) e email
+  // dell'account appena autenticato: precompilano i passi "Il tuo profilo" e "Il tuo accesso"
+  // così non si richiedono due volte le stesse informazioni.
+  useEffect(() => {
+    if (authUser?.email) setEmail((e) => e || authUser.email!);
+    try {
+      const pre = localStorage.getItem("xn-prefill-username");
+      if (pre) { setUsername(pre); localStorage.removeItem("xn-prefill-username"); }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser?.email]);
 
   const [step, setStep] = useState(0);
   // Profilo

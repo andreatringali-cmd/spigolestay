@@ -35,6 +35,8 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
+  const [pwd2, setPwd2] = useState("");
+  const [username, setUsername] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [show, setShow] = useState(false);
@@ -48,14 +50,16 @@ export default function LoginPage() {
   const [captchaKey, setCaptchaKey] = useState(0); // cambiando la key si rigenera il token (monouso)
   const resetCaptcha = () => { setCaptchaToken(null); setCaptchaKey((k) => k + 1); };
 
-  // Link dall'email di benvenuto per chi non è su Gmail (?mode=signup&email=...): apre già in
-  // modalità registrazione con l'indirizzo precompilato, pronta per scegliere la password.
+  // Link dall'email di benvenuto per chi non è su Gmail (?mode=signup&email=...): primo passo
+  // "credenziali" semplificato (username + email precompilata + password), coerente col wizard
+  // che segue subito dopo — invece della pagina di login completa con tutte le altre opzioni.
+  const [inviteFlow, setInviteFlow] = useState(false);
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const qEmail = params.get("email");
       if (qEmail) setEmail(qEmail);
-      if (params.get("mode") === "signup") setMode("signup");
+      if (params.get("mode") === "signup") { setMode("signup"); if (qEmail) setInviteFlow(true); }
     } catch {}
   }, []);
 
@@ -102,12 +106,17 @@ export default function LoginPage() {
         router.push(afterLoginPath());
       } else {
         if (pwd.length < 8) { setErr("La password deve avere almeno 8 caratteri."); return; }
+        if (inviteFlow) {
+          if (!username.trim() || username.trim().length < 3) { setErr("Scegli un nome utente di almeno 3 caratteri."); return; }
+          if (pwd !== pwd2) { setErr("Le due password non coincidono."); return; }
+        }
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: pwd,
           options: { data: { full_name: name.trim(), phone: phone.trim() }, emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined, captchaToken: captchaToken ?? undefined },
         });
         if (error) { setErr(traduci(error.message)); return; }
+        if (inviteFlow) { try { localStorage.setItem("xn-prefill-username", username.trim()); } catch {} }
         if (data.session) router.push(afterLoginPath());
         else { setInfo("Ti abbiamo inviato un'email di conferma. Apri il link e poi torna qui per accedere."); setMode("login"); }
       }
@@ -168,7 +177,44 @@ export default function LoginPage() {
             {/* Slogan di marca: resta in inglese in ogni lingua (volutamente non passa dal sistema i18n) */}
           </div>
 
-          {recovery ? (
+          {inviteFlow ? (
+            <>
+              <div className="mb-4 flex items-center justify-between text-[11px] font-medium text-[#9a9186]">
+                <span>Passo 1 di 7</span><span>Il tuo accesso</span>
+              </div>
+              <div className="mb-5 h-1.5 overflow-hidden rounded-full bg-[#f0eee9]"><div className="h-full rounded-full bg-[#2f6bb0]" style={{ width: "14%" }} /></div>
+              <h1 className="text-2xl font-bold tracking-tight">Crea le tue credenziali</h1>
+              <p className="mt-1 text-sm text-[#6b6459]">Scegli un nome utente e una password: ci vuole un minuto, poi si parte con la configurazione della tua struttura.</p>
+              <form onSubmit={submit} className="mt-6">
+                <label className="mb-3 block">
+                  <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Nome utente</span>
+                  <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="es. mario.rossi" className={fld} disabled={busy} autoFocus required minLength={3} />
+                </label>
+                <label className="mb-3 block">
+                  <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Email</span>
+                  <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={fld} disabled={busy} />
+                </label>
+                <label className="mb-3 block">
+                  <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Password</span>
+                  <div className="relative">
+                    <input type={show ? "text" : "password"} required minLength={8} value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="••••••••" className={`${fld} pr-16`} disabled={busy} />
+                    <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-[11px] font-semibold text-[#6b6459] hover:text-[#1f1b16]">{show ? "Nascondi" : "Mostra"}</button>
+                  </div>
+                  <span className="mt-1 block text-[11px] text-[#9a9186]">Almeno 8 caratteri.</span>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[13px] font-medium text-[#4a453d]">Ripeti password</span>
+                  <input type={show ? "text" : "password"} required minLength={8} value={pwd2} onChange={(e) => setPwd2(e.target.value)} placeholder="••••••••" className={fld} disabled={busy} />
+                </label>
+
+                {TURNSTILE_SITE_KEY && <Turnstile key={captchaKey} siteKey={TURNSTILE_SITE_KEY} onToken={setCaptchaToken} />}
+                {err && <div className="mt-4 rounded-lg border border-[#f0c2c2] bg-[#fdf1f1] px-3 py-2.5 text-[13px] font-medium text-[#c0392b]">{err}</div>}
+                {info && <div className="mt-4 rounded-lg border border-[#e2ded7] bg-[#f6f4f1] px-3 py-2.5 text-[13px] text-[#4a453d]">{info}</div>}
+
+                <button type="submit" disabled={busy} className={`mt-5 ${primaryBtn}`}>{busy ? "Attendi…" : "Continua →"}</button>
+              </form>
+            </>
+          ) : recovery ? (
             <>
               <h1 className="text-2xl font-bold tracking-tight">Imposta una nuova password</h1>
               <p className="mt-1 text-sm text-[#6b6459]">Scegli la nuova password per il tuo account.</p>
