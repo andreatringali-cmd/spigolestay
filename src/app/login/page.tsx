@@ -78,12 +78,27 @@ export default function LoginPage() {
       })();
       return;
     }
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) { router.replace(afterLoginPath()); return; }
+    supabase.auth.getSession().then(async ({ data }) => {
+      const params = new URLSearchParams(window.location.search);
+      const linkEmail = (params.get("email") || "").trim().toLowerCase();
+      if (data.session) {
+        // Link di invito per UN'email precisa (?email=...), ma il browser è già loggato con
+        // un account DIVERSO (sessione rimasta aperta da un test/uso precedente): senza questo
+        // controllo si finiva dentro all'account sbagliato, mostrando i suoi dati invece di
+        // partire da zero con l'email per cui è stato approvato l'accesso.
+        const sessionEmail = (data.session.user?.email || "").trim().toLowerCase();
+        if (linkEmail && sessionEmail && linkEmail !== sessionEmail) {
+          try { await supabase!.auth.signOut(); } catch {}
+          setInfo(`Questo browser era collegato come ${sessionEmail}: ti abbiamo disconnesso. Continua qui sotto con ${linkEmail}.`);
+        } else {
+          router.replace(afterLoginPath());
+          return;
+        }
+      }
       // Link diretto dall'email (?auto=google): parte subito il login Google, un click solo,
       // invece di aprire la pagina e aspettare che la persona prema di nuovo "Accedi con Google".
       try {
-        const auto = new URLSearchParams(window.location.search).get("auto");
+        const auto = params.get("auto");
         if (auto === "google") void oauth("google");
       } catch {}
     });
