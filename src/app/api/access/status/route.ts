@@ -6,13 +6,10 @@ export const dynamic = "force-dynamic";
 
 // Cancello di accesso "su invito": stabilisce se l'utente autenticato può ENTRARE nell'app.
 // Xenora non è a registrazione aperta — chi entra con Google ma non è approvato viene bloccato.
-// Ammessi:
-//  1) gli OWNER/admin (ADMIN_EMAILS),
-//  2) gli utenti GIÀ esistenti (hanno un app_state) — grandfather, nessun lockout,
-//  3) i co-gestori con una membership,
-//  4) gli invitati con un invito ancora da accettare (org_invites, accepted_at null),
-//  5) le email in access_allowlist (approvate dall'owner dal back-office).
-// Tutti gli altri: allowed=false → il client li disconnette e mostra "accesso su invito".
+// Regola VOLUTAMENTE semplice e assoluta: email in access_allowlist → entra, altrimenti no.
+// Nessun "utente già esistente" grandfather: così "Rimuovi" da Accessi revoca DAVVERO l'accesso,
+// anche a chi ha già usato l'app (prima la rimozione non aveva effetto su chi aveva già uno
+// stato salvato). Unica eccezione: gli OWNER/admin (ADMIN_EMAILS), che non possono auto-bloccarsi.
 // In caso di errore tecnico: fail-open (allowed=true) per non bloccare clienti legittimi su un
 // problema transitorio; i dati restano comunque isolati da RLS.
 
@@ -36,24 +33,11 @@ export async function GET(req: Request) {
     const email = (user.email || "").toLowerCase();
 
     if (email && OWNER_EMAILS.includes(email)) return NextResponse.json({ allowed: true, reason: "owner" });
+    if (!email) return NextResponse.json({ allowed: false, reason: "not_approved" }, { status: 200 });
 
-    // Utente già esistente (ha uno stato personale) → sempre ammesso.
-    const { data: st } = await admin.from("app_state").select("user_id").eq("user_id", user.id).maybeSingle();
-    if (st) return NextResponse.json({ allowed: true, reason: "existing" });
-
-    // Co-gestore con membership.
-    const { data: mem } = await admin.from("memberships").select("org_id").eq("user_id", user.id).limit(1);
-    if (mem && mem.length) return NextResponse.json({ allowed: true, reason: "member" });
-
-    if (email) {
-      // Invito ancora da accettare (deve poter entrare per accettarlo).
-      const { data: inv } = await admin.from("org_invites").select("id").eq("email", email).is("accepted_at", null).limit(1);
-      if (inv && inv.length) return NextResponse.json({ allowed: true, reason: "invited" });
-
-      // Email approvata in allowlist.
-      const { data: al } = await admin.from("access_allowlist").select("email").eq("email", email).maybeSingle();
-      if (al) return NextResponse.json({ allowed: true, reason: "allowlist" });
-    }
+    // Email approvata in allowlist: unica condizione di ingresso.
+    const { data: al } = await admin.from("access_allowlist").select("email").eq("email", email).maybeSingle();
+    if (al) return NextResponse.json({ allowed: true, reason: "allowlist" });
 
     return NextResponse.json({ allowed: false, reason: "not_approved" }, { status: 200 });
   } catch {
