@@ -82,8 +82,12 @@ function wipeLocalAccount() {
 // precedente — un vero incidente di sicurezza/isolamento dati, non solo un fastidio nei test.
 const LOCAL_OWNER_KEY = "spigolestay:localowner";
 function markLocalOwner(uid: string) { try { localStorage.setItem(LOCAL_OWNER_KEY, uid); } catch {} }
+// Ci si fida del locale SOLO con conferma positiva che è di questo uid — non il contrario
+// ("sospetto solo se so che è di un altro"). Un dispositivo già contaminato PRIMA che questo
+// controllo esistesse non ha ancora nessun marcatore: deve comunque essere trattato come
+// estraneo, non come "non so, quindi va bene". Si autocorregge dal primo accesso in poi.
 function localBelongsToOther(uid: string): boolean {
-  try { const o = localStorage.getItem(LOCAL_OWNER_KEY); return !!o && o !== uid; } catch { return false; }
+  try { return localStorage.getItem(LOCAL_OWNER_KEY) !== uid; } catch { return true; }
 }
 
 // Ricarica la pagina in modo SICURO: applica gli aggiornamenti scaricati dal server
