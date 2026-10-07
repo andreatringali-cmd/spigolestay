@@ -20,6 +20,7 @@ import Donut from "@/components/Donut";
 import ChannelBars from "@/components/ChannelBars";
 import Bars from "@/components/Bars";
 import ColumnChart from "@/components/ColumnChart";
+import StackedColumns from "@/components/StackedColumns";
 import RankBars from "@/components/RankBars";
 import LineChart from "@/components/LineChart";
 import DateField from "@/components/DateField";
@@ -269,7 +270,7 @@ export default function PrenotazioniPage() {
   const chColor = (c: Channel) => `var(${CHANNELS[c].cssVar})`;
   // Tutti i dati dei grafici in un'unica passata memorizzata: con "Tutte (da sempre)" sono migliaia di prenotazioni e non si devono rifare a ogni clic.
   /* eslint-disable react-hooks/exhaustive-deps */
-  const { byChannel, channelRows, structureRows, stayDist, byMonth, revByMonth, roomTypeRows, byCountry } = useMemo(() => {
+  const { byChannel, channelRows, structureRows, stayDist, byMonth, revByMonth, roomTypeRows, byCountry, monthStack } = useMemo(() => {
     const guestMap = new Map(guests.map((g) => [g.id, g]));
     const unitMap = new Map(units.map((u) => [u.id, u]));
     const rtMap = new Map(roomTypes.map((r) => [r.id, r.name]));
@@ -301,7 +302,22 @@ export default function PrenotazioniPage() {
   const countryAgg: Record<string, number> = {};
   filtered.forEach((b) => { const c = guestMap.get(b.guestId)?.country ?? "—"; countryAgg[c] = (countryAgg[c] || 0) + 1; });
   const byCountry = Object.entries(countryAgg).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v, color: flagColor(k), fill: flagGradient(k) }));
-    return { byChannel, channelRows, structureRows, stayDist, byMonth, revByMonth, roomTypeRows, byCountry };
+    // Divisione per canale (colori delle OTA): per struttura, per tipologia e per mese.
+    type Parts = Map<string, Map<Channel, { count: number; revenue: number }>>;
+    const addPart = (m: Parts, key: string, ch: Channel, rev: number) => { let c = m.get(key); if (!c) { c = new Map(); m.set(key, c); } const x = c.get(ch) ?? { count: 0, revenue: 0 }; x.count++; x.revenue += rev; c.set(ch, x); };
+    const stParts: Parts = new Map(), rtParts: Parts = new Map(), moParts: Parts = new Map();
+    const stName = new Map(structures.map((s) => [s.id, s.name]));
+    filtered.forEach((b) => {
+      const rev = b.total ?? 0;
+      const sn = stName.get(b.structureId); if (sn) addPart(stParts, sn, b.channel, rev);
+      const u = b.unitId ? unitMap.get(b.unitId) : undefined; const tn = u ? rtMap.get(u.roomTypeId) : null; if (tn) addPart(rtParts, tn, b.channel, rev);
+      addPart(moParts, String(parseISO(b.checkIn).getMonth()), b.channel, rev);
+    });
+    const partsOf = (m: Parts, key: string) => Array.from(m.get(key) ?? []).map(([channel, v]) => ({ channel, count: v.count, revenue: Math.round(v.revenue) }));
+    const structureRowsCh = structureRows.map((r) => ({ ...r, parts: partsOf(stParts, r.label) }));
+    const roomTypeRowsCh = roomTypeRows.map((r) => ({ ...r, parts: partsOf(rtParts, r.label) }));
+    const monthStack = Object.keys(monthAgg).map(Number).sort((a, b) => a - b).map((mo) => ({ label: MONTHS[mo], segs: partsOf(moParts, String(mo)).map((p) => ({ channel: p.channel, value: p.count })) }));
+    return { byChannel, channelRows, structureRows: structureRowsCh, stayDist, byMonth, revByMonth, roomTypeRows: roomTypeRowsCh, byCountry, monthStack };
   }, [filtered, guests, units, roomTypes, structures]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
@@ -311,7 +327,7 @@ export default function PrenotazioniPage() {
     { key: "ch-mix", title: "Prenotazioni e ricavi per canale", wide: true, node: <ChannelBars rows={channelRows} fmtEur={eur} /> },
     { key: "str-mix", title: "Prenotazioni e ricavi per struttura", perStructure: true, wide: true, node: <ChannelBars rows={structureRows} fmtEur={eur} /> },
     { key: "stay", title: "Durata soggiorno", node: <Donut data={stayDist} showPercent={false} /> },
-    { key: "month", title: "Prenotazioni per mese", node: <ColumnChart bars={byMonth} barWidth={26} /> },
+    { key: "month", title: "Prenotazioni per mese", node: <StackedColumns bars={monthStack} barWidth={26} /> },
     { key: "rev-month", title: "Ricavi per mese", wide: true, node: <LineChart points={revByMonth} format={(n) => eur(n)} color="var(--ok)" everyLabel={1} /> },
     { key: "rt-mix", title: "Prenotazioni e ricavi per tipologia", wide: true, node: <ChannelBars rows={roomTypeRows} fmtEur={eur} /> },
     { key: "country", title: "Provenienza per paese", wide: true, node: <RankBars items={byCountry} top={6} /> },
