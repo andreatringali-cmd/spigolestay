@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { buildApprovalToken } from "@/lib/allowlist-approve";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,6 +50,11 @@ export async function POST(req: Request) {
     }
     if (!KEY) return NextResponse.json({ ok: false, error: "Invio email non configurato." }, { status: 500, headers: cors });
 
+    const approval = buildApprovalToken(email);
+    const approveUrl = approval
+      ? `${process.env.NEXT_PUBLIC_APP_URL || "https://xenora-app.vercel.app"}/api/admin/allowlist/approve?e=${encodeURIComponent(approval.e)}&t=${approval.t}&s=${approval.s}`
+      : null;
+
     const html = `
       <div style="font-family:system-ui,Segoe UI,Roboto,sans-serif;font-size:15px;color:#1f2430">
         <h2 style="margin:0 0 12px">Nuova richiesta demo · Xenora</h2>
@@ -59,6 +65,7 @@ export async function POST(req: Request) {
           ${structure ? `<tr><td style="padding:4px 12px 4px 0;color:#6b7280">Struttura</td><td style="padding:4px 0">${esc(structure)}</td></tr>` : ""}
         </table>
         ${message ? `<p style="margin:14px 0 0;color:#6b7280">Messaggio</p><p style="margin:4px 0;white-space:pre-wrap">${esc(message)}</p>` : ""}
+        ${approveUrl ? `<p style="margin:20px 0"><a href="${approveUrl}" style="display:inline-block;background:#1f6feb;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600">✅ Approva accesso a ${esc(email)}</a></p><p style="color:#9aa3b2;font-size:12px;margin:0 0 14px">Link valido 30 giorni. In alternativa puoi sempre approvare da Accessi nell'app.</p>` : ""}
         <hr style="margin:18px 0;border:none;border-top:1px solid #e5e7eb">
         <p style="color:#9aa3b2;font-size:12px;margin:0">Inviata dal form "Richiedi una demo" della vetrina.</p>
       </div>`;
