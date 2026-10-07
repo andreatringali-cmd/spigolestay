@@ -47,15 +47,11 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
  * non come una notifica di sistema — logo, tono caldo, un accenno di cosa trova dentro. */
 export async function notifyAccessApproved(email: string): Promise<boolean> {
   if (!RESEND) return false;
-  // Gmail → quasi certamente un account Google: un click avvia subito l'OAuth. Altri domini
-  // (anche Google Workspace su dominio proprio non è rilevabile) → portiamo dritti alla
-  // registrazione email+password, con l'indirizzo già precompilato, invece di tentare un
-  // login Google che per loro fallirebbe o confonderebbe.
-  const isGmail = /@gmail\.com$/i.test(email);
-  const loginUrl = isGmail
-    ? `${APP_URL}/login?auto=google`
-    : `${APP_URL}/login?mode=signup&email=${encodeURIComponent(email)}`;
-  const ctaNote = isGmail ? "" : " (scegli una password per completare la registrazione)";
+  // Sempre il "Passo 1" (username + email precompilata + password), per chiunque — a prescindere
+  // dal dominio dell'email. Il login con Google resta disponibile come opzione in un secondo
+  // momento dalla pagina di login, ma non è la scorciatoia di default da questo link.
+  const loginUrl = `${APP_URL}/login?mode=signup&email=${encodeURIComponent(email)}`;
+  const ctaNote = " (scegli una password per completare la registrazione)";
   const html = `<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
   <body style="margin:0;background:#eef1f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2430;">
   <div style="max-width:540px;margin:0 auto;padding:40px 16px;">
