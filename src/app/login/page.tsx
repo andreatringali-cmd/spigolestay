@@ -48,6 +48,17 @@ export default function LoginPage() {
   const [captchaKey, setCaptchaKey] = useState(0); // cambiando la key si rigenera il token (monouso)
   const resetCaptcha = () => { setCaptchaToken(null); setCaptchaKey((k) => k + 1); };
 
+  // Link dall'email di benvenuto per chi non è su Gmail (?mode=signup&email=...): apre già in
+  // modalità registrazione con l'indirizzo precompilato, pronta per scegliere la password.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const qEmail = params.get("email");
+      if (qEmail) setEmail(qEmail);
+      if (params.get("mode") === "signup") setMode("signup");
+    } catch {}
+  }, []);
+
   useEffect(() => {
     if (!supabaseEnabled || !supabase) return;
     const hash = typeof window !== "undefined" ? window.location.hash : "";

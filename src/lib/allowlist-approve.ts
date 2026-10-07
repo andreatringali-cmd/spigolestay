@@ -47,6 +47,15 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
  * non come una notifica di sistema — logo, tono caldo, un accenno di cosa trova dentro. */
 export async function notifyAccessApproved(email: string): Promise<boolean> {
   if (!RESEND) return false;
+  // Gmail → quasi certamente un account Google: un click avvia subito l'OAuth. Altri domini
+  // (anche Google Workspace su dominio proprio non è rilevabile) → portiamo dritti alla
+  // registrazione email+password, con l'indirizzo già precompilato, invece di tentare un
+  // login Google che per loro fallirebbe o confonderebbe.
+  const isGmail = /@gmail\.com$/i.test(email);
+  const loginUrl = isGmail
+    ? `${APP_URL}/login?auto=google`
+    : `${APP_URL}/login?mode=signup&email=${encodeURIComponent(email)}`;
+  const ctaNote = isGmail ? "" : " (scegli una password per completare la registrazione)";
   const html = `<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
   <body style="margin:0;background:#eef1f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2430;">
   <div style="max-width:540px;margin:0 auto;padding:40px 16px;">
@@ -59,10 +68,10 @@ export async function notifyAccessApproved(email: string): Promise<boolean> {
         <div style="color:#fff;font-size:21px;font-weight:700;letter-spacing:-.01em;">Benvenuto in Xenora</div>
       </div>
       <div style="padding:30px 32px 8px;font-size:15px;line-height:1.65;">
-        <p style="margin:0 0 16px;">Il tuo accesso è stato approvato: puoi entrare subito con il login Google su questo indirizzo (<b>${esc(email)}</b>).</p>
+        <p style="margin:0 0 16px;">Il tuo accesso è stato approvato: puoi entrare subito su questo indirizzo (<b>${esc(email)}</b>)${ctaNote}.</p>
         <p style="margin:0 0 24px;color:#5b6472;">Xenora è il gestionale che unisce PMS, Channel Manager e revenue in un unico posto: al primo accesso ti guidiamo passo passo nella configurazione della tua struttura.</p>
         <div style="margin:0 0 8px;">
-          <a href="${APP_URL}/login?auto=google" style="display:block;text-align:center;background:#1f2430;color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:15px;border-radius:12px;">Accedi a Xenora →</a>
+          <a href="${loginUrl}" style="display:block;text-align:center;background:#1f2430;color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:15px;border-radius:12px;">Accedi a Xenora →</a>
         </div>
       </div>
       <div style="padding:18px 32px 28px;border-top:1px solid #eef0f3;margin-top:18px;">
