@@ -62,7 +62,7 @@ export async function notifyAccessApproved(email: string): Promise<boolean> {
         <p style="margin:0 0 16px;">Il tuo accesso è stato approvato: puoi entrare subito con il login Google su questo indirizzo (<b>${esc(email)}</b>).</p>
         <p style="margin:0 0 24px;color:#5b6472;">Xenora è il gestionale che unisce PMS, Channel Manager e revenue in un unico posto: al primo accesso ti guidiamo passo passo nella configurazione della tua struttura.</p>
         <div style="margin:0 0 8px;">
-          <a href="${APP_URL}/login" style="display:block;text-align:center;background:#1f2430;color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:15px;border-radius:12px;">Accedi a Xenora →</a>
+          <a href="${APP_URL}/login?auto=google" style="display:block;text-align:center;background:#1f2430;color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:15px;border-radius:12px;">Accedi a Xenora →</a>
         </div>
       </div>
       <div style="padding:18px 32px 28px;border-top:1px solid #eef0f3;margin-top:18px;">

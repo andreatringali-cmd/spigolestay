@@ -63,7 +63,16 @@ export default function LoginPage() {
       })();
       return;
     }
-    supabase.auth.getSession().then(({ data }) => { if (data.session) router.replace(afterLoginPath()); });
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) { router.replace(afterLoginPath()); return; }
+      // Link diretto dall'email (?auto=google): parte subito il login Google, un click solo,
+      // invece di aprire la pagina e aspettare che la persona prema di nuovo "Accedi con Google".
+      try {
+        const auto = new URLSearchParams(window.location.search).get("auto");
+        if (auto === "google") void oauth("google");
+      } catch {}
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   // Se il cancello di accesso ha rifiutato l'utente (registrazione su invito), mostra l'avviso.
