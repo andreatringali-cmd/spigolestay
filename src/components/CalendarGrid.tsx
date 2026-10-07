@@ -1266,7 +1266,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         </div>
         )}
         {showCard("channels") && (
-        <div data-cardkey="channels" onDrop={() => onCardDrop("channels")} style={{ order: orderOf("channels"), animationDelay: `${orderOf("channels") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "channels" ? "opacity-40" : ""} ${dragCard && dragCard !== "channels" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="channels" onDrop={() => onCardDrop("channels")} style={{ order: orderOf("channels"), animationDelay: `${orderOf("channels") * 0.07}s` }} className={`anim-in flex flex-col rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "channels" ? "opacity-40" : ""} ${dragCard && dragCard !== "channels" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🔀</span> Mix canali</div>
           {chTotalN === 0 ? (
             <div className="flex items-center gap-2 py-1 text-xs text-faint">Nessuna prenotazione nel periodo.</div>
@@ -1285,7 +1285,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               <div className="anim-grow mb-2 flex h-2.5 overflow-hidden rounded-full">
                 {chAgg.map((x) => (<div key={x.ch} style={{ width: `${(x.n / chTotalN) * 100}%`, backgroundColor: `var(${x.meta.cssVar})` }} title={`${x.meta.label}: ${x.n}`} />))}
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="mt-auto flex flex-col gap-1 border-t border-line pt-2">
                 {chAgg.map((x) => (
                   <div key={x.ch} className="flex items-center gap-2 text-xs">
                     <ChannelLogo channel={x.ch} size={16} />
