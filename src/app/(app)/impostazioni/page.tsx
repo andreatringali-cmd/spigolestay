@@ -11,7 +11,7 @@ import StyleChooser from "@/components/StyleChooser";
 import { apiPost } from "@/lib/invoicing/client";
 import { useData } from "@/lib/store";
 import { NOTIF_DEF, loadNotifPrefs } from "@/lib/notifPrefs";
-import { AI_CONCIERGE_DEF, AI_CONCIERGE_KEY, CONCIERGE_TONES, CONCIERGE_TONE_LABEL, loadAiConciergePrefs, normalizeTone } from "@/lib/aiConcierge";
+import { AI_CONCIERGE_DEF, AI_CONCIERGE_KEY, CONCIERGE_TONES, CONCIERGE_TONE_LABEL, loadAiConciergePrefs, normalizeTone, type OtaAutoMode } from "@/lib/aiConcierge";
 
 // Errore comune: incollare il link di embed/pubblico del calendario invece del semplice ID
 // (es. "https://calendar.google.com/calendar/embed?src=xxx%40group.calendar.google.com&ctz=...").
@@ -41,7 +41,8 @@ export default function ImpostazioniPage() {
   const [aiConcierge, setAiConciergeState] = useState(AI_CONCIERGE_DEF);
   useEffect(() => { setAiConciergeState(loadAiConciergePrefs()); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const setAiConciergeEnabled = (v: boolean) => setAiConciergeState((p) => { const n = { ...p, enabled: v }; try { localStorage.setItem(AI_CONCIERGE_KEY, JSON.stringify(n)); } catch {} return n; });
-  const setAiConciergeTone = (v: string) => setAiConciergeState((p) => { const n = { ...p, tone: normalizeTone(v) }; try { localStorage.setItem(AI_CONCIERGE_KEY, JSON.stringify(n)); } catch {} return n; });
+  const setAiConciergeOta = (patch: Partial<Pick<typeof AI_CONCIERGE_DEF, "otaMode" | "otaFrom" | "otaTo">>) => setAiConciergeState((p) => { const n = { ...p, ...patch }; try { localStorage.setItem(AI_CONCIERGE_KEY, JSON.stringify(n)); } catch {} return n; });
+  const setAiConciergeTone =(v: string) => setAiConciergeState((p) => { const n = { ...p, tone: normalizeTone(v) }; try { localStorage.setItem(AI_CONCIERGE_KEY, JSON.stringify(n)); } catch {} return n; });
   const setAiConciergeStructure = (v: string) => setAiConciergeState((p) => { const n = { ...p, defaultStructureId: v }; try { localStorage.setItem(AI_CONCIERGE_KEY, JSON.stringify(n)); } catch {} return n; });
   const ask = useConfirm();
 
@@ -215,6 +216,27 @@ export default function ImpostazioniPage() {
             </select>
             <span className="mt-1 block text-[11px] text-faint">{t("Formale: dà del Lei, frasi complete. Amichevole: cordiale e diretto. Essenziale: solo l'informazione, in una o due frasi.")}</span>
           </label>
+        )}
+        {aiConcierge.enabled && (
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-dim">{t("Messaggi di Booking.com, Airbnb ed Expedia")}
+              <select value={aiConcierge.otaMode} onChange={(e) => setAiConciergeOta({ otaMode: e.target.value as OtaAutoMode })} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt">
+                <option value="off">{t("Non rispondere in automatico")}</option>
+                <option value="offhours">{t("Rispondi solo fuori orario")}</option>
+                <option value="always">{t("Rispondi sempre (domande semplici)")}</option>
+              </select>
+            </label>
+            {aiConcierge.otaMode === "offhours" && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-dim">
+                <span>{t("Fuori orario: dalle")}</span>
+                <input type="number" min={0} max={23} value={aiConcierge.otaFrom} onChange={(e) => setAiConciergeOta({ otaFrom: Number(e.target.value) })} className="w-16 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
+                <span>{t("alle")}</span>
+                <input type="number" min={0} max={23} value={aiConcierge.otaTo} onChange={(e) => setAiConciergeOta({ otaTo: Number(e.target.value) })} className="w-16 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
+                <span>{t("(ora italiana)")}</span>
+              </div>
+            )}
+            <span className="mt-1 block text-[11px] text-faint">{t("Rispondono solo alle domande semplici di cui l'AI è sicura; il resto resta a te. Le risposte partono sulla stessa OTA su cui l'ospite ha scritto.")}</span>
+          </div>
         )}
         {aiConcierge.enabled && structures.length > 1 && (
           <label className="mt-3 block text-xs font-medium text-dim">{t("Struttura di riferimento per chi scrive senza prenotazione")}

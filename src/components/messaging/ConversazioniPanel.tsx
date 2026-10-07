@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { buildGuestLink, buildGroupGuestLink, shortenLink } from "@/lib/guestlink";
 import { playSound } from "@/lib/sound";
+import { otaLabel, isOtaVia } from "@/lib/ota-label";
 import { useLang } from "@/lib/i18n";
 import { CHANNELS, type Booking, type Guest } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
@@ -376,9 +377,13 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   // Invio SPERIMENTALE nel thread Booking.com/Airbnb/Expedia via Channex (Messages API).
   // Richiede la Messages App attiva su Channex per la property: se non lo è, l'invio fallisce
   // e lo segnaliamo con un alert — il testo resta in chat locale ma va verificato su Booking.com.
+  // Canale della risposta: se l'ultimo messaggio dell'ospite è arrivato da una OTA (e la prenotazione è su Channex) si risponde lì, altrimenti WhatsApp.
+  const otaName = otaLabel(current?.b?.channel);
+  const lastIn = current ? [...(threads[current.id] ?? [])].reverse().find((m) => m.dir === "in") : undefined;
+  const replyOta = !!chxBookingId && isOtaVia(lastIn?.via);
   const sendChx = async () => {
     if (!draft.trim() || !chxBookingId) return;
-    const text = draft; add("out", text, "Booking.com"); setDraft("");
+    const text = draft; add("out", text, otaName); setDraft("");
     try { await apiPost<{ ok: boolean }>("channex/messages", { action: "send", bookingId: chxBookingId, text }); }
     catch (e) { window.alert(t("Non risulta inviato su Booking.com: ") + (e instanceof Error ? e.message : "errore") + ". " + t("Il messaggio resta qui in chat ma potrebbe NON essere arrivato all'ospite.")); }
   };
@@ -869,11 +874,12 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 {aiErr && <span className="text-[11px] text-[color:var(--err)]">{t("Non sono riuscito a generare la bozza. Riprova.")}</span>}
               </div>
               <div className="rounded-2xl border border-line bg-paper p-2 transition focus-within:border-focus focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--focus)_18%,transparent)]">
-                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendWa(); } }} rows={2} placeholder={t("Scrivi un messaggio… (Invio per inviare, Shift+Invio per andare a capo)")} className="w-full resize-none bg-transparent px-1.5 py-1 text-sm text-txt outline-none placeholder:text-faint" />
+                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void (replyOta ? sendChx() : sendWa()); } }} rows={2} placeholder={t("Scrivi un messaggio… (Invio per inviare, Shift+Invio per andare a capo)")} className="w-full resize-none bg-transparent px-1.5 py-1 text-sm text-txt outline-none placeholder:text-faint" />
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <button onClick={sendWa} disabled={!draft.trim()} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</button>
                   <button onClick={sendMail} disabled={!draft.trim() || !current.email} className="inline-flex items-center gap-1.5 rounded-full bg-focus px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40">✉ Email</button>
-                  {chxBookingId && <button onClick={sendChx} disabled={!draft.trim()} title={t("Sperimentale: invia nel thread messaggi di Booking.com/Airbnb/Expedia (Channex) — verifica il primo invio")} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#003580" }}>🏨 Booking.com <span className="text-[9px] font-normal opacity-75">beta</span></button>}
+                  {chxBookingId && <button onClick={sendChx} disabled={!draft.trim()} title={t("Sperimentale: invia nel thread messaggi di Booking.com/Airbnb/Expedia (Channex) — verifica il primo invio")} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#003580" }}>🏨 {otaName} <span className="text-[9px] font-normal opacity-75">beta</span></button>}
+                  <span className="text-[11px] text-faint">{t("Con Invio rispondi su")} <b className="text-dim">{replyOta ? otaName : "WhatsApp"}</b>{chxBookingId && !replyOta ? ` · ${t("per rispondere su")} ${otaName} ${t("usa il pulsante blu")}` : ""}</span>
                   <button onClick={logIn} className="ml-auto rounded-full border border-line px-3 py-1.5 text-sm font-medium text-dim transition hover:bg-wash hover:text-txt" title={t("Registra una risposta arrivata dall'ospite")}>＋ {t("Risposta ricevuta")}</button>
                 </div>
               </div>

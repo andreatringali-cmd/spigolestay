@@ -24,6 +24,7 @@ export function parseChannexMessage(body: unknown): InboundOtaMessage | null {
   return { id, text, bookingId, propertyId };
 }
 
+// Stessa funzione di ota-label.ts (lì per il browser): qui copiata perché i test Node non risolvono import senza estensione.
 export function otaLabel(channel?: string): string {
   const c = (channel ?? "").toLowerCase();
   if (c.includes("booking")) return "Booking.com";
@@ -33,13 +34,13 @@ export function otaLabel(channel?: string): string {
 }
 
 export type AppendResult =
-  | { status: "added"; guestId: string; channel: string }
+  | { status: "added"; guestId: string; bookingId: string; channel: string }
   | { status: "duplicate" }
   | { status: "no_booking" };
 
 /** Aggiunge il messaggio al thread dell'ospite dentro il blob di stato (modifica `blob` sul posto). Idempotente sull'id del messaggio. */
 export function appendOtaMessage(blob: Record<string, string>, msg: InboundOtaMessage, now: number): AppendResult {
-  let data: { bookings?: { extId?: string; guestId?: string; channel?: string }[] } = {};
+  let data: { bookings?: { id?: string; extId?: string; guestId?: string; channel?: string }[] } = {};
   try { data = JSON.parse(blob[DATA_KEY] || "{}"); } catch { data = {}; }
   const booking = (Array.isArray(data.bookings) ? data.bookings : []).find((x) => x.extId === `channex:${msg.bookingId}`);
   if (!booking?.guestId) return { status: "no_booking" };
@@ -50,7 +51,7 @@ export function appendOtaMessage(blob: Record<string, string>, msg: InboundOtaMe
   if (list.some((m) => m.id === mid)) return { status: "duplicate" };
   threads[booking.guestId] = [...list, { id: mid, dir: "in", text: msg.text, ts: now, via: otaLabel(booking.channel) }];
   blob[THREADS_KEY] = JSON.stringify(threads);
-  return { status: "added", guestId: booking.guestId, channel: otaLabel(booking.channel) };
+  return { status: "added", guestId: booking.guestId, bookingId: booking.id ?? "", channel: otaLabel(booking.channel) };
 }
 
 /** Segreto condiviso con Channex (intestazione del webhook), derivato da un segreto già presente su Vercel. Vuoto se non disponibile. */
