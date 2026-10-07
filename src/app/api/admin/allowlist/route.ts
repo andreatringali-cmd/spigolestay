@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { notifyAccessApproved } from "@/lib/allowlist-approve";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,7 +43,8 @@ export async function POST(req: Request) {
   const note = String(body?.note ?? "").slice(0, 200) || null;
   const { error } = await a.admin.from("access_allowlist").upsert({ email, note, added_by: a.email }, { onConflict: "email" });
   if (error) return NextResponse.json({ error: error.message }, { status: 200 });
-  return NextResponse.json({ ok: true });
+  const notified = await notifyAccessApproved(email);
+  return NextResponse.json({ ok: true, notified });
 }
 
 export async function DELETE(req: Request) {

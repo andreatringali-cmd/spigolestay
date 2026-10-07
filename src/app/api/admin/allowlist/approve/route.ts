@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { verifyApprovalToken } from "@/lib/allowlist-approve";
+import { verifyApprovalToken, notifyAccessApproved } from "@/lib/allowlist-approve";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,5 +42,10 @@ export async function GET(req: Request) {
   );
   if (error) return page("Errore", `Non sono riuscito ad approvare ${verified}: ${error.message}`, false);
 
-  return page("Accesso approvato", `${verified} può ora accedere a Xenora con il login Google.`, true);
+  const notified = await notifyAccessApproved(verified);
+  return page(
+    "Accesso approvato",
+    `${verified} può ora accedere a Xenora con il login Google.` + (notified ? " Gli abbiamo inviato un'email per avvisarlo." : " Non sono riuscito ad avvisarlo via email: avvisalo tu direttamente."),
+    true
+  );
 }
