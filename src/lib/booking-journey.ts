@@ -151,8 +151,6 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   if (b.depositPaid) chips.push({ key: "dep", label: "Caparra ricevuta", tone: "info" });
   if (b.refundable === false) chips.push({ key: "nr", label: "Non rimborsabile", tone: "info" });
   if (b.movedFrom) chips.push({ key: "moved", label: `Spostata da ${b.movedFrom.structureName}`, tone: "warn" });
-  const inote = internalNote(b.note);
-  if (inote) chips.push({ key: "note", label: `Nota interna: ${inote.length > 40 ? inote.slice(0, 40) + "…" : inote}`, tone: "info" });
 
   return { steps, done, total: relevant.length, next, chips };
 }
