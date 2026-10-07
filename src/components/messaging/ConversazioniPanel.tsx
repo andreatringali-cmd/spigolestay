@@ -50,6 +50,26 @@ declare global {
 interface Msg { id: string; dir: "out" | "in"; text: string; ts: number; via?: string; wid?: string; st?: "sent" | "delivered" | "read" | "failed"; media?: { kind: "audio"; id: string; transcribed: boolean }; sys?: "payment" }
 type Threads = Record<string, Msg[]>;
 const KEY = "spigolestay:threads:v1";
+// Altezza di un riquadro = spazio rimasto nella finestra dal suo bordo alto (qualunque sia l'intestazione sopra), così la casella di scrittura
+// resta sempre visibile senza scorrere la pagina. Prima della misura vale il valore di riserva in CSS.
+function useFitViewport(gap = 72, min = 380) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [h, setH] = useState<number | null>(null);
+  useEffect(() => {
+    const fit = () => {
+      const el = ref.current;
+      if (!el || el.offsetParent === null) return; // nascosto (vista a una colonna): niente da misurare
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      setH(Math.max(min, Math.floor(window.innerHeight - top - gap)));
+    };
+    fit();
+    const t = window.setTimeout(fit, 300); // dopo che intestazione e schede sopra hanno preso la loro altezza definitiva
+    window.addEventListener("resize", fit);
+    return () => { window.clearTimeout(t); window.removeEventListener("resize", fit); };
+  }, [gap, min]);
+  return { ref, style: h ? { height: h } : undefined };
+}
+
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()));
 const relTime = (ts: number, t: (s: string) => string) => { const d = Math.floor((Date.now() - ts) / 60000); if (d < 1) return t("adesso"); if (d < 60) return `${d} ${t("min fa")}`; if (d < 1440) return `${Math.floor(d / 60)} ${t("h fa")}`; return `${Math.floor(d / 1440)} ${t("g fa")}`; };
 const initials = (n: string) => n.split(/\s+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -126,6 +146,8 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const [draft, setDraft] = useState("");
   const [queueOpen, setQueueOpen] = useState(false); // elenco degli invii automatici in arrivo per l'ospite aperto (menu nell'intestazione)
   const queueRef = useRef<HTMLDivElement>(null);
+  const fitList = useFitViewport();
+  const fitChat = useFitViewport();
   useEffect(() => {
     if (!queueOpen) return;
     const h = (e: MouseEvent) => { if (queueRef.current && !queueRef.current.contains(e.target as Node)) setQueueOpen(false); };
@@ -584,7 +606,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     <div className="grid gap-4 lg:grid-cols-3 lg:gap-3">
       {/* Elenco (su cellulare: nascosto quando una conversazione/invii è aperta).
           Larghezza = 1/3 con gap-3 → allineata alla tab "Conversazioni" sopra. */}
-      <div className={`${(current || showInvii) ? "hidden lg:flex" : "flex"} h-[calc(100dvh-12rem)] min-h-[560px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm lg:col-span-1`}>
+      <div className={`${(current || showInvii) ? "hidden lg:flex" : "flex"} h-[calc(100dvh-14.5rem)] min-h-[480px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm lg:col-span-1`} ref={fitList.ref} style={fitList.style}>
         <div className="border-b border-line p-2.5">
           <div className="relative">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-faint">🔍</span>
@@ -645,7 +667,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       </div>
 
       {/* Thread + invii programmati (su cellulare: visibile solo quando selezioni una conversazione/invii) */}
-      <div className={`${(current || showInvii) ? "flex" : "hidden lg:flex"} h-[calc(100dvh-12rem)] min-h-[560px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm lg:col-span-2`}>
+      <div className={`${(current || showInvii) ? "flex" : "hidden lg:flex"} h-[calc(100dvh-14.5rem)] min-h-[480px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm lg:col-span-2`} ref={fitChat.ref} style={fitChat.style}>
         {!current ? (
           !showInvii ? (
             // Nessun ospite selezionato → placeholder pulito (gli invii si aprono col pulsante).

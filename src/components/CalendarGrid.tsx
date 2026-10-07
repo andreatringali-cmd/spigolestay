@@ -1288,7 +1288,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               <div className="flex flex-col gap-1">
                 {chAgg.map((x) => (
                   <div key={x.ch} className="flex items-center gap-2 text-xs">
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: `var(${x.meta.cssVar})` }} />
+                    <ChannelLogo channel={x.ch} size={16} />
                     <span className="min-w-0 flex-1 truncate text-txt">{x.meta.label}</span>
                     <span className="shrink-0 font-mono text-dim">{x.n}</span>
                     <span className="w-9 shrink-0 text-right font-mono text-faint">{Math.round((x.n / chTotalN) * 100)}%</span>
