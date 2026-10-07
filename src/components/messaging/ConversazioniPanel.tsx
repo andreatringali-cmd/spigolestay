@@ -124,6 +124,15 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const [sel, setSel] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [draft, setDraft] = useState("");
+  const [queueOpen, setQueueOpen] = useState(false); // elenco degli invii automatici in arrivo per l'ospite aperto (menu nell'intestazione)
+  const queueRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!queueOpen) return;
+    const h = (e: MouseEvent) => { if (queueRef.current && !queueRef.current.contains(e.target as Node)) setQueueOpen(false); };
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") setQueueOpen(false); };
+    document.addEventListener("mousedown", h); document.addEventListener("keydown", k);
+    return () => { document.removeEventListener("mousedown", h); document.removeEventListener("keydown", k); };
+  }, [queueOpen]);
   const [showInvii, setShowInvii] = useState(false); // gli invii programmati si aprono su richiesta, non di default
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -575,7 +584,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     <div className="grid gap-4 lg:grid-cols-3 lg:gap-3">
       {/* Elenco (su cellulare: nascosto quando una conversazione/invii è aperta).
           Larghezza = 1/3 con gap-3 → allineata alla tab "Conversazioni" sopra. */}
-      <div className={`${(current || showInvii) ? "hidden lg:flex" : "flex"} h-[calc(100vh-15rem)] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm lg:col-span-1`}>
+      <div className={`${(current || showInvii) ? "hidden lg:flex" : "flex"} h-[calc(100dvh-12rem)] min-h-[560px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm lg:col-span-1`}>
         <div className="border-b border-line p-2.5">
           <div className="relative">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-faint">🔍</span>
@@ -636,7 +645,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       </div>
 
       {/* Thread + invii programmati (su cellulare: visibile solo quando selezioni una conversazione/invii) */}
-      <div className={`${(current || showInvii) ? "flex" : "hidden lg:flex"} h-[calc(100vh-15rem)] min-h-[420px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm lg:col-span-2`}>
+      <div className={`${(current || showInvii) ? "flex" : "hidden lg:flex"} h-[calc(100dvh-12rem)] min-h-[560px] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm lg:col-span-2`}>
         {!current ? (
           !showInvii ? (
             // Nessun ospite selezionato → placeholder pulito (gli invii si aprono col pulsante).
@@ -703,6 +712,25 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                     <span className="truncate text-[11px] font-medium" style={{ color: "var(--focus)" }}>↩ {t("Ospite di ritorno")} · {t("ultimo soggiorno")} {fmtD(current.lastPastStay.date)}{current.lastPastStay.structName ? ` · ${current.lastPastStay.structName}` : ""}</span>
                   )}
                 </div>
+                {guestQueue.length > 0 && (
+                  <div ref={queueRef} className="relative shrink-0">
+                    <button onClick={() => setQueueOpen((o) => !o)} aria-expanded={queueOpen} title={t("Invii automatici in arrivo")} className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition hover:bg-wash ${queueOpen ? "border-focus text-focus" : "border-line text-dim"}`}>⏱ {guestQueue.length} {t("in arrivo")}</button>
+                    {queueOpen && (
+                      <div className="absolute right-0 top-full z-30 mt-1 w-72 max-w-[85vw] rounded-xl border border-line bg-surface p-2 shadow-xl">
+                        <div className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-faint">{t("Invii automatici in arrivo")}</div>
+                        <div className="flex flex-col gap-1.5">
+                          {guestQueue.slice(0, 5).map((x) => (
+                            <div key={x.key} className="flex items-center gap-2 text-xs">
+                              <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 font-mono text-[10px] text-dim">{new Date(x.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</span>
+                              <span className="min-w-0 flex-1 truncate text-txt">{x.tpl.name}</span>
+                              <button onClick={() => { sendScheduled(x); setQueueOpen(false); }} className="shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: (x.g.phone ? "#25D366" : "var(--focus)") }}>{t("Invia ora")}</button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <button onClick={() => togglePin(current.id)} title={isPinned(current.id) ? t("Togli dalle fissate") : t("Fissa in alto")} aria-pressed={isPinned(current.id)} className={`shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition hover:bg-wash ${isPinned(current.id) ? "border-focus text-focus" : "border-line text-dim"}`}>📌 {isPinned(current.id) ? t("Fissata") : t("Fissa")}</button>
                 <button onClick={() => toggleArch(current.id)} title={isArch(current.id) ? t("Ripristina") : t("Archivia")} className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim transition hover:bg-wash">{isArch(current.id) ? `⬆ ${t("Ripristina")}` : `🗄 ${t("Archivia")}`}</button>
               </div>
@@ -798,22 +826,6 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 );
               })}
             </div>
-
-            {/* Invii programmati per QUESTO ospite */}
-            {guestQueue.length > 0 && (
-              <div className="border-t border-line bg-paper px-3 py-2">
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-faint">{t("Invii automatici in arrivo")}</div>
-                <div className="flex flex-col gap-1.5">
-                  {guestQueue.slice(0, 3).map((x) => (
-                    <div key={x.key} className="flex items-center gap-2 text-xs">
-                      <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 font-mono text-[10px] text-dim">{new Date(x.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</span>
-                      <span className="min-w-0 flex-1 truncate text-txt">{x.tpl.name}</span>
-                      <button onClick={() => sendScheduled(x)} className="shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-semibold text-white hover:opacity-90" style={{ backgroundColor: (x.g.phone ? "#25D366" : "var(--focus)") }}>{t("Invia ora")}</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <div className="border-t border-line bg-surface p-3">
               {payOpen && current.b && (() => {

@@ -28,7 +28,7 @@ export default function LinkPreview({ text }: { text: string }) {
     <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 block overflow-hidden rounded-xl border border-line bg-surface text-left text-txt no-underline shadow-sm">
       {data.image && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={data.image} alt="" referrerPolicy="no-referrer" className="aspect-[1.91/1] w-full object-cover" />
+        <img src={data.image} alt="" referrerPolicy="no-referrer" className="aspect-[1.91/1] max-h-28 w-full object-cover" />
       )}
       <div className="px-3 py-2">
         {data.title && <div className="truncate text-xs font-semibold">{data.title}</div>}
