@@ -327,7 +327,7 @@ export default function PrenotazioniPage() {
     { key: "ch-mix", title: "Prenotazioni e ricavi per canale", wide: true, node: <ChannelBars rows={channelRows} fmtEur={eur} /> },
     { key: "str-mix", title: "Prenotazioni e ricavi per struttura", perStructure: true, wide: true, node: <ChannelBars rows={structureRows} fmtEur={eur} /> },
     { key: "stay", title: "Durata soggiorno", node: <Donut data={stayDist} showPercent={false} /> },
-    { key: "month", title: "Prenotazioni per mese", node: <StackedColumns bars={monthStack} barWidth={26} /> },
+    { key: "month", title: "Prenotazioni per mese", node: <StackedColumns bars={monthStack} barWidth={26} height={106} /> },
     { key: "rev-month", title: "Ricavi per mese", wide: true, node: <LineChart points={revByMonth} format={(n) => eur(n)} color="var(--ok)" everyLabel={1} /> },
     { key: "rt-mix", title: "Prenotazioni e ricavi per tipologia", wide: true, node: <ChannelBars rows={roomTypeRows} fmtEur={eur} /> },
     { key: "country", title: "Provenienza per paese", wide: true, node: <RankBars items={byCountry} top={6} /> },
