@@ -24,6 +24,7 @@ export const dynamic = "force-dynamic";
 // Auth: Bearer <CRON_SECRET> (Vercel Cron) oppure ?secret= per test.
 // ─────────────────────────────────────────────────────────────────────────────
 
+const errText = (j: { error?: unknown; message?: unknown } | null | undefined, status: number): string => (typeof j?.error === "string" ? j.error : j?.error ? JSON.stringify(j.error) : j?.message ? String(j.message) : `HTTP ${status}`);
 type Json = Record<string, unknown>;
 const DATA_KEY = "spigolestay:data:v1";
 const TPL_KEY = "spigolestay:msgtemplates";
@@ -152,7 +153,7 @@ export async function GET(req: Request) {
             });
             const j = await r.json().catch(() => ({}));
             if (r.ok && j?.ok) { okAny = true; sent++; await logInvio(admin, tenantId, { job: "messaggi", ref: s(b.id), channel: "email", ok: true, detail: `${tp.name || tp.id} → ${email}` }); }
-            else { errors.push(`mail ${s(b.id)}/${tp.id}: ${j?.error || r.status}`); await logInvio(admin, tenantId, { job: "messaggi", ref: s(b.id), channel: "email", ok: false, detail: `${tp.name || tp.id} → ${email}: ${j?.error || r.status}` }); }
+            else { errors.push(`mail ${s(b.id)}/${tp.id}: ${errText(j, r.status)}`); await logInvio(admin, tenantId, { job: "messaggi", ref: s(b.id), channel: "email", ok: false, detail: `${tp.name || tp.id} → ${email}: ${errText(j, r.status)}` }); }
           } catch (e) { errors.push(`mail ${s(b.id)}: ${e instanceof Error ? e.message : "err"}`); }
         }
         // Canale 2: WHATSAPP (se WA collegato per il tenant e l'ospite ha numero). Per i messaggi

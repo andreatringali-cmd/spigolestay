@@ -25,6 +25,7 @@ export const dynamic = "force-dynamic";
 // Auth: Bearer <CRON_SECRET> (Vercel Cron) oppure ?secret= per test manuale.
 // ─────────────────────────────────────────────────────────────────────────────
 
+const errText = (j: { error?: unknown; message?: unknown } | null | undefined, status: number): string => (typeof j?.error === "string" ? j.error : j?.error ? JSON.stringify(j.error) : j?.message ? String(j.message) : `HTTP ${status}`);
 type Json = Record<string, unknown>;
 const DATA_KEY = "spigolestay:data:v1";
 const NOTES_KEY = "spigolestay:pulizie:notes";
@@ -106,7 +107,7 @@ export async function GET(req: Request) {
           });
           const j = await r.json().catch(() => ({}));
           if (r.ok && j?.ok) { sent++; await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "email", ok: true, detail: cfg.emailTo }); }
-          else { errors.push(`mail ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${j?.error || r.status}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "email", ok: false, detail: String(j?.error || r.status) }); }
+          else { errors.push(`mail ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${errText(j, r.status)}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "email", ok: false, detail: errText(j, r.status) }); }
         } catch (e) { errors.push(`mail ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "email", ok: false, detail: e instanceof Error ? e.message : "errore" }); }
       }
       if (cfg.whatsapp && cfg.whatsappTo) {
