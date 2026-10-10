@@ -1,5 +1,6 @@
 "use client";
 
+import { POOL_KEY, parsePool, inPool, poolRemaining } from "@/lib/inventory-pool";
 import { useEffect, useMemo, useRef, useState, type DragEvent as RDragEvent, type MouseEvent as RMouseEvent } from "react";
 import { isHexColor, textOn } from "@/lib/booking-color";
 import Image from "next/image";
@@ -101,7 +102,7 @@ interface DragView {
 const readLS = <T,>(key: string, fallback: T): T => { try { const r = localStorage.getItem(key); return r ? (JSON.parse(r) as T) : fallback; } catch { return fallback; } };
 
 export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactNode } = {}) {
-  const { structures, units, roomTypes, bookings, guests, events: allEvents, rateOverrides, moveBooking, openBooking, addBooking, updateBooking, deleteBooking, addEvent, updateEvent, deleteEvent, setDayRates, clearDayRates, activeStructureId, updateUnit, deleteUnit, addUnit } = useData();
+  const { structures, units, roomTypes, bookings, guests, events: allEvents, rateOverrides, moveBooking, openBooking, addBooking, updateBooking, deleteBooking, addEvent, updateEvent, deleteEvent, setDayRates, clearDayRates, activeStructureId, updateUnit, deleteUnit, addUnit, raw } = useData();
   // Eventi: con una struttura selezionata solo i suoi (quelli senza struttura valgono per tutte).
   const events = activeStructureId === "all" ? allEvents : allEvents.filter((e) => !e.structureId || e.structureId === activeStructureId);
   const router = useRouter();
@@ -574,6 +575,18 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   const rateKey = (typeId: string, iso: string) => `${typeId}|${iso}`;
   const weekendPct = loadWeekendPct();
   const rateFor = (typeId: string, iso: string) => rateForDay(typeId, iso, roomTypes, rateOverrides, weekendPct);
+  // Strutture che si dividono le camere reali (Impostazioni → Disponibilità condivisa): la disponibilità mostrata è la stessa che si invia ai portali,
+  // cioè mai più delle camere libere nel gruppo. Si usano TUTTE le prenotazioni (anche delle strutture non visibili) e la somma di ogni giorno si calcola una volta.
+  const poolCfg = (() => { try { return parsePool(localStorage.getItem(POOL_KEY)); } catch { return parsePool(null); } })();
+  const poolRem = new Map<string, number>();
+  const capPool = (avail: number, typeId: string, iso: string) => {
+    if (!poolCfg.enabled) return avail;
+    const sid = roomTypes.find((r) => r.id === typeId)?.structureId;
+    if (!sid || !inPool(poolCfg, sid)) return avail;
+    let rem = poolRem.get(iso);
+    if (rem === undefined) { rem = poolRemaining(poolCfg, raw.bookings, iso); poolRem.set(iso, rem); }
+    return Math.min(avail, rem);
+  };
   // Striscia tariffa+disponibilità per una singola tipologia.
   const typeStrip = (typeId: string, typeUnits: typeof units) => {
     const act = typeUnits.filter((u) => !u.outOfService);
@@ -581,7 +594,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       const iso = toISO(d);
       const occupied = bookings.filter((b) => b.unitId && act.some((u) => u.id === b.unitId) && b.checkIn <= iso && iso < b.checkOut).length;
       const closed = closes[closeKey(typeId, iso)] ?? 0;
-      return { iso, rate: rateFor(typeId, iso), overridden: rateOverrides[rateKey(typeId, iso)] != null, avail: Math.max(0, act.length - occupied - closed), closed };
+      return { iso, rate: rateFor(typeId, iso), overridden: rateOverrides[rateKey(typeId, iso)] != null, avail: capPool(Math.max(0, act.length - occupied - closed), typeId, iso), closed };
     });
   };
   // Striscia aggregata su più tipologie (vista compatta): disponibilità sommata, tariffa rappresentativa (1ª tipologia).
@@ -597,7 +610,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         closed += cl;
       }
       const t0 = typeIds[0];
-      return { iso, rate: rateFor(t0, iso), overridden: rateOverrides[rateKey(t0, iso)] != null, avail, closed };
+      return { iso, rate: rateFor(t0, iso), overridden: rateOverrides[rateKey(t0, iso)] != null, avail: capPool(avail, t0, iso), closed };
     });
   };
   // Occupazione complessiva (per il grafico in alto).
