@@ -1,89 +1,93 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parsePool, physicalKey, poolOccupancy, inPool } from "../src/lib/inventory-pool.ts";
+import { parsePool, famKeyOf, poolListings, poolFamilies, poolOccupancy, inPool } from "../src/lib/inventory-pool.ts";
 
-// Camere reali: Spigolehouse 1,3,4,5,6,7 (Deluxe) e 2 (Tripla); le camere 5-8 sono anche Spigolerooms (#5,#6,#7 Deluxe, #8 Junior Suite).
-// In Xenora la Deluxe di Spigolehouse ha 7 camere (1,3,4,5,6,7,8): la "8" è la stessa camera della Junior Suite #8.
+// Due strutture nello stesso edificio. Camere reali: 6 Deluxe, 1 Tripla, 1 Junior Suite. Sui portali ogni struttura ne mostra più delle reali.
 const H = "H", R = "R";
 const roomTypes = [
-  { id: "hDeluxe", name: "Deluxe", structureId: H }, { id: "hTripla", name: "Tripla", structureId: H },
-  { id: "rDeluxe", name: "Deluxe", structureId: R }, { id: "rJunior", name: "Junior Suite", structureId: R },
+  { id: "hD", name: "Deluxe", structureId: H }, { id: "hT", name: "Tripla", structureId: H }, { id: "hJ", name: "Junior Suite", structureId: H },
+  { id: "rD", name: "Deluxe", structureId: R }, { id: "rT", name: "Tripla", structureId: R }, { id: "rJ", name: "junior suite", structureId: R },
+  { id: "x", name: "Altra", structureId: "X" },
 ];
-const units = [
-  ...["1", "3", "4", "5", "6", "7", "8"].map((n) => ({ id: "h" + n, name: n, roomTypeId: "hDeluxe" })),
-  { id: "h2", name: "2", roomTypeId: "hTripla" },
-  ...["#5", "#6", "#7"].map((n) => ({ id: "r" + n, name: n, roomTypeId: "rDeluxe" })),
-  { id: "r8", name: "#8", roomTypeId: "rJunior" },
-];
-const cfg = parsePool(JSON.stringify({ enabled: true, structureIds: [H, R] }));
+const mk = (typeId: string, n: number) => Array.from({ length: n }, (_, i) => ({ id: `${typeId}-${i}`, roomTypeId: typeId }));
+const units = [...mk("hD", 7), ...mk("hT", 1), ...mk("hJ", 1), ...mk("rD", 3), ...mk("rT", 1), ...mk("rJ", 1), ...mk("x", 2)];
+const cfgOf = (extra: Record<string, unknown> = {}) => parsePool(JSON.stringify({ enabled: true, structureIds: [H, R], rooms: { deluxe: 6, tripla: 1, juniorsuite: 1 }, ...extra }));
+const cfg = cfgOf();
 const day = "2026-10-10", next = "2026-10-11";
 const bk = (roomTypeId: string, n = 1, checkIn = day, checkOut = next, status = "confirmed") => Array.from({ length: n }, () => ({ roomTypeId, checkIn, checkOut, status }));
-const av = (bookings: ReturnType<typeof bk>, closed = 0, d = day) => {
-  const o = poolOccupancy(cfg, roomTypes, units, bookings);
-  return { HD: o.availFor("hDeluxe", d, closed), HT: o.availFor("hTripla", d), RD: o.availFor("rDeluxe", d, closed), RJ: o.availFor("rJunior", d), o };
+const a = (bookings: ReturnType<typeof bk>, c = cfg, closed = 0) => {
+  const o = poolOccupancy(c, roomTypes, units, bookings);
+  return { hD: o.availFor("hD", day, closed), hT: o.availFor("hT", day), hJ: o.availFor("hJ", day), rD: o.availFor("rD", day, closed), rT: o.availFor("rT", day), rJ: o.availFor("rJ", day), o };
 };
 
-test("parsePool e physicalKey", () => {
+test("parsePool: serve almeno due strutture; ripulisce i dati sporchi", () => {
   assert.equal(parsePool(null).enabled, false);
   assert.equal(parsePool(JSON.stringify({ enabled: true, structureIds: ["H"] })).enabled, false);
   assert.equal(parsePool("non json").enabled, false);
-  assert.equal(cfg.enabled, true);
-  assert.equal(inPool(cfg, H), true);
-  assert.equal(inPool(cfg, "ALTRA"), false);
-  assert.equal(physicalKey({ id: "a", name: "#5" }), "5");
-  assert.equal(physicalKey({ id: "zz", name: "Suite" }), "u:zz");
+  const p = parsePool(JSON.stringify({ enabled: true, structureIds: [H, R], rooms: { deluxe: 6.7, x: -1, y: "a" }, assign: { a: "deluxe", b: 3 } }));
+  assert.deepEqual(p.rooms, { deluxe: 6 });
+  assert.deepEqual(p.assign, { a: "deluxe" });
+  assert.equal(inPool(cfg, H), true); assert.equal(inPool(cfg, "X"), false);
 });
 
-test("le camere fisiche si ricavano dalle tipologie: 6 Deluxe, 1 Tripla, 1 Junior Suite", () => {
-  const s = poolOccupancy(cfg, roomTypes, units, []).summary();
-  assert.deepEqual(Object.fromEntries(s.map((f) => [f.name, f.rooms])), { deluxe: 6, tripla: 1, juniorsuite: 1 });
+test("le tipologie con lo stesso nome (anche maiuscole diverse) formano una famiglia", () => {
+  assert.equal(famKeyOf("Junior Suite"), "juniorsuite"); assert.equal(famKeyOf("junior suite"), "juniorsuite");
+  const f = poolFamilies(cfg, roomTypes, units);
+  assert.deepEqual(f.map((x) => [x.key, x.real, x.listings.length]), [["deluxe", 6, 2], ["juniorsuite", 1, 2], ["tripla", 1, 2]]);
+  assert.equal(poolListings(cfg, roomTypes, units).some((l) => l.structureId === "X"), false); // fuori dal gruppo
 });
 
-test("senza prenotazioni: le Deluxe fisiche sono 6, quindi anche la Deluxe di Spigolehouse (7 in Xenora) mostra 6", () => {
-  assert.deepEqual({ HD: av([]).HD, HT: av([]).HT, RD: av([]).RD, RJ: av([]).RJ }, { HD: 6, HT: 1, RD: 3, RJ: 1 });
+test("senza numero indicato si propone la tipologia che ne mostra di più, da confermare", () => {
+  const f = poolFamilies(cfgOf({ rooms: {} }), roomTypes, units);
+  const d = f.find((x) => x.key === "deluxe")!;
+  assert.equal(d.real, 7); assert.equal(d.suggested, 7); assert.equal(d.set, false);
 });
 
-test("una Deluxe prenotata in una struttura riduce la disponibilità dell'altra (e viceversa)", () => {
-  const a = av(bk("rDeluxe", 2)); // 2 su Spigolerooms
-  assert.equal(a.HD, 4); assert.equal(a.RD, 1);
-  const b = av(bk("hDeluxe", 2)); // 2 su Spigolehouse
-  assert.equal(b.HD, 4); assert.equal(b.RD, 3); // Spigolerooms resta al suo massimo (3) perché le Deluxe libere sono 4
-  const c = av(bk("hDeluxe", 4));
-  assert.equal(c.RD, 2); // restano 2 Deluxe libere: Spigolerooms ne può vendere al massimo 2
+test("senza prenotazioni: ogni tipologia non mostra più delle reali", () => {
+  const r = a([]);
+  assert.deepEqual([r.hD, r.hT, r.hJ, r.rD, r.rT, r.rJ], [6, 1, 1, 3, 1, 1]);
 });
 
-test("la Junior Suite occupata non tocca le Deluxe (tipologia diversa)", () => {
-  const a = av(bk("rJunior", 1));
-  assert.equal(a.RJ, 0); assert.equal(a.HD, 6); assert.equal(a.RD, 3); // le Deluxe restano 6
+test("una prenotazione su una struttura riduce la disponibilità dell'altra (Deluxe)", () => {
+  const r = a(bk("rD", 2));
+  assert.equal(r.hD, 4); assert.equal(r.rD, 1);
+  const s = a(bk("hD", 4));
+  assert.equal(s.hD, 2); assert.equal(s.rD, 2); // le Deluxe libere sono 2: Spigolerooms ne vende al massimo 2
 });
 
-test("6 Deluxe prenotate chiudono entrambe le Deluxe e lasciano la Junior Suite", () => {
-  const a = av(bk("hDeluxe", 6));
-  assert.equal(a.HD, 0); assert.equal(a.RD, 0); assert.equal(a.RJ, 1);
+test("Tripla e Junior Suite si sincronizzano tra le due strutture", () => {
+  const t = a(bk("hT", 1));
+  assert.equal(t.hT, 0); assert.equal(t.rT, 0); assert.equal(t.hD, 6);
+  const j = a(bk("rJ", 1));
+  assert.equal(j.hJ, 0); assert.equal(j.rJ, 0);
 });
 
-test("allineamento: con Tripla e Junior Suite occupate le due Deluxe mostrano lo stesso numero", () => {
-  const a = av([...bk("hTripla", 1), ...bk("rJunior", 1), ...bk("hDeluxe", 3)]);
-  assert.equal(a.HT, 0); assert.equal(a.RJ, 0);
-  assert.equal(a.HD, 3); assert.equal(a.RD, 3);
-  const b = av([...bk("hTripla", 1), ...bk("rJunior", 1), ...bk("hDeluxe", 4)]);
-  assert.equal(b.HD, 2); assert.equal(b.RD, 2);
-});
-
-test("la Tripla occupata chiude solo la Tripla", () => {
-  const a = av(bk("hTripla", 1));
-  assert.equal(a.HT, 0); assert.equal(a.HD, 6); assert.equal(a.RD, 3); assert.equal(a.RJ, 1);
+test("Deluxe esaurite in una struttura chiudono entrambe; le altre tipologie restano", () => {
+  const r = a(bk("hD", 6));
+  assert.equal(r.hD, 0); assert.equal(r.rD, 0); assert.equal(r.hT, 1); assert.equal(r.rJ, 1);
 });
 
 test("annullate e giorni fuori periodo non contano; le chiusure manuali si sottraggono", () => {
-  const a = av([...bk("hDeluxe", 2, day, next, "cancelled"), ...bk("hDeluxe", 1, "2026-10-12", "2026-10-13")]);
-  assert.equal(a.HD, 6);
-  assert.equal(av([], 2).HD, 4);
+  const r = a([...bk("hD", 2, day, next, "cancelled"), ...bk("hD", 1, "2026-10-12", "2026-10-13")]);
+  assert.equal(r.hD, 6);
+  assert.equal(a([], cfg, 2).hD, 4);
+});
+
+test("tipologia assegnata a mano a un'altra famiglia o esclusa", () => {
+  // "Altra" di un'altra struttura entra nella famiglia Deluxe: ora condivide le 6 Deluxe
+  const c1 = cfgOf({ structureIds: [H, R, "X"], assign: { x: "deluxe" } });
+  const o1 = poolOccupancy(c1, roomTypes, units, bk("x", 2));
+  assert.equal(o1.availFor("hD", day), 4); // 6 reali meno 2 prenotate nella famiglia
+  // la Deluxe di Spigolerooms resa "non condivisa": torna a contare solo le sue camere
+  const c2 = cfgOf({ assign: { rD: "" } });
+  const o2 = poolOccupancy(c2, roomTypes, units, bk("hD", 6));
+  assert.equal(o2.availFor("hD", day), 0); assert.equal(o2.availFor("rD", day), 3);
 });
 
 test("canSell: serve disponibilità in tutte le notti", () => {
-  const o = poolOccupancy(cfg, roomTypes, units, [...bk("hDeluxe", 6, "2026-10-12", "2026-10-13"), ...bk("rJunior", 1, "2026-10-12", "2026-10-13")]);
-  assert.equal(o.canSell("rDeluxe", "2026-10-10", "2026-10-12"), true);
-  assert.equal(o.canSell("rDeluxe", "2026-10-11", "2026-10-13"), false); // il 12 le Deluxe sono finite
-  assert.equal(o.canSell("rJunior", "2026-10-12", "2026-10-13"), false);
+  const o = poolOccupancy(cfg, roomTypes, units, [...bk("hD", 6, "2026-10-12", "2026-10-13"), ...bk("rJ", 1, "2026-10-12", "2026-10-13")]);
+  assert.equal(o.canSell("rD", "2026-10-10", "2026-10-12"), true);
+  assert.equal(o.canSell("rD", "2026-10-11", "2026-10-13"), false); // il 12 le Deluxe sono finite
+  assert.equal(o.canSell("hJ", "2026-10-12", "2026-10-13"), false); // la Junior è occupata (condivisa)
+  assert.equal(o.includes("x"), false);
 });

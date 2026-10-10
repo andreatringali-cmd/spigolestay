@@ -1,7 +1,7 @@
 "use client";
 
-import { POOL_DEF, POOL_KEY, parsePool, poolOccupancy } from "@/lib/inventory-pool";
 import { CHANNEX_DIRTY_EVENT } from "@/components/ChannexAutoSync";
+import Link from "next/link";
 import { RATEMODEL_DEF, RATEMODEL_KEY, parseRateModel, type RatePlanDef, type SingleDiscount } from "@/lib/rate-model";
 import { useEffect, useRef, useState } from "react";
 import { kvGet, kvSet, kvKeys, kvFlush } from "@/lib/bigstore";
@@ -51,20 +51,7 @@ export default function ImpostazioniPage() {
 
   // Sync Google Calendar in TEMPO REALE: Xenora scrive/cancella direttamente gli eventi sul
   // calendario Google che l'utente condivide col service account (vedi googleCalendarSync.ts).
-  const { structures, updateStructure, activeStructureId, bookings, guests, units, roomTypes, raw } = useData();
-  // Disponibilità condivisa: strutture che si dividono le stesse camere fisiche (vedi src/lib/inventory-pool.ts). Default spenta.
-  const [pool, setPoolState] = useState(POOL_DEF);
-  useEffect(() => { setPoolState(parsePool(localStorage.getItem(POOL_KEY))); }, []);
-  const savePool = (patch: Partial<typeof POOL_DEF>) => setPoolState((p) => {
-    const n = { ...p, ...patch };
-    try { localStorage.setItem(POOL_KEY, JSON.stringify(n)); window.dispatchEvent(new Event(CHANNEX_DIRTY_EVENT)); } catch {}
-    return n;
-  });
-  const poolStructs = raw.structures;
-  const poolUnits = raw.units.filter((u) => pool.structureIds.includes(u.structureId) && !u.outOfService);
-  const poolListed = poolUnits.length;
-  const poolSummary = pool.structureIds.length > 1 ? poolOccupancy({ enabled: true, structureIds: pool.structureIds }, raw.roomTypes, raw.units, []).summary() : [];
-  const poolRoomsCount = poolSummary.reduce((a, f) => a + f.rooms, 0);
+  const { structures, updateStructure, activeStructureId, bookings, guests, units, roomTypes } = useData();
   // Più piani tariffari e prezzo per 1 ospite verso i portali (vedi src/lib/rate-model.ts). Default SPENTO: finché è spento Xenora invia la tariffa unica di sempre.
   const [rateModel, setRateModelState] = useState(RATEMODEL_DEF);
   useEffect(() => { setRateModelState(parseRateModel(localStorage.getItem(RATEMODEL_KEY))); }, []);
@@ -234,85 +221,14 @@ export default function ImpostazioniPage() {
         </div>
       </Card>
 
-      {/* Camere condivise tra strutture, default SPENTE */}
-      {poolStructs.length > 1 && (
+      {/* Camere condivise: ora ha una pagina dedicata */}
+      {structures.length > 1 && (
         <Card className="mt-4">
           <SectionTitle>{t("Camere condivise tra strutture")}</SectionTitle>
-          <p className="mb-3 text-xs text-dim">{t("Per strutture che mostrano le stesse camere fisiche (per esempio le camere 5-8 di Spigolehouse sono anche Spigolerooms). Le camere della stessa tipologia (stesso nome) si dividono le stesse camere fisiche e si possono spostare: una prenotazione su una struttura riduce la disponibilità dell'altra. Il numero di camere fisiche si ricava dai numeri delle camere. Vale per Booking, Expedia, HotelBeds, per il sito diretto e per il Calendario.")}</p>
-          <Toggle label={t("Condividi le camere")} checked={pool.enabled} onChange={(v) => savePool({ enabled: v })} />
-          <div className="mt-3 text-xs font-medium text-dim">{t("Strutture del gruppo")}</div>
-          <div className="mt-1 flex flex-wrap gap-2">
-            {poolStructs.map((st) => {
-              const on = pool.structureIds.includes(st.id);
-              return (
-                <button key={st.id} type="button" aria-pressed={on} onClick={() => savePool({ structureIds: on ? pool.structureIds.filter((x) => x !== st.id) : [...pool.structureIds, st.id] })}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${on ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}
-                  style={on ? { backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)" } : undefined}>{st.name}</button>
-              );
-            })}
-          </div>
-          {pool.structureIds.length > 1 && (
-            <p className="mt-2 text-[11px] text-faint">
-              {t("Camere in Xenora per queste strutture")}: {poolListed} · {t("camere fisiche")}: {poolRoomsCount} ({poolSummary.map((f) => `${f.name} ${f.rooms}`).join(", ")})
-              {poolRoomsCount < poolListed ? ` · ${t("le altre sono la stessa camera mostrata due volte")}` : ""}
-              {!pool.enabled ? ` · ${t("Attiva l'interruttore per applicare la regola.")}` : ""}
-            </p>
-          )}
+          <p className="mb-3 text-xs text-dim">{t("Per strutture che mostrano le stesse camere: la disponibilità resta sincronizzata. Si imposta nella pagina dedicata (PMS → Camere condivise).")}</p>
+          <Link href="/camere-condivise" className="inline-block rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-focus transition hover:bg-wash">{t("Apri Camere condivise")}</Link>
         </Card>
       )}
-
-      {/* Più piani tariffari e prezzo per 1 ospite, default SPENTI */}
-      <Card className="mt-4">
-        <SectionTitle>{t("Più piani tariffari e prezzo per 1 ospite")}</SectionTitle>
-        <p className="mb-3 text-xs text-dim">{t("Per Booking ed Expedia: oltre alla tariffa unica di oggi puoi definire altri piani per la stessa camera (non rimborsabile, con colazione…), come variazione % o € sulla tariffa base, e un prezzo ridotto per 1 ospite. Da spento non cambia nulla: continui a inviare la sola tariffa di oggi. I piani vanno poi creati e collegati su Channex (non avviene da solo).")}</p>
-        <Toggle label={t("Abilita piani tariffari")} checked={rateModel.enabled} onChange={(v) => saveRateModel((p) => ({ ...p, enabled: v }))} />
-        {rateModel.enabled && raw.structures.map((st) => {
-          const rts = raw.roomTypes.filter((r) => r.structureId === st.id);
-          if (!rts.length) return null;
-          return (
-            <div key={st.id} className="mt-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-faint">{st.name}</div>
-              {rts.map((rt) => {
-                const plans = rateModel.plans[rt.id] ?? [];
-                const sd = rateModel.single[rt.id];
-                return (
-                  <div key={rt.id} className="mt-2 rounded-lg border border-line p-3">
-                    <div className="text-sm font-medium text-txt">{rt.name}</div>
-                    {plans.map((pl) => (
-                      <div key={pl.id} className="mt-2 flex flex-wrap items-end gap-2 text-xs text-dim">
-                        <label className="min-w-[8rem] flex-1">{t("Nome piano")}
-                          <input value={pl.name} onChange={(e) => setPlans(rt.id, (l) => l.map((x) => x.id === pl.id ? { ...x, name: e.target.value } : x))} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
-                        </label>
-                        <label className="w-20">{t("Variaz. %")}
-                          <input type="number" step="1" value={pl.adjPct ?? ""} onChange={(e) => setPlans(rt.id, (l) => l.map((x) => x.id === pl.id ? { ...x, adjPct: numOrUndef(e.target.value) } : x))} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
-                        </label>
-                        <label className="w-20">{t("Variaz. €")}
-                          <input type="number" step="1" value={pl.adjEur ?? ""} onChange={(e) => setPlans(rt.id, (l) => l.map((x) => x.id === pl.id ? { ...x, adjEur: numOrUndef(e.target.value) } : x))} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
-                        </label>
-                        <label className="w-24">{t("Notti min.")}
-                          <input type="number" min={1} step="1" value={pl.minStay ?? ""} onChange={(e) => setPlans(rt.id, (l) => l.map((x) => x.id === pl.id ? { ...x, minStay: numOrUndef(e.target.value) } : x))} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
-                        </label>
-                        <button type="button" onClick={() => setPlans(rt.id, (l) => l.filter((x) => x.id !== pl.id))} className="rounded-lg border border-line px-2 py-1.5 text-xs font-semibold text-dim hover:bg-wash">{t("Rimuovi")}</button>
-                      </div>
-                    ))}
-                    <button type="button" onClick={() => setPlans(rt.id, (l) => [...l, { id: `rp_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, name: "" }])} className="mt-2 rounded-full border border-line px-3 py-1 text-xs font-semibold text-dim hover:bg-wash">+ {t("Aggiungi piano")}</button>
-                    <div className="mt-3 flex flex-wrap items-end gap-2 text-xs text-dim">
-                      <label>{t("Sconto per 1 ospite")}
-                        <input type="number" min={0} step="1" value={sd?.value ?? ""} onChange={(e) => setSingle(rt.id, { mode: sd?.mode ?? "pct", value: Number(e.target.value) })} className="mt-1 block w-24 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
-                      </label>
-                      <select value={sd?.mode ?? "pct"} onChange={(e) => sd && setSingle(rt.id, { ...sd, mode: e.target.value as "pct" | "eur" })} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt">
-                        <option value="pct">%</option>
-                        <option value="eur">€</option>
-                      </select>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-        {rateModel.enabled && <p className="mt-3 text-[11px] text-faint">{t("Il prezzo di ogni piano = tariffa base del giorno × (1 + %) + €. Lo sconto per 1 ospite vale solo sui piani «per persona» su Channex.")}</p>}
-      </Card>
 
       {/* Concierge AI — risposta automatica WhatsApp alle domande semplici, default SPENTO */}
       <Card className="mt-4">
