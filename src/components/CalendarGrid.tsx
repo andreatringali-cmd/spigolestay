@@ -1,7 +1,7 @@
 "use client";
 
 import { sortRoomTypes } from "@/lib/sortUnits";
-import { overlapLosers } from "@/lib/overlaps";
+import { planOverlapFix } from "@/lib/overlaps";
 import { POOL_KEY, parsePool, inPool, poolOccupancy } from "@/lib/inventory-pool";
 import { useEffect, useMemo, useRef, useState, type DragEvent as RDragEvent, type MouseEvent as RMouseEvent } from "react";
 import { isHexColor, textOn } from "@/lib/booking-color";
@@ -727,7 +727,9 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   roomTypes.filter((rt) => visibleStructures.some((s) => s.id === rt.structureId) && units.some((u) => u.roomTypeId === rt.id)).forEach((rt) => days.forEach((d) => { if (rateFor(rt.id, toISO(d)) <= 0) zeroRateN++; }));
   if (zeroRateN) calAlerts.push({ n: zeroRateN, label: "giorni con tariffa a €0", color: "var(--warn)", icon: "🏷️", sev: "warn", href: "/calendario" });
   // Prenotazioni che non trovano posto (due sulla stessa camera nelle stesse notti): si possono spostare in "Da assegnare" con un clic.
-  const stackedIds = overlapLosers(bookings, (x) => visibleStructures.some((s) => s.id === x.structureId));
+  const stackFix = planOverlapFix(bookings, units, roomTypes, (x) => visibleStructures.some((s) => s.id === x.structureId));
+  const stackedN = stackFix.moves.length + stackFix.unassign.length;
+  const applyStackFix = () => { stackFix.moves.forEach((m) => updateBooking(m.id, { unitId: m.unitId })); stackFix.unassign.forEach((id) => updateBooking(id, { unitId: null })); };
   const alertTotal = calAlerts.reduce((a, x) => a + x.n, 0);
   const alertWorst = calAlerts.some((a) => a.sev === "err") ? "var(--err)" : "var(--warn)";
 
@@ -1417,10 +1419,10 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       </div>
       )}
 
-      {stackedIds.length > 0 && (
+      {stackedN > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-wash/60 px-3 py-2 text-xs">
-          <span className="min-w-0 text-dim"><span style={{ color: "var(--warn)" }}>⚠</span> <b className="text-txt">{stackedIds.length}</b> {stackedIds.length === 1 ? "prenotazione non trova posto: è sulla stessa camera di un'altra" : "prenotazioni non trovano posto: sono sulla stessa camera di un'altra"}. Resta quella che arriva per prima.</span>
-          <button type="button" onClick={() => stackedIds.forEach((id) => updateBooking(id, { unitId: null }))} className="shrink-0 rounded-lg border border-line bg-surface px-2.5 py-1.5 font-semibold text-txt transition hover:bg-wash">Sposta in Da assegnare</button>
+          <span className="min-w-0 text-dim"><span style={{ color: "var(--warn)" }}>⚠</span> <b className="text-txt">{stackedN}</b> {stackedN === 1 ? "prenotazione è sulla stessa camera di un'altra" : "prenotazioni sono sulla stessa camera di un'altra"}: {stackFix.moves.length > 0 && <>{stackFix.moves.length} {stackFix.moves.length === 1 ? "ha" : "hanno"} un'altra camera libera</>}{stackFix.moves.length > 0 && stackFix.unassign.length > 0 && ", "}{stackFix.unassign.length > 0 && <>{stackFix.unassign.length} non {stackFix.unassign.length === 1 ? "trova" : "trovano"} posto e va{stackFix.unassign.length === 1 ? "" : "nno"} in Da assegnare</>}. Resta dov'è quella che arriva per prima.</span>
+          <button type="button" onClick={applyStackFix} className="shrink-0 rounded-lg border border-line bg-surface px-2.5 py-1.5 font-semibold text-txt transition hover:bg-wash">Sistema le sovrapposizioni</button>
         </div>
       )}
 

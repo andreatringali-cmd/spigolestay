@@ -24,3 +24,34 @@ export function overlapLosers<T extends B>(bookings: T[], inScope: (b: T) => boo
   }
   return losers;
 }
+
+type U = { id: string; roomTypeId: string; outOfService?: boolean };
+type RT = { id: string; structureId?: string };
+
+/**
+ * Sistema le sovrapposizioni: ogni prenotazione che non trova posto va prima in un'altra camera libera della stessa struttura
+ * (prima della stessa tipologia, poi di un'altra: una camera può essere venduta con più tipologie), e solo se non ce n'è nessuna in "Da assegnare".
+ */
+export function planOverlapFix<T extends B & { roomTypeId?: string; structureId?: string }>(bookings: T[], units: U[], roomTypes: RT[], inScope: (b: T) => boolean = () => true): { moves: { id: string; unitId: string }[]; unassign: string[] } {
+  const loserIds = new Set(overlapLosers(bookings, inScope));
+  const typeStruct = new Map(roomTypes.map((r) => [r.id, r.structureId]));
+  const unitStruct = (u: U) => typeStruct.get(u.roomTypeId);
+  // prenotazioni che restano dove sono, per camera (le sposteremo man mano che si riempiono)
+  const placed = new Map<string, T[]>();
+  for (const b of bookings) {
+    if (!b.unitId || b.status === "cancelled" || loserIds.has(b.id)) continue;
+    const arr = placed.get(b.unitId);
+    if (arr) arr.push(b); else placed.set(b.unitId, [b]);
+  }
+  const moves: { id: string; unitId: string }[] = [];
+  const unassign: string[] = [];
+  const losers = bookings.filter((b) => loserIds.has(b.id)).sort((a, b) => a.checkIn.localeCompare(b.checkIn) || a.id.localeCompare(b.id));
+  for (const b of losers) {
+    const cands = units.filter((u) => !u.outOfService && u.id !== b.unitId && (!b.structureId || unitStruct(u) === b.structureId))
+      .sort((x, y) => (x.roomTypeId === b.roomTypeId ? 0 : 1) - (y.roomTypeId === b.roomTypeId ? 0 : 1));
+    const free = cands.find((u) => !(placed.get(u.id) ?? []).some((k) => clash(k, b)));
+    if (free) { moves.push({ id: b.id, unitId: free.id }); const arr = placed.get(free.id); if (arr) arr.push(b); else placed.set(free.id, [b]); }
+    else unassign.push(b.id);
+  }
+  return { moves, unassign };
+}
