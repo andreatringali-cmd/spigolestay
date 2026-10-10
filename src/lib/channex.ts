@@ -303,6 +303,21 @@ export async function sendBookingMessage(channexBookingId: string, text: string)
   });
 }
 
+// Invio di un allegato (doc Channex "Send Attachment to Booking"): 1) POST /attachments col file in base64 → id; 2) POST /bookings/:id/messages
+// con { message: { attachment_id } } (senza testo: se c'è anche "message" l'allegato viene ignorato). Richiede la stessa Messages App.
+export async function sendBookingAttachment(channexBookingId: string, file: { base64: string; name: string; type: string }) {
+  const up = await channex<{ data?: { id?: string } }>("/attachments", {
+    method: "POST",
+    body: JSON.stringify({ attachment: { file: file.base64, file_name: file.name, file_type: file.type } }),
+  });
+  const attachmentId = up.data?.data?.id;
+  if (!up.ok || !attachmentId) return { ...up, ok: false, error: up.error || "caricamento allegato su Channex non riuscito" };
+  return channex<{ data?: unknown }>(`/bookings/${encodeURIComponent(channexBookingId)}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ message: { attachment_id: attachmentId } }),
+  });
+}
+
 // ── Recensioni (Reviews Collection API: Booking.com/Airbnb/Expedia unificate) ──
 // Richiede la STESSA app "Messages & Reviews" installata per property in Channex (dashboard →
 // Applications) già richiesta sopra dai Messaggi: "Add the Messages & Reviews app to the

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
-import { listBookingMessages, sendBookingMessage } from "@/lib/channex";
+import { listBookingMessages, sendBookingMessage, sendBookingAttachment, channexBase } from "@/lib/channex";
+import { parseAttachments } from "@/lib/channex-messages";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +32,18 @@ export async function POST(req: Request) {
   }
   if (!ok) return NextResponse.json({ error: "non_autorizzato" }, { status: 403 });
 
+  // Allegato (foto/PDF) dalla chat: il client manda il file in base64 (max ~3 MB per stare nel limite di body di Vercel). Non viene salvato da noi.
+  if (action === "send_attachment") {
+    const base64 = String(b?.base64 || "").replace(/^data:[^,]*,/, "");
+    const name = String(b?.name || "").trim().slice(0, 120) || "allegato";
+    const type = String(b?.type || "").trim();
+    if (!base64) return NextResponse.json({ error: "missing_file" }, { status: 400 });
+    if (!/^(image\/(jpeg|png|webp|gif)|application\/pdf)$/.test(type)) return NextResponse.json({ ok: false, error: "Formato non supportato: solo immagini (JPG, PNG, WebP, GIF) e PDF." });
+    if (base64.length > 4_200_000) return NextResponse.json({ ok: false, error: "File troppo grande (massimo circa 3 MB)." });
+    const res = await sendBookingAttachment(bookingId, { base64, name, type });
+    if (!res.ok) return NextResponse.json({ ok: false, error: res.error || `errore Channex (status ${res.status})` });
+    return NextResponse.json({ ok: true });
+  }
   if (action === "send") {
     const text = String(b?.text || "").trim();
     if (!text) return NextResponse.json({ error: "missing_text" }, { status: 400 });
@@ -39,5 +52,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
   const res = await listBookingMessages(bookingId);
-  return NextResponse.json({ ok: res.ok, error: res.ok ? undefined : res.error, messages: res.messages });
+  // `att`: allegati con URL già completo (Channex può darli relativi e temporanei: si rileggono a ogni apertura della chat).
+  const messages = res.messages.map((m) => ({ ...m, att: parseAttachments(m.attachments, channexBase()) }));
+  return NextResponse.json({ ok: res.ok, error: res.ok ? undefined : res.error, messages });
 }

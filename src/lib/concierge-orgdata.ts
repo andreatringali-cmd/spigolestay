@@ -24,15 +24,22 @@ export async function loadOrgDatas(admin: SupabaseClient<any>, tenantId: string)
       .filter((m) => (m as { active?: boolean }).active !== false)
       .map((m) => String((m as { org_id?: string }).org_id || "")).filter(Boolean))).slice(0, 20);
     for (const orgId of orgIds) {
-      const { data: row } = await admin.from("org_state").select("data").eq("org_id", orgId).maybeSingle();
-      const blob = (((row as { data?: unknown } | null)?.data ?? {}) as Record<string, string>) || {};
-      try {
-        const d = JSON.parse(blob[DATA_KEY] || "{}");
-        if (d && typeof d === "object") out.push(d as DataObj);
-      } catch { /* blob org non valido: lo salto */ }
+      const d = await loadOrgData(admin, orgId);
+      if (d) out.push(d);
     }
   } catch { /* tabelle assenti o errore di rete: resta il solo personale */ }
   return out;
+}
+
+// Dati (DATA_KEY già parsificato) di UNA organizzazione; null se la riga manca o il blob non è valido. Sola lettura.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function loadOrgData(admin: SupabaseClient<any>, orgId: string): Promise<DataObj | null> {
+  try {
+    const { data: row } = await admin.from("org_state").select("data").eq("org_id", orgId).maybeSingle();
+    const blob = (((row as { data?: unknown } | null)?.data ?? {}) as Record<string, string>) || {};
+    const d = JSON.parse(blob[DATA_KEY] || "{}");
+    return d && typeof d === "object" ? (d as DataObj) : null;
+  } catch { return null; /* blob org non valido o errore di rete: lo salto */ }
 }
 
 // Unione personale + org per id (le copie org, che portano orgId, sovrascrivono): stessa regola di combineData().
