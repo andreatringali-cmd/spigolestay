@@ -1,5 +1,7 @@
 "use client";
 
+import { POOL_DEF, POOL_KEY, parsePool } from "@/lib/inventory-pool";
+import { CHANNEX_DIRTY_EVENT } from "@/components/ChannexAutoSync";
 import { useEffect, useRef, useState } from "react";
 import { kvGet, kvSet, kvKeys, kvFlush } from "@/lib/bigstore";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
@@ -48,7 +50,17 @@ export default function ImpostazioniPage() {
 
   // Sync Google Calendar in TEMPO REALE: Xenora scrive/cancella direttamente gli eventi sul
   // calendario Google che l'utente condivide col service account (vedi googleCalendarSync.ts).
-  const { structures, updateStructure, activeStructureId, bookings, guests, units, roomTypes } = useData();
+  const { structures, updateStructure, activeStructureId, bookings, guests, units, roomTypes, raw } = useData();
+  // Disponibilità condivisa: strutture che si dividono le stesse camere fisiche (vedi src/lib/inventory-pool.ts). Default spenta.
+  const [pool, setPoolState] = useState(POOL_DEF);
+  useEffect(() => { setPoolState(parsePool(localStorage.getItem(POOL_KEY))); }, []);
+  const savePool = (patch: Partial<typeof POOL_DEF>) => setPoolState((p) => {
+    const n = { ...p, ...patch };
+    try { localStorage.setItem(POOL_KEY, JSON.stringify(n)); window.dispatchEvent(new Event(CHANNEX_DIRTY_EVENT)); } catch {}
+    return n;
+  });
+  const poolStructs = raw.structures;
+  const poolListed = pool.structureIds.reduce((a, id) => a + raw.units.filter((u) => u.structureId === id && !u.outOfService).length, 0);
   const [gcalInfo, setGcalInfo] = useState<{ configured: boolean; serviceAccountEmail: string | null } | null>(null);
   useEffect(() => {
     apiPost<{ ok: boolean; configured: boolean; serviceAccountEmail: string | null }>("calendar/gcal-info", {})
@@ -203,6 +215,36 @@ export default function ImpostazioniPage() {
           <Toggle label={t("Promemoria pulizie")} checked={notifs.cleaning} onChange={(v) => setNotif("cleaning", v)} />
         </div>
       </Card>
+
+      {/* Disponibilità condivisa tra strutture, default SPENTA */}
+      {poolStructs.length > 1 && (
+        <Card className="mt-4">
+          <SectionTitle>{t("Disponibilità condivisa tra strutture")}</SectionTitle>
+          <p className="mb-3 text-xs text-dim">{t("Per strutture che si dividono le stesse camere (per esempio mostri sui portali più camere di quelle reali per farti trovare dai gruppi): a ogni data, una struttura non mostra più camere di quante ne restano libere nel gruppo. Vale per Booking, Expedia, HotelBeds e per le altre OTA collegate.")}</p>
+          <Toggle label={t("Condividi la disponibilità")} checked={pool.enabled} onChange={(v) => savePool({ enabled: v })} />
+          <div className="mt-3 text-xs font-medium text-dim">{t("Strutture del gruppo")}</div>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {poolStructs.map((st) => {
+              const on = pool.structureIds.includes(st.id);
+              return (
+                <button key={st.id} type="button" aria-pressed={on} onClick={() => savePool({ structureIds: on ? pool.structureIds.filter((x) => x !== st.id) : [...pool.structureIds, st.id] })}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${on ? "border-focus text-focus" : "border-line text-dim hover:bg-wash"}`}
+                  style={on ? { backgroundColor: "color-mix(in srgb, var(--focus) 10%, transparent)" } : undefined}>{st.name}</button>
+              );
+            })}
+          </div>
+          <label className="mt-3 block text-xs font-medium text-dim">{t("Camere reali del gruppo")}
+            <input type="number" min={1} value={pool.realRooms || ""} onChange={(e) => savePool({ realRooms: Math.max(0, Math.floor(Number(e.target.value) || 0)) })} className="mt-1 w-28 rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt" />
+          </label>
+          {pool.structureIds.length > 1 && (
+            <p className="mt-2 text-[11px] text-faint">
+              {t("Camere mostrate in Xenora per queste strutture")}: {poolListed}.{" "}
+              {pool.realRooms > 0 && pool.realRooms < poolListed ? t("Le altre sono virtuali: si chiudono da sole man mano che il gruppo si riempie.") : ""}
+              {!pool.enabled || pool.realRooms <= 0 ? " " + t("Attiva l'interruttore e indica le camere reali per applicare la regola.") : ""}
+            </p>
+          )}
+        </Card>
+      )}
 
       {/* Concierge AI — risposta automatica WhatsApp alle domande semplici, default SPENTO */}
       <Card className="mt-4">

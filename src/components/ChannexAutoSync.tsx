@@ -1,5 +1,6 @@
 "use client";
 
+import { POOL_KEY, parsePool } from "@/lib/inventory-pool";
 import { useEffect, useRef } from "react";
 import { useData } from "@/lib/store";
 import { buildAriPayload, type ChxStructMap } from "@/lib/channex-ari";
@@ -94,6 +95,8 @@ export default function ChannexAutoSync() {
         try { cta = JSON.parse(localStorage.getItem(CTA_KEY) || "{}"); } catch {}
         let ctd: Record<string, true> = {};
         try { ctd = JSON.parse(localStorage.getItem(CTD_KEY) || "{}"); } catch {}
+        // Strutture che si dividono le camere reali (Impostazioni → Disponibilità condivisa): la disponibilità di una non supera le camere libere del gruppo.
+        const pool = parsePool(localStorage.getItem(POOL_KEY));
         const { roomTypes: rt, units: un, bookings: bk, rateOverrides: ro } = dataRef.current;
 
         const snapshots = loadSnapshots();
@@ -102,7 +105,7 @@ export default function ChannexAutoSync() {
 
         for (const [sid, map] of linked) {
           // Finestra COMPLETA 500 giorni (una sola build: da qui si ricava full o delta).
-          const { availability, restrictions } = buildAriPayload(map, sid, rt, un, bk, ro, { days: FULL_DAYS, weekendPct, closes, cta, ctd });
+          const { availability, restrictions } = buildAriPayload(map, sid, rt, un, bk, ro, { days: FULL_DAYS, weekendPct, closes, cta, ctd, pool });
           if (availability.length === 0 && restrictions.length === 0) continue;
 
           const snap = snapshots[sid];
