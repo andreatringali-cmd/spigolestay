@@ -3,10 +3,10 @@ import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { internalFetch } from "@/lib/server-auth";
 import { logInvio } from "@/lib/invii-log";
-import { parseChannexMessage, appendOtaMessage, verifyMessageHook, HOOK_SECRET_HEADER, type InboundOtaMessage } from "@/lib/channex-messages";
+import { parseChannexMessage, appendOtaMessage, pickMessageStore, verifyMessageHook, HOOK_SECRET_HEADER, type InboundOtaMessage } from "@/lib/channex-messages";
 import { AI_CONCIERGE_KEY, parseAiConciergePrefs, otaAutoActive } from "@/lib/aiConcierge";
 import { conciergeAnswer, resolveStructureId, type BookingLite } from "@/lib/concierge-engine";
-import { loadOrgDatas, mergeOrgData } from "@/lib/concierge-orgdata";
+import { loadOrgDatas, loadOrgData, mergeOrgData } from "@/lib/concierge-orgdata";
 import { logUnanswered } from "@/lib/concierge-unanswered";
 import { sendBookingMessage } from "@/lib/channex";
 
@@ -18,6 +18,10 @@ export const maxDuration = 60; // la risposta automatica (AI) gira dopo aver ris
 // Il messaggio entra nel thread dell'ospite dentro lo stato del proprietario (stessa chiave dei messaggi WhatsApp),
 // quindi pallino in sidebar, suono e "da leggere" funzionano senza altro. Poi un'email al proprietario (al massimo una ogni 30 min per prenotazione).
 // URL registrato da /api/channex/webhook-setup: https://xenora.it/api/channex/webhook-messages
+// Strutture condivise (org): la prenotazione vive in org_state(org_id) e non nel blob personale; la si cerca lì (channex_map.org_id) e poi,
+// se serve, in tutte le org di cui il proprietario è membro. Il thread resta nello stato personale di chi ha collegato la property
+// (la chiave dei thread non è divisa per organizzazione, vedi splitByOrg in authsync.tsx). Scrittura sempre con lock su rev.
+// I messaggi della struttura scritti fuori da Xenora (sender "property") entrano nel thread come "out" ma NON generano email né risposta automatica.
 // Risponde SEMPRE 200: Channex ritenta all'infinito se non lo riceve.
 const NOTIFY_EVERY_MS = 30 * 60 * 1000;
 const THREADS_KEY = "spigolestay:threads:v1";
@@ -80,9 +84,14 @@ export async function POST(req: Request) {
     if (!msg || !url || !service) return NextResponse.json({ received: true });
     const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
-    const { data: maps } = await admin.from("channex_map").select("tenant_id").eq("channex_property_id", msg.propertyId).limit(1);
-    const tenantId = (maps?.[0] as { tenant_id?: string } | undefined)?.tenant_id;
-    if (!tenantId) { console.log("[channex webhook-messages] property non collegata", msg.propertyId); return NextResponse.json({ received: true }); }
+    const { data: maps } = await admin.from("channex_map").select("tenant_id, org_id").eq("channex_property_id", msg.propertyId).limit(10);
+    const store = pickMessageStore(maps as { tenant_id?: string | null; org_id?: string | null }[] | null);
+    if (!store) { console.log("[channex webhook-messages] property non collegata", msg.propertyId); return NextResponse.json({ received: true }); }
+    const tenantId = store.tenantId;
+    // Dati dell'org della property (se condivisa); se la prenotazione non c'è si riprova una volta con tutte le org del tenant.
+    let orgDatas: Record<string, unknown>[] = [];
+    if (store.orgId) { const d = await loadOrgData(admin, store.orgId); if (d) orgDatas = [d]; }
+    let triedAllOrgs = false;
 
     let added: { guestId: string; bookingId: string; channel: string } | null = null;
     let savedBlob: Record<string, string> = {};
@@ -90,8 +99,9 @@ export async function POST(req: Request) {
       const { data: row } = await admin.from("app_state").select("data, rev").eq("user_id", tenantId).maybeSingle();
       const blob = ((row?.data ?? {}) as Record<string, string>) || {};
       const rev = typeof (row as { rev?: number } | null)?.rev === "number" ? (row as { rev: number }).rev : null;
-      const res = appendOtaMessage(blob, msg, Date.now());
+      const res = appendOtaMessage(blob, msg, Date.now(), orgDatas);
       if (res.status === "duplicate") return NextResponse.json({ received: true });
+      if (res.status === "no_booking" && !triedAllOrgs) { triedAllOrgs = true; orgDatas = await loadOrgDatas(admin, tenantId); attempt--; continue; }
       if (res.status === "no_booking") { console.log("[channex webhook-messages] prenotazione non trovata", msg.bookingId); return NextResponse.json({ received: true }); }
       let write = admin.from("app_state").update({ data: blob, updated_at: new Date().toISOString() }).eq("user_id", tenantId);
       if (rev !== null) write = write.eq("rev", rev);
@@ -99,6 +109,9 @@ export async function POST(req: Request) {
       if (updated && updated.length > 0) { added = { guestId: res.guestId, bookingId: res.bookingId, channel: res.channel }; savedBlob = blob; }
     }
     if (!added) { console.log("[channex webhook-messages] conflitto di rev, messaggio non salvato", msg.id); return NextResponse.json({ received: true }); }
+
+    // Messaggio scritto dalla struttura fuori da Xenora: solo thread, niente email al proprietario né risposta automatica.
+    if (msg.sender === "property") return NextResponse.json({ received: true });
 
     const done = added;
     after(() => tryOtaAutoReply(admin, tenantId, msg, { blob: savedBlob, guestId: done.guestId, bookingId: done.bookingId }));

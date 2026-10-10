@@ -47,7 +47,7 @@ declare global {
 
 
 // wid = id del messaggio su WhatsApp; st = stato di consegna (sent ✓, delivered ✓✓, read ✓✓ blu, failed).
-interface Msg { id: string; dir: "out" | "in"; text: string; ts: number; via?: string; wid?: string; st?: "sent" | "delivered" | "read" | "failed"; media?: { kind: "audio"; id: string; transcribed: boolean }; sys?: "payment" }
+interface Msg { id: string; dir: "out" | "in"; text: string; ts: number; via?: string; att?: { url: string; name?: string }[]; wid?: string; st?: "sent" | "delivered" | "read" | "failed"; media?: { kind: "audio"; id: string; transcribed: boolean }; sys?: "payment" }
 type Threads = Record<string, Msg[]>;
 const KEY = "spigolestay:threads:v1";
 // Altezza di un riquadro = spazio rimasto nella finestra dal suo bordo alto (qualunque sia l'intestazione sopra), così la casella di scrittura
@@ -277,23 +277,47 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   // unificata (SPERIMENTALE, vedi src/lib/channex.ts). extId è "channex:<booking_id>".
   const chxExtId = current?.b?.extId;
   const chxBookingId = chxExtId?.startsWith("channex:") ? chxExtId.slice("channex:".length) : undefined;
-  // Alla apertura della chat, importa i messaggi dell'ospite arrivati su Booking.com/Airbnb/Expedia
-  // (solo "guest": i nostri "property" sono già loggati localmente quando li inviamo). Fallisce in
+  // Alla apertura della chat, importa i messaggi arrivati su Booking.com/Airbnb/Expedia: quelli dell'ospite ("guest") e le risposte
+  // date dalla struttura fuori da Xenora ("property", dedup col testo già registrato quando si risponde da qui). Fallisce in
   // silenzio (es. Messages App non installata su Channex): non è un invio, solo lettura in background.
   useEffect(() => {
     if (!chxBookingId || !sel) return;
     const gid = sel;
-    apiPost<{ ok: boolean; messages?: { id: string; message?: string; sender?: string }[] }>("channex/messages", { action: "list", bookingId: chxBookingId })
+    apiPost<{ ok: boolean; messages?: { id: string; message?: string; sender?: string; inserted_at?: string; att?: { url: string; name?: string }[] }[] }>("channex/messages", { action: "list", bookingId: chxBookingId })
       .then((r) => {
         if (!r.ok || !r.messages) return;
         const seenKey = `spigolestay:chxseen:${chxBookingId}`;
         let seen: string[] = []; try { seen = JSON.parse(localStorage.getItem(seenKey) || "[]"); } catch {}
         const seenSet = new Set(seen);
-        const nuovi = r.messages.filter((m) => m.sender === "guest" && m.id && !seenSet.has(m.id) && (m.message || "").trim());
-        if (nuovi.length) {
-          nuovi.forEach((m) => addTo(gid, "in", m.message || "", "Booking.com", `chx:${m.id}`));
-          try { localStorage.setItem(seenKey, JSON.stringify([...seen, ...nuovi.map((m) => m.id)].slice(-300))); } catch {}
-        }
+        const via = otaLabel(current?.b?.channel);
+        const norm = (x: string) => x.replace(/\s+/g, " ").trim();
+        const when = (iso?: string) => { const v = (iso ?? "").trim(); const t = v ? Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(v) ? v : `${v}Z`) : NaN; return Number.isFinite(t) ? t : Date.now(); };
+        // Messaggi con solo allegato: testo segnaposto, l'allegato si apre dal link. Gli indirizzi degli allegati possono essere temporanei: si aggiornano a ogni apertura.
+        const textOf = (m: { message?: string; att?: unknown[] }) => (m.message || "").trim() || (m.att?.length ? "📎 Allegato" : "");
+        const nuovi = r.messages.filter((m) => m.id && !seenSet.has(m.id) && textOf(m) && (m.sender === "guest" || m.sender === "property"));
+        const conAtt = r.messages.filter((m) => m.id && m.att?.length);
+        setThreads((tt) => {
+          let list = tt[gid] ?? [];
+          let changed = false;
+          // Aggiorna gli indirizzi degli allegati dei messaggi già in chat.
+          for (const m of conAtt) {
+            const i = list.findIndex((x) => x.id === `chx:${m.id}`);
+            if (i >= 0 && JSON.stringify(list[i].att) !== JSON.stringify(m.att)) { list = list.map((x, j) => (j === i ? { ...x, att: m.att } : x)); changed = true; }
+          }
+          for (const m of nuovi) {
+            const mid = `chx:${m.id}`;
+            if (list.some((x) => x.id === mid)) continue;
+            const text = textOf(m);
+            if (m.sender === "guest") { list = [...list, { id: mid, dir: "in", text, ts: Date.now(), via, ...(m.att?.length ? { att: m.att } : {}) }]; changed = true; continue; }
+            // Risposta della struttura data fuori da Xenora (extranet, Booking Pulse…): entra come "out", salvo sia la stessa già registrata da qui (stesso testo, entro 10 minuti).
+            const ts = when(m.inserted_at);
+            if (list.some((x) => x.dir === "out" && norm(x.text) === norm(text) && Math.abs(x.ts - ts) <= 10 * 60 * 1000)) continue;
+            list = [...list, { id: mid, dir: "out", text, ts, via, ...(m.att?.length ? { att: m.att } : {}) }]; changed = true;
+          }
+          return changed ? { ...tt, [gid]: list } : tt;
+        });
+        if (nuovi.some((m) => m.sender === "guest")) playSound("received");
+        if (nuovi.length) { try { localStorage.setItem(seenKey, JSON.stringify([...seen, ...nuovi.map((m) => m.id)].slice(-300))); } catch {} }
       })
       .catch(() => {});
   }, [chxBookingId, sel]);
@@ -420,6 +444,22 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     const text = draft; add("out", text, otaName); setDraft("");
     try { await apiPost<{ ok: boolean }>("channex/messages", { action: "send", bookingId: chxBookingId, text }); }
     catch (e) { window.alert(t("Non risulta inviato su Booking.com: ") + (e instanceof Error ? e.message : "errore") + ". " + t("Il messaggio resta qui in chat ma potrebbe NON essere arrivato all'ospite.")); }
+  };
+
+  // Allegato (foto/PDF) nella chat della OTA: Channex lo vuole in due passi (carica in base64, poi invia l'id) e senza testo insieme.
+  // Il file non viene salvato qui: in chat resta solo la riga "📎 Allegato" (poi riletta da Channex con lo stesso testo, senza doppioni).
+  const attachRef = useRef<HTMLInputElement>(null);
+  const sendChxFile = (file: File | undefined) => {
+    if (!file || !chxBookingId) return;
+    if (file.size > 3 * 1024 * 1024) { window.alert(t("File troppo grande (massimo circa 3 MB).")); return; }
+    const rd = new FileReader();
+    rd.onload = async () => {
+      try {
+        await apiPost<{ ok: boolean }>("channex/messages", { action: "send_attachment", bookingId: chxBookingId, base64: String(rd.result || ""), name: file.name, type: file.type });
+        add("out", "📎 Allegato", otaName);
+      } catch (e) { window.alert(t("Allegato non inviato: ") + (e instanceof Error ? e.message : "errore")); }
+    };
+    rd.readAsDataURL(file);
   };
 
   // Chiede a Claude una BOZZA di risposta nella lingua dell'ospite, basata sul thread + prenotazione.
@@ -836,6 +876,13 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                           {isAiReply && <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold">🤖 {t("Risposta automatica")}</div>}
                           {m.media?.kind === "audio" && <VoiceNote mediaId={m.media.id} transcribed={m.media.transcribed} />}
                           <div className="whitespace-pre-wrap [overflow-wrap:anywhere]">{m.text}</div>
+                          {/* Allegati dalle OTA (Channex): solo link, il file resta su Channex; le immagini hanno un'anteprima piccola che sparisce se non si carica. */}
+                          {m.att?.map((a) => (
+                            <div key={a.url} className="mt-1.5">
+                              {/\.(jpe?g|png|gif|webp)(\?|$)/i.test(a.name || a.url) && <a href={a.url} target="_blank" rel="noopener noreferrer"><img src={a.url} alt={a.name || ""} loading="lazy" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.display = "none"; }} className="mb-1 max-h-40 max-w-full rounded-lg border border-line object-cover" /></a>}
+                              <a href={a.url} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1 rounded-lg border border-line bg-wash px-2 py-1 text-xs font-medium text-txt underline-offset-2 hover:underline"><span>📎</span><span className="truncate">{a.name || t("Allegato")}</span></a>
+                            </div>
+                          ))}
                           <LinkPreview text={m.text} />
                         </div>
                         {groupEnd && <div className="mt-1 px-1 text-[10px] text-faint">{hhmm}{m.via ? ` · ${m.via}` : ""}{out && m.st && (
@@ -916,6 +963,10 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                   <button onClick={sendWa} disabled={!draft.trim()} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</button>
                   <button onClick={sendMail} disabled={!draft.trim() || !current.email} className="inline-flex items-center gap-1.5 rounded-full bg-focus px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40">✉ Email</button>
                   {chxBookingId && <button onClick={sendChx} disabled={!draft.trim()} title={t("Sperimentale: invia nel thread messaggi di Booking.com/Airbnb/Expedia (Channex) — verifica il primo invio")} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#003580" }}>🏨 {otaName} <span className="text-[9px] font-normal opacity-75">beta</span></button>}
+                  {chxBookingId && <>
+                    <input ref={attachRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="hidden" onChange={(e) => { sendChxFile(e.target.files?.[0]); e.target.value = ""; }} />
+                    <button onClick={() => attachRef.current?.click()} title={t("Sperimentale: invia una foto o un PDF (max ~3 MB) nel thread di Booking.com/Airbnb/Expedia — non tutte le OTA accettano allegati")} className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1.5 text-sm font-medium text-dim transition hover:bg-wash hover:text-txt">📎 {t("Allegato")} <span className="text-[9px] font-normal opacity-75">beta</span></button>
+                  </>}
                   <span className="text-[11px] text-faint">{t("Con Invio rispondi su")} <b className="text-dim">{replyOta ? otaName : "WhatsApp"}</b>{chxBookingId && !replyOta ? ` · ${t("per rispondere su")} ${otaName} ${t("usa il pulsante blu")}` : ""}</span>
                   <button onClick={logIn} className="ml-auto rounded-full border border-line px-3 py-1.5 text-sm font-medium text-dim transition hover:bg-wash hover:text-txt" title={t("Registra una risposta arrivata dall'ospite")}>＋ {t("Risposta ricevuta")}</button>
                 </div>
