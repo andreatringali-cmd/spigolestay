@@ -1,6 +1,6 @@
 "use client";
 
-import { POOL_KEY, parsePool, inPool, poolRemaining } from "@/lib/inventory-pool";
+import { POOL_KEY, parsePool, inPool, poolOccupancy } from "@/lib/inventory-pool";
 import { useEffect, useMemo, useRef, useState, type DragEvent as RDragEvent, type MouseEvent as RMouseEvent } from "react";
 import { isHexColor, textOn } from "@/lib/booking-color";
 import Image from "next/image";
@@ -575,17 +575,13 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   const rateKey = (typeId: string, iso: string) => `${typeId}|${iso}`;
   const weekendPct = loadWeekendPct();
   const rateFor = (typeId: string, iso: string) => rateForDay(typeId, iso, roomTypes, rateOverrides, weekendPct);
-  // Strutture che si dividono le camere reali (Impostazioni → Disponibilità condivisa): la disponibilità mostrata è la stessa che si invia ai portali,
-  // cioè mai più delle camere libere nel gruppo. Si usano TUTTE le prenotazioni (anche delle strutture non visibili) e la somma di ogni giorno si calcola una volta.
+  // Strutture che mostrano le stesse camere fisiche (Impostazioni → Disponibilità condivisa): la disponibilità è quella delle camere fisiche libere in tutto il gruppo,
+  // la stessa che si invia ai portali. Si usano TUTTE le prenotazioni e TUTTE le camere (anche delle strutture non visibili).
   const poolCfg = (() => { try { return parsePool(localStorage.getItem(POOL_KEY)); } catch { return parsePool(null); } })();
-  const poolRem = new Map<string, number>();
-  const capPool = (avail: number, typeId: string, iso: string) => {
-    if (!poolCfg.enabled) return avail;
+  const poolOcc = poolCfg.enabled ? poolOccupancy(poolCfg, raw.units, raw.bookings) : null;
+  const poolAvail = (typeId: string, iso: string, closed: number): number | null => {
     const sid = roomTypes.find((r) => r.id === typeId)?.structureId;
-    if (!sid || !inPool(poolCfg, sid)) return avail;
-    let rem = poolRem.get(iso);
-    if (rem === undefined) { rem = poolRemaining(poolCfg, raw.bookings, iso); poolRem.set(iso, rem); }
-    return Math.min(avail, rem);
+    return poolOcc && inPool(poolCfg, sid) ? poolOcc.availFor(typeId, iso, closed) : null;
   };
   // Striscia tariffa+disponibilità per una singola tipologia.
   const typeStrip = (typeId: string, typeUnits: typeof units) => {
@@ -594,7 +590,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       const iso = toISO(d);
       const occupied = bookings.filter((b) => b.unitId && act.some((u) => u.id === b.unitId) && b.checkIn <= iso && iso < b.checkOut).length;
       const closed = closes[closeKey(typeId, iso)] ?? 0;
-      return { iso, rate: rateFor(typeId, iso), overridden: rateOverrides[rateKey(typeId, iso)] != null, avail: capPool(Math.max(0, act.length - occupied - closed), typeId, iso), closed };
+      return { iso, rate: rateFor(typeId, iso), overridden: rateOverrides[rateKey(typeId, iso)] != null, avail: poolAvail(typeId, iso, closed) ?? Math.max(0, act.length - occupied - closed), closed };
     });
   };
   // Striscia aggregata su più tipologie (vista compatta): disponibilità sommata, tariffa rappresentativa (1ª tipologia).
@@ -606,11 +602,11 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         const act = sectionUnits.filter((u) => u.roomTypeId === tid && !u.outOfService);
         const occupied = bookings.filter((b) => b.unitId && act.some((u) => u.id === b.unitId) && b.checkIn <= iso && iso < b.checkOut).length;
         const cl = closes[closeKey(tid, iso)] ?? 0;
-        avail += Math.max(0, act.length - occupied - cl);
+        avail += poolAvail(tid, iso, cl) ?? Math.max(0, act.length - occupied - cl);
         closed += cl;
       }
       const t0 = typeIds[0];
-      return { iso, rate: rateFor(t0, iso), overridden: rateOverrides[rateKey(t0, iso)] != null, avail: capPool(avail, t0, iso), closed };
+      return { iso, rate: rateFor(t0, iso), overridden: rateOverrides[rateKey(t0, iso)] != null, avail, closed };
     });
   };
   // Occupazione complessiva (per il grafico in alto).

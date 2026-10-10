@@ -1,5 +1,5 @@
 import { schedulePoolPush } from "@/lib/pool-push";
-import { POOL_KEY, parsePool, inPool, poolRemaining } from "@/lib/inventory-pool";
+import { POOL_KEY, parsePool, inPool, poolOccupancy } from "@/lib/inventory-pool";
 import { NextResponse } from "next/server";
 import { stayFloor, hasFreeUnit, clientIp, type OwnerStructureData } from "@/lib/server-booking-guard";
 import { isInternalRequest, rateLimited } from "@/lib/server-auth";
@@ -111,14 +111,13 @@ export async function POST(req: Request) {
     // Camera: prima unità libera della tipologia. Se non ce ne sono: dal sito anonimo si rifiuta (409); se invece il pagamento
     // è già avvenuto (chiamata interna) si registra comunque, senza camera e con un avviso, invece di sovrapporla a un'altra prenotazione.
     const ofType = units.filter((u) => u.roomTypeId === rt && !u.outOfService);
-    const free = ofType.find((u) => !bookings.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)));
-    // Strutture che si dividono le camere reali (Impostazioni → Disponibilità condivisa): se in una delle notti il gruppo non ha camere libere, non c'è disponibilità.
+    // Strutture che mostrano le stesse camere fisiche: la camera deve essere libera anche in tutto il gruppo (la "5" di una struttura è la "#5" dell'altra).
     const pool = parsePool(blob[POOL_KEY]);
-    let poolFull = false;
-    if (inPool(pool, sid)) { for (let t = new Date(ci + "T00:00:00Z"); t.toISOString().slice(0, 10) < co; t.setUTCDate(t.getUTCDate() + 1)) { if (poolRemaining(pool, bookings, t.toISOString().slice(0, 10)) < 1) { poolFull = true; break; } } }
+    const poolOcc = inPool(pool, sid) ? poolOccupancy(pool, units, bookings) : null;
+    const free = ofType.find((u) => !bookings.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)) && (!poolOcc || poolOcc.unitFreeForStay(u, ci, co)));
     let overbooked = false;
-    let unitId: string | null = poolFull ? null : free?.id ?? null;
-    if ((!free || poolFull) && ofType.length) {
+    let unitId: string | null = free?.id ?? null;
+    if (!free && ofType.length) {
       if (!internal) return NextResponse.json({ error: "no_availability" }, { status: 409 });
       overbooked = true; unitId = null;
     }

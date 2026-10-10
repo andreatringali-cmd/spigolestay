@@ -1,4 +1,4 @@
-import { inPool, poolRemaining, type PoolConfig } from "./inventory-pool";
+import { inPool, poolOccupancy, type PoolConfig } from "./inventory-pool";
 import { effectiveBase, effectiveMinStay, effectiveClosed, structureWeekendPct } from "@/lib/pricing";
 import { addDays, isWeekend, toISO } from "@/lib/dates";
 import type { RoomType, Unit, Booking } from "@/lib/types";
@@ -44,7 +44,8 @@ export function buildAriPayload(
   const cta = opts?.cta ?? {};
   const ctd = opts?.ctd ?? {};
   const base0 = new Date();
-  const poolCache = new Map<string, number>();
+  // Strutture che mostrano le stesse camere fisiche: la disponibilità conta le camere fisiche libere in tutto il gruppo (vedi inventory-pool.ts).
+  const poolOcc = opts?.pool && inPool(opts.pool, structureId) ? poolOccupancy(opts.pool, units, bookings) : null;
   for (const rt of rts) {
     const mp = map.rooms![rt.id];
     const totalUnits = units.filter((u) => u.roomTypeId === rt.id && !u.outOfService).length;
@@ -59,9 +60,7 @@ export function buildAriPayload(
       // (fuori servizio a periodo). Il fuori servizio permanente è già escluso da totalUnits.
       const occupied = bookings.filter((b) => b.status !== "cancelled" && b.roomTypeId === rt.id && b.checkIn <= iso && iso < b.checkOut).length;
       const closed = closes[`${rt.id}|${iso}`] ?? 0; // camere chiuse alla vendita per quel giorno
-      // Gruppo di strutture che si dividono le camere reali: mai più camere di quante ne restano libere nel gruppo (una sola somma per giorno, poi in cache).
-      let avail = Math.max(0, totalUnits - occupied - closed);
-      if (opts?.pool && inPool(opts.pool, structureId)) { let rem = poolCache.get(iso); if (rem === undefined) { rem = poolRemaining(opts.pool, bookings, iso); poolCache.set(iso, rem); } avail = Math.min(avail, rem); }
+      const avail = poolOcc ? poolOcc.availFor(rt.id, iso, closed) : Math.max(0, totalUnits - occupied - closed);
       availability.push({ property_id: map.propertyId, room_type_id: mp.roomTypeId, date: iso, availability: avail });
       if (mp.ratePlanId) {
         const raw = rateOverrides[`${rt.id}|${iso}`] ?? rateOverrides[iso] ?? Math.round(effectiveBase(rt, roomTypes) * (isWeekend(dt) ? 1 + structureWeekendPct(rt.structureId, weekendPct) / 100 : 1));
