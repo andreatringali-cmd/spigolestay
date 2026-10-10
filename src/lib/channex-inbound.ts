@@ -371,6 +371,12 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         // vecchia/e riga/e (id diverso) va tolto esplicitamente, altrimenti resta un doppione
         // "fantasma" sul calendario reale dell'utente.
         if (isUpdate) removed.forEach((old) => syncGcalServer(old, "delete"));
+        // Le righe sostituite vanno LAPIDATE: senza, un browser rimasto aperto con la copia vecchia la rimette dentro alla sincronizzazione e la prenotazione risulta doppia
+        // (successo con le prenotazioni importate da Octorate e poi ricevute da Channex). La fusione del client tratta le lapidi del server come autorevoli.
+        if (removed.length) {
+          const del = (((data as { _deleted?: Record<string, string[]> })._deleted) ??= {});
+          del.bookings = Array.from(new Set([...(del.bookings ?? []), ...removed.map((old) => String((old as { id?: unknown }).id ?? "")).filter(Boolean)])).slice(-3000);
+        }
         applied.push({ rev: r }); out.imported++;
         pushActivity(data, "booking", `Prenotazione OTA ${isUpdate ? "aggiornata" : "importata"} — ${fullName} · ${channel.toUpperCase()} (Channex)`);
         console.log(`[channex inbound] ${isUpdate ? "MODIFICA" : "NUOVA"} booking_id=${bidLog} → ${added} camera/e ${isUpdate ? "aggiornata/e" : "creata/e"} (ack)`);
