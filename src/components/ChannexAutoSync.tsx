@@ -1,6 +1,7 @@
 "use client";
 
 import { POOL_KEY, parsePool } from "@/lib/inventory-pool";
+import { RATEMODEL_KEY, parseRateModel } from "@/lib/rate-model";
 import { useEffect, useRef } from "react";
 import { useData } from "@/lib/store";
 import { buildAriPayload, type ChxStructMap } from "@/lib/channex-ari";
@@ -66,8 +67,8 @@ const availKey = (r: { property_id: string; room_type_id: string; date: string }
 const availVal = (r: { availability: number }) => String(r.availability);
 const restrKey = (r: { property_id: string; rate_plan_id: string; date?: string; date_from?: string }) => `${r.property_id}|${r.rate_plan_id}|${r.date ?? r.date_from ?? ""}`;
 // Valore canonico (ordine campi fisso) così due righe identiche producono la stessa stringa.
-const restrVal = (r: { rate?: string; min_stay_arrival?: number; max_stay?: number; stop_sell?: boolean; closed_to_arrival?: boolean; closed_to_departure?: boolean }) =>
-  JSON.stringify({ rate: r.rate, min_stay_arrival: r.min_stay_arrival, max_stay: r.max_stay, stop_sell: r.stop_sell, closed_to_arrival: r.closed_to_arrival, closed_to_departure: r.closed_to_departure });
+const restrVal = (r: { rate?: string; rates?: { occupancy: number; rate: string }[]; min_stay_arrival?: number; max_stay?: number; stop_sell?: boolean; closed_to_arrival?: boolean; closed_to_departure?: boolean }) =>
+  JSON.stringify({ rate: r.rate, rates: r.rates, min_stay_arrival: r.min_stay_arrival, max_stay: r.max_stay, stop_sell: r.stop_sell, closed_to_arrival: r.closed_to_arrival, closed_to_departure: r.closed_to_departure });
 
 export default function ChannexAutoSync() {
   const { raw, rateOverrides } = useData(); // dati completi: la sincronizzazione non dipende dalle strutture selezionate in alto
@@ -97,6 +98,8 @@ export default function ChannexAutoSync() {
         try { ctd = JSON.parse(localStorage.getItem(CTD_KEY) || "{}"); } catch {}
         // Strutture che si dividono le camere reali (Impostazioni → Disponibilità condivisa): la disponibilità di una non supera le camere libere del gruppo.
         const pool = parsePool(localStorage.getItem(POOL_KEY));
+        // Più piani tariffari / prezzo per 1 ospite: default SPENTO (Impostazioni), vedi src/lib/rate-model.ts.
+        const rateModel = parseRateModel(localStorage.getItem(RATEMODEL_KEY));
         const { roomTypes: rt, units: un, bookings: bk, rateOverrides: ro } = dataRef.current;
 
         const snapshots = loadSnapshots();
@@ -105,7 +108,7 @@ export default function ChannexAutoSync() {
 
         for (const [sid, map] of linked) {
           // Finestra COMPLETA 500 giorni (una sola build: da qui si ricava full o delta).
-          const { availability, restrictions } = buildAriPayload(map, sid, rt, un, bk, ro, { days: FULL_DAYS, weekendPct, closes, cta, ctd, pool });
+          const { availability, restrictions } = buildAriPayload(map, sid, rt, un, bk, ro, { days: FULL_DAYS, weekendPct, closes, cta, ctd, pool, rateModel });
           if (availability.length === 0 && restrictions.length === 0) continue;
 
           const snap = snapshots[sid];
