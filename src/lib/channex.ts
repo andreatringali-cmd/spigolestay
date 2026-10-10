@@ -8,6 +8,7 @@
 // ============================================================
 
 import { channexFetch } from "@/lib/channex-queue";
+import { otaActionRequest, type OtaAction } from "@/lib/channex-booking-actions";
 
 const BASE = process.env.CHANNEX_API_URL || "https://staging.channex.io/api/v1";
 const KEY = process.env.CHANNEX_API_KEY || "";
@@ -301,6 +302,18 @@ export async function sendBookingMessage(channexBookingId: string, text: string)
     method: "POST",
     body: JSON.stringify({ message: { message: text } }),
   });
+}
+
+// ── Segnalazioni all'OTA (Reporting API, SOLO Booking.com) ──
+// Doc: https://docs.channex.io/api-v.1-documentation/bookings-collection.md (sezione Reporting API):
+// POST /bookings/:id/no_show {no_show_report:{waived_fees}} · /invalid_card · /cancel_due_invalid_card
+// (questi ultimi due a corpo vuoto). Per OTA non supportate Channex risponde 422 method_not_supported.
+// ALTO RISCHIO: chiamare SOLO da un'azione esplicita dell'utente con conferma (route
+// /api/channex/booking-actions), MAI da cron, webhook o automazioni. La doc mostra solo URL di
+// staging: in produzione si presume lo stesso percorso su CHANNEX_API_URL (da verificare con Channex).
+export async function reportBookingToOta(action: OtaAction, channexBookingId: string) {
+  const { path, body } = otaActionRequest(action, channexBookingId);
+  return channex<{ meta?: { message?: string } }>(path, { method: "POST", ...(body ? { body } : {}) });
 }
 
 // ── Recensioni (Reviews Collection API: Booking.com/Airbnb/Expedia unificate) ──

@@ -18,6 +18,7 @@ import { loadWeekendPct } from "@/lib/pricing";
 import { eur } from "@/lib/format";
 import { invPost } from "@/lib/invoicing/client";
 import AdempimentiPanel from "@/components/booking/AdempimentiPanel";
+import OtaReportMenu from "@/components/booking/OtaReportMenu";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useAccess } from "@/lib/access";
@@ -647,6 +648,11 @@ export default function BookingDrawer() {
       <Section title={t("Adempimenti")}>
         <AdempimentiPanel booking={booking} />
       </Section>
+
+      {/* Segnalazioni a Booking.com (no-show / carta): si rende solo per prenotazioni Channex Booking.com */}
+      {booking.channel === "booking" && booking.extId?.startsWith("channex:") && (
+        <div className="border-b border-line px-5 py-3"><OtaReportMenu booking={booking} /></div>
+      )}
 
       <Section title={t("Documenti")}>
         <button onClick={emitDocument} disabled={emit.busy} className="flex w-full items-center justify-between rounded-lg bg-focus px-3 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">
