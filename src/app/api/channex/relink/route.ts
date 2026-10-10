@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { channexEnabled, listProperties, listRoomTypesFor, listRatePlansForRoomType } from "@/lib/channex";
 import { saveChannexMap } from "@/lib/channex-inbound";
+import { allowedChannexProperties } from "@/lib/channex-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,12 +75,18 @@ export async function POST(req: Request) {
   // combaciano con la stessa struttura (doppioni su Channex), tengo solo la più COMPLETA
   // (più camere abbinate) per non creare mappature doppie.
   type Match = { c: Candidate; propertyId: string; propertyTitle: string; rooms: Record<string, string>; ratePlans: Record<string, string>; count: number };
+  // L'account Channex è condiviso fra tutti i tenant e l'abbinamento è per NOME: senza questo filtro chi chiamasse una
+  // struttura come l'hotel di un altro gli "ruberebbe" la mappatura (saveChannexMap sovrascrive per property).
+  // Si abbinano solo property libere o già collegate a questo tenant (o alle sue strutture condivise).
+  const mine = await allowedChannexProperties(auth.admin, auth.tenantId);
+  const { data: mapped } = await auth.admin.from("channex_map").select("channex_property_id");
+  const takenByOthers = new Set(((mapped ?? []) as { channex_property_id?: string }[]).map((r) => r.channex_property_id).filter((id): id is string => !!id && !mine.has(id)));
   const bestByStruct = new Map<string, Match>();
   const unmatched: string[] = [];
   for (const p of propList) {
     const title = norm(p.attributes?.title);
     const c = candidates.find((x) => norm(x.name) === title);
-    if (!c) { unmatched.push(p.attributes?.title || p.id); continue; }
+    if (!c || takenByOthers.has(p.id)) { unmatched.push(p.attributes?.title || p.id); continue; }
     const rt = await listRoomTypesFor(p.id);
     const rooms: Record<string, string> = {}; // channex_room_type_id → xenora_room_type_id
     const ratePlans: Record<string, string> = {}; // channex_room_type_id → channex_rate_plan_id (per inviare i prezzi)

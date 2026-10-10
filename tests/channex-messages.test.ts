@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { isOffHours, otaAutoActive } from "../src/lib/aiConcierge.ts";
-import { parseChannexMessage, appendOtaMessage, otaLabel, messageHookSecret } from "../src/lib/channex-messages.ts";
+import { parseChannexMessage, appendOtaMessage, otaLabel, messageHookSecret, bookingHookSecret, verifyMessageHook, verifyBookingHook } from "../src/lib/channex-messages.ts";
 
 const ev = (over: Record<string, unknown> = {}) => ({ event: "message", property_id: "P1", payload: { id: "m1", message: " Ciao ", sender: "guest", booking_id: "B1", property_id: "P1", ...over } });
 
@@ -59,4 +59,47 @@ test("otaAutoActive: serve il Concierge acceso e la modalità giusta", () => {
   assert.equal(otaAutoActive({ ...p, otaMode: "always" }, day), true);
   assert.equal(otaAutoActive({ ...p, otaMode: "off" }, night), false);
   assert.equal(otaAutoActive({ ...p, enabled: false, otaMode: "always" }, night), false);
+});
+
+test("segreti webhook: stessa base, etichette diverse (non intercambiabili)", () => {
+  const env = { CRON_SECRET: "abc" };
+  assert.equal(bookingHookSecret({}), "");
+  assert.equal(bookingHookSecret(env), bookingHookSecret({ CRON_SECRET: "abc" }));
+  assert.notEqual(bookingHookSecret(env), messageHookSecret(env));
+  assert.equal(bookingHookSecret({ CRED_SECRET: "abc" }), bookingHookSecret(env)); // ripiego su CRED_SECRET
+});
+
+test("verifyMessageHook: fallisce in chiusura in produzione senza segreto, in locale no", () => {
+  assert.deepEqual(verifyMessageHook(null, { NODE_ENV: "production" }), { accept: false, reason: "no_secret_prod" });
+  assert.deepEqual(verifyMessageHook("x", { VERCEL_ENV: "production" }), { accept: false, reason: "no_secret_prod" });
+  assert.deepEqual(verifyMessageHook(null, { NODE_ENV: "development" }), { accept: true, reason: "no_secret_dev" });
+  assert.deepEqual(verifyMessageHook(undefined, {}), { accept: true, reason: "no_secret_dev" });
+});
+test("verifyMessageHook: con segreto configurato serve quello giusto", () => {
+  const env = { CRON_SECRET: "abc", NODE_ENV: "production" };
+  const good = messageHookSecret(env);
+  assert.equal(verifyMessageHook(good, env).accept, true);
+  assert.deepEqual(verifyMessageHook(null, env), { accept: false, reason: "bad_secret" });
+  assert.deepEqual(verifyMessageHook("sbagliato", env), { accept: false, reason: "bad_secret" });
+  assert.equal(verifyMessageHook(bookingHookSecret(env), env).accept, false); // il segreto delle prenotazioni non vale per i messaggi
+  assert.equal(verifyMessageHook(good, { ...env, NODE_ENV: "development" }).accept, true);
+});
+
+test("verifyBookingHook: retrocompatibile senza STRICT, rifiuta segreti sbagliati", () => {
+  const env = { CRON_SECRET: "abc", NODE_ENV: "production" };
+  const good = bookingHookSecret(env);
+  assert.deepEqual(verifyBookingHook(good, env), { accept: true, reason: "ok" });
+  assert.deepEqual(verifyBookingHook(null, env), { accept: true, reason: "missing_secret_legacy" }); // webhook già registrati, senza intestazione
+  assert.deepEqual(verifyBookingHook("", env), { accept: true, reason: "missing_secret_legacy" });
+  assert.deepEqual(verifyBookingHook("sbagliato", env), { accept: false, reason: "bad_secret" });
+  assert.deepEqual(verifyBookingHook(messageHookSecret(env), env), { accept: false, reason: "bad_secret" });
+  assert.deepEqual(verifyBookingHook(null, {}), { accept: true, reason: "no_secret_legacy" }); // nessun segreto configurato: come prima
+});
+test("verifyBookingHook: con CHANNEX_WEBHOOK_STRICT=1 serve il segreto", () => {
+  const env = { CRON_SECRET: "abc", CHANNEX_WEBHOOK_STRICT: "1" };
+  assert.equal(verifyBookingHook(bookingHookSecret(env), env).accept, true);
+  assert.deepEqual(verifyBookingHook(null, env), { accept: false, reason: "missing_secret_strict" });
+  assert.equal(verifyBookingHook("sbagliato", env).accept, false);
+  assert.equal(verifyBookingHook(null, { CHANNEX_WEBHOOK_STRICT: "1" }).accept, false); // strict ma segreto non configurato
+  assert.equal(verifyBookingHook(null, { CRON_SECRET: "abc", CHANNEX_WEBHOOK_STRICT: "0" }).accept, true);
 });

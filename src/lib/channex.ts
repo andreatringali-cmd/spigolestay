@@ -100,12 +100,20 @@ export async function setChannelPriceCorrection(channelId: string, steps: [strin
 // ── Webhook (ricezione automatica prenotazioni in tempo reale) ──
 // Channex chiama il callback_url a ogni nuova prenotazione/modifica/cancellazione.
 export async function listWebhooks(propertyId: string) {
-  return channex<{ data: { id: string; attributes?: { callback_url?: string; is_active?: boolean } }[] }>(`/webhooks?filter[property_id]=${encodeURIComponent(propertyId)}`);
+  return channex<{ data: { id: string; attributes?: { callback_url?: string; is_active?: boolean; headers?: Record<string, string> | null } }[] }>(`/webhooks?filter[property_id]=${encodeURIComponent(propertyId)}`);
 }
 export async function createWebhook(propertyId: string, callbackUrl: string, eventMask = "booking", headers?: Record<string, string>) {
   return channex<Created>("/webhooks", {
     method: "POST",
     body: JSON.stringify({ webhook: { property_id: propertyId, callback_url: callbackUrl, event_mask: eventMask, is_active: true, send_data: true, ...(headers ? { headers } : {}) } }),
+  });
+}
+
+// Aggiorna un webhook esistente (usato per aggiungere/ruotare l'intestazione con il segreto condiviso).
+export async function updateWebhook(webhookId: string, patch: { headers?: Record<string, string> }) {
+  return channex<Created>(`/webhooks/${encodeURIComponent(webhookId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ webhook: patch }),
   });
 }
 

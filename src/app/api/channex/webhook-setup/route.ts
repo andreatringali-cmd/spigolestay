@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
-import { channexEnabled, listWebhooks, createWebhook } from "@/lib/channex";
-import { messageHookSecret } from "@/lib/channex-messages";
+import { channexEnabled, listWebhooks, createWebhook, updateWebhook } from "@/lib/channex";
+import { messageHookSecret, bookingHookSecret } from "@/lib/channex-messages";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,19 +21,34 @@ export async function POST(req: Request) {
   const props = Array.from(new Set((maps ?? []).map((m) => m.channex_property_id as string).filter(Boolean)));
   if (!props.length) return NextResponse.json({ ok: false, error: "Nessuna struttura collegata a Channex." }, { status: 200 });
 
-  const result: { propertyId: string; created: boolean; alreadyActive: boolean; error?: string }[] = [];
+  const result: { propertyId: string; created: boolean; alreadyActive: boolean; headerUpdated?: boolean; error?: string }[] = [];
+  const bookingSecret = bookingHookSecret();
+  const messageSecret = messageHookSecret();
   for (const pid of props) {
     const existing = await listWebhooks(pid);
     const hooks = existing.data?.data ?? [];
-    const has = (url: string) => hooks.some((h) => (h.attributes?.callback_url || "").replace(/\/$/, "") === url.replace(/\/$/, ""));
-    // Secondo webhook, solo per i messaggi degli ospiti delle OTA (con segreto nell'intestazione): non toccare quello delle prenotazioni.
-    if (!has(messagesUrl)) {
-      const secret = messageHookSecret();
-      await createWebhook(pid, messagesUrl, "message", secret ? { "X-Xenora-Secret": secret } : undefined);
-    }
-    if (has(callbackUrl)) { result.push({ propertyId: pid, created: false, alreadyActive: true }); continue; }
-    const c = await createWebhook(pid, callbackUrl);
-    result.push({ propertyId: pid, created: c.ok, alreadyActive: false, error: c.ok ? undefined : c.error });
+    const find = (url: string) => hooks.find((h) => (h.attributes?.callback_url || "").replace(/\/$/, "") === url.replace(/\/$/, ""));
+    // Registra il webhook, oppure (se esiste già) gli applica l'intestazione col segreto condiviso: i webhook
+    // registrati prima non l'avevano. L'aggiornamento è idempotente e serve anche a ruotare il segreto.
+    const ensure = async (url: string, mask: string, secret: string) => {
+      const hook = find(url);
+      const headers = secret ? { "X-Xenora-Secret": secret } : undefined;
+      if (hook) {
+        if (!headers) return { created: false, alreadyActive: true, headerUpdated: false as boolean | undefined, error: undefined as string | undefined };
+        // Già col segreto giusto (se Channex ci restituisce le intestazioni): niente chiamata inutile a ogni apertura della pagina.
+        const cur = Object.entries(hook.attributes?.headers ?? {}).find(([k]) => k.toLowerCase() === "x-xenora-secret")?.[1];
+        if (cur === secret) return { created: false, alreadyActive: true, headerUpdated: false, error: undefined };
+        const u = await updateWebhook(hook.id, { headers });
+        return { created: false, alreadyActive: true, headerUpdated: u.ok, error: u.ok ? undefined : u.error };
+      }
+      const c = await createWebhook(pid, url, mask, headers);
+      return { created: c.ok, alreadyActive: false, headerUpdated: c.ok && !!headers, error: c.ok ? undefined : c.error };
+    };
+    // Secondo webhook, solo per i messaggi degli ospiti delle OTA (con segreto nell'intestazione).
+    const m = await ensure(messagesUrl, "message", messageSecret);
+    if (m.error) console.log("[channex webhook-setup] webhook messaggi", pid, m.error);
+    const b = await ensure(callbackUrl, "booking", bookingSecret);
+    result.push({ propertyId: pid, created: b.created, alreadyActive: b.alreadyActive, headerUpdated: b.headerUpdated, error: b.error });
   }
   return NextResponse.json({ ok: true, callbackUrl, result });
 }
