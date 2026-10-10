@@ -478,7 +478,7 @@ export default function StatistichePage() {
           onReorder={(keys) => { const rest = charts.map((c) => c.key).filter((k) => !keys.includes(k)); persistChartOrder([...keys, ...rest]); }}
           items={orderedCharts.map((c) => { const wide = (c as { wide?: boolean }).wide; return {
             key: c.key,
-            className: `flex flex-none snap-start flex-col ${wide ? "w-[520px] max-w-[92vw] lg:w-[calc((100%-3rem)*2/5+0.75rem)]" : "w-[260px] lg:w-[calc((100%-3rem)/5)]"}`,
+            className: `flex flex-none snap-start flex-col ${wide ? "w-[calc(100vw-2rem)] sm:w-[520px] sm:max-w-[92vw] lg:w-[calc((100%-3rem)*2/5+0.75rem)]" : "w-[calc(100vw-2rem)] sm:w-[260px] lg:w-[calc((100%-3rem)/5)]"}`,
             node: (
               <div className="flex h-full flex-col rounded-xl border border-line bg-surface p-4 shadow-sm">
                 <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{c.title}</div>
@@ -535,7 +535,7 @@ export default function StatistichePage() {
             gap="gap-3"
             items={chartsY.map((c) => { const wide = (c as { wide?: boolean }).wide; return {
               key: c.key,
-              className: `flex flex-none snap-start flex-col ${wide ? "w-[520px] max-w-[92vw] lg:w-[calc((100%-3rem)*2/5+0.75rem)]" : "w-[260px] lg:w-[calc((100%-3rem)/5)]"}`,
+              className: `flex flex-none snap-start flex-col ${wide ? "w-[calc(100vw-2rem)] sm:w-[520px] sm:max-w-[92vw] lg:w-[calc((100%-3rem)*2/5+0.75rem)]" : "w-[calc(100vw-2rem)] sm:w-[260px] lg:w-[calc((100%-3rem)/5)]"}`,
               node: (
                 <div className="flex h-full flex-col rounded-xl border border-line bg-surface p-4 shadow-sm">
                   <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-faint">{c.title}</div>

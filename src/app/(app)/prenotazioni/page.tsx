@@ -409,7 +409,7 @@ export default function PrenotazioniPage() {
             onReorder={(keys) => { const rest = charts.map((c) => c.key).filter((k) => !keys.includes(k)); persistChartOrder([...keys, ...rest]); }}
             items={shownCharts.map((c) => ({
               key: c.key,
-              className: `flex-none snap-start ${c.wide ? "w-[520px] max-w-[92vw] lg:w-[calc((100%-2.25rem)/2+0.75rem)]" : "w-[280px] lg:w-[calc((100%-2.25rem)/4)]"}`,
+              className: `flex-none snap-start ${c.wide ? "w-[calc(100vw-2rem)] sm:w-[520px] sm:max-w-[92vw] lg:w-[calc((100%-2.25rem)/2+0.75rem)]" : "w-[calc(100vw-2rem)] sm:w-[280px] lg:w-[calc((100%-2.25rem)/4)]"}`,
               node: (
                 <Card className="flex h-full flex-col">
                   <SectionTitle>{t(c.title)}</SectionTitle>
