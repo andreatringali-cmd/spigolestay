@@ -16,6 +16,7 @@ import { cityTaxOf, commissionOf, commissionPctOf, nettoOf } from "@/lib/booking
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { loadWeekendPct } from "@/lib/pricing";
 import { eur } from "@/lib/format";
+import { describeCancelPenalties } from "@/lib/channex-guestdata";
 import { invPost } from "@/lib/invoicing/client";
 import AdempimentiPanel from "@/components/booking/AdempimentiPanel";
 import OtaReportMenu from "@/components/booking/OtaReportMenu";
@@ -527,6 +528,28 @@ export default function BookingDrawer() {
       {booking.note && (
         <Section title={t("Note")}><p className="whitespace-pre-wrap text-sm text-txt">{booking.note}</p></Section>
       )}
+
+      {/* Dati letti dalla booking revision del canale (Channex): solo testo, mostrati se presenti. */}
+      {(() => {
+        const o = booking.otaInfo;
+        const ages = booking.childAges && booking.childAges.length ? booking.childAges : undefined;
+        const cancelTxt = describeCancelPenalties(o?.cancelPenalties);
+        const pay = o?.paymentCollect === "ota" ? t("Pagato all'OTA (incassa il canale)") : o?.paymentCollect === "property" ? t("Da incassare dalla struttura") : undefined;
+        const payType = o?.paymentType === "credit_card" ? t("carta di credito") : o?.paymentType === "bank_transfer" ? t("bonifico") : undefined;
+        if (!o && !ages) return null;
+        if (!ages && !cancelTxt && !pay && !payType && !o?.paymentInstruction && !o?.mealPlan && !o?.bedPreferences && !o?.smokingPreferences) return null;
+        return (
+          <Section title={t("Dati dal canale")}>
+            {pay && <Row label={t("Pagamento")} value={payType ? `${pay} · ${payType}` : pay} />}
+            {ages && <Row label={t("Età bambini")} value={ages.join(", ")} />}
+            {o?.mealPlan && <Row label={t("Trattamento")} value={o.mealPlan} />}
+            {o?.bedPreferences && <Row label={t("Letti")} value={o.bedPreferences} />}
+            {o?.smokingPreferences && <Row label={t("Fumatori")} value={o.smokingPreferences} />}
+            {cancelTxt && <Row label={t("Cancellazione")} value={cancelTxt} />}
+            {o?.paymentInstruction && <p className="text-[12px] leading-snug text-dim">{o.paymentInstruction}</p>}
+          </Section>
+        );
+      })()}
 
       <div ref={checkinRef} className="scroll-mt-2" />
       <Section title={t("Check-in online")}>

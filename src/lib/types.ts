@@ -1,5 +1,6 @@
 // Modello dati di Xenora (front-end), sincronizzato con lo schema DB reale su Supabase.
 // Strutture → tipologie → unità; prenotazioni; folio.
+import type { OtaInfo } from "./channex-guestdata";
 
 export type Channel = "booking" | "airbnb" | "expedia" | "hotelbeds" | "other" | "direct" | "blocked";
 
@@ -371,6 +372,10 @@ export interface Booking {
   ratePlanName?: string;   // nome del piano scelto (es. "Flessibile", "Non rimborsabile")
   refundable?: boolean;    // il piano prevede la cancellazione gratuita
   cancelDays?: number;     // cancellazione gratuita fino a N giorni prima del check-in (se refundable)
+  // Dati letti dalla booking revision Channex (note cliente, chi incassa, penali di cancellazione...).
+  // Sola lettura per l'host; se ne ricava anche guestRequests/arrivalTime/childAges. NON alimenta
+  // refundable/cancelDays: quelli guidano il self-service con rimborso Stripe, che per le OTA non vale.
+  otaInfo?: OtaInfo;
   // Riferimenti Stripe del pagamento online (necessari per il rimborso automatico).
   stripePaymentIntent?: string;
   stripeSessionId?: string;
