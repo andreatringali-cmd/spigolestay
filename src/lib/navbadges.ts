@@ -106,14 +106,16 @@ export function useNavBadges(pathname: string): NavBadges {
     if (!supabase) return;
     try {
       const head = { count: "exact" as const, head: true };
+      // Ogni struttura ha i suoi conti: con una struttura attiva contano solo le sue righe (e quelle "per tutte", senza struttura), come nelle pagine.
+      const mine = <T extends { or: (f: string) => T }>(q: T): T => (activeStructureId && activeStructureId !== "all" ? q.or(`structure_id.eq.${activeStructureId},structure_id.is.null`) : q);
       const [a, i, d] = await Promise.all([
-        supabase.from("alloggiati_schedine").select("id", head).in("stato", ["pronta", "da_validare"]),
-        supabase.from("istat_rows").select("id", head).eq("stato", "pending").lte("arrival", today),
-        supabase.from("documents").select("id", head).eq("stato", "scartata"),
+        mine(supabase.from("alloggiati_schedine").select("id", head).in("stato", ["pronta", "da_validare"])),
+        mine(supabase.from("istat_rows").select("id", head).eq("stato", "pending").lte("arrival", today)),
+        mine(supabase.from("documents").select("id", head).eq("stato", "scartata")),
       ]);
       setRemote({ schedine: a.count ?? 0, istat: i.count ?? 0, scartate: d.count ?? 0 });
     } catch {}
-  }, [today]);
+  }, [today, activeStructureId]);
   useEffect(() => {
     void loadRemote();
     const id = setInterval(() => { void loadRemote(); }, 60000);
