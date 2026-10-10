@@ -17,7 +17,7 @@ export const NAV: NavItem[] = [
   { label: "Prenotazioni", href: "/prenotazioni", group: "PMS", icon: "clipboard", perm: "prenotazioni", module: "pms" },
   { label: "Calendario", href: "/calendario", group: "PMS", icon: "calendar", perm: "calendario", module: "pms" },
   { label: "Camere", href: "/camere", group: "PMS", icon: "bed", perm: "camere", module: "pms" },
-  { label: "Camere condivise", href: "/camere-condivise", group: "PMS", icon: "building", perm: "camere", module: "pms" },
+  { label: "Disponibilità di gruppo", href: "/disponibilita-gruppo", group: "PMS", icon: "building", perm: "camere", module: "pms" },
   { label: "Pulizie", href: "/pulizie", group: "PMS", icon: "sparkles", perm: "pulizie", module: "housekeeping" },
   { label: "Ospiti", href: "/ospiti", group: "PMS", icon: "users", perm: "prenotazioni", module: "pms" },
   { label: "Messaggi", href: "/messaggi", group: "PMS", icon: "chat", perm: "webconcierge", module: "messaging" },

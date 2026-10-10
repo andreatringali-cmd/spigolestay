@@ -1,5 +1,5 @@
-// Camere condivise tra strutture: più strutture mostrano le STESSE camere fisiche (es. Spigolehouse e Spigolerooms sono nello stesso edificio).
-// Si imposta nella pagina "Camere condivise": si scelgono le strutture del gruppo, Xenora riconosce le tipologie e accanto a ciascuna si indica il NUMERO
+// Disponibilità di gruppo: più strutture mostrano le STESSE camere fisiche (es. Spigolehouse e Spigolerooms sono nello stesso edificio).
+// Si imposta nella pagina "Disponibilità di gruppo": si scelgono le strutture del gruppo, Xenora riconosce le tipologie e accanto a ciascuna si indica il NUMERO
 // DI CAMERE REALI. Le tipologie con lo stesso nome (es. "Deluxe" in due strutture) formano una famiglia e dividono le stesse camere reali.
 // Disponibilità di una tipologia, per ogni giorno = il minore tra (camere che mostra - sue prenotazioni) e (camere reali della famiglia - prenotazioni di
 // tutta la famiglia). Così una prenotazione su una struttura riduce la disponibilità dell'altra, sempre.

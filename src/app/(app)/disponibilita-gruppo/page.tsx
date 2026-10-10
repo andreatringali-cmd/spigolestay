@@ -1,6 +1,6 @@
 "use client";
 
-// Camere condivise tra strutture: si scelgono le strutture del gruppo, Xenora riconosce le tipologie e accanto a ciascuna si indica il numero di camere
+// Disponibilità di gruppo: si scelgono le strutture del gruppo, Xenora riconosce le tipologie e accanto a ciascuna si indica il numero di camere
 // reali. Le tipologie con lo stesso nome dividono le stesse camere; la disponibilità resta sincronizzata tra le strutture (portali, calendario, sito diretto).
 // Logica in src/lib/inventory-pool.ts.
 import { useEffect, useMemo, useState } from "react";
@@ -57,7 +57,7 @@ export default function CamereCondivisePage() {
   if (!loaded) return null;
   return (
     <div>
-      <PageHeader title="Camere condivise" subtitle="Strutture che mostrano le stesse camere: la disponibilità resta sincronizzata tra loro su portali, calendario e sito diretto." />
+      <PageHeader title="Disponibilità di gruppo" subtitle="Strutture che mostrano le stesse camere: la disponibilità resta sincronizzata tra loro su portali, calendario e sito diretto." />
 
       <Card>
         <div className="flex items-start justify-between gap-4">

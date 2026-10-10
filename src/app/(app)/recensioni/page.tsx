@@ -614,73 +614,7 @@ export default function RecensioniPage() {
         <p className="mt-1.5 text-[11px] text-faint">Calcolata sulle recensioni disponibili qui sotto (di Google arrivano solo le ~5 più recenti): è un indicatore, non la media ufficiale della piattaforma.</p>
       </Card>
 
-      {/* Chiedi la recensione: automazione della richiesta Google post check-out + tracciamento invio */}
-      <Card className="mb-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <SectionTitle>Chiedi la recensione</SectionTitle>
-            {checkouts.length > 0 && <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">{requestedCount}/{checkouts.length} già richieste</span>}
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="mr-1 text-[11px] font-semibold text-faint">Check-out ultimi</span>
-            {[7, 14, 30, 60].map((d) => (
-              <button key={d} onClick={() => setReqWindow(d)} className={`rounded-lg px-2 py-1 text-xs font-semibold transition ${reqWindow === d ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{d}g</button>
-            ))}
-          </div>
-        </div>
-        <p className="mt-1 text-xs text-dim">Invia all&apos;ospite il link diretto alla recensione Google della struttura, via WhatsApp o email. Segna chi ha già ricevuto la richiesta.</p>
-
-        {reqMsg && <div className="mt-2 rounded-lg border border-line bg-wash px-3 py-2 text-[13px] text-txt">{reqMsg}</div>}
-
-        {missingPlaceId.length > 0 && (
-          <div className="mt-2 rounded-lg border p-2.5 text-[13px]" style={{ borderColor: "var(--warn)", background: "color-mix(in srgb, var(--warn) 8%, transparent)" }}>
-            <span className="font-semibold text-txt">Manca il Google Place ID</span>
-            <span className="text-dim"> per {missingPlaceId.map((s) => s.name).join(", ")}. Impostalo (pulsante «Google» tra le Fonti qui sotto) per generare il link recensione.</span>
-          </div>
-        )}
-
-        {checkouts.length === 0 ? (
-          <div className="mt-2"><EmptyState title="Nessun check-out recente" sub={`Le prenotazioni con partenza negli ultimi ${reqWindow} giorni compariranno qui per chiedere la recensione.`} /></div>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {checkouts.map(({ booking: b, guest: g, guestName, daysAgo, requested }) => {
-              const st = structures.find((s) => s.id === b.structureId);
-              const hasPid = Boolean((st?.googlePlaceId || "").trim());
-              const busy = reqBusy[b.id];
-              const ago = daysAgo === 1 ? "ieri" : `${daysAgo} giorni fa`;
-              const nn = stayNights(b);
-              return (
-                <div key={b.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-line bg-paper px-3 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-txt">{guestName}</span>
-                      {requested && <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }}>✓ Richiesta inviata{b.reviewRequestChannel ? ` · ${b.reviewRequestChannel === "whatsapp" ? "WhatsApp" : "email"}` : ""}</span>}
-                    </div>
-                    <div className="mt-0.5 truncate text-[11px] text-faint">
-                      {st?.name ? `${st.name} · ` : ""}Check-out {fmt(b.checkOut)} ({ago}){nn ? ` · ${nn} notti` : ""}
-                      {g?.phone ? ` · ${g.phone}` : ""}{g?.email ? ` · ${g.email}` : ""}
-                    </div>
-                  </div>
-                  {requested ? (
-                    <button onClick={() => undoRequested(b.id)} className="shrink-0 text-[11px] font-semibold text-faint hover:text-[color:var(--err)]">Segna come non inviata</button>
-                  ) : (
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <button onClick={() => requestWhatsapp(b.id)} disabled={!!busy || !hasPid || !g?.phone} title={!hasPid ? "Imposta il Google Place ID della struttura" : !g?.phone ? "L'ospite non ha un telefono" : "Chiedi la recensione via WhatsApp"} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>
-                        {busy === "wa" ? "…" : "WhatsApp"}
-                      </button>
-                      <button onClick={() => requestEmail(b.id)} disabled={!!busy || !hasPid || !g?.email} title={!hasPid ? "Imposta il Google Place ID della struttura" : !g?.email ? "L'ospite non ha un'email" : "Chiedi la recensione via email"} className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus transition hover:bg-wash disabled:opacity-40">
-                        {busy === "email" ? "…" : "Email"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        <p className="mt-2 text-[11px] text-faint">Le recensioni effettivamente lasciate su Google non sono recuperabili senza API a pagamento: qui si gestisce la <strong>richiesta</strong> e il <strong>tracciamento dell&apos;invio</strong>. Le recensioni ricevute compaiono nell&apos;elenco sotto quando Google è collegato.</p>
-      </Card>
-
+      {/* La richiesta di recensione si fa dalla prenotazione (passaggio «Recensione»): qui resta solo la lettura e la risposta. */}
 
       {/* Finestra di configurazione Google: ricerca struttura + Place ID */}
       {cfgOpen && (

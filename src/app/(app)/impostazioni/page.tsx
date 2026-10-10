@@ -221,12 +221,12 @@ export default function ImpostazioniPage() {
         </div>
       </Card>
 
-      {/* Camere condivise: ora ha una pagina dedicata */}
+      {/* Disponibilità di gruppo: ora ha una pagina dedicata */}
       {structures.length > 1 && (
         <Card className="mt-4">
-          <SectionTitle>{t("Camere condivise tra strutture")}</SectionTitle>
-          <p className="mb-3 text-xs text-dim">{t("Per strutture che mostrano le stesse camere: la disponibilità resta sincronizzata. Si imposta nella pagina dedicata (PMS → Camere condivise).")}</p>
-          <Link href="/camere-condivise" className="inline-block rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-focus transition hover:bg-wash">{t("Apri Camere condivise")}</Link>
+          <SectionTitle>{t("Disponibilità di gruppo")}</SectionTitle>
+          <p className="mb-3 text-xs text-dim">{t("Per strutture che mostrano le stesse camere: la disponibilità resta sincronizzata. Si imposta nella pagina dedicata (PMS → Disponibilità di gruppo).")}</p>
+          <Link href="/disponibilita-gruppo" className="inline-block rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-focus transition hover:bg-wash">{t("Apri Disponibilità di gruppo")}</Link>
         </Card>
       )}
 
