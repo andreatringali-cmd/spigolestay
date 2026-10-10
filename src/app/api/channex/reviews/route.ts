@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
-import { channexEnabled, listReviews, replyToReview, isReviewsNotInstalled, type ChxReview } from "@/lib/channex";
+import { channexEnabled, listReviews, replyToReview, isReviewsNotInstalled, getPropertyScoresDetailed, type ChxReview } from "@/lib/channex";
+import { normalizeReviewScores, parseDetailedScores, mergeSummaries, REVIEW_CHANNELS, type ReviewScore, type ReviewChannel, type ScoreSummary } from "@/lib/channex-review-scores";
 import { channelFromOta } from "@/lib/channex-inbound";
 
 export const runtime = "nodejs";
@@ -13,7 +14,9 @@ export const dynamic = "force-dynamic";
 // "non installata" per quella property invece di un elenco vuoto o un errore grezzo.
 //
 // POST /api/channex/reviews (bearer) { action: "list" }
-//   → { ok, byStructure: { [structureId]: { reviews: ReviewRow[]; notInstalled?: boolean; error?: string } } }
+//   → { ok, byStructure: { [structureId]: { reviews: ReviewRow[]; scores?: StructureScores; notInstalled?: boolean; error?: string } } }
+//   `scores` = punteggi UFFICIALI Channex (GET /scores/:property/detailed) per struttura e per canale;
+//   assente se Channex non li fornisce (la pagina mostra «n/d», nessun valore inventato).
 // POST /api/channex/reviews (bearer) { action: "reply", structureId, reviewId, text }
 //   → { ok, error? }
 
@@ -28,7 +31,10 @@ export interface ReviewRow {
   bucket: "pos" | "neu" | "neg";
   isReplied: boolean;
   reply: string | null;
+  scores: ReviewScore[]; // punteggi per categoria (Review.scores), [] se il canale non li manda
 }
+// Punteggi aggregati ufficiali Channex: media/categorie della struttura e di ciascun canale.
+export interface StructureScores { property: ScoreSummary | null; byChannel: Partial<Record<ReviewChannel, ScoreSummary>> }
 
 function bucketOf(r10: number): "pos" | "neu" | "neg" { return r10 >= 8 ? "pos" : r10 >= 6 ? "neu" : "neg"; }
 
@@ -48,6 +54,7 @@ function normalize(r: ChxReview): ReviewRow {
     bucket: bucketOf(rating),
     isReplied: !!r.is_replied,
     reply: r.reply || null,
+    scores: normalizeReviewScores(r.scores),
   };
 }
 
@@ -93,7 +100,8 @@ export async function POST(req: Request) {
 
   // action "list": una property per volta, raggruppate per struttura. Un errore "app non
   // installata" su una property non blocca le altre strutture del tenant.
-  const byStructure: Record<string, { reviews: ReviewRow[]; notInstalled?: boolean; error?: string }> = {};
+  const byStructure: Record<string, { reviews: ReviewRow[]; scores?: StructureScores; notInstalled?: boolean; error?: string }> = {};
+  const scoreParts: Record<string, ReturnType<typeof parseDetailedScores>[]> = {};
   for (const r of rows) {
     const sid = r.structure_id; const pid = r.channex_property_id;
     if (!sid || !pid) continue;
@@ -105,6 +113,19 @@ export async function POST(req: Request) {
       continue;
     }
     byStructure[sid] = { ...cur, reviews: cur.reviews.concat(res.reviews.map(normalize)) };
+    // Punteggi ufficiali aggregati: best-effort, un errore qui non toglie le recensioni.
+    const sc = await getPropertyScoresDetailed(pid);
+    if (sc.ok) (scoreParts[sid] ??= []).push(parseDetailedScores(sc.data));
+  }
+  // Più property per la stessa struttura → medie pesate sul numero di recensioni.
+  for (const [sid, parts] of Object.entries(scoreParts)) {
+    const property = mergeSummaries(parts.map((p) => p.property));
+    const byChannel: StructureScores["byChannel"] = {};
+    for (const ch of REVIEW_CHANNELS) {
+      const m = mergeSummaries(parts.map((p) => p.byChannel[ch]));
+      if (m) byChannel[ch] = m;
+    }
+    if (property || Object.keys(byChannel).length) byStructure[sid].scores = { property, byChannel };
   }
 
   return NextResponse.json({ ok: true, byStructure });

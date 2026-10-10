@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseISO, toISO } from "@/lib/dates";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import Icon from "@/components/Icon";
+import ChannelLogo from "@/components/ChannelLogo";
 import EmptyState from "@/components/EmptyState";
 import SearchInput from "@/components/SearchInput";
 import { useData } from "@/lib/store";
@@ -11,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { apiPost } from "@/lib/invoicing/client";
 import { DATA_KEY } from "@/lib/publicdata";
 import type { NormalizedReview } from "@/lib/reviews/google";
+import { REVIEW_CHANNELS, mergeSummaries, summarizeFromReviews, type ReviewChannel, type ReviewScore, type ScoreSummary } from "@/lib/channex-review-scores";
 import { googleReviewUrl, recentCheckouts, reviewRequestMessage, stayNights } from "@/lib/reviews";
 
 const fmt = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" });
@@ -41,8 +43,16 @@ interface ChxReviewRow {
   id: string; reviewId: string; guest: string; date: string; rating: number; text: string;
   source: "booking" | "airbnb" | "expedia" | "other"; bucket: "pos" | "neu" | "neg";
   isReplied: boolean; reply: string | null;
+  scores?: ReviewScore[]; // punteggi per categoria (può mancare: n/d)
 }
-interface ChxStructureReviews { reviews: ChxReviewRow[]; notInstalled?: boolean; error?: string }
+// Punteggi ufficiali Channex (GET /scores/:property/detailed) per struttura e per canale.
+interface ChxStructureScores { property: ScoreSummary | null; byChannel: Partial<Record<ReviewChannel, ScoreSummary>> }
+interface ChxStructureReviews { reviews: ChxReviewRow[]; scores?: ChxStructureScores; notInstalled?: boolean; error?: string }
+
+// Tinta tenue per una barra di punteggio 0..10 (stesse soglie di bucketOf: 8 / 6).
+const scoreTint = (v: number) => `color-mix(in srgb, ${v >= 8 ? "var(--ok)" : v >= 6 ? "var(--warn)" : "var(--err)"} 55%, transparent)`;
+const CHANNEL_LABEL: Record<ReviewChannel, string> = { booking: "Booking.com", airbnb: "Airbnb", expedia: "Expedia" };
+const fmtScore = (v: number | null | undefined) => (v == null ? "n/d" : v.toFixed(1));
 
 const bucketOf = (r10: number): "pos" | "neu" | "neg" => (r10 >= 8 ? "pos" : r10 >= 6 ? "neu" : "neg");
 
@@ -232,6 +242,34 @@ export default function RecensioniPage() {
       .map((r) => ({ id: r.id, guest: r.guest, date: r.date, rating: r.rating, text: r.text, source: r.source as SourceKey, bucket: r.bucket }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chx.byStructure, selStructureId]);
+  // Punteggi per categoria per canale: ufficiali Channex se presenti, altrimenti ripiego calcolato
+  // dalle recensioni scaricate (segnalato con "derived"). Nessun valore se Channex non lo dà → n/d.
+  const scoreView = useMemo(() => {
+    const official = chx.byStructure[selStructureId]?.scores;
+    const perChannel = {} as Record<ReviewChannel, { overall: number | null; count: number; cats: Map<string, { label: string; score: number }>; derived: boolean; overallDerived: boolean }>;
+    for (const ch of REVIEW_CHANNELS) {
+      const rows = chxRowsSel.filter((r) => r.source === ch);
+      const off = official?.byChannel[ch];
+      const der = summarizeFromReviews(rows);
+      const useOff = !!off?.categories.length;
+      const cats = new Map<string, { label: string; score: number }>();
+      for (const c of (useOff ? off!.categories : der?.categories ?? [])) cats.set(c.key, { label: c.label, score: c.score });
+      const rated = rows.length ? Math.round(rows.reduce((a, r) => a + r.rating, 0) / rows.length * 10) / 10 : null;
+      perChannel[ch] = {
+        overall: off?.overall ?? rated,
+        count: off?.overall != null && off.count ? off.count : rows.length,
+        cats, derived: !useOff && cats.size > 0, overallDerived: off?.overall == null && rated != null,
+      };
+    }
+    // Media per categoria su tutti i canali: riepilogo ufficiale della struttura se c'è, altrimenti fusione dei canali.
+    const merged = official?.property?.categories.length
+      ? official.property.categories
+      : (mergeSummaries(REVIEW_CHANNELS.map((ch) => ({ overall: null, count: perChannel[ch].count, categories: Array.from(perChannel[ch].cats, ([key, v]) => ({ key, label: v.label, score: v.score, count: perChannel[ch].count })) }))
+          .filter((x) => x.categories.length))?.categories ?? []);
+    return { perChannel, categories: merged, hasAny: merged.length > 0 || REVIEW_CHANNELS.some((ch) => perChannel[ch].overall != null) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chx.byStructure, selStructureId]);
+  const chxScoresById = useMemo(() => new Map(chxRowsSel.map((r) => [r.id, r.scores ?? []])), [chx.byStructure, selStructureId]); // eslint-disable-line react-hooks/exhaustive-deps
   // Stato Channex per una fonte OTA (null per Google/Diretta/Tripadvisor, non coperte da Channex):
   // "mapped" = la struttura ha una property Channex collegata; "notInstalled" = manca l'app
   // "Messages & Reviews" lato Channex (vedi channex.ts isReviewsNotInstalled).
@@ -700,6 +738,49 @@ export default function RecensioniPage() {
         <Card><SectionTitle>Distribuzione voti</SectionTitle><div className="space-y-1.5">{dist.map((d) => (<div key={d.v} className="flex items-center gap-2"><span className="w-6 text-right font-mono text-sm text-dim">{d.v}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full bg-focus" style={{ width: `${reviews.length ? (d.n / reviews.length) * 100 : 0}%` }} /></div><span className="w-8 text-right font-mono text-sm text-dim">{d.n}</span></div>))}</div></Card>
       </div>
 
+      {/* Punteggi per categoria (Booking.com / Airbnb / Expedia via Channex): media per canale + per categoria */}
+      {scoreView.hasAny && (
+        <Card className="mb-4">
+          <SectionTitle>Punteggi per categoria</SectionTitle>
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            {REVIEW_CHANNELS.map((ch) => {
+              const v = scoreView.perChannel[ch];
+              return (
+                <div key={ch} className="rounded-lg border border-line bg-paper px-2.5 py-2" title={v.overallDerived ? "Media calcolata sulle recensioni scaricate (Channex non fornisce il riepilogo ufficiale)" : "Punteggio ufficiale Channex"}>
+                  <div className="flex items-center gap-1.5"><ChannelLogo channel={ch} size={16} /><span className="truncate text-[11px] font-semibold text-dim">{CHANNEL_LABEL[ch]}</span></div>
+                  <div className="mt-1 font-mono text-lg font-bold tabular-nums text-txt">{fmtScore(v.overall)}{v.overall != null && <span className="text-[10px] font-normal text-faint">/10</span>}</div>
+                  <div className="text-[10px] text-faint">{v.overall == null ? "nessun dato da Channex" : `${v.count} recens.${v.overallDerived ? " · calcolata" : ""}`}</div>
+                </div>
+              );
+            })}
+          </div>
+          {scoreView.categories.length === 0 ? (
+            <p className="text-sm text-faint">Channex non ha ancora fornito punteggi per categoria per questa struttura (n/d).</p>
+          ) : (
+            <div>
+              <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-faint">
+                <span className="w-32 shrink-0">Categoria</span><span className="flex-1">Media</span><span className="w-9 shrink-0" />
+                {REVIEW_CHANNELS.map((ch) => <span key={ch} className="flex w-9 shrink-0 justify-center"><ChannelLogo channel={ch} size={14} /></span>)}
+              </div>
+              <div className="space-y-1.5">
+                {scoreView.categories.map((c, i) => (
+                  <div key={c.key} className="flex items-center gap-2">
+                    <span className="w-32 shrink-0 truncate text-sm text-txt">{c.label}</span>
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-wash"><div className="anim-grow h-full rounded-full" style={{ width: `${c.score * 10}%`, backgroundColor: scoreTint(c.score), animationDelay: `${i * 45}ms` }} /></div>
+                    <span className="w-9 shrink-0 text-right font-mono text-sm font-semibold text-txt">{c.score.toFixed(1)}</span>
+                    {REVIEW_CHANNELS.map((ch) => {
+                      const cv = scoreView.perChannel[ch].cats.get(c.key);
+                      return <span key={ch} className="w-9 shrink-0 text-center font-mono text-[11px] text-dim" style={cv ? undefined : { color: "var(--faint)" }} title={cv ? `${CHANNEL_LABEL[ch]}${scoreView.perChannel[ch].derived ? " · media delle recensioni scaricate" : ""}` : `${CHANNEL_LABEL[ch]}: dato non fornito`}>{cv ? cv.score.toFixed(1) : "n/d"}</span>;
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <p className="mt-2 text-[11px] text-faint">Dati Channex (Reviews Collection). Ogni canale usa le proprie categorie (Booking.com: pulizia, comfort, posizione, personale, servizi, qualità/prezzo; Airbnb: anche corrispondenza annuncio, comunicazione, check-in): «n/d» = il canale non fornisce quel dato. Non include Google, dirette e recensioni manuali.</p>
+        </Card>
+      )}
+
       {/* Fonti recensioni */}
       <div className="mb-2 flex items-center justify-between gap-2">
         <SectionTitle>Fonti recensioni</SectionTitle>
@@ -847,6 +928,20 @@ export default function RecensioniPage() {
               {r.id.startsWith("manual-") && <button onClick={() => removeManual(r.id)} className="text-faint hover:text-[color:var(--err)]" title="Elimina recensione manuale"><Icon name="trash" size={14} /></button>}
             </div>
             {r.text && <p className="mt-2 text-sm text-txt">{r.text}</p>}
+            {isChx(r) && (() => {
+              const cs = chxScoresById.get(r.id) ?? [];
+              if (!cs.length) return <p className="mt-1.5 text-[11px] text-faint">Punteggi per categoria: n/d</p>;
+              return (
+                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
+                  {cs.map((c, i) => (
+                    <div key={c.key} title={`${c.label}: ${c.score.toFixed(1)}/10`}>
+                      <div className="flex items-baseline justify-between gap-2 text-[11px]"><span className="truncate text-dim">{c.label}</span><span className="font-mono font-semibold text-txt">{c.score.toFixed(1)}</span></div>
+                      <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-wash"><div className="anim-grow h-full rounded-full" style={{ width: `${c.score * 10}%`, backgroundColor: scoreTint(c.score), animationDelay: `${i * 40}ms` }} /></div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
             {replies[r.id] ? (
               <div className="mt-2 rounded-lg border border-line bg-wash p-2.5 text-sm text-dim"><span className="text-[10px] font-semibold uppercase tracking-wide text-faint">La tua risposta</span><div className="mt-0.5 text-txt">{replies[r.id]}</div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">

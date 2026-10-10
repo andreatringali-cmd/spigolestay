@@ -316,7 +316,7 @@ export interface ChxReview {
   content?: string;
   guest_name?: string;
   overall_score?: number; // 0..10
-  scores?: ChxReviewScore[];
+  scores?: ChxReviewScore[]; // [{category, score}] (doc Channex); normalizzato da normalizeReviewScores
   ota?: string; // "AirBNB" | "BookingCom" | "Expedia"
   ota_reservation_id?: string;
   received_at?: string;
@@ -349,6 +349,14 @@ export async function getPropertyScores(propertyId: string) {
   if (!res.ok) return { ok: false as const, status: res.status, error: res.error, score: undefined as ChxPropertyScore | undefined };
   const row = res.data?.data as { attributes?: Record<string, unknown> } | undefined;
   return { ok: true as const, status: res.status, score: (row?.attributes ?? row) as ChxPropertyScore | undefined };
+}
+// Punteggi aggregati per OTA e per categoria (GET /scores/:property_id/detailed): oltre ai dati
+// della property porta relationships.ota_scores[] con media e categorie di ogni canale.
+// Restituisce l'oggetto «data» grezzo: si normalizza con parseDetailedScores (channex-review-scores.ts).
+export async function getPropertyScoresDetailed(propertyId: string) {
+  const res = await channex<{ data?: unknown }>(`/scores/${encodeURIComponent(propertyId)}/detailed`);
+  if (!res.ok) return { ok: false as const, status: res.status, error: res.error, data: undefined as unknown };
+  return { ok: true as const, status: res.status, data: res.data?.data as unknown };
 }
 // Risponde a una recensione (Booking.com/Airbnb/Expedia) via Channex. Corpo verificato sulla
 // documentazione ufficiale: { reply: { reply: "testo" } } (il campo interno si chiama "reply").
