@@ -192,13 +192,18 @@ export async function pushRates(values: RateValue[]) {
 // La via consigliata da Channex per ricevere le prenotazioni: si legge il feed
 // delle revision non confermate, si importano e si fa l'ACK (così non tornano più).
 export interface ChxOccupancy { adults?: number; children?: number; infants?: number }
-export interface ChxRoom { room_type_id?: string; rate_plan_id?: string; checkin_date?: string; checkout_date?: string; occupancy?: ChxOccupancy; guests?: { name?: string; surname?: string }[]; days?: Record<string, string> }
+// `ages` (età bambini) presente se children > 0, può essere null; `amount` = totale camera; `meta` = JSON libero per OTA
+// (cancel_penalties, meal_plan, payment_instruction, free_text... vedi channex-guestdata.ts).
+export interface ChxRoom { room_type_id?: string; rate_plan_id?: string; checkin_date?: string; checkout_date?: string; occupancy?: ChxOccupancy & { ages?: number[] | null }; guests?: { name?: string; surname?: string }[]; days?: Record<string, string>; amount?: string; meta?: Record<string, unknown> | null }
 export interface ChxRevision {
   id: string; property_id?: string; booking_id?: string; status?: string; ota_reservation_code?: string;
   ota_name?: string; arrival_date?: string; departure_date?: string; amount?: string; currency?: string;
   // Commissione OTA reale (quando il canale la manda): il campo varia per OTA, quindi accettiamo
   // più nomi possibili. Non tutti gli OTA lo espongono → resta opzionale (fallback: % di default).
   ota_commission?: string | number; commission?: string | number;
+  // Dati ospite documentati da Channex: note del cliente, orario di arrivo "HH:MM" (nullable),
+  // chi incassa ("property" | "ota" | null) e modalità ("credit_card" | "bank_transfer" | null).
+  notes?: string | null; arrival_hour?: string | null; payment_collect?: string | null; payment_type?: string | null;
   customer?: { name?: string; surname?: string; mail?: string; email?: string; phone?: string; country?: string };
   rooms?: ChxRoom[];
 }

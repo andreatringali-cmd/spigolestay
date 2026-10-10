@@ -12,6 +12,7 @@ import { bookingRevisionsFeed, ackBookingRevision, listProperties, type ChxRevis
 import { upsertGcalEvent, deleteGcalEvent, gcalEventId } from "@/lib/googleCalendarSync";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { parseNotifPrefs } from "@/lib/notifPrefs";
+import { readRevisionGuestData, mergeOtaOverCarried, type OtaInfo } from "@/lib/channex-guestdata";
 
 // Property di test della certificazione: le sue prenotazioni non sono in channex_map (non è una
 // struttura reale), ma vanno comunque ACKate dal flusso di import automatico — che è quello che
@@ -83,7 +84,6 @@ function otaCardFrom(r: ChxRevision): OtaCard | undefined {
   if (!isVirtual && balance == null && !effectiveDate && !expirationDate) return undefined;
   return { present: true, currency, balance, effectiveDate, expirationDate };
 }
-const sumDays = (days?: Record<string, string>) => days ? Object.values(days).reduce((a, v) => a + num(v), 0) : 0;
 // Dettaglio notte-per-notte mandato da Channex (es. Booking.com lo manda sempre): data ISO ->
 // importo di quella notte. Lo teniamo accanto al totale invece di buttarlo via, così si può
 // vedere nella scheda prenotazione quanto ha pagato l'ospite per ogni singola notte.
@@ -367,7 +367,15 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         if (old) for (const k of CARRY) { const v = (old as unknown as Record<string, unknown>)[k]; if (v !== undefined && v !== null && v !== "") keep[k] = v; }
         // Camera: si tiene quella già assegnata se è ancora libera; altrimenti la prima libera. MAI una occupata se ce n'è una libera.
         const prevUnit = old?.unitId && ofType.some((u) => u.id === old.unitId) && isFree(old.unitId) ? old.unitId : undefined;
-        const total = Math.round(sumDays(room.days) || (idx === 0 ? num(r.amount) : 0));
+        // Dati ospite dalla revision (note, orario di arrivo, età bambini, tipo di pagamento, penali) e totale CON i
+        // centesimi (somma notti → room.amount → amount della prenotazione). Logica pura in channex-guestdata.ts.
+        // Non mappati perché assenti dallo schema Channex: culle/lettini (restano quelle riportate da CARRY),
+        // infants (nessun campo in Booking), "Expedia Collect" esplicito (si vede solo payment_collect/payment_instruction).
+        const gd = readRevisionGuestData(r as unknown as Record<string, unknown>, room as unknown as Record<string, unknown>, idx === 0);
+        const oldInfo = (old as unknown as { otaInfo?: OtaInfo } | undefined)?.otaInfo;
+        const fromOta = mergeOtaOverCarried(gd, keep, oldInfo);
+        const otaInfo = gd.otaInfo ?? oldInfo;
+        const total = gd.total ?? 0;
         const nightlyRates = nightlyRatesOf(room.days);
         bookings.push({
           id: uid(), groupId, structureId: map.structure_id, roomTypeId, unitId: prevUnit ?? (free ?? ofType[0])?.id ?? null,
@@ -375,6 +383,8 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           adults: Math.max(1, num(room.occupancy?.adults, 1)), children: num(room.occupancy?.children, 0),
           total: total || undefined, ...(nightlyRates ? { nightlyRates } : {}), cleaningFee: 0, paid: 0, cityTaxPaid: false,
           ...keep,
+          ...fromOta,
+          ...(otaInfo ? { otaInfo } : {}),
           ...(commissionAmount != null ? { commissionAmount } : {}),
           ...(commissionPct != null ? { commissionPct } : {}),
           ...(otaCard && idx === 0 ? { otaCard } : {}), // la VCC copre la prenotazione: la attacchiamo alla prima camera
