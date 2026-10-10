@@ -277,6 +277,9 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
     };
 
     const touchedKeys = new Set<string>();
+    // Struttura/tipologia delle prenotazioni toccate (nuove, modificate, cancellate, sostituite): servono a inviare ai portali solo la disponibilità interessata.
+    const availTouched: { structureId?: string | null; roomTypeId?: string | null }[] = [];
+    const touchAvail = (b: { structureId?: string | null; roomTypeId?: string | null }) => { availTouched.push({ structureId: b.structureId, roomTypeId: b.roomTypeId }); };
     for (const { rev: r, map } of items) {
       // Chiave STABILE della prenotazione: SEMPRE booking_id quando presente (Channex lo
       // mantiene uguale tra le revision della stessa prenotazione), id-revision solo come
@@ -302,7 +305,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         // updatedAt DEVE avanzare: la fusione client/server è last-write-wins su questo campo
         // (vedi authsync.tsx) — senza, al sync successivo del browser la copia locale ancora
         // "confirmed" (stesso updatedAt di prima) vince a parità e la cancellazione sparisce.
-        prevIdx.forEach((i) => { bookings[i].status = "cancelled"; bookings[i].updatedAt = Date.now(); syncGcalServer(bookings[i], "delete"); notifyOwnerServer("cancel", bookings[i]); });
+        prevIdx.forEach((i) => { touchAvail(bookings[i]); bookings[i].status = "cancelled"; bookings[i].updatedAt = Date.now(); syncGcalServer(bookings[i], "delete"); notifyOwnerServer("cancel", bookings[i]); });
         applied.push({ rev: r }); out.cancelled++;
         if (prevIdx.length) pushActivity(data, "cancel", `Cancellazione OTA${cancelledGuestName ? " — " + cancelledGuestName : ""} (Channex)`);
         console.log(`[channex inbound] CANCELLAZIONE booking_id=${bidLog} → ${prevIdx.length} prenotazione/i marcata/e cancelled (ack)`);
@@ -313,6 +316,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       // ripristiniamo (vedi sotto) così una modifica non-mappabile non cancella il dato.
       const isUpdate = prevIdx.length > 0;
       const removed = prevIdx.sort((a, b) => b - a).map((i) => bookings.splice(i, 1)[0]);
+      removed.forEach(touchAvail);
 
       // Ospite (riusa per email)
       const c = r.customer || {};
@@ -382,6 +386,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           note: oldNote && !/via Channex/.test(oldNote) ? oldNote : `Prenotazione ${channel.toUpperCase()} via Channex${r.ota_reservation_code ? ` · ${r.ota_reservation_code}` : ""}`,
           updatedAt: Date.now(), // senza, qualunque modifica successiva (es. una cancellazione) rischia di sparire al sync (vedi sopra)
         } as Booking);
+        touchAvail(bookings[bookings.length - 1]);
         syncGcalServer(bookings[bookings.length - 1], "upsert");
         if (!isUpdate) notifyOwnerServer("newBooking", bookings[bookings.length - 1]);
         added++;
@@ -430,8 +435,8 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
     if (wErr) return { ok: false, applied: [] };
     if ((!updated || updated.length === 0) && rev !== null) return { ok: false, conflict: true, applied: [] };
     // Segna l'ultimo import sulle righe di mappatura di questo store.
-    // Strutture che si dividono le camere: l'altra struttura del gruppo va ricalcolata e inviata anche se nessun browser è aperto.
-    if (target.kind === "user" && applied.length > 0) await schedulePoolPush(blob);
+    // Disponibilità verso i portali anche se nessun browser è aperto: solo le strutture/tipologie coinvolte (e, con camere condivise, tutto il gruppo).
+    if (applied.length > 0) await schedulePoolPush(blob, availTouched);
     const mapUpd = admin.from("channex_map").update({ last_import_at: new Date().toISOString() });
     await (target.kind === "org" ? mapUpd.eq("org_id", target.id) : mapUpd.eq("tenant_id", target.id).is("org_id", null));
     return { ok: true, applied };

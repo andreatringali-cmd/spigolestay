@@ -237,8 +237,8 @@ export async function POST(req: Request) {
       }
     } catch { /* email non critica */ }
 
-    // Strutture che si dividono le camere: ricalcola e invia la disponibilità del gruppo ai portali.
-    try { const { data: rowP } = await admin.from("app_state").select("data").eq("user_id", ownerId).maybeSingle(); await schedulePoolPush(((rowP?.data ?? {}) as Record<string, string>) || {}); } catch { /* non critico */ }
+    // Disponibilità verso i portali (Channex) senza aspettare un browser aperto: la struttura/tipologia prenotata e, con camere condivise, tutto il gruppo.
+    try { const { data: rowP } = await admin.from("app_state").select("data").eq("user_id", ownerId).maybeSingle(); await schedulePoolPush(((rowP?.data ?? {}) as Record<string, string>) || {}, [{ structureId: booking.structureId, roomTypeId: booking.roomTypeId }]); } catch { /* non critico */ }
 
     return NextResponse.json({ ok: true });
   } catch (e) {
