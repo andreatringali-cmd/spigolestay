@@ -246,9 +246,12 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     let arr = allPeople;
     if (q.trim()) { const s = q.toLowerCase(); arr = arr.filter((p) => p.name.toLowerCase().includes(s) || (threads[p.id] ?? []).some((m) => m.text.toLowerCase().includes(s))); }
     arr = arr.filter((p) => (showArchived ? isArch(p.id) : !isArch(p.id)));
-    const lastTs = (id: string) => { const th = threads[id] ?? []; return th.length ? th[th.length - 1].ts : 0; };
-    // Prima le chat fissate (la più recente in alto), poi per struttura e nome.
-    return [...arr].sort((a, b) => Number(isPinned(b.id)) - Number(isPinned(a.id)) || (isPinned(a.id) && isPinned(b.id) ? lastTs(b.id) - lastTs(a.id) : (a.struct || "").localeCompare(b.struct || "") || a.name.localeCompare(b.name)));
+    // Ultimo messaggio di ogni conversazione (calcolato una volta).
+    const last = new Map<string, number>();
+    arr.forEach((p) => { const th = threads[p.id] ?? []; let m = 0; for (const x of th) if (x.ts > m) m = x.ts; last.set(p.id, m); });
+    // Prima le chat fissate, poi in ordine cronologico: chi ha scritto o ricevuto per ultimo sta in cima (così un messaggio nuovo sale da solo).
+    // Le conversazioni senza messaggi vanno in fondo, per struttura e nome.
+    return [...arr].sort((a, b) => Number(isPinned(b.id)) - Number(isPinned(a.id)) || (last.get(b.id) ?? 0) - (last.get(a.id) ?? 0) || (a.struct || "").localeCompare(b.struct || "") || a.name.localeCompare(b.name));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPeople, q, archived, pinned, restoredAt, showArchived, threads]);
   const archivedCount = useMemo(() => allPeople.filter((p) => isArch(p.id)).length,

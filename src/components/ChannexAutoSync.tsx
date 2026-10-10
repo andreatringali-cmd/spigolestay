@@ -125,7 +125,17 @@ export default function ChannexAutoSync() {
             const prevA = snap!.availability || {};
             const prevR = snap!.restrictions || {};
             sendAvail = availability.filter((a) => prevA[availKey(a)] !== availVal(a));
-            sendRestr = restrictions.filter((r) => prevR[restrKey(r)] !== restrVal(r));
+            sendRestr = restrictions.filter((r) => prevR[restrKey(r)] !== restrVal(r)).map((r) => {
+              // Una chiusura/un minimo tolto in Xenora: il campo non è più nel payload e Channex terrebbe il valore vecchio. Si invia il valore "aperto" solo per ciò che prima era attivo.
+              let prev: { min_stay_arrival?: number; stop_sell?: boolean; closed_to_arrival?: boolean; closed_to_departure?: boolean } = {};
+              try { prev = JSON.parse(prevR[restrKey(r)] || "{}"); } catch { /* snapshot illeggibile: nessuna riapertura */ }
+              const out = { ...r };
+              if (prev.stop_sell && !r.stop_sell) out.stop_sell = false;
+              if (prev.closed_to_arrival && !r.closed_to_arrival) out.closed_to_arrival = false;
+              if (prev.closed_to_departure && !r.closed_to_departure) out.closed_to_departure = false;
+              if ((prev.min_stay_arrival ?? 0) > 1 && !r.min_stay_arrival) out.min_stay_arrival = 1;
+              return out;
+            });
             if (sendAvail.length === 0 && sendRestr.length === 0) continue; // niente cambiato per questa struttura
           }
 
