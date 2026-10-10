@@ -289,11 +289,11 @@ export default function ImpostazioniPage() {
               </li>
               <li className="flex gap-2.5">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-wash text-[11px] font-bold text-txt">2</span>
-                <span className="pt-0.5">
+                <span className="min-w-0 pt-0.5">
                   {t("Clicca sui tre puntini accanto al nome del calendario → \"Impostazioni e condivisione\" → \"Aggiungi persone e gruppi\" → incolla questa email:")}
                   {gcalInfo?.serviceAccountEmail && (
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <code className="truncate rounded-lg border border-line bg-wash px-2 py-1.5 text-[11px] text-txt">{gcalInfo.serviceAccountEmail}</code>
+                    <div className="mt-1.5 flex min-w-0 items-center gap-2">
+                      <code className="min-w-0 truncate rounded-lg border border-line bg-wash px-2 py-1.5 text-[11px] text-txt">{gcalInfo.serviceAccountEmail}</code>
                       <button onClick={copyServiceEmail} className="shrink-0 rounded-lg bg-focus px-2.5 py-1.5 text-xs font-semibold text-white hover:opacity-90">{gcalCopied ? `✓ ${t("Copiata")}` : t("Copia")}</button>
                     </div>
                   )}
