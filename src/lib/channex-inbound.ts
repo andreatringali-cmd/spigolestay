@@ -5,6 +5,7 @@
 //  scrivi la prenotazione nella app_state del proprietario, poi ACK.
 //  Tutto server-side (service role). Idempotente per booking_id (extId).
 // ============================================================
+import { schedulePoolPush } from "@/lib/pool-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { internalFetch } from "@/lib/server-auth";
 import { bookingRevisionsFeed, ackBookingRevision, listProperties, type ChxRevision } from "@/lib/channex";
@@ -429,6 +430,8 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
     if (wErr) return { ok: false, applied: [] };
     if ((!updated || updated.length === 0) && rev !== null) return { ok: false, conflict: true, applied: [] };
     // Segna l'ultimo import sulle righe di mappatura di questo store.
+    // Strutture che si dividono le camere: l'altra struttura del gruppo va ricalcolata e inviata anche se nessun browser è aperto.
+    if (target.kind === "user" && applied.length > 0) await schedulePoolPush(blob);
     const mapUpd = admin.from("channex_map").update({ last_import_at: new Date().toISOString() });
     await (target.kind === "org" ? mapUpd.eq("org_id", target.id) : mapUpd.eq("tenant_id", target.id).is("org_id", null));
     return { ok: true, applied };
