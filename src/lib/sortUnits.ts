@@ -12,3 +12,14 @@ export function byUnitName<T extends { name?: string; order?: number }>(a: T, b:
 export function sortUnitsByName<T extends { name?: string }>(list: readonly T[]): T[] {
   return [...list].sort(byUnitName);
 }
+
+/** Tipologie nell'ordine scelto a mano (Camere → trascina); le senza ordine restano dopo, nell'ordine in cui sono. Stabile. */
+export function sortRoomTypes<T extends { order?: number }>(list: readonly T[]): T[] {
+  return list.map((t, i) => ({ t, i })).sort((a, b) => {
+    const ao = a.t.order, bo = b.t.order;
+    if (ao != null && bo != null && ao !== bo) return ao - bo;
+    if (ao != null && bo == null) return -1;
+    if (ao == null && bo != null) return 1;
+    return a.i - b.i;
+  }).map((x) => x.t);
+}

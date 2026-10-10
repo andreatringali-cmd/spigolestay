@@ -101,6 +101,10 @@ export async function POST(req: Request) {
       if (isReviewsNotInstalled(res.status, res.error)) {
         return NextResponse.json({ ok: false, error: 'L\'app "Messages & Reviews" non è ancora installata su Channex per questa struttura: installala dalla dashboard Channex (Applications) per poter rispondere da qui.' });
       }
+      // Channex risponde 'validation_error ... content: empty_review' quando la recensione dell'ospite non ha testo (solo punteggio): il portale non permette di rispondere.
+      if (/empty_review/i.test(res.error || "")) {
+        return NextResponse.json({ ok: false, error: "Questa recensione non ha testo (solo punteggio): il portale non permette di rispondere." });
+      }
       return NextResponse.json({ ok: false, error: res.error || "Invio risposta non riuscito" });
     }
     return NextResponse.json({ ok: true });

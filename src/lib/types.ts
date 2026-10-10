@@ -178,6 +178,7 @@ export const ROOM_TYPE_OPTIONS = [
 export interface RoomType {
   id: string;
   updatedAt?: number; // epoch ms ultima modifica (sync last-write-wins)
+  order?: number; // ordine manuale (drag & drop in Camere); pilota anche il calendario
   structureId: string;
   name: string; // "Camera matrimoniale", "Appartamento"
   beds: number; // posti letto

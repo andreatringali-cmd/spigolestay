@@ -325,6 +325,8 @@ export default function RecensioniPage() {
     const t = (draft[r.id] ?? "").trim();
     const row = chxRowsSel.find((x) => x.id === r.id);
     if (!t || !row) return;
+    // Recensione senza testo (solo punteggio): i portali non permettono di rispondere. Meglio dirlo subito che aspettare l'errore di Channex.
+    if (!r.text.trim()) { setChxReplyErr((e) => ({ ...e, [r.id]: "Questa recensione non ha testo (solo punteggio): il portale non permette di rispondere." })); return; }
     setChxReplyBusy((b) => ({ ...b, [r.id]: true }));
     setChxReplyErr((e) => ({ ...e, [r.id]: "" }));
     try {

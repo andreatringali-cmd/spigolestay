@@ -1,5 +1,6 @@
 "use client";
 
+import { sortRoomTypes } from "@/lib/sortUnits";
 import { POOL_KEY, parsePool, inPool, poolOccupancy } from "@/lib/inventory-pool";
 import { useEffect, useMemo, useRef, useState, type DragEvent as RDragEvent, type MouseEvent as RMouseEvent } from "react";
 import { isHexColor, textOn } from "@/lib/booking-color";
@@ -1481,7 +1482,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           {/* Righe per tipologia — Esplosa (struttura → tipologia) o Compatta (solo per tipologia) */}
           {vw.group === "struct" ? (
             visibleStructures.map((s, si) => {
-              const sTypes = roomTypes.filter((rt) => rt.structureId === s.id && units.some((u) => u.structureId === s.id && u.roomTypeId === rt.id));
+              const sTypes = sortRoomTypes(roomTypes.filter((rt) => rt.structureId === s.id && units.some((u) => u.structureId === s.id && u.roomTypeId === rt.id)));
               if (!sTypes.length) return null;
               return (
                 <div key={s.id}>

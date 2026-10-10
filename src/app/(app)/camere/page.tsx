@@ -16,7 +16,7 @@ import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useAccess } from "@/lib/access";
 import { amenityIcon } from "@/lib/amenities";
-import { byUnitName } from "@/lib/sortUnits";
+import { sortRoomTypes, byUnitName } from "@/lib/sortUnits";
 import { ROOMS_PER_STRUCT, ROOM_OVERAGE } from "@/lib/plan";
 import { useLang } from "@/lib/i18n";
 
@@ -43,13 +43,14 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 export default function CamerePage() {
   const router = useRouter();
   const { t } = useLang();
-  const { structures, roomTypes, units, activeStructureId, updateUnit, addActivity } = useData();
+  const { structures, roomTypes, units, activeStructureId, updateUnit, updateRoomType, addActivity } = useData();
   const ask = useConfirm();
   const [localS, setLocalS] = useState("all");
   const [highlight, setHighlight] = useState<string | null>(null);
   const [roomModal, setRoomModal] = useState<{ structureId: string; unit?: Unit } | null>(null);
   const [sortKey, setSortKey] = useState<string>("name");
   const [dragId, setDragId] = useState<string | null>(null); // camera trascinata (riordino manuale)
+  const [dragTypeId, setDragTypeId] = useState<string | null>(null); // tipologia trascinata (riordino manuale)
   const [search, setSearch] = useState(""); // filtro: cerca per tipologia o nome/codice camera
   const q = search.trim().toLowerCase();
   const typeMatchQ = (rt: { name: string }) => !q || rt.name.toLowerCase().includes(q);
@@ -116,6 +117,16 @@ export default function CamerePage() {
     if (sortKey !== "name") { setSortKey("name"); setSortDir("asc"); }
     setDragId(null);
   };
+  // Riordino delle tipologie: sposta quella trascinata prima di quella di destinazione e salva l'ordine (vale anche per il Calendario).
+  const reorderType = (group: RoomType[], targetId: string) => {
+    if (!dragTypeId || dragTypeId === targetId) { setDragTypeId(null); return; }
+    const rest = group.map((x) => x.id).filter((id) => id !== dragTypeId);
+    const ti = rest.indexOf(targetId);
+    if (ti < 0) { setDragTypeId(null); return; }
+    rest.splice(ti, 0, dragTypeId);
+    rest.forEach((id, idx) => updateRoomType(id, { order: idx }));
+    setDragTypeId(null);
+  };
   const SortTh = ({ k, label }: { k: string; label: string }) => (
     <th className="cursor-pointer select-none px-3 py-2 font-semibold hover:text-txt" onClick={() => toggleSort(k)}>
       {label}{sortKey === k ? <span className="ml-1 text-[color:var(--focus)]">{sortDir === "asc" ? "▲" : "▼"}</span> : ""}
@@ -169,14 +180,15 @@ export default function CamerePage() {
 
       <div className="flex flex-col gap-5">
         {scoped.map((s) => {
-          const types = roomTypes.filter((rt) => rt.structureId === s.id);
+          const typesRaw = roomTypes.filter((rt) => rt.structureId === s.id); // ordine di creazione: i colori di default restano legati a questo
+          const types = sortRoomTypes(typesRaw);
+          const colorIdx = (rt: RoomType) => typesRaw.findIndex((x) => x.id === rt.id);
           const sUnits = units.filter((u) => u.structureId === s.id);
           const beds = sUnits.reduce((a, u) => a + (types.find((t) => t.id === u.roomTypeId)?.beds ?? 0), 0);
           const oos = sUnits.filter((u) => u.outOfService).length;
           const rowOf = (u: Unit, showType = false, group?: Unit[]) => {
-            const i = types.findIndex((tt) => tt.id === u.roomTypeId);
-            const rt = types[i];
-            const color = rt ? typeColor(rt, i) : "var(--line)";
+            const rt = types.find((tt) => tt.id === u.roomTypeId);
+            const color = rt ? typeColor(rt, colorIdx(rt)) : "var(--line)";
             return (
               <tr key={u.id} id={`unit-${u.id}`}
                 draggable={!!group}
@@ -233,10 +245,10 @@ export default function CamerePage() {
               <div className="mb-4 grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {types.map((rt, i) => {
                   if (rt.deriveFrom) return null; // le derivate stanno nella tabella "Tariffe derivate"
-                  const color = typeColor(rt, i);
+                  const color = typeColor(rt, colorIdx(rt));
                   const n = sUnits.filter((u) => u.roomTypeId === rt.id).length;
                   return (
-                    <button key={rt.id} onClick={() => router.push(`/camere/tipologia/${rt.id}`)} className="group flex h-full flex-col overflow-hidden rounded-xl border border-line bg-surface text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                    <button key={rt.id} onClick={() => router.push(`/camere/tipologia/${rt.id}`)} draggable onDragStart={(e) => { setDragTypeId(rt.id); e.dataTransfer.effectAllowed = "move"; }} onDragOver={(e) => { if (dragTypeId && dragTypeId !== rt.id) e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); reorderType(types.filter((x) => !x.deriveFrom), rt.id); }} onDragEnd={() => setDragTypeId(null)} title={t("Trascina per cambiare l'ordine delle tipologie")} className={`${dragTypeId === rt.id ? "opacity-40 " : ""}cursor-grab group flex h-full flex-col overflow-hidden rounded-xl border border-line bg-surface text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md`}>
                       <div className="h-1.5 w-full shrink-0" style={{ backgroundColor: color }} />
                       <div className="flex flex-1 flex-col p-3">
                         <div className="flex items-start justify-between gap-2">
@@ -268,11 +280,11 @@ export default function CamerePage() {
                   {types.map((rt, i) => {
                     const g = sortUnits(sUnits.filter((u) => u.roomTypeId === rt.id && (typeMatchQ(rt) || unitMatchQ(u))), types);
                     if (!g.length) return null;
-                    const color = typeColor(rt, i);
+                    const color = typeColor(rt, colorIdx(rt));
                     const open = !!search.trim() || opened.has(rt.id); // cercando, apriamo i gruppi che corrispondono
                     return (
                       <div key={rt.id} className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
-                        <div className={`flex items-center justify-between gap-2 px-3 py-2.5 ${open ? "border-b border-line" : ""}`} style={{ borderLeft: `4px solid ${color}` }}>
+                        <div draggable onDragStart={(e) => { setDragTypeId(rt.id); e.dataTransfer.effectAllowed = "move"; }} onDragOver={(e) => { if (dragTypeId && dragTypeId !== rt.id) e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); reorderType(types, rt.id); }} onDragEnd={() => setDragTypeId(null)} title={t("Trascina per cambiare l'ordine delle tipologie")} className={`flex cursor-grab items-center justify-between gap-2 px-3 py-2.5 ${dragTypeId === rt.id ? "opacity-40" : ""} ${open ? "border-b border-line" : ""}`} style={{ borderLeft: `4px solid ${color}` }}>
                           <button onClick={() => toggleOpen(rt.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left" title={open ? t("Comprimi") : t("Espandi")}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-faint transition-transform" style={{ transform: open ? "rotate(90deg)" : "none" }}><polyline points="9 18 15 12 9 6" /></svg>
                             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
