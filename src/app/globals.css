@@ -153,5 +153,6 @@ body {
 /* Telefono: una griglia senza colonne esplicite ha una sola colonna "automatica" che si allarga fino al contenuto più largo e spinge la pagina fuori dallo schermo.
    Con minmax(0, 1fr) la colonna resta larga quanto lo schermo e il testo va a capo. Non tocca le griglie con colonne esplicite (grid-cols-*) né quelle a scorrimento (grid-flow-*). */
 @media (max-width: 639px) {
-  .grid:not([class*="grid-cols-"]):not([class*="grid-flow-"]):not([class*="grid-rows-"]) { grid-template-columns: minmax(0, 1fr); }
+  /* le classi con prefisso (sm:grid-cols-2) contengono ":" e non contano: valgono solo le colonne esplicite di base */
+  .grid:not([class^="grid-cols-"]):not([class*=" grid-cols-"]):not([class^="grid-flow-"]):not([class*=" grid-flow-"]):not([class^="grid-rows-"]):not([class*=" grid-rows-"]) { grid-template-columns: minmax(0, 1fr); }
 }
