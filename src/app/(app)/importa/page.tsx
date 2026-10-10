@@ -52,6 +52,7 @@ const FIELDS: { key: string; label: string; req?: boolean; kw: RegExp; strict?: 
   { key: "paid", label: "Importo incassato", kw: /incassato|\bpaid\b/i, strict: /^importo incassato$/i },
   { key: "commission", label: "Commissione OTA (€)", kw: /^commissione$|commission/i, strict: /^commissione$/i },
   { key: "country", label: "Nazione ospite", kw: /^nazione$|country|paese/i },
+  { key: "status", label: "Stato (le cancellate non occupano camere)", kw: /^stato$|^status$/i, strict: /^stato$/i },
   { key: "property", label: "Struttura nel file (per filtrare)", kw: /^nome della struttura$/i, strict: /^nome della struttura$/i },
 ];
 
@@ -153,7 +154,11 @@ export default function ImportaPage() {
     setMode("csv"); setEvents([]);
     if (parsed.length < 2) { setErr(t("Il file sembra vuoto o non valido.")); setRows([]); return; }
     setRows(parsed);
-    setMap(autoMap(parsed[0]));
+    const m = autoMap(parsed[0]);
+    // Octorate: la colonna "Camera" può avere solo la tipologia; il codice della camera vera sta nella colonna "PMS" (es. CP_#1). Se è compilata, si usa quella.
+    const pi = parsed[0].findIndex((h) => /^pms$/i.test((h || "").trim()));
+    if (pi >= 0) { const data = parsed.slice(1); const filled = data.filter((r) => (r[pi] || "").trim()).length; if (filled >= data.length * 0.4) m.room = pi; }
+    setMap(m);
   };
 
 
@@ -391,6 +396,13 @@ export default function ImportaPage() {
       const dbId = val(r, "dbId");
       const extId = dbId ? `octorate:${dbId}` : undefined;
       const known = extId ? seenExt.get(extId) : undefined;
+      const isCancelled = /cancel|annull/i.test(val(r, "status"));
+      if (known && isCancelled) {
+        // Cancellata su Octorate: nelle versioni precedenti veniva importata come attiva e occupava una camera. Ora si segna cancellata.
+        if (known.status !== "cancelled") { updateBooking(known.id, { status: "cancelled" }); fixed++; }
+        note("gia_presente", undefined, extId);
+        dup++; return;
+      }
       if (known) {
         // Già importata: se non ha ancora una camera, la assegna adesso (senza ricrearla).
         if (!known.unitId || reIds.has(known.id)) { const res = resolveUnit(val(r, "room"), ci, co); if (res.unitId && res.unitId !== known.unitId) { updateBooking(known.id, { unitId: res.unitId, roomTypeId: res.roomTypeId }); fixed++; } else if (!res.unitId && reIds.has(known.id) && known.unitId) { updateBooking(known.id, { unitId: null }); fixed++; } }
@@ -419,8 +431,8 @@ export default function ImportaPage() {
       let guestId = gk ? guestByKey.get(gk) : undefined;
       if (!guestId) { guestId = addGuest(gInfo); guestsNew++; if (gk) guestByKey.set(gk, guestId); } else guestsReused++;
       const roomTxt = val(r, "room");
-      const { unitId, roomTypeId } = resolveUnit(roomTxt, ci, co);
-      if (!unitId) noRoom++;
+      const { unitId, roomTypeId } = isCancelled ? { unitId: null as string | null, roomTypeId: resolveUnit(roomTxt, ci, co).roomTypeId } : resolveUnit(roomTxt, ci, co);
+      if (!unitId && !isCancelled) noRoom++;
       const bookedOn = toISO(val(r, "bookedOn"));
       const noteTxt = val(r, "note");
       const channel = toChannel(val(r, "channel"));
@@ -430,7 +442,7 @@ export default function ImportaPage() {
       const paidN = toNum(val(r, "paid")), commN = toNum(val(r, "commission"));
       addBooking({
         structureId, roomTypeId, unitId, guestId,
-        channel, status: "confirmed",
+        channel, status: isCancelled ? "cancelled" : "confirmed",
         ...(otaCode ? { code: otaCode } : {}), ...(extId ? { extId } : {}), ...(groupFor(r) ? { groupId: groupFor(r) } : {}),
         ...(paidN !== undefined && paidN > 0 ? { paid: paidN } : {}), ...(commN !== undefined && commN > 0 ? { commissionAmount: commN } : {}),
         checkIn: ci, checkOut: co, ...(bookedOn ? { bookedOn } : {}),
