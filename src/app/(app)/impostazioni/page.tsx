@@ -224,9 +224,9 @@ export default function ImpostazioniPage() {
       {/* Disponibilità di gruppo: ora ha una pagina dedicata */}
       {structures.length > 1 && (
         <Card className="mt-4">
-          <SectionTitle>{t("Disponibilità di gruppo")}</SectionTitle>
-          <p className="mb-3 text-xs text-dim">{t("Per strutture che mostrano le stesse camere: la disponibilità resta sincronizzata. Si imposta nella pagina dedicata (PMS → Disponibilità di gruppo).")}</p>
-          <Link href="/disponibilita-gruppo" className="inline-block rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-focus transition hover:bg-wash">{t("Apri Disponibilità di gruppo")}</Link>
+          <SectionTitle>{t("Gruppo")}</SectionTitle>
+          <p className="mb-3 text-xs text-dim">{t("Per strutture che mostrano le stesse camere: la disponibilità resta sincronizzata. Si imposta nella pagina dedicata (PMS → Gruppo).")}</p>
+          <Link href="/disponibilita-gruppo" className="inline-block rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-focus transition hover:bg-wash">{t("Apri Gruppo")}</Link>
         </Card>
       )}
 

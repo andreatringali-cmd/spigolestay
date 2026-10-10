@@ -57,7 +57,7 @@ export default function CamereCondivisePage() {
   if (!loaded) return null;
   return (
     <div>
-      <PageHeader title="Disponibilità gruppo (beta)" subtitle="Strutture che mostrano le stesse camere: la disponibilità resta sincronizzata tra loro su portali, calendario e sito diretto." />
+      <PageHeader title="Gruppo (beta)" subtitle="Strutture che mostrano le stesse camere: la disponibilità resta sincronizzata tra loro su portali, calendario e sito diretto." />
 
       <Card>
         <div className="flex items-start justify-between gap-4">
