@@ -578,7 +578,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   // Strutture che mostrano le stesse camere fisiche (Impostazioni → Disponibilità condivisa): la disponibilità è quella delle camere fisiche libere in tutto il gruppo,
   // la stessa che si invia ai portali. Si usano TUTTE le prenotazioni e TUTTE le camere (anche delle strutture non visibili).
   const poolCfg = (() => { try { return parsePool(localStorage.getItem(POOL_KEY)); } catch { return parsePool(null); } })();
-  const poolOcc = poolCfg.enabled ? poolOccupancy(poolCfg, raw.units, raw.bookings) : null;
+  const poolOcc = poolCfg.enabled ? poolOccupancy(poolCfg, raw.roomTypes, raw.units, raw.bookings) : null;
   const poolAvail = (typeId: string, iso: string, closed: number): number | null => {
     const sid = roomTypes.find((r) => r.id === typeId)?.structureId;
     return poolOcc && inPool(poolCfg, sid) ? poolOcc.availFor(typeId, iso, closed) : null;

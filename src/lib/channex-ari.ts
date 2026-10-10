@@ -45,7 +45,7 @@ export function buildAriPayload(
   const ctd = opts?.ctd ?? {};
   const base0 = new Date();
   // Strutture che mostrano le stesse camere fisiche: la disponibilità conta le camere fisiche libere in tutto il gruppo (vedi inventory-pool.ts).
-  const poolOcc = opts?.pool && inPool(opts.pool, structureId) ? poolOccupancy(opts.pool, units, bookings) : null;
+  const poolOcc = opts?.pool && inPool(opts.pool, structureId) ? poolOccupancy(opts.pool, roomTypes, units, bookings) : null;
   for (const rt of rts) {
     const mp = map.rooms![rt.id];
     const totalUnits = units.filter((u) => u.roomTypeId === rt.id && !u.outOfService).length;

@@ -1,6 +1,6 @@
 "use client";
 
-import { POOL_DEF, POOL_KEY, parsePool, physicalKey } from "@/lib/inventory-pool";
+import { POOL_DEF, POOL_KEY, parsePool, poolOccupancy } from "@/lib/inventory-pool";
 import { CHANNEX_DIRTY_EVENT } from "@/components/ChannexAutoSync";
 import { useEffect, useRef, useState } from "react";
 import { kvGet, kvSet, kvKeys, kvFlush } from "@/lib/bigstore";
@@ -62,7 +62,8 @@ export default function ImpostazioniPage() {
   const poolStructs = raw.structures;
   const poolUnits = raw.units.filter((u) => pool.structureIds.includes(u.structureId) && !u.outOfService);
   const poolListed = poolUnits.length;
-  const poolRoomsCount = new Set(poolUnits.map((u) => physicalKey(u))).size;
+  const poolSummary = pool.structureIds.length > 1 ? poolOccupancy({ enabled: true, structureIds: pool.structureIds }, raw.roomTypes, raw.units, []).summary() : [];
+  const poolRoomsCount = poolSummary.reduce((a, f) => a + f.rooms, 0);
   const [gcalInfo, setGcalInfo] = useState<{ configured: boolean; serviceAccountEmail: string | null } | null>(null);
   useEffect(() => {
     apiPost<{ ok: boolean; configured: boolean; serviceAccountEmail: string | null }>("calendar/gcal-info", {})
@@ -222,7 +223,7 @@ export default function ImpostazioniPage() {
       {poolStructs.length > 1 && (
         <Card className="mt-4">
           <SectionTitle>{t("Camere condivise tra strutture")}</SectionTitle>
-          <p className="mb-3 text-xs text-dim">{t("Per strutture che mostrano le stesse camere fisiche (per esempio le camere 5-8 di Spigolehouse sono anche Spigolerooms). La stessa camera si riconosce dal numero nel nome: «5» e «#5» sono la stessa camera. Se una camera è occupata in una struttura, lo è anche nell'altra, e la disponibilità si calcola sulle camere davvero libere. Vale per Booking, Expedia, HotelBeds, per il sito diretto e per il Calendario.")}</p>
+          <p className="mb-3 text-xs text-dim">{t("Per strutture che mostrano le stesse camere fisiche (per esempio le camere 5-8 di Spigolehouse sono anche Spigolerooms). Le camere della stessa tipologia (stesso nome) si dividono le stesse camere fisiche e si possono spostare: una prenotazione su una struttura riduce la disponibilità dell'altra. Il numero di camere fisiche si ricava dai numeri delle camere. Vale per Booking, Expedia, HotelBeds, per il sito diretto e per il Calendario.")}</p>
           <Toggle label={t("Condividi le camere")} checked={pool.enabled} onChange={(v) => savePool({ enabled: v })} />
           <div className="mt-3 text-xs font-medium text-dim">{t("Strutture del gruppo")}</div>
           <div className="mt-1 flex flex-wrap gap-2">
@@ -237,7 +238,7 @@ export default function ImpostazioniPage() {
           </div>
           {pool.structureIds.length > 1 && (
             <p className="mt-2 text-[11px] text-faint">
-              {t("Camere in Xenora per queste strutture")}: {poolListed} · {t("camere fisiche")}: {poolRoomsCount}
+              {t("Camere in Xenora per queste strutture")}: {poolListed} · {t("camere fisiche")}: {poolRoomsCount} ({poolSummary.map((f) => `${f.name} ${f.rooms}`).join(", ")})
               {poolRoomsCount < poolListed ? ` · ${t("le altre sono la stessa camera mostrata due volte")}` : ""}
               {!pool.enabled ? ` · ${t("Attiva l'interruttore per applicare la regola.")}` : ""}
             </p>

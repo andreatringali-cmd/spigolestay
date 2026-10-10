@@ -111,10 +111,11 @@ export async function POST(req: Request) {
     // Camera: prima unità libera della tipologia. Se non ce ne sono: dal sito anonimo si rifiuta (409); se invece il pagamento
     // è già avvenuto (chiamata interna) si registra comunque, senza camera e con un avviso, invece di sovrapporla a un'altra prenotazione.
     const ofType = units.filter((u) => u.roomTypeId === rt && !u.outOfService);
-    // Strutture che mostrano le stesse camere fisiche: la camera deve essere libera anche in tutto il gruppo (la "5" di una struttura è la "#5" dell'altra).
+    // Strutture che mostrano le stesse camere fisiche: la tipologia deve avere camere libere anche nel gruppo (le camere uguali si dividono le stesse camere fisiche).
     const pool = parsePool(blob[POOL_KEY]);
-    const poolOcc = inPool(pool, sid) ? poolOccupancy(pool, units, bookings) : null;
-    const free = ofType.find((u) => !bookings.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)) && (!poolOcc || poolOcc.unitFreeForStay(u, ci, co)));
+    const poolOcc = inPool(pool, sid) ? poolOccupancy(pool, (Array.isArray(data.roomTypes) ? data.roomTypes : []) as never, units, bookings) : null;
+    const poolBlocks = poolOcc ? !poolOcc.canSell(rt, ci, co) : false;
+    const free = poolBlocks ? undefined : ofType.find((u) => !bookings.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)));
     let overbooked = false;
     let unitId: string | null = free?.id ?? null;
     if (!free && ofType.length) {

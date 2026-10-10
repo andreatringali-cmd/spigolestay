@@ -1,7 +1,10 @@
-// Camere condivise tra strutture: più strutture che mostrano le STESSE camere fisiche (es. le camere 5-8 di Spigolehouse sono anche Spigolerooms: in Xenora
-// ci sono due volte, "5" in Spigolehouse e "#5" in Spigolerooms). La camera fisica si riconosce dal NUMERO nel nome dell'unità: "5" e "#5" sono la stessa camera.
-// Una camera è occupata se è prenotata in QUALUNQUE struttura del gruppo; così la disponibilità di ogni tipologia conta solo le camere fisiche davvero libere
-// (se la Junior Suite #8 è occupata, anche la "8" di Spigolehouse lo è).
+// Camere condivise tra strutture: più strutture mostrano le STESSE camere fisiche (es. le camere 5-8 di Spigolehouse sono anche Spigolerooms).
+// Il collegamento è per TIPOLOGIA, non per numero di camera: le camere della stessa tipologia sono intercambiabili e si possono spostare.
+//  - Le tipologie con lo stesso nome (es. "Deluxe" in Spigolehouse e in Spigolerooms) pescano dalle STESSE camere fisiche: quante sono si ricava dai numeri
+//    delle camere (1,3,4,5,6,7 = 6 Deluxe, anche se la Deluxe di Spigolehouse ne mostra 7 e quella di Spigolerooms 3).
+//  - Un numero che compare con tipologie DIVERSE (la "8" è Deluxe in Spigolehouse e Junior Suite in Spigolerooms) è la camera della tipologia con meno camere
+//    (la Junior Suite): la Deluxe di Spigolehouse può usarla come camera in più, e se è occupata si chiude anche lì.
+//  - Disponibilità di una tipologia = quante prenotazioni in più si potrebbero ancora accogliere con le camere fisiche del gruppo.
 // Modulo puro (niente rete, niente storage): lo usano l'invio ARI ai portali, il Calendario, il sito diretto e i test.
 
 export const POOL_KEY = "spigolestay:inventorypool";
@@ -9,7 +12,7 @@ export const POOL_KEY = "spigolestay:inventorypool";
 export interface PoolConfig {
   enabled: boolean;
   structureIds: string[]; // strutture che condividono le camere fisiche
-  realRooms?: number;     // non più usato (versione precedente: tetto numerico); si ignora
+  realRooms?: number;     // non più usato (versione precedente); si ignora
 }
 
 export const POOL_DEF: PoolConfig = { enabled: false, structureIds: [] };
@@ -22,40 +25,101 @@ export function parsePool(raw: string | null | undefined): PoolConfig {
   } catch { return { ...POOL_DEF }; }
 }
 
-type U = { id: string; name?: string; roomTypeId: string; structureId?: string; outOfService?: boolean };
-type B = { status?: string; structureId?: string; roomTypeId?: string; unitId?: string | null; checkIn: string; checkOut: string };
+type RT = { id: string; name?: string; structureId?: string };
+type U = { id: string; name?: string; roomTypeId: string; outOfService?: boolean };
+type B = { status?: string; roomTypeId?: string; checkIn: string; checkOut: string };
 
 /** La struttura fa parte di un gruppo attivo? */
 export const inPool = (cfg: PoolConfig | undefined, structureId: string | undefined): boolean => !!cfg?.enabled && !!structureId && cfg.structureIds.includes(structureId);
 
-/** Identità della camera fisica: il numero nel nome ("5", "#5", "Camera 5" → "5"); senza numero, la camera è solo sua. */
+/** Identità della camera dal numero nel nome ("5", "#5", "Camera 05" → "5"); senza numero, la camera è solo sua. */
 export const physicalKey = (u: { id: string; name?: string }): string => { const m = (u.name ?? "").match(/\d+/); return m ? String(Number(m[0])) : `u:${u.id}`; };
 
-const covers = (b: { checkIn: string; checkOut: string }, iso: string) => b.checkIn <= iso && iso < b.checkOut;
-const active = (b: B) => b.status !== "cancelled";
+const famName = (n?: string) => (n ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 
-/** Occupazione per camera fisica del gruppo, con cache per giorno. */
-export function poolOccupancy(cfg: PoolConfig, units: U[], bookings: B[]) {
-  const keyOfUnit = new Map(units.map((u) => [u.id, physicalKey(u)]));
-  // Prenotazioni attive del gruppo con camera assegnata: (camera fisica, date).
-  const assigned = bookings.filter((b) => active(b) && b.unitId && inPool(cfg, b.structureId) && keyOfUnit.has(b.unitId)).map((b) => ({ key: keyOfUnit.get(b.unitId as string) as string, checkIn: b.checkIn, checkOut: b.checkOut }));
-  const cache = new Map<string, Set<string>>();
-  const occupiedAt = (iso: string): Set<string> => {
-    let s = cache.get(iso);
-    if (!s) { s = new Set(assigned.filter((a) => covers(a, iso)).map((a) => a.key)); cache.set(iso, s); }
-    return s;
+const covers = (b: { checkIn: string; checkOut: string }, iso: string) => b.checkIn <= iso && iso < b.checkOut;
+
+/** Grafo delle camere condivise e disponibilità per tipologia/giorno. `closed` (chiusure manuali) si sottrae dal risultato. */
+export function poolOccupancy(cfg: PoolConfig, roomTypes: RT[], units: U[], bookings: B[]) {
+  const types = roomTypes.filter((r) => inPool(cfg, r.structureId));
+  const tIndex = new Map(types.map((t, i) => [t.id, i]));
+  const typeUnits = types.map((t) => units.filter((u) => u.roomTypeId === t.id && !u.outOfService));
+  // Per ogni numero di camera: con quali nomi di tipologia compare e quante camere ha ciascun nome nel gruppo.
+  const unitsByName = new Map<string, number>();
+  types.forEach((t, i) => unitsByName.set(famName(t.name), (unitsByName.get(famName(t.name)) ?? 0) + typeUnits[i].length));
+  const namesByKey = new Map<string, Set<string>>();
+  types.forEach((t, i) => typeUnits[i].forEach((u) => { const k = physicalKey(u); if (!namesByKey.has(k)) namesByKey.set(k, new Set()); namesByKey.get(k)!.add(famName(t.name)); }));
+  // Tipologia "vera" di ogni numero: se compare con più nomi, quella con meno camere nel gruppo (la Junior Suite, non la Deluxe "virtuale").
+  const nativeOf = new Map<string, string>();
+  namesByKey.forEach((names, k) => nativeOf.set(k, Array.from(names).sort((a, b) => (unitsByName.get(a) ?? 0) - (unitsByName.get(b) ?? 0) || a.localeCompare(b))[0]));
+  const families = Array.from(new Set(nativeOf.values()));
+  const fIndex = new Map(families.map((f, i) => [f, i]));
+  const physical = families.map(() => 0);
+  nativeOf.forEach((fam) => { physical[fIndex.get(fam) as number]++; });
+  // Per ogni tipologia: capacità verso la propria famiglia (illimitata) e verso le altre (le sue camere che sono in realtà di un'altra tipologia).
+  const alias = types.map((t, i) => {
+    const m = new Map<number, number>();
+    typeUnits[i].forEach((u) => { const fam = nativeOf.get(physicalKey(u)) as string; if (fam !== famName(t.name)) { const fi = fIndex.get(fam) as number; m.set(fi, (m.get(fi) ?? 0) + 1); } });
+    return m;
+  });
+  const own = types.map((t) => fIndex.get(famName(t.name)));
+
+  // Le prenotazioni già presenti riempiono PRIMA le camere della propria famiglia (la Deluxe di Spigolehouse e quella di Spigolerooms dividono le 6 Deluxe);
+  // solo se la famiglia è piena, la tipologia che ha camere "in più" (la Deluxe di Spigolehouse con la camera 8) usa quelle dell'altra famiglia (la Junior Suite).
+  // Per le prenotazioni NUOVE è prudente: una tipologia senza camere in più (Deluxe di Spigolerooms) conta solo le camere della propria famiglia, e le camere in più
+  // le può usare soltanto la tipologia che le ha. Così due tipologie non si vendono mai la stessa camera di scorta con una sola vendita.
+  const place = (d: number[]) => {
+    const load = families.map(() => 0);
+    d.forEach((n, i) => { if (own[i] !== undefined) load[own[i] as number] += n; });
+    const spill = families.map(() => 0);
+    const spillBy = types.map(() => 0);
+    for (let f = 0; f < families.length; f++) {
+      let remaining = Math.max(0, load[f] - physical[f]);
+      types.forEach((_, i) => {
+        if (own[i] !== f || remaining === 0) return;
+        let usable = d[i];
+        alias[i].forEach((cap, g) => { const use = Math.min(remaining, usable, cap); spill[g] += use; spillBy[i] += use; remaining -= use; usable -= use; });
+      });
+      if (remaining > 0) return null;
+    }
+    return { load, spill, spillBy };
   };
-  /** La camera fisica di questa unità è libera per tutte le notti del soggiorno [ci, co)? */
-  const unitFreeForStay = (u: U, ci: string, co: string): boolean => {
-    const k = keyOfUnit.get(u.id) ?? physicalKey(u);
-    return !assigned.some((a) => a.key === k && a.checkIn < co && a.checkOut > ci);
+
+  const active = bookings.filter((b) => b.status !== "cancelled" && b.roomTypeId && tIndex.has(b.roomTypeId));
+  const demandCache = new Map<string, number[]>();
+  const demandAt = (iso: string): number[] => {
+    let d = demandCache.get(iso);
+    if (!d) { d = types.map(() => 0); active.forEach((b) => { if (covers(b, iso)) d![tIndex.get(b.roomTypeId as string) as number]++; }); demandCache.set(iso, d); }
+    return d;
   };
-  /** Disponibilità di una tipologia in un giorno: camere (non fuori servizio) la cui camera fisica è libera, meno le prenotazioni senza camera, meno le chiusure. */
+  const availCache = new Map<string, number>();
+  /** Quante prenotazioni in più di questa tipologia si possono ancora accogliere quel giorno (meno le chiusure manuali). */
   const availFor = (typeId: string, iso: string, closed = 0): number => {
-    const occ = occupiedAt(iso);
-    const free = units.filter((u) => u.roomTypeId === typeId && !u.outOfService && !occ.has(keyOfUnit.get(u.id) ?? physicalKey(u))).length;
-    const unassigned = bookings.filter((b) => active(b) && !b.unitId && b.roomTypeId === typeId && covers(b, iso)).length;
-    return Math.max(0, free - unassigned - closed);
+    const i = tIndex.get(typeId); if (i === undefined) return 0;
+    const ck = `${typeId}|${iso}`; let k = availCache.get(ck);
+    if (k === undefined) {
+      const d = demandAt(iso);
+      const base = place(d);
+      if (!base) k = 0;
+      else {
+        const free = families.map((_, g) => physical[g] - Math.min(base.load[g], physical[g]) - base.spill[g]); // camere libere per famiglia
+        const f = own[i] as number | undefined;
+        let room = f === undefined ? 0 : Math.max(0, free[f]);
+        // camere in più della tipologia (solo lei le usa), dentro ciò che l'altra famiglia ha ancora libero
+        let extra = 0;
+        alias[i].forEach((cap, g) => { extra += Math.max(0, Math.min(cap - base.spillBy[i], free[g])); });
+        k = Math.min(Math.max(0, typeUnits[i].length - d[i]), room + extra);
+      }
+      availCache.set(ck, k);
+    }
+    return Math.max(0, k - closed);
   };
-  return { availFor, unitFreeForStay, occupiedAt };
+  /** Si può accogliere una prenotazione di questa tipologia per tutte le notti [ci, co)? */
+  const canSell = (typeId: string, ci: string, co: string): boolean => {
+    for (let t = new Date(ci + "T00:00:00Z"); t.toISOString().slice(0, 10) < co; t.setUTCDate(t.getUTCDate() + 1)) if (availFor(typeId, t.toISOString().slice(0, 10)) < 1) return false;
+    return true;
+  };
+  /** Per l'interfaccia: camere fisiche per tipologia. */
+  const summary = () => families.map((f, i) => ({ name: f, rooms: physical[i] }));
+  return { availFor, canSell, summary };
 }
