@@ -31,7 +31,7 @@ export function parsePool(raw: string | null | undefined): PoolConfig {
 
 type RT = { id: string; name?: string; structureId?: string };
 type U = { id: string; roomTypeId: string; outOfService?: boolean };
-type B = { status?: string; roomTypeId?: string; checkIn: string; checkOut: string };
+type B = { status?: string; roomTypeId?: string; unitId?: string | null; checkIn: string; checkOut: string };
 
 /** La struttura fa parte di un gruppo attivo? */
 export const inPool = (cfg: PoolConfig | undefined, structureId: string | undefined): boolean => !!cfg?.enabled && !!structureId && cfg.structureIds.includes(structureId);
@@ -73,11 +73,15 @@ export function poolOccupancy(cfg: PoolConfig, roomTypes: RT[], units: U[], book
   const listings = poolListings(cfg, roomTypes, units);
   const byType = new Map(listings.map((l) => [l.typeId, l]));
   const fams = new Map(poolFamilies(cfg, roomTypes, units).map((f) => [f.key, f]));
-  const active = bookings.filter((b) => b.status !== "cancelled" && b.roomTypeId && byType.has(b.roomTypeId));
+  // Una prenotazione conta per la tipologia della camera in cui sta ORA (se la camera è stata spostata o cambiata di tipologia, vale quella di adesso: è la riga in cui
+  // la vedi nel Calendario); senza camera assegnata vale la tipologia scelta alla prenotazione.
+  const typeOfUnit = new Map(units.map((u) => [u.id, u.roomTypeId]));
+  const typeOf = (b: B): string | undefined => (b.unitId && typeOfUnit.get(b.unitId)) || b.roomTypeId;
+  const active = bookings.filter((b) => b.status !== "cancelled" && (() => { const t = typeOf(b); return !!t && byType.has(t); })());
   const demandCache = new Map<string, Map<string, number>>(); // giorno → tipologia → prenotazioni
   const demandAt = (iso: string) => {
     let d = demandCache.get(iso);
-    if (!d) { d = new Map(); active.forEach((b) => { if (covers(b, iso)) d!.set(b.roomTypeId as string, (d!.get(b.roomTypeId as string) ?? 0) + 1); }); demandCache.set(iso, d); }
+    if (!d) { d = new Map(); active.forEach((b) => { if (covers(b, iso)) { const t = typeOf(b) as string; d!.set(t, (d!.get(t) ?? 0) + 1); } }); demandCache.set(iso, d); }
     return d;
   };
   const availFor = (typeId: string, iso: string, closed = 0): number => {

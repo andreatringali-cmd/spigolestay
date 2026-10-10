@@ -84,6 +84,14 @@ test("tipologia assegnata a mano a un'altra famiglia o esclusa", () => {
   assert.equal(o2.availFor("hD", day), 0); assert.equal(o2.availFor("rD", day), 3);
 });
 
+test("una prenotazione conta per la tipologia della camera in cui sta adesso (anche se la tipologia scelta all'inizio era un'altra)", () => {
+  // La camera "hJ-0" era una Deluxe e poi è diventata Junior Suite: le prenotazioni sopra restano segnate Deluxe ma occupano la Junior.
+  const bookings = [{ roomTypeId: "hD", unitId: "hJ-0", checkIn: day, checkOut: next, status: "confirmed" }];
+  const o = poolOccupancy(cfg, roomTypes, units, bookings);
+  assert.equal(o.availFor("hJ", day), 0); assert.equal(o.availFor("rJ", day), 0); // la Junior è occupata, in tutte e due le strutture
+  assert.equal(o.availFor("hD", day), 6); // le Deluxe non perdono una camera
+});
+
 test("canSell: serve disponibilità in tutte le notti", () => {
   const o = poolOccupancy(cfg, roomTypes, units, [...bk("hD", 6, "2026-10-12", "2026-10-13"), ...bk("rJ", 1, "2026-10-12", "2026-10-13")]);
   assert.equal(o.canSell("rD", "2026-10-10", "2026-10-12"), true);
