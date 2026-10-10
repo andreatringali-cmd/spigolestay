@@ -39,27 +39,27 @@ test("le camere fisiche si ricavano dalle tipologie: 6 Deluxe, 1 Tripla, 1 Junio
   assert.deepEqual(Object.fromEntries(s.map((f) => [f.name, f.rooms])), { deluxe: 6, tripla: 1, juniorsuite: 1 });
 });
 
-test("senza prenotazioni: la Deluxe di Spigolehouse mostra 7 (6 + la Junior come settima), Spigolerooms 3 + 1", () => {
-  assert.deepEqual({ HD: av([]).HD, HT: av([]).HT, RD: av([]).RD, RJ: av([]).RJ }, { HD: 7, HT: 1, RD: 3, RJ: 1 });
+test("senza prenotazioni: le Deluxe fisiche sono 6, quindi anche la Deluxe di Spigolehouse (7 in Xenora) mostra 6", () => {
+  assert.deepEqual({ HD: av([]).HD, HT: av([]).HT, RD: av([]).RD, RJ: av([]).RJ }, { HD: 6, HT: 1, RD: 3, RJ: 1 });
 });
 
 test("una Deluxe prenotata in una struttura riduce la disponibilità dell'altra (e viceversa)", () => {
   const a = av(bk("rDeluxe", 2)); // 2 su Spigolerooms
-  assert.equal(a.HD, 5); assert.equal(a.RD, 1);
+  assert.equal(a.HD, 4); assert.equal(a.RD, 1);
   const b = av(bk("hDeluxe", 2)); // 2 su Spigolehouse
-  assert.equal(b.HD, 5); assert.equal(b.RD, 3); // Spigolerooms resta al suo massimo (3) perché le Deluxe libere sono 4
+  assert.equal(b.HD, 4); assert.equal(b.RD, 3); // Spigolerooms resta al suo massimo (3) perché le Deluxe libere sono 4
   const c = av(bk("hDeluxe", 4));
   assert.equal(c.RD, 2); // restano 2 Deluxe libere: Spigolerooms ne può vendere al massimo 2
 });
 
-test("la Junior Suite occupata chiude la camera in più della Deluxe di Spigolehouse", () => {
+test("la Junior Suite occupata non tocca le Deluxe (tipologia diversa)", () => {
   const a = av(bk("rJunior", 1));
-  assert.equal(a.RJ, 0); assert.equal(a.HD, 6); assert.equal(a.RD, 3);
+  assert.equal(a.RJ, 0); assert.equal(a.HD, 6); assert.equal(a.RD, 3); // le Deluxe restano 6
 });
 
-test("Spigolehouse piena di Deluxe (7) usa anche la Junior Suite", () => {
-  const a = av(bk("hDeluxe", 7));
-  assert.equal(a.HD, 0); assert.equal(a.RD, 0); assert.equal(a.RJ, 0);
+test("6 Deluxe prenotate chiudono entrambe le Deluxe e lasciano la Junior Suite", () => {
+  const a = av(bk("hDeluxe", 6));
+  assert.equal(a.HD, 0); assert.equal(a.RD, 0); assert.equal(a.RJ, 1);
 });
 
 test("allineamento: con Tripla e Junior Suite occupate le due Deluxe mostrano lo stesso numero", () => {
@@ -72,13 +72,13 @@ test("allineamento: con Tripla e Junior Suite occupate le due Deluxe mostrano lo
 
 test("la Tripla occupata chiude solo la Tripla", () => {
   const a = av(bk("hTripla", 1));
-  assert.equal(a.HT, 0); assert.equal(a.HD, 7); assert.equal(a.RD, 3); assert.equal(a.RJ, 1);
+  assert.equal(a.HT, 0); assert.equal(a.HD, 6); assert.equal(a.RD, 3); assert.equal(a.RJ, 1);
 });
 
 test("annullate e giorni fuori periodo non contano; le chiusure manuali si sottraggono", () => {
   const a = av([...bk("hDeluxe", 2, day, next, "cancelled"), ...bk("hDeluxe", 1, "2026-10-12", "2026-10-13")]);
-  assert.equal(a.HD, 7);
-  assert.equal(av([], 2).HD, 5);
+  assert.equal(a.HD, 6);
+  assert.equal(av([], 2).HD, 4);
 });
 
 test("canSell: serve disponibilità in tutte le notti", () => {

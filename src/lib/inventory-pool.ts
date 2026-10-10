@@ -3,7 +3,7 @@
 //  - Le tipologie con lo stesso nome (es. "Deluxe" in Spigolehouse e in Spigolerooms) pescano dalle STESSE camere fisiche: quante sono si ricava dai numeri
 //    delle camere (1,3,4,5,6,7 = 6 Deluxe, anche se la Deluxe di Spigolehouse ne mostra 7 e quella di Spigolerooms 3).
 //  - Un numero che compare con tipologie DIVERSE (la "8" è Deluxe in Spigolehouse e Junior Suite in Spigolerooms) è la camera della tipologia con meno camere
-//    (la Junior Suite): la Deluxe di Spigolehouse può usarla come camera in più, e se è occupata si chiude anche lì.
+//    (la Junior Suite): non si conta tra le Deluxe e le due tipologie non si scambiano camere.
 //  - Disponibilità di una tipologia = quante prenotazioni in più si potrebbero ancora accogliere con le camere fisiche del gruppo.
 // Modulo puro (niente rete, niente storage): lo usano l'invio ARI ai portali, il Calendario, il sito diretto e i test.
 
@@ -56,12 +56,9 @@ export function poolOccupancy(cfg: PoolConfig, roomTypes: RT[], units: U[], book
   const fIndex = new Map(families.map((f, i) => [f, i]));
   const physical = families.map(() => 0);
   nativeOf.forEach((fam) => { physical[fIndex.get(fam) as number]++; });
-  // Per ogni tipologia: capacità verso la propria famiglia (illimitata) e verso le altre (le sue camere che sono in realtà di un'altra tipologia).
-  const alias = types.map((t, i) => {
-    const m = new Map<number, number>();
-    typeUnits[i].forEach((u) => { const fam = nativeOf.get(physicalKey(u)) as string; if (fam !== famName(t.name)) { const fi = fIndex.get(fam) as number; m.set(fi, (m.get(fi) ?? 0) + 1); } });
-    return m;
-  });
+  // Le tipologie diverse NON si scambiano camere: la "8" è la Junior Suite, una tipologia a sé, e non conta come Deluxe di Spigolehouse
+  // (la Deluxe di Spigolehouse ne mostra 7 in Xenora, ma le Deluxe fisiche sono 6). `alias` resta vuoto: nessuna camera "in più" tra famiglie.
+  const alias = types.map(() => new Map<number, number>());
   const own = types.map((t) => fIndex.get(famName(t.name)));
 
   // Le prenotazioni già presenti riempiono PRIMA le camere della propria famiglia (la Deluxe di Spigolehouse e quella di Spigolerooms dividono le 6 Deluxe);
