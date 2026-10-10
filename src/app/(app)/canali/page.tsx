@@ -9,6 +9,7 @@ import Icon from "@/components/Icon";
 import IcalSyncPanel from "@/components/IcalSyncPanel";
 import { apiPost } from "@/lib/invoicing/client";
 import { forceFullSync } from "@/components/ChannexAutoSync";
+import type { MappedExtraPlan } from "@/lib/rate-model";
 import { CHANNELS, type Channel } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
 import { usePriceCorrections } from "@/lib/usePriceCorrections";
@@ -57,7 +58,7 @@ export default function CanaliPage() {
   const clearLog = () => saveLog(effStructure === "all" ? [] : allLog.filter((l) => l.structureId && l.structureId !== effStructure));
 
   // Sincronizzazione reale verso Channex (staging): crea property + camere + tariffe da Xenora.
-  const [chxMap, setChxMap] = useState<Record<string, { propertyId: string; rooms?: Record<string, { roomTypeId: string; ratePlanId?: string }>; at: string }>>({});
+  const [chxMap, setChxMap] = useState<Record<string, { propertyId: string; rooms?: Record<string, { roomTypeId: string; ratePlanId?: string; ratePlans?: MappedExtraPlan[] }>; at: string }>>({});
   const [chxSync, setChxSync] = useState<{ running: boolean; msg?: string; ok?: boolean }>({ running: false });
   // Collegamento reale delle OTA (Booking.com, Airbnb, Expedia, ...): si apre in un pannello DENTRO
   // Xenora l'interfaccia dedicata (autenticazioni/credenziali OTA non replicabili lato nostro),
@@ -111,7 +112,12 @@ export default function CanaliPage() {
         for (const l of linked) {
           const rooms: Record<string, { roomTypeId: string; ratePlanId?: string }> = {};
           // ratePlanId (dal server) è indispensabile per inviare i PREZZI in ARI, non solo la disponibilità.
-          for (const [chxRt, xid] of Object.entries(l.roomsMap || {})) rooms[xid] = { roomTypeId: chxRt, ratePlanId: l.ratePlans?.[chxRt] };
+          for (const [chxRt, xid] of Object.entries(l.roomsMap || {})) {
+            rooms[xid] = { roomTypeId: chxRt, ratePlanId: l.ratePlans?.[chxRt] };
+            // Piani tariffari extra già mappati (modello tariffe, default spento): il relink non li conosce, si conservano com'erano.
+            const prev = chxMap[l.structureId]?.rooms?.[xid];
+            if (prev?.ratePlans?.length && prev.roomTypeId === chxRt) rooms[xid] = { ...prev };
+          }
           next[l.structureId] = { propertyId: l.propertyId, rooms, at: new Date().toISOString() };
         }
         setChxMap(next); try { localStorage.setItem("spigolestay:channexmap", JSON.stringify(next)); } catch {}

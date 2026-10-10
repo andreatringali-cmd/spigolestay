@@ -8,6 +8,7 @@
 // ============================================================
 
 import { channexFetch } from "@/lib/channex-queue";
+import { ratePlanCreateBody } from "@/lib/rate-model";
 
 const BASE = process.env.CHANNEX_API_URL || "https://staging.channex.io/api/v1";
 const KEY = process.env.CHANNEX_API_KEY || "";
@@ -168,6 +169,8 @@ export interface RestrictionRow {
   date_from?: string;        // intervallo: inizio (con date_to). Channex accetta date OPPURE date_from/date_to.
   date_to?: string;          // intervallo: fine
   rate?: string;
+  // Prezzi per occupazione (solo piani "per persona", modello tariffe attivo, vedi rate-model.ts): es. [{ occupancy: 1, rate: "90.00" }].
+  rates?: { occupancy: number; rate: string }[];
   min_stay_arrival?: number;
   min_stay_through?: number;  // soggiorno minimo "through" (quello verificato dalla certificazione Channex)
   max_stay?: number;
@@ -384,6 +387,13 @@ export async function createRatePlan(propertyId: string, roomTypeId: string, opt
       options: [{ occupancy: Math.max(1, opts.occupancy), is_primary: true, rate: Math.max(0, Math.round(opts.rate)) }],
     } }),
   });
+}
+
+// Crea un piano tariffario IN PIÙ per una tipologia (non rimborsabile, con colazione, …; eventualmente per persona).
+// PREPARATA ma NON invocata da nessuna route: va usata solo da una futura creazione guidata, dopo che l'owner
+// ha abilitato il modello tariffe (Impostazioni → Più piani tariffari). Il corpo è costruito in rate-model.ts.
+export async function createExtraRatePlan(propertyId: string, roomTypeId: string, opts: Parameters<typeof ratePlanCreateBody>[2]) {
+  return channex<Created>("/rate_plans", { method: "POST", body: JSON.stringify(ratePlanCreateBody(propertyId, roomTypeId, opts)) });
 }
 
 // Corregge l'occupazione (adulti max) di un piano tariffario già creato — serve quando la

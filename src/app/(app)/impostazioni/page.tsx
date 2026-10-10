@@ -2,6 +2,7 @@
 
 import { POOL_DEF, POOL_KEY, parsePool, poolOccupancy } from "@/lib/inventory-pool";
 import { CHANNEX_DIRTY_EVENT } from "@/components/ChannexAutoSync";
+import { RATEMODEL_DEF, RATEMODEL_KEY, parseRateModel, type RatePlanDef, type SingleDiscount } from "@/lib/rate-model";
 import { useEffect, useRef, useState } from "react";
 import { kvGet, kvSet, kvKeys, kvFlush } from "@/lib/bigstore";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
@@ -64,6 +65,20 @@ export default function ImpostazioniPage() {
   const poolListed = poolUnits.length;
   const poolSummary = pool.structureIds.length > 1 ? poolOccupancy({ enabled: true, structureIds: pool.structureIds }, raw.roomTypes, raw.units, []).summary() : [];
   const poolRoomsCount = poolSummary.reduce((a, f) => a + f.rooms, 0);
+  // Più piani tariffari e prezzo per 1 ospite verso i portali (vedi src/lib/rate-model.ts). Default SPENTO: finché è spento Xenora invia la tariffa unica di sempre.
+  const [rateModel, setRateModelState] = useState(RATEMODEL_DEF);
+  useEffect(() => { setRateModelState(parseRateModel(localStorage.getItem(RATEMODEL_KEY))); }, []);
+  const saveRateModel = (fn: (p: typeof RATEMODEL_DEF) => typeof RATEMODEL_DEF) => setRateModelState((p) => {
+    const n = fn(p);
+    try { localStorage.setItem(RATEMODEL_KEY, JSON.stringify(n)); window.dispatchEvent(new Event(CHANNEX_DIRTY_EVENT)); } catch {}
+    return n;
+  });
+  const setPlans = (rtId: string, fn: (l: RatePlanDef[]) => RatePlanDef[]) => saveRateModel((p) => ({ ...p, plans: { ...p.plans, [rtId]: fn(p.plans[rtId] ?? []) } }));
+  const setSingle = (rtId: string, d: SingleDiscount | null) => saveRateModel((p) => {
+    const single = { ...p.single }; if (d && d.value > 0) single[rtId] = d; else delete single[rtId];
+    return { ...p, single };
+  });
+  const numOrUndef = (v: string) => (v.trim() === "" || !Number.isFinite(Number(v)) ? undefined : Number(v));
   const [gcalInfo, setGcalInfo] = useState<{ configured: boolean; serviceAccountEmail: string | null } | null>(null);
   useEffect(() => {
     apiPost<{ ok: boolean; configured: boolean; serviceAccountEmail: string | null }>("calendar/gcal-info", {})
@@ -245,6 +260,59 @@ export default function ImpostazioniPage() {
           )}
         </Card>
       )}
+
+      {/* Più piani tariffari e prezzo per 1 ospite, default SPENTI */}
+      <Card className="mt-4">
+        <SectionTitle>{t("Più piani tariffari e prezzo per 1 ospite")}</SectionTitle>
+        <p className="mb-3 text-xs text-dim">{t("Per Booking ed Expedia: oltre alla tariffa unica di oggi puoi definire altri piani per la stessa camera (non rimborsabile, con colazione…), come variazione % o € sulla tariffa base, e un prezzo ridotto per 1 ospite. Da spento non cambia nulla: continui a inviare la sola tariffa di oggi. I piani vanno poi creati e collegati su Channex (non avviene da solo).")}</p>
+        <Toggle label={t("Abilita piani tariffari")} checked={rateModel.enabled} onChange={(v) => saveRateModel((p) => ({ ...p, enabled: v }))} />
+        {rateModel.enabled && raw.structures.map((st) => {
+          const rts = raw.roomTypes.filter((r) => r.structureId === st.id);
+          if (!rts.length) return null;
+          return (
+            <div key={st.id} className="mt-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-faint">{st.name}</div>
+              {rts.map((rt) => {
+                const plans = rateModel.plans[rt.id] ?? [];
+                const sd = rateModel.single[rt.id];
+                return (
+                  <div key={rt.id} className="mt-2 rounded-lg border border-line p-3">
+                    <div className="text-sm font-medium text-txt">{rt.name}</div>
+                    {plans.map((pl) => (
+                      <div key={pl.id} className="mt-2 flex flex-wrap items-end gap-2 text-xs text-dim">
+                        <label className="min-w-[8rem] flex-1">{t("Nome piano")}
+                          <input value={pl.name} onChange={(e) => setPlans(rt.id, (l) => l.map((x) => x.id === pl.id ? { ...x, name: e.target.value } : x))} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
+                        </label>
+                        <label className="w-20">{t("Variaz. %")}
+                          <input type="number" step="1" value={pl.adjPct ?? ""} onChange={(e) => setPlans(rt.id, (l) => l.map((x) => x.id === pl.id ? { ...x, adjPct: numOrUndef(e.target.value) } : x))} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
+                        </label>
+                        <label className="w-20">{t("Variaz. €")}
+                          <input type="number" step="1" value={pl.adjEur ?? ""} onChange={(e) => setPlans(rt.id, (l) => l.map((x) => x.id === pl.id ? { ...x, adjEur: numOrUndef(e.target.value) } : x))} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
+                        </label>
+                        <label className="w-24">{t("Notti min.")}
+                          <input type="number" min={1} step="1" value={pl.minStay ?? ""} onChange={(e) => setPlans(rt.id, (l) => l.map((x) => x.id === pl.id ? { ...x, minStay: numOrUndef(e.target.value) } : x))} className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
+                        </label>
+                        <button type="button" onClick={() => setPlans(rt.id, (l) => l.filter((x) => x.id !== pl.id))} className="rounded-lg border border-line px-2 py-1.5 text-xs font-semibold text-dim hover:bg-wash">{t("Rimuovi")}</button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setPlans(rt.id, (l) => [...l, { id: `rp_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, name: "" }])} className="mt-2 rounded-full border border-line px-3 py-1 text-xs font-semibold text-dim hover:bg-wash">+ {t("Aggiungi piano")}</button>
+                    <div className="mt-3 flex flex-wrap items-end gap-2 text-xs text-dim">
+                      <label>{t("Sconto per 1 ospite")}
+                        <input type="number" min={0} step="1" value={sd?.value ?? ""} onChange={(e) => setSingle(rt.id, { mode: sd?.mode ?? "pct", value: Number(e.target.value) })} className="mt-1 block w-24 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt" />
+                      </label>
+                      <select value={sd?.mode ?? "pct"} onChange={(e) => sd && setSingle(rt.id, { ...sd, mode: e.target.value as "pct" | "eur" })} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt">
+                        <option value="pct">%</option>
+                        <option value="eur">€</option>
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+        {rateModel.enabled && <p className="mt-3 text-[11px] text-faint">{t("Il prezzo di ogni piano = tariffa base del giorno × (1 + %) + €. Lo sconto per 1 ospite vale solo sui piani «per persona» su Channex.")}</p>}
+      </Card>
 
       {/* Concierge AI — risposta automatica WhatsApp alle domande semplici, default SPENTO */}
       <Card className="mt-4">

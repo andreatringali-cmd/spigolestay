@@ -1,4 +1,5 @@
 import { inPool, poolOccupancy, type PoolConfig } from "./inventory-pool";
+import { rateModelActive, extraPlanRow, type RateModelConfig, type MappedExtraPlan } from "./rate-model";
 import { effectiveBase, effectiveMinStay, effectiveClosed, structureWeekendPct } from "@/lib/pricing";
 import { addDays, isWeekend, toISO } from "@/lib/dates";
 import type { RoomType, Unit, Booking } from "@/lib/types";
@@ -7,7 +8,9 @@ import type { RestrictionRow } from "@/lib/channex";
 // Mappatura di UNA struttura Xenora verso Channex (dal localStorage "spigolestay:channexmap").
 export interface ChxStructMap {
   propertyId: string;
-  rooms?: Record<string, { roomTypeId: string; ratePlanId?: string }>; // xenora room_type id → channex ids
+  // xenora room_type id → channex ids. `ratePlans` (opzionale, solo con il modello tariffe attivo, vedi rate-model.ts):
+  // piani tariffari IN PIÙ rispetto a quello base `ratePlanId`. Se assente, tutto come prima.
+  rooms?: Record<string, { roomTypeId: string; ratePlanId?: string; ratePlans?: MappedExtraPlan[] }>;
   at?: string;
 }
 
@@ -26,7 +29,7 @@ export function buildAriPayload(
   units: Unit[],
   bookings: Booking[],
   rateOverrides: Record<string, number>,
-  opts?: { days?: number; weekendPct?: number; closes?: Record<string, number>; cta?: Record<string, true>; ctd?: Record<string, true>; pool?: PoolConfig },
+  opts?: { days?: number; weekendPct?: number; closes?: Record<string, number>; cta?: Record<string, true>; ctd?: Record<string, true>; pool?: PoolConfig; rateModel?: RateModelConfig },
 ): { availability: AvailRow[]; restrictions: RestrictionRow[] } {
   const availability: AvailRow[] = [];
   const restrictions: RestrictionRow[] = [];
@@ -43,6 +46,8 @@ export function buildAriPayload(
   // chiuso all'arrivo (nessun check-in) e chiuso alla partenza (nessun check-out) per quel giorno.
   const cta = opts?.cta ?? {};
   const ctd = opts?.ctd ?? {};
+  // Più piani tariffari / prezzo per 1 ospite: attivo SOLO se l'owner l'ha abilitato (default spento → output identico a prima).
+  const rateModel = rateModelActive(opts?.rateModel) ? opts!.rateModel : undefined;
   const base0 = new Date();
   // Strutture che mostrano le stesse camere fisiche: la disponibilità conta le camere fisiche libere in tutto il gruppo (vedi inventory-pool.ts).
   const poolOcc = opts?.pool && inPool(opts.pool, structureId) ? poolOccupancy(opts.pool, roomTypes, units, bookings) : null;
@@ -84,6 +89,14 @@ export function buildAriPayload(
         if (ctd[`${rt.id}|${iso}`]) row.closed_to_departure = true;
         // max_stay: NON inviato — Xenora non ha ancora un dato reale per questa restrizione.
         restrictions.push(row);
+        // Piani extra mappati (solo con il modello tariffe attivo): stessa riga del piano base con il prezzo del piano.
+        if (rateModel && mp.ratePlans?.length) {
+          for (const mapped of mp.ratePlans) {
+            const plan = rateModel.plans[rt.id]?.find((p) => p.id === mapped.id);
+            if (!plan || !mapped.ratePlanId) continue;
+            restrictions.push(extraPlanRow(row, mapped, plan, rateModel.single[rt.id], minStay));
+          }
+        }
       }
     }
   }
