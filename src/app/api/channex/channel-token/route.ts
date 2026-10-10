@@ -18,16 +18,17 @@ export async function POST(req: Request) {
   const structureId = String(body?.structureId || "").trim();
   if (!structureId) return NextResponse.json({ ok: false, error: "structureId mancante" }, { status: 400 });
 
-  const { data: map } = await auth.admin.from("channex_map").select("channex_property_id, tenant_id, org_id").eq("structure_id", structureId).maybeSingle();
-  if (!map?.channex_property_id) return NextResponse.json({ ok: false, error: "Struttura non collegata a un canale manager." }, { status: 200 });
+  // Più righe possono avere lo stesso structure_id (id scelti dal client, copie personale/org): con maybeSingle()
+  // un duplicato faceva fallire la lettura. Si prendono tutte e si usa solo una riga di cui il chiamante è davvero titolare.
+  const { data: maps } = await auth.admin.from("channex_map").select("channex_property_id, tenant_id, org_id").eq("structure_id", structureId);
+  const rows = (maps ?? []).filter((m) => m.channex_property_id);
+  if (!rows.length) return NextResponse.json({ ok: false, error: "Struttura non collegata a un canale manager." }, { status: 200 });
 
   // Autorizzazione: proprietario diretto, oppure membro dell'organizzazione proprietaria della mappatura.
-  let allowed = map.tenant_id === auth.tenantId;
-  if (!allowed && map.org_id) {
-    const { data: mem } = await auth.admin.from("memberships").select("org_id").eq("user_id", auth.tenantId).eq("org_id", map.org_id).maybeSingle();
-    allowed = !!mem;
-  }
-  if (!allowed) return NextResponse.json({ ok: false, error: "Non autorizzato per questa struttura." }, { status: 403 });
+  const { data: mships } = await auth.admin.from("memberships").select("org_id").eq("user_id", auth.tenantId);
+  const myOrgs = new Set((mships ?? []).map((m) => m.org_id as string).filter(Boolean));
+  const map = rows.find((m) => m.tenant_id === auth.tenantId) ?? rows.find((m) => m.org_id && myOrgs.has(m.org_id as string));
+  if (!map) return NextResponse.json({ ok: false, error: "Non autorizzato per questa struttura." }, { status: 403 });
 
   const { data: who } = await auth.admin.auth.admin.getUserById(auth.tenantId);
   const username = who?.user?.email || "utente";

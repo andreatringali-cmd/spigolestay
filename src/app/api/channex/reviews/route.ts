@@ -81,6 +81,14 @@ export async function POST(req: Request) {
     // arriva dal client e Channex non espone un endpoint economico per verificarne il proprietario,
     // quindi ci affidiamo alla mappatura channex_map già verificata altrove in questo stesso file.
     if (!rows.some((r) => r.structure_id === structureId)) return NextResponse.json({ ok: false, error: "Struttura non trovata per questo account" }, { status: 404 });
+    // Anche la recensione deve appartenere a una property di quella struttura: il reviewId arriva dal client e
+    // l'account Channex è condiviso. Stessa lista che mostra la pagina (le recensioni rispondibili sono quelle elencate).
+    let reviewMine = false;
+    for (const r of rows.filter((x) => x.structure_id === structureId && x.channex_property_id)) {
+      const lst = await listReviews(r.channex_property_id);
+      if (lst.ok && lst.reviews.some((v) => v.id === reviewId)) { reviewMine = true; break; }
+    }
+    if (!reviewMine) return NextResponse.json({ ok: false, error: "Recensione non trovata per questa struttura" }, { status: 404 });
     const res = await replyToReview(reviewId, text);
     if (!res.ok) {
       if (isReviewsNotInstalled(res.status, res.error)) {

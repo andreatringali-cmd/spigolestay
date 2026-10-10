@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { internalFetch } from "@/lib/server-auth";
 import { logInvio } from "@/lib/invii-log";
-import { parseChannexMessage, appendOtaMessage, messageHookSecret, type InboundOtaMessage } from "@/lib/channex-messages";
+import { parseChannexMessage, appendOtaMessage, verifyMessageHook, HOOK_SECRET_HEADER, type InboundOtaMessage } from "@/lib/channex-messages";
 import { AI_CONCIERGE_KEY, parseAiConciergePrefs, otaAutoActive } from "@/lib/aiConcierge";
 import { conciergeAnswer, resolveStructureId, type BookingLite } from "@/lib/concierge-engine";
 import { loadOrgDatas, mergeOrgData } from "@/lib/concierge-orgdata";
@@ -69,9 +69,10 @@ async function tryOtaAutoReply(admin: SupabaseClient<any>, tenantId: string, msg
 
 export async function POST(req: Request) {
   try {
-    const secret = messageHookSecret();
-    if (secret && req.headers.get("x-xenora-secret") !== secret) {
-      console.log("[channex webhook-messages] segreto non valido");
+    // Fallisce in chiusura: senza segreto configurato (in produzione) o con segreto errato non si elabora nulla, ma si risponde 200 (Channex ritenta all'infinito).
+    const verdict = verifyMessageHook(req.headers.get(HOOK_SECRET_HEADER));
+    if (!verdict.accept) {
+      console.log("[channex webhook-messages] chiamata rifiutata:", verdict.reason);
       return NextResponse.json({ received: true });
     }
     const msg = parseChannexMessage(await req.json().catch(() => ({})));

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
-import { channexEnabled, updateRatePlanOccupancy } from "@/lib/channex";
+import { channexEnabled, updateRatePlanOccupancy, listRoomTypesFor, listRatePlansForRoomType } from "@/lib/channex";
+import { allowedChannexMapRows, ratePlanBelongsTo } from "@/lib/channex-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,13 @@ export async function POST(req: Request) {
   const ratePlanId = String(body?.ratePlanId || "").trim();
   const occupancy = Number(body?.occupancy);
   if (!ratePlanId || !Number.isFinite(occupancy) || occupancy < 1) return NextResponse.json({ ok: false, error: "Parametri mancanti" }, { status: 400 });
+  // Il piano tariffario deve appartenere a una property di QUESTO tenant (o di una sua struttura condivisa):
+  // ratePlanId arriva dal client e l'account Channex è condiviso fra tutti.
+  const owned = await ratePlanBelongsTo(ratePlanId, await allowedChannexMapRows(auth.admin, auth.tenantId), {
+    listRoomTypeIds: async (pid) => ((await listRoomTypesFor(pid)).data?.data ?? []).map((r) => r.id),
+    listRatePlanIds: async (rtId) => ((await listRatePlansForRoomType(rtId)).data?.data ?? []).map((r) => r.id),
+  });
+  if (!owned) return NextResponse.json({ ok: false, error: "Piano tariffario non trovato per questo account" }, { status: 404 });
   const res = await updateRatePlanOccupancy(ratePlanId, occupancy);
   return NextResponse.json({ ok: res.ok, status: res.status, error: res.ok ? undefined : res.error });
 }
