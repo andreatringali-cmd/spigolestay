@@ -275,11 +275,13 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       }).catch(() => {});
     };
 
+    const touchedKeys = new Set<string>();
     for (const { rev: r, map } of items) {
       // Chiave STABILE della prenotazione: SEMPRE booking_id quando presente (Channex lo
       // mantiene uguale tra le revision della stessa prenotazione), id-revision solo come
       // fallback se booking_id manca. È la chiave con cui SCRIVIAMO le nuove righe.
       const stableKey = `channex:${r.booking_id || r.id}`;
+      touchedKeys.add(stableKey);
       // Per RITROVARE le prenotazioni già importate accettiamo ENTRAMBE le chiavi possibili
       // (booking_id e id-revision): così una modifica/cancellazione ritrova la prenotazione
       // anche se una revision precedente fosse stata salvata con l'altra chiave. Questo è il
@@ -406,6 +408,20 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       }
     }
 
+    // Rete di sicurezza: la stessa prenotazione OTA importata due volte da elaborazioni sovrapposte (webhook + sincronizzazione manuale) produce righe con lo stesso extId
+    // ma groupId DIVERSI (le righe di una stessa prenotazione multi-camera condividono il groupId). Se succede resta solo il gruppo più recente, e le altre righe vengono lapidate.
+    for (const key of touchedKeys) {
+      const live = bookings.filter((b) => b.extId === key && b.status !== "cancelled");
+      const groups = new Map<string, Booking[]>();
+      live.forEach((b) => { const g = String(b.groupId ?? ""); const l = groups.get(g); if (l) l.push(b); else groups.set(g, [b]); });
+      if (groups.size < 2) continue;
+      const newest = Array.from(groups.entries()).sort((a, b) => Math.max(...b[1].map((x) => Number(x.updatedAt ?? 0))) - Math.max(...a[1].map((x) => Number(x.updatedAt ?? 0))))[0][0];
+      const drop = new Set(live.filter((b) => String(b.groupId ?? "") !== newest).map((b) => b.id));
+      for (let i = bookings.length - 1; i >= 0; i--) if (drop.has(bookings[i].id)) bookings.splice(i, 1);
+      const del = (((data as { _deleted?: Record<string, string[]> })._deleted) ??= {});
+      del.bookings = Array.from(new Set([...(del.bookings ?? []), ...drop])).slice(-3000);
+      console.log(`[channex inbound] doppione da elaborazioni sovrapposte su ${key}: tolte ${drop.size} righe`);
+    }
     data.bookings = bookings; data.guests = guests; blob[DATA_KEY] = JSON.stringify(data);
     let write = admin.from(table).update({ data: blob, updated_at: new Date().toISOString() }).eq(keyCol, target.id);
     if (rev !== null) write = write.eq("rev", rev);
