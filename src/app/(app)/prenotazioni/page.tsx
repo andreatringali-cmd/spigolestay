@@ -424,10 +424,10 @@ export default function PrenotazioniPage() {
       {/* Filtri */}
       {/* Stessa griglia dei KPI sopra: la ricerca è la 1ª cella (= larga quanto una card e allineata),
           gli altri filtri occupano le colonne restanti. */}
-      <div className="no-print mb-4 grid items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+      <div className="no-print mb-4 grid grid-cols-[minmax(0,1fr)] items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca nome o codice…")} className="w-full" />
-        <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
-        <div className="flex items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
+        <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
           <Select value={dateField} onChange={(v) => { const f = v as "attive" | "arrivo" | "prenotazione" | "incasa" | "tutte"; setDateField(f); if (f === "tutte") { setFrom(""); setTo(""); } else if (!from) setFrom(toISO(new Date())); }} label={t("Tipo data")}>
             <option value="attive">{t("In corso e future")}</option>
             <option value="tutte">{t("Tutte (da sempre)")}</option>
