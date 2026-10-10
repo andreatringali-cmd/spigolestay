@@ -729,6 +729,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   // Prenotazioni che non trovano posto (due sulla stessa camera nelle stesse notti): si possono spostare in "Da assegnare" con un clic.
   const stackFix = planOverlapFix(bookings, units, roomTypes, (x) => visibleStructures.some((s) => s.id === x.structureId));
   const stackedN = stackFix.moves.length + stackFix.unassign.length;
+  const stackedIdSet = new Set([...stackFix.moves.map((m) => m.id), ...stackFix.unassign]);
+  const stackedVisibleN = bookings.filter((b) => stackedIdSet.has(b.id) && b.checkOut > periodFrom && b.checkIn < periodTo).length;
   const applyStackFix = () => { stackFix.moves.forEach((m) => updateBooking(m.id, { unitId: m.unitId })); stackFix.unassign.forEach((id) => updateBooking(id, { unitId: null })); };
   const alertTotal = calAlerts.reduce((a, x) => a + x.n, 0);
   const alertWorst = calAlerts.some((a) => a.sev === "err") ? "var(--err)" : "var(--warn)";
@@ -775,7 +777,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     // identico a prima); più di 1 solo quando due prenotazioni si sovrappongono in date sulla
     // stessa camera. Le prenotazioni cancellate non contano ai fini del conflitto (come in validate()).
     const laneSource = unit.outOfService ? [] : uBookings.filter((b) => b.status !== "cancelled");
-    const { laneOf, lanes } = assignLanes(laneSource);
+    // Le corsie (e il ⚠) valgono solo per le date che stai guardando: una sovrapposizione in un altro mese non allarga questa riga.
+    const { laneOf, lanes } = assignLanes(laneSource.filter((b) => b.checkOut > periodFrom && b.checkIn < periodTo));
     const hasConflict = lanes > 1;
     const unitRowH = rowH * lanes;
     // Movimenti di OGGI (monocromatico): arrivo, partenza, turnover, occupata, libera, fuori servizio.
@@ -1421,7 +1424,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
 
       {stackedN > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-wash/60 px-3 py-2 text-xs">
-          <span className="min-w-0 text-dim"><span style={{ color: "var(--warn)" }}>⚠</span> <b className="text-txt">{stackedN}</b> {stackedN === 1 ? "prenotazione è sulla stessa camera di un'altra" : "prenotazioni sono sulla stessa camera di un'altra"}: {stackFix.moves.length > 0 && <>{stackFix.moves.length} {stackFix.moves.length === 1 ? "ha" : "hanno"} un'altra camera libera</>}{stackFix.moves.length > 0 && stackFix.unassign.length > 0 && ", "}{stackFix.unassign.length > 0 && <>{stackFix.unassign.length} non {stackFix.unassign.length === 1 ? "trova" : "trovano"} posto e va{stackFix.unassign.length === 1 ? "" : "nno"} in Da assegnare</>}. Resta dov'è quella che arriva per prima.</span>
+          <span className="min-w-0 text-dim"><span style={{ color: "var(--warn)" }}>⚠</span> <b className="text-txt">{stackedN}</b> {stackedN === 1 ? "prenotazione è sulla stessa camera di un'altra" : "prenotazioni sono sulla stessa camera di un'altra"}: {stackFix.moves.length > 0 && <>{stackFix.moves.length} {stackFix.moves.length === 1 ? "ha" : "hanno"} un'altra camera libera</>}{stackFix.moves.length > 0 && stackFix.unassign.length > 0 && ", "}{stackFix.unassign.length > 0 && <>{stackFix.unassign.length} non {stackFix.unassign.length === 1 ? "trova" : "trovano"} posto e va{stackFix.unassign.length === 1 ? "" : "nno"} in Da assegnare</>}. {stackedVisibleN === 0 ? " Nessuna è nelle date che vedi ora (sono in altri mesi)." : stackedVisibleN < stackedN ? ` ${stackedVisibleN} sono nelle date che vedi ora.` : ""} Resta dov'è quella che arriva per prima.</span>
           <button type="button" onClick={applyStackFix} className="shrink-0 rounded-lg border border-line bg-surface px-2.5 py-1.5 font-semibold text-txt transition hover:bg-wash">Sistema le sovrapposizioni</button>
         </div>
       )}
