@@ -1517,7 +1517,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
 
           {/* Prenotazioni da assegnare (senza unità): una riga PER OGNI struttura visibile (con più strutture selezionate ognuna ha la sua riga, col nome) */}
           {visibleStructures.map((st) => {
-            const unassigned = bookings.filter((b) => !b.unitId && b.structureId === st.id);
+            const unassigned = bookings.filter((b) => !b.unitId && b.structureId === st.id && b.status !== "cancelled");
             if (!unassigned.length) return null;
             return (
               <div key={"da-assegnare-" + st.id} className="flex border-b border-line bg-wash/40">
