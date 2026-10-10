@@ -1,6 +1,7 @@
 "use client";
 
 import { sortRoomTypes } from "@/lib/sortUnits";
+import { overlapLosers } from "@/lib/overlaps";
 import { POOL_KEY, parsePool, inPool, poolOccupancy } from "@/lib/inventory-pool";
 import { useEffect, useMemo, useRef, useState, type DragEvent as RDragEvent, type MouseEvent as RMouseEvent } from "react";
 import { isHexColor, textOn } from "@/lib/booking-color";
@@ -725,6 +726,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   let zeroRateN = 0;
   roomTypes.filter((rt) => visibleStructures.some((s) => s.id === rt.structureId) && units.some((u) => u.roomTypeId === rt.id)).forEach((rt) => days.forEach((d) => { if (rateFor(rt.id, toISO(d)) <= 0) zeroRateN++; }));
   if (zeroRateN) calAlerts.push({ n: zeroRateN, label: "giorni con tariffa a €0", color: "var(--warn)", icon: "🏷️", sev: "warn", href: "/calendario" });
+  // Prenotazioni che non trovano posto (due sulla stessa camera nelle stesse notti): si possono spostare in "Da assegnare" con un clic.
+  const stackedIds = overlapLosers(bookings, (x) => visibleStructures.some((s) => s.id === x.structureId));
   const alertTotal = calAlerts.reduce((a, x) => a + x.n, 0);
   const alertWorst = calAlerts.some((a) => a.sev === "err") ? "var(--err)" : "var(--warn)";
 
@@ -1414,6 +1417,13 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       </div>
       )}
 
+      {stackedIds.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-wash/60 px-3 py-2 text-xs">
+          <span className="min-w-0 text-dim"><span style={{ color: "var(--warn)" }}>⚠</span> <b className="text-txt">{stackedIds.length}</b> {stackedIds.length === 1 ? "prenotazione non trova posto: è sulla stessa camera di un'altra" : "prenotazioni non trovano posto: sono sulla stessa camera di un'altra"}. Resta quella che arriva per prima.</span>
+          <button type="button" onClick={() => stackedIds.forEach((id) => updateBooking(id, { unitId: null }))} className="shrink-0 rounded-lg border border-line bg-surface px-2.5 py-1.5 font-semibold text-txt transition hover:bg-wash">Sposta in Da assegnare</button>
+        </div>
+      )}
+
       {/* Calendario */}
       <div ref={gridScrollRef} onScroll={() => syncScroll(gridScrollRef.current, occScrollRef.current)} className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <div
@@ -1519,13 +1529,15 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           {visibleStructures.map((st) => {
             const unassigned = bookings.filter((b) => !b.unitId && b.structureId === st.id && b.status !== "cancelled");
             if (!unassigned.length) return null;
+            // Più prenotazioni nelle stesse notti: ognuna sulla sua riga, così si vede subito quante sono.
+            const { laneOf: uLane, lanes: uLanes } = assignLanes(unassigned);
             return (
               <div key={"da-assegnare-" + st.id} className="flex border-b border-line bg-wash/40">
-                <div className="sticky left-0 z-10 flex shrink-0 flex-col justify-center border-r border-line px-3 leading-tight" style={{ width: LABEL_W, height: rowH }}>
-                  <span className="text-xs italic text-faint">Da assegnare</span>
+                <div className="sticky left-0 z-10 flex shrink-0 flex-col justify-center border-r border-line px-3 leading-tight" style={{ width: LABEL_W, height: rowH * uLanes }}>
+                  <span className="text-xs italic text-faint">Da assegnare{uLanes > 1 ? ` · ${unassigned.length}` : ""}</span>
                   {visibleStructures.length > 1 && <span className="truncate text-[10px] font-semibold text-dim">{st.name}</span>}
                 </div>
-                <div className="relative" style={{ width: gridW, height: rowH }}>
+                <div className="relative" style={{ width: gridW, height: rowH * uLanes }}>
                   {unassigned.map((b) => {
                     const g = geom(b.checkIn, b.checkOut);
                     if (!g) return null;
@@ -1537,7 +1549,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                         onPointerDown={(e) => onBarPointerDown(e, b.id)}
                         title={`${guestName(b.guestId)} · da assegnare${visibleStructures.length > 1 ? " · " + st.name : ""}`}
                         className="absolute flex cursor-grab items-center overflow-hidden border-2 border-dashed px-2 text-xs font-semibold active:cursor-grabbing"
-                        style={{ left: g.left, width: g.width, top: 0, height: rowH, borderColor: `var(${meta.cssVar})`, color: `var(${meta.cssVar})`, background: "color-mix(in srgb, var(--surface) 85%, transparent)", opacity: dragging ? 0.35 : 1, pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
+                        style={{ left: g.left, width: g.width, top: (uLane.get(b.id) ?? 0) * rowH, height: rowH, borderColor: `var(${meta.cssVar})`, color: `var(${meta.cssVar})`, background: "color-mix(in srgb, var(--surface) 85%, transparent)", opacity: dragging ? 0.35 : 1, pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
                       >
                         <span className="truncate">{guestName(b.guestId)}</span>
                       </div>
