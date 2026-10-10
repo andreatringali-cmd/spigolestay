@@ -54,6 +54,7 @@ export function channelFromOta(ota?: string): string {
   if (s.includes("book")) return "booking";
   if (s.includes("airbnb")) return "airbnb";
   if (s.includes("expedia") || s.includes("vrbo") || s.includes("homeaway")) return "expedia";
+  if (s.includes("hotelbed") || s.includes("hotel bed") || s.includes("hbeds")) return "hotelbeds";
   if (s.includes("direct") || s.includes("crs") || s.includes("website")) return "direct";
   return "other";
 }
