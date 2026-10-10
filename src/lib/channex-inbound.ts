@@ -341,6 +341,11 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
 
       const roomsArr = r.rooms && r.rooms.length ? r.rooms : [{}];
       let added = 0;
+      // Righe sostituite (modifica, o prenotazione già importata da Octorate): i dati che Channex non conosce — incassi, check-in online, documenti, note, extra,
+      // camera assegnata — si RIPORTANO sulla nuova riga, altrimenti una prenotazione già pagata tornerebbe "da incassare".
+      const oldPool = [...removed];
+      const CARRY = ["paid", "cleaningFee", "cityTaxExempt", "cityTaxPaid", "depositPaid", "parking", "webCheckin", "arrivalTime", "docPhotoFront", "docPhotoBack", "signature", "invoiceNo",
+        "extraGuests", "primaryGuest", "extras", "upsellOffers", "invoiceRequest", "guestRequests", "color", "movedFrom", "reviewRequestedAt", "reviewRequestChannel", "bookedOn", "childAges", "cribs"] as const;
       roomsArr.forEach((room, idx) => {
         const roomTypeId = (room.room_type_id && map.rooms[room.room_type_id]) || undefined;
         if (!roomTypeId) return; // tipologia non mappata → salta questa camera
@@ -348,19 +353,30 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         const co = room.checkout_date || r.departure_date || "";
         if (!/^\d{4}-\d{2}-\d{2}$/.test(ci) || !/^\d{4}-\d{2}-\d{2}$/.test(co) || co <= ci) return;
         const ofType = units.filter((u) => u.roomTypeId === roomTypeId && !u.outOfService);
-        const free = ofType.find((u) => !bookings.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)));
+        const isFree = (uid2: string) => !bookings.some((b) => b.unitId === uid2 && b.status !== "cancelled" && overlaps(b, ci, co));
+        const free = ofType.find((u) => isFree(u.id));
+        // Riga sostituita corrispondente: stessa tipologia (e se possibile stesse date), altrimenti la prima della stessa tipologia.
+        let oi = oldPool.findIndex((o) => o.roomTypeId === roomTypeId && o.checkIn === ci && o.checkOut === co);
+        if (oi < 0) oi = oldPool.findIndex((o) => o.roomTypeId === roomTypeId);
+        const old = oi >= 0 ? oldPool.splice(oi, 1)[0] : undefined;
+        const oldNote = String(old?.note ?? "");
+        const keep: Record<string, unknown> = {};
+        if (old) for (const k of CARRY) { const v = (old as unknown as Record<string, unknown>)[k]; if (v !== undefined && v !== null && v !== "") keep[k] = v; }
+        // Camera: si tiene quella già assegnata se è ancora libera; altrimenti la prima libera. MAI una occupata se ce n'è una libera.
+        const prevUnit = old?.unitId && ofType.some((u) => u.id === old.unitId) && isFree(old.unitId) ? old.unitId : undefined;
         const total = Math.round(sumDays(room.days) || (idx === 0 ? num(r.amount) : 0));
         const nightlyRates = nightlyRatesOf(room.days);
         bookings.push({
-          id: uid(), groupId, structureId: map.structure_id, roomTypeId, unitId: (free ?? ofType[0])?.id ?? null,
+          id: uid(), groupId, structureId: map.structure_id, roomTypeId, unitId: prevUnit ?? (free ?? ofType[0])?.id ?? null,
           guestId, channel, status: "confirmed", checkIn: ci, checkOut: co, bookedOn: new Date().toISOString().slice(0, 10),
           adults: Math.max(1, num(room.occupancy?.adults, 1)), children: num(room.occupancy?.children, 0),
           total: total || undefined, ...(nightlyRates ? { nightlyRates } : {}), cleaningFee: 0, paid: 0, cityTaxPaid: false,
+          ...keep,
           ...(commissionAmount != null ? { commissionAmount } : {}),
           ...(commissionPct != null ? { commissionPct } : {}),
           ...(otaCard && idx === 0 ? { otaCard } : {}), // la VCC copre la prenotazione: la attacchiamo alla prima camera
           extId: stableKey, code: r.ota_reservation_code || undefined, source: "channex",
-          note: `Prenotazione ${channel.toUpperCase()} via Channex${r.ota_reservation_code ? ` · ${r.ota_reservation_code}` : ""}`,
+          note: oldNote && !/via Channex/.test(oldNote) ? oldNote : `Prenotazione ${channel.toUpperCase()} via Channex${r.ota_reservation_code ? ` · ${r.ota_reservation_code}` : ""}`,
           updatedAt: Date.now(), // senza, qualunque modifica successiva (es. una cancellazione) rischia di sparire al sync (vedi sopra)
         } as Booking);
         syncGcalServer(bookings[bookings.length - 1], "upsert");
