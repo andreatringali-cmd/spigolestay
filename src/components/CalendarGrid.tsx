@@ -64,6 +64,9 @@ function dayHue(d: Date): { tint?: string; text?: string } {
   return {};
 }
 
+// Id della zona "Da assegnare" nel trascinamento (seguito dall'id della struttura).
+const UNASSIGNED_PREFIX = "unassigned:";
+
 const rangesOverlap = (aIn: string, aOut: string, bIn: string, bOut: string) =>
   aIn < bOut && bIn < aOut;
 
@@ -495,6 +498,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     const b = bookingsRef.current.find((x) => x.id === bId);
     if (!b) return { valid: false, reason: "—" };
     if (!targetUnitId) return { valid: false, reason: "Fuori griglia" };
+    // Riga "Da assegnare" di una struttura: ci si può trascinare una prenotazione di quella stessa struttura.
+    if (targetUnitId.startsWith(UNASSIGNED_PREFIX)) return targetUnitId.slice(UNASSIGNED_PREFIX.length) === b.structureId ? { valid: true, reason: "" } : { valid: false, reason: "Altra struttura" };
     const unit = unitsRef.current.find((u) => u.id === targetUnitId);
     if (!unit) return { valid: false, reason: "Fuori griglia" };
     if (unit.outOfService) return { valid: false, reason: "Fuori servizio" };
@@ -538,6 +543,12 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     setDragView(null);
     if (!s) return;
     if (!s.moved) { const b = bookingsRef.current.find((x) => x.id === s.id); if (b && b.channel === "blocked") openOosEdit(b); else openBooking(s.id); return; } // click semplice → scheda (o editor fuori servizio)
+    if (view && view.valid && view.targetUnitId?.startsWith(UNASSIGNED_PREFIX)) {
+      // Trascinata su "Da assegnare": esce dalla camera (le date restano), senza conferma; si rimette in camera trascinandola indietro.
+      const b = bookingsRef.current.find((x) => x.id === s.id);
+      if (b && b.unitId) updateBooking(b.id, { unitId: null });
+      return;
+    }
     if (view && view.valid && view.targetUnitId) {
       const b = bookingsRef.current.find((x) => x.id === s.id);
       if (!b) return;
@@ -1533,11 +1544,13 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           {/* Prenotazioni da assegnare (senza unità): una riga PER OGNI struttura visibile (con più strutture selezionate ognuna ha la sua riga, col nome) */}
           {visibleStructures.map((st) => {
             const unassigned = bookings.filter((b) => !b.unitId && b.structureId === st.id && b.status !== "cancelled");
-            if (!unassigned.length) return null;
+            // Durante il trascinamento la riga c'è sempre (anche vuota), così ci si può lasciare una prenotazione sopra.
+            const dragBk = dragView ? bookings.find((b) => b.id === dragView.id) : undefined;
+            if (!unassigned.length && !(dragBk && dragBk.structureId === st.id)) return null;
             // Più prenotazioni nelle stesse notti: ognuna sulla sua riga, così si vede subito quante sono.
             const { laneOf: uLane, lanes: uLanes } = assignLanes(unassigned);
             return (
-              <div key={"da-assegnare-" + st.id} className="flex border-b border-line bg-wash/40">
+              <div key={"da-assegnare-" + st.id} data-unit-id={UNASSIGNED_PREFIX + st.id} className="flex border-b border-line bg-wash/40" style={dragView?.targetUnitId === UNASSIGNED_PREFIX + st.id ? { outline: "2px solid var(--focus)", outlineOffset: -2 } : undefined}>
                 <div className="sticky left-0 z-10 flex shrink-0 flex-col justify-center border-r border-line px-3 leading-tight" style={{ width: LABEL_W, height: rowH * uLanes }}>
                   <span className="text-xs italic text-faint">Da assegnare{uLanes > 1 ? ` · ${unassigned.length}` : ""}</span>
                   {visibleStructures.length > 1 && <span className="truncate text-[10px] font-semibold text-dim">{st.name}</span>}
@@ -1941,6 +1954,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
 
 function destinationLabel(view: DragView, bookings: { id: string; checkIn: string; checkOut: string }[], units: { id: string; name: string }[]) {
   const b = bookings.find((x) => x.id === view.id);
+  if (view.targetUnitId?.startsWith(UNASSIGNED_PREFIX)) return "Da assegnare";
   const u = units.find((x) => x.id === view.targetUnitId);
   if (!b || !u) return "";
   const newIn = shiftISO(b.checkIn, view.dxDays);
