@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
+import { logInvio, giaInviato } from "@/lib/invii-log";
 import { DATA_KEY } from "@/lib/manage-booking";
 import type { Booking, Structure, Guest } from "@/lib/types";
 
@@ -81,8 +82,10 @@ export async function GET(req: Request) {
   let sent = 0; // email effettivamente inviate
   const errors: string[] = [];
 
-  // Elabora una singola riga (blob) di org_state o app_state.
-  async function processBlob(rowData: unknown) {
+  let skippedDup = 0; // già sollecitate nelle ultime 20 ore (anti-doppioni)
+
+  // Elabora una singola riga (blob) di org_state o app_state. `tenantId` = user_id / org_id della riga (serve al registro invii).
+  async function processBlob(tenantId: string, rowData: unknown) {
     const data = parseData(rowData);
     const bookings = arr<Booking>(data.bookings);
     if (!bookings.length) return;
@@ -103,6 +106,12 @@ export async function GET(req: Request) {
         if (!guestEmail) continue; // niente email → non possiamo sollecitare
 
         scanned++;
+
+        // Anti-doppioni: se per questa prenotazione c'è già un sollecito riuscito nelle ultime 20 ore non si rimanda.
+        // Se il registro non si legge si invia comunque (meglio un doppione che un sollecito mancato) e si segnala.
+        const dup = tenantId ? await giaInviato(admin, tenantId, "checkin", String(b.id), 20, "email") : { gia: false };
+        if (dup.gia) { skippedDup++; continue; }
+        if (dup.errore) errors.push(`invii_log (anti-doppioni) ${b.id}: ${dup.errore}`);
 
         const st = structById.get(String(b.structureId || "")) || null;
         const checkinUrl = `${origin}/checkin?b=${b.id}`;
@@ -134,30 +143,32 @@ export async function GET(req: Request) {
         });
         if (res.ok) {
           const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-          if (j.ok) sent++;
-          else errors.push(`booking ${b.id}: ${j.error || "email_failed"}`);
+          if (j.ok) { sent++; if (tenantId) await logInvio(admin, tenantId, { job: "checkin", ref: String(b.id), channel: "email", ok: true, detail: `promemoria check-in → ${guestEmail}` }); }
+          else { errors.push(`booking ${b.id}: ${j.error || "email_failed"}`); if (tenantId) await logInvio(admin, tenantId, { job: "checkin", ref: String(b.id), channel: "email", ok: false, detail: `promemoria check-in → ${guestEmail}: ${j.error || "email_failed"}` }); }
         } else {
           errors.push(`booking ${b.id}: email HTTP ${res.status}`);
+          if (tenantId) await logInvio(admin, tenantId, { job: "checkin", ref: String(b.id), channel: "email", ok: false, detail: `promemoria check-in → ${guestEmail}: errore HTTP ${res.status}` });
         }
       } catch (e) {
         // Un errore su una prenotazione non deve bloccare le altre.
         errors.push(`booking ${b?.id ?? "?"}: ${e instanceof Error ? e.message : "error"}`);
+        if (tenantId && b?.id) await logInvio(admin, tenantId, { job: "checkin", ref: String(b.id), channel: "email", ok: false, detail: `promemoria check-in: ${e instanceof Error ? e.message : "errore"}` });
       }
     }
   }
 
   try {
     // 3) Scansione di TUTTE le strutture condivise (org_state) e personali (app_state).
-    const { data: orgRows, error: orgErr } = await admin.from("org_state").select("data").limit(5000);
+    const { data: orgRows, error: orgErr } = await admin.from("org_state").select("org_id, data").limit(5000);
     if (orgErr) errors.push(`org_state: ${orgErr.message}`);
-    for (const row of arr<{ data?: unknown }>(orgRows)) {
-      await processBlob((row as { data?: unknown }).data);
+    for (const row of arr<{ org_id?: string; data?: unknown }>(orgRows)) {
+      await processBlob(String(row.org_id ?? ""), row.data);
     }
 
-    const { data: appRows, error: appErr } = await admin.from("app_state").select("data").limit(10000);
+    const { data: appRows, error: appErr } = await admin.from("app_state").select("user_id, data").limit(10000);
     if (appErr) errors.push(`app_state: ${appErr.message}`);
-    for (const row of arr<{ data?: unknown }>(appRows)) {
-      await processBlob((row as { data?: unknown }).data);
+    for (const row of arr<{ user_id?: string; data?: unknown }>(appRows)) {
+      await processBlob(String(row.user_id ?? ""), row.data);
     }
   } catch (e) {
     return NextResponse.json(
@@ -171,6 +182,7 @@ export async function GET(req: Request) {
     date: tomorrow,
     scanned,
     sent,
+    skippedDup,
     ...(errors.length ? { errors: errors.slice(0, 50) } : {}),
   });
 }

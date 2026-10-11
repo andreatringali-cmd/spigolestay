@@ -1,11 +1,26 @@
 // Registro degli invii automatici: ogni tentativo lascia una riga con l'esito, così un messaggio non arrivato ha sempre una spiegazione.
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export interface InvioLog { job: "pulizie" | "messaggi" | "ota_msg"; ref?: string; channel: "whatsapp" | "email"; ok: boolean; detail?: string; wamid?: string }
+export interface InvioLog { job: "pulizie" | "messaggi" | "ota_msg" | "checkin"; ref?: string; channel: "whatsapp" | "email"; ok: boolean; detail?: string; wamid?: string }
 
 /** Scrive l'esito di un invio. Non solleva mai errori: il registro non deve rompere l'invio. */
 export async function logInvio(admin: SupabaseClient, tenantId: string, e: InvioLog): Promise<void> {
   try { await admin.from("invii_log").insert({ tenant_id: tenantId, job: e.job, ref: e.ref ?? null, channel: e.channel, ok: e.ok, detail: (e.detail ?? "").slice(0, 500) || null, wamid: e.wamid ?? null }); } catch { /* registro non disponibile */ }
+}
+
+/**
+ * Anti-doppioni: c'è già un invio RIUSCITO per questo riferimento nelle ultime `ore` ore?
+ * Se la lettura del registro fallisce NON blocca nulla: restituisce già=false e il motivo in `errore`, così il chiamante invia comunque e lo segnala.
+ */
+export async function giaInviato(admin: SupabaseClient, tenantId: string, job: InvioLog["job"], ref: string, ore: number, channel?: InvioLog["channel"], adessoMs: number = Date.now()): Promise<{ gia: boolean; errore?: string }> {
+  try {
+    const da = new Date(adessoMs - ore * 3600 * 1000).toISOString();
+    let q = admin.from("invii_log").select("id").eq("tenant_id", tenantId).eq("job", job).eq("ref", ref).eq("ok", true).gte("at", da);
+    if (channel) q = q.eq("channel", channel);
+    const { data, error } = await q.limit(1);
+    if (error) return { gia: false, errore: error.message };
+    return { gia: !!data && data.length > 0 };
+  } catch (e) { return { gia: false, errore: e instanceof Error ? e.message : "registro non leggibile" }; }
 }
 
 /** Spiegazione in italiano degli errori più comuni di WhatsApp. */

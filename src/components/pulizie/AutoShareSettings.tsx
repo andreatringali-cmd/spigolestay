@@ -7,6 +7,7 @@ import { apiPost } from "@/lib/invoicing/client";
 import { useLang } from "@/lib/i18n";
 import { checkPhone } from "@/lib/contacts-check";
 import { spiegaErroreWa } from "@/lib/invii-log";
+import { sameDigits } from "@/lib/same-digits";
 
 const KEY_PREFIX = "spigolestay:pulizie:autoshare:";
 export interface AutoShareCfg { enabled: boolean; time: string; email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string }
@@ -112,7 +113,7 @@ export default function AutoShareSettings({ structureId, structureName, onClose 
               className="min-w-0 flex-1 bg-transparent text-sm text-txt outline-none placeholder:text-faint disabled:opacity-40"
             />
           </div>
-          {cfg.whatsapp && phone && (phone.status === "ok" || phone.status === "landline") && phone.pretty && cfg.whatsappTo.replace(/D/g, "") !== phone.pretty.replace(/D/g, "") && (
+          {cfg.whatsapp && phone && (phone.status === "ok" || phone.status === "landline") && phone.pretty && !sameDigits(cfg.whatsappTo, phone.pretty) && (
             <p className="px-1 text-[11px] text-faint">{t("Manca il prefisso del Paese: l'invio usa")} <b className="text-txt">{phone.pretty}</b> <button type="button" onClick={() => setCfg((c) => ({ ...c, whatsappTo: phone.pretty! }))} className="ml-1 font-semibold text-focus hover:underline">{t("Scrivilo così")}</button></p>
           )}
           {cfg.whatsapp && phone && phone.status === "invalid" && <p className="px-1 text-[11px] font-medium" style={{ color: "var(--err)" }}>{t("Numero non valido")}: {phone.reason}</p>}

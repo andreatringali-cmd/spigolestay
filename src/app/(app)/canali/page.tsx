@@ -71,9 +71,9 @@ export default function CanaliPage() {
   const [fullSync, setFullSync] = useState<{ running: boolean; msg?: string }>({ running: false });
   const doFullSync = () => {
     if (effStructure === "all") return;
-    forceFullSync(effStructure);
     setFullSync({ running: true, msg: t("Full sync in corso…") });
-    setTimeout(() => setFullSync({ running: false, msg: t("Full sync inviato (2 chiamate: disponibilità + restrizioni) ✓") }), 5000);
+    // Esito reale: la Promise si risolve quando l'invio a Channex termina (o dopo un minuto senza conferma).
+    void forceFullSync(effStructure).then((e) => setFullSync({ running: false, msg: e.ok ? "✓ " + t(e.message) : "⚠ " + t(e.message) }));
   };
   // Importa le prenotazioni OTA in entrata dal feed Channex (2-way).
   const importOta = async () => {
