@@ -98,6 +98,8 @@ export async function GET(req: Request) {
 
       const { rooms } = computePuliziePlan({ date: todayRome, structures: [st], units, roomTypes, bookings });
       const text = buildPuliziePlanText({ date: todayRome, scopedStructures: [st], rooms, guests, notes });
+      const claimId = s(claim.data[0]?.id);
+      const sentBefore = sent + waSent; // per capire se in questo giro almeno un canale è riuscito
       const subject = `Planning pulizie · ${s((st as unknown as Json).name)} · ${todayRome}`;
 
       if (cfg.email && cfg.emailTo) {
@@ -123,6 +125,8 @@ export async function GET(req: Request) {
           else { errors.push(`wa ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${w.message}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "whatsapp", ok: false, detail: `modello: ${tplErr} · testo libero: ${w.message}` }); }
         } catch (e) { errors.push(`wa ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "whatsapp", ok: false, detail: e instanceof Error ? e.message : "errore" }); }
       }
+      // Se NESSUN canale ha inviato (es. errore di Meta o dell'email) si libera il segno "già inviato oggi": alla prossima esecuzione si riprova, invece di saltare la giornata.
+      if (sent + waSent === sentBefore && claimId) { try { await admin.from("pulizie_share_log").delete().eq("id", claimId); } catch { /* il prossimo giro lo ritenterà comunque domani */ } }
     }
   };
 
