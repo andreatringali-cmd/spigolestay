@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { internalFetch } from "@/lib/server-auth";
+import { internalFetch, rateLimited } from "@/lib/server-auth";
+import { clientIp } from "@/lib/server-booking-guard";
 import { createClient } from "@supabase/supabase-js";
 import { parseNotifPrefs } from "@/lib/notifPrefs";
 
@@ -34,6 +35,9 @@ export async function POST(req: Request) {
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!sbUrl || !service) return NextResponse.json({ error: "supabase_not_configured" }, { status: 503 });
 
+  // Endpoint anonimo che scrive nei dati del proprietario: limite di richieste per IP.
+  if (rateLimited("pr:" + clientIp(req), 5, 60_000)) return NextResponse.json({ error: "troppe_richieste" }, { status: 429 });
+
   try {
     const body = await req.json().catch(() => ({}));
     const slug = String(body?.slug || "").trim();
@@ -42,6 +46,8 @@ export async function POST(req: Request) {
     const text = String(body?.text || "").trim().slice(0, 1000);
 
     if (!slug || rating <= 0) return NextResponse.json({ error: "bad_request" }, { status: 400 });
+    // Lunghezze massime sui valori GREZZI (il taglio a 60/1000 caratteri sotto resta come rete di sicurezza).
+    if (slug.length > 80 || String(body?.guest ?? "").length > 120 || String(body?.text ?? "").length > 3000) return NextResponse.json({ error: "bad_request" }, { status: 400 });
 
     const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
 

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimited } from "@/lib/server-auth";
+import { clientIp } from "@/lib/server-booking-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +18,9 @@ export async function POST(req: Request) {
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!sbUrl || !service) return NextResponse.json({ error: "supabase_not_configured" }, { status: 503 });
 
+  // Endpoint anonimo che scrive nei dati del proprietario: limite di richieste per IP.
+  if (rateLimited("pl:" + clientIp(req), 5, 60_000)) return NextResponse.json({ error: "troppe_richieste" }, { status: 429 });
+
   try {
     const body = await req.json().catch(() => ({}));
     const slug = String(body?.slug || "").trim();
@@ -25,6 +30,9 @@ export async function POST(req: Request) {
     const email = String(g.email || "").trim();
     const phone = String(g.phone || "").trim();
     if (!slug || (!email && !phone)) return NextResponse.json({ error: "bad_request" }, { status: 400 });
+    // Lunghezze massime dei campi di testo (un modulo reale non le raggiunge mai) e forma minima dell'email.
+    if (slug.length > 80 || firstName.length > 60 || lastName.length > 60 || email.length > 120 || phone.length > 40) return NextResponse.json({ error: "bad_request" }, { status: 400 });
+    if (email && !/^[^s@]+@[^s@]+$/.test(email)) return NextResponse.json({ error: "bad_request" }, { status: 400 });
 
     const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
