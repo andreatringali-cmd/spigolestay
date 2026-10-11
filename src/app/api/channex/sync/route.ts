@@ -4,6 +4,22 @@ import { channexEnabled, createProperty, createRoomType, createRatePlan, type Sy
 import { saveChannexMap } from "@/lib/channex-inbound";
 
 export const runtime = "nodejs";
+
+// Se la struttura è CONDIVISA (vive in org_state di un'org di cui il tenant è membro, es. Central Perk) restituisce l'id dell'org: la mappatura va salvata con org_id,
+// così le prenotazioni in arrivo da Channex si scrivono nell'org e non nel blob personale del proprietario. Struttura personale → null.
+async function orgOfStructure(admin: import("@supabase/supabase-js").SupabaseClient, tenantId: string, structureId: string): Promise<string | null> {
+  const { data: mships } = await admin.from("memberships").select("org_id").eq("user_id", tenantId);
+  const orgIds = Array.from(new Set((mships ?? []).map((m) => m.org_id as string).filter(Boolean)));
+  for (const oid of orgIds) {
+    const { data: os } = await admin.from("org_state").select("data").eq("org_id", oid).maybeSingle();
+    try {
+      const raw = (os?.data as Record<string, unknown> | undefined)?.["spigolestay:data:v1"];
+      const d = (typeof raw === "string" ? JSON.parse(raw) : raw) as { structures?: { id?: string }[] } | undefined;
+      if ((d?.structures ?? []).some((st) => st?.id === structureId)) return oid;
+    } catch { /* org senza dati leggibili: si salta */ }
+  }
+  return null;
+}
 export const dynamic = "force-dynamic";
 
 // Sincronizza UNA struttura di Xenora verso Channex: crea property + room types + rate plan,
@@ -38,7 +54,7 @@ export async function POST(req: Request) {
   }
 
   // Persisti la mappatura server-side (indispensabile per l'import in entrata).
-  if (structureId) await saveChannexMap(auth.admin, auth.tenantId, structureId, propertyId, roomMap);
+  if (structureId) await saveChannexMap(auth.admin, auth.tenantId, structureId, propertyId, roomMap, await orgOfStructure(auth.admin, auth.tenantId, structureId));
 
   return NextResponse.json({ ok: true, propertyId, rooms });
 }
