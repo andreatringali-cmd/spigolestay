@@ -55,26 +55,39 @@ export async function sendWhatsapp(admin: SupabaseClient, tenantId: string, args
   const to = waDigits(args.to, args.country) || digits(args.to); // "3473824353" senza prefisso → 393473824353
   if (!to) return { ok: false, message: "Numero destinatario mancante." };
 
-  const body: Record<string, unknown> = { messaging_product: "whatsapp", to };
-  if (args.templateName) {
-    body.type = "template";
-    body.template = {
-      name: args.templateName, language: { code: args.lang || "it" },
-      // Variabili del corpo del modello ({{1}}, {{2}}…): niente a capo né tab (regola di Meta).
-      ...(args.params?.length ? { components: [{ type: "body", parameters: args.params.map((t) => ({ type: "text", text: t.replace(/[\r\n\t]+/g, " · ").replace(/ {2,}/g, " ").trim().slice(0, 900) || "-" })) }] } : {}),
-    };
-  } else {
-    body.type = "text";
-    // preview_url: senza, la Cloud API NON genera l'anteprima (foto + descrizione) dei link nel testo.
-    body.text = { body: args.text || "", preview_url: true };
-  }
+  const mkBody = (lang: string): Record<string, unknown> => {
+    const body: Record<string, unknown> = { messaging_product: "whatsapp", to };
+    if (args.templateName) {
+      body.type = "template";
+      body.template = {
+        name: args.templateName, language: { code: lang },
+        // Variabili del corpo del modello ({{1}}, {{2}}…): niente a capo né tab (regola di Meta).
+        ...(args.params?.length ? { components: [{ type: "body", parameters: args.params.map((t) => ({ type: "text", text: t.replace(/[\r\n\t]+/g, " · ").replace(/ {2,}/g, " ").trim().slice(0, 900) || "-" })) }] } : {}),
+      };
+    } else {
+      body.type = "text";
+      // preview_url: senza, la Cloud API NON genera l'anteprima (foto + descrizione) dei link nel testo.
+      body.text = { body: args.text || "", preview_url: true };
+    }
+    return body;
+  };
+  // Un modello esiste PER LINGUA: se Meta risponde "il modello non esiste in questa lingua" (errore 132001) si riprova con le altre lingue
+  // più probabili (es. un modello creato come "English" anche se il testo è italiano). Per il testo libero c'è un solo tentativo.
+  const langs = args.templateName ? Array.from(new Set([args.lang || "it", "it", "en", "en_US"])) : [""];
+  let firstErr = "";
   try {
-    const r = await fetch(`${GRAPH}/${cfg.phoneId}/messages`, {
-      method: "POST", headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) return { ok: false, message: j?.error?.message || `Errore ${r.status}` };
-    return { ok: true, message: "Inviato", id: j?.messages?.[0]?.id };
+    for (const lang of langs) {
+      const r = await fetch(`${GRAPH}/${cfg.phoneId}/messages`, {
+        method: "POST", headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/json" }, body: JSON.stringify(mkBody(lang)),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) return { ok: true, message: "Inviato", id: j?.messages?.[0]?.id };
+      const msg = j?.error?.message || `Errore ${r.status}`;
+      if (!firstErr) firstErr = msg;
+      const wrongLang = j?.error?.code === 132001 || /does not exist in the translation|template name does not exist/i.test(String(msg));
+      if (!wrongLang) return { ok: false, message: msg };
+    }
+    return { ok: false, message: firstErr || "Invio non riuscito." };
   } catch (e) { return { ok: false, message: (e as Error)?.message ?? "Invio non riuscito." }; }
 }
 
