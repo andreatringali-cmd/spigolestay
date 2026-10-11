@@ -1,5 +1,5 @@
 // Estrazione AI dei dati da una foto del documento d'identità (check-in online).
-// Logica condivisa usata dalla route /api/ai/checkin-extract.
+// Logica condivisa usata (via checkin-extract-handler) da /api/ai/checkin-extract e /api/checkin/extract.
 //
 // Usa la vision API di Anthropic (Claude). Richiede ANTHROPIC_API_KEY (Vercel);
 // se assente → { ok:false, error:"ai_not_configured" } e il client nasconde/disattiva
