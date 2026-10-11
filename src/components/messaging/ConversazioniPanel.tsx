@@ -134,10 +134,14 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const [pinned, setPinned] = useState<string[]>([]);
   const [restoredAt, setRestoredAt] = useState<Record<string, number>>({});
   const [showArchived, setShowArchived] = useState(false);
+  // "Da leggere": messaggio dell'ospite non ancora letto, oppure conversazione segnata a mano come da leggere (come "segna come non letto").
+  const [manualUnread, setManualUnread] = useState<string[]>([]);
+  const [onlyUnread, setOnlyUnread] = useState(false);
   useEffect(() => {
     try { const a = localStorage.getItem("spigolestay:archived"); if (a) setArchived(JSON.parse(a)); } catch {}
     try { const a = localStorage.getItem("spigolestay:pinned"); if (a) setPinned(JSON.parse(a)); } catch {}
     try { const a = localStorage.getItem("spigolestay:archived-restored"); if (a) setRestoredAt(JSON.parse(a)); } catch {}
+    try { const a = localStorage.getItem("spigolestay:manualunread"); if (a) setManualUnread(JSON.parse(a)); } catch {}
   }, []);
   const persist = (key: string, v: unknown) => { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} };
 
@@ -225,6 +229,18 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const byId = useMemo(() => new Map(allPeople.map((p) => [p.id, p])), [allPeople]);
   const isArch = (id: string) => archived.includes(id) || (byId.has(id) && autoArchived(byId.get(id)!));
   const isPinned = (id: string) => pinned.includes(id);
+  const isToRead = (id: string) => {
+    if (manualUnread.includes(id)) return true;
+    const th = threads[id] ?? []; const l = th[th.length - 1];
+    return !!l && l.dir === "in" && isThreadUnread(id, th);
+  };
+  const toggleToRead = (id: string) => {
+    if (isToRead(id)) {
+      // Segna come letta: toglie il flag manuale e fissa l'ultimo messaggio ricevuto come visto.
+      const next = manualUnread.filter((x) => x !== id); setManualUnread(next); persist("spigolestay:manualunread", next);
+      markThreadSeen(id, threads[id]);
+    } else { const next = [...manualUnread, id]; setManualUnread(next); persist("spigolestay:manualunread", next); }
+  };
   const toggleArch = (id: string) => {
     if (isArch(id)) {
       // Ripristina: toglie l'archiviazione manuale e tiene la chat in lista per altri 5 giorni.
@@ -246,6 +262,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     let arr = allPeople;
     if (q.trim()) { const s = q.toLowerCase(); arr = arr.filter((p) => p.name.toLowerCase().includes(s) || (threads[p.id] ?? []).some((m) => m.text.toLowerCase().includes(s))); }
     arr = arr.filter((p) => (showArchived ? isArch(p.id) : !isArch(p.id)));
+    if (onlyUnread) arr = arr.filter((p) => p.id === sel || isToRead(p.id));
     // Ultimo messaggio di ogni conversazione (calcolato una volta).
     const last = new Map<string, number>();
     arr.forEach((p) => { const th = threads[p.id] ?? []; let m = 0; for (const x of th) if (x.ts > m) m = x.ts; last.set(p.id, m); });
@@ -253,7 +270,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     // Le conversazioni senza messaggi vanno in fondo, per struttura e nome.
     return [...arr].sort((a, b) => Number(isPinned(b.id)) - Number(isPinned(a.id)) || (last.get(b.id) ?? 0) - (last.get(a.id) ?? 0) || (a.struct || "").localeCompare(b.struct || "") || a.name.localeCompare(b.name));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPeople, q, archived, pinned, restoredAt, showArchived, threads]);
+  }, [allPeople, q, archived, pinned, restoredAt, showArchived, threads, onlyUnread, manualUnread, sel]);
+  // Quante conversazioni (non archiviate) hanno qualcosa da leggere: si guardano solo quelle con messaggi.
+  const toReadCount = allPeople.filter((p) => !isArch(p.id) && (threads[p.id]?.length || manualUnread.includes(p.id)) && isToRead(p.id)).length;
   const archivedCount = useMemo(() => allPeople.filter((p) => isArch(p.id)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [allPeople, archived, pinned, restoredAt, threads]);
@@ -268,6 +287,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const msgs = sel ? threads[sel] ?? [] : [];
   // Conversazione aperta = messaggi letti (spegne il badge nella barra laterale; vale anche per i messaggi che arrivano mentre è aperta).
   useEffect(() => { if (sel) markThreadSeen(sel, threads[sel]); }, [sel, threads]);
+  // Aprire la conversazione toglie il "da leggere" messo a mano.
+  useEffect(() => { if (sel && manualUnread.includes(sel)) { const next = manualUnread.filter((x) => x !== sel); setManualUnread(next); persist("spigolestay:manualunread", next); } // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel]);
   // Rinfresca l'elenco quando una conversazione viene segnata come letta (il pallino verde segue "non letto", non "ultimo messaggio dell'ospite").
   const [, setSeenTick] = useState(0);
   useEffect(() => { const h = () => setSeenTick((n) => n + 1); window.addEventListener("spigolestay:navseen", h); return () => window.removeEventListener("spigolestay:navseen", h); }, []);
@@ -656,6 +678,10 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca ospite…")} className="w-full rounded-xl border border-line bg-paper py-2 pl-9 pr-3 text-sm text-txt outline-none transition placeholder:text-faint focus:border-focus focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--focus)_20%,transparent)]" />
           </div>
         </div>
+        <div className="flex items-center gap-1.5 border-b border-line px-2.5 py-2" role="group" aria-label={t("Filtra conversazioni")}>
+          <button type="button" onClick={() => setOnlyUnread(false)} aria-pressed={!onlyUnread} className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${!onlyUnread ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t("Tutte")}</button>
+          <button type="button" onClick={() => setOnlyUnread(true)} aria-pressed={onlyUnread} className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition ${onlyUnread ? "border-[color:var(--ok)] bg-[color:color-mix(in_srgb,var(--ok)_14%,transparent)] text-[color:var(--ok)]" : "border-line text-dim hover:bg-wash"}`}>{t("Da leggere")}{toReadCount > 0 && <span className="rounded-full px-1.5 text-[10px] font-bold text-white" style={{ backgroundColor: "var(--ok)" }}>{toReadCount}</span>}</button>
+        </div>
         {(showArchived || archivedCount > 0) && (
           <button onClick={() => setShowArchived((v) => !v)} className="flex w-full items-center gap-2 border-b border-line px-3 py-2 text-left text-xs font-semibold text-dim hover:bg-wash">
             <span>{showArchived ? "←" : "🗄"}</span>
@@ -666,7 +692,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
         <div className="flex-1 overflow-y-auto">
           {people.map((p, i) => {
             const th = threads[p.id] ?? []; const last = th[th.length - 1];
-            const needsReply = !!last && last.dir === "in" && isThreadUnread(p.id, threads[p.id]); // pallino verde = messaggio ricevuto e non ancora letto
+            const needsReply = th.length > 0 || manualUnread.includes(p.id) ? isToRead(p.id) : false; // "Da leggere" = messaggio ricevuto e non ancora letto, o segnata a mano
             const pin = isPinned(p.id);
             const showPinHeader = pin && !showArchived && (i === 0 || !isPinned(people[i - 1].id));
             const showHeader = activeStructureId === "all" && !pin && (i === 0 || isPinned(people[i - 1].id) || people[i - 1].struct !== p.struct);
@@ -690,11 +716,12 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2">
                         <span className={`truncate text-sm text-txt ${needsReply ? "font-bold" : "font-semibold"}`}>{p.name}</span>
-                        <span className="flex shrink-0 items-center gap-1.5">{last && <span className={`text-[10px] ${needsReply ? "font-semibold text-[color:var(--ok)]" : "text-faint"}`}>{relTime(last.ts, t)}</span>}{needsReply && <span className="h-2 w-2 rounded-full ring-2 ring-[color:color-mix(in_srgb,var(--ok)_30%,transparent)]" style={{ backgroundColor: "var(--ok)" }} title={t("Da rispondere")} />}</span>
+                        <span className="flex shrink-0 items-center gap-1.5">{last && <span className={`text-[10px] ${needsReply ? "font-semibold text-[color:var(--ok)]" : "text-faint"}`}>{relTime(last.ts, t)}</span>}{needsReply && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--ok)", backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)" }}>{t("Da leggere")}</span>}</span>
                       </span>
                       <span className={`mt-0.5 block truncate text-xs ${needsReply ? "font-medium text-txt" : "text-dim"}`}>{sub}</span>
                     </span>
                   </button>
+                  <button onClick={() => toggleToRead(p.id)} title={needsReply ? t("Segna come letta") : t("Segna come da leggere")} aria-label={needsReply ? t("Segna come letta") : t("Segna come da leggere")} className={`shrink-0 rounded-lg px-1.5 py-1.5 text-sm transition hover:bg-line ${needsReply ? "text-[color:var(--ok)] opacity-100" : "text-faint opacity-0 hover:text-txt group-hover:opacity-100"}`}>{needsReply ? "✓" : "✉"}</button>
                   <button onClick={() => togglePin(p.id)} title={pin ? t("Togli dalle fissate") : t("Fissa in alto")} aria-pressed={pin} className={`shrink-0 rounded-lg px-1.5 py-1.5 text-sm transition hover:bg-line ${pin ? "text-focus opacity-100" : "text-faint opacity-0 hover:text-txt group-hover:opacity-100"}`}>📌</button>
                   <button onClick={() => toggleArch(p.id)} title={isArch(p.id) ? t("Ripristina dalla archiviazione") : t("Archivia conversazione")} className={`shrink-0 rounded-lg px-1.5 py-1.5 text-sm text-faint transition hover:bg-line hover:text-txt ${isArch(p.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>{isArch(p.id) ? "⬆" : "🗄"}</button>
                 </div>
