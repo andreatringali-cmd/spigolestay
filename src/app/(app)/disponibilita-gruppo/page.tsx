@@ -79,7 +79,7 @@ export default function GruppoPage() {
   if (!loaded) return null;
   const sharedRooms = families.reduce((a, f) => a + f.real, 0);
   return (
-    <div className="mx-auto max-w-5xl">
+    <div>
       <PageHeader title="Gruppo (beta)" subtitle="Strutture che mostrano le stesse camere: la disponibilità resta sincronizzata tra loro su portali, calendario e sito diretto." />
 
       {/* 1 · Il gruppo */}
