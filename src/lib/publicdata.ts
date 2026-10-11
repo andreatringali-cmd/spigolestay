@@ -18,6 +18,7 @@
 
 import { supabase } from "./supabase";
 import { kvGet } from "./bigstore";
+import { cleanStructure, cleanUnit, cleanBookings } from "./publicsanitize";
 
 export const DATA_KEY = "spigolestay:data:v1";
 export const AUX_KEYS = [
@@ -121,9 +122,6 @@ export function lsGet(key: string): string | null {
   try { return kvGet(key); } catch { return null; }
 }
 
-// Campi struttura da NON pubblicare (dati fiscali/bancari privati).
-const STRUCT_PRIVATE = ["vat", "taxCode", "iban", "ibanHolder"];
-
 // Costruisce il dizionario da pubblicare per UNA struttura, a partire dal
 // localStorage del proprietario. Ritorna null se la struttura non esiste.
 export function buildPublishData(structureId: string): Record<string, string> | null {
@@ -145,27 +143,12 @@ export function buildPublishData(structureId: string): Record<string, string> | 
 
   // Struttura: rimuovo i campi privati. Restano i dati pubblici, incluso
   // googlePlaceId (serve al sito pubblico per mostrare le recensioni Google).
-  const cleanStructs = structures.map((s) => {
-    const c = { ...s };
-    for (const k of STRUCT_PRIVATE) delete c[k];
-    return c;
-  });
+  const cleanStructs = structures.map(cleanStructure);
   const roomTypes = (blob.roomTypes ?? []).filter((rt) => rt.structureId === structureId);
-  const units = (blob.units ?? []).filter((u) => u.structureId === structureId);
+  const units = (blob.units ?? []).filter((u) => u.structureId === structureId).map(cleanUnit);
 
   // Prenotazioni: SOLO le date di occupazione (nessun ospite, prezzo o nota).
-  const bookings = (blob.bookings ?? [])
-    .filter((b) => b.structureId === structureId || rtIds.has(b.roomTypeId as string))
-    .map((b) => ({
-      id: b.id,
-      structureId: b.structureId,
-      roomTypeId: b.roomTypeId,
-      unitId: b.unitId ?? null,
-      checkIn: b.checkIn,
-      checkOut: b.checkOut,
-      status: b.status,
-      channel: b.channel,
-    }));
+  const bookings = cleanBookings((blob.bookings ?? []).filter((b) => b.structureId === structureId || rtIds.has(b.roomTypeId as string)));
   // Eventi: quelli della struttura + quelli senza struttura ("per tutte").
   const events = (blob.events ?? []).filter((e) => { const sid = (e as { structureId?: string }).structureId; return !sid || sid === structureId; });
   // Tariffe forzate: solo le chiavi "<tipologia>|<giorno>" delle tipologie di QUESTA struttura (+ le chiavi giorno nude, valide per tutte).
