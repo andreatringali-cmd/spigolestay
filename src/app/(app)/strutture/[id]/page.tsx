@@ -18,14 +18,8 @@ import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { CO_LEVELS, coManagerPerms, levelOf, type CoLevel } from "@/lib/comanager";
 import { loadDeposit, type DepositCfg } from "@/lib/deposit";
+import Toggle from "@/components/Toggle";
 
-function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
-  return (
-    <button type="button" onClick={onClick} aria-pressed={on} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? color : "var(--line)" }}>
-      <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} />
-    </button>
-  );
-}
 function Info({ children }: { children: React.ReactNode }) {
   return (
     <div className="mt-1 flex items-start gap-2 rounded-lg px-3 py-2 text-[11px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 9%, transparent)", color: "var(--dim)" }}>
@@ -349,7 +343,7 @@ export default function StrutturaSchedaPage() {
           <Card>
             <div className="mb-3 flex items-center justify-between">
               <SectionTitle>{t("Dati generali")}</SectionTitle>
-              <div className="flex items-center gap-2"><span className="text-xs text-dim">{t("Attiva")}</span><Toggle on={f.active !== false} onClick={() => set("active", f.active === false)} color="var(--ok)" /></div>
+              <div className="flex items-center gap-2"><span className="text-xs text-dim">{t("Attiva")}</span><Toggle label={t("Attiva")} on={f.active !== false} onClick={() => set("active", f.active === false)} color="var(--ok)" /></div>
             </div>
             {/* Logo cliccabile (fallback: iniziali sul colore identità) — usato su preventivi e PDF */}
             <div className="mb-3 flex items-center gap-3.5">
@@ -496,7 +490,7 @@ export default function StrutturaSchedaPage() {
               <label className={lbl}>{t("alle")}<input type="time" value={f.checkInTo ?? ""} onChange={(e) => set("checkInTo", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Check-out entro")}<input type="time" value={f.checkOutBy ?? ""} onChange={(e) => set("checkOutBy", e.target.value)} className={`${inp} mt-1`} /></label>
             </div>
-            <div className="mt-3 flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Self check-in (accesso autonomo)")}</span><Toggle on={!!f.selfCheckin} onClick={() => set("selfCheckin", !f.selfCheckin)} /></div>
+            <div className="mt-3 flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Self check-in (accesso autonomo)")}</span><Toggle label={t("Self check-in (accesso autonomo)")} on={!!f.selfCheckin} onClick={() => set("selfCheckin", !f.selfCheckin)} /></div>
 
             {/* Guida ospiti personalizzata (servizio a piano) */}
             {hasGuide ? (
@@ -573,8 +567,8 @@ export default function StrutturaSchedaPage() {
               <label className={lbl}>{t("alle")}<input type="time" value={f.quietTo ?? ""} onChange={(e) => set("quietTo", e.target.value)} className={`${inp} mt-1`} /></label>
             </div>
             <div className="mt-3 flex flex-col gap-1">
-              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Animali ammessi")}</span><Toggle on={!!f.pets} onClick={() => set("pets", !f.pets)} /></div>
-              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Fumatori")}</span><Toggle on={!!f.smoking} onClick={() => set("smoking", !f.smoking)} /></div>
+              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Animali ammessi")}</span><Toggle label={t("Animali ammessi")} on={!!f.pets} onClick={() => set("pets", !f.pets)} /></div>
+              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Fumatori")}</span><Toggle label={t("Fumatori")} on={!!f.smoking} onClick={() => set("smoking", !f.smoking)} /></div>
             </div>
           </Card>
 

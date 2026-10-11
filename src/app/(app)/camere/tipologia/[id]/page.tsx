@@ -13,13 +13,10 @@ import ImageUploader from "@/components/ImageUploader";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { amenityIcon } from "@/lib/amenities";
 import { useLang } from "@/lib/i18n";
+import Toggle from "@/components/Toggle";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
-function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
-  return <button type="button" onClick={onClick} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? color : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} /></button>;
-}
-
 const blankType = (structureId: string): Partial<RoomType> => ({
   structureId, name: "", beds: 2, basePrice: 100, maxOccupancy: 2, maxAdults: 2, maxChildren: 0, infants: 0, extraBeds: 0, size: undefined,
   bedConfig: "1 matrimoniale", minStay: 1, minPrice: undefined, childrenAllowed: true, dormMode: false, autoPrice: false,
@@ -223,8 +220,8 @@ export default function TipologiaSchedaPage() {
               <label className={lbl}>{t("Superficie m²")}<input type="number" min={0} value={f.size ?? ""} onChange={(e) => set("size", num(e.target.value))} className={`${inp} mt-1`} /></label>
             </div>
             <div className="mt-3 flex flex-col gap-1">
-              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Bambini ammessi")}</span><Toggle on={f.childrenAllowed !== false} onClick={() => set("childrenAllowed", !(f.childrenAllowed !== false))} /></div>
-              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Modalità dormitorio")} <span className="text-[11px] text-faint">{t("(vendita a posto letto)")}</span></span><Toggle on={!!f.dormMode} onClick={() => set("dormMode", !f.dormMode)} /></div>
+              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Bambini ammessi")}</span><Toggle label={t("Bambini ammessi")} on={f.childrenAllowed !== false} onClick={() => set("childrenAllowed", !(f.childrenAllowed !== false))} /></div>
+              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Modalità dormitorio")} <span className="text-[11px] text-faint">{t("(vendita a posto letto)")}</span></span><Toggle label={t("Modalità dormitorio")} on={!!f.dormMode} onClick={() => set("dormMode", !f.dormMode)} /></div>
             </div>
           </Card>
 
