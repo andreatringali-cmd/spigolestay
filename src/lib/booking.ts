@@ -67,7 +67,7 @@ export function bookingPaidTotal(b: BookingLike): number {
 // Calcolo UNICO della commissione OTA, condiviso ovunque venga mostrata o sommata.
 // Se è nota la cifra esatta (commissionAmount, es. da Booking.com/Channex) ha sempre priorità
 // sul calcolo via percentuale, che resta una stima quando la cifra esatta non c'è.
-type CommissionBookingLike = { total?: number; channel: Channel; commissionPct?: number; commissionAmount?: number | null; paymentFee?: number | null; structureId?: string };
+type CommissionBookingLike = { total?: number; cleaningFee?: number; extras?: { price?: number }[]; channel: Channel; commissionPct?: number; commissionAmount?: number | null; paymentFee?: number | null; structureId?: string };
 export function commissionPctOf(b: CommissionBookingLike): number {
   if (b.commissionAmount != null && b.total) return Math.round(((b.commissionAmount + paymentFeeOf(b)) / b.total) * 1000) / 10;
   return b.commissionPct ?? loadChannelCommissionPct(b.channel, b.structureId) ?? CHANNELS[b.channel].commission * 100;
@@ -86,8 +86,21 @@ export function commissionOf(b: CommissionBookingLike): number {
 export function paymentFeeOf(b: CommissionBookingLike): number {
   return b.paymentFee && b.paymentFee > 0 ? b.paymentFee : 0;
 }
+/** Lordo = quanto ha pagato l'ospite per il soggiorno (soggiorno + pulizia + extra, senza tassa di soggiorno): la cifra della colonna Totale. */
+export function lordoOf(b: CommissionBookingLike): number {
+  const acc = b.total ?? 0;
+  if (!acc) return 0;
+  return acc + (b.cleaningFee ?? 0) + (Array.isArray(b.extras) ? b.extras.reduce((a, e) => a + (e?.price || 0), 0) : 0);
+}
+/** Netto = lordo − commissioni (stessi numeri che si vedono nell'elenco). */
 export function nettoOf(b: CommissionBookingLike): number {
-  return Math.round(((b.total ?? 0) - commissionOf(b)) * 100) / 100;
+  const lordo = lordoOf(b);
+  return lordo ? Math.round((lordo - commissionOf(b)) * 100) / 100 : 0;
+}
+/** Percentuale di commissione REALE, calcolata dai numeri della riga: commissioni ÷ lordo × 100 (un decimale). Non è un valore impostato: è il risultato della formula. */
+export function commissionShareOf(b: CommissionBookingLike): number {
+  const lordo = lordoOf(b);
+  return lordo > 0 ? Math.round((commissionOf(b) / lordo) * 1000) / 10 : 0;
 }
 
 type NightlyBookingLike = { total?: number; checkIn: string; checkOut: string; nightlyRates?: Record<string, number> };

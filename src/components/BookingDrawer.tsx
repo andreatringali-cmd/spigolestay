@@ -179,7 +179,7 @@ export default function BookingDrawer() {
   // "Totale ospite" = quanto pagato per il soggiorno (senza tassa di soggiorno, riscossa
   // localmente e mai transitata dall'OTA): torna con l'importo che mostra Booking.com ecc.
   const totalV = accV + cleanV + extrasV;
-  const commPctV = booking.commissionAmount != null && booking.total ? Math.round((booking.commissionAmount / booking.total) * 1000) / 10 : commissionPctOf(booking);
+  const commPctV = totalV > 0 ? Math.round((commissionBaseOf(booking) / totalV) * 1000) / 10 : 0; // dalla formula: commissione ÷ lordo
   const commV = commissionBaseOf(booking);
   const payFeeV = paymentFeeOf(booking);
   const nettoV = nettoOf(booking);

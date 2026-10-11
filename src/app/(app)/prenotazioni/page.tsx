@@ -8,7 +8,7 @@ import { bookingCode } from "@/lib/bookingCode";
 import { CHANNELS, type BookingStatus, type Channel } from "@/lib/types";
 import { nights, parseISO, toISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
-import { bookingPaidTotal, cityTaxOf, commissionOf, commissionPctOf, nettoOf } from "@/lib/booking";
+import { bookingPaidTotal, cityTaxOf, commissionOf, commissionPctOf, commissionShareOf, nettoOf } from "@/lib/booking";
 import { loadWeekendPct } from "@/lib/pricing";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { exportExcel, exportPdf } from "@/lib/export";
@@ -246,7 +246,7 @@ export default function PrenotazioniPage() {
           {underprice?.flagged && <span title={underpriceReason(b, underprice)} className="font-sans text-sm font-extrabold leading-none" style={{ color: "var(--err)" }}>!</span>}
         </span>
       </td>
-      <td className="px-3 py-2.5 font-mono text-dim">{commissionOf(b) ? <>{eur(commissionOf(b))} <span className="text-faint">({commissionPctOf(b)}%)</span></> : "—"}</td>
+      <td className="px-3 py-2.5 font-mono text-dim">{commissionOf(b) ? <>{eur(commissionOf(b))} <span className="text-faint" title="Commissioni ÷ lordo">({commissionShareOf(b)}%)</span></> : "—"}</td>
       <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{b.total ? eur(nettoOf(b)) : "—"}</td>
       <td className="px-3 py-2.5"><StatoCell b={b} /></td>
     </>);
@@ -371,7 +371,7 @@ export default function PrenotazioniPage() {
     { key: "cityTax", label: "Tassa di soggiorno €", default: false, get: (b) => cityTaxOf(getStructure(b.structureId), b.adults, nights(b.checkIn, b.checkOut), b.total ?? 0, b.cityTaxExempt) },
     { key: "grandTotal", label: "Totale €", get: (b) => grand(b) },
     { key: "commissionEur", label: "Commissione €", get: (b) => commissionOf(b) },
-    { key: "commissionPct", label: "Commissione %", default: false, get: (b) => commissionPctOf(b) },
+    { key: "commissionPct", label: "Commissione %", default: false, get: (b) => commissionShareOf(b) },
     { key: "netto", label: "Netto €", get: (b) => nettoOf(b) },
     { key: "paid", label: "Incassato €", default: false, get: (b) => b.paid ?? 0 },
     { key: "balance", label: "Saldo dovuto €", default: false, get: (b) => Math.max(0, grand(b) - (b.paid ?? 0)) },
@@ -578,7 +578,7 @@ export default function PrenotazioniPage() {
                     <td className="px-3 py-2.5 font-mono text-xs text-dim">{fmt(b.checkOut)}</td>
                     <td className="px-3 py-2.5 font-mono text-dim">{nights(b.checkIn, b.checkOut)}</td>
                     <td className="px-3 py-2.5 font-mono font-semibold text-txt">{eur(gSum(members, (x) => grand(x)))}</td>
-                    <td className="px-3 py-2.5 font-mono text-dim">{eur(gSum(members, (x) => commissionOf(x)))}</td>
+                    <td className="px-3 py-2.5 font-mono text-dim">{gSum(members, (x) => commissionOf(x)) ? <>{eur(gSum(members, (x) => commissionOf(x)))} <span className="text-faint" title="Commissioni ÷ lordo">({gSum(members, (x) => grand(x)) > 0 ? Math.round((gSum(members, (x) => commissionOf(x)) / gSum(members, (x) => grand(x))) * 1000) / 10 : 0}%)</span></> : "—"}</td>
                     <td className="px-3 py-2.5 font-mono font-semibold text-[color:var(--ok)]">{eur(gSum(members, (x) => nettoOf(x)))}</td>
                     <td className="px-3 py-2.5"><span className="inline-flex items-center gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }} title={t("Prenotazione di gruppo")}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><button onClick={async (e) => { e.stopPropagation(); if (await ask({ title: t("Elimina prenotazione di gruppo"), message: `${t("Eliminare definitivamente tutte le")} ${members.length} ${t("camere di questo gruppo?")}`, danger: true, confirmLabel: t("Elimina tutto il gruppo") })) deleteBookingGroup(gid); }} title={t("Elimina tutto il gruppo")} aria-label={t("Elimina tutto il gruppo")} className="grid h-6 w-6 place-items-center rounded-md text-faint hover:bg-[color:color-mix(in_srgb,var(--err)_12%,transparent)] hover:text-[color:var(--err)]"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /></svg></button></span></td>
                   </tr>
