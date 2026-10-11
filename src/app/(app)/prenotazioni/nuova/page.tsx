@@ -137,7 +137,7 @@ export default function NuovaPrenotazionePage() {
   const roomInstances = selected.flatMap((rt) => Array<typeof rt>(qty[rt.id] ?? 0).fill(rt));
   const nInst = Math.max(1, roomInstances.length);
   const distAdults = (i: number) => nInst > 1 ? Math.floor(adults / nInst) + (i < adults % nInst ? 1 : 0) : adults;
-  const cityTax = roomInstances.reduce((sum, rt, i) => sum + cityTaxOf(getStructure(rt.structureId), distAdults(i), nightsN, linePrice(rt)), 0);
+  const cityTax = roomInstances.reduce((sum, rt, i) => sum + cityTaxOf(getStructure(rt.structureId), distAdults(i), nightsN, linePrice(rt), false, distAdults(i) + (nInst > 1 ? Math.floor(children / nInst) + (i < children % nInst ? 1 : 0) : children)), 0);
   const grandFinal = grandWithExtras + parkingPriceN + cityTax;
 
   const doSearch = () => {

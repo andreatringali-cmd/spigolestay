@@ -59,6 +59,11 @@ export default function LoginPage() {
       const params = new URLSearchParams(window.location.search);
       const qEmail = params.get("email");
       if (qEmail) setEmail(qEmail);
+      else if (params.get("mode") !== "signup") {
+        // "Ricordami": l'email dell'ultimo accesso (solo l'email, mai la password) si ripropone da sola.
+        const saved = localStorage.getItem("xn-remember-email");
+        if (saved) setEmail(saved);
+      }
       if (params.get("mode") === "signup") { setMode("signup"); if (qEmail) setInviteFlow(true); }
     } catch {}
   }, []);
@@ -118,6 +123,7 @@ export default function LoginPage() {
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pwd, options: { captchaToken: captchaToken ?? undefined } });
         if (error) { setErr(traduci(error.message)); return; }
+        try { if (remember) localStorage.setItem("xn-remember-email", email.trim()); else localStorage.removeItem("xn-remember-email"); } catch {}
         router.push(afterLoginPath());
       } else {
         if (pwd.length < 8) { setErr("La password deve avere almeno 8 caratteri."); return; }
@@ -278,7 +284,7 @@ export default function LoginPage() {
 
                 <div className="mt-3 flex items-center justify-between gap-2">
                   <label className="flex cursor-pointer items-center gap-2 text-[13px] text-[#4a453d]">
-                    <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 rounded accent-[#2f6bb0]" />
+                    <input type="checkbox" checked={remember} onChange={(e) => { setRemember(e.target.checked); if (!e.target.checked) { try { localStorage.removeItem("xn-remember-email"); } catch {} } }} className="h-4 w-4 rounded accent-[#2f6bb0]" />
                     Ricordami
                   </label>
                   {mode === "login" && <button type="button" onClick={resetPwd} className="text-[13px] font-medium text-[#2f6bb0] hover:underline" disabled={busy}>Password dimenticata?</button>}

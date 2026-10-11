@@ -8,7 +8,7 @@ import { bookingCode } from "@/lib/bookingCode";
 import { CHANNELS, type BookingStatus, type Channel } from "@/lib/types";
 import { nights, parseISO, toISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
-import { bookingPaidTotal, cityTaxOf, commissionOf, commissionPctOf, commissionShareOf, nettoOf } from "@/lib/booking";
+import { bookingPaidTotal, cityTaxOfBooking, commissionOf, commissionPctOf, commissionShareOf, nettoOf } from "@/lib/booking";
 import { loadWeekendPct } from "@/lib/pricing";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { exportExcel, exportPdf } from "@/lib/export";
@@ -368,7 +368,7 @@ export default function PrenotazioniPage() {
     { key: "nights", label: "Notti", get: (b) => nights(b.checkIn, b.checkOut) },
     { key: "total", label: "Soggiorno €", default: false, get: (b) => b.total ?? 0 },
     { key: "cleaning", label: "Pulizia €", default: false, get: (b) => b.cleaningFee ?? 0 },
-    { key: "cityTax", label: "Tassa di soggiorno €", default: false, get: (b) => cityTaxOf(getStructure(b.structureId), b.adults, nights(b.checkIn, b.checkOut), b.total ?? 0, b.cityTaxExempt) },
+    { key: "cityTax", label: "Tassa di soggiorno €", default: false, get: (b) => cityTaxOfBooking(getStructure(b.structureId), b) },
     { key: "grandTotal", label: "Totale €", get: (b) => grand(b) },
     { key: "commissionEur", label: "Commissione €", get: (b) => commissionOf(b) },
     { key: "commissionPct", label: "Commissione %", default: false, get: (b) => commissionShareOf(b) },

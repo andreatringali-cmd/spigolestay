@@ -10,7 +10,7 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { eur } from "@/lib/format";
 import { roundCents } from "@/lib/money";
 import { nights } from "@/lib/dates";
-import { cityTaxOf } from "@/lib/booking";
+import { cityTaxOfBooking } from "@/lib/booking";
 import { invPost, centsEur, DOC_KIND_LABEL, STATO } from "@/lib/invoicing/client";
 import { BOLLO_THRESHOLD_CENTS } from "@/lib/invoicing/folio";
 import { validateDocument, hasErrors, type Issue } from "@/lib/invoicing/validate";
@@ -200,7 +200,7 @@ export default function DocumentoPage() {
     if (b.total) add.push({ description: `${(rt?.name ?? "Soggiorno").toUpperCase()} – ${dmy(b.checkIn)} al ${dmy(b.checkOut)}`, qty: 1, unitEur: b.total, vat: v10, sourceKind: "accommodation" });
     if (b.cleaningFee) add.push({ description: "Pulizia finale", qty: 1, unitEur: b.cleaningFee, vat: v10, sourceKind: "cleaning" });
     (b.extras ?? []).forEach((e) => { if (e?.price) add.push({ description: e.name || "Extra", qty: 1, unitEur: e.price, vat: v22, sourceKind: "extra" }); });
-    const tax = cityTaxOf(structure, b.adults ?? 0, nights(b.checkIn, b.checkOut), b.total ?? 0, b.cityTaxExempt);
+    const tax = cityTaxOfBooking(structure, b);
     if (tax) add.push({ description: "Imposta di soggiorno", qty: 1, unitEur: tax, vat: "N1", sourceKind: "city_tax" });
     setLines((p) => [...p, ...add]);
     setStructureId(b.structureId);

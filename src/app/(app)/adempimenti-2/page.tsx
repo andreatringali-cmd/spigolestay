@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { apiPost } from "@/lib/invoicing/client";
 import { toISO, nights, parseISO } from "@/lib/dates";
-import { bookingPaidTotal, cityTaxOf } from "@/lib/booking";
+import { bookingPaidTotal, cityTaxOfBooking } from "@/lib/booking";
 import { journeyOf, type JourneyStep } from "@/lib/booking-journey";
 import { isGuideSent, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import {
@@ -65,7 +65,7 @@ export default function Adempimenti2() {
     primaryOf: (b) => guestMap.get(b.guestId) ?? b.primaryGuest,
     nameOf,
     sched, istat,
-    taxOf: (b) => cityTaxOf(getStructure(b.structureId), b.adults, nights(b.checkIn, b.checkOut), b.total ?? 0, b.cityTaxExempt),
+    taxOf: (b) => cityTaxOfBooking(getStructure(b.structureId), b),
     balanceOf: (b) => Math.max(0, bookingPaidTotal(b) - (b.paid ?? 0)),
     totalOf: (b) => bookingPaidTotal(b),
     docs, passive,

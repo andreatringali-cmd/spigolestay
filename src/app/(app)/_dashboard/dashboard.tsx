@@ -9,7 +9,7 @@ import { useData } from "@/lib/store";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { toISO, parseISO, nights } from "@/lib/dates";
 import { num } from "@/lib/format";
-import { bookingPaidTotal, cityTaxOf, nightlyRevenue } from "@/lib/booking";
+import { bookingPaidTotal, cityTaxOfBooking, nightlyRevenue } from "@/lib/booking";
 import { journeyOf, type JourneyStep } from "@/lib/booking-journey";
 import { channelPulse } from "@/lib/channel-pulse";
 import { contactReportCached } from "@/lib/contacts-check";
@@ -91,7 +91,7 @@ export default function Dashboard2() {
     journeyFor: (b) => stepsOf(b),
     schedinaOf: (b) => dati.schedBy.get(b.id) ?? "none",
     istatPending: (b) => dati.istatPendingIds.has(b.id),
-    taxOf: (b) => cityTaxOf(structMap.get(b.structureId), b.adults, nights(b.checkIn, b.checkOut), b.total ?? 0, b.cityTaxExempt),
+    taxOf: (b) => cityTaxOfBooking(structMap.get(b.structureId), b),
     balanceOf,
     nameOf: (b) => guestShort(b.guestId),
     questuraErrors: dati.questuraErrors,

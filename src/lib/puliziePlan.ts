@@ -103,8 +103,21 @@ export function computePuliziePlan(opts: {
 const fmtDM = (iso: string) => new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
 export const fmtLongIT = (iso: string) => new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long", day: "2-digit", month: "long" });
 
-// Testo del programma da condividere (WhatsApp/email) — sempre TUTTE le camere della struttura,
-// comprese quelle fuori servizio/con un guasto; niente emoji (WhatsApp Business non le rende sempre).
+// Testo del programma da condividere (WhatsApp/email), ORDINATO PER LAVORO DA FARE: prima i cambi completi, poi gli arrivi, le partenze e i riassetti;
+// le camere senza nulla da fare stanno in una riga sola in fondo. Sempre TUTTE le camere della struttura, comprese quelle fuori servizio o con un guasto.
+// Niente emoji (WhatsApp Business non le rende sempre). stile "whatsapp": titoli in *grassetto*; stile "plain" (email): niente asterischi.
+export type PlanStyle = "whatsapp" | "plain";
+
+const GROUPS: { key: ActionKey; title: string }[] = [
+  { key: "turnover", title: "CAMBIO COMPLETO (esce un ospite, ne entra un altro)" },
+  { key: "arrivo", title: "DA PREPARARE PER L'ARRIVO" },
+  { key: "partenza", title: "DOPO LA PARTENZA" },
+  { key: "riassetto", title: "RIASSETTO (ospiti in casa)" },
+];
+
+// Ordine naturale delle camere: 1, 2, 3, 10 (non 1, 10, 2).
+const byUnit = (a: PlanRoom, b: PlanRoom) => a.unit.name.localeCompare(b.unit.name, "it", { numeric: true, sensitivity: "base" });
+
 export function buildPuliziePlanText(opts: {
   date: string;
   scopedStructures: Structure[];
@@ -112,32 +125,79 @@ export function buildPuliziePlanText(opts: {
   guests: Guest[];
   notes?: Record<string, string>;
   t?: (s: string) => string;
+  style?: PlanStyle;
 }): string {
-  const { date, scopedStructures, rooms, guests, notes = {}, t = (x: string) => x } = opts;
+  const { date, scopedStructures, rooms, guests, notes = {}, t = (x: string) => x, style = "whatsapp" } = opts;
+  const bold = (x: string) => (style === "whatsapp" ? `*${x}*` : x);
   const guestName = (id: string) => guests.find((g) => g.id === id)?.fullName ?? "";
+  const pers = (b: Booking) => `${b.adults + b.children} ${t("pers.")}`;
   const keyOf = (unitId: string) => `${unitId}:${date}`;
+  const noteOf = (r: PlanRoom) => { const n = notes[keyOf(r.unit.id)]?.trim(); return n ? ` [${n}]` : ""; };
 
-  const lines: string[] = [`*${t("Pulizie di oggi")}* — ${fmtLongIT(date)}`];
+  const lines: string[] = [`${bold(t("Pulizie di oggi"))} — ${fmtLongIT(date)}`];
   for (const s of scopedStructures) {
-    const list = rooms.filter((r) => r.structure.id === s.id);
+    const list = rooms.filter((r) => r.structure.id === s.id).sort(byUnit);
     if (!list.length) continue;
-    lines.push("", `*${s.name}*`);
-    for (const r of list) {
-      const note = notes[keyOf(r.unit.id)]?.trim();
-      const suffix = note ? ` [${note}]` : "";
-      if (r.oos) {
-        lines.push(`• ${r.unit.name}: ${t("Fuori servizio")}${r.oosNote ? ` — ${r.oosNote}` : ""}${suffix}`);
-      } else if (r.action === "turnover" && r.dep && r.arr) {
-        lines.push(`• ${r.unit.name}: ${t("PARTENZA + ARRIVO — parte")} ${guestName(r.dep.guestId)} (${r.dep.adults + r.dep.children} ${t("persone")}), ${t("poi arriva")} ${guestName(r.arr.guestId)} (${r.arr.adults + r.arr.children} ${t("persone")}, ${fmtDM(r.arr.checkIn)}→${fmtDM(r.arr.checkOut)})${suffix}`);
-      } else {
-        const p = r.arr ?? r.dep ?? r.stay;
-        const io = p ? ` (${fmtDM(p.checkIn)}→${fmtDM(p.checkOut)}, ${p.adults + p.children} ${t("persone")})` : "";
-        const who = p ? ` — ${guestName(p.guestId)}` : "";
-        const oosNote = r.oosFrom && r.oosNote ? ` [${r.oosNote}]` : "";
-        lines.push(`• ${r.unit.name}: ${t(ACT_LABEL[r.action])}${who}${io}${suffix}${oosNote}`);
+    const todo = list.filter((r) => !r.oos && r.action !== "niente").length;
+    lines.push("", `${bold(s.name)} — ${todo} ${todo === 1 ? t("camera da fare") : t("camere da fare")}`);
+
+    for (const g of GROUPS) {
+      const grp = list.filter((r) => !r.oos && r.action === g.key);
+      if (!grp.length) continue;
+      lines.push("", t(g.title));
+      for (const r of grp) {
+        let row: string;
+        if (g.key === "turnover" && r.dep && r.arr) {
+          row = `${r.unit.name} — ${t("esce")} ${guestName(r.dep.guestId)} · ${t("entra")} ${guestName(r.arr.guestId)} (${pers(r.arr)}, ${t("fino al")} ${fmtDM(r.arr.checkOut)})`;
+        } else if (g.key === "arrivo" && r.arr) {
+          row = `${r.unit.name} — ${t("entra")} ${guestName(r.arr.guestId)} (${pers(r.arr)}, ${t("fino al")} ${fmtDM(r.arr.checkOut)})`;
+        } else if (g.key === "partenza" && r.dep) {
+          row = `${r.unit.name} — ${t("esce")} ${guestName(r.dep.guestId)}`;
+        } else {
+          const b = r.stay ?? r.arr ?? r.dep;
+          row = b ? `${r.unit.name} — ${guestName(b.guestId)} (${pers(b)}, ${t("fino al")} ${fmtDM(b.checkOut)})` : r.unit.name;
+        }
+        lines.push(`• ${row}${noteOf(r)}${r.oosFrom && r.oosNote ? ` [${r.oosNote}]` : ""}`);
       }
     }
+
+    const oos = list.filter((r) => r.oos);
+    if (oos.length) {
+      lines.push("", t("FUORI SERVIZIO"));
+      for (const r of oos) lines.push(`• ${r.unit.name}${r.oosNote ? ` — ${r.oosNote}` : ""}${noteOf(r)}`);
+    }
+    const nothing = list.filter((r) => !r.oos && r.action === "niente");
+    if (nothing.length) lines.push("", `${t("NIENTE DA FARE")}: ${nothing.map((r) => r.unit.name).join(", ")}`);
   }
   if (lines.length === 1) lines.push("", t("Nessuna pulizia in programma."));
   return lines.join("\n");
+}
+
+// Versione BREVE su una riga, per il modello WhatsApp (Meta non permette a capo dentro le variabili): solo i numeri delle camere per tipo di lavoro.
+// Il dettaglio con i nomi degli ospiti sta nell'email o nella pagina Pulizie.
+export function buildPuliziePlanSummary(opts: {
+  scopedStructures: Structure[];
+  rooms: PlanRoom[];
+  notes?: Record<string, string>;
+  date: string;
+  t?: (s: string) => string;
+}): string {
+  const { scopedStructures, rooms, notes = {}, date, t = (x: string) => x } = opts;
+  const SHORT: Record<string, string> = { turnover: "cambio completo", arrivo: "arrivo", partenza: "partenza", riassetto: "riassetto" };
+  const parts: string[] = [];
+  for (const s of scopedStructures) {
+    const list = rooms.filter((r) => r.structure.id === s.id).sort(byUnit);
+    if (!list.length) continue;
+    const seg: string[] = [];
+    for (const g of GROUPS) {
+      const grp = list.filter((r) => !r.oos && r.action === g.key);
+      if (grp.length) seg.push(`${t(SHORT[g.key])}: ${grp.map((r) => { const n = notes[`${r.unit.id}:${date}`]?.trim(); return n ? `${r.unit.name} (${n})` : r.unit.name; }).join(", ")}`);
+    }
+    const oos = list.filter((r) => r.oos);
+    if (oos.length) seg.push(`${t("fuori servizio")}: ${oos.map((r) => r.unit.name).join(", ")}`);
+    const nothing = list.filter((r) => !r.oos && r.action === "niente");
+    if (nothing.length && seg.length) seg.push(`${t("niente")}: ${nothing.map((r) => r.unit.name).join(", ")}`);
+    parts.push(seg.length ? `${s.name} — ${seg.join(" | ")}` : `${s.name} — ${t("nessuna pulizia")}`);
+  }
+  return parts.join(" // ") || t("Nessuna pulizia in programma.");
 }

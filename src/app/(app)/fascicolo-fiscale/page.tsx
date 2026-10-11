@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { CHANNELS, type Channel } from "@/lib/types";
-import { commissionOf, cityTaxOf, cityTaxPayers } from "@/lib/booking";
+import { commissionOf, cityTaxOfBooking } from "@/lib/booking";
 import { nights, toISO } from "@/lib/dates";
 import { eur, num } from "@/lib/format";
 import { captureA4ToPdfBlob } from "@/lib/pdf-capture";
@@ -79,9 +79,7 @@ export default function FascicoloFiscalePage() {
   for (const b of yearBookings) {
     const st = getStructure(b.structureId);
     if (!st?.cityTax) continue;
-    const n = nights(b.checkIn, b.checkOut);
-    const payers = cityTaxPayers(st, b);
-    const tax = cityTaxOf(st, payers, n, b.total ?? 0, b.cityTaxExempt);
+    const tax = cityTaxOfBooking(st, b);
     cityTaxDovuta += tax;
     if (b.cityTaxPaid) cityTaxIncassata += tax;
   }

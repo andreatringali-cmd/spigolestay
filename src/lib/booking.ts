@@ -9,23 +9,26 @@ import { commissionEstimateFor } from "./commission-estimate";
 // Tassa di soggiorno. Due modalità:
 //  - "fixed":   € a persona per notte × persone × notti tassabili
 //  - "percent": % del pernottamento a persona per notte, con TETTO € a persona/notte
-//               (es. Siracusa: 4% del costo camera/ospite, max 5€ a persona/notte, prime 7 notti)
-export function cityTaxOf(structure: Structure | undefined, adults: number, n: number, accommodation: number, exempt?: boolean): number {
+//               (es. Siracusa: (costo alloggio / numero ospiti) × 4%, max 5€ a persona/notte, prime 7 notti)
+// `adults` = persone che PAGANO la tassa. `guests` = TUTTI gli ospiti, anche gli esenti (minori, ecc.): è il divisore del costo dell'alloggio, come nella formula del Comune.
+// Senza `guests` si divide per i soli paganti (compatibilità). Importi arrotondati ai centesimi.
+export function cityTaxOf(structure: Structure | undefined, adults: number, n: number, accommodation: number, exempt?: boolean, guests?: number): number {
   if (exempt || !structure?.cityTax) return 0;
   const persons = Math.max(1, adults || 0);
+  const divisor = Math.max(persons, guests ?? 0);
   const nightsTot = Math.max(0, n || 0);
   const maxN = structure.cityTaxMaxNights ?? (structure.cityTaxMode === "percent" ? 7 : 3);
   const taxedNights = Math.min(nightsTot, maxN);
   if (taxedNights <= 0) return 0;
   if (structure.cityTaxMode === "percent") {
     const roomPerNight = nightsTot > 0 ? (accommodation || 0) / nightsTot : (accommodation || 0);
-    const perPersonNight = (roomPerNight / persons) * ((structure.cityTaxPercent ?? 0) / 100);
+    const perPersonNight = (roomPerNight / divisor) * ((structure.cityTaxPercent ?? 0) / 100);
     const cap = structure.cityTaxCap ?? 0;
     const capped = cap > 0 ? Math.min(perPersonNight, cap) : perPersonNight;
-    return Math.round(capped * persons * taxedNights);
+    return Math.round(capped * persons * taxedNights * 100) / 100;
   }
   const rate = structure.cityTaxAmount ?? 2;
-  return Math.round(persons * taxedNights * rate);
+  return Math.round(persons * taxedNights * rate * 100) / 100;
 }
 
 type BookingLike = {
@@ -35,6 +38,11 @@ type BookingLike = {
 
 // Persone paganti la tassa: adulti + minori NON esenti (età >= soglia comunale).
 // Se non sono note le età dei bambini, si considerano esenti (comportamento prudente).
+/** Imposta di soggiorno di una prenotazione: paganti = adulti + minori sopra la soglia, divisore = tutti gli ospiti. Un solo punto di calcolo per elenco, fatture, fascicolo, adempimenti e check-in. */
+export function cityTaxOfBooking(structure: Structure | undefined, b: { adults?: number; children?: number; childAges?: number[]; checkIn: string; checkOut: string; total?: number; cityTaxExempt?: boolean }): number {
+  const n = Math.max(0, Math.round((Date.parse(b.checkOut + "T00:00:00Z") - Date.parse(b.checkIn + "T00:00:00Z")) / 86400000));
+  return cityTaxOf(structure, cityTaxPayers(structure, b), n, b.total ?? 0, b.cityTaxExempt, (b.adults ?? 0) + (b.children ?? 0));
+}
 export function cityTaxPayers(structure: Structure | undefined, b: { adults?: number; childAges?: number[] }): number {
   const adults = b.adults ?? 0;
   const freeUnder = structure?.cityTaxChildFreeUnder ?? 18; // default: tutti i minorenni esenti

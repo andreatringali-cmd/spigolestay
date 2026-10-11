@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     const unit = arr(store.data.units).find((x) => (x as { id?: string }).id === s(b.unitId)) as Json | undefined;
     // Tassa di soggiorno calcolata sul server (dipende dalla configurazione struttura).
     const nightsTot = (() => { try { return Math.max(1, Math.round((Date.parse(s(b.checkOut)) - Date.parse(s(b.checkIn))) / 86400000)); } catch { return 1; } })();
-    const cityTax = cityTaxOf(st as unknown as Structure, n(b.adults) || 1, nightsTot, n(b.total), b.cityTaxExempt === true);
+    const cityTax = cityTaxOf(st as unknown as Structure, n(b.adults) || 1, nightsTot, n(b.total), b.cityTaxExempt === true, (n(b.adults) || 1) + n(b.children));
 
     // Prenotazione di GRUPPO: se questa prenotazione ha un groupId, restituisci tutte le camere
     // del gruppo (stessa struttura/store) per un check-in unico che compila tutti gli ospiti.

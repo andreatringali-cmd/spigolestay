@@ -263,7 +263,7 @@ export default function PreventiviPage() {
   const cotTotal = 0; // culla sempre gratuita
   // Imposta di soggiorno: logica unica dalla config struttura (a Siracusa 4% del
   // pernottamento, max 5€ a persona/notte, prime 7 notti). taxPersons esclude i minori esenti.
-  const cityTax = cityTaxOf(structures.find((s) => s.id === structureId), taxPersons, n, accommodation);
+  const cityTax = cityTaxOf(structures.find((s) => s.id === structureId), taxPersons, n, accommodation, false, adults + children);
   const total = accommodation + parkingTotal + breakfastTotal + cotTotal + cityTax;
   const deposit = Math.round(total * acconto / 100);
   const balance = total - deposit;

@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { internalFetch } from "@/lib/server-auth";
 import { sendWhatsapp } from "@/lib/whatsapp";
 import { logInvio } from "@/lib/invii-log";
-import { computePuliziePlan, buildPuliziePlanText } from "@/lib/puliziePlan";
+import { computePuliziePlan, buildPuliziePlanText, buildPuliziePlanSummary, fmtLongIT } from "@/lib/puliziePlan";
 import type { Booking, Unit, RoomType, Structure, Guest } from "@/lib/types";
 
 export interface PulizieSendCfg { email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string }
@@ -28,8 +28,12 @@ export async function deliverPuliziePlan(a: {
   const stJ = st as unknown as Record<string, unknown>;
   const structureId = str(stJ.id), name = str(stJ.name);
   const { rooms } = computePuliziePlan({ date, structures: [st], units: a.units, roomTypes: a.roomTypes, bookings: a.bookings });
-  const text = buildPuliziePlanText({ date, scopedStructures: [st], rooms, guests: a.guests, notes: a.notes });
-  const subject = `Planning pulizie · ${name} · ${date}`;
+  const planArgs = { date, scopedStructures: [st], rooms, guests: a.guests, notes: a.notes };
+  const text = buildPuliziePlanText({ ...planArgs, style: "whatsapp" });   // testo completo con grassetti: WhatsApp (ripiego a testo libero)
+  const emailText = buildPuliziePlanText({ ...planArgs, style: "plain" }); // email: niente asterischi
+  const summary = buildPuliziePlanSummary(planArgs);                       // una riga, per il modello WhatsApp (Meta non ammette a capo)
+  const dateLong = fmtLongIT(date);                                         // "domenica 11 ottobre" invece di "2026-10-11"
+  const subject = `Planning pulizie · ${name} · ${dateLong}`;
   const out: PulizieSendResult[] = [];
 
   if (cfg.email && cfg.emailTo) {
@@ -37,7 +41,7 @@ export async function deliverPuliziePlan(a: {
     try {
       const resp = await internalFetch(`${origin}/api/email`, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "guest_message", to: cfg.emailTo, subject, text, booking: { structureName: name, color: str(stJ.photoColor), logo: str(stJ.logo) } }),
+        body: JSON.stringify({ kind: "guest_message", to: cfg.emailTo, subject, text: emailText, booking: { structureName: name, color: str(stJ.photoColor), logo: str(stJ.logo) } }),
       });
       const j = await resp.json().catch(() => ({}));
       r = resp.ok && j?.ok ? { channel: "email", ok: true, detail: cfg.emailTo } : { channel: "email", ok: false, detail: errText(j, resp.status) };
@@ -52,7 +56,7 @@ export async function deliverPuliziePlan(a: {
       // Il planning parte senza che il destinatario abbia scritto: per Meta è un messaggio "a freddo" e VA mandato col modello approvato.
       // Il testo libero viene accettato dall'API ma poi NON consegnato (errore 131047) se il destinatario non ha scritto negli ultimi 24 ore: per questo non è il primo tentativo.
       // (corpo del modello con 3 variabili: {{1}} struttura, {{2}} data, {{3}} planning in una riga)
-      let w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, country: "IT", templateName: process.env.WHATSAPP_PULIZIE_TEMPLATE || "planning_pulizie", lang: "it", params: [name, date, text] });
+      let w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, country: "IT", templateName: process.env.WHATSAPP_PULIZIE_TEMPLATE || "planning_pulizie", lang: "it", params: [name, dateLong, summary] });
       const tplErr = w.ok ? "" : w.message;
       if (!w.ok) w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, country: "IT", text }); // ripiego: arriva solo se il destinatario ha scritto nelle ultime 24 ore
       wamid = w.id;

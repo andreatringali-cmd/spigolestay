@@ -247,10 +247,10 @@ export default function PuliziePage() {
   const notify = (title: string, body: string) => { try { if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(title, { body }); } catch {} };
 
   // Testo del programma da condividere con la signora delle pulizie (stessa logica del cron di invio automatico).
-  const buildPlanText = () => buildPuliziePlanText({ date, scopedStructures, rooms, guests, notes, t });
+  const buildPlanText = (style: "whatsapp" | "plain" = "whatsapp") => buildPuliziePlanText({ date, scopedStructures, rooms, guests, notes, t, style });
   const shareWhatsApp = () => window.open(`https://wa.me/?text=${encodeURIComponent(buildPlanText())}`, "_blank", "noopener,noreferrer");
-  const emailPlan = () => { window.location.href = `mailto:?subject=${encodeURIComponent(t("Planning pulizie"))}&body=${encodeURIComponent(buildPlanText())}`; }; // window.open("mailto:...") non apriva nulla in Chrome
-  const copyPlan = async () => { try { await navigator.clipboard.writeText(buildPlanText()); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} };
+  const emailPlan = () => { window.location.href = `mailto:?subject=${encodeURIComponent(t("Planning pulizie"))}&body=${encodeURIComponent(buildPlanText("plain"))}`; }; // window.open("mailto:...") non apriva nulla in Chrome
+  const copyPlan = async () => { try { await navigator.clipboard.writeText(buildPlanText("plain")); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch {} };
   // PDF scaricabile del planning, con la grafica "Minimale" scelta (vedi PulizieDoc) — una
   // pagina A4 per struttura, catturata dall'anteprima reale fuori schermo (stessa tecnica del
   // voucher/preventivi: il PDF è una fotocopia esatta, mai un disegno ricostruito a parte).
