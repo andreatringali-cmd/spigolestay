@@ -9,6 +9,7 @@ import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
+import { roundCents, sumCents } from "@/lib/money";
 import { exportExcel } from "@/lib/export";
 import { type Mov, type Rule, computeAuto, computeScheduled, scopeVisible, loadCash } from "@/lib/cassa";
 
@@ -70,11 +71,11 @@ export default function ChiusuraCassaPage() {
   const conti = useMemo(() => { const s = new Set(all.map((m) => m.conto).filter(Boolean)); CONTI.forEach((c) => s.add(c.key)); return Array.from(s); }, [all]);
 
   const dayMovs = useMemo(() => all.filter((m) => m.conto === conto && m.date === day).sort((a, b) => b.amount - a.amount), [all, conto, day]);
-  const entrate = dayMovs.filter((m) => m.kind === "in").reduce((a, m) => a + m.amount, 0);
-  const uscite = dayMovs.filter((m) => m.kind === "out").reduce((a, m) => a + m.amount, 0);
+  const entrate = sumCents(dayMovs.filter((m) => m.kind === "in").map((m) => m.amount));
+  const uscite = sumCents(dayMovs.filter((m) => m.kind === "out").map((m) => m.amount));
   // Saldo teorico cumulato del conto fino al giorno scelto.
-  const expected = useMemo(() => all.filter((m) => m.conto === conto && m.date <= day).reduce((a, m) => a + (m.kind === "in" ? m.amount : -m.amount), 0), [all, conto, day]);
-  const diff = numv(counted) - expected;
+  const expected = useMemo(() => sumCents(all.filter((m) => m.conto === conto && m.date <= day).map((m) => (m.kind === "in" ? m.amount : -m.amount))), [all, conto, day]);
+  const diff = roundCents(numv(counted) - expected);
 
   const contoLabel = (k: string) => CONTI.find((c) => c.key === k)?.label ?? k;
   const structOf = (id: string | null) => (!id || id === "all" ? "Tutte" : getStructure(id)?.name ?? "—");

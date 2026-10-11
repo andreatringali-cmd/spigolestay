@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Structure, Booking, Guest } from "@/lib/types";
 import { nights } from "@/lib/dates";
+import { todayRome, ymdRome, addDaysYmd } from "@/lib/dates-rome";
 import { getAlloggiatiProvider, type AlloggiatiCreds, type SchedinaPayload } from "./provider";
 import { logBookingEvent } from "@/lib/booking-events";
 import { decryptCred } from "@/lib/crypto-creds";
@@ -117,8 +118,7 @@ export async function syncSchedine(admin: SupabaseClient, tenantId: string, opts
   const blob = await readBlob(admin, tenantId);
   const { data: settRows } = await admin.from("alloggiati_settings").select("structure_id, group_guests").eq("tenant_id", tenantId);
   const groupBy = new Map((settRows ?? []).map((s) => [s.structure_id as string, s.group_guests as boolean]));
-  const start = new Date(); start.setDate(start.getDate() - (opts.fromDays ?? 7));
-  const startISO = start.toISOString().slice(0, 10);
+  const startISO = addDaysYmd(todayRome(), -(opts.fromDays ?? 7));
 
   const isInactive = (b: { status?: string; channel?: string }) => b.status === "cancelled" || b.status === "no_show" || b.channel === "blocked";
   const bookings = (blob.bookings ?? []).filter((b) =>
@@ -223,7 +223,7 @@ export async function testReady(admin: SupabaseClient, tenantId: string, structu
   let q = admin.from("alloggiati_schedine").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pronta");
   // Si controllano solo gli arrivi GIÀ avvenuti: gli arrivi futuri (in preparazione) non si verificano.
   if (arrival) q = q.eq("arrival", arrival);
-  else q = q.lte("arrival", new Date().toISOString().slice(0, 10));
+  else q = q.lte("arrival", todayRome());
   const { data: sched } = await q;
   const list = sched ?? [];
   if (!list.length) return { ok: true, message: "Nessuna schedina da controllare." };
@@ -257,7 +257,7 @@ export async function fetchRicevuta(admin: SupabaseClient, tenantId: string, str
 
 // Genera il tracciato .txt (168 char/riga) delle schedine PRONTE — fallback per l'invio manuale sul portale.
 export async function buildTracciato(admin: SupabaseClient, tenantId: string, structureId: string): Promise<{ ok: boolean; message: string; text?: string; count?: number }> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayRome();
   const { data } = await admin.from("alloggiati_schedine").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pronta").lte("arrival", today);
   const list = data ?? [];
   if (!list.length) return { ok: false, message: "Nessuna schedina pronta (gli arrivi futuri si inviano dopo l'arrivo)." };
@@ -284,50 +284,56 @@ export async function getSubmissionRicevuta(admin: SupabaseClient, tenantId: str
   const { data: sub } = await admin.from("alloggiati_submissions").select("id, created_at, ricevuta_pdf").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("id", submissionId).maybeSingle();
   if (!sub) return { ok: false, message: "Invio non trovato." };
   if (sub.ricevuta_pdf) return { ok: true, message: "Ricevuta dall'archivio.", pdfBase64: sub.ricevuta_pdf as string };
-  const day = String(sub.created_at).slice(0, 10);
+  const day = ymdRome(String(sub.created_at));
   const r = await fetchRicevuta(admin, tenantId, structureId, day);
   if (r.ok && r.pdfBase64) { try { await admin.from("alloggiati_submissions").update({ ricevuta_pdf: r.pdfBase64 }).eq("id", submissionId); } catch {} return r; }
   // La ricevuta è disponibile sul portale dal giorno DOPO l'invio ed entro ~30 giorni.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayRome();
   if (day >= today) return { ok: false, message: "La ricevuta sarà disponibile dal giorno successivo all'invio: riprova domani." };
   return r;
 }
 
+// Messaggio dell'esito quando l'invio reale non è attivo: nulla parte, nulla viene segnato come inviato.
+export const ALLOGGIATI_SIMULATED_MSG = "Simulato (invio reale non attivo): nulla è stato inviato alla Questura, le schedine restano da inviare.";
+
 // Invia le schedine PRONTE (arrivo indicato o tutte) → submission + ricevuta.
-export async function sendReady(admin: SupabaseClient, tenantId: string, structureId: string, arrival?: string): Promise<{ ok: boolean; message: string; sent: number }> {
+// `simulated`: true quando l'invio reale non è attivo (ALLOGGIATI_LIVE spento o credenziali incomplete):
+// in quel caso NON si segna nulla come inviato, non si scrive l'evento e non si cancellano le foto.
+export async function sendReady(admin: SupabaseClient, tenantId: string, structureId: string, arrival?: string): Promise<{ ok: boolean; message: string; sent: number; simulated?: boolean }> {
   let q = admin.from("alloggiati_schedine").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pronta");
   // La schedina si invia DOPO l'arrivo: nell'invio massivo escludiamo gli arrivi futuri.
   if (arrival) q = q.eq("arrival", arrival);
-  else q = q.lte("arrival", new Date().toISOString().slice(0, 10));
+  else q = q.lte("arrival", todayRome());
   const { data: sched } = await q;
   const list = sched ?? [];
   if (!list.length) return { ok: false, message: "Nessuna schedina pronta da inviare (gli arrivi futuri si inviano dopo l'arrivo).", sent: 0 };
 
   const { c, live } = await creds(admin, tenantId, structureId);
 
-  // Costruisce i record: con codici risolti se l'integrazione reale è attiva.
-  const maps: CodeMaps | null = live ? await loadCodeMaps(admin) : null;
-  const records = list.map((s) => (maps
-    ? buildRecordResolved(s.guest as SchedinaGuest, s.ruolo, s.arrival, (s.guest as { perm?: number })?.perm ?? 1, maps)
-    : buildRecord(s.guest as SchedinaGuest, s.ruolo, s.arrival, (s.guest as { perm?: number })?.perm ?? 1)));
+  // Invio reale non attivo: esito SIMULATO. Nessun invio, nessuna submission, nessuna schedina segnata
+  // "inviata", nessun evento "inviata alla Questura", nessuna foto cancellata.
+  if (!live) {
+    const t = await getAlloggiatiProvider("mock").test(c);
+    if (!t.ok) return { ok: false, message: t.message, sent: 0 };
+    return { ok: false, message: ALLOGGIATI_SIMULATED_MSG, sent: 0, simulated: true };
+  }
+
+  // Costruisce i record con i codici risolti (integrazione reale attiva).
+  const maps: CodeMaps = await loadCodeMaps(admin);
+  const records = list.map((s) => buildRecordResolved(s.guest as SchedinaGuest, s.ruolo, s.arrival, (s.guest as { perm?: number })?.perm ?? 1, maps));
   const payload: SchedinaPayload[] = list.map((s, i) => ({ record: records[i], guest: s.guest }));
 
   const { data: sub } = await admin.from("alloggiati_submissions").insert({ tenant_id: tenantId, structure_id: structureId, arrival: arrival ?? null, stato: "pending", count: list.length, payload }).select("id").single();
 
   let res: { ok: boolean; message: string; ricevuta?: string; perLine?: boolean[] };
-  if (live) {
-    try {
-      const token = await getToken(c);
-      const { result, elenco } = await wsSend(c.username!, token, records);
-      const perLine = list.map((_, i) => elenco.dettaglio[i]?.esito ?? result.esito);
-      const invalid = perLine.filter((v) => !v).length;
-      const ric = `RIC-${new Date().toISOString().slice(0, 10)}`;
-      res = { ok: result.esito && invalid === 0, message: invalid ? `${elenco.schedineValide}/${list.length} acquisite, ${invalid} con errori.` : `Inviate ${elenco.schedineValide} schedine alla Questura.`, ricevuta: result.esito ? ric : undefined, perLine };
-    } catch (e) { res = { ok: false, message: (e as Error)?.message ?? "Errore invio schedine." }; }
-  } else {
-    const r = await getAlloggiatiProvider("mock").send(c, payload);
-    res = { ok: r.ok, message: r.message, ricevuta: r.ricevuta };
-  }
+  try {
+    const token = await getToken(c);
+    const { result, elenco } = await wsSend(c.username!, token, records);
+    const perLine = list.map((_, i) => elenco.dettaglio[i]?.esito ?? result.esito);
+    const invalid = perLine.filter((v) => !v).length;
+    const ric = `RIC-${todayRome()}`;
+    res = { ok: result.esito && invalid === 0, message: invalid ? `${elenco.schedineValide}/${list.length} acquisite, ${invalid} con errori.` : `Inviate ${elenco.schedineValide} schedine alla Questura.`, ricevuta: result.esito ? ric : undefined, perLine };
+  } catch (e) { res = { ok: false, message: (e as Error)?.message ?? "Errore invio schedine." }; }
 
   await admin.from("alloggiati_submissions").update({ stato: res.ok ? "sent" : "error", esito: res.message, ricevuta: res.ricevuta ?? null, tentativi: 1 }).eq("id", sub!.id);
   // Segna come inviate le schedine effettivamente acquisite (per-riga se disponibile).

@@ -13,6 +13,7 @@ import { PageHeader, Card, StatCard } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
+import { roundCents } from "@/lib/money";
 import { DOC_KIND_LABEL } from "@/lib/invoicing/client";
 import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import { computeResidui, daysOverdue, todayLocalISO, agingBucket, AGING_LABEL, type AgingKey } from "@/lib/invoicing/receivables";
@@ -118,7 +119,7 @@ export default function ScadenzarioIncassiPage() {
     if (error) { setErr("Errore incasso: " + error.message); setBusy(""); return; }
     // Fonte di verità incassi = prenotazione (come nella scheda documento).
     const b = r.booking_code ? bookings.find((x) => x.code === r.booking_code) : undefined;
-    if (b) updateBooking(b.id, { paid: (b.paid ?? 0) + Math.round(r.residuo) / 100 });
+    if (b) updateBooking(b.id, { paid: roundCents((b.paid ?? 0) + Math.round(r.residuo) / 100) });
     await load(); setBusy("");
   };
 

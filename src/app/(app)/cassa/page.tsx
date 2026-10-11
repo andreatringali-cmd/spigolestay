@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
+import { roundCents, sumCents } from "@/lib/money";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import ExportMenu from "@/components/ExportMenu";
@@ -91,6 +92,12 @@ export default function CassaPage() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [paid, setPaid] = useState<string[]>([]);
   const paidSet = useMemo(() => new Set(paid), [paid]);
+  // Esito delle scritture sul server: se una fallisce si annulla la modifica fatta a video e si avvisa.
+  const [saveErr, setSaveErr] = useState("");
+  const checkWrite = (p: Promise<string | null>, what: string, rollback: () => void) => {
+    p.then((err) => { if (err) { rollback(); setSaveErr(`${what} non salvato: ${err}. La modifica è stata annullata, riprova.`); } })
+      .catch((e) => { rollback(); setSaveErr(`${what} non salvato: ${e instanceof Error ? e.message : "errore di rete"}. La modifica è stata annullata, riprova.`); });
+  };
   useEffect(() => {
     if (!user) return;
     (async () => {
@@ -118,8 +125,9 @@ export default function CassaPage() {
     return out.sort((a, b) => (a.iso < b.iso ? 1 : -1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rules, activeStructureId, today, paidSet]);
-  const markPaid = (r: Rule, iso: string) => { const k = `${r.id}|${iso}`; setPaid((p) => [...p, k]); if (user) addPaid(user.id, [k]); };
-  const markAllPaid = () => { const keys = pending.map((p) => `${p.rule.id}|${p.iso}`); setPaid((p) => [...p, ...keys]); if (user) addPaid(user.id, keys); };
+  const dropPaid = (keys: string[]) => setPaid((p) => p.filter((x) => !keys.includes(x)));
+  const markPaid = (r: Rule, iso: string) => { const k = `${r.id}|${iso}`; setPaid((p) => [...p, k]); if (user) checkWrite(addPaid(user.id, [k]), "Il pagamento", () => dropPaid([k])); };
+  const markAllPaid = () => { const keys = pending.map((p) => `${p.rule.id}|${p.iso}`); setPaid((p) => [...p, ...keys]); if (user) checkWrite(addPaid(user.id, keys), "I pagamenti", () => dropPaid(keys)); };
 
   // Prossime scadenze (dopo oggi).
   const upcoming = useMemo(() => {
@@ -141,21 +149,21 @@ export default function CassaPage() {
   const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
 
   const rows = all.filter((m) => month === "all" || monthKey(m.date) === month);
-  const entrate = rows.filter((m) => m.kind === "in").reduce((a, m) => a + m.amount, 0);
-  const uscite = rows.filter((m) => m.kind === "out").reduce((a, m) => a + m.amount, 0);
-  const saldo = entrate - uscite;
+  const entrate = sumCents(rows.filter((m) => m.kind === "in").map((m) => m.amount));
+  const uscite = sumCents(rows.filter((m) => m.kind === "out").map((m) => m.amount));
+  const saldo = roundCents(entrate - uscite);
 
-  const saldoConti = useMemo(() => { const map: Record<string, number> = {}; for (const m of all) map[m.conto] = (map[m.conto] ?? 0) + (m.kind === "in" ? m.amount : -m.amount); return map; }, [all]);
-  const saldoTot = Object.values(saldoConti).reduce((a, v) => a + v, 0);
+  const saldoConti = useMemo(() => { const map: Record<string, number> = {}; for (const m of all) map[m.conto] = roundCents((map[m.conto] ?? 0) + (m.kind === "in" ? m.amount : -m.amount)); return map; }, [all]);
+  const saldoTot = sumCents(Object.values(saldoConti));
 
-  const perCat = useMemo(() => { const map: Record<string, number> = {}; for (const m of rows) if (m.kind === "out") map[m.cat] = (map[m.cat] ?? 0) + m.amount; return Object.entries(map).map(([k, v]) => ({ cat: catOf(k), v })).filter((x) => x.cat).sort((a, b) => b.v - a.v); }, [rows]);
+  const perCat = useMemo(() => { const map: Record<string, number> = {}; for (const m of rows) if (m.kind === "out") map[m.cat] = roundCents((map[m.cat] ?? 0) + m.amount); return Object.entries(map).map(([k, v]) => ({ cat: catOf(k), v })).filter((x) => x.cat).sort((a, b) => b.v - a.v); }, [rows]);
   const maxCat = Math.max(1, ...perCat.map((x) => x.v));
 
   const trend = useMemo(() => {
     const base = month === "all" ? monthKey(today) : month;
     const [by, bm] = base.split("-").map(Number);
     const list: { ym: string; in: number; out: number }[] = [];
-    for (let i = 11; i >= 0; i--) { const d = new Date(by, bm - 1 - i, 1); const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; const mm = all.filter((m) => monthKey(m.date) === ym); list.push({ ym, in: mm.filter((m) => m.kind === "in").reduce((a, m) => a + m.amount, 0), out: mm.filter((m) => m.kind === "out").reduce((a, m) => a + m.amount, 0) }); }
+    for (let i = 11; i >= 0; i--) { const d = new Date(by, bm - 1 - i, 1); const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; const mm = all.filter((m) => monthKey(m.date) === ym); list.push({ ym, in: sumCents(mm.filter((m) => m.kind === "in").map((m) => m.amount)), out: sumCents(mm.filter((m) => m.kind === "out").map((m) => m.amount)) }); }
     return list;
   }, [all, month, today]);
   const maxTrend = Math.max(1, ...trend.flatMap((t) => [t.in, t.out]));
@@ -169,7 +177,7 @@ export default function CassaPage() {
     const desc = form.desc.trim() || catOf(form.cat)?.label || "";
     const mov: Mov = { id: uid(), date: form.date, kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura };
     setManual((prev) => [mov, ...prev]);
-    if (user) insertMovement(user.id, mov);
+    if (user) checkWrite(insertMovement(user.id, mov), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
     // Ricorrente: crea la regola che riparte dal periodo SUCCESSIVO (questo è già registrato come movimento).
     if (form.repeat !== "once") {
       const d = new Date(form.date);
@@ -179,11 +187,11 @@ export default function CassaPage() {
       const nextStart = fmt(d.getFullYear(), d.getMonth(), d.getDate());
       const rule: Rule = { id: uid(), kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura, freq: form.repeat, day: parseInt(form.date.slice(8, 10)) || 1, start: nextStart, auto: true };
       setRules((prev) => [...prev, rule]);
-      if (user) insertRule(user.id, rule);
+      if (user) checkWrite(insertRule(user.id, rule), "Il pagamento ricorrente", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
     }
     setForm((f) => ({ ...f, desc: "", amount: "", repeat: "once" }));
   };
-  const del = async (id: string) => { if (!(await ask({ message: t("Eliminare questo movimento?"), danger: true, confirmLabel: t("Elimina") }))) return; setManual((prev) => prev.filter((m) => m.id !== id)); deleteMovement(id); };
+  const del = async (id: string) => { if (!(await ask({ message: t("Eliminare questo movimento?"), danger: true, confirmLabel: t("Elimina") }))) return; const gone = manual.find((m) => m.id === id); setManual((prev) => prev.filter((m) => m.id !== id)); checkWrite(deleteMovement(id), "L'eliminazione", () => { if (gone) setManual((prev) => (prev.some((m) => m.id === gone.id) ? prev : [gone, ...prev])); }); };
 
   // ---- Modale selezione/gestione categorie ----------------------------------
   const [catPicker, setCatPicker] = useState(false);
@@ -210,12 +218,12 @@ export default function CassaPage() {
     if (amt <= 0) return;
     const rule: Rule = { id: uid(), kind: rf.kind, cat: rf.cat, desc: rf.desc.trim() || catOf(rf.cat)?.label || "", amount: amt, conto: rf.conto, structureId: rf.struttura, freq: rf.freq, day: parseInt(rf.day) || 1, start: rf.start, auto: rf.auto, end: rf.end || undefined, note: rf.note?.trim() || undefined };
     setRules((prev) => [...prev, rule]);
-    if (user) insertRule(user.id, rule);
+    if (user) checkWrite(insertRule(user.id, rule), "Il pagamento programmato", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
     setRuleModal(false);
     setRf((f) => ({ ...f, desc: "", amount: "" }));
   };
-  const delRule = async (id: string) => { if (!(await ask({ message: t("Eliminare questo pagamento programmato?"), danger: true, confirmLabel: t("Elimina") }))) return; setRules((prev) => prev.filter((r) => r.id !== id)); deleteRule(id); };
-  const monthlyRecurring = rules.filter((r) => r.freq === "monthly" && ruleVisible(r.structureId)).reduce((a, r) => a + (r.kind === "out" ? r.amount : -r.amount), 0);
+  const delRule = async (id: string) => { if (!(await ask({ message: t("Eliminare questo pagamento programmato?"), danger: true, confirmLabel: t("Elimina") }))) return; const gone = rules.find((r) => r.id === id); setRules((prev) => prev.filter((r) => r.id !== id)); checkWrite(deleteRule(id), "L'eliminazione", () => { if (gone) setRules((prev) => (prev.some((r) => r.id === gone.id) ? prev : [...prev, gone])); }); };
+  const monthlyRecurring = sumCents(rules.filter((r) => r.freq === "monthly" && ruleVisible(r.structureId)).map((r) => (r.kind === "out" ? r.amount : -r.amount)));
 
   const selCat = catOf(form.cat);
   const structNameOf = (id?: string) => (!id || id === "all" ? t("Tutte") : getStructure(id)?.name ?? "—");
@@ -240,6 +248,12 @@ export default function CassaPage() {
   return (
     <div>
       <PageHeader title={t("Cassa · Prima Nota")} subtitle={t("Entrate e uscite, saldo e analisi della cassa")} />
+      {saveErr && (
+        <div role="alert" className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-[color:var(--err)] bg-paper px-3 py-2 text-sm" style={{ color: "var(--err)" }}>
+          <span>{saveErr}</span>
+          <button type="button" className="shrink-0 font-semibold underline" onClick={() => setSaveErr("")}>Chiudi</button>
+        </div>
+      )}
 
       {/* Riepilogo */}
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

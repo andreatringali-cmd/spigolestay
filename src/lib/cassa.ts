@@ -5,6 +5,7 @@ import { supabase } from "./supabase";
 import { CHANNELS } from "./types";
 import type { Booking, Guest, Structure } from "./types";
 import { commissionOf } from "./booking";
+import { roundCents } from "./money";
 
 export type Kind = "in" | "out";
 export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string }
@@ -13,7 +14,7 @@ export interface Rule { id: string; kind: Kind; cat: string; desc: string; amoun
 const pad = (n: number) => String(n).padStart(2, "0");
 const fmt = (y: number, m0: number, d: number) => `${y}-${pad(m0 + 1)}-${pad(d)}`;
 const daysIn = (y: number, m0: number) => new Date(y, m0 + 1, 0).getDate();
-const e2c = (e: number) => Math.round(e * 100);
+const e2c = (e: number) => Math.round(roundCents(e) * 100);
 const c2e = (c: number) => Math.round(c) / 100;
 const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 
@@ -60,9 +61,9 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
     const st = getStructure(b.structureId);
     // Incasso automatico = quanto realmente incassato sulla prenotazione (fonte di
     // verità = prenotazione), non l'intero totale: così la cassa/chiusura riflette il reale.
-    const incassato = b.paid ?? 0;
+    const incassato = roundCents(b.paid ?? 0);
     if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: b.checkIn, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: b.channel === "direct" ? "contanti" : "banca", auto: true, ref: b.id });
-    const comm = commissionOf(b);
+    const comm = roundCents(commissionOf(b));
     if (comm > 0) out.push({ id: `auto-comm-${b.id}`, date: b.checkIn, kind: "out", cat: "commissioni", desc: `Commissione ${CHANNELS[b.channel].label} · ${g?.fullName ?? "Ospite"}`, amount: comm, conto: "banca", auto: true, ref: b.id });
   }
   return out;
@@ -97,17 +98,38 @@ export async function loadCash(): Promise<{ movements: Mov[]; rules: Rule[]; pai
   return { movements, rules, paid };
 }
 
-export async function insertMovement(tenantId: string, m: Mov) {
-  if (!supabase) return;
-  await supabase.from("cash_movements").insert({ ...(isUuid(m.id) ? { id: m.id } : {}), tenant_id: tenantId, structure_id: m.structureId ?? null, date: m.date, kind: m.kind, cat: m.cat, descr: m.desc, amount_cents: e2c(m.amount), conto: m.conto });
+// Le scritture restituiscono il messaggio d'errore (null = riuscita), così la pagina può avvisare
+// l'utente e annullare la modifica fatta a video invece di lasciarla "fantasma".
+export type WriteResult = string | null;
+const errMsg = (e: { message?: string } | null | undefined): WriteResult => (e ? (e.message || "errore sconosciuto") : null);
+const NO_CONN: WriteResult = "Non sei connesso al server: la modifica non è stata salvata.";
+
+export async function insertMovement(tenantId: string, m: Mov): Promise<WriteResult> {
+  if (!supabase) return NO_CONN;
+  const { error } = await supabase.from("cash_movements").insert({ ...(isUuid(m.id) ? { id: m.id } : {}), tenant_id: tenantId, structure_id: m.structureId ?? null, date: m.date, kind: m.kind, cat: m.cat, descr: m.desc, amount_cents: e2c(m.amount), conto: m.conto });
+  return errMsg(error);
 }
-export async function deleteMovement(id: string) { if (supabase) await supabase.from("cash_movements").delete().eq("id", id); }
-export async function insertRule(tenantId: string, r: Rule) {
-  if (!supabase) return;
-  await supabase.from("cash_rules").insert({ ...(isUuid(r.id) ? { id: r.id } : {}), tenant_id: tenantId, structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null });
+export async function deleteMovement(id: string): Promise<WriteResult> {
+  if (!supabase) return NO_CONN;
+  const { error } = await supabase.from("cash_movements").delete().eq("id", id);
+  return errMsg(error);
 }
-export async function deleteRule(id: string) { if (supabase) await supabase.from("cash_rules").delete().eq("id", id); }
-export async function addPaid(tenantId: string, keys: string[]) { if (supabase && keys.length) await supabase.from("cash_paid").upsert(keys.map((k) => ({ tenant_id: tenantId, k })), { onConflict: "tenant_id,k" }); }
+export async function insertRule(tenantId: string, r: Rule): Promise<WriteResult> {
+  if (!supabase) return NO_CONN;
+  const { error } = await supabase.from("cash_rules").insert({ ...(isUuid(r.id) ? { id: r.id } : {}), tenant_id: tenantId, structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null });
+  return errMsg(error);
+}
+export async function deleteRule(id: string): Promise<WriteResult> {
+  if (!supabase) return NO_CONN;
+  const { error } = await supabase.from("cash_rules").delete().eq("id", id);
+  return errMsg(error);
+}
+export async function addPaid(tenantId: string, keys: string[]): Promise<WriteResult> {
+  if (!keys.length) return null;
+  if (!supabase) return NO_CONN;
+  const { error } = await supabase.from("cash_paid").upsert(keys.map((k) => ({ tenant_id: tenantId, k })), { onConflict: "tenant_id,k" });
+  return errMsg(error);
+}
 
 // Migrazione una-tantum dei dati Cassa da localStorage → Supabase (per non perdere lo storico).
 export async function migrateLocalCash(tenantId: string): Promise<boolean> {

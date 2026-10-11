@@ -20,14 +20,14 @@ export const dynamic = "force-dynamic";
 //    b) invia le schedine "pronte" degli ospiti GIÀ arrivati (sendReady esclude gli
 //       arrivi futuri): rispetta la finestra di legge (entro 24h dall'arrivo).
 //    L'invio REALE avviene solo se ALLOGGIATI_LIVE=1 e le credenziali sono valide;
-//    altrimenti sendReady degrada al provider mock (nessun invio reale) — stesso
-//    comportamento della UI manuale in /alloggiati-web.
+//    altrimenti sendReady restituisce un esito "simulato": nulla viene inviato né segnato
+//    come inviato (le schedine restano pronte) — stesso comportamento della UI manuale.
 //
 // 2) ISTAT / TURIST@T — per ogni struttura con istat_settings.auto_daily = true:
 //    a) rigenera i movimenti dagli arrivi (syncIstat);
 //    b) chiude/invia la giornata (closeDay) per i movimenti già maturati (arrivo <= oggi).
 //    L'invio REALE avviene solo se ISTAT_LIVE=1 e le credenziali sono valide; altrimenti
-//    closeDay degrada al comportamento mock — stesso comportamento della UI manuale in /istat.
+//    closeDay restituisce un esito "simulato" (righe non segnate come inviate) — come la UI manuale in /istat.
 //
 // Auth: header Bearer <CRON_SECRET> (inviato da Vercel Cron) oppure ?secret= per test.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -75,7 +75,7 @@ export async function GET(req: Request) {
         const s = await sendReady(admin, r.tenant_id, r.structure_id);
         sent += s.sent ?? 0;
         if (!s.ok && s.sent === 0 && s.message && !/Nessuna schedina/i.test(s.message)) {
-          errors.push(`send ${r.structure_id}: ${s.message}`);
+          errors.push(`send ${r.structure_id}: ${s.simulated ? "[simulato] " : ""}${s.message}`);
         }
       } catch (e) { errors.push(`send ${r.structure_id}: ${e instanceof Error ? e.message : "error"}`); }
     }
@@ -101,7 +101,7 @@ export async function GET(req: Request) {
           const s = await closeDay(admin, r.tenant_id, r.structure_id);
           istatSent += s.sent ?? 0;
           if (!s.ok && s.sent === 0 && s.message && !/Nessuna riga da inviare/i.test(s.message)) {
-            istatErrors.push(`close ${r.structure_id}: ${s.message}`);
+            istatErrors.push(`close ${r.structure_id}: ${s.simulated ? "[simulato] " : ""}${s.message}`);
           }
         } catch (e) { istatErrors.push(`close ${r.structure_id}: ${e instanceof Error ? e.message : "error"}`); }
       }
