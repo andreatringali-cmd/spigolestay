@@ -13,6 +13,7 @@ import { upsertGcalEvent, deleteGcalEvent, gcalEventId } from "@/lib/googleCalen
 import { CHANNELS, type Channel } from "@/lib/types";
 import { parseNotifPrefs } from "@/lib/notifPrefs";
 import { readRevisionGuestData, mergeOtaOverCarried, type OtaInfo } from "@/lib/channex-guestdata";
+import { splitCommission } from "@/lib/commission-split";
 
 // Property di test della certificazione: le sue prenotazioni non sono in channex_map (non è una
 // struttura reale), ma vanno comunque ACKate dal flusso di import automatico — che è quello che
@@ -24,6 +25,7 @@ type Json = Record<string, unknown>;
 type Booking = Json & { id: string; structureId: string; roomTypeId: string; unitId: string | null; checkIn: string; checkOut: string; status: string; extId?: string };
 type Unit = { id: string; roomTypeId: string; structureId?: string; outOfService?: boolean };
 const overlaps = (b: { checkIn: string; checkOut: string }, ci: string, co: string) => b.checkIn < co && b.checkOut > ci;
+
 const uid = () => (globalThis.crypto?.randomUUID?.() ?? `x_${Date.now()}_${Math.random().toString(36).slice(2)}`);
 
 // Registro attività: questo import gira SERVER-SIDE (nessun accesso al DataProvider del client),
@@ -347,6 +349,9 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         : prevOtaCard;
 
       const roomsArr = r.rooms && r.rooms.length ? r.rooms : [{}];
+      // La commissione OTA è quella dell'INTERA prenotazione: con più camere va divisa tra le righe in proporzione al prezzo di ciascuna
+      // (all'ultima va il resto, così la somma torna al centesimo), non ripetuta su ognuna.
+      const commShares = splitCommission(commissionAmount, roomsArr.map((room, i) => readRevisionGuestData(r as unknown as Record<string, unknown>, room as unknown as Record<string, unknown>, i === 0).total ?? 0));
       let added = 0;
       // Righe sostituite (modifica, o prenotazione già importata da Octorate): i dati che Channex non conosce — incassi, check-in online, documenti, note, extra,
       // camera assegnata — si RIPORTANO sulla nuova riga, altrimenti una prenotazione già pagata tornerebbe "da incassare".
@@ -389,7 +394,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           ...keep,
           ...fromOta,
           ...(otaInfo ? { otaInfo } : {}),
-          ...(commissionAmount != null ? { commissionAmount } : {}),
+          ...(commShares[idx] != null ? { commissionAmount: commShares[idx] } : {}),
           ...(commissionPct != null ? { commissionPct } : {}),
           ...(otaCard && idx === 0 ? { otaCard } : {}), // la VCC copre la prenotazione: la attacchiamo alla prima camera
           extId: stableKey, code: r.ota_reservation_code || undefined, source: "channex",
