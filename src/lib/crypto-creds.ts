@@ -6,6 +6,7 @@
 // I valori legacy (plaintext, salvati prima della cifratura) NON hanno il prefisso
 // "enc:v1:" e vengono restituiti invariati da decryptCred → nessuna migrazione forzata.
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
+import { warnFallbackOnce } from "@/lib/warn-fallback";
 
 const PREFIX = "enc:v1:";
 
@@ -36,7 +37,7 @@ export function encryptCred(plain: string | null | undefined): string {
   if (!text) return "";
   if (isEncrypted(text)) return text; // già cifrato, non ricifrare
   const k = key();
-  if (!k) return text; // nessuna chiave: resta in chiaro (fallback)
+  if (!k) { warnFallbackOnce("CRED_SECRET(crypto-creds)", "Le credenziali dei portali vengono salvate IN CHIARO: imposta CRED_SECRET."); return text; } // nessuna chiave: resta in chiaro (fallback)
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", k, iv);
   const ct = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);

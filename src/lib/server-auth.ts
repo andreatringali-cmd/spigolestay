@@ -7,6 +7,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
+import { warnFallbackOnce } from "@/lib/warn-fallback";
 
 const INTERNAL_HEADER = "x-xenora-internal";
 
@@ -46,7 +47,10 @@ export function siteOrigin(req: Request): string {
 const OWNER_EMAILS = (process.env.ADMIN_EMAILS || "spigolehouse@gmail.com,andreatringali.spi@gmail.com")
   .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
 
-export const isOwnerEmail = (email: string) => OWNER_EMAILS.includes((email || "").toLowerCase());
+function warnAdminEmailsFallback() {
+  if (!process.env.ADMIN_EMAILS) warnFallbackOnce("ADMIN_EMAILS", "Gli amministratori sono quelli scritti nel codice: imposta ADMIN_EMAILS (elenco separato da virgole).");
+}
+export const isOwnerEmail = (email: string) => { warnAdminEmailsFallback(); return OWNER_EMAILS.includes((email || "").toLowerCase()); };
 
 // Cache breve: evita 4 query a ogni chiamata API dello stesso utente.
 const allowCache = new Map<string, { ok: boolean; at: number }>();
@@ -58,7 +62,7 @@ export async function isUserAllowed(admin: SupabaseClient, user: User): Promise<
   if (hit && Date.now() - hit.at < ALLOW_TTL_MS) return hit.ok;
   const email = (user.email || "").toLowerCase();
   let ok = false;
-  if (email && OWNER_EMAILS.includes(email)) ok = true;
+  if (email && OWNER_EMAILS.includes(email)) { warnAdminEmailsFallback(); ok = true; }
   if (!ok) {
     const { data: st } = await admin.from("app_state").select("user_id").eq("user_id", user.id).maybeSingle();
     if (st) ok = true;
