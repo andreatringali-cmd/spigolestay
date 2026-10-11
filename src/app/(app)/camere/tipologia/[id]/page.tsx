@@ -7,7 +7,6 @@ import { useData } from "@/lib/store";
 import type { RoomType } from "@/lib/types";
 import { ROOM_TYPE_OPTIONS, BED_CONFIGS, ROOM_AMENITIES, ROOM_SPACES } from "@/lib/types";
 import { USER_LANGS, AV_COLORS } from "@/lib/users";
-import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import ImageUploader from "@/components/ImageUploader";
 import { useConfirm } from "@/components/ConfirmProvider";

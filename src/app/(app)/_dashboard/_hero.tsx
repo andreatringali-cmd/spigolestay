@@ -27,7 +27,6 @@ export interface HeroProps {
 }
 
 const AMBER = "#FFC46B";
-const PART_COLOR: Record<string, string> = { ok: HERO.mint, err: HERO.coral, focus: HERO.lilac };
 const STATUS_COLOR: Record<HeroProps["statusTone"], string> = { ok: HERO.mint, warn: AMBER, err: HERO.coral, dim: "rgba(255,255,255,.72)" };
 
 // "Vetro": fondo bianco 12%, bordo sottile, sfocatura lieve.

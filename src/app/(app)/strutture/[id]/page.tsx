@@ -7,7 +7,6 @@ import { useData } from "@/lib/store";
 import type { Structure } from "@/lib/types";
 import { STRUCTURE_TYPES, AMENITIES, PAY_METHODS, CANCEL_POLICIES } from "@/lib/types";
 import { USER_LANGS, AV_COLORS } from "@/lib/users";
-import { eur } from "@/lib/format";
 import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
@@ -37,7 +36,7 @@ export default function StrutturaSchedaPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const isNew = params.id === "nuovo";
-  const { structures, roomTypes, units, addStructure, updateStructure, setActiveStructure, addActivity } = useData();
+  const { structures, units, addStructure, updateStructure, setActiveStructure, addActivity } = useData();
   const { t } = useLang();
   const ask = useConfirm();
   const toast = useToast();
