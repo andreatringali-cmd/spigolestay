@@ -12,7 +12,7 @@ import VoucherDoc from "@/components/pdf/VoucherDoc";
 import { buildGuestLink, buildGroupGuestLink, guideMessage, shortenGuideLink, shortenLink } from "@/lib/guestlink";
 import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
 import { nights, parseISO, shiftISO } from "@/lib/dates";
-import { cityTaxOf, commissionOf, commissionPctOf, nettoOf } from "@/lib/booking";
+import { cityTaxOf, commissionBaseOf, commissionPctOf, nettoOf, paymentFeeOf } from "@/lib/booking";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { loadWeekendPct } from "@/lib/pricing";
 import { eur } from "@/lib/format";
@@ -179,8 +179,9 @@ export default function BookingDrawer() {
   // "Totale ospite" = quanto pagato per il soggiorno (senza tassa di soggiorno, riscossa
   // localmente e mai transitata dall'OTA): torna con l'importo che mostra Booking.com ecc.
   const totalV = accV + cleanV + extrasV;
-  const commPctV = commissionPctOf(booking);
-  const commV = commissionOf(booking);
+  const commPctV = booking.commissionAmount != null && booking.total ? Math.round((booking.commissionAmount / booking.total) * 1000) / 10 : commissionPctOf(booking);
+  const commV = commissionBaseOf(booking);
+  const payFeeV = paymentFeeOf(booking);
   const nettoV = nettoOf(booking);
   const paidV = booking.paid ?? 0;
   const balanceV = Math.max(0, totalV - paidV);
@@ -482,6 +483,7 @@ export default function BookingDrawer() {
         </div>
         <div className="my-1 border-t border-line" />
         {commV > 0 && <Row label={`${t("Commissione")} (${commPctV}%)`} value={eur(commV)} mono />}
+        {payFeeV > 0 && <Row label={t("Costo incasso")} value={eur(payFeeV)} mono />}
         <Row label={t("Netto struttura")} value={eur(nettoV)} mono strong />
       </Section>
 

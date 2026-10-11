@@ -14,6 +14,7 @@ import { CHANNELS, type Channel } from "@/lib/types";
 import { parseNotifPrefs } from "@/lib/notifPrefs";
 import { readRevisionGuestData, mergeOtaOverCarried, type OtaInfo } from "@/lib/channex-guestdata";
 import { splitCommission } from "@/lib/commission-split";
+import { parsePaymentCharge } from "@/lib/payment-fee";
 
 // Property di test della certificazione: le sue prenotazioni non sono in channex_map (non è una
 // struttura reale), ma vanno comunque ACKate dal flusso di import automatico — che è quello che
@@ -351,7 +352,10 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       const roomsArr = r.rooms && r.rooms.length ? r.rooms : [{}];
       // La commissione OTA è quella dell'INTERA prenotazione: con più camere va divisa tra le righe in proporzione al prezzo di ciascuna
       // (all'ultima va il resto, così la somma torna al centesimo), non ripetuta su ognuna.
-      const commShares = splitCommission(commissionAmount, roomsArr.map((room, i) => readRevisionGuestData(r as unknown as Record<string, unknown>, room as unknown as Record<string, unknown>, i === 0).total ?? 0));
+      const roomTotals = roomsArr.map((room, i) => readRevisionGuestData(r as unknown as Record<string, unknown>, room as unknown as Record<string, unknown>, i === 0).total ?? 0);
+      const commShares = splitCommission(commissionAmount, roomTotals);
+      // Costo d'incasso dell'OTA ("Payment charge" nelle note di Booking): anche questo è dell'intera prenotazione, quindi diviso tra le camere.
+      const feeShares = splitCommission(parsePaymentCharge(String((r as unknown as { notes?: unknown }).notes ?? "")), roomTotals);
       let added = 0;
       // Righe sostituite (modifica, o prenotazione già importata da Octorate): i dati che Channex non conosce — incassi, check-in online, documenti, note, extra,
       // camera assegnata — si RIPORTANO sulla nuova riga, altrimenti una prenotazione già pagata tornerebbe "da incassare".
@@ -395,6 +399,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           ...fromOta,
           ...(otaInfo ? { otaInfo } : {}),
           ...(commShares[idx] != null ? { commissionAmount: commShares[idx] } : {}),
+          ...(feeShares[idx] != null ? { paymentFee: feeShares[idx] } : {}),
           ...(commissionPct != null ? { commissionPct } : {}),
           ...(otaCard && idx === 0 ? { otaCard } : {}), // la VCC copre la prenotazione: la attacchiamo alla prima camera
           extId: stableKey, code: r.ota_reservation_code || undefined, source: "channex",

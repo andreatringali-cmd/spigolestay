@@ -67,16 +67,27 @@ export function bookingPaidTotal(b: BookingLike): number {
 // Calcolo UNICO della commissione OTA, condiviso ovunque venga mostrata o sommata.
 // Se è nota la cifra esatta (commissionAmount, es. da Booking.com/Channex) ha sempre priorità
 // sul calcolo via percentuale, che resta una stima quando la cifra esatta non c'è.
-type CommissionBookingLike = { total?: number; channel: Channel; commissionPct?: number; commissionAmount?: number | null; structureId?: string };
+type CommissionBookingLike = { total?: number; channel: Channel; commissionPct?: number; commissionAmount?: number | null; paymentFee?: number | null; structureId?: string };
 export function commissionPctOf(b: CommissionBookingLike): number {
-  if (b.commissionAmount != null && b.total) return Math.round((b.commissionAmount / b.total) * 1000) / 10;
+  if (b.commissionAmount != null && b.total) return Math.round(((b.commissionAmount + paymentFeeOf(b)) / b.total) * 1000) / 10;
   return b.commissionPct ?? loadChannelCommissionPct(b.channel, b.structureId) ?? CHANNELS[b.channel].commission * 100;
 }
+/** Solo la commissione di intermediazione dell'OTA (senza il costo d'incasso). */
+export function commissionBaseOf(b: CommissionBookingLike): number {
+  if (b.commissionAmount != null) return b.commissionAmount;
+  const pct = b.commissionPct ?? loadChannelCommissionPct(b.channel, b.structureId) ?? CHANNELS[b.channel].commission * 100;
+  return Math.round((b.total ?? 0) * pct) / 100; // ai centesimi, non all'euro intero
+}
+/** Commissioni totali trattenute dall'OTA: intermediazione + costo d'incasso (es. "Payment charge" di Booking.com). È la cifra della colonna Commissioni. */
 export function commissionOf(b: CommissionBookingLike): number {
-  return b.commissionAmount ?? Math.round((b.total ?? 0) * commissionPctOf(b)) / 100; // ai centesimi, non all'euro intero
+  return Math.round((commissionBaseOf(b) + paymentFeeOf(b)) * 100) / 100;
+}
+/** Costo d'incasso trattenuto dall'OTA (es. "Payment charge" di Booking.com), separato dalla commissione. */
+export function paymentFeeOf(b: CommissionBookingLike): number {
+  return b.paymentFee && b.paymentFee > 0 ? b.paymentFee : 0;
 }
 export function nettoOf(b: CommissionBookingLike): number {
-  return (b.total ?? 0) - commissionOf(b);
+  return Math.round(((b.total ?? 0) - commissionOf(b)) * 100) / 100;
 }
 
 type NightlyBookingLike = { total?: number; checkIn: string; checkOut: string; nightlyRates?: Record<string, number> };
