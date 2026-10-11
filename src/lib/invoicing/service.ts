@@ -10,6 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Structure, RoomType, Booking, Guest } from "@/lib/types";
 import { cityTaxOf } from "@/lib/booking";
 import { nights } from "@/lib/dates";
+import { todayRome } from "@/lib/dates-rome";
 import {
   buildDocumentDraft, toCents, type FolioLine, type Regime, type DocKind,
 } from "./folio";
@@ -421,9 +422,10 @@ export async function createAutofattura(admin: SupabaseClient, tenantId: string,
   const imponibileCents = (pd.taxable_cents && pd.taxable_cents > 0) ? pd.taxable_cents : (pd.total_cents ?? 0);
   if (imponibileCents <= 0) return { ok: false, message: "Imponibile a zero: indica l'importo della commissione." };
 
-  const year = new Date().getFullYear();
+  // Data e anno nel fuso italiano (il server gira in UTC: a cavallo di mezzanotte/Capodanno sarebbero sbagliati).
+  const dateISO = todayRome();
+  const year = Number(dateISO.slice(0, 4));
   const number = pd.selfinvoice_number || await nextAutofatturaNumber(admin, tenantId, year);
-  const dateISO = new Date().toISOString().slice(0, 10);
   const causale = `Autofattura reverse charge (TD17) — ${pd.supplier_name || sup?.name || "fornitore estero"}${pd.doc_number ? ` rif. ${pd.doc_number}` : ""}`;
 
   const xml = buildAutofatturaXml({

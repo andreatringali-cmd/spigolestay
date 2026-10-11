@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authTenant, isResponse, type AuthOk } from "@/lib/invoicing/api";
 import { syncSchedine, sendReady } from "@/lib/alloggiati/service";
 import { syncIstat, closeDay } from "@/lib/istat/service";
+import { todayRome } from "@/lib/dates-rome";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,8 @@ const ISTAT_LIVE = process.env.ISTAT_LIVE === "1";
 type StepStatus = "fatto" | "prova" | "errore" | "niente";
 interface Step { key: "schedine" | "istat"; label: string; status: StepStatus; detail: string; count: number }
 
-const today = () => new Date().toISOString().slice(0, 10);
+// "Oggi" nel fuso italiano (il server gira in UTC).
+const today = () => todayRome();
 
 // Conta le schedine PRONTE (arrivo già avvenuto) per una struttura — quelle realmente inviabili.
 async function countSchedineReady(auth: AuthOk, structureId: string): Promise<number> {

@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Structure, Booking, Guest } from "@/lib/types";
 import { nights } from "@/lib/dates";
+import { todayRome, ymdRome, addDaysYmd } from "@/lib/dates-rome";
 import { getAlloggiatiProvider, type AlloggiatiCreds, type SchedinaPayload } from "./provider";
 import { logBookingEvent } from "@/lib/booking-events";
 import { decryptCred } from "@/lib/crypto-creds";
@@ -117,8 +118,7 @@ export async function syncSchedine(admin: SupabaseClient, tenantId: string, opts
   const blob = await readBlob(admin, tenantId);
   const { data: settRows } = await admin.from("alloggiati_settings").select("structure_id, group_guests").eq("tenant_id", tenantId);
   const groupBy = new Map((settRows ?? []).map((s) => [s.structure_id as string, s.group_guests as boolean]));
-  const start = new Date(); start.setDate(start.getDate() - (opts.fromDays ?? 7));
-  const startISO = start.toISOString().slice(0, 10);
+  const startISO = addDaysYmd(todayRome(), -(opts.fromDays ?? 7));
 
   const isInactive = (b: { status?: string; channel?: string }) => b.status === "cancelled" || b.status === "no_show" || b.channel === "blocked";
   const bookings = (blob.bookings ?? []).filter((b) =>
@@ -223,7 +223,7 @@ export async function testReady(admin: SupabaseClient, tenantId: string, structu
   let q = admin.from("alloggiati_schedine").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pronta");
   // Si controllano solo gli arrivi GIÀ avvenuti: gli arrivi futuri (in preparazione) non si verificano.
   if (arrival) q = q.eq("arrival", arrival);
-  else q = q.lte("arrival", new Date().toISOString().slice(0, 10));
+  else q = q.lte("arrival", todayRome());
   const { data: sched } = await q;
   const list = sched ?? [];
   if (!list.length) return { ok: true, message: "Nessuna schedina da controllare." };
@@ -257,7 +257,7 @@ export async function fetchRicevuta(admin: SupabaseClient, tenantId: string, str
 
 // Genera il tracciato .txt (168 char/riga) delle schedine PRONTE — fallback per l'invio manuale sul portale.
 export async function buildTracciato(admin: SupabaseClient, tenantId: string, structureId: string): Promise<{ ok: boolean; message: string; text?: string; count?: number }> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayRome();
   const { data } = await admin.from("alloggiati_schedine").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pronta").lte("arrival", today);
   const list = data ?? [];
   if (!list.length) return { ok: false, message: "Nessuna schedina pronta (gli arrivi futuri si inviano dopo l'arrivo)." };
@@ -284,11 +284,11 @@ export async function getSubmissionRicevuta(admin: SupabaseClient, tenantId: str
   const { data: sub } = await admin.from("alloggiati_submissions").select("id, created_at, ricevuta_pdf").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("id", submissionId).maybeSingle();
   if (!sub) return { ok: false, message: "Invio non trovato." };
   if (sub.ricevuta_pdf) return { ok: true, message: "Ricevuta dall'archivio.", pdfBase64: sub.ricevuta_pdf as string };
-  const day = String(sub.created_at).slice(0, 10);
+  const day = ymdRome(String(sub.created_at));
   const r = await fetchRicevuta(admin, tenantId, structureId, day);
   if (r.ok && r.pdfBase64) { try { await admin.from("alloggiati_submissions").update({ ricevuta_pdf: r.pdfBase64 }).eq("id", submissionId); } catch {} return r; }
   // La ricevuta è disponibile sul portale dal giorno DOPO l'invio ed entro ~30 giorni.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayRome();
   if (day >= today) return { ok: false, message: "La ricevuta sarà disponibile dal giorno successivo all'invio: riprova domani." };
   return r;
 }
@@ -298,7 +298,7 @@ export async function sendReady(admin: SupabaseClient, tenantId: string, structu
   let q = admin.from("alloggiati_schedine").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pronta");
   // La schedina si invia DOPO l'arrivo: nell'invio massivo escludiamo gli arrivi futuri.
   if (arrival) q = q.eq("arrival", arrival);
-  else q = q.lte("arrival", new Date().toISOString().slice(0, 10));
+  else q = q.lte("arrival", todayRome());
   const { data: sched } = await q;
   const list = sched ?? [];
   if (!list.length) return { ok: false, message: "Nessuna schedina pronta da inviare (gli arrivi futuri si inviano dopo l'arrivo).", sent: 0 };
@@ -321,7 +321,7 @@ export async function sendReady(admin: SupabaseClient, tenantId: string, structu
       const { result, elenco } = await wsSend(c.username!, token, records);
       const perLine = list.map((_, i) => elenco.dettaglio[i]?.esito ?? result.esito);
       const invalid = perLine.filter((v) => !v).length;
-      const ric = `RIC-${new Date().toISOString().slice(0, 10)}`;
+      const ric = `RIC-${todayRome()}`;
       res = { ok: result.esito && invalid === 0, message: invalid ? `${elenco.schedineValide}/${list.length} acquisite, ${invalid} con errori.` : `Inviate ${elenco.schedineValide} schedine alla Questura.`, ricevuta: result.esito ? ric : undefined, perLine };
     } catch (e) { res = { ok: false, message: (e as Error)?.message ?? "Errore invio schedine." }; }
   } else {

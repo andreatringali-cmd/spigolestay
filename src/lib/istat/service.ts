@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Structure, Booking, Guest } from "@/lib/types";
 import { logBookingEvent } from "@/lib/booking-events";
+import { todayRome, addDaysYmd } from "@/lib/dates-rome";
 import { decryptCred } from "@/lib/crypto-creds";
 import { sendDaily, type DailyMovement } from "@/lib/istat/turistat";
 
@@ -23,8 +24,7 @@ export async function syncIstat(admin: SupabaseClient, tenantId: string, opts: {
   const blob = await readBlob(admin, tenantId);
   const { data: sett } = await admin.from("istat_settings").select("structure_id, start_from").eq("tenant_id", tenantId);
   const startFrom = new Map((sett ?? []).map((s) => [s.structure_id as string, s.start_from as string | null]));
-  const start = new Date(); start.setDate(start.getDate() - (opts.fromDays ?? 7));
-  const startISO = start.toISOString().slice(0, 10);
+  const startISO = addDaysYmd(todayRome(), -(opts.fromDays ?? 7));
   const guestsById = new Map((blob.guests ?? []).map((g) => [g.id, g]));
 
   const isInactive = (b: { status?: string; channel?: string }) => b.status === "cancelled" || b.status === "no_show" || b.channel === "blocked";
@@ -99,7 +99,7 @@ function buildDailyMovement(blob: Blob, structureId: string, day: string): Daily
 // altrimenti mock. Marca come inviate le righe pending del giorno.
 export async function closeDay(admin: SupabaseClient, tenantId: string, structureId: string, day?: string): Promise<{ ok: boolean; message: string; sent: number }> {
   const { data: sett } = await admin.from("istat_settings").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).maybeSingle();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayRome();
   let q = admin.from("istat_rows").select("id, booking_id").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pending");
   // Si invia per gli arrivi già avvenuti: senza un giorno specifico, escludi gli arrivi futuri.
   if (day) q = q.eq("arrival", day);
