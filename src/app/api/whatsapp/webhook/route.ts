@@ -9,6 +9,7 @@ import { conciergeAnswer, resolveStructureId, type BookingLite } from "@/lib/con
 import { loadOrgDatas, mergeOrgData } from "@/lib/concierge-orgdata";
 import { logUnanswered } from "@/lib/concierge-unanswered";
 import { sendWhatsapp } from "@/lib/whatsapp";
+import { verifyMetaSignature } from "@/lib/meta-signature";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +34,12 @@ type MsgSt = "sent" | "delivered" | "read" | "failed";
 type Msg = { id: string; dir: "in" | "out"; text: string; ts: number; via?: string; wid?: string; st?: MsgSt; media?: { kind: "audio"; id: string; transcribed: boolean } };
 interface WaStatus { id?: string; status?: string; errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[] }
 const ST_RANK: Record<string, number> = { sent: 1, failed: 1.5, delivered: 2, read: 3 };
+
+// Conflitto di rev (un altro processo ha scritto nel mentre): si rilegge e si riprova, con attesa crescente + un po' di casualità
+// per non scontrarsi di nuovo. 7 tentativi totali (attese ~0,25 / 0,5 / 0,75 / 1 / 1,25 / 1,5 s ≈ 5 s al massimo), ben dentro maxDuration.
+const WRITE_ATTEMPTS = 7;
+const retryDelay = (attempt: number) => 250 * (attempt + 1) + Math.floor(Math.random() * 120);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Handshake di verifica richiesto da Meta alla configurazione del webhook.
 export async function GET(req: Request) {
@@ -59,9 +66,11 @@ interface WaMessage {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function applyIncoming(admin: SupabaseClient<any>, tenantId: string, fromDigits: string, text: string, msgId: string, media?: Msg["media"]) {
-  // Stesso pattern rev-lock + retry singolo già usato in public-review/public-booking.
+  // Stesso pattern rev-lock già usato in public-review/public-booking, con più tentativi (vedi WRITE_ATTEMPTS).
+  // Il controllo "già ricevuto" (id messaggio) è RIFATTO a ogni tentativo: un retry non può mai creare doppioni.
   let orgGuestsCache: { id: string; fullName?: string; phone?: string; language?: string }[] | null = null; // letti al massimo una volta
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt++) {
+    if (attempt > 0) await sleep(retryDelay(attempt - 1));
     const { data: row } = await admin.from("app_state").select("data, rev").eq("user_id", tenantId).maybeSingle();
     const blob = ((row?.data ?? {}) as Record<string, string>) || {};
     const rev = typeof (row as { rev?: number } | null)?.rev === "number" ? (row as { rev: number }).rev : null;
@@ -110,7 +119,7 @@ async function applyIncoming(admin: SupabaseClient<any>, tenantId: string, fromD
         priorMessages: list,
       };
     }
-    // Conflitto di rev: un altro processo ha scritto nel mentre, riprova una volta.
+    // Conflitto di rev: un altro processo ha scritto nel mentre, rilegge e riprova (con attesa crescente).
   }
   return { ok: false };
 }
@@ -227,7 +236,8 @@ async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: 
     if (!sent.ok) return;
 
     // Stesso pattern rev-lock + retry di applyIncoming, per appendere la risposta AI al thread.
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt++) {
+      if (attempt > 0) await sleep(retryDelay(attempt - 1));
       const { data: row } = await admin.from("app_state").select("data, rev").eq("user_id", tenantId).maybeSingle();
       const blob = ((row?.data ?? {}) as Record<string, string>) || {};
       const rev = typeof (row as { rev?: number } | null)?.rev === "number" ? (row as { rev: number }).rev : null;
@@ -241,7 +251,7 @@ async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: 
       if (rev !== null) write = write.eq("rev", rev);
       const { data: updated } = await write.select("rev");
       if (updated && updated.length > 0) return;
-      // Conflitto di rev: un altro processo (es. l'host che risponde nel mentre) ha scritto, riprova una volta.
+      // Conflitto di rev: un altro processo (es. l'host che risponde nel mentre) ha scritto, riprova (con attesa crescente).
     }
   } catch (e) { console.error("[whatsapp webhook concierge]", e); }
 }
@@ -253,8 +263,21 @@ export async function POST(req: Request) {
   if (!sbUrl || !service) return NextResponse.json({ ok: true });
   const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  const body = await req.json().catch(() => null) as { entry?: { changes?: { value?: { metadata?: { phone_number_id?: string }; messages?: WaMessage[]; statuses?: WaStatus[] } }[] }[] } | null;
+  // Firma di Meta (X-Hub-Signature-256) sul corpo GREZZO. Senza META_APP_SECRET la chiamata è accettata con avviso (fail-open)
+  // finché non si imposta WHATSAPP_WEBHOOK_STRICT=1; con segreto presente una firma assente/errata è sempre rifiutata.
+  const raw = await req.text();
+  const sig = verifyMetaSignature(raw, req.headers.get("x-hub-signature-256"));
+  if (!sig.accept) {
+    console.warn("[whatsapp webhook] chiamata rifiutata (firma Meta):", sig.reason);
+    return NextResponse.json({ error: "invalid_signature" }, { status: 401 });
+  }
+  if (sig.reason === "no_secret") console.warn("[whatsapp webhook] META_APP_SECRET non impostata: firma Meta NON verificata (chiamata accettata). Imposta META_APP_SECRET e poi WHATSAPP_WEBHOOK_STRICT=1.");
 
+  let parsed: unknown = null;
+  try { parsed = JSON.parse(raw); } catch { parsed = null; }
+  const body = parsed as { entry?: { changes?: { value?: { metadata?: { phone_number_id?: string }; messages?: WaMessage[]; statuses?: WaStatus[] } }[] }[] } | null;
+
+  let saveFailed = false; // almeno un messaggio in arrivo NON è stato salvato → 500 così Meta riprova
   try {
     for (const entry of body?.entry ?? []) {
       for (const change of entry.changes ?? []) {
@@ -291,6 +314,7 @@ export async function POST(req: Request) {
           }
           if (!fromDigits || !text || !m.id) continue;
           const res = await applyIncoming(admin, tenantId, fromDigits, text, m.id, media);
+          if (!res.ok) { saveFailed = true; console.error("[whatsapp webhook] salvataggio messaggio fallito dopo i tentativi (conflitto di versione), risposta 500 per il retry di Meta:", m.id); continue; }
 
           // Notifica email al gestore (interruttore "Messaggi degli ospiti") — fire-and-forget.
           if (res.ok && res.notifPrefsRaw !== undefined) {
@@ -332,5 +356,7 @@ export async function POST(req: Request) {
     }
   } catch (e) { console.error("[whatsapp webhook]", e); }
 
+  // I messaggi già salvati restano (il dedupe sull'id li riconosce al retry di Meta): nessun doppione, nessuna notifica ripetuta.
+  if (saveFailed) return NextResponse.json({ ok: false, error: "save_failed" }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
