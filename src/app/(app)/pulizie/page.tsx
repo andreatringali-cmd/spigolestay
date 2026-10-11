@@ -395,15 +395,15 @@ export default function PuliziePage() {
 
       {/* Selettore: Pulizie / Scorte · meteo e "?" in linea, a destra */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="inline-flex rounded-xl border border-line bg-surface p-0.5 shadow-sm">
+        <div className="inline-flex rounded-xl border border-line bg-surface p-0.5 shadow-sm max-sm:w-full">
           {([["planning", "Pulizie"], ["scorte", "Scorte & spesa"]] as ["planning" | "scorte", string][]).map(([v, lab]) => (
-            <button key={v} onClick={() => setTab(v)} className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${tab === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>
+            <button key={v} onClick={() => setTab(v)} className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition max-sm:flex-1 max-sm:justify-center max-sm:px-2 ${tab === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>
               <Icon name={v === "planning" ? "sparkles" : "clipboard"} size={15} /> {t(lab)}
               {v === "scorte" && shopList.length > 0 && <span className="rounded-full bg-[color:var(--err)] px-1.5 text-[10px] font-bold text-white">{shopList.length}</span>}
             </button>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-3"><WeatherWidget compact /><PageHelp /></div>
+        <div className="ml-auto flex items-center gap-3 max-sm:w-full max-sm:justify-end"><WeatherWidget compact /><PageHelp /></div>
       </div>
 
       {tab === "scorte" ? (
@@ -546,24 +546,27 @@ export default function PuliziePage() {
       {/* Riga filtri — sinistra: struttura, calendario (frecce ±1g), Oggi, vista · destra: Copia/Condividi */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
         {activeStructureId === "all" && (
-          <select value={structFilter} onChange={(e) => setStructFilter(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-txt outline-none focus:border-focus">
+          <select value={structFilter} onChange={(e) => setStructFilter(e.target.value)} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-txt outline-none focus:border-focus max-sm:h-9 max-sm:w-full">
             <option value="all">{t("Tutte le strutture")}</option>
             {structures.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
           </select>
         )}
-        <div className="flex items-center gap-1">
-          <button onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} aria-label={t("Giorno precedente")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">‹</button>
-          <DateField value={date} onChange={setDate} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-focus" />
-          <button onClick={() => setDate(toISO(addDays(parseISO(date), 1)))} title={t("Giorno successivo")} aria-label={t("Giorno successivo")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">›</button>
+        <div className="flex w-full items-center gap-2 sm:contents">
+        <div className="flex min-w-0 items-center gap-1 max-sm:flex-1">
+          <button onClick={() => setDate(toISO(addDays(parseISO(date), -1)))} title={t("Giorno precedente")} aria-label={t("Giorno precedente")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt max-sm:h-9">‹</button>
+          <div className="min-w-0 sm:flex-none max-sm:flex-1"><DateField value={date} onChange={setDate} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm transition hover:border-focus max-sm:h-9 max-sm:w-full max-sm:justify-between max-sm:py-0" /></div>
+          <button onClick={() => setDate(toISO(addDays(parseISO(date), 1)))} title={t("Giorno successivo")} aria-label={t("Giorno successivo")} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt max-sm:h-9">›</button>
         </div>
-        <button onClick={() => setDate(todayISO)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt">{t("Oggi")}</button>
+        <button onClick={() => setDate(todayISO)} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash hover:text-txt max-sm:h-9 max-sm:py-0">{t("Oggi")}</button>
+        </div>
+        <div className="flex w-full items-center gap-2 sm:contents">
         <div className="flex items-center rounded-lg border border-line p-0.5">
           <Seg v="cards" icon="grid" title={t("Vista card")} />
           <Seg v="rows" icon="menu" title={t("Vista lista")} />
         </div>
         <div className="relative ml-auto">
           {copied && <span className="mr-2 text-xs font-medium text-[color:var(--ok)]">{t("Copiato ✓")}</span>}
-          <button onClick={() => setPlanShare((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
+          <button onClick={() => setPlanShare((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:h-9 max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
           {planShare && (<>
             <button aria-label={t("Chiudi")} onClick={() => setPlanShare(false)} className="fixed inset-0 z-20 cursor-default" />
             <div className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
@@ -580,6 +583,7 @@ export default function PuliziePage() {
               ><Icon name="clock" size={15} /> {t("Invio automatico")}</button>
             </div>
           </>)}
+        </div>
         </div>
       </div>
       {autoOpen && autoShareStructure && <AutoShareSettings structureId={autoShareStructure.id} structureName={autoShareStructure.name} onClose={() => setAutoOpen(false)} />}

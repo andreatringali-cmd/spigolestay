@@ -49,8 +49,8 @@ export default function ExportMenu({ onExcel, onPdf, excelFields }: { onExcel: (
   const toggleField = (key: string) => setPicker((p) => { const n = new Set(p); n.has(key) ? n.delete(key) : n.add(key); return n; });
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash">
-        {t("Esporta")} <Icon name="chevron" size={14} />
+      <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-txt hover:bg-wash max-sm:h-9 max-sm:px-2.5 max-sm:py-0">
+        <span className="max-sm:sr-only">{t("Esporta")}</span> <Icon name="chevron" size={14} />
       </button>
       {open && (
         <div className="absolute right-0 top-full z-40 mt-1 w-40 overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-xl">

@@ -333,16 +333,18 @@ export default function OspitiPage() {
       <div className="mb-4 grid grid-cols-2 items-center gap-2.5 rounded-xl border border-line bg-surface p-3 shadow-sm sm:grid-cols-4">
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca per nome, email o paese…")} className="col-span-2 w-full sm:col-span-1" />
         <div className="col-span-2 flex flex-wrap items-center gap-1.5 sm:col-span-3">
+          <div className="flex items-center gap-1.5 max-sm:-mx-1 max-sm:w-full max-sm:overflow-x-auto max-sm:px-1 max-sm:pb-1 sm:contents [&>button]:shrink-0 [&>button]:whitespace-nowrap">
           {SEGMENTS.map(([k, lab]) => (
             <button key={k} onClick={() => setSeg(k)} className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${seg === k ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_14%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{lab}</button>
           ))}
           {seg !== "all" && guestSorted.length > 0 && (
             <button onClick={selectSegment} className="rounded-lg border border-line px-3 py-1 text-xs font-semibold text-txt hover:bg-wash">{t("Seleziona segmento")} ({guestSorted.length})</button>
           )}
-          <div className="ml-auto flex items-center gap-2">
-            <button onClick={() => router.push("/ospiti/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ {t("Nuovo ospite")}</button>
-            <button onClick={() => router.push("/promozioni")} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash"><Icon name="tag" size={14} /> {t("Promozioni")}</button>
-            <button onClick={() => setExportPick(true)} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash"><Icon name="fileText" size={14} /> Excel</button>
+          </div>
+          <div className="ml-auto flex items-center gap-2 max-sm:ml-0 max-sm:w-full">
+            <button onClick={() => router.push("/ospiti/nuovo")} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 max-sm:h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:py-0">+ {t("Nuovo ospite")}</button>
+            <button onClick={() => router.push("/promozioni")} aria-label={t("Promozioni")} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:h-9 max-sm:px-2.5 max-sm:py-0"><Icon name="tag" size={14} /> <span className="max-sm:hidden">{t("Promozioni")}</span></button>
+            <button onClick={() => setExportPick(true)} aria-label="Excel" className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash max-sm:h-9 max-sm:px-2.5 max-sm:py-0"><Icon name="fileText" size={14} /> <span className="max-sm:hidden">Excel</span></button>
           </div>
         </div>
       </div>

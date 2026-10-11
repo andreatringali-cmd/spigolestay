@@ -427,33 +427,37 @@ export default function PrenotazioniPage() {
       <div className="no-print mb-4 grid grid-cols-[minmax(0,1fr)] items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca nome o codice…")} className="w-full" />
         <div className="flex min-w-0 flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
-        <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
-          <Select value={dateField} onChange={(v) => { const f = v as "attive" | "arrivo" | "prenotazione" | "incasa" | "tutte"; setDateField(f); if (f === "tutte") { setFrom(""); setTo(""); } else if (!from) setFrom(toISO(new Date())); }} label={t("Tipo data")}>
+        <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1 max-sm:w-full">
+          <Select className="max-sm:w-full" value={dateField} onChange={(v) => { const f = v as "attive" | "arrivo" | "prenotazione" | "incasa" | "tutte"; setDateField(f); if (f === "tutte") { setFrom(""); setTo(""); } else if (!from) setFrom(toISO(new Date())); }} label={t("Tipo data")}>
             <option value="attive">{t("In corso e future")}</option>
             <option value="tutte">{t("Tutte (da sempre)")}</option>
             <option value="arrivo">{t("Arrivo / check-in")}</option>
             <option value="prenotazione">{t("Data prenotazione")}</option>
             <option value="incasa">{t("In casa (occupazione)")}</option>
           </Select>
-          <DateField value={from} onChange={setFrom} title={t("Dal")} placeholder={t("Dal")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
+          <div className="max-sm:min-w-0 max-sm:flex-1"><DateField value={from} onChange={setFrom} title={t("Dal")} placeholder={t("Dal")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus max-sm:w-full max-sm:justify-between" /></div>
           <span className="text-xs text-faint">→</span>
-          <DateField value={to} onChange={setTo} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
+          <div className="max-sm:min-w-0 max-sm:flex-1"><DateField value={to} onChange={setTo} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus max-sm:w-full max-sm:justify-between" /></div>
         </div>
-        <StructureFilter value={loc} onChange={setLoc} structures={structuresToShow} units={units} roomTypes={roomTypes} single={activeStructureId !== "all"} />
-        <Select value={channel} onChange={setChannel} label={t("Canale")}>
+        <div className="flex items-center gap-2 max-sm:w-full sm:contents">
+        <div className="max-sm:min-w-0 max-sm:flex-1 max-sm:[&>div]:w-full max-sm:[&>div>button]:w-full max-sm:[&>div>button]:justify-between"><StructureFilter value={loc} onChange={setLoc} structures={structuresToShow} units={units} roomTypes={roomTypes} single={activeStructureId !== "all"} /></div>
+        <Select className="max-sm:min-w-0 max-sm:flex-1" value={channel} onChange={setChannel} label={t("Canale")}>
           <option value="all">{t("Tutti i canali")}</option>
           {(Object.keys(CHANNELS) as Channel[]).filter((c) => c !== "blocked").map((c) => (<option key={c} value={c}>{CHANNELS[c].label}</option>))}
         </Select>
-        {/* Vista compatta / dettagliata */}
-        <div className="flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold" role="group" aria-label={t("Vista")}>
-          <button onClick={() => pickView("compact")} aria-pressed={view === "compact"} className={`rounded-md px-2.5 py-1.5 transition ${view === "compact" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Compatta")}</button>
-          <button onClick={() => pickView("detail")} aria-pressed={view === "detail"} className={`rounded-md px-2.5 py-1.5 transition ${view === "detail" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Dettagliata")}</button>
         </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 max-sm:w-full sm:contents">
+        {/* Vista compatta / dettagliata */}
+        <div className="flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold max-sm:h-9 max-sm:min-w-0 max-sm:flex-1" role="group" aria-label={t("Vista")}>
+          <button onClick={() => pickView("compact")} aria-pressed={view === "compact"} className={`rounded-md px-2.5 py-1.5 transition max-sm:flex-1 max-sm:px-1 ${view === "compact" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Compatta")}</button>
+          <button onClick={() => pickView("detail")} aria-pressed={view === "detail"} className={`rounded-md px-2.5 py-1.5 transition max-sm:flex-1 max-sm:px-1 ${view === "detail" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Dettagliata")}</button>
+        </div>
+        <div className="ml-auto flex shrink-0 items-center gap-2 sm:flex-wrap">
           {/* Toggle grafici: un click mostra tutti / nasconde tutti */}
           <button onClick={() => (shownCharts.length > 0 ? hideAllCharts() : showAllCharts())} title={shownCharts.length > 0 ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-9 w-9 place-items-center rounded-lg border transition ${shownCharts.length > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={16} /></button>
-          <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
+          <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:inline-flex max-sm:h-9 max-sm:items-center max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>+ {t("Nuova")}</Link>
           <ExportMenu onExcel={doExcel} onPdf={exportPdf} excelFields={excelFields} />
+        </div>
         </div>
         </div>
       </div>
@@ -714,9 +718,9 @@ function StructureFilter({ value, onChange, structures, units, roomTypes, single
 function Opt({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return <button onClick={onClick} className={`block w-full truncate rounded-md px-2 py-1.5 text-left text-sm ${active ? "bg-focus text-white" : "text-txt hover:bg-wash"}`}>{children}</button>;
 }
-function Select({ value, onChange, label, children }: { value: string; onChange: (v: string) => void; label: string; children: React.ReactNode }) {
+function Select({ value, onChange, label, children, className = "" }: { value: string; onChange: (v: string) => void; label: string; children: React.ReactNode; className?: string }) {
   return (
-    <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className="rounded-lg border border-line bg-surface px-2 py-2 text-sm text-txt outline-none focus:border-focus">
+    <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className={`rounded-lg border border-line bg-surface px-2 py-2 text-sm text-txt outline-none focus:border-focus ${className}`}>
       {children}
     </select>
   );
