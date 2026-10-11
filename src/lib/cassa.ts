@@ -98,17 +98,38 @@ export async function loadCash(): Promise<{ movements: Mov[]; rules: Rule[]; pai
   return { movements, rules, paid };
 }
 
-export async function insertMovement(tenantId: string, m: Mov) {
-  if (!supabase) return;
-  await supabase.from("cash_movements").insert({ ...(isUuid(m.id) ? { id: m.id } : {}), tenant_id: tenantId, structure_id: m.structureId ?? null, date: m.date, kind: m.kind, cat: m.cat, descr: m.desc, amount_cents: e2c(m.amount), conto: m.conto });
+// Le scritture restituiscono il messaggio d'errore (null = riuscita), così la pagina può avvisare
+// l'utente e annullare la modifica fatta a video invece di lasciarla "fantasma".
+export type WriteResult = string | null;
+const errMsg = (e: { message?: string } | null | undefined): WriteResult => (e ? (e.message || "errore sconosciuto") : null);
+const NO_CONN: WriteResult = "Non sei connesso al server: la modifica non è stata salvata.";
+
+export async function insertMovement(tenantId: string, m: Mov): Promise<WriteResult> {
+  if (!supabase) return NO_CONN;
+  const { error } = await supabase.from("cash_movements").insert({ ...(isUuid(m.id) ? { id: m.id } : {}), tenant_id: tenantId, structure_id: m.structureId ?? null, date: m.date, kind: m.kind, cat: m.cat, descr: m.desc, amount_cents: e2c(m.amount), conto: m.conto });
+  return errMsg(error);
 }
-export async function deleteMovement(id: string) { if (supabase) await supabase.from("cash_movements").delete().eq("id", id); }
-export async function insertRule(tenantId: string, r: Rule) {
-  if (!supabase) return;
-  await supabase.from("cash_rules").insert({ ...(isUuid(r.id) ? { id: r.id } : {}), tenant_id: tenantId, structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null });
+export async function deleteMovement(id: string): Promise<WriteResult> {
+  if (!supabase) return NO_CONN;
+  const { error } = await supabase.from("cash_movements").delete().eq("id", id);
+  return errMsg(error);
 }
-export async function deleteRule(id: string) { if (supabase) await supabase.from("cash_rules").delete().eq("id", id); }
-export async function addPaid(tenantId: string, keys: string[]) { if (supabase && keys.length) await supabase.from("cash_paid").upsert(keys.map((k) => ({ tenant_id: tenantId, k })), { onConflict: "tenant_id,k" }); }
+export async function insertRule(tenantId: string, r: Rule): Promise<WriteResult> {
+  if (!supabase) return NO_CONN;
+  const { error } = await supabase.from("cash_rules").insert({ ...(isUuid(r.id) ? { id: r.id } : {}), tenant_id: tenantId, structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null });
+  return errMsg(error);
+}
+export async function deleteRule(id: string): Promise<WriteResult> {
+  if (!supabase) return NO_CONN;
+  const { error } = await supabase.from("cash_rules").delete().eq("id", id);
+  return errMsg(error);
+}
+export async function addPaid(tenantId: string, keys: string[]): Promise<WriteResult> {
+  if (!keys.length) return null;
+  if (!supabase) return NO_CONN;
+  const { error } = await supabase.from("cash_paid").upsert(keys.map((k) => ({ tenant_id: tenantId, k })), { onConflict: "tenant_id,k" });
+  return errMsg(error);
+}
 
 // Migrazione una-tantum dei dati Cassa da localStorage → Supabase (per non perdere lo storico).
 export async function migrateLocalCash(tenantId: string): Promise<boolean> {

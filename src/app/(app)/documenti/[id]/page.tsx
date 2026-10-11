@@ -230,14 +230,27 @@ export default function DocumentoPage() {
   const saveDraft = async () => {
     if (!supabase || !user || !doc) return false;
     // Righe: elimino e reinserisco (solo in bozza è consentito dal trigger).
-    await supabase.from("document_lines").delete().eq("document_id", id);
+    // Si controlla ogni passaggio: se l'inserimento fallisce si ripristinano le righe di prima,
+    // così il documento non resta mai senza righe a metà salvataggio.
+    const { data: oldLines, error: selErr } = await supabase.from("document_lines").select("*").eq("document_id", id);
+    if (selErr) { setMsg("Errore salvataggio righe: " + selErr.message + " Il documento non è stato modificato."); return false; }
+    const { error: delErr } = await supabase.from("document_lines").delete().eq("document_id", id);
+    if (delErr) { setMsg("Errore salvataggio righe: " + delErr.message + " Il documento non è stato modificato."); return false; }
     if (lines.length) {
-      await supabase.from("document_lines").insert(lines.map((l, i) => ({
+      const { error: insErr } = await supabase.from("document_lines").insert(lines.map((l, i) => ({
         document_id: id, tenant_id: user.id, pos: i + 1, description: l.description || "—", qty: l.qty || 1,
         unit_price_cents: Math.round(l.unitEur * 100), vat_rate: l.vat === "N1" || l.vat === "N2.2" ? 0 : Number(l.vat) || 0,
         vat_nature: l.vat === "N1" ? "N1" : l.vat === "N2.2" ? "N2.2" : null,
         line_total_cents: Math.round(l.unitEur * 100 * (l.qty || 0)), source_kind: l.sourceKind, booking_id: doc.booking_id, folio_ref: `l${i}`,
       })));
+      if (insErr) {
+        let restored = true;
+        if (oldLines && oldLines.length) { const { error: rErr } = await supabase.from("document_lines").insert(oldLines); restored = !rErr; }
+        setMsg(restored
+          ? "Errore salvataggio righe: " + insErr.message + " Le righe precedenti sono state ripristinate: riprova."
+          : "ATTENZIONE: salvataggio righe non riuscito (" + insErr.message + ") e le righe precedenti non si sono potute ripristinare. Non chiudere la pagina: ricaricala e controlla le righe del documento prima di continuare.");
+        return false;
+      }
     }
     const counterpart = { kind: cp.kind, name: cp.name, lastName: cp.lastName || undefined, vat: cp.vat || null, tax_code: cp.tax_code || null, country: cp.country || "IT", address: cp.address || null, city: cp.city || null, cap: cp.cap || null, province: cp.province || null, sdi_code: f.sdi_code || (cp.kind === "estero" ? "XXXXXXX" : "0000000"), pec: f.pec || null };
     const { error } = await supabase.from("documents").update({
@@ -273,7 +286,9 @@ export default function DocumentoPage() {
   const addPayment = async (amountCents: number, method: string) => {
     if (!supabase || !user || amountCents <= 0) return;
     await act("pay", async () => {
-      await supabase!.from("document_payments").insert({ document_id: id, tenant_id: user.id, amount_cents: amountCents, method });
+      const { error: payErr } = await supabase!.from("document_payments").insert({ document_id: id, tenant_id: user.id, amount_cents: amountCents, method });
+      // Se il pagamento non è stato registrato NON si tocca booking.paid (altrimenti incassi e documento divergono).
+      if (payErr) throw new Error("Pagamento non registrato: " + payErr.message);
       // Fonte di verità = prenotazione: propaga l'incasso su booking.paid (in €).
       if (link.bookingId) { const b = bookings.find((x) => x.id === link.bookingId); if (b) updateBooking(b.id, { paid: roundCents((b.paid ?? 0) + Math.round(amountCents) / 100) }); }
     });
