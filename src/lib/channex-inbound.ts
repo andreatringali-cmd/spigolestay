@@ -361,7 +361,9 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       // camera assegnata — si RIPORTANO sulla nuova riga, altrimenti una prenotazione già pagata tornerebbe "da incassare".
       const oldPool = [...removed];
       const CARRY = ["paid", "cleaningFee", "cityTaxExempt", "cityTaxPaid", "depositPaid", "parking", "webCheckin", "arrivalTime", "docPhotoFront", "docPhotoBack", "signature", "invoiceNo",
-        "extraGuests", "primaryGuest", "extras", "upsellOffers", "invoiceRequest", "guestRequests", "color", "movedFrom", "reviewRequestedAt", "reviewRequestChannel", "bookedOn", "childAges", "cribs"] as const;
+        "extraGuests", "primaryGuest", "extras", "upsellOffers", "invoiceRequest", "guestRequests", "color", "movedFrom", "reviewRequestedAt", "reviewRequestChannel", "bookedOn", "childAges", "cribs",
+        // Commissione già nota (es. dal file Octorate): se Channex non la manda per questa prenotazione NON va persa. Se la manda, quella di Channex vince (più sotto).
+        "commissionAmount", "commissionPct", "paymentFee"] as const;
       roomsArr.forEach((room, idx) => {
         const roomTypeId = (room.room_type_id && map.rooms[room.room_type_id]) || undefined;
         if (!roomTypeId) return; // tipologia non mappata → salta questa camera
