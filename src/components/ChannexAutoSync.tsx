@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import { useData } from "@/lib/store";
 import { buildAriPayload, type ChxStructMap } from "@/lib/channex-ari";
 import { apiPost } from "@/lib/invoicing/client";
+import { esitoFullSync, ESITO_NON_CONFERMATO, FULLSYNC_RESULT_EVENT, FULLSYNC_TIMEOUT_MS, type FullSyncEsito, type FullSyncDettaglio } from "@/lib/fullsync-result";
 
 // Sincronizzazione AUTOMATICA disponibilità+prezzi verso Channex.
 // Sostituisce il vecchio pulsante manuale "Prezzi & disponibilità": ogni volta che cambiano
@@ -33,11 +34,23 @@ export const CHANNEX_DIRTY_EVENT = "spigolestay:channex-dirty";
 // per la struttura così il prossimo giro di ChannexAutoSync invia SEMPRE la finestra intera
 // (needFull=true), non il delta — esattamente le 2 chiamate (availability+restrictions) richieste
 // da Channex per il test "Full sync on demand".
-export function forceFullSync(structureId: string) {
+// Restituisce una Promise (che non fallisce mai) con l'esito reale dell'invio, ricavato dall'evento che l'invio emette a fine lavoro;
+// se non arriva nulla entro un minuto (nulla da inviare, nessuna struttura collegata…) risolve con "non confermato". Chi non ne ha bisogno la ignora.
+export function forceFullSync(structureId: string): Promise<FullSyncEsito> {
   const lastFull = loadJSON<Record<string, number>>(LASTFULL_KEY, {});
   delete lastFull[structureId];
   saveJSON(LASTFULL_KEY, lastFull);
+  const esito = new Promise<FullSyncEsito>((resolve) => {
+    const done = (v: FullSyncEsito) => { clearTimeout(to); window.removeEventListener(FULLSYNC_RESULT_EVENT, on); resolve(v); };
+    const on = (ev: Event) => {
+      const d = (ev as CustomEvent<{ sid: string } & FullSyncDettaglio>).detail;
+      if (d && d.sid === structureId) done(esitoFullSync(d));
+    };
+    const to = setTimeout(() => done(ESITO_NON_CONFERMATO), FULLSYNC_TIMEOUT_MS);
+    window.addEventListener(FULLSYNC_RESULT_EVENT, on);
+  });
   window.dispatchEvent(new Event(CHANNEX_DIRTY_EVENT));
+  return esito;
 }
 
 // Snapshot per struttura: mappa chiave→valore (stringa) delle righe già inviate.
@@ -142,17 +155,21 @@ export default function ChannexAutoSync() {
             if (sendAvail.length === 0 && sendRestr.length === 0) continue; // niente cambiato per questa struttura
           }
 
-          let availOk = false, restrOk = false;
+          let availOk = false, restrOk = false, availError = "", restrError = "", netError = "";
           try {
             const res = await fetch("/api/channex/ari", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ availability: sendAvail, restrictions: sendRestr }),
             });
-            const j = await res.json().catch(() => null) as null | { availability?: { ok?: boolean }; restrictions?: { ok?: boolean } };
+            const j = await res.json().catch(() => null) as null | { error?: string; availability?: { ok?: boolean; error?: string }; restrictions?: { ok?: boolean; error?: string } };
             availOk = !!j?.availability?.ok;
             restrOk = !!j?.restrictions?.ok;
-          } catch { /* rete assente: snapshot non aggiornato → si riprova al prossimo cambiamento */ }
+            availError = String(j?.availability?.error ?? ""); restrError = String(j?.restrictions?.error ?? "");
+            if (!res.ok || (!availOk && !restrOk && j?.error)) netError = String(j?.error ?? `HTTP ${res.status}`);
+          } catch (e) { netError = e instanceof Error ? e.message : "rete assente"; /* rete assente: snapshot non aggiornato → si riprova al prossimo cambiamento */ }
+          // Esito reale per chi ha chiesto un full sync a mano (pulsante in Canali).
+          if (needFull) window.dispatchEvent(new CustomEvent(FULLSYNC_RESULT_EVENT, { detail: { sid, availOk, restrOk, availError, restrError, error: netError } }));
 
           // Aggiorna lo snapshot SOLO con le righe inviate con successo (per endpoint).
           const nextSnap: StructSnapshot = snap ? { availability: { ...snap.availability }, restrictions: { ...snap.restrictions } } : { availability: {}, restrictions: {} };
