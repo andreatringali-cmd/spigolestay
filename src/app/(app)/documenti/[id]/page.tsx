@@ -8,6 +8,7 @@ import { useData } from "@/lib/store";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { eur } from "@/lib/format";
+import { roundCents } from "@/lib/money";
 import { nights } from "@/lib/dates";
 import { cityTaxOf } from "@/lib/booking";
 import { invPost, centsEur, DOC_KIND_LABEL, STATO } from "@/lib/invoicing/client";
@@ -274,7 +275,7 @@ export default function DocumentoPage() {
     await act("pay", async () => {
       await supabase!.from("document_payments").insert({ document_id: id, tenant_id: user.id, amount_cents: amountCents, method });
       // Fonte di verità = prenotazione: propaga l'incasso su booking.paid (in €).
-      if (link.bookingId) { const b = bookings.find((x) => x.id === link.bookingId); if (b) updateBooking(b.id, { paid: (b.paid ?? 0) + Math.round(amountCents) / 100 }); }
+      if (link.bookingId) { const b = bookings.find((x) => x.id === link.bookingId); if (b) updateBooking(b.id, { paid: roundCents((b.paid ?? 0) + Math.round(amountCents) / 100) }); }
     });
   };
   const deleteDraft = async () => {

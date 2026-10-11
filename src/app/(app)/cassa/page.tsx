@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useData } from "@/lib/store";
 import { eur } from "@/lib/format";
+import { roundCents, sumCents } from "@/lib/money";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import ExportMenu from "@/components/ExportMenu";
@@ -141,21 +142,21 @@ export default function CassaPage() {
   const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
 
   const rows = all.filter((m) => month === "all" || monthKey(m.date) === month);
-  const entrate = rows.filter((m) => m.kind === "in").reduce((a, m) => a + m.amount, 0);
-  const uscite = rows.filter((m) => m.kind === "out").reduce((a, m) => a + m.amount, 0);
-  const saldo = entrate - uscite;
+  const entrate = sumCents(rows.filter((m) => m.kind === "in").map((m) => m.amount));
+  const uscite = sumCents(rows.filter((m) => m.kind === "out").map((m) => m.amount));
+  const saldo = roundCents(entrate - uscite);
 
-  const saldoConti = useMemo(() => { const map: Record<string, number> = {}; for (const m of all) map[m.conto] = (map[m.conto] ?? 0) + (m.kind === "in" ? m.amount : -m.amount); return map; }, [all]);
-  const saldoTot = Object.values(saldoConti).reduce((a, v) => a + v, 0);
+  const saldoConti = useMemo(() => { const map: Record<string, number> = {}; for (const m of all) map[m.conto] = roundCents((map[m.conto] ?? 0) + (m.kind === "in" ? m.amount : -m.amount)); return map; }, [all]);
+  const saldoTot = sumCents(Object.values(saldoConti));
 
-  const perCat = useMemo(() => { const map: Record<string, number> = {}; for (const m of rows) if (m.kind === "out") map[m.cat] = (map[m.cat] ?? 0) + m.amount; return Object.entries(map).map(([k, v]) => ({ cat: catOf(k), v })).filter((x) => x.cat).sort((a, b) => b.v - a.v); }, [rows]);
+  const perCat = useMemo(() => { const map: Record<string, number> = {}; for (const m of rows) if (m.kind === "out") map[m.cat] = roundCents((map[m.cat] ?? 0) + m.amount); return Object.entries(map).map(([k, v]) => ({ cat: catOf(k), v })).filter((x) => x.cat).sort((a, b) => b.v - a.v); }, [rows]);
   const maxCat = Math.max(1, ...perCat.map((x) => x.v));
 
   const trend = useMemo(() => {
     const base = month === "all" ? monthKey(today) : month;
     const [by, bm] = base.split("-").map(Number);
     const list: { ym: string; in: number; out: number }[] = [];
-    for (let i = 11; i >= 0; i--) { const d = new Date(by, bm - 1 - i, 1); const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; const mm = all.filter((m) => monthKey(m.date) === ym); list.push({ ym, in: mm.filter((m) => m.kind === "in").reduce((a, m) => a + m.amount, 0), out: mm.filter((m) => m.kind === "out").reduce((a, m) => a + m.amount, 0) }); }
+    for (let i = 11; i >= 0; i--) { const d = new Date(by, bm - 1 - i, 1); const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; const mm = all.filter((m) => monthKey(m.date) === ym); list.push({ ym, in: sumCents(mm.filter((m) => m.kind === "in").map((m) => m.amount)), out: sumCents(mm.filter((m) => m.kind === "out").map((m) => m.amount)) }); }
     return list;
   }, [all, month, today]);
   const maxTrend = Math.max(1, ...trend.flatMap((t) => [t.in, t.out]));
@@ -215,7 +216,7 @@ export default function CassaPage() {
     setRf((f) => ({ ...f, desc: "", amount: "" }));
   };
   const delRule = async (id: string) => { if (!(await ask({ message: t("Eliminare questo pagamento programmato?"), danger: true, confirmLabel: t("Elimina") }))) return; setRules((prev) => prev.filter((r) => r.id !== id)); deleteRule(id); };
-  const monthlyRecurring = rules.filter((r) => r.freq === "monthly" && ruleVisible(r.structureId)).reduce((a, r) => a + (r.kind === "out" ? r.amount : -r.amount), 0);
+  const monthlyRecurring = sumCents(rules.filter((r) => r.freq === "monthly" && ruleVisible(r.structureId)).map((r) => (r.kind === "out" ? r.amount : -r.amount)));
 
   const selCat = catOf(form.cat);
   const structNameOf = (id?: string) => (!id || id === "all" ? t("Tutte") : getStructure(id)?.name ?? "—");

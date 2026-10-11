@@ -5,6 +5,7 @@ import { supabase } from "./supabase";
 import { CHANNELS } from "./types";
 import type { Booking, Guest, Structure } from "./types";
 import { commissionOf } from "./booking";
+import { roundCents } from "./money";
 
 export type Kind = "in" | "out";
 export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string }
@@ -13,7 +14,7 @@ export interface Rule { id: string; kind: Kind; cat: string; desc: string; amoun
 const pad = (n: number) => String(n).padStart(2, "0");
 const fmt = (y: number, m0: number, d: number) => `${y}-${pad(m0 + 1)}-${pad(d)}`;
 const daysIn = (y: number, m0: number) => new Date(y, m0 + 1, 0).getDate();
-const e2c = (e: number) => Math.round(e * 100);
+const e2c = (e: number) => Math.round(roundCents(e) * 100);
 const c2e = (c: number) => Math.round(c) / 100;
 const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 
@@ -60,9 +61,9 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
     const st = getStructure(b.structureId);
     // Incasso automatico = quanto realmente incassato sulla prenotazione (fonte di
     // verità = prenotazione), non l'intero totale: così la cassa/chiusura riflette il reale.
-    const incassato = b.paid ?? 0;
+    const incassato = roundCents(b.paid ?? 0);
     if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: b.checkIn, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: b.channel === "direct" ? "contanti" : "banca", auto: true, ref: b.id });
-    const comm = commissionOf(b);
+    const comm = roundCents(commissionOf(b));
     if (comm > 0) out.push({ id: `auto-comm-${b.id}`, date: b.checkIn, kind: "out", cat: "commissioni", desc: `Commissione ${CHANNELS[b.channel].label} · ${g?.fullName ?? "Ospite"}`, amount: comm, conto: "banca", auto: true, ref: b.id });
   }
   return out;
