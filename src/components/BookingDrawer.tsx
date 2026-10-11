@@ -12,7 +12,7 @@ import VoucherDoc from "@/components/pdf/VoucherDoc";
 import { buildGuestLink, buildGroupGuestLink, guideMessage, shortenGuideLink, shortenLink } from "@/lib/guestlink";
 import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
 import { nights, parseISO, shiftISO } from "@/lib/dates";
-import { cityTaxOf, commissionBaseOf, commissionPctOf, nettoOf, paymentFeeOf } from "@/lib/booking";
+import { cityTaxOf, commissionBaseOf, commissionPctOf, defaultCommissionInfo, nettoOf, paymentFeeOf } from "@/lib/booking";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { loadWeekendPct } from "@/lib/pricing";
 import { eur } from "@/lib/format";
@@ -108,7 +108,7 @@ export default function BookingDrawer() {
       adults: booking.adults, children: booking.children,
       unitId: booking.unitId,
       total: booking.total ?? 0, cleaningFee: booking.cleaningFee ?? 0,
-      commissionPct: booking.commissionPct ?? Math.round(CHANNELS[booking.channel].commission * 100),
+      commissionPct: booking.commissionPct ?? defaultCommissionInfo(booking.channel, booking.structureId).pct,
       commissionAmount: booking.commissionAmount ?? null,
       paid: booking.paid ?? 0, code: booking.code ?? "",
       cityTaxExempt: !!booking.cityTaxExempt, cityTaxPaid: !!booking.cityTaxPaid, depositPaid: !!booking.depositPaid, parking: !!booking.parking,
@@ -737,7 +737,8 @@ export default function BookingDrawer() {
     updateBooking(booking.id, {
       checkIn: form.checkIn, checkOut: form.checkOut, channel: form.channel, status: form.status,
       adults: form.adults, children: form.children, unitId: form.unitId,
-      total: form.total, cleaningFee: form.cleaningFee, commissionPct: form.commissionPct,
+      total: form.total, cleaningFee: form.cleaningFee,
+      commissionPct: form.commissionPct === (booking.commissionPct ?? defaultCommissionInfo(booking.channel, booking.structureId).pct) ? booking.commissionPct : form.commissionPct,
       commissionAmount: form.commissionAmount ?? undefined, paid: form.paid,
       cityTaxExempt: form.cityTaxExempt, cityTaxPaid: form.cityTaxPaid, depositPaid: form.depositPaid, parking: form.parking,
       note: form.note.trim() || undefined, code: form.code.trim() || undefined, color: isHexColor(form.color) ? form.color : undefined,

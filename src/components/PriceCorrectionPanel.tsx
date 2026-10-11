@@ -16,7 +16,7 @@ import { CHANNELS, type Channel, type RoomType } from "@/lib/types";
 import { addDays, toISO } from "@/lib/dates";
 import { rateForDay } from "@/lib/pricing";
 import { loadWeekendPct } from "@/lib/pricing";
-import { loadChannelCommissionPct } from "@/lib/channelOverrides";
+import { defaultCommissionInfo } from "@/lib/booking";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { forceFullSync } from "@/components/ChannexAutoSync";
 import type { PriceCorrectionsApi } from "@/lib/usePriceCorrections";
@@ -29,11 +29,9 @@ import {
 export interface ChannelRef { id: string; channel: string; title: string; active: boolean }
 
 export const channelLabelOf = (c: ChannelRef) => CHANNELS[c.channel as Channel]?.label ?? c.title;
-// Commissione usata per il netto: quella impostata per canale/struttura, altrimenti il default del canale.
-export const commissionPctFor = (channel: string, sid: string) => {
-  const ch = channel as Channel;
-  return loadChannelCommissionPct(ch, sid) ?? Math.round((CHANNELS[ch]?.commission ?? 0) * 1000) / 10;
-};
+// Commissione usata per il netto: la stessa di Canali. Impostata a mano, altrimenti stima dai dati reali dell'ultimo anno, altrimenti la percentuale standard del canale.
+export const commissionPctFor = (channel: string, sid: string) => defaultCommissionInfo(channel as Channel, sid).pct;
+const commissionIsEstimate = (channel: string, sid: string) => defaultCommissionInfo(channel as Channel, sid).source === "stima";
 
 const eur = (n: number) => n.toLocaleString("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
 const eurSigned = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toLocaleString("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2 })}`;
@@ -533,7 +531,7 @@ export function ParityPanel({ sid, channels, api, rows, onSuggest }: {
                   <td className="px-2 py-1.5 text-dim">{readable ? correctionLabel(corr) : "?"}</td>
                   <td className="px-2 py-1.5 text-right font-mono text-dim">{rows.length ? eur(s.avgXenora) : "—"}</td>
                   <td className="px-2 py-1.5 text-right font-mono text-txt">{rows.length && readable ? eur(s.avgOta) : "—"}</td>
-                  <td className="px-2 py-1.5 text-right text-dim">{comm}%</td>
+                  <td className="px-2 py-1.5 text-right text-dim" title={commissionIsEstimate(c.channel, sid) ? "Stima dalle commissioni reali dell'ultimo anno" : undefined}>{commissionIsEstimate(c.channel, sid) ? "~" : ""}{comm}%</td>
                   <td className="px-2 py-1.5 text-right font-mono text-dim">{rows.length && readable ? eur(s.avgNetOta) : "—"}</td>
                   <td className="px-2 py-1.5 text-right font-mono" style={{ color: s.avgNetVsXenora < 0 ? "var(--err)" : "var(--ok)" }}>{rows.length && readable ? eurSigned(s.avgNetVsXenora) : "—"}</td>
                   <td className="px-2 py-1.5 text-right">{be && readable && comm > 0 && !sameCorrection(corr, be) && <button onClick={() => onSuggest(c, be)} className="text-[11px] text-dim hover:text-focus" title="Imposta la correzione che pareggia il netto della vendita diretta">pareggio {correctionLabel(be)}</button>}</td>
