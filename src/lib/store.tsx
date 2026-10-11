@@ -7,6 +7,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { kvGet, kvSet, kvRemove, kvKeys, kvFlush } from "./bigstore";
 import type { Structure, RoomType, Unit, Guest, Booking, Channel, CalEvent, DirectReview } from "./types";
 import { CHANNELS } from "./types";
+import { computeCommissionEstimates, setCommissionEstimates } from "./commission-estimate";
 import { playSound } from "./sound";
 import { loadUsers } from "./users";
 import { isPublicMode, lsGet, DATA_KEY } from "./publicdata";
@@ -361,6 +362,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (kept.length >= 2) setSubsetIds(kept); else { setSubsetIds([]); if (kept.length === 1) setActiveStructureId(kept[0]); }
     }
   }, [ready, structures, activeStructureId, subsetIds]);
+
+  // Stima della commissione per le prenotazioni senza cifra reale: si ricalcola quando cambiano le prenotazioni, PRIMA che i componenti figli la leggano.
+  useMemo(() => { setCommissionEstimates(computeCommissionEstimates(bookings, new Date().toISOString().slice(0, 10))); }, [bookings]);
 
   const value = useMemo<DataContextValue>(() => {
     // Strutture ordinate secondo la preferenza dell'utente (campo order), poi per nome.

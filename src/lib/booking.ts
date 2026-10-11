@@ -4,6 +4,7 @@
 import { nights, shiftISO } from "./dates";
 import { CHANNELS, type Channel, type Structure } from "./types";
 import { loadChannelCommissionPct } from "./channelOverrides";
+import { commissionEstimateFor } from "./commission-estimate";
 
 // Tassa di soggiorno. Due modalità:
 //  - "fixed":   € a persona per notte × persone × notti tassabili
@@ -68,14 +69,25 @@ export function bookingPaidTotal(b: BookingLike): number {
 // Se è nota la cifra esatta (commissionAmount, es. da Booking.com/Channex) ha sempre priorità
 // sul calcolo via percentuale, che resta una stima quando la cifra esatta non c'è.
 type CommissionBookingLike = { total?: number; cleaningFee?: number; extras?: { price?: number }[]; channel: Channel; commissionPct?: number; commissionAmount?: number | null; paymentFee?: number | null; structureId?: string };
+/**
+ * Percentuale da usare quando una prenotazione NON ha la cifra reale: 1) quella impostata a mano in Canali, 2) la stima dai dati reali (media pesata
+ * delle commissioni vere dello stesso canale e struttura nell'ultimo anno, vedi commission-estimate.ts), 3) la percentuale standard del canale.
+ */
+export function defaultCommissionInfo(channel: Channel, structureId?: string): { pct: number; source: "manuale" | "stima" | "standard" } {
+  const manual = loadChannelCommissionPct(channel, structureId);
+  if (manual !== undefined) return { pct: manual, source: "manuale" };
+  const est = commissionEstimateFor(channel, structureId);
+  if (est !== undefined) return { pct: est, source: "stima" };
+  return { pct: CHANNELS[channel].commission * 100, source: "standard" };
+}
 export function commissionPctOf(b: CommissionBookingLike): number {
   if (b.commissionAmount != null && b.total) return Math.round(((b.commissionAmount + paymentFeeOf(b)) / b.total) * 1000) / 10;
-  return b.commissionPct ?? loadChannelCommissionPct(b.channel, b.structureId) ?? CHANNELS[b.channel].commission * 100;
+  return b.commissionPct ?? defaultCommissionInfo(b.channel, b.structureId).pct;
 }
 /** Solo la commissione di intermediazione dell'OTA (senza il costo d'incasso). */
 export function commissionBaseOf(b: CommissionBookingLike): number {
   if (b.commissionAmount != null) return b.commissionAmount;
-  const pct = b.commissionPct ?? loadChannelCommissionPct(b.channel, b.structureId) ?? CHANNELS[b.channel].commission * 100;
+  const pct = b.commissionPct ?? defaultCommissionInfo(b.channel, b.structureId).pct;
   return Math.round((b.total ?? 0) * pct) / 100; // ai centesimi, non all'euro intero
 }
 /** Commissioni totali trattenute dall'OTA: intermediazione + costo d'incasso (es. "Payment charge" di Booking.com). È la cifra della colonna Commissioni. */

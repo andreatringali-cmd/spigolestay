@@ -16,6 +16,7 @@ import { usePriceCorrections } from "@/lib/usePriceCorrections";
 import { CorrectionEditor, CorrectionHistory, BulkCorrection, ParityPanel, buildPriceRows } from "@/components/PriceCorrectionPanel";
 import { correctionLabel, logForStructure, type Correction } from "@/lib/priceCorrection";
 import { loadChannelColor, saveChannelColor, loadChannelCommissionPct, saveChannelCommissionPct } from "@/lib/channelOverrides";
+import { defaultCommissionInfo } from "@/lib/booking";
 
 interface LogEntry { id: string; ts: number; text: string; color: string; structureId?: string }
 
@@ -366,7 +367,8 @@ export default function CanaliPage() {
                           const chKey = c.channel as Channel;
                           const label = CHANNELS[chKey]?.label ?? c.title;
                           const corr = c.id ? corrText(c.id) : "—";
-                          const commPct = loadChannelCommissionPct(chKey, g.sid) ?? (CHANNELS[chKey]?.commission ?? 0) * 100;
+                          const commInfo = defaultCommissionInfo(chKey, g.sid);
+                          const commPct = commInfo.pct;
                           const color = loadChannelColor(chKey) || `var(${CHANNELS[chKey]?.cssVar ?? ""})`;
                           return (
                             <tr key={c.id || c.channel + i} className="border-b border-line last:border-0 hover:bg-wash">
@@ -383,7 +385,7 @@ export default function CanaliPage() {
                                 <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
                               </td>
                               <td className="px-3 py-2.5 text-dim">{corr}</td>
-                              <td className="px-3 py-2.5 text-dim">{commPct}%</td>
+                              <td className="px-3 py-2.5 text-dim" title={commInfo.source === "stima" ? "Stima dalle commissioni reali dell'ultimo anno (per le prenotazioni senza cifra)" : commInfo.source === "manuale" ? "Valore impostato da te" : "Percentuale standard: non ci sono abbastanza dati reali per stimarla"}>{commInfo.source === "stima" ? "~" : ""}{commPct}%{commInfo.source === "standard" ? <span className="ml-1 text-[10px] text-faint">standard</span> : null}</td>
                               <td className="px-3 py-2.5 text-right">
                                 <button onClick={() => setChannelDetail({ sid: g.sid, c })} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-surface">{t("Modifica")}</button>
                               </td>
@@ -463,7 +465,7 @@ export default function CanaliPage() {
                 const savedColor = loadChannelColor(chKey);
                 const computedColor = typeof window !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue(CHANNELS[chKey]?.cssVar ?? "").trim() : "";
                 const pickerColor = savedColor || (/^#/.test(computedColor) ? computedColor : "#888888");
-                const commVal = commDraft[c.id] ?? String(loadChannelCommissionPct(chKey, sid) ?? Math.round((CHANNELS[chKey]?.commission ?? 0) * 1000) / 10);
+                const commVal = commDraft[c.id] ?? String(defaultCommissionInfo(chKey, sid).pct);
                 // Suggerimento basato sui dati reali: media della commissione ESATTA (non stimata)
                 // comunicata dal canale sulle ultime prenotazioni — così la predefinita si imposta
                 // su un numero osservato, non a intuito.
