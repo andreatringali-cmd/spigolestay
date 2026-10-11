@@ -40,7 +40,7 @@ type ManualReview = NormalizedReview & { structureId?: string }; // stessa forma
 // Recensioni Booking.com/Airbnb/Expedia reali via Channex (Reviews Collection API) — stessa forma
 // restituita da /api/channex/reviews (vedi src/app/api/channex/reviews/route.ts).
 interface ChxReviewRow {
-  id: string; reviewId: string; guest: string; date: string; rating: number; text: string;
+  id: string; reviewId: string; guest: string; reservationId?: string; date: string; rating: number; text: string;
   source: "booking" | "airbnb" | "expedia" | "other"; bucket: "pos" | "neu" | "neg";
   isReplied: boolean; reply: string | null;
   scores?: ReviewScore[]; // punteggi per categoria (può mancare: n/d)
@@ -236,12 +236,20 @@ export default function RecensioniPage() {
 
   // Recensioni Channex (Booking.com/Airbnb/Expedia reali) della struttura selezionata.
   const chxRowsSel: ChxReviewRow[] = chx.byStructure[selStructureId]?.reviews ?? [];
+  // Booking spesso non dà il nome di chi recensisce ("Ospite"): se la recensione porta il codice della prenotazione, il nome si ricava dalla prenotazione in Xenora.
+  const guestOfReview = (r: ChxReviewRow): string => {
+    const generic = !r.guest || /^(ospite|guest|anonym\w*|anonim\w*)$/i.test(r.guest.trim());
+    if (!generic || !r.reservationId) return r.guest || "Ospite";
+    const b = bookings.find((x) => String(x.code ?? "").trim() === r.reservationId);
+    const g = b ? guests.find((x) => x.id === b.guestId)?.fullName : undefined;
+    return g ? g : `Ospite · pren. ${r.reservationId}`;
+  };
   const chxList: NormalizedReview[] = useMemo(() => {
     return chxRowsSel
       .filter((r) => r.source === "booking" || r.source === "airbnb" || r.source === "expedia")
-      .map((r) => ({ id: r.id, guest: r.guest, date: r.date, rating: r.rating, text: r.text, source: r.source as SourceKey, bucket: r.bucket }));
+      .map((r) => ({ id: r.id, guest: guestOfReview(r), date: r.date, rating: r.rating, text: r.text, source: r.source as SourceKey, bucket: r.bucket }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chx.byStructure, selStructureId]);
+  }, [chx.byStructure, selStructureId, bookings, guests]);
   // Punteggi per categoria per canale: ufficiali Channex se presenti, altrimenti ripiego calcolato
   // dalle recensioni scaricate (segnalato con "derived"). Nessun valore se Channex non lo dà → n/d.
   const scoreView = useMemo(() => {

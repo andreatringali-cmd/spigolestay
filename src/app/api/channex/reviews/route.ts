@@ -24,6 +24,7 @@ export interface ReviewRow {
   id: string;       // chiave UI: "chx-<reviewId>"
   reviewId: string; // id Channex reale (serve per rispondere)
   guest: string;
+  reservationId?: string; // codice della prenotazione dell'OTA a cui si riferisce la recensione (serve a risalire al nome dell'ospite)
   date: string;     // ISO YYYY-MM-DD
   rating: number;   // 0..10
   text: string;
@@ -47,6 +48,7 @@ function normalize(r: ChxReview): ReviewRow {
     id: `chx-${r.id}`,
     reviewId: r.id,
     guest: (r.guest_name || "Ospite").trim(),
+    ...(r.ota_reservation_id ? { reservationId: String(r.ota_reservation_id).trim() } : {}),
     date,
     rating,
     text: (r.content || "").trim(),
