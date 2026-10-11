@@ -163,16 +163,16 @@ export default function GruppoPage() {
                           <Dot name={sName(l.structureId)} color={sColor(l.structureId)} size={18} />
                           <span className="font-semibold text-txt">{sName(l.structureId)}</span>
                           <span className="text-dim">{l.name}</span>
-                          <span className="ml-auto font-mono text-faint">mostra {l.listed} su {f.real}</span>
+                          <span className="ml-auto text-faint"><b className="font-mono font-semibold text-dim">{l.listed}</b> {l.listed === 1 ? "camera" : "camere"} in questa struttura</span>
                           <select value={l.famKey} onChange={(e) => setAssign(l.typeId, e.target.value)} className="rounded-lg border border-line bg-surface px-1.5 py-1 text-[11px] text-dim" aria-label={`Tipologia reale di ${l.name} in ${sName(l.structureId)}`}>
                             {families.map((o) => <option key={o.key} value={o.key}>{o.name}</option>)}
                             <option value={NONE}>Non condivisa</option>
                           </select>
                         </div>
-                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: tint("var(--line)", 100) }} role="img" aria-label={`${l.listed} camere mostrate su ${f.real} reali`}>
+                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: tint("var(--line)", 100) }} role="img" aria-label={`${l.listed} camere in questa struttura, ${f.real} reali nel gruppo`}>
                           <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: over ? "var(--warn)" : "var(--ok)", opacity: 0.8 }} />
                         </div>
-                        {over && <div className="mt-1 text-[11px]" style={{ color: "var(--warn)" }}>Mostra più camere delle reali: il gruppo le tiene allineate.</div>}
+                        {over && <div className="mt-1 text-[11px]" style={{ color: "var(--warn)" }}>Ha più camere di quelle reali: il gruppo ne vende al massimo {f.real}, in tutte le strutture insieme.</div>}
                       </div>
                     );
                   })}
