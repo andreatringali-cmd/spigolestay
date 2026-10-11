@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { internalFetch } from "@/lib/server-auth";
+import { internalFetch, siteOrigin } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
 import { sendWhatsapp } from "@/lib/whatsapp";
 import { logInvio } from "@/lib/invii-log";
@@ -59,7 +59,8 @@ export async function GET(req: Request) {
   if (!supaUrl || !service) return NextResponse.json({ ok: false, skipped: "supabase_not_configured" });
   const admin = createClient(supaUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  const origin = url.origin;
+  // Indirizzo FISSO del sito: l'origine della richiesta del cron è quella del deployment (…vercel.app), protetta da autenticazione → "Protected deployment 401".
+  const origin = siteOrigin(req);
   const { ymd: todayRome, hm: nowSlot } = romeNowSlot();
 
   let configured = 0, matched = 0, sent = 0, waSent = 0;

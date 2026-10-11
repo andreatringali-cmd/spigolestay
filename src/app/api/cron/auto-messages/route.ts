@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { internalFetch } from "@/lib/server-auth";
+import { internalFetch, siteOrigin } from "@/lib/server-auth";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { sendWhatsapp } from "@/lib/whatsapp";
 import { logInvio } from "@/lib/invii-log";
@@ -79,7 +79,8 @@ export async function GET(req: Request) {
   const admin = createClient(supaUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
   const live = process.env.AUTO_MESSAGES_LIVE === "1";
-  const origin = url.origin;
+  // Indirizzo FISSO del sito: l'origine della richiesta del cron è quella del deployment (…vercel.app), protetta da autenticazione → "Protected deployment 401".
+  const origin = siteOrigin(req);
   // Su piano Hobby il cron gira UNA volta al giorno: inviamo tutti i messaggi previsti per
   // oggi al run giornaliero (l'orario del modello è indicativo). Dedup per giorno.
   const { ymd: todayRome } = romeNow();

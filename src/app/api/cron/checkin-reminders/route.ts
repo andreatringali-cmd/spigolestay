@@ -72,11 +72,8 @@ export async function GET(req: Request) {
   });
 
   // Origin per costruire i link e la chiamata interna a /api/email.
-  const proto = req.headers.get("x-forwarded-proto") || "https";
-  const host = req.headers.get("host") || "";
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (host ? `${proto}://${host}` : "https://xenora.it");
+  // Indirizzo FISSO del sito (l'host della richiesta del cron è quello del deployment, protetto da autenticazione).
+  const origin = (process.env.NEXT_PUBLIC_SITE_URL || "https://xenora.it").replace(/\/+$/, "");
 
   const tomorrow = itDatePlus(1);
 
