@@ -2,6 +2,7 @@
 // invio WhatsApp/email e registrazione nella conversazione. Solo lato browser.
 
 import { useCallback, useEffect, useState } from "react";
+import { windowOpenFrom } from "./wa-window";
 import type { Guest } from "./types";
 import { apiPost } from "./invoicing/client";
 import { waDigits } from "./contacts-check";
@@ -76,12 +77,23 @@ async function whatsappConnected(): Promise<boolean> {
 
 export type SendResult = { ok: boolean; how: "api" | "link" | "none"; message: string };
 
+/** Finestra WhatsApp aperta per questo ospite? Si legge l'ultimo messaggio ricevuto dalla chat; se la chat non si legge si considera aperta (nessun blocco inutile). */
+export function whatsappWindowOpen(guestId: string, now = Date.now()): boolean {
+  try { return windowOpenFrom(JSON.parse(localStorage.getItem("spigolestay:threads:v1") || "{}"), guestId, now); } catch { return true; }
+}
+
 /** WhatsApp: se la Cloud API è collegata invia davvero (e registra in chat); altrimenti apre wa.me col testo pronto. */
 export async function sendWhatsAppToGuest(g: Guest | undefined, text: string, meta?: SendMeta): Promise<SendResult> {
   const digits = waDigits(g?.phone, g?.country); // con il prefisso del Paese anche se il numero è stato scritto senza
   if (!g || !digits) return { ok: false, how: "none", message: "L'ospite non ha un numero di telefono." };
   const wa = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
   if (await whatsappConnected()) {
+    // Finestra chiusa: la Cloud API non consegnerebbe il testo libero. Meglio dirlo subito e aprire WhatsApp col testo pronto (da lì parte dal tuo telefono e arriva).
+    if (!whatsappWindowOpen(g.id)) {
+      window.open(wa, "_blank", "noopener");
+      recordOutgoing(g.id, text, "WhatsApp (link)", undefined, meta);
+      return { ok: true, how: "link", message: "L'ospite non ti scrive da più di 24 ore: WhatsApp non consegna i messaggi liberi inviati da Xenora. Ho aperto WhatsApp col testo pronto: premi invio lì per mandarlo (oppure usa l'email)." };
+    }
     try {
       const r = await apiPost<{ ok?: boolean; id?: string; message?: string }>("whatsapp/send", { to: digits, text });
       if (r?.ok !== false) { recordOutgoing(g.id, text, "WhatsApp", r?.id, meta); return { ok: true, how: "api", message: "Inviato su WhatsApp ✓" }; }
