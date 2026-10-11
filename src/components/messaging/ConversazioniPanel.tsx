@@ -695,7 +695,6 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
             const needsReply = th.length > 0 || manualUnread.includes(p.id) ? isToRead(p.id) : false; // "Da leggere" = messaggio ricevuto e non ancora letto, o segnata a mano
             const pin = isPinned(p.id);
             const showPinHeader = pin && !showArchived && (i === 0 || !isPinned(people[i - 1].id));
-            const showHeader = activeStructureId === "all" && !pin && (i === 0 || isPinned(people[i - 1].id) || people[i - 1].struct !== p.struct);
             const isSelected = sel === p.id;
             const sub = last
               ? preview(last, t)
@@ -705,7 +704,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
             return (
               <div key={p.id}>
                 {showPinHeader && <div className="sticky top-0 z-10 border-b border-line bg-wash px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">📌 {t("Fissate")}</div>}
-                {showHeader && <div className="sticky top-0 z-10 border-b border-line bg-wash px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">{p.struct || "—"}</div>}
+                
                 <div className={`group relative flex w-full items-center border-b border-[color:color-mix(in_srgb,var(--line)_55%,transparent)] pr-1 transition-colors ${isSelected ? "bg-[color:color-mix(in_srgb,var(--focus)_10%,transparent)]" : "hover:bg-wash"}`}>
                   {isSelected && <span className="absolute inset-y-1 left-0 w-[3px] rounded-full" style={{ backgroundColor: "var(--focus)" }} />}
                   <button onClick={() => setSel(p.id)} className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3.5 text-left">
@@ -715,7 +714,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2">
-                        <span className={`truncate text-sm text-txt ${needsReply ? "font-bold" : "font-semibold"}`}>{p.name}</span>
+                        <span className="flex min-w-0 items-center gap-1.5"><span className={`truncate text-sm text-txt ${needsReply ? "font-bold" : "font-semibold"}`}>{p.name}</span>{activeStructureId === "all" && p.struct && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-faint" title={p.struct}>{p.struct}</span>}</span>
                         <span className="flex shrink-0 items-center gap-1.5">{last && <span className={`text-[10px] ${needsReply ? "font-semibold text-[color:var(--ok)]" : "text-faint"}`}>{relTime(last.ts, t)}</span>}{needsReply && <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--ok)", backgroundColor: "color-mix(in srgb, var(--ok) 15%, transparent)" }}>{t("Da leggere")}</span>}</span>
                       </span>
                       <span className={`mt-0.5 block truncate text-xs ${needsReply ? "font-medium text-txt" : "text-dim"}`}>{sub}</span>
