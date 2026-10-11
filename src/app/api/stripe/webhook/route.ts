@@ -171,8 +171,15 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, received: event.type });
   } catch (e) {
-    // Non far ritentare all'infinito Stripe per errori nostri non critici: rispondi 200.
-    return NextResponse.json({ ok: true, warning: (e as Error)?.message ?? "handler_error" });
+    // Errore INATTESO in un passaggio (rete, database…): rispondi 500 così Stripe ritenta (con backoff, fino a ~3 giorni).
+    // Verificato che i passaggi che possono lanciare sono idempotenti, quindi un nuovo tentativo non crea doppioni:
+    //  - prenotazione dal sito: /api/public-booking è idempotente sul token/sessione (extId) → "already";
+    //  - incasso in chat: recordChatPayment è idempotente (booking.paidSessions + id messaggio pay:<sessione>);
+    //  - fattura abbonamento: handleSubscriptionPaid fa un "claim" con vincolo unico su stripe_invoice_id (ripetizione = "duplicate");
+    //  - rimborso/dispute: scrittura unica con rev-lock sulla prenotazione (stato "cancelled" già impostato resta tale).
+    // Gli avvisi email e la sincronizzazione del profilo hanno già il loro try/catch best-effort e non arrivano qui.
+    console.error("[stripe webhook] errore inatteso, risposta 500 per il retry di Stripe:", event.type, event.id, e);
+    return NextResponse.json({ ok: false, error: "handler_error", message: (e as Error)?.message ?? "handler_error" }, { status: 500 });
   }
 }
 
