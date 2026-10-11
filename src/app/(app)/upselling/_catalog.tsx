@@ -80,7 +80,7 @@ export default function CatalogTab({ structure, extras, onSave, stats, addDisabl
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
-                  <button onClick={() => upd(e.id, { active: !isActive(e) })} title={isActive(e) ? "Disattiva" : "Attiva"} className={`relative h-5 w-9 shrink-0 rounded-full transition ${isActive(e) ? "bg-focus" : "bg-line"}`}><span className="absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all" style={{ left: isActive(e) ? "18px" : "2px" }} /></button>
+                  <button onClick={() => upd(e.id, { active: !isActive(e) })} title={isActive(e) ? "Disattiva" : "Attiva"} role="switch" aria-checked={isActive(e)} aria-label={`Attivo: ${e.name}`} className={`relative h-5 w-9 shrink-0 rounded-full transition ${isActive(e) ? "bg-focus" : "bg-line"}`}><span className="absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all" style={{ left: isActive(e) ? "18px" : "2px" }} /></button>
                   <div className="min-w-0 flex-1 basis-40">
                     <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-txt">{e.name}
                       <span className="rounded bg-wash px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-faint">{KIND_LABEL[kind]}</span>

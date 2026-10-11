@@ -160,7 +160,7 @@ export default function TipologiaSchedaPage() {
             )}
             <div className="mb-3 flex items-center gap-3">
               <div className="h-11 w-11 shrink-0 rounded-lg" style={{ backgroundColor: f.color }} />
-              <div><div className="text-[11px] text-faint">{t("Colore (calendario e camere)")}</div><div className="mt-1 flex gap-1.5">{AV_COLORS.map((c) => <button key={c} onClick={() => set("color", c)} className={`h-5 w-5 rounded-full border-2 ${f.color === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div></div>
+              <div><div className="text-[11px] text-faint">{t("Colore (calendario e camere)")}</div><div className="mt-1 flex gap-1.5">{AV_COLORS.map((c) => <button key={c} aria-label={`${t("Colore")} ${c}`} aria-pressed={f.color === c} onClick={() => set("color", c)} className={`h-5 w-5 rounded-full border-2 ${f.color === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div></div>
               {!isNew && <span className="ml-auto rounded-full bg-wash px-2.5 py-1 text-xs text-dim">{nUnits} {t("camere di questa tipologia")}</span>}
             </div>
             <label className={lbl}>{t("Nome tipologia")} *
@@ -232,7 +232,7 @@ export default function TipologiaSchedaPage() {
                 <div key={i} className="flex items-center gap-2 rounded-lg border border-line px-3 py-2">
                   <span className="flex-1 text-sm text-txt">{c.name}</span>
                   <button onClick={() => toggleShared(i)} className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${c.shared ? "bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] text-[color:var(--warn)]" : "bg-wash text-dim"}`}>{c.shared ? t("Condiviso") : t("Privato")}</button>
-                  <button onClick={() => delSpace(i)} className="rounded p-1 text-faint hover:text-[color:var(--err)]">✕</button>
+                  <button aria-label={t("Rimuovi spazio")} onClick={() => delSpace(i)} className="rounded p-1 text-faint hover:text-[color:var(--err)]">✕</button>
                 </div>
               ))}
               {(f.composition ?? []).length === 0 && <div className="text-sm text-faint">{t("Nessun ambiente.")}</div>}
