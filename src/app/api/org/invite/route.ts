@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { siteOrigin } from "@/lib/server-auth";
+import { decideOrgReuse } from "@/lib/org-invite-guard";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
@@ -73,18 +74,23 @@ export async function POST(req: Request) {
     if (!S) return NextResponse.json({ error: "structure_not_found", message: "Struttura non trovata nel tuo account. Ricarica la pagina e riprova." }, { status: 404 });
 
     // PREVENZIONE DOPPIONI: se questa struttura è GIÀ in un'organizzazione (magari creata in un
-    // tentativo precedente, anche di un'org di cui non risulto membro), RIUSALA invece di crearne
-    // una nuova — evita org duplicate per la stessa struttura (causa storica di "cancellazioni che risorgono").
+    // tentativo precedente), RIUSALA invece di crearne una nuova — evita org duplicate per la stessa struttura
+    // (causa storica di "cancellazioni che risorgono").
+    // SICUREZZA: si riusa SOLO un'org di cui il chiamante è già membro. Mai inserirlo come owner in un'org altrui
+    // (basterebbe conoscere l'id di una struttura per entrare nei dati di un altro cliente): in quel caso 403.
     if (!orgId) {
       const { data: allOrgs } = await admin.from("org_state").select("org_id, data");
+      const withStructure: string[] = [];
       for (const r of arr(allOrgs)) {
         let od: J = {}; try { od = JSON.parse((((r as J).data ?? {}) as Record<string, string>)[DATA_KEY] || "{}") as J; } catch { od = {}; }
-        if (arr(od.structures).some((s) => s?.id === structureId)) { orgId = (r as J).org_id as string; break; }
+        if (arr(od.structures).some((s) => s?.id === structureId)) withStructure.push((r as J).org_id as string);
       }
-      if (orgId) {
-        const { data: mem } = await admin.from("memberships").select("user_id").eq("org_id", orgId).eq("user_id", caller.id).maybeSingle();
-        if (!mem) await admin.from("memberships").insert({ org_id: orgId, user_id: caller.id, role: "owner" });
+      const { data: myMships } = await admin.from("memberships").select("org_id").eq("user_id", caller.id);
+      const decision = decideOrgReuse(withStructure, arr(myMships).map((m) => m.org_id as string));
+      if (decision.action === "forbidden") {
+        return NextResponse.json({ error: "forbidden_org", message: "Questa struttura risulta già condivisa in un'altra organizzazione di cui non fai parte. Non puoi invitare altri finché non ne sei membro: chiedi al proprietario di aggiungerti oppure contatta l'assistenza." }, { status: 403 });
       }
+      if (decision.action === "use") orgId = decision.orgId;
     }
 
     // Prima condivisione: crea org + membership owner e migra la struttura in org_state.
