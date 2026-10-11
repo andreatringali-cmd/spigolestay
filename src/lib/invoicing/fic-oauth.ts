@@ -18,6 +18,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { encryptCred, decryptCred } from "@/lib/crypto-creds";
+import { warnFallbackOnce } from "@/lib/warn-fallback";
 
 export const FIC_API_BASE = "https://api-v2.fattureincloud.it";
 const AUTH_URL = `${FIC_API_BASE}/oauth/authorize`;
@@ -35,7 +36,11 @@ export function ficConfigured(): boolean {
 const b64url = (b: Buffer) => b.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const fromB64url = (s: string) => Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");
 
-function stateSecret(): string { return process.env.CRED_SECRET || "xenora-fic-state"; }
+function stateSecret(): string {
+  if (process.env.CRED_SECRET) return process.env.CRED_SECRET;
+  warnFallbackOnce("CRED_SECRET(fic-oauth)", "Lo stato OAuth di Fatture in Cloud e' firmato con un segreto noto: imposta CRED_SECRET.");
+  return "xenora-fic-state";
+}
 
 export function signState(tenantId: string): string {
   const payload = `${tenantId}.${Date.now()}.${randomBytes(8).toString("hex")}`;

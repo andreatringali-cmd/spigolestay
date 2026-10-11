@@ -7,10 +7,15 @@
 
 import { createHmac, timingSafeEqual } from "crypto";
 import { DATA_KEY } from "@/lib/manage-booking";
+import { warnFallbackOnce } from "@/lib/warn-fallback";
 
 export type FeedKind = "bookings" | "pulizie";
 
-function feedSecret(): string { return process.env.CRED_SECRET || "xenora-calendar-feed"; }
+function feedSecret(): string {
+  if (process.env.CRED_SECRET) return process.env.CRED_SECRET;
+  warnFallbackOnce("CRED_SECRET(calendar-feed)", "I feed calendario sono firmati con un segreto noto: imposta CRED_SECRET (cambiarla poi invalida i link già condivisi).");
+  return "xenora-calendar-feed";
+}
 
 function b64url(buf: Buffer): string { return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 
