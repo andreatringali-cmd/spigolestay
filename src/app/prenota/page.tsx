@@ -12,6 +12,7 @@ import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } fro
 import { amenityIcon } from "@/lib/amenities";
 import { loadPromos } from "@/lib/promos";
 import { inScope } from "@/lib/scope";
+import { bookingErrorMessage, BOOKING_NETWORK_ERROR } from "@/lib/booking-errors";
 import { loadPublicSite, lsGet, isPublicMode, publicSlug, findAvailableSibling, findNetworkSuggestions, type SiblingSuggestion } from "@/lib/publicdata";
 
 // ---- pricing helpers --------------------------------------------------------
@@ -91,6 +92,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   // metasearch), mostra subito i risultati.
   const [searched, setSearched] = useState<boolean>(() => !!((qp("ci") || qp("checkin")) && (qp("co") || qp("checkout"))) || !!rtParam);
   const [processing, setProcessing] = useState(false); // invio prenotazione / redirect pagamento
+  const [bookError, setBookError] = useState<string | null>(null); // esito negativo dell'invio: la conferma NON va mostrata
   // Riepilogo per la schermata di conferma dopo il ritorno dal pagamento Stripe (lo stato
   // del form si perde nel redirect: lo ripristiniamo da sessionStorage).
   const [doneSummary, setDoneSummary] = useState<null | { code: string; structureName?: string; roomName?: string; ci: string; co: string; total: number; deposit: number; guestFirst?: string; email?: string }>(null);
@@ -106,6 +108,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const nights = nightsBetween(checkIn, checkOut);
 
   const [step, setStep] = useState<"rooms" | "checkout" | "done">("rooms");
+  useEffect(() => { setBookError(null); }, [step]); // l'errore dell'invio precedente non resta quando si cambia schermata
   const [sel, setSel] = useState<{ rtId: string; planId: string } | null>(null);
   const [extraQty, setExtraQty] = useState<Record<string, number>>({});
   const [guest, setGuest] = useState({ firstName: "", lastName: "", email: "", phone: "", address: "", city: "", country: "Italia", arrival: "Non lo so", requests: "" });
@@ -222,6 +225,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
 
   const confirm = async () => {
     if (!selRt || !guestValid || processing) return;
+    setBookError(null);
     const unit = availUnitsFor(selRt)[0]; // le derivate usano le camere della tipologia madre
     // Evita doppioni in anagrafica: riusa l'ospite esistente (stessa email, o stesso nome con telefono compatibile).
     const norm = (s?: string) => (s ?? "").trim().toLowerCase();
@@ -249,14 +253,25 @@ export function Engine({ embed = false }: { embed?: boolean }) {
       const guestBody = { firstName: guest.firstName.trim(), lastName: guest.lastName.trim(), email: guest.email.trim(), phone: guest.phone.trim(), country: guest.country };
       try { sessionStorage.setItem("xn-lastbooking", JSON.stringify({ code: bkCode, structureName: structure?.name, roomName: `${selRt.name}${selPlan ? " · " + selPlan.name : ""}`, ci: checkIn, co: checkOut, total, deposit, guestFirst: guest.firstName.trim(), email: guest.email.trim() })); } catch {}
       setProcessing(true);
+      let failure: string | null = null;
       try {
         const policy = { planName: selPlan?.name, refundable: !!selPlan?.refundable, cancelDays: selPlan?.cancelDays ?? 0 };
         const r = await fetch("/api/stripe/book", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), s: structureId, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges, total: accommodation, deposit, note, code: bkCode, token, guest: guestBody, ...policy }) });
         const j = await r.json().catch(() => ({}));
-        if (j?.payment && j?.url) { window.location.href = j.url as string; return; } // → Stripe
-        await fetch("/api/public-booking", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), token, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges, total: accommodation, deposit, note, code: bkCode, guest: guestBody, ...policy }) });
-      } catch { /* rete assente: mostra comunque la conferma */ }
+        if (!r.ok || j?.ok === false) failure = bookingErrorMessage(r.status, j?.error);
+        else if (j?.payment && j?.url) { window.location.href = j.url as string; return; } // → Stripe
+        else {
+          const r2 = await fetch("/api/public-booking", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: publicSlug(), token, rt: selRt.id, ci: checkIn, co: checkOut, adults, children, childAges, total: accommodation, deposit, note, code: bkCode, guest: guestBody, ...policy }) });
+          const j2 = await r2.json().catch(() => ({}));
+          if (!r2.ok || j2?.ok === false) failure = bookingErrorMessage(r2.status, j2?.error);
+        }
+      } catch { failure = BOOKING_NETWORK_ERROR; }
       setProcessing(false);
+      if (failure) {
+        try { sessionStorage.removeItem("xn-lastbooking"); } catch {}
+        setBookError(failure);
+        return; // niente schermata di conferma: la prenotazione non è stata registrata
+      }
     } else {
       addBooking({ structureId, roomTypeId: selRt.id, unitId: unit?.id ?? null, guestId: gid, channel: "direct", status: "confirmed", checkIn, checkOut, adults, children, childAges: childAges.length ? childAges : undefined, total: accommodation, cleaningFee: 0, paid: deposit, cityTaxPaid: false, note });
       addActivity("booking", `Prenotazione dal sito — ${guest.firstName} ${guest.lastName}`);
@@ -673,7 +688,8 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                 <div className="flex items-baseline justify-between"><span className="text-sm font-semibold text-txt">Totale</span><span className="font-mono text-xl font-bold text-txt">{eur(total)}</span></div>
                 {deposit > 0 && <div className="mt-1 flex items-baseline justify-between text-xs"><span className="text-dim">{deposit < total ? "Acconto adesso" : "Da pagare adesso"}</span><span className="font-mono font-semibold text-txt">{eur(deposit)}</span></div>}
                 <div className="mt-1 text-[11px]" style={{ color: selPlan.refundable ? "var(--ok)" : "var(--warn)" }}>{cancelText(selPlan)}</div>
-                <button onClick={confirm} disabled={!guestValid} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">Conferma prenotazione</button>
+                {bookError && <div role="alert" className="mt-3 rounded-lg border px-3 py-2 text-xs font-medium" style={{ borderColor: "var(--warn)", color: "var(--warn)" }}>{bookError}</div>}
+                <button onClick={confirm} disabled={!guestValid || processing} className="mt-3 w-full rounded-lg bg-focus py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{processing ? "Invio in corso…" : "Conferma prenotazione"}</button>
                 {!guestValid && <div className="mt-2 text-center text-[11px] text-faint">Compila nome, cognome, telefono, email e accetta la privacy.</div>}
               </div>
             </div>
