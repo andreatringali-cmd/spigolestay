@@ -1182,9 +1182,9 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
           </div>
         </div>
       )}
-      <ArrowScroller wrapperClassName="order-first" className="flex gap-3 pb-1" onDoubleClick={onCardsDblClick}>
+      <ArrowScroller wrapperClassName="order-first" className="flex snap-x snap-mandatory gap-3 pb-1 sm:snap-none" onDoubleClick={onCardsDblClick}>
         {showCard("copilot") && (
-        <div data-cardkey="copilot" onDrop={() => onCardDrop("copilot")} style={{ order: orderOf("copilot"), animationDelay: `${orderOf("copilot") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "copilot" ? "opacity-40" : ""} ${dragCard && dragCard !== "copilot" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="copilot" onDrop={() => onCardDrop("copilot")} style={{ order: orderOf("copilot"), animationDelay: `${orderOf("copilot") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 snap-start basis-[calc(100vw-2rem)] sm:grow sm:basis-[calc(25%-9px)] sm:min-w-[240px] cursor-default transition ${dragCard === "copilot" ? "opacity-40" : ""} ${dragCard && dragCard !== "copilot" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🤖</span> Copilota revenue</div>
           <div className="flex flex-col gap-2">
             {suggestions.slice(0, 3).map((s, i) => (
@@ -1200,7 +1200,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         </div>
         )}
         {showCard("pickup") && (
-        <div data-cardkey="pickup" onDrop={() => onCardDrop("pickup")} style={{ order: orderOf("pickup"), animationDelay: `${orderOf("pickup") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "pickup" ? "opacity-40" : ""} ${dragCard && dragCard !== "pickup" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="pickup" onDrop={() => onCardDrop("pickup")} style={{ order: orderOf("pickup"), animationDelay: `${orderOf("pickup") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 snap-start basis-[calc(100vw-2rem)] sm:grow sm:basis-[calc(25%-9px)] sm:min-w-[240px] cursor-default transition ${dragCard === "pickup" ? "opacity-40" : ""} ${dragCard && dragCard !== "pickup" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>📈</span> Ritmo prenotazioni</div>
             <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: `color-mix(in srgb, ${pickVerdict.c} 15%, transparent)`, color: pickVerdict.c }}>{pickDelta >= 0 ? "▲ +" : "▼ "}{pickDelta} vs 7gg</span>
@@ -1233,7 +1233,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         </div>
         )}
         {showCard("gaps") && (
-        <div data-cardkey="gaps" onDrop={() => onCardDrop("gaps")} style={{ order: orderOf("gaps"), animationDelay: `${orderOf("gaps") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "gaps" ? "opacity-40" : ""} ${dragCard && dragCard !== "gaps" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="gaps" onDrop={() => onCardDrop("gaps")} style={{ order: orderOf("gaps"), animationDelay: `${orderOf("gaps") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 snap-start basis-[calc(100vw-2rem)] sm:grow sm:basis-[calc(25%-9px)] sm:min-w-[240px] cursor-default transition ${dragCard === "gaps" ? "opacity-40" : ""} ${dragCard && dragCard !== "gaps" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🕳️</span> Buchi da riempire</div>
           {gaps.length === 0 ? (
             <div className="flex items-center gap-2 py-1 text-xs text-dim"><span className="font-bold text-[color:var(--ok)]">✓</span> Nessun buco di 1–2 notti nel periodo.</div>
@@ -1268,7 +1268,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         </div>
         )}
         {showCard("sim") && (
-        <div data-cardkey="sim" onDrop={() => onCardDrop("sim")} style={{ order: orderOf("sim"), animationDelay: `${orderOf("sim") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "sim" ? "opacity-40" : ""} ${dragCard && dragCard !== "sim" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="sim" onDrop={() => onCardDrop("sim")} style={{ order: orderOf("sim"), animationDelay: `${orderOf("sim") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 snap-start basis-[calc(100vw-2rem)] sm:grow sm:basis-[calc(25%-9px)] sm:min-w-[240px] cursor-default transition ${dragCard === "sim" ? "opacity-40" : ""} ${dragCard && dragCard !== "sim" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🎚️</span> Simulatore prezzi</div>
           <div className="flex items-baseline justify-between">
             <span className="text-[11px] text-faint">Ricavi previsti periodo</span>
@@ -1295,7 +1295,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         </div>
         )}
         {showCard("channels") && (
-        <div data-cardkey="channels" onDrop={() => onCardDrop("channels")} style={{ order: orderOf("channels"), animationDelay: `${orderOf("channels") * 0.07}s` }} className={`anim-in flex flex-col rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "channels" ? "opacity-40" : ""} ${dragCard && dragCard !== "channels" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="channels" onDrop={() => onCardDrop("channels")} style={{ order: orderOf("channels"), animationDelay: `${orderOf("channels") * 0.07}s` }} className={`anim-in flex flex-col rounded-xl border bg-surface p-3 shadow-sm shrink-0 snap-start basis-[calc(100vw-2rem)] sm:grow sm:basis-[calc(25%-9px)] sm:min-w-[240px] cursor-default transition ${dragCard === "channels" ? "opacity-40" : ""} ${dragCard && dragCard !== "channels" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>🔀</span> Mix canali</div>
           {chTotalN === 0 ? (
             <div className="flex items-center gap-2 py-1 text-xs text-faint">Nessuna prenotazione nel periodo.</div>
@@ -1329,7 +1329,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         </div>
         )}
         {showCard("kpi") && (
-        <div data-cardkey="kpi" onDrop={() => onCardDrop("kpi")} style={{ order: orderOf("kpi"), animationDelay: `${orderOf("kpi") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 grow basis-[calc(25%-9px)] min-w-[240px] cursor-default transition ${dragCard === "kpi" ? "opacity-40" : ""} ${dragCard && dragCard !== "kpi" ? "border-dashed border-focus" : "border-line"}`}>
+        <div data-cardkey="kpi" onDrop={() => onCardDrop("kpi")} style={{ order: orderOf("kpi"), animationDelay: `${orderOf("kpi") * 0.07}s` }} className={`anim-in rounded-xl border bg-surface p-3 shadow-sm shrink-0 snap-start basis-[calc(100vw-2rem)] sm:grow sm:basis-[calc(25%-9px)] sm:min-w-[240px] cursor-default transition ${dragCard === "kpi" ? "opacity-40" : ""} ${dragCard && dragCard !== "kpi" ? "border-dashed border-focus" : "border-line"}`}>
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-dim"><span>📊</span> ADR &amp; RevPAR</div>
           <div className="flex flex-col gap-2">
             <div className="rounded-lg border border-line p-2">
