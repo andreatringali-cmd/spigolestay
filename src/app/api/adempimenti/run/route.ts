@@ -58,16 +58,24 @@ export async function POST(req: Request) {
       schedStep = { key: "schedine", label: "Schedine Alloggiati (Questura)", status: "niente", detail: "Nessuna schedina pronta da inviare.", count: 0 };
     } else if (mode === "confirm" && ALLOGGIATI_LIVE) {
       // Invio REALE, per struttura. sendReady applica ancora i suoi controlli interni sulle credenziali.
-      let sent = 0; const errs: string[] = [];
+      let sent = 0; let simulated = 0; const errs: string[] = [];
       for (let i = 0; i < ids.length; i++) {
         if (readyPerStruct[i] === 0) continue;
-        try { const r = await sendReady(auth.admin, auth.tenantId, ids[i]); sent += r.sent; if (!r.ok && r.message) errs.push(r.message); }
+        try {
+          const r = await sendReady(auth.admin, auth.tenantId, ids[i]);
+          sent += r.sent;
+          if (r.simulated) { simulated++; errs.push(r.message); }
+          else if (!r.ok && r.message) errs.push(r.message);
+        }
         catch (e) { errs.push((e as Error)?.message ?? "errore invio"); }
       }
+      // Se l'invio reale non è partito per nessuna struttura (credenziali incomplete) l'esito è "prova", non "fatto".
       schedStep = {
         key: "schedine", label: "Schedine Alloggiati (Questura)",
-        status: errs.length && sent === 0 ? "errore" : "fatto",
-        detail: `Inviate ${sent} schedine alla Questura${errs.length ? ` · ${errs.join(" · ")}` : ""}.`, count: sent,
+        status: sent === 0 && simulated > 0 && errs.length === simulated ? "prova" : errs.length && sent === 0 ? "errore" : "fatto",
+        detail: sent === 0 && simulated > 0 && errs.length === simulated
+          ? `${errs[0]} Nulla è stato inviato.`
+          : `Inviate ${sent} schedine alla Questura${errs.length ? ` · ${errs.join(" · ")}` : ""}.`, count: sent,
       };
     } else {
       // Prova: gate OFF oppure fase di preparazione → NON viene inviato nulla davvero.
@@ -93,16 +101,23 @@ export async function POST(req: Request) {
     if (istatPending === 0) {
       istatStep = { key: "istat", label: "Movimenti ISTAT (Turist@t)", status: "niente", detail: "Nessun movimento da inviare.", count: 0 };
     } else if (mode === "confirm" && ISTAT_LIVE) {
-      let sent = 0; const errs: string[] = [];
+      let sent = 0; let simulated = 0; const errs: string[] = [];
       for (let i = 0; i < ids.length; i++) {
         if (istatPerStruct[i] === 0) continue;
-        try { const r = await closeDay(auth.admin, auth.tenantId, ids[i]); sent += r.sent; if (!r.ok && r.message) errs.push(r.message); }
+        try {
+          const r = await closeDay(auth.admin, auth.tenantId, ids[i]);
+          sent += r.sent;
+          if (r.simulated) { simulated++; errs.push(r.message); }
+          else if (!r.ok && r.message) errs.push(r.message);
+        }
         catch (e) { errs.push((e as Error)?.message ?? "errore chiusura"); }
       }
       istatStep = {
         key: "istat", label: "Movimenti ISTAT (Turist@t)",
-        status: errs.length && sent === 0 ? "errore" : "fatto",
-        detail: `Inviati ${sent} movimenti al portale${errs.length ? ` · ${errs.join(" · ")}` : ""}.`, count: sent,
+        status: sent === 0 && simulated > 0 && errs.length === simulated ? "prova" : errs.length && sent === 0 ? "errore" : "fatto",
+        detail: sent === 0 && simulated > 0 && errs.length === simulated
+          ? `${errs[0]} Nulla è stato inviato.`
+          : `Inviati ${sent} movimenti al portale${errs.length ? ` · ${errs.join(" · ")}` : ""}.`, count: sent,
       };
     } else {
       // ISTAT è ancora in attesa delle API dell'Osservatorio: resta sempre in prova (dry-run).

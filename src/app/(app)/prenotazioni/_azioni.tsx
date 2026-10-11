@@ -215,8 +215,9 @@ export default function StepActions(p: StepActionsProps) {
           {st === "da_validare" && <button className={btnPrimary} style={{ background: "var(--warn)" }} onClick={() => { p.onClose(); openBooking(b.id); }}>Correggi i dati dell'ospite</button>}
           {isQ && st === "pronta" && <button className={btnPrimary} style={{ background: "var(--err)" }} disabled={!!busy || (cfg !== null && !cfg.ready)} onClick={() => run("send", async () => {
             if (!(await ask({ title: "Invia alla Questura", message: `Invio alla Questura tutte le schedine pronte di ${structure?.name ?? "questa struttura"}, non solo questa. L'invio è definitivo. Procedere?`, confirmLabel: "Invia alla Questura", danger: true }))) return;
-            const r = await apiPost<{ message?: string; sent?: number }>("alloggiati/send", { structureId: b.structureId }); p.onChanged();
-            return { ok: true, message: r.message || `Inviate: ${r.sent ?? 0}` };
+            const r = await apiPost<{ message?: string; sent?: number; simulated?: boolean }>("alloggiati/send", { structureId: b.structureId }); p.onChanged();
+            // Se l'invio reale non è attivo l'esito è "simulato": non va mostrato come successo.
+            return { ok: !r.simulated, message: r.message || `Inviate: ${r.sent ?? 0}` };
           })}>{busy === "send" ? "Invio…" : "Invia ora alla Questura"}</button>}
           <button className={btnGhost} onClick={() => router.push(isQ ? "/alloggiati-web" : "/istat")}>{isQ ? "Apri Alloggiati Web" : "Apri Osservatorio"}</button>
         </div>

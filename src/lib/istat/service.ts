@@ -97,7 +97,12 @@ function buildDailyMovement(blob: Blob, structureId: string, day: string): Daily
 
 // Chiusura/invio giornaliero. Con ISTAT_LIVE + credenziali → invio reale al portale (Turist@t);
 // altrimenti mock. Marca come inviate le righe pending del giorno.
-export async function closeDay(admin: SupabaseClient, tenantId: string, structureId: string, day?: string): Promise<{ ok: boolean; message: string; sent: number }> {
+// Messaggio dell'esito quando l'invio reale non è attivo: nulla parte, nulla viene segnato come inviato.
+export const ISTAT_SIMULATED_MSG = "Simulato (invio reale non attivo): nulla è stato inviato al portale Turist@t, i movimenti restano da inviare.";
+
+// `simulated`: true quando l'invio reale non è attivo (ISTAT_LIVE spento): le righe restano "pending",
+// nessun evento "Movimento ISTAT inviato", nessuna riga nell'archivio invii.
+export async function closeDay(admin: SupabaseClient, tenantId: string, structureId: string, day?: string): Promise<{ ok: boolean; message: string; sent: number; simulated?: boolean }> {
   const { data: sett } = await admin.from("istat_settings").select("*").eq("tenant_id", tenantId).eq("structure_id", structureId).maybeSingle();
   const today = todayRome();
   let q = admin.from("istat_rows").select("id, booking_id").eq("tenant_id", tenantId).eq("structure_id", structureId).eq("stato", "pending");
@@ -113,16 +118,17 @@ export async function closeDay(admin: SupabaseClient, tenantId: string, structur
   if (!sett?.username || !istatPassword) return { ok: false, message: "Credenziali ISTAT mancanti: aprile impostazioni e inserisci username e password.", sent: 0 };
 
   const live = ISTAT_LIVE && !!sett.username && !!istatPassword;
-  let esito = "Inviato (mock)";
-  if (live) {
-    try {
-      const blob = await readBlob(admin, tenantId);
-      const movement = buildDailyMovement(blob, structureId, day ?? today);
-      const r = await sendDaily({ username: sett.username, password: istatPassword }, movement);
-      if (!r.ok) return { ok: false, message: r.message, sent: 0 };
-      esito = r.ricevuta ? `Inviato · ric. ${r.ricevuta}` : "Inviato al portale Turist@t";
-    } catch (e) { return { ok: false, message: (e as Error)?.message ?? "Errore invio al portale Turist@t.", sent: 0 }; }
-  }
+  // Invio reale non attivo: esito SIMULATO, nessuna riga segnata come inviata.
+  if (!live) return { ok: false, message: ISTAT_SIMULATED_MSG, sent: 0, simulated: true };
+
+  let esito: string;
+  try {
+    const blob = await readBlob(admin, tenantId);
+    const movement = buildDailyMovement(blob, structureId, day ?? today);
+    const r = await sendDaily({ username: sett.username, password: istatPassword }, movement);
+    if (!r.ok) return { ok: false, message: r.message, sent: 0 };
+    esito = r.ricevuta ? `Inviato · ric. ${r.ricevuta}` : "Inviato al portale Turist@t";
+  } catch (e) { return { ok: false, message: (e as Error)?.message ?? "Errore invio al portale Turist@t.", sent: 0 }; }
 
   await admin.from("istat_rows").update({ stato: "sent", esito }).in("id", ids);
   for (const bid of Array.from(new Set(list.map((r) => r.booking_id).filter(Boolean))) as string[]) {
@@ -130,7 +136,7 @@ export async function closeDay(admin: SupabaseClient, tenantId: string, structur
   }
   // Storico: registra la chiusura giornaliera (archivio invii ISTAT).
   try { await admin.from("istat_submissions").insert({ tenant_id: tenantId, structure_id: structureId, day: day ?? today, count: ids.length, stato: "sent", esito }); } catch {}
-  return { ok: true, message: live ? `Movimento inviato al portale: ${ids.length} righe.` : `Movimento inviato: ${ids.length} righe (demo).`, sent: ids.length };
+  return { ok: true, message: `Movimento inviato al portale: ${ids.length} righe.`, sent: ids.length };
 }
 
 // Archivio invii ISTAT: elenco delle chiusure giornaliere (storico).
