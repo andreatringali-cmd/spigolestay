@@ -88,7 +88,7 @@ export function useDashboard2Dati(structureIds: string[], scope: string, today: 
       const msg = bad.filter((y) => y.job === "messaggi");
       if (msg.length) out.push({ label: `${msg.length} ${msg.length === 1 ? "messaggio automatico agli ospiti non consegnato" : "messaggi automatici agli ospiti non consegnati"}${spiegaErroreWa(msg[0].detail) ? `: ${spiegaErroreWa(msg[0].detail)}` : ""}`, href: "/messaggi" });
       setInviiKo(out);
-    }).catch(() => {});
+    }).catch((e) => { console.error("Lettura registro invii non riuscita", e); });
     return () => { alive = false; };
   }, []);
 

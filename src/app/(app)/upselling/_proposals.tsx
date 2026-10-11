@@ -120,7 +120,7 @@ function CandidateBody({ c, onDone }: { c: Candidate; onDone: () => void }) {
                   return (
                     <div key={p.extra.id} className={`rounded-lg border p-2 transition ${on ? "border-focus bg-surface" : "border-line bg-surface/60"}`}>
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setPicked((s) => { const nx = new Set(s); if (nx.has(p.extra.id)) nx.delete(p.extra.id); else nx.add(p.extra.id); return nx; })} aria-pressed={on} className={`grid h-5 w-5 shrink-0 place-items-center rounded border text-[11px] font-bold ${on ? "border-focus bg-focus text-white" : "border-line text-transparent"}`}>✓</button>
+                        <button onClick={() => setPicked((s) => { const nx = new Set(s); if (nx.has(p.extra.id)) nx.delete(p.extra.id); else nx.add(p.extra.id); return nx; })} aria-pressed={on} aria-label={`Includi: ${p.extra.name}`} className={`grid h-5 w-5 shrink-0 place-items-center rounded border text-[11px] font-bold ${on ? "border-focus bg-focus text-white" : "border-line text-transparent"}`}>✓</button>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-txt">{p.extra.name}<span className="rounded bg-wash px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-faint">{KIND_LABEL[p.kind]}</span></div>
                           <div className={`text-[11px] ${p.status === "warn" ? "text-[color:var(--warn,#b7791f)]" : "text-faint"}`}>{p.status === "warn" ? "⚠ " : ""}{p.reason}</div>
@@ -128,9 +128,9 @@ function CandidateBody({ c, onDone }: { c: Candidate; onDone: () => void }) {
                         </div>
                         {p.maxQty > 1 && on && (
                           <div className="flex shrink-0 items-center gap-1">
-                            <button onClick={() => setQtys((s) => ({ ...s, [p.extra.id]: Math.max(1, q - 1) }))} className="grid h-6 w-6 place-items-center rounded border border-line text-txt hover:bg-wash">−</button>
+                            <button aria-label={`Diminuisci quantità: ${p.extra.name}`} onClick={() => setQtys((s) => ({ ...s, [p.extra.id]: Math.max(1, q - 1) }))} className="grid h-6 w-6 place-items-center rounded border border-line text-txt hover:bg-wash">−</button>
                             <span className="w-5 text-center font-mono text-xs">{q}</span>
-                            <button onClick={() => setQtys((s) => ({ ...s, [p.extra.id]: Math.min(p.maxQty, q + 1) }))} className="grid h-6 w-6 place-items-center rounded border border-line text-txt hover:bg-wash">+</button>
+                            <button aria-label={`Aumenta quantità: ${p.extra.name}`} onClick={() => setQtys((s) => ({ ...s, [p.extra.id]: Math.min(p.maxQty, q + 1) }))} className="grid h-6 w-6 place-items-center rounded border border-line text-txt hover:bg-wash">+</button>
                           </div>
                         )}
                         <span className="shrink-0 font-mono text-sm font-bold text-txt">{eur(p.unit * q)}</span>

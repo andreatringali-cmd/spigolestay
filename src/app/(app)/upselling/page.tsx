@@ -50,7 +50,7 @@ export default function UpsellingPage() {
       if (seeded.includes(catId)) return;
       if ((catStruct.extras ?? []).length === 0) updateStructure(catId, { extras: DEFAULT_EXTRAS.map((e) => ({ ...e, confirmed: false })) });
       localStorage.setItem("spigolestay:extrasseeded", JSON.stringify([...new Set([...seeded, catId])]));
-    } catch {}
+    } catch { /* localStorage non disponibile: gli esempi potranno ripresentarsi alla prossima apertura */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catId]);
 

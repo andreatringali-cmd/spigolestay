@@ -9,17 +9,10 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { POOL_DEF, POOL_KEY, parsePool, poolFamilies, poolListings, poolOccupancy, type PoolConfig } from "@/lib/inventory-pool";
 import { CHANNEX_DIRTY_EVENT } from "@/components/ChannexAutoSync";
 import { addDays, toISO, parseISO } from "@/lib/dates";
+import Toggle from "@/components/Toggle";
 
 const NONE = ""; // famiglia "non condivisa"
 const tint = (c: string, pct: number) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
-
-function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
-  return (
-    <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={onClick} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? "var(--focus)" : "var(--line)" }}>
-      <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? 22 : 2 }} />
-    </button>
-  );
-}
 
 /** Pallino con l'iniziale della struttura, nel suo colore. */
 function Dot({ name, color, size = 22 }: { name: string; color?: string; size?: number }) {
@@ -76,7 +69,7 @@ export default function GruppoPage() {
     ...(unshared.length ? [{ key: "_none", title: "Non condivise", real: undefined as number | undefined, items: unshared }] : []),
   ], [families, unshared]);
 
-  if (!loaded) return null;
+  if (!loaded) return <div role="status" aria-live="polite" className="p-6 text-sm text-dim">Caricamento…</div>;
   const sharedRooms = families.reduce((a, f) => a + f.real, 0);
   return (
     <div>

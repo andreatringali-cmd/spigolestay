@@ -7,7 +7,6 @@ import { useData } from "@/lib/store";
 import type { Structure } from "@/lib/types";
 import { STRUCTURE_TYPES, AMENITIES, PAY_METHODS, CANCEL_POLICIES } from "@/lib/types";
 import { USER_LANGS, AV_COLORS } from "@/lib/users";
-import { eur } from "@/lib/format";
 import { downscaleImage } from "@/lib/images";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
@@ -18,14 +17,8 @@ import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
 import { CO_LEVELS, coManagerPerms, levelOf, type CoLevel } from "@/lib/comanager";
 import { loadDeposit, type DepositCfg } from "@/lib/deposit";
+import Toggle from "@/components/Toggle";
 
-function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
-  return (
-    <button type="button" onClick={onClick} aria-pressed={on} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? color : "var(--line)" }}>
-      <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} />
-    </button>
-  );
-}
 function Info({ children }: { children: React.ReactNode }) {
   return (
     <div className="mt-1 flex items-start gap-2 rounded-lg px-3 py-2 text-[11px] leading-snug" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 9%, transparent)", color: "var(--dim)" }}>
@@ -43,7 +36,7 @@ export default function StrutturaSchedaPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const isNew = params.id === "nuovo";
-  const { structures, roomTypes, units, addStructure, updateStructure, setActiveStructure, addActivity } = useData();
+  const { structures, units, addStructure, updateStructure, setActiveStructure, addActivity } = useData();
   const { t } = useLang();
   const ask = useConfirm();
   const toast = useToast();
@@ -57,14 +50,14 @@ export default function StrutturaSchedaPage() {
   const set = <K extends keyof Structure>(k: K, v: Structure[K]) => setF((p) => ({ ...p, [k]: v }));
   // Stripe Connect: collega il Stripe del proprietario di questa struttura (incassa lui).
   const [stripeSt, setStripeSt] = useState<{ loading?: boolean; enabled?: boolean; msg?: string }>({});
-  const verifyStripe = async (acct: string) => { try { const r = await fetch(`/api/stripe/connect?id=${encodeURIComponent(acct)}`); const j = await r.json(); const en = !!j?.chargesEnabled; setStripeSt({ enabled: en }); if (!isNew) updateStructure(params.id as string, { stripeChargesEnabled: en }); } catch {} };
+  const verifyStripe = async (acct: string) => { try { const r = await fetch(`/api/stripe/connect?id=${encodeURIComponent(acct)}`); const j = await r.json(); const en = !!j?.chargesEnabled; setStripeSt({ enabled: en }); if (!isNew) updateStructure(params.id as string, { stripeChargesEnabled: en }); } catch (e) { console.error("Verifica Stripe non riuscita", e); } };
   useEffect(() => {
     try {
       const sp = new URLSearchParams(window.location.search);
       const acct = sp.get("acct");
       if (sp.get("stripe") === "done" && acct && !isNew) { updateStructure(params.id as string, { stripeAccount: acct }); setF((p) => ({ ...p, stripeAccount: acct })); verifyStripe(acct); }
       else if (existing?.stripeAccount) verifyStripe(existing.stripeAccount);
-    } catch {}
+    } catch (e) { console.error("Lettura parametri Stripe dall'indirizzo non riuscita", e); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const connectStripe = async () => {
@@ -98,7 +91,8 @@ export default function StrutturaSchedaPage() {
       if (!token) return;
       const r = await fetch("/api/org/invite/revoke", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ code }) });
       if (r.ok) loadInvites();
-    } catch {}
+      else toast(t("Impossibile eliminare l'invito"), "error");
+    } catch (e) { console.error("Eliminazione invito non riuscita", e); toast(t("Rete non disponibile"), "error"); }
   };
   const loadInvites = async () => {
     if (isNew || !supabase) return;
@@ -108,7 +102,7 @@ export default function StrutturaSchedaPage() {
       const r = await fetch(`/api/org/invites?structureId=${encodeURIComponent(params.id as string)}`, { headers: { Authorization: `Bearer ${token}` } });
       const j = await r.json().catch(() => ({}));
       if (r.ok && Array.isArray(j.invites)) setInvites(j.invites);
-    } catch {}
+    } catch (e) { console.error("Caricamento inviti non riuscito", e); }
   };
   useEffect(() => { loadInvites(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [params.id]);
   const inviteSocio = async () => {
@@ -167,7 +161,7 @@ export default function StrutturaSchedaPage() {
         const jm = await rm.json().catch(() => ({}));
         if (jm?.ok) setMembers(jm.members || []);
       }
-    } catch {}
+    } catch (e) { console.error("Caricamento condivisione non riuscito", e); }
   };
   useEffect(() => { if (!isNew && f.orgId) loadShare(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [f.orgId]);
   const leaveShare = async () => {
@@ -188,9 +182,10 @@ export default function StrutturaSchedaPage() {
       if (patch.level) body.permissions = coManagerPerms(patch.level as CoLevel);
       if (typeof patch.active === "boolean") body.active = patch.active;
       if (patch.remove) body.remove = true;
-      await fetch("/api/org/members", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+      const r = await fetch("/api/org/members", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+      if (!r.ok) toast(t("Modifica del co-gestore non riuscita"), "error");
       loadShare();
-    } catch {}
+    } catch (e) { console.error("Modifica co-gestore non riuscita", e); toast(t("Rete non disponibile"), "error"); }
   };
 
   const num = (v: string) => (v === "" ? undefined : Number(v.replace(",", ".")));
@@ -321,7 +316,7 @@ export default function StrutturaSchedaPage() {
 
   // Logo struttura (ridimensionato a dataURL, salvato sulla struttura).
   const logoRef = useRef<HTMLInputElement>(null);
-  const onLogoFile = async (file?: File) => { if (!file || !file.type.startsWith("image/")) return; try { set("logo", await downscaleImage(file, 260, 0.82)); } catch {} };
+  const onLogoFile = async (file?: File) => { if (!file || !file.type.startsWith("image/")) return; try { set("logo", await downscaleImage(file, 260, 0.82)); } catch (e) { console.error("Caricamento logo non riuscito", e); toast(t("Impossibile caricare l'immagine"), "error"); } };
 
   return (
     <div>
@@ -347,7 +342,7 @@ export default function StrutturaSchedaPage() {
           <Card>
             <div className="mb-3 flex items-center justify-between">
               <SectionTitle>{t("Dati generali")}</SectionTitle>
-              <div className="flex items-center gap-2"><span className="text-xs text-dim">{t("Attiva")}</span><Toggle on={f.active !== false} onClick={() => set("active", f.active === false)} color="var(--ok)" /></div>
+              <div className="flex items-center gap-2"><span className="text-xs text-dim">{t("Attiva")}</span><Toggle label={t("Attiva")} on={f.active !== false} onClick={() => set("active", f.active === false)} color="var(--ok)" /></div>
             </div>
             {/* Logo cliccabile (fallback: iniziali sul colore identità) — usato su preventivi e PDF */}
             <div className="mb-3 flex items-center gap-3.5">
@@ -494,7 +489,7 @@ export default function StrutturaSchedaPage() {
               <label className={lbl}>{t("alle")}<input type="time" value={f.checkInTo ?? ""} onChange={(e) => set("checkInTo", e.target.value)} className={`${inp} mt-1`} /></label>
               <label className={lbl}>{t("Check-out entro")}<input type="time" value={f.checkOutBy ?? ""} onChange={(e) => set("checkOutBy", e.target.value)} className={`${inp} mt-1`} /></label>
             </div>
-            <div className="mt-3 flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Self check-in (accesso autonomo)")}</span><Toggle on={!!f.selfCheckin} onClick={() => set("selfCheckin", !f.selfCheckin)} /></div>
+            <div className="mt-3 flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Self check-in (accesso autonomo)")}</span><Toggle label={t("Self check-in (accesso autonomo)")} on={!!f.selfCheckin} onClick={() => set("selfCheckin", !f.selfCheckin)} /></div>
 
             {/* Guida ospiti personalizzata (servizio a piano) */}
             {hasGuide ? (
@@ -571,8 +566,8 @@ export default function StrutturaSchedaPage() {
               <label className={lbl}>{t("alle")}<input type="time" value={f.quietTo ?? ""} onChange={(e) => set("quietTo", e.target.value)} className={`${inp} mt-1`} /></label>
             </div>
             <div className="mt-3 flex flex-col gap-1">
-              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Animali ammessi")}</span><Toggle on={!!f.pets} onClick={() => set("pets", !f.pets)} /></div>
-              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Fumatori")}</span><Toggle on={!!f.smoking} onClick={() => set("smoking", !f.smoking)} /></div>
+              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Animali ammessi")}</span><Toggle label={t("Animali ammessi")} on={!!f.pets} onClick={() => set("pets", !f.pets)} /></div>
+              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Fumatori")}</span><Toggle label={t("Fumatori")} on={!!f.smoking} onClick={() => set("smoking", !f.smoking)} /></div>
             </div>
           </Card>
 

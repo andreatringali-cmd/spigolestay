@@ -181,7 +181,7 @@ export default function PreventiviPage() {
       const own = structureId && r.byStructure ? r.byStructure[structureId] : undefined;
       const src = own ?? r;
       setPayHolder(src.holder ?? ""); setPayIban(src.iban ?? ""); setPayExtra(typeof src.extra === "string" ? src.extra : "PayPal / Revolut: su richiesta inviamo il link dedicato.");
-    } catch {}
+    } catch { /* localStorage non disponibile o JSON non valido: restano i valori predefiniti */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structureId]);
   // Si salva SOLO quando l'utente modifica un campo (mai al caricamento), nella voce della struttura del preventivo.
@@ -194,7 +194,7 @@ export default function PreventiviPage() {
       const r = JSON.parse(localStorage.getItem(PAY_KEY) || "{}");
       if (structureId && structures.length > 1) localStorage.setItem(PAY_KEY, JSON.stringify({ ...r, byStructure: { ...(r.byStructure ?? {}), [structureId]: vals } }));
       else localStorage.setItem(PAY_KEY, JSON.stringify({ ...r, ...vals }));
-    } catch {}
+    } catch { /* localStorage non disponibile (modalità privata/quota): i dati di pagamento non vengono ricordati */ }
   };
   const [saved, setSaved] = useState<Preventivo[]>([]);
   // Archivio filtrato per la struttura attiva (selettore in alto) — "tutte" mostra ogni preventivo.

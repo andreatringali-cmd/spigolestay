@@ -34,7 +34,7 @@ export default function StrutturePage() {
     const posti = sUnits.reduce((a, u) => a + (roomTypes.find((rt) => rt.id === u.roomTypeId)?.beds ?? 0), 0);
     const color = s.photoColor ?? AV_COLORS[1];
     return (
-      <tr key={s.id} onClick={() => router.push(`/strutture/${s.id}`)} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
+      <tr key={s.id} tabIndex={0} onClick={() => router.push(`/strutture/${s.id}`)} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); router.push(`/strutture/${s.id}`); } }} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash">
         <td className="px-3 py-2.5">
           <div className="flex items-center gap-2.5">
             <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-xs font-bold text-white" style={{ backgroundColor: color }}>{s.logo ? <img src={s.logo} alt="" className="h-full w-full object-cover" /> : s.name.slice(0, 2).toUpperCase()}</div>
@@ -57,8 +57,8 @@ export default function StrutturePage() {
         </td>
         <td className="px-3 py-2.5 text-center">
           <span className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <button title={t("Sposta su")} onClick={() => moveStructure(s.id, "up")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↑</button>
-            <button title={t("Sposta giù")} onClick={() => moveStructure(s.id, "down")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↓</button>
+            <button title={t("Sposta su")} aria-label={t("Sposta su")} onClick={() => moveStructure(s.id, "up")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↑</button>
+            <button title={t("Sposta giù")} aria-label={t("Sposta giù")} onClick={() => moveStructure(s.id, "down")} className="grid h-6 w-6 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">↓</button>
           </span>
         </td>
         <td className="px-3 py-2.5 text-right text-faint">›</td>

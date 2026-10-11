@@ -7,19 +7,15 @@ import { useData } from "@/lib/store";
 import type { RoomType } from "@/lib/types";
 import { ROOM_TYPE_OPTIONS, BED_CONFIGS, ROOM_AMENITIES, ROOM_SPACES } from "@/lib/types";
 import { USER_LANGS, AV_COLORS } from "@/lib/users";
-import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import ImageUploader from "@/components/ImageUploader";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { amenityIcon } from "@/lib/amenities";
 import { useLang } from "@/lib/i18n";
+import Toggle from "@/components/Toggle";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
-function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
-  return <button type="button" onClick={onClick} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? color : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} /></button>;
-}
-
 const blankType = (structureId: string): Partial<RoomType> => ({
   structureId, name: "", beds: 2, basePrice: 100, maxOccupancy: 2, maxAdults: 2, maxChildren: 0, infants: 0, extraBeds: 0, size: undefined,
   bedConfig: "1 matrimoniale", minStay: 1, minPrice: undefined, childrenAllowed: true, dormMode: false, autoPrice: false,
@@ -163,7 +159,7 @@ export default function TipologiaSchedaPage() {
             )}
             <div className="mb-3 flex items-center gap-3">
               <div className="h-11 w-11 shrink-0 rounded-lg" style={{ backgroundColor: f.color }} />
-              <div><div className="text-[11px] text-faint">{t("Colore (calendario e camere)")}</div><div className="mt-1 flex gap-1.5">{AV_COLORS.map((c) => <button key={c} onClick={() => set("color", c)} className={`h-5 w-5 rounded-full border-2 ${f.color === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div></div>
+              <div><div className="text-[11px] text-faint">{t("Colore (calendario e camere)")}</div><div className="mt-1 flex gap-1.5">{AV_COLORS.map((c) => <button key={c} aria-label={`${t("Colore")} ${c}`} aria-pressed={f.color === c} onClick={() => set("color", c)} className={`h-5 w-5 rounded-full border-2 ${f.color === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div></div>
               {!isNew && <span className="ml-auto rounded-full bg-wash px-2.5 py-1 text-xs text-dim">{nUnits} {t("camere di questa tipologia")}</span>}
             </div>
             <label className={lbl}>{t("Nome tipologia")} *
@@ -223,8 +219,8 @@ export default function TipologiaSchedaPage() {
               <label className={lbl}>{t("Superficie m²")}<input type="number" min={0} value={f.size ?? ""} onChange={(e) => set("size", num(e.target.value))} className={`${inp} mt-1`} /></label>
             </div>
             <div className="mt-3 flex flex-col gap-1">
-              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Bambini ammessi")}</span><Toggle on={f.childrenAllowed !== false} onClick={() => set("childrenAllowed", !(f.childrenAllowed !== false))} /></div>
-              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Modalità dormitorio")} <span className="text-[11px] text-faint">{t("(vendita a posto letto)")}</span></span><Toggle on={!!f.dormMode} onClick={() => set("dormMode", !f.dormMode)} /></div>
+              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Bambini ammessi")}</span><Toggle label={t("Bambini ammessi")} on={f.childrenAllowed !== false} onClick={() => set("childrenAllowed", !(f.childrenAllowed !== false))} /></div>
+              <div className="flex items-center justify-between py-1"><span className="text-sm text-txt">{t("Modalità dormitorio")} <span className="text-[11px] text-faint">{t("(vendita a posto letto)")}</span></span><Toggle label={t("Modalità dormitorio")} on={!!f.dormMode} onClick={() => set("dormMode", !f.dormMode)} /></div>
             </div>
           </Card>
 
@@ -235,7 +231,7 @@ export default function TipologiaSchedaPage() {
                 <div key={i} className="flex items-center gap-2 rounded-lg border border-line px-3 py-2">
                   <span className="flex-1 text-sm text-txt">{c.name}</span>
                   <button onClick={() => toggleShared(i)} className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${c.shared ? "bg-[color:color-mix(in_srgb,var(--warn)_16%,transparent)] text-[color:var(--warn)]" : "bg-wash text-dim"}`}>{c.shared ? t("Condiviso") : t("Privato")}</button>
-                  <button onClick={() => delSpace(i)} className="rounded p-1 text-faint hover:text-[color:var(--err)]">✕</button>
+                  <button aria-label={t("Rimuovi spazio")} onClick={() => delSpace(i)} className="rounded p-1 text-faint hover:text-[color:var(--err)]">✕</button>
                 </div>
               ))}
               {(f.composition ?? []).length === 0 && <div className="text-sm text-faint">{t("Nessun ambiente.")}</div>}

@@ -14,19 +14,18 @@ import WeatherWidget from "@/components/WeatherWidget";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useToast } from "@/components/ToastProvider";
 import { useAccess } from "@/lib/access";
 import { amenityIcon } from "@/lib/amenities";
 import { sortRoomTypes, byUnitName } from "@/lib/sortUnits";
 import { ROOMS_PER_STRUCT, ROOM_OVERAGE } from "@/lib/plan";
 import { useLang } from "@/lib/i18n";
+import Toggle from "@/components/Toggle";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
 const typeColor = (rt: RoomType, i: number) => rt.color ?? AV_COLORS[i % AV_COLORS.length];
 
-function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?: () => void; color?: string }) {
-  return <button type="button" onClick={onClick} className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: on ? color : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: on ? "22px" : "2px" }} /></button>;
-}
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const { t } = useLang();
   return (
@@ -383,6 +382,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
   const { roomTypes, units, addUnit, updateUnit, deleteUnit, setActiveStructure, addActivity } = useData();
   const { t } = useLang();
   const ask = useConfirm();
+  const toast = useToast();
   const router = useRouter();
   const { moduleOn } = useAccess();
   const hasGuide = moduleOn("concierge");
@@ -409,7 +409,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
     if (!files?.length) return;
     for (const file of Array.from(files)) {
       if (!file.type.startsWith("image/")) continue;
-      try { const url = await downscaleImage(file, 900, 0.72); setF((p) => ({ ...p, photos: [...(p.photos ?? []), url] })); } catch {}
+      try { const url = await downscaleImage(file, 900, 0.72); setF((p) => ({ ...p, photos: [...(p.photos ?? []), url] })); } catch (e) { console.error("Caricamento foto non riuscito", e); toast(t("Impossibile caricare una foto"), "error"); }
     }
   };
   const removePhoto = (i: number) => setF((p) => ({ ...p, photos: (p.photos ?? []).filter((_, j) => j !== i) }));
@@ -479,7 +479,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
       </div>
 
       <div className="mt-3 rounded-lg border border-line p-3">
-        <div className="flex items-center justify-between"><span className="text-sm font-medium text-txt">{t("Fuori servizio")}</span><Toggle on={!!f.outOfService} onClick={() => set("outOfService", !f.outOfService)} color="var(--warn)" /></div>
+        <div className="flex items-center justify-between"><span className="text-sm font-medium text-txt">{t("Fuori servizio")}</span><Toggle label={t("Fuori servizio")} on={!!f.outOfService} onClick={() => set("outOfService", !f.outOfService)} color="var(--warn)" /></div>
         {f.outOfService && <input value={f.oosReason ?? ""} onChange={(e) => set("oosReason", e.target.value)} className={`${inp} mt-2`} placeholder={t("Motivo (es. ristrutturazione)")} />}
       </div>
       <div className="mt-4 flex items-center gap-2">
