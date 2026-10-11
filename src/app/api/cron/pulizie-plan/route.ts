@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { internalFetch, siteOrigin } from "@/lib/server-auth";
+import { siteOrigin } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
-import { sendWhatsapp } from "@/lib/whatsapp";
-import { logInvio } from "@/lib/invii-log";
-import { computePuliziePlan, buildPuliziePlanText } from "@/lib/puliziePlan";
+import { deliverPuliziePlan, romeNowSlot } from "@/lib/pulizie-send";
 import type { Booking, Unit, RoomType, Structure, Guest } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -25,7 +23,6 @@ export const dynamic = "force-dynamic";
 // Auth: Bearer <CRON_SECRET> (Vercel Cron) oppure ?secret= per test manuale.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const errText = (j: { error?: unknown; message?: unknown } | null | undefined, status: number): string => (typeof j?.error === "string" ? j.error : j?.error ? JSON.stringify(j.error) : j?.message ? String(j.message) : `HTTP ${status}`);
 type Json = Record<string, unknown>;
 const DATA_KEY = "spigolestay:data:v1";
 const NOTES_KEY = "spigolestay:pulizie:notes";
@@ -34,15 +31,6 @@ const s = (v: unknown) => (typeof v === "string" ? v : "");
 const arr = (x: unknown): Json[] => (Array.isArray(x) ? (x as Json[]) : []);
 
 interface AutoShareCfg { enabled: boolean; time: string; email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string }
-
-// Data (Y-M-D) e "HH:MM" adesso nel fuso Europe/Rome.
-function romeNowSlot(): { ymd: string; hm: string } {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
-  const g = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
-  const ymd = `${g("year")}-${g("month")}-${g("day")}`;
-  const hm = `${g("hour")}:${g("minute")}`;
-  return { ymd, hm };
-}
 
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
@@ -96,37 +84,15 @@ export async function GET(req: Request) {
       if (claim.error) { errors.push(`claim ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${claim.error.message}`); continue; }
       if (!claim.data || claim.data.length === 0) continue; // già inviato oggi per questa struttura
 
-      const { rooms } = computePuliziePlan({ date: todayRome, structures: [st], units, roomTypes, bookings });
-      const text = buildPuliziePlanText({ date: todayRome, scopedStructures: [st], rooms, guests, notes });
       const claimId = s(claim.data[0]?.id);
-      const sentBefore = sent + waSent; // per capire se in questo giro almeno un canale è riuscito
-      const subject = `Planning pulizie · ${s((st as unknown as Json).name)} · ${todayRome}`;
-
-      if (cfg.email && cfg.emailTo) {
-        try {
-          const r = await internalFetch(`${origin}/api/email`, {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ kind: "guest_message", to: cfg.emailTo, subject, text, booking: { structureName: s((st as unknown as Json)?.name), color: s((st as unknown as Json)?.photoColor), logo: s((st as unknown as Json)?.logo) } }),
-          });
-          const j = await r.json().catch(() => ({}));
-          if (r.ok && j?.ok) { sent++; await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "email", ok: true, detail: cfg.emailTo }); }
-          else { errors.push(`mail ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${errText(j, r.status)}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "email", ok: false, detail: errText(j, r.status) }); }
-        } catch (e) { errors.push(`mail ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "email", ok: false, detail: e instanceof Error ? e.message : "errore" }); }
-      }
-      if (cfg.whatsapp && cfg.whatsappTo) {
-        try {
-          // Il planning parte ogni mattina senza che il destinatario abbia scritto: per Meta è un messaggio "a freddo" e VA mandato col modello approvato.
-          // Il testo libero viene accettato dall'API ma poi NON consegnato (errore 131047) se il destinatario non ha scritto negli ultimi 24 ore: per questo non è più il primo tentativo.
-          // (corpo del modello con 3 variabili: {{1}} struttura, {{2}} data, {{3}} planning in una riga)
-          let w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, country: "IT", templateName: process.env.WHATSAPP_PULIZIE_TEMPLATE || "planning_pulizie", lang: "it", params: [s((st as unknown as Json).name), todayRome, text] });
-          const tplErr = w.ok ? "" : w.message;
-          if (!w.ok) w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, country: "IT", text }); // ripiego: arriva solo se il destinatario ha scritto nelle ultime 24 ore
-          if (w.ok) { waSent++; await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "whatsapp", ok: true, wamid: w.id, detail: tplErr ? `testo libero (il modello non è partito: ${tplErr}): consegnato solo se hai scritto negli ultimi 24 ore` : `modello a ${cfg.whatsappTo}` }); }
-          else { errors.push(`wa ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${w.message}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "whatsapp", ok: false, detail: `modello: ${tplErr} · testo libero: ${w.message}` }); }
-        } catch (e) { errors.push(`wa ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${e instanceof Error ? e.message : "err"}`); await logInvio(admin, tenantId, { job: "pulizie", ref: structureId, channel: "whatsapp", ok: false, detail: e instanceof Error ? e.message : "errore" }); }
+      const results = await deliverPuliziePlan({ admin, tenantId, origin, structure: st, cfg, date: todayRome, units, roomTypes, bookings, guests, notes });
+      let okNow = 0;
+      for (const r of results) {
+        if (r.ok) { okNow++; if (r.channel === "email") sent++; else waSent++; }
+        else errors.push(`${r.channel === "email" ? "mail" : "wa"} ${tenantId.slice(0, 8)}/${structureId.slice(0, 8)}: ${r.detail}`);
       }
       // Se NESSUN canale ha inviato (es. errore di Meta o dell'email) si libera il segno "già inviato oggi": alla prossima esecuzione si riprova, invece di saltare la giornata.
-      if (sent + waSent === sentBefore && claimId) { try { await admin.from("pulizie_share_log").delete().eq("id", claimId); } catch { /* il prossimo giro lo ritenterà comunque domani */ } }
+      if (okNow === 0 && claimId) { try { await admin.from("pulizie_share_log").delete().eq("id", claimId); } catch { /* il prossimo giro lo ritenterà comunque domani */ } }
     }
   };
 
