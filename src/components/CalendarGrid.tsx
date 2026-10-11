@@ -1041,94 +1041,95 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   return (
     <div ref={wrapRef} className="flex flex-col gap-3 select-none">
       {/* Riga filtri — data (jump), navigazione, menu Visualizza */}
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
-        {/* Cerca ospite o codice: prima del mese */}
-        <div className="relative order-first w-full sm:w-[calc(25%-2.5px)] sm:min-w-[240px] sm:shrink-0">
-          <SearchInput value={calQuery} onChange={setCalQuery} placeholder="Cerca ospite o codice…" className="w-full" />
-          {calQuery.trim() && (
-            <div className="absolute left-0 top-full z-40 mt-1 w-full min-w-[17rem] overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
-              {calHits.length === 0
-                ? <div className="px-2.5 py-2 text-xs text-faint">Nessuna prenotazione trovata</div>
-                : calHits.map((b) => (
-                  <button key={b.id} onClick={() => goToHit(b)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition hover:bg-wash">
-                    <span className="min-w-0 flex-1 truncate font-semibold text-txt">{guestName(b.guestId)}</span>
-                    <span className="shrink-0 font-mono text-[11px] text-faint">{fmtDM(parseISO(b.checkIn))} → {fmtDM(parseISO(b.checkOut))}</span>
-                  </button>
-                ))}
-            </div>
-          )}
-        </div>
-        {/* Menu Visualizza — spostato dopo i mesi (order) */}
-        <div ref={vizRef} className="relative order-3">
-          <button onClick={() => setVizOpen((o) => !o)} title="Visualizza" className={`grid h-9 w-9 place-items-center rounded-lg border transition ${vizOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
-          </button>
-          {vizOpen && (
-            <div className="absolute left-0 top-full z-40 mt-1 w-64 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
-              <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Vista</div>
-              <div className="mb-1 grid grid-cols-2 gap-1 px-1.5">
-                {([["type", "Compatta"], ["struct", "Esplosa"]] as ["type" | "struct", string][]).map(([v, lab]) => (
-                  <button key={v} onClick={() => patchView({ group: v })} title={v === "type" ? "Raggruppa per tipologia (tipologie uguali unite)" : "Dividi per struttura, poi per tipologia"} className={`rounded-md py-1 text-xs font-semibold transition ${vw.group === v ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>{lab}</button>
-                ))}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-sm sm:gap-3">
+        <div className="flex w-full items-center gap-2 sm:contents">
+          {/* Cerca ospite o codice: prima del mese */}
+          <div className="relative min-w-0 flex-1 sm:order-first sm:w-[calc(25%-2.5px)] sm:min-w-[240px] sm:flex-none sm:shrink-0">
+            <SearchInput value={calQuery} onChange={setCalQuery} placeholder="Cerca ospite o codice…" className="w-full" />
+            {calQuery.trim() && (
+              <div className="absolute left-0 top-full z-40 mt-1 w-full min-w-[17rem] overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
+                {calHits.length === 0
+                  ? <div className="px-2.5 py-2 text-xs text-faint">Nessuna prenotazione trovata</div>
+                  : calHits.map((b) => (
+                    <button key={b.id} onClick={() => goToHit(b)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition hover:bg-wash">
+                      <span className="min-w-0 flex-1 truncate font-semibold text-txt">{guestName(b.guestId)}</span>
+                      <span className="shrink-0 font-mono text-[11px] text-faint">{fmtDM(parseISO(b.checkIn))} → {fmtDM(parseISO(b.checkOut))}</span>
+                    </button>
+                  ))}
               </div>
-              <div className="my-1 border-t border-line" />
-              <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Finestra</div>
-              <div className="mb-1 grid grid-cols-2 gap-1 px-1.5">
-                {([[7, "7 giorni"], ["month", "Mensile"]] as [Span, string][]).map(([v, lab]) => (
-                  <button key={String(v)} onClick={() => patchView({ span: v })} className={`rounded-md py-1 text-xs font-semibold transition ${vw.span === v ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>{lab}</button>
-                ))}
+            )}
+          </div>
+          <Link href="/prenotazioni/nuova" className="sm:order-[42] inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Nuova</Link>
+        </div>
+        <div className="flex w-full items-center gap-2 sm:contents">
+          <div ref={monthRef} className="relative shrink-0 sm:order-[10]">
+            <button onClick={() => setMonthOpen((o) => !o)} className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition sm:h-auto sm:py-1.5 ${monthOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
+              <span className="hidden sm:inline-flex"><Icon name="calendar" size={15} /></span> <span className="capitalize">{monthLabel(start)}</span> <span className="text-xs">▾</span>
+            </button>
+            {monthOpen && (
+              <div className="absolute left-0 top-full z-40 mt-1 max-h-72 w-52 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-xl">
+                {monthList.map((mm) => {
+                  const active = start.getFullYear() === mm.y && start.getMonth() === mm.m;
+                  return (
+                    <button key={`${mm.y}-${mm.m}`} onClick={() => { setStart(new Date(mm.y, mm.m, 1)); patchView({ span: "month" }); setMonthOpen(false); }} className={`block w-full truncate rounded-md px-2.5 py-1.5 text-left text-sm capitalize ${active ? "bg-focus text-white" : "text-txt hover:bg-wash"}`}>{mm.label}</button>
+                  );
+                })}
               </div>
-              <MenuToggle label="Inizia da ieri" on={vw.fromYesterday} onClick={() => { const nf = !vw.fromYesterday; patchView({ fromYesterday: nf }); const t = new Date(); const base = new Date(t.getFullYear(), t.getMonth(), t.getDate()); setStart(nf ? addDays(base, -1) : base); }} />
-              <div className="my-1 border-t border-line" />
-              <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Righe</div>
-              <MenuToggle label="Tariffa" on={vw.rate} onClick={() => patchView({ rate: !vw.rate })} />
-              <MenuToggle label="Disponibilità" on={vw.avail} onClick={() => patchView({ avail: !vw.avail })} />
-              <MenuToggle label="Tasso di occupazione" on={vw.occ} onClick={() => patchView({ occ: !vw.occ })} />
-              <div className="my-1 border-t border-line" />
-              <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Etichetta barra</div>
-              <div className="mb-1 grid grid-cols-2 gap-1 px-1.5">
-                <button onClick={() => setBars("dentro")} className={`rounded-md py-1 text-xs font-semibold transition ${barStyle === "dentro" ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>Dentro</button>
-                <button onClick={() => setBars("sotto")} className={`rounded-md py-1 text-xs font-semibold transition ${barStyle === "sotto" ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>Sotto</button>
+            )}
+          </div>
+          {/* Salta a una data + frecce ±1 giorno (come nella dashboard) */}
+          <div className="flex min-w-0 flex-1 items-center gap-1 sm:order-[20] sm:flex-none">
+            <button onClick={() => setStart((d) => addDays(d, -1))} title="Giorno precedente" aria-label="Giorno precedente" className="grid h-9 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt sm:h-8">‹</button>
+            <div className="min-w-0 flex-1 sm:flex-none"><DateField value={toISO(start)} onChange={(v) => { if (v) setStart(parseISO(v)); }} title="Salta a una data" className="h-9 w-full justify-between rounded-lg border border-line bg-surface px-2 text-sm transition hover:border-focus sm:h-auto sm:w-auto sm:px-2.5 sm:py-1.5" /></div>
+            <button onClick={() => setStart((d) => addDays(d, 1))} title="Giorno successivo" aria-label="Giorno successivo" className="grid h-9 w-8 shrink-0 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt sm:h-8">›</button>
+          </div>
+        </div>
+        <div className="flex w-full items-center gap-2 sm:contents">
+          <div className="min-w-0 flex-1 sm:order-[31] sm:flex-none [&>div]:w-full sm:[&>div]:w-auto [&>div>button]:flex-1 [&>div>button]:whitespace-nowrap [&>div]:h-9 sm:[&>div]:h-auto [&>div>button]:px-2 sm:[&>div>button]:px-2.5">{viewSwitch}</div>
+          {/* Menu Visualizza — spostato dopo i mesi (order) */}
+          <div ref={vizRef} className="relative shrink-0 sm:order-[30]">
+            <button onClick={() => setVizOpen((o) => !o)} title="Visualizza" className={`grid h-9 w-9 place-items-center rounded-lg border transition ${vizOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+            </button>
+            {vizOpen && (
+              <div className="absolute left-0 top-full z-40 mt-1 w-64 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-xl">
+                <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Vista</div>
+                <div className="mb-1 grid grid-cols-2 gap-1 px-1.5">
+                  {([["type", "Compatta"], ["struct", "Esplosa"]] as ["type" | "struct", string][]).map(([v, lab]) => (
+                    <button key={v} onClick={() => patchView({ group: v })} title={v === "type" ? "Raggruppa per tipologia (tipologie uguali unite)" : "Dividi per struttura, poi per tipologia"} className={`rounded-md py-1 text-xs font-semibold transition ${vw.group === v ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>{lab}</button>
+                  ))}
+                </div>
+                <div className="my-1 border-t border-line" />
+                <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Finestra</div>
+                <div className="mb-1 grid grid-cols-2 gap-1 px-1.5">
+                  {([[7, "7 giorni"], ["month", "Mensile"]] as [Span, string][]).map(([v, lab]) => (
+                    <button key={String(v)} onClick={() => patchView({ span: v })} className={`rounded-md py-1 text-xs font-semibold transition ${vw.span === v ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>{lab}</button>
+                  ))}
+                </div>
+                <MenuToggle label="Inizia da ieri" on={vw.fromYesterday} onClick={() => { const nf = !vw.fromYesterday; patchView({ fromYesterday: nf }); const t = new Date(); const base = new Date(t.getFullYear(), t.getMonth(), t.getDate()); setStart(nf ? addDays(base, -1) : base); }} />
+                <div className="my-1 border-t border-line" />
+                <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Righe</div>
+                <MenuToggle label="Tariffa" on={vw.rate} onClick={() => patchView({ rate: !vw.rate })} />
+                <MenuToggle label="Disponibilità" on={vw.avail} onClick={() => patchView({ avail: !vw.avail })} />
+                <MenuToggle label="Tasso di occupazione" on={vw.occ} onClick={() => patchView({ occ: !vw.occ })} />
+                <div className="my-1 border-t border-line" />
+                <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Etichetta barra</div>
+                <div className="mb-1 grid grid-cols-2 gap-1 px-1.5">
+                  <button onClick={() => setBars("dentro")} className={`rounded-md py-1 text-xs font-semibold transition ${barStyle === "dentro" ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>Dentro</button>
+                  <button onClick={() => setBars("sotto")} className={`rounded-md py-1 text-xs font-semibold transition ${barStyle === "sotto" ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>Sotto</button>
+                </div>
+                <div className="my-1 border-t border-line" />
+                <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Etichette camera</div>
+                <MenuToggle label="Icone (arrivo/partenza, pulizia, lenzuola)" on={showRoomIcons} onClick={toggleRoomIcons} />
               </div>
-              <div className="my-1 border-t border-line" />
-              <div className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Etichette camera</div>
-              <MenuToggle label="Icone (arrivo/partenza, pulizia, lenzuola)" on={showRoomIcons} onClick={toggleRoomIcons} />
-            </div>
-          )}
-        </div>
-        {/* Selettore mese (tendina) */}
-        <div className="order-3">{viewSwitch}</div>
-        <div ref={monthRef} className="relative order-1">
-          <button onClick={() => setMonthOpen((o) => !o)} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${monthOpen ? "border-focus text-focus" : "border-line text-txt hover:bg-wash"}`}>
-            <Icon name="calendar" size={15} /> <span className="capitalize">{monthLabel(start)}</span> <span className="text-xs">▾</span>
-          </button>
-          {monthOpen && (
-            <div className="absolute left-0 top-full z-40 mt-1 max-h-72 w-52 overflow-auto rounded-xl border border-line bg-surface p-1 shadow-xl">
-              {monthList.map((mm) => {
-                const active = start.getFullYear() === mm.y && start.getMonth() === mm.m;
-                return (
-                  <button key={`${mm.y}-${mm.m}`} onClick={() => { setStart(new Date(mm.y, mm.m, 1)); patchView({ span: "month" }); setMonthOpen(false); }} className={`block w-full truncate rounded-md px-2.5 py-1.5 text-left text-sm capitalize ${active ? "bg-focus text-white" : "text-txt hover:bg-wash"}`}>{mm.label}</button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        {/* Salta a una data + frecce ±1 giorno (come nella dashboard) */}
-        <div className="order-2 flex items-center gap-1">
-          <button onClick={() => setStart((d) => addDays(d, -1))} title="Giorno precedente" aria-label="Giorno precedente" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">‹</button>
-          <DateField value={toISO(start)} onChange={(v) => { if (v) setStart(parseISO(v)); }} title="Salta a una data" className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm transition hover:border-focus" />
-          <button onClick={() => setStart((d) => addDays(d, 1))} title="Giorno successivo" aria-label="Giorno successivo" className="grid h-8 w-8 place-items-center rounded-lg border border-line text-base leading-none text-dim transition hover:bg-wash hover:text-txt">›</button>
-        </div>
-        <div className="order-4 ml-auto flex items-center gap-2">
-          {/* Selettore card Insights (mostra/nascondi) */}
-          {/* Toggle card: un click mostra tutte / nasconde tutte (come le altre sezioni) */}
-          <button onClick={() => (INSIGHT_CARDS.some((c) => showCard(c.key)) ? persistCards(new Set(INSIGHT_CARDS.map((c) => c.key))) : persistCards(new Set()))} title={INSIGHT_CARDS.some((c) => showCard(c.key)) ? "Nascondi le card" : "Mostra le card"} className={`grid h-9 w-9 place-items-center rounded-lg border border-line transition ${INSIGHT_CARDS.some((c) => showCard(c.key)) ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
+            )}
+          </div>
+          <button onClick={() => (INSIGHT_CARDS.some((c) => showCard(c.key)) ? persistCards(new Set(INSIGHT_CARDS.map((c) => c.key))) : persistCards(new Set()))} title={INSIGHT_CARDS.some((c) => showCard(c.key)) ? "Nascondi le card" : "Mostra le card"} className={`grid h-9 w-9 shrink-0 place-items-center sm:order-[40] sm:ml-auto rounded-lg border border-line transition ${INSIGHT_CARDS.some((c) => showCard(c.key)) ? "bg-wash text-txt" : "text-dim hover:bg-wash hover:text-txt"}`}>
             <Icon name="chart" size={16} />
           </button>
-          <Link href="/importa" title="Importa prenotazioni" aria-label="Importa prenotazioni" className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt">
+          <Link href="/importa" title="Importa prenotazioni" aria-label="Importa prenotazioni" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-dim sm:order-[41] transition hover:bg-wash hover:text-txt">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12" /><path d="m8 11 4 4 4-4" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>
           </Link>
-          <Link href="/prenotazioni/nuova" className="rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: "var(--focus)" }}>+ Nuova</Link>
         </div>
       </div>
 
