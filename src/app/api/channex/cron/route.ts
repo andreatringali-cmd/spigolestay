@@ -7,17 +7,17 @@ export const dynamic = "force-dynamic";
 
 // Rete di sicurezza: importa dal feed Channex TUTTE le prenotazioni non ancora
 // confermate (tutti i tenant mappati), nel caso un webhook si perda.
-// Proteggi con CRON_SECRET: Vercel Cron invia "Authorization: Bearer <CRON_SECRET>"
+// OBBLIGATORIO CRON_SECRET (se manca la rotta non esegue nulla): Vercel Cron invia "Authorization: Bearer <CRON_SECRET>"
 // se l'env è impostata; oppure chiamalo da un cron esterno con ?key=<CRON_SECRET>.
 // vercel.json (quando il piano lo consente):
 //   { "crons": [{ "path": "/api/channex/cron", "schedule": "*/15 * * * *" }] }
 async function run(req: Request) {
+  // Senza CRON_SECRET la rotta si ferma (come gli altri cron): niente accesso anonimo all'importazione di tutti i tenant.
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization") || "";
-    const key = new URL(req.url).searchParams.get("key") || "";
-    if (auth !== `Bearer ${secret}` && key !== secret) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  if (!secret) return NextResponse.json({ ok: false, skipped: "no_secret" });
+  const auth = req.headers.get("authorization") || "";
+  const key = new URL(req.url).searchParams.get("key") || "";
+  if (auth !== `Bearer ${secret}` && key !== secret) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !service) return NextResponse.json({ error: "supabase_not_configured" }, { status: 503 });
