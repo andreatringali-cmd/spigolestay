@@ -78,7 +78,7 @@ interface Preventivo {
   lang: Lang;
   total: number;
   createdAt: string;
-  status: "inviato" | "confermato";
+  status: "bozza" | "inviato" | "confermato";
   bookingId?: string;
 }
 
@@ -420,6 +420,7 @@ export default function PreventiviPage() {
     const s = await shortenLink(payUrl); payShortRef.current[payUrl] = s; return s;
   };
   const [mailState, setMailState] = useState<{ sending?: boolean; ok?: boolean; msg?: string }>({});
+  const [saveNote, setSaveNote] = useState<{ ok: boolean; msg: string } | null>(null);
 
   // Attende che tutte le <img> dentro un contenitore (in particolare il logo) siano caricate prima
   // di catturarlo con html2canvas — altrimenti il logo rischia di mancare per un problema di TIMING
@@ -501,20 +502,23 @@ export default function PreventiviPage() {
   };
 
   // Salvataggio in archivio (con dedup dell'ultimo identico).
-  const save = () => {
+  const save = (asDraft = false) => {
     if (!name.trim()) return;
     const fields = { name: name.trim(), email: email.trim() || undefined, phone: phone.trim() || undefined, structure: structureName, structureId, roomTypeId: roomLines[0]?.roomTypeId ?? "", roomLines, checkIn, checkOut, adults, children, childAges, rooms: roomsTotal, taxPersons, price: roomLines[0]?.price ?? 0, parking, parkingPrice, breakfast, breakfastPrice, cot: wantsCot, cotPrice, extrasPage: extrasPage && structExtras.length > 0, acconto, note: note.trim() || undefined, lang, total };
     // Modifica di un preventivo esistente (da "Modifica" in archivio): aggiorna in-place, niente duplicato.
     if (editingId && saved.some((p) => p.id === editingId)) {
-      setSaved((prev) => prev.map((p) => (p.id === editingId ? { ...p, ...fields } : p)));
+      // Una bozza che viene poi inviata diventa "inviato"; un preventivo già inviato/confermato non torna bozza.
+      setSaved((prev) => prev.map((p) => (p.id === editingId ? { ...p, ...fields, status: p.status === "bozza" && !asDraft ? ("inviato" as const) : p.status } : p)));
       return;
     }
     const dup = saved[0] && saved[0].name === name.trim() && saved[0].checkIn === checkIn && saved[0].checkOut === checkOut && saved[0].total === total;
-    if (dup) return;
+    if (dup) { setEditingId(saved[0].id); return; }
     const num = saved.filter((p) => new Date(p.createdAt).getFullYear() === curYear).reduce((m, p) => Math.max(m, p.number ?? 0), 0) + 1;
-    addActivity("quote", `Preventivo n. ${num} inviato — ${name.trim()}`);
+    addActivity("quote", `Preventivo n. ${num} ${asDraft ? "salvato" : "inviato"} — ${name.trim()}`);
+    const newId = crypto.randomUUID();
+    setEditingId(newId); // da qui in poi "Salva" e "Invia" aggiornano questo stesso preventivo, senza doppioni
     setSaved((prev) => {
-      return [{ id: crypto.randomUUID(), number: num, ...fields, createdAt: toISO(new Date()), status: "inviato" as const }, ...prev];
+      return [{ id: newId, number: num, ...fields, createdAt: toISO(new Date()), status: asDraft ? ("bozza" as const) : ("inviato" as const) }, ...prev];
     });
   };
 
@@ -902,8 +906,10 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button onClick={() => { if (!name.trim()) { setSaveNote({ ok: false, msg: "Inserisci il nome del cliente" }); return; } save(true); setSaveNote({ ok: true, msg: "Salvato in archivio" }); window.setTimeout(() => setSaveNote(null), 2500); }} className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-txt transition hover:bg-wash"><Icon name="check" size={15} /> {t("Salva")}</button>
             <button onClick={sendQuoteEmail} disabled={mailState.sending} className="flex items-center gap-1.5 rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"><Icon name="mail" size={15} /> {mailState.sending ? t("Invio…") : t("Invia via email")}</button>
             <button onClick={printPdf} title={t("Scarica il preventivo in PDF")} aria-label={t("Scarica PDF")} className="grid h-9 w-9 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><Icon name="fileText" size={16} /></button>
+            {saveNote && <span className={`text-xs ${saveNote.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{saveNote.ok ? "✓ " : "⚠ "}{t(saveNote.msg)}</span>}
             {(mailState.sending || mailState.msg) && <span className={`text-xs ${mailState.sending ? "text-dim" : mailState.ok ? "text-[color:var(--ok)]" : "text-[color:var(--err)]"}`}>{mailState.sending ? t("Invio…") : (mailState.ok ? "✓ " : "⚠ ") + mailState.msg}</span>}
           </div>
         </Card>
@@ -945,9 +951,9 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
                     <td className="px-3 py-2.5 font-mono text-dim">{nights(p.checkIn, p.checkOut)}</td>
                     <td className="px-3 py-2.5 font-mono font-semibold text-txt">{eur(p.total)}</td>
                     <td className="px-3 py-2.5">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: p.status === "confermato" ? "var(--ok)" : "var(--warn)" }}>
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.status === "confermato" ? "var(--ok)" : "var(--warn)" }} />
-                        {p.status === "confermato" ? t("Confermato") : t("Inviato")}
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: p.status === "confermato" ? "var(--ok)" : p.status === "bozza" ? "var(--dim)" : "var(--warn)" }}>
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.status === "confermato" ? "var(--ok)" : p.status === "bozza" ? "var(--faint)" : "var(--warn)" }} />
+                        {p.status === "confermato" ? t("Confermato") : p.status === "bozza" ? t("Bozza") : t("Inviato")}
                       </span>
                     </td>
                     <td className="px-3 py-2.5 text-right">
