@@ -381,11 +381,30 @@ export function isReviewsNotInstalled(status: number, error?: string): boolean {
   if (status === 403) return true;
   return /messages application|not have installed/i.test(error || "");
 }
+// Channex pagina l'elenco (senza parametri arriva solo la prima pagina, poche recensioni): si scorrono TUTTE le pagine finché non ne arrivano di nuove.
+// Funziona anche se Channex ignora la dimensione di pagina richiesta; il limite di pagine evita cicli infiniti.
+const REVIEWS_PAGE_SIZE = 100;
+const REVIEWS_MAX_PAGES = 60;
 export async function listReviews(propertyId: string) {
-  const res = await channex<{ data?: unknown[] }>(`/reviews?filter[property_id]=${encodeURIComponent(propertyId)}`);
-  if (!res.ok) return { ok: false as const, status: res.status, error: res.error, reviews: [] as ChxReview[] };
-  const list = Array.isArray(res.data?.data) ? res.data!.data! : [];
-  return { ok: true as const, status: res.status, reviews: list.map(flattenReview) };
+  const seen = new Set<string>();
+  const all: ChxReview[] = [];
+  let lastStatus = 200;
+  for (let page = 1; page <= REVIEWS_MAX_PAGES; page++) {
+    const res = await channex<{ data?: unknown[]; meta?: { total?: number } }>(`/reviews?filter[property_id]=${encodeURIComponent(propertyId)}&pagination[page]=${page}&pagination[limit]=${REVIEWS_PAGE_SIZE}`);
+    lastStatus = res.status;
+    if (!res.ok) {
+      // Un errore alla prima pagina è un errore vero; dalle successive si tiene quanto già letto.
+      if (page === 1) return { ok: false as const, status: res.status, error: res.error, reviews: [] as ChxReview[] };
+      break;
+    }
+    const list = (Array.isArray(res.data?.data) ? res.data!.data! : []).map(flattenReview);
+    const fresh = list.filter((r) => r.id && !seen.has(r.id));
+    if (fresh.length === 0) break;
+    fresh.forEach((r) => { seen.add(r.id); all.push(r); });
+    const total = Number(res.data?.meta?.total);
+    if (Number.isFinite(total) && total > 0 && all.length >= total) break;
+  }
+  return { ok: true as const, status: lastStatus, reviews: all };
 }
 export interface ChxPropertyScore { overall_score?: number; count?: number; scores?: Record<string, { count?: number; score?: number }> }
 export async function getPropertyScores(propertyId: string) {
