@@ -14,6 +14,7 @@ import WeatherWidget from "@/components/WeatherWidget";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useToast } from "@/components/ToastProvider";
 import { useAccess } from "@/lib/access";
 import { amenityIcon } from "@/lib/amenities";
 import { sortRoomTypes, byUnitName } from "@/lib/sortUnits";
@@ -383,6 +384,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
   const { roomTypes, units, addUnit, updateUnit, deleteUnit, setActiveStructure, addActivity } = useData();
   const { t } = useLang();
   const ask = useConfirm();
+  const toast = useToast();
   const router = useRouter();
   const { moduleOn } = useAccess();
   const hasGuide = moduleOn("concierge");
@@ -409,7 +411,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
     if (!files?.length) return;
     for (const file of Array.from(files)) {
       if (!file.type.startsWith("image/")) continue;
-      try { const url = await downscaleImage(file, 900, 0.72); setF((p) => ({ ...p, photos: [...(p.photos ?? []), url] })); } catch {}
+      try { const url = await downscaleImage(file, 900, 0.72); setF((p) => ({ ...p, photos: [...(p.photos ?? []), url] })); } catch (e) { console.error("Caricamento foto non riuscito", e); toast(t("Impossibile caricare una foto"), "error"); }
     }
   };
   const removePhoto = (i: number) => setF((p) => ({ ...p, photos: (p.photos ?? []).filter((_, j) => j !== i) }));

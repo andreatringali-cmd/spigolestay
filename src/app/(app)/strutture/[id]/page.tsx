@@ -57,14 +57,14 @@ export default function StrutturaSchedaPage() {
   const set = <K extends keyof Structure>(k: K, v: Structure[K]) => setF((p) => ({ ...p, [k]: v }));
   // Stripe Connect: collega il Stripe del proprietario di questa struttura (incassa lui).
   const [stripeSt, setStripeSt] = useState<{ loading?: boolean; enabled?: boolean; msg?: string }>({});
-  const verifyStripe = async (acct: string) => { try { const r = await fetch(`/api/stripe/connect?id=${encodeURIComponent(acct)}`); const j = await r.json(); const en = !!j?.chargesEnabled; setStripeSt({ enabled: en }); if (!isNew) updateStructure(params.id as string, { stripeChargesEnabled: en }); } catch {} };
+  const verifyStripe = async (acct: string) => { try { const r = await fetch(`/api/stripe/connect?id=${encodeURIComponent(acct)}`); const j = await r.json(); const en = !!j?.chargesEnabled; setStripeSt({ enabled: en }); if (!isNew) updateStructure(params.id as string, { stripeChargesEnabled: en }); } catch (e) { console.error("Verifica Stripe non riuscita", e); } };
   useEffect(() => {
     try {
       const sp = new URLSearchParams(window.location.search);
       const acct = sp.get("acct");
       if (sp.get("stripe") === "done" && acct && !isNew) { updateStructure(params.id as string, { stripeAccount: acct }); setF((p) => ({ ...p, stripeAccount: acct })); verifyStripe(acct); }
       else if (existing?.stripeAccount) verifyStripe(existing.stripeAccount);
-    } catch {}
+    } catch (e) { console.error("Lettura parametri Stripe dall'indirizzo non riuscita", e); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const connectStripe = async () => {
@@ -98,7 +98,8 @@ export default function StrutturaSchedaPage() {
       if (!token) return;
       const r = await fetch("/api/org/invite/revoke", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ code }) });
       if (r.ok) loadInvites();
-    } catch {}
+      else toast(t("Impossibile eliminare l'invito"), "error");
+    } catch (e) { console.error("Eliminazione invito non riuscita", e); toast(t("Rete non disponibile"), "error"); }
   };
   const loadInvites = async () => {
     if (isNew || !supabase) return;
@@ -108,7 +109,7 @@ export default function StrutturaSchedaPage() {
       const r = await fetch(`/api/org/invites?structureId=${encodeURIComponent(params.id as string)}`, { headers: { Authorization: `Bearer ${token}` } });
       const j = await r.json().catch(() => ({}));
       if (r.ok && Array.isArray(j.invites)) setInvites(j.invites);
-    } catch {}
+    } catch (e) { console.error("Caricamento inviti non riuscito", e); }
   };
   useEffect(() => { loadInvites(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [params.id]);
   const inviteSocio = async () => {
@@ -167,7 +168,7 @@ export default function StrutturaSchedaPage() {
         const jm = await rm.json().catch(() => ({}));
         if (jm?.ok) setMembers(jm.members || []);
       }
-    } catch {}
+    } catch (e) { console.error("Caricamento condivisione non riuscito", e); }
   };
   useEffect(() => { if (!isNew && f.orgId) loadShare(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [f.orgId]);
   const leaveShare = async () => {
@@ -188,9 +189,10 @@ export default function StrutturaSchedaPage() {
       if (patch.level) body.permissions = coManagerPerms(patch.level as CoLevel);
       if (typeof patch.active === "boolean") body.active = patch.active;
       if (patch.remove) body.remove = true;
-      await fetch("/api/org/members", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+      const r = await fetch("/api/org/members", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+      if (!r.ok) toast(t("Modifica del co-gestore non riuscita"), "error");
       loadShare();
-    } catch {}
+    } catch (e) { console.error("Modifica co-gestore non riuscita", e); toast(t("Rete non disponibile"), "error"); }
   };
 
   const num = (v: string) => (v === "" ? undefined : Number(v.replace(",", ".")));
@@ -321,7 +323,7 @@ export default function StrutturaSchedaPage() {
 
   // Logo struttura (ridimensionato a dataURL, salvato sulla struttura).
   const logoRef = useRef<HTMLInputElement>(null);
-  const onLogoFile = async (file?: File) => { if (!file || !file.type.startsWith("image/")) return; try { set("logo", await downscaleImage(file, 260, 0.82)); } catch {} };
+  const onLogoFile = async (file?: File) => { if (!file || !file.type.startsWith("image/")) return; try { set("logo", await downscaleImage(file, 260, 0.82)); } catch (e) { console.error("Caricamento logo non riuscito", e); toast(t("Impossibile caricare l'immagine"), "error"); } };
 
   return (
     <div>

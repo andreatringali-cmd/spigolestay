@@ -120,7 +120,7 @@ export default function PuliziePage() {
         if (Array.isArray(p) && p.length && p[0].structureId && p[0].qty !== undefined) { setStock(p); stockSeeded.current = true; return; }
         if (Array.isArray(p) && p.length && p[0].structureId) { setStock(p.map((o: { id?: string; name: string; structureId: string; supplier?: string; status?: string }, i: number) => ({ id: o.id ?? `m${i}`, name: o.name, structureId: o.structureId, supplier: o.supplier ?? "", min: 1, qty: o.status === "out" ? 0 : o.status === "low" ? 1 : 3 }))); stockSeeded.current = true; return; }
       }
-    } catch {}
+    } catch { /* localStorage non disponibile o dati non validi: si riparte dalle scorte predefinite */ }
     if (structures.length) { setStock(structures.flatMap((s) => DEFAULT_PRODUCTS.map((name, i) => ({ id: `${s.id}-p${i}`, name, structureId: s.id, supplier: "", min: 1, qty: 3 })))); stockSeeded.current = true; }
   }, [structures]);
   const persistStock = (next: Prod[]) => { setStock(next); try { localStorage.setItem("spigolestay:pulizie:stock", JSON.stringify(next)); } catch {} };
@@ -139,7 +139,7 @@ export default function PuliziePage() {
         const iss = localStorage.getItem("spigolestay:pulizie:issues"); if (iss) setIssues(JSON.parse(iss));
         const dn = localStorage.getItem("spigolestay:pulizie:done"); if (dn) setDone(JSON.parse(dn));
         const nt = localStorage.getItem("spigolestay:pulizie:notes"); if (nt) setNotes(JSON.parse(nt));
-      } catch {}
+      } catch { /* localStorage non disponibile o dati non validi: si tiene lo stato attuale */ }
     };
     const onVis = () => { if (document.visibilityState === "visible") rehydrate(); };
     window.addEventListener("spigolestay:datasync", rehydrate);
