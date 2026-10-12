@@ -245,11 +245,11 @@ export default function CanaliPage() {
   // Canali non ancora collegati nel perimetro in vista (Airbnb è tra i canali di Xenora; Agoda e Trip.com sono altri portali collegabili da "Gestisci canali").
   const connectedText = (effStructure === "all" ? Object.values(otaByStructure ?? {}).flat() : otaByStructure?.[effStructure] ?? []).map((c) => `${c.channel} ${c.title}`.toLowerCase()).join(" | ");
   const airbnbShare = Math.round(scope.rows.find((r) => r.channel === "airbnb")?.shareGross ?? 0);
-  const suggestions: { key: string; name: string; channel?: Channel; why: string }[] = [
+  const suggestions: { key: string; name: string; mark?: string; channel?: Channel; why: string }[] = [
     { key: "airbnb", name: "Airbnb", channel: "airbnb" as Channel, why: airbnbShare > 0 ? `Oggi vale il ${airbnbShare}% dei tuoi ricavi.` : "Porta ospiti che cercano appartamenti e camere in stile locale, un pubblico diverso da quello di Booking.com." },
-    { key: "agoda", name: "Agoda", why: "Forte sul pubblico asiatico: utile se vuoi più ospiti da fuori Europa." },
-    { key: "trip", name: "Trip.com", why: "Porta ospiti dalla Cina e dall'Asia, che prenotano in anticipo." },
-    { key: "despegar", name: "Despegar", why: "Il portale più usato in America Latina: utile per ospiti sudamericani." },
+    { key: "agoda", name: "Agoda", mark: "agoda", why: "Forte sul pubblico asiatico: utile se vuoi più ospiti da fuori Europa." },
+    { key: "trip", name: "Trip.com", mark: "Trip.com", why: "Porta ospiti dalla Cina e dall'Asia, che prenotano in anticipo." },
+    { key: "despegar", name: "Despegar", mark: "despegar", why: "Il portale più usato in America Latina: utile per ospiti sudamericani." },
   ].filter((s) => !connectedText.includes(s.key)).slice(0, 3); // se ne collega uno, al suo posto compare il successivo dell'elenco
 
   return (
@@ -359,7 +359,7 @@ export default function CanaliPage() {
               <div className="flex w-full min-w-0 flex-1 flex-col justify-center gap-4">
                 {scope.rows.map((r) => (
                   <div key={r.channel} className="flex items-center gap-3">
-                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: chColor(r.channel) }} />
+                    <span className="shrink-0 rounded-full p-[2.5px]" style={{ backgroundColor: chColor(r.channel) }}><ChannelLogo channel={r.channel} size={24} title={CHANNELS[r.channel]?.label ?? r.channel} /></span>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold text-txt">{CHANNELS[r.channel]?.label ?? r.channel}</div>
                       <div className="text-[11px] text-faint">{r.bookings} {t("pren.")} · {eur(r.gross)}</div>
@@ -538,8 +538,9 @@ export default function CanaliPage() {
             {suggestions.map((s) => (
               <div key={s.key} className="flex flex-col rounded-xl border border-dashed border-line bg-surface p-4">
                 <div className="flex items-center gap-2.5">
-                  {s.channel ? <ChannelLogo channel={s.channel} size={26} title={s.name} /> : <span className="grid h-[26px] w-[26px] place-items-center rounded-full bg-wash text-xs font-bold text-dim">{s.name[0]}</span>}
-                  <span className="font-semibold text-txt">{s.name}</span>
+                  {s.channel ? (<><ChannelLogo channel={s.channel} size={26} title={s.name} /><span className="font-semibold text-txt">{s.name}</span></>) : (
+                    <span className="inline-flex h-[28px] items-center rounded-md bg-white px-2.5 text-[14px] font-extrabold tracking-tight" style={{ color: "#2B3340", boxShadow: "0 0 0 1px rgba(0,0,0,.09)" }} title={s.name}>{s.mark ?? s.name}</span>
+                  )}
                   <span className="ml-auto rounded-full bg-wash px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-faint">{t("Non collegato")}</span>
                 </div>
                 <p className="mt-2 flex-1 text-[13px] leading-snug text-dim">{s.why}</p>
