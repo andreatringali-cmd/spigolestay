@@ -10,6 +10,8 @@ import { USER_LANGS, AV_COLORS } from "@/lib/users";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import ImageUploader from "@/components/ImageUploader";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { needsBulkGuard } from "@/lib/bulk-guard";
+import { useBulkGuard } from "@/components/useBulkGuard";
 import { amenityIcon } from "@/lib/amenities";
 import { useLang } from "@/lib/i18n";
 import Toggle from "@/components/Toggle";
@@ -120,9 +122,15 @@ export default function TipologiaSchedaPage() {
     }
   };
   // Elimina le camere selezionate nel picker (salta quelle con prenotazioni attive per sicurezza).
-  const confirmRemove = () => {
+  const bulkGuard = useBulkGuard();
+  const confirmRemove = async () => {
     if (!existing) return;
     const ids = [...removeSel].filter((id) => !hasActiveBooking(id));
+    // Da 20 camere in su: conferma forte (ELIMINA) e copia JSON scaricata prima di cancellare.
+    if (needsBulkGuard(ids.length)) {
+      const list = units.filter((u) => ids.includes(u.id));
+      if (!(await bulkGuard({ kind: "camere", items: list, noun: t("camere"), title: t("Eliminare molte camere?") }))) return;
+    }
     ids.forEach((id) => deleteUnit(id));
     setPickerOpen(false);
     setRemoveSel(new Set());
