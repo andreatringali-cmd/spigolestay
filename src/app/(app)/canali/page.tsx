@@ -376,26 +376,22 @@ export default function CanaliPage() {
                     const tot = shown.reduce((a, r) => ({ n: a.n + r.bookings, nights: a.nights + r.nights, gross: a.gross + r.gross, comm: a.comm + r.commission, net: a.net + r.net }), { n: 0, nights: 0, gross: 0, comm: 0, net: 0 });
                     const th = "px-3 py-2 font-bold";
                     const td = "px-3 py-1.5";
-                    // Prenotazioni e notti sempre nello stesso formato (righe e totale), così le colonne restano allineate.
-                    const nightsCell = (n: number, nights: number, extra = "") => <div className="whitespace-nowrap"><span className="font-mono font-semibold tabular-nums text-txt">{n}</span><span className="ml-1.5 text-[11px] font-normal text-faint">· {nights} {t("notti")}{extra}</span></div>;
                     return (
                   <div className="overflow-x-auto rounded-xl border border-line">
-                    <table className="w-full min-w-[920px] table-fixed text-sm">
+                    <table className="w-full min-w-[820px] table-fixed text-sm">
                       <colgroup>
-                        {[15, 7, 13, 13, 10, 10, 7, 10, 8, 4, 3].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
+                        {[17, 9, 9, 12, 12, 12, 10, 14, 5].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
                       </colgroup>
                       <thead>
                         <tr className="border-b border-line bg-wash text-left text-[10px] font-bold uppercase tracking-wide text-faint">
                           <th className={th}>{t("Canale")}</th>
                           <th className={th}>{t("Stato")}</th>
-                          <th className={`${th} text-right`}>{t("Prenotazioni")}</th>
-                          <th className={th}>{t("Quota ricavi")}</th>
+                          <th className={`${th} text-right`}>{t("Correzione")}</th>
                           <th className={`${th} text-right`}>{t("Lordo")}</th>
                           <th className={`${th} text-right`}>{t("Commissioni")}</th>
-                          <th className={`${th} text-right`}>{t("Comm. %")}</th>
                           <th className={`${th} text-right`}>{t("Netto")}</th>
                           <th className={`${th} text-right`}>{t("€ / notte")}</th>
-                          <th className={`${th} text-right`}>{t("Corr.")}</th>
+                          <th className={th}>{t("Quota ricavi")}</th>
                           <th className={`${th} text-right`}>{t("Colore")}</th>
                         </tr>
                       </thead>
@@ -409,6 +405,7 @@ export default function CanaliPage() {
                           const color = loadChannelColor(chKey) || `var(${CHANNELS[chKey]?.cssVar ?? ""})`;
                           const st = gs?.rows.find((r) => r.channel === chKey);
                           const dash = <span className="text-faint">—</span>;
+                          const commTip = `${commInfo.source === "stima" ? "~" : ""}${commPct}% · ${commInfo.source === "stima" ? "percentuale stimata dalle commissioni reali dell'ultimo anno (per le prenotazioni senza cifra)" : commInfo.source === "manuale" ? "percentuale impostata da te" : "percentuale standard: non ci sono abbastanza dati reali per stimarla"}`;
                           return (
                             <tr key={c.id || c.channel + i} className="border-b border-line last:border-0 hover:bg-wash">
                               <td className={td}>
@@ -420,7 +417,11 @@ export default function CanaliPage() {
                               <td className={td}>
                                 <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
                               </td>
-                              <td className={`${td} text-right`}>{st ? nightsCell(st.bookings, st.nights, st.cancelled ? ` · ${st.cancelled} ${t("annullate")}` : "") : dash}</td>
+                              <td className={`${td} text-right text-xs text-dim`}>{corr}</td>
+                              <td className={`${td} text-right font-mono tabular-nums text-txt`}>{st && st.gross > 0 ? eur(st.gross) : dash}</td>
+                              <td className={`${td} text-right font-mono tabular-nums text-txt`} title={commTip}>{st && st.commission > 0 ? eur(st.commission) : dash}</td>
+                              <td className={`${td} text-right font-mono font-semibold tabular-nums`} style={{ color: st && st.net > 0 ? "var(--ok)" : undefined }}>{st && st.net > 0 ? eur(st.net) : dash}</td>
+                              <td className={`${td} text-right font-mono tabular-nums text-dim`}>{st?.avgNight ? eur(st.avgNight) : dash}</td>
                               <td className={td}>
                                 {st ? (
                                   <div className="flex items-center gap-2">
@@ -429,12 +430,6 @@ export default function CanaliPage() {
                                   </div>
                                 ) : dash}
                               </td>
-                              <td className={`${td} text-right font-mono tabular-nums text-txt`}>{st && st.gross > 0 ? eur(st.gross) : dash}</td>
-                              <td className={`${td} text-right font-mono tabular-nums text-txt`}>{st && st.commission > 0 ? eur(st.commission) : dash}</td>
-                              <td className={`${td} text-right text-xs text-faint`} title={commInfo.source === "stima" ? "Percentuale stimata dalle commissioni reali dell'ultimo anno (per le prenotazioni senza cifra)" : commInfo.source === "manuale" ? "Percentuale impostata da te" : "Percentuale standard: non ci sono abbastanza dati reali per stimarla"}>{commInfo.source === "stima" ? "~" : ""}{commPct}%</td>
-                              <td className={`${td} text-right font-mono font-semibold tabular-nums`} style={{ color: st && st.net > 0 ? "var(--ok)" : undefined }}>{st && st.net > 0 ? eur(st.net) : dash}</td>
-                              <td className={`${td} text-right font-mono tabular-nums text-dim`}>{st?.avgNight ? eur(st.avgNight) : dash}</td>
-                              <td className={`${td} text-right text-xs text-dim`}>{corr}</td>
                               <td className={`${td} text-right`}>
                                 <button onClick={() => setChannelDetail({ sid: g.sid, c })} title={t("Cambia il colore su calendario")} aria-label={t("Cambia il colore su calendario")} className="h-4 w-4 rounded-full border border-line align-middle transition hover:scale-110" style={{ backgroundColor: color }} />
                               </td>
@@ -445,12 +440,9 @@ export default function CanaliPage() {
                       {shown.length > 1 && (
                         <tfoot>
                           <tr className="border-t border-line bg-wash text-xs font-semibold text-txt">
-                            <td className="px-3 py-2" colSpan={2}>{t("Totale canali")}</td>
-                            <td className="px-3 py-2 text-right">{nightsCell(tot.n, tot.nights)}</td>
-                            <td />
+                            <td className="px-3 py-2" colSpan={3}>{t("Totale canali")}</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums">{eur(tot.gross)}</td>
-                            <td className="px-3 py-2 text-right font-mono tabular-nums">{eur(tot.comm)}</td>
-                            <td className="px-3 py-2 text-right text-xs font-normal text-faint">{tot.gross > 0 ? `${Math.round((tot.comm / tot.gross) * 1000) / 10}%` : "—"}</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums" title={tot.gross > 0 ? `${Math.round((tot.comm / tot.gross) * 1000) / 10}% del lordo` : undefined}>{eur(tot.comm)}</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums" style={{ color: "var(--ok)" }}>{eur(tot.net)}</td>
                             <td className="px-3 py-2 text-right font-mono tabular-nums text-dim">{tot.nights > 0 && tot.gross > 0 ? eur(Math.round(tot.gross / tot.nights)) : "—"}</td>
                             <td colSpan={2} />
