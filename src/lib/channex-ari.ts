@@ -51,6 +51,10 @@ export function buildAriPayload(
   const base0 = new Date();
   // Strutture che mostrano le stesse camere fisiche: la disponibilità conta le camere fisiche libere in tutto il gruppo (vedi inventory-pool.ts).
   const poolOcc = opts?.pool && inPool(opts.pool, structureId) ? poolOccupancy(opts.pool, roomTypes, units, bookings) : null;
+  // Una prenotazione conta per la tipologia della camera in cui sta ORA (la riga in cui la vedi nel Calendario), come in inventory-pool.ts: se una Standard è stata
+  // spostata in una camera Deluxe, occupa una Deluxe e libera una Standard. Senza camera assegnata vale la tipologia scelta alla prenotazione.
+  const typeOfUnit = new Map(units.map((u) => [u.id, u.roomTypeId]));
+  const typeOf = (b: Booking): string => (b.unitId && typeOfUnit.get(b.unitId)) || b.roomTypeId;
   for (const rt of rts) {
     const mp = map.rooms![rt.id];
     const totalUnits = units.filter((u) => u.roomTypeId === rt.id && !u.outOfService).length;
@@ -63,7 +67,7 @@ export function buildAriPayload(
       const iso = toISO(dt);
       // Occupato = QUALSIASI prenotazione non annullata che copre il giorno, incluso il "blocked"
       // (fuori servizio a periodo). Il fuori servizio permanente è già escluso da totalUnits.
-      const occupied = bookings.filter((b) => b.status !== "cancelled" && b.roomTypeId === rt.id && b.checkIn <= iso && iso < b.checkOut).length;
+      const occupied = bookings.filter((b) => b.status !== "cancelled" && typeOf(b) === rt.id && b.checkIn <= iso && iso < b.checkOut).length;
       const closed = closes[`${rt.id}|${iso}`] ?? 0; // camere chiuse alla vendita per quel giorno
       const avail = poolOcc ? poolOcc.availFor(rt.id, iso, closed) : Math.max(0, totalUnits - occupied - closed);
       availability.push({ property_id: map.propertyId, room_type_id: mp.roomTypeId, date: iso, availability: avail });
