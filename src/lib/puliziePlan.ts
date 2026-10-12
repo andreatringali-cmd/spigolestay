@@ -173,6 +173,28 @@ export function buildPuliziePlanText(opts: {
   return lines.join("\n");
 }
 
+// Una voce per tipo di lavoro, per il modello WhatsApp "a righe" (ogni riga del modello è una variabile: Meta non ammette a capo DENTRO una variabile, ma il modello li ha già).
+// Ogni valore è su una sola riga e mai vuoto (Meta rifiuta le variabili vuote): "nessuna" se non c'è nulla. Per cambi e arrivi si indica anche quante persone entrano (servono per i letti).
+export interface PlanFields { cambio: string; arrivi: string; partenze: string; riassetto: string; fuori: string; niente: string }
+export function buildPuliziePlanFields(opts: { scopedStructures: Structure[]; rooms: PlanRoom[]; notes?: Record<string, string>; date: string; t?: (s: string) => string }): PlanFields {
+  const { scopedStructures, rooms, notes = {}, date, t = (x: string) => x } = opts;
+  const ids = new Set(scopedStructures.map((s) => s.id));
+  const list = rooms.filter((r) => ids.has(r.structure.id)).sort(byUnit);
+  const none = t("nessuna");
+  const note = (r: PlanRoom) => { const n = notes[`${r.unit.id}:${date}`]?.trim(); return n ? ` [${n}]` : ""; };
+  const join = (rs: PlanRoom[], label: (r: PlanRoom) => string) => (rs.length ? rs.map((r) => `${label(r)}${note(r)}`).join(", ") : none);
+  const withPers = (r: PlanRoom) => (r.arr ? `${r.unit.name} (${r.arr.adults + r.arr.children} ${t("pers.")})` : r.unit.name);
+  const of = (k: ActionKey) => list.filter((r) => !r.oos && r.action === k);
+  return {
+    cambio: join(of("turnover"), withPers),
+    arrivi: join(of("arrivo"), withPers),
+    partenze: join(of("partenza"), (r) => r.unit.name),
+    riassetto: join(of("riassetto"), (r) => r.unit.name),
+    fuori: join(list.filter((r) => r.oos), (r) => r.unit.name),
+    niente: join(of("niente"), (r) => r.unit.name),
+  };
+}
+
 // Versione BREVE su una riga, per il modello WhatsApp (Meta non permette a capo dentro le variabili): solo i numeri delle camere per tipo di lavoro.
 // Il dettaglio con i nomi degli ospiti sta nell'email o nella pagina Pulizie.
 export function buildPuliziePlanSummary(opts: {

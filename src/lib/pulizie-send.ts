@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { internalFetch } from "@/lib/server-auth";
 import { sendWhatsapp } from "@/lib/whatsapp";
 import { logInvio } from "@/lib/invii-log";
-import { computePuliziePlan, buildPuliziePlanText, buildPuliziePlanSummary, fmtLongIT } from "@/lib/puliziePlan";
+import { computePuliziePlan, buildPuliziePlanText, buildPuliziePlanSummary, buildPuliziePlanFields, fmtLongIT } from "@/lib/puliziePlan";
 import type { Booking, Unit, RoomType, Structure, Guest } from "@/lib/types";
 
 export interface PulizieSendCfg { email: boolean; emailTo: string; whatsapp: boolean; whatsappTo: string }
@@ -31,7 +31,8 @@ export async function deliverPuliziePlan(a: {
   const planArgs = { date, scopedStructures: [st], rooms, guests: a.guests, notes: a.notes };
   const text = buildPuliziePlanText({ ...planArgs, style: "whatsapp" });   // testo completo con grassetti: WhatsApp (ripiego a testo libero)
   const emailText = buildPuliziePlanText({ ...planArgs, style: "plain" }); // email: niente asterischi
-  const summary = buildPuliziePlanSummary(planArgs);                       // una riga, per il modello WhatsApp (Meta non ammette a capo)
+  const summary = buildPuliziePlanSummary(planArgs);
+  const f = buildPuliziePlanFields(planArgs);                              // una voce per tipo di lavoro: modello WhatsApp "a righe"                       // una riga, per il modello WhatsApp (Meta non ammette a capo)
   const dateLong = fmtLongIT(date);                                         // "domenica 11 ottobre" invece di "2026-10-11"
   const subject = `Planning pulizie · ${name} · ${dateLong}`;
   const out: PulizieSendResult[] = [];
@@ -56,7 +57,10 @@ export async function deliverPuliziePlan(a: {
       // Il planning parte senza che il destinatario abbia scritto: per Meta è un messaggio "a freddo" e VA mandato col modello approvato.
       // Il testo libero viene accettato dall'API ma poi NON consegnato (errore 131047) se il destinatario non ha scritto negli ultimi 24 ore: per questo non è il primo tentativo.
       // (corpo del modello con 3 variabili: {{1}} struttura, {{2}} data, {{3}} planning in una riga)
-      let w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, country: "IT", templateName: process.env.WHATSAPP_PULIZIE_TEMPLATE || "planning_pulizie", lang: "it", params: [name, dateLong, summary] });
+      // 1) modello "a righe" (una riga per tipo di lavoro; si crea su Meta con il nome qui sotto); 2) se non esiste o non è approvato, il vecchio modello a una riga.
+      const V2 = process.env.WHATSAPP_PULIZIE_TEMPLATE_V2 || "planning_pulizie_righe";
+      let w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, country: "IT", templateName: V2, lang: "it", params: [name, dateLong, f.cambio, f.arrivi, f.partenze, f.riassetto, f.fuori, f.niente] });
+      if (!w.ok) w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, country: "IT", templateName: process.env.WHATSAPP_PULIZIE_TEMPLATE || "planning_pulizie", lang: "it", params: [name, dateLong, summary] });
       const tplErr = w.ok ? "" : w.message;
       if (!w.ok) w = await sendWhatsapp(admin, tenantId, { to: cfg.whatsappTo, country: "IT", text }); // ripiego: arriva solo se il destinatario ha scritto nelle ultime 24 ore
       wamid = w.id;

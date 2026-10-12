@@ -45,3 +45,16 @@ test("senza camere: messaggio chiaro", () => {
   assert.match(buildPuliziePlanSummary({ date: "2026-10-11", scopedStructures: [S], rooms: [] } as never), /Nessuna pulizia/);
   assert.match(buildPuliziePlanText({ date: "2026-10-11", scopedStructures: [S], rooms: [], guests: [] } as never), /Nessuna pulizia in programma/);
 });
+
+const { buildPuliziePlanFields } = await import("../src/lib/puliziePlan.ts");
+
+test("campi per il modello WhatsApp a righe: una voce per lavoro, mai vuota, persone per cambi e arrivi", () => {
+  const f = buildPuliziePlanFields(args as never);
+  assert.equal(f.cambio, "1 (2 pers.)");
+  assert.equal(f.arrivi, "nessuna");
+  assert.equal(f.partenze, "3");
+  assert.equal(f.riassetto, "10");
+  assert.equal(f.fuori, "5");
+  assert.equal(f.niente, "2");
+  for (const v of Object.values(f)) assert.ok(v.length > 0 && !v.includes("\n"));
+});
