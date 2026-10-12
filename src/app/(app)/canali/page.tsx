@@ -148,6 +148,7 @@ export default function CanaliPage() {
   const structureChannels = effStructure !== "all" ? (otaByStructure?.[effStructure] ?? []).filter((c) => c.id) : [];
   // Card "essenziali" (logo + nome + stato) nella lista canali: il dettaglio (attiva/disattiva,
   // correzione prezzo) si apre al click, invece di stare tutto incollato nella card.
+  const [, setColorTick] = useState(0); // il colore sta nel browser: dopo ogni scelta si ridisegna la pagina (evidenziazione e pallino in tabella)
   const [channelDetail, setChannelDetail] = useState<{ sid: string; c: { id: string; channel: string; title: string; active: boolean } } | null>(null);
   const [channelSearch, setChannelSearch] = useState("");
 
@@ -393,11 +394,11 @@ export default function CanaliPage() {
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                         {[...(CHANNEL_BRAND_COLORS[chKey] ? [CHANNEL_BRAND_COLORS[chKey] as string] : []), ...CHANNEL_PRESET_COLORS].map((hex) => (
-                          <button key={hex} onClick={() => saveChannelColor(chKey, hex)} title={hex} className="h-5 w-5 shrink-0 rounded-full" style={{ backgroundColor: hex, boxShadow: pickerColor.toLowerCase() === hex.toLowerCase() ? "0 0 0 2px var(--surface), 0 0 0 3.5px var(--focus)" : "0 0 0 1px rgba(0,0,0,.12)" }} />
+                          <button key={hex} onClick={() => { saveChannelColor(chKey, hex); setColorTick((n) => n + 1); }} title={hex} aria-pressed={pickerColor.toLowerCase() === hex.toLowerCase()} className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-bold leading-none text-white" style={{ backgroundColor: hex, textShadow: "0 0 2px rgba(0,0,0,.6)", boxShadow: pickerColor.toLowerCase() === hex.toLowerCase() ? "0 0 0 2px var(--surface), 0 0 0 4px var(--txt)" : "0 0 0 1px rgba(0,0,0,.12)" }}>{pickerColor.toLowerCase() === hex.toLowerCase() ? "✓" : ""}</button>
                         ))}
-                        <label className="relative grid h-5 w-5 shrink-0 cursor-pointer place-items-center rounded-full border border-dashed border-line text-[10px] text-faint" title={t("Colore personalizzato")}>
+                        <label className="relative grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full border border-dashed border-line text-[10px] text-faint" title={t("Colore personalizzato")}>
                           +
-                          <input type="color" value={pickerColor} onChange={(e) => saveChannelColor(chKey, e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+                          <input type="color" value={pickerColor} onChange={(e) => { saveChannelColor(chKey, e.target.value); setColorTick((n) => n + 1); }} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
                         </label>
                       </div>
             </div>
