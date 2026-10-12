@@ -340,10 +340,12 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     setSel({ kind: "event", anchor: iso }); setSelHover(iso);
   };
   const clickRate = (typeId: string, iso: string, typeIds?: string[]) => {
+    if (iso < todayISO) return; // giorno passato: tariffa non modificabile
     if (sel?.kind === "rate" && sel.typeId === typeId && selLo && selHi) { const members = typeIds ?? [typeId]; setSel(null); setSelHover(null); setRateEdit({ typeId: members[0], typeIds: members, from: selLo, to: selHi, mode: "fixed", value: rateFor(members[0], selLo), weekendBoost: true, weekendPct: loadWeekendPct() }); return; }
     setSel({ kind: "rate", typeId, anchor: iso }); setSelHover(iso);
   };
   const clickAvail = (typeId: string, iso: string) => {
+    if (iso < todayISO) return; // giorno passato: disponibilità non modificabile
     if (sel?.kind === "avail" && sel.typeId === typeId && selLo && selHi) { const tp = sel.typeId; setSel(null); setSelHover(null); setAvailEdit({ typeId: tp, from: selLo, to: selHi, closed: closes[closeKey(tp, selLo)] ?? 0, cta: !!cta[closeKey(tp, selLo)], ctd: !!ctd[closeKey(tp, selLo)] }); return; }
     setSel({ kind: "avail", typeId, anchor: iso }); setSelHover(iso);
   };
@@ -352,6 +354,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     setSel({ kind: "booking", unitId: unit.id, structureId, roomTypeId: unit.roomTypeId, anchor: iso }); setSelHover(iso);
   };
 
+  // Giorni già passati: tariffa e disponibilità non si modificano più (solo oggi e i giorni futuri).
+  const futureIsos = (from: string, to: string) => rangeIsos(from, to).filter((iso) => iso >= todayISO);
   const rangeIsos = (from: string, to: string) => {
     const a = from <= to ? from : to, b = from <= to ? to : from;
     const out: string[] = []; let d = a; while (d <= b) { out.push(d); d = shiftISO(d, 1); }
@@ -361,7 +365,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     if (!rateEdit) return;
     const targets = rateEdit.typeIds ?? [rateEdit.typeId];
     const map: Record<string, number> = {};
-    for (const tid of targets) for (const iso of rangeIsos(rateEdit.from, rateEdit.to)) {
+    for (const tid of targets) for (const iso of futureIsos(rateEdit.from, rateEdit.to)) {
       let v = rateEdit.mode === "fixed" ? Math.max(0, Math.round(rateEdit.value)) : Math.max(0, Math.round(rateFor(tid, iso) * (1 + rateEdit.value / 100)));
       // Il valore impostato è per i feriali: sui giorni ven/sab/dom si tiene la maggiorazione
       // weekend anche sopra un prezzo forzato, invece di appiattirla a un'unica tariffa fissa.
@@ -371,14 +375,14 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     setDayRates(map);
     setRateEdit(null);
   };
-  const resetRate = () => { if (rateEdit) { clearDayRates(rangeIsos(rateEdit.from, rateEdit.to).map((iso) => rateKey(rateEdit.typeId, iso))); setRateEdit(null); } };
+  const resetRate = () => { if (rateEdit) { clearDayRates(futureIsos(rateEdit.from, rateEdit.to).map((iso) => rateKey(rateEdit.typeId, iso))); setRateEdit(null); } };
   const saveAvail = () => {
     if (!availEdit) return;
     const next = { ...closes };
     // Restrizioni OTA: imposta/rimuove CTA e CTD per ogni giorno dell'intervallo, specularmente alle chiusure.
     const nextCta = { ...cta };
     const nextCtd = { ...ctd };
-    for (const iso of rangeIsos(availEdit.from, availEdit.to)) {
+    for (const iso of futureIsos(availEdit.from, availEdit.to)) {
       const k = closeKey(availEdit.typeId, iso);
       if (availEdit.closed !== 0) next[k] = Math.round(availEdit.closed); else delete next[k];
       if (availEdit.cta) nextCta[k] = true; else delete nextCta[k];
@@ -672,7 +676,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   const fmtDM = (d: Date) => `${weekdayShort(d)} ${d.getDate()} ${monthShort(d)}`;
   const fmtRange = (aIso: string, bIso: string) => { const a = parseISO(aIso), b = parseISO(bIso); const am = monthShort(a), bm = monthShort(b); return am === bm ? `${a.getDate()}–${b.getDate()} ${bm}` : `${a.getDate()} ${am} – ${b.getDate()} ${bm}`; };
   // Applica una variazione percentuale ai prezzi di una tipologia su un intervallo di date [fromIso, toIso).
-  const applyPctRange = (typeId: string, fromIso: string, toIso: string, pct: number) => { const map: Record<string, number> = {}; let dd = parseISO(fromIso); const end = parseISO(toIso); while (dd < end) { const iso = toISO(dd); map[`${typeId}|${iso}`] = Math.round(rateFor(typeId, iso) * (1 + pct / 100)); dd = addDays(dd, 1); } setDayRates(map); };
+  const applyPctRange = (typeId: string, fromIso: string, toIso: string, pct: number) => { const map: Record<string, number> = {}; let dd = parseISO(fromIso); const end = parseISO(toIso); while (dd < end) { const iso = toISO(dd); if (iso >= todayISO) map[`${typeId}|${iso}`] = Math.round(rateFor(typeId, iso) * (1 + pct / 100)); dd = addDays(dd, 1); } setDayRates(map); };
   // Suggerimenti Copilota (priorità: alta occupazione → alza; buchi → riempi; bassa → apri).
   const futureDemand = occByDay.filter((x) => x.iso >= todayISO);
   // Alta occupazione MA non piena: a camere esaurite (100%) non ha senso alzare il prezzo (niente da vendere).
@@ -715,7 +719,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   const simRevenue = Math.round(periodRevenue * (1 + whatIf / 100) * occRatio);
   // Applica la variazione dello slider a TUTTI i prezzi delle tipologie visibili, sull'intera finestra.
   // Applica la variazione % del simulatore a tutte le tipologie visibili, sul periodo scelto [fromIso, toIso].
-  const applyWhatIfRange = (fromIso: string, toIso: string, pct: number) => { if (!pct) return; const scope = roomTypes.filter((rt) => visibleStructures.some((s) => s.id === rt.structureId) && units.some((u) => u.roomTypeId === rt.id)); const map: Record<string, number> = {}; for (const rt of scope) for (const iso of rangeIsos(fromIso, toIso)) { map[`${rt.id}|${iso}`] = Math.round(rateFor(rt.id, iso) * (1 + pct / 100)); } setDayRates(map); setWhatIf(0); };
+  const applyWhatIfRange = (fromIso: string, toIso: string, pct: number) => { if (!pct) return; const scope = roomTypes.filter((rt) => visibleStructures.some((s) => s.id === rt.structureId) && units.some((u) => u.roomTypeId === rt.id)); const map: Record<string, number> = {}; for (const rt of scope) for (const iso of futureIsos(fromIso, toIso)) { map[`${rt.id}|${iso}`] = Math.round(rateFor(rt.id, iso) * (1 + pct / 100)); } setDayRates(map); setWhatIf(0); };
   // Prenotazioni che coprono il periodo (per pickup e alert).
   const bkPeriod = bookings.filter((b) => b.channel !== "blocked" && b.status !== "cancelled" && b.checkOut > periodFrom && b.checkIn < periodTo && visibleStructures.some((s) => s.id === b.structureId));
   // Pickup: nuove prenotazioni (per data prenotazione) negli ultimi 14 giorni.
@@ -981,11 +985,12 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               const trendCol = trend === "up" ? "var(--ok)" : trend === "down" ? "var(--err)" : null;
               const diff = Math.abs(c.rate - prevRate);
               const zero = c.rate <= 0; // prezzo mancante: la camera non è vendibile
+              const pastDay = c.iso < todayISO;
               return (
                 <div key={c.iso} onClick={() => clickRate(keyId, c.iso, typeIds)} onMouseEnter={() => { if (sel?.kind === "rate" && sel.typeId === keyId) setSelHover(c.iso); }}
-                  title={sel?.kind === "rate" ? "Clicca il giorno finale" : zero ? "Tariffa a €0 — imposta un prezzo, la camera non è vendibile. Clicca per modificare." : `Tariffa €${c.rate}${trend ? ` · ${trend === "up" ? "+" : "−"}€${diff} vs giorno prima` : ""}. Clicca per modificare (poi clicca il giorno finale).`}
-                  className={`flex cursor-pointer items-center justify-center gap-0.5 border-r border-line font-mono text-[11px] tabular-nums hover:bg-wash ${zero ? "font-bold" : "font-semibold"}`}
-                  style={{ width: cellW, color: zero ? "var(--err)" : c.overridden ? "var(--focus)" : "var(--dim)", ...(inSel ? { backgroundColor: "color-mix(in srgb, var(--focus) 20%, transparent)" } : zero ? { backgroundColor: "color-mix(in srgb, var(--err) 16%, transparent)" } : trendCol ? { backgroundColor: `color-mix(in srgb, ${trendCol} 12%, transparent)` } : {}) }}>
+                  title={pastDay ? `Giorno passato · tariffa €${c.rate} (non modificabile)` : sel?.kind === "rate" ? "Clicca il giorno finale" : zero ? "Tariffa a €0 — imposta un prezzo, la camera non è vendibile. Clicca per modificare." : `Tariffa €${c.rate}${trend ? ` · ${trend === "up" ? "+" : "−"}€${diff} vs giorno prima` : ""}. Clicca per modificare (poi clicca il giorno finale).`}
+                  className={`flex items-center justify-center gap-0.5 border-r border-line font-mono text-[11px] tabular-nums ${pastDay ? "cursor-default" : "cursor-pointer hover:bg-wash"} ${zero ? "font-bold" : "font-semibold"}`}
+                  style={{ width: cellW, ...(pastDay ? { opacity: 0.5, filter: "saturate(.65)" } : {}), color: zero ? "var(--err)" : c.overridden ? "var(--focus)" : "var(--dim)", ...(inSel ? { backgroundColor: "color-mix(in srgb, var(--focus) 20%, transparent)" } : zero ? { backgroundColor: "color-mix(in srgb, var(--err) 16%, transparent)" } : trendCol ? { backgroundColor: `color-mix(in srgb, ${trendCol} 12%, transparent)` } : {}) }}>
                   {zero ? <span className="text-[8px] leading-none">⚠</span> : trendCol && <span className="text-[8px] leading-none" style={{ color: trendCol }}>{trend === "up" ? "▲" : "▼"}</span>}
                   <span style={{ opacity: 0.65 }}>€</span>{c.rate}
                 </div>
@@ -1009,13 +1014,14 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
               const scarce = c.avail === 1 && cap > 1;
               const availBg = full ? "var(--err)" : scarce ? "var(--warn)" : "var(--ok)";
               const availText = scarce ? "#3a2600" : "#ffffff";
+              const pastDay = c.iso < todayISO;
               return (
                 <div key={c.iso}
-                  onClick={editableAvail ? () => clickAvail(keyId, c.iso) : undefined}
+                  onClick={editableAvail && !pastDay ? () => clickAvail(keyId, c.iso) : undefined}
                   onMouseEnter={() => { if (editableAvail && sel?.kind === "avail" && sel.typeId === keyId) setSelHover(c.iso); }}
-                  title={noRate ? "Tariffa mancante (€0): camera chiusa alla vendita. Imposta un prezzo per riaprirla." : editableAvail ? (sel?.kind === "avail" ? "Clicca il giorno finale" : `${c.avail} disponibili${c.closed ? ` · ${c.closed} chiuse alla vendita` : ""}. Clicca per chiudere/riaprire le vendite (poi clicca il giorno finale).`) : `${c.avail} disponibili (somma tipologie). Modifica nella vista Esplosa.`}
-                  className={`flex items-center justify-center border-r border-line ${editableAvail ? "cursor-pointer hover:opacity-90" : "cursor-default"}`}
-                  style={{ width: cellW, backgroundColor: inSel ? "color-mix(in srgb, var(--focus) 45%, var(--ok))" : noRate ? "var(--err)" : availBg }}>
+                  title={pastDay ? `Giorno passato · ${c.avail} disponibili (non modificabile)` : noRate ? "Tariffa mancante (€0): camera chiusa alla vendita. Imposta un prezzo per riaprirla." : editableAvail ? (sel?.kind === "avail" ? "Clicca il giorno finale" : `${c.avail} disponibili${c.closed ? ` · ${c.closed} chiuse alla vendita` : ""}. Clicca per chiudere/riaprire le vendite (poi clicca il giorno finale).`) : `${c.avail} disponibili (somma tipologie). Modifica nella vista Esplosa.`}
+                  className={`flex items-center justify-center border-r border-line ${editableAvail && !pastDay ? "cursor-pointer hover:opacity-90" : "cursor-default"}`}
+                  style={{ width: cellW, ...(pastDay ? { opacity: 0.5, filter: "saturate(.65)" } : {}), backgroundColor: inSel ? "color-mix(in srgb, var(--focus) 45%, var(--ok))" : noRate ? "var(--err)" : availBg }}>
                   {noRate ? (
                     <span title="Chiusa · tariffa mancante" className="font-mono text-[11px] font-bold" style={{ color: "#fff" }}>✕</span>
                   ) : (
@@ -1684,7 +1690,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
 
       {/* Modale Tariffa (intervallo: importo fisso o variazione %) */}
       {rateEdit && (() => {
-        const isos = rangeIsos(rateEdit.from, rateEdit.to);
+        const isos = futureIsos(rateEdit.from, rateEdit.to);
         const sample = isos[0];
         const preview = rateEdit.mode === "fixed" ? Math.max(0, Math.round(rateEdit.value)) : Math.max(0, Math.round(rateFor(rateEdit.typeId, sample) * (1 + rateEdit.value / 100)));
         return (
@@ -1696,8 +1702,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 <button onClick={() => setRateEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <label className="block text-xs font-medium text-dim">Dal<input type="date" value={rateEdit.from} onChange={(e) => setRateEdit({ ...rateEdit, from: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
-                <label className="block text-xs font-medium text-dim">Al<input type="date" value={rateEdit.to} onChange={(e) => setRateEdit({ ...rateEdit, to: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
+                <label className="block text-xs font-medium text-dim">Dal<input type="date" min={todayISO} value={rateEdit.from} onChange={(e) => setRateEdit({ ...rateEdit, from: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
+                <label className="block text-xs font-medium text-dim">Al<input type="date" min={todayISO} value={rateEdit.to} onChange={(e) => setRateEdit({ ...rateEdit, to: e.target.value })} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
               </div>
 
               <div className="mt-3 flex items-center rounded-lg border border-line p-0.5">
@@ -1743,7 +1749,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
 
       {/* Modale Disponibilità (chiudi/riduci vendite su un intervallo) */}
       {availEdit && (() => {
-        const isos = rangeIsos(availEdit.from, availEdit.to);
+        const isos = futureIsos(availEdit.from, availEdit.to);
         const rt = roomTypes.find((x) => x.id === availEdit.typeId);
         const totalRooms = units.filter((u) => u.roomTypeId === availEdit.typeId && !u.outOfService).length;
         return (
@@ -1755,7 +1761,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 <button onClick={() => setAvailEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <label className="block text-xs font-medium text-dim">Dal<input type="date" value={availEdit.from} onChange={(e) => { if (e.target.value) setAvailEdit({ ...availEdit, from: e.target.value, to: e.target.value > availEdit.to ? e.target.value : availEdit.to }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
+                <label className="block text-xs font-medium text-dim">Dal<input type="date" min={todayISO} value={availEdit.from} onChange={(e) => { if (e.target.value) setAvailEdit({ ...availEdit, from: e.target.value, to: e.target.value > availEdit.to ? e.target.value : availEdit.to }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
                 <label className="block text-xs font-medium text-dim">Al<input type="date" min={availEdit.from} value={availEdit.to} onChange={(e) => { if (e.target.value) setAvailEdit({ ...availEdit, to: e.target.value < availEdit.from ? availEdit.from : e.target.value }); }} className="mt-1 w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>
               </div>
               {(() => {
