@@ -1,0 +1,116 @@
+// Statistiche per canale per la pagina Canali: prenotazioni, notti, lordo, commissioni, netto e quota sui ricavi.
+// Si contano le prenotazioni NON annullate (e non i blocchi "fuori servizio") il cui ARRIVO cade nel periodo scelto.
+// Lordo, commissioni e netto usano le stesse formule dell'elenco Prenotazioni (lib/booking.ts): i numeri tornano ovunque.
+import type { Channel } from "@/lib/types";
+import { lordoOf, commissionOf, nettoOf } from "@/lib/booking";
+
+export type StatsPeriod = "last30" | "next30" | "year";
+export const PERIOD_LABEL: Record<StatsPeriod, string> = { last30: "Ultimi 30 giorni", next30: "Prossimi 30 giorni", year: "Anno in corso" };
+
+type StatBooking = Parameters<typeof lordoOf>[0] & { status: string; checkIn: string; checkOut: string; channel: Channel; structureId?: string };
+
+const addDaysISO = (iso: string, n: number): string => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const nightsBetween = (a: string, b: string): number => Math.max(0, Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000));
+
+/** Intervallo [from, to) sulle date di ARRIVO. `today` è un ISO yyyy-mm-dd. */
+export function periodRange(p: StatsPeriod, today: string): { from: string; to: string } {
+  if (p === "next30") return { from: today, to: addDaysISO(today, 30) };
+  if (p === "year") return { from: `${today.slice(0, 4)}-01-01`, to: `${Number(today.slice(0, 4)) + 1}-01-01` };
+  return { from: addDaysISO(today, -29), to: addDaysISO(today, 1) }; // ultimi 30 giorni, oggi compreso
+}
+
+export interface ChannelStat {
+  channel: Channel;
+  bookings: number;
+  nights: number;
+  gross: number;       // lordo (soggiorno + pulizia + extra, senza tassa di soggiorno)
+  commission: number;  // commissioni totali trattenute (intermediazione + costo d'incasso)
+  net: number;
+  cancelled: number;   // prenotazioni annullate nello stesso periodo
+  avgNight: number | null;       // lordo medio a notte
+  commissionPct: number | null;  // commissioni ÷ lordo × 100
+  shareGross: number;            // quota sul lordo totale del perimetro (0..100); se il lordo è 0, quota sulle prenotazioni
+}
+export interface ChannelStatsResult { rows: ChannelStat[]; totals: Omit<ChannelStat, "channel" | "shareGross"> }
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+export function channelStats(bookings: readonly StatBooking[], opts: { from: string; to: string; structureId?: string }): ChannelStatsResult {
+  const by = new Map<Channel, ChannelStat>();
+  const row = (ch: Channel): ChannelStat => {
+    let r = by.get(ch);
+    if (!r) { r = { channel: ch, bookings: 0, nights: 0, gross: 0, commission: 0, net: 0, cancelled: 0, avgNight: null, commissionPct: null, shareGross: 0 }; by.set(ch, r); }
+    return r;
+  };
+  for (const b of bookings) {
+    if (b.channel === "blocked") continue;
+    if (opts.structureId && b.structureId !== opts.structureId) continue;
+    if (!(b.checkIn >= opts.from && b.checkIn < opts.to)) continue;
+    const r = row(b.channel);
+    if (b.status === "cancelled") { r.cancelled++; continue; }
+    r.bookings++;
+    r.nights += nightsBetween(b.checkIn, b.checkOut);
+    r.gross += lordoOf(b);
+    r.commission += commissionOf(b);
+    r.net += nettoOf(b);
+  }
+  const rows = Array.from(by.values()).filter((r) => r.bookings > 0 || r.cancelled > 0);
+  const totalGross = rows.reduce((a, r) => a + r.gross, 0);
+  const totalBookings = rows.reduce((a, r) => a + r.bookings, 0);
+  for (const r of rows) {
+    r.gross = round2(r.gross); r.commission = round2(r.commission); r.net = round2(r.net);
+    r.avgNight = r.nights > 0 && r.gross > 0 ? Math.round(r.gross / r.nights) : null;
+    r.commissionPct = r.gross > 0 ? Math.round((r.commission / r.gross) * 1000) / 10 : null;
+    r.shareGross = totalGross > 0 ? (r.gross / totalGross) * 100 : totalBookings > 0 ? (r.bookings / totalBookings) * 100 : 0;
+  }
+  rows.sort((a, b) => b.gross - a.gross || b.bookings - a.bookings);
+  const t = rows.reduce((a, r) => ({ bookings: a.bookings + r.bookings, nights: a.nights + r.nights, gross: a.gross + r.gross, commission: a.commission + r.commission, net: a.net + r.net, cancelled: a.cancelled + r.cancelled }), { bookings: 0, nights: 0, gross: 0, commission: 0, net: 0, cancelled: 0 });
+  return {
+    rows,
+    totals: {
+      ...t, gross: round2(t.gross), commission: round2(t.commission), net: round2(t.net),
+      avgNight: t.nights > 0 && t.gross > 0 ? Math.round(t.gross / t.nights) : null,
+      commissionPct: t.gross > 0 ? Math.round((t.commission / t.gross) * 1000) / 10 : null,
+    },
+  };
+}
+
+// ---- Andamento mensile (grafico) ------------------------------------------------------------------------------------------------------------------
+/** Mesi da `back` prima a `ahead` dopo quello di oggi, ciascuno come intervallo [from, to) sulle date di arrivo. */
+export function monthRanges(today: string, back: number, ahead: number): { key: string; from: string; to: string; label: string; current: boolean; future: boolean }[] {
+  const y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7)) - 1;
+  const iso = (yy: number, mm: number) => new Date(Date.UTC(yy, mm, 1)).toISOString().slice(0, 10);
+  const out = [];
+  for (let k = -back; k <= ahead; k++) {
+    const from = iso(y, m + k), to = iso(y, m + k + 1);
+    out.push({
+      key: from.slice(0, 7), from, to, current: k === 0, future: k > 0,
+      label: new Date(`${from}T00:00:00Z`).toLocaleDateString("it-IT", { month: "short", timeZone: "UTC" }).replace(".", ""),
+    });
+  }
+  return out;
+}
+
+// ---- Spunti calcolati dai numeri -------------------------------------------------------------------------------------------------------------------
+export interface Insight { id: string; tone: "warn" | "info" | "ok"; text: string }
+const eurTxt = (n: number) => `€ ${Math.round(n).toLocaleString("it-IT")}`;
+
+/** Osservazioni brevi sul periodo: nessuna cifra inventata, tutto deriva da `res`. Al massimo 4. */
+export function channelInsights(res: ChannelStatsResult, labelOf: (c: Channel) => string): Insight[] {
+  const out: Insight[] = [];
+  const t = res.totals;
+  if (t.gross <= 0 || res.rows.length === 0) return out;
+  const top = res.rows[0];
+  const topPct = Math.round(top.shareGross);
+  if (top.channel !== "direct" && topPct >= 60) out.push({ id: "dipendenza", tone: "warn", text: `${labelOf(top.channel)} pesa il ${topPct}% dei ricavi: un secondo canale forte riduce il rischio di dipendere da uno solo.` });
+  else out.push({ id: "dipendenza", tone: "ok", text: `Ricavi ben distribuiti: il canale principale, ${labelOf(top.channel)}, pesa il ${topPct}%.` });
+  if (t.commission > 0 && t.avgNight) out.push({ id: "commissioni", tone: "info", text: `Nel periodo hai pagato ${eurTxt(t.commission)} di commissioni: equivalgono a circa ${Math.max(1, Math.round(t.commission / t.avgNight))} notti vendute.` });
+  const otaComm = res.rows.filter((r) => r.channel !== "direct").reduce((a, r) => a + r.commission, 0);
+  if (otaComm > 0) out.push({ id: "diretto", tone: "info", text: `Se il 10% delle vendite dalle OTA diventasse diretto, risparmieresti circa ${eurTxt(otaComm * 0.1)} di commissioni (stima).` });
+  const worst = res.rows
+    .map((r) => ({ r, tot: r.bookings + r.cancelled }))
+    .filter((x) => x.tot >= 5 && x.r.cancelled / x.tot >= 0.2)
+    .sort((a, b) => b.r.cancelled / b.tot - a.r.cancelled / a.tot)[0];
+  if (worst) out.push({ id: "cancellazioni", tone: "warn", text: `${labelOf(worst.r.channel)}: ${Math.round((worst.r.cancelled / worst.tot) * 100)}% di cancellazioni (${worst.r.cancelled} su ${worst.tot}).` });
+  return out.slice(0, 4);
+}
