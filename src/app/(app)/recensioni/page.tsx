@@ -221,6 +221,60 @@ export default function RecensioniPage() {
   const googleConnected = Boolean(placeId) && google.configured === true && !google.error;
   const keyMissing = google.configured === false;
 
+  // Google Business Profile: TUTTE le recensioni della sede + risposta pubblicata davvero (serve l'account collegato e una sede per struttura).
+  // Se non è collegato, o Google dà errore (per esempio accesso API non ancora approvato), resta il vecchio elenco Places.
+  type GbpRow = NormalizedReview & { reviewName: string; isReplied: boolean; reply: string | null };
+  const [gbp, setGbp] = useState<{ loading: boolean; configured: boolean; connected: boolean; mappedTitle?: string; reviews: GbpRow[]; total?: number; error?: string }>({ loading: false, configured: false, connected: false, reviews: [] });
+  const [gbpLocs, setGbpLocs] = useState<{ loading: boolean; list: { account: string; location: string; title: string }[]; error?: string }>({ loading: false, list: [] });
+  const [gbpMsg, setGbpMsg] = useState("");
+  const [gbpReplyBusy, setGbpReplyBusy] = useState<Record<string, boolean>>({});
+  const [gbpReplyErr, setGbpReplyErr] = useState<Record<string, string>>({});
+  const gbpReq = useRef(0);
+  const loadGbp = useCallback(async (sid: string) => {
+    const my = ++gbpReq.current;
+    setGbp((g) => ({ ...g, loading: true }));
+    try {
+      const j = await apiPost<{ configured?: boolean; connected?: boolean; mapped?: { title: string }; reviews?: GbpRow[]; total?: number; loadError?: string }>("google-business", { action: "overview", structureId: sid });
+      if (my !== gbpReq.current) return;
+      setGbp({ loading: false, configured: !!j.configured, connected: !!j.connected, mappedTitle: j.mapped?.title, reviews: Array.isArray(j.reviews) ? j.reviews : [], total: j.total, error: j.loadError });
+    } catch {
+      if (my !== gbpReq.current) return;
+      setGbp({ loading: false, configured: false, connected: false, reviews: [] });
+    }
+  }, []);
+  useEffect(() => { if (selStructureId) loadGbp(selStructureId); }, [selStructureId, loadGbp]);
+  // Ritorno dal consenso Google (?gbp=connected / ?gbp=error&msg=…): messaggio nella finestra di collegamento.
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const st = q.get("gbp");
+      if (!st) return;
+      setCfgOpen(true);
+      setGbpMsg(st === "connected" ? "Account Google collegato. Scegli la sede di questa struttura." : "Collegamento a Google non riuscito: " + (q.get("msg") || "errore"));
+      window.history.replaceState(null, "", window.location.pathname);
+    } catch { /* niente */ }
+  }, []);
+  const gbpOn = gbp.connected && !!gbp.mappedTitle && !gbp.error;
+  const connectGbp = async () => {
+    setGbpMsg("");
+    try { const j = await apiPost<{ url?: string }>("google-business/start", {}); if (j.url) window.location.href = j.url; }
+    catch (e) { setGbpMsg(e instanceof Error ? e.message : "errore"); }
+  };
+  const loadGbpLocations = async () => {
+    setGbpLocs({ loading: true, list: [] });
+    try { const j = await apiPost<{ locations?: { account: string; location: string; title: string }[] }>("google-business", { action: "locations" }); setGbpLocs({ loading: false, list: j.locations ?? [] }); }
+    catch (e) { setGbpLocs({ loading: false, list: [], error: e instanceof Error ? e.message : "errore" }); }
+  };
+  const pickGbpLocation = async (l: { account: string; location: string; title: string }) => {
+    if (!selStructureId) return;
+    try { await apiPost("google-business", { action: "select", structureId: selStructureId, ...l }); setGbpLocs({ loading: false, list: [] }); setGbpMsg(""); await loadGbp(selStructureId); }
+    catch (e) { setGbpMsg(e instanceof Error ? e.message : "errore"); }
+  };
+  const unlinkGbp = async () => {
+    try { await apiPost("google-business", { action: "disconnect" }); setGbpLocs({ loading: false, list: [] }); setGbpMsg(""); if (selStructureId) await loadGbp(selStructureId); }
+    catch (e) { setGbpMsg(e instanceof Error ? e.message : "errore"); }
+  };
+
   // Recensioni manuali della struttura selezionata: quelle senza structureId (inserite prima
   // dell'indipendenza per struttura) restano visibili in tutte, le nuove portano la propria struttura.
   const manualReviews = useMemo(() => manual.filter((m) => !m.structureId || m.structureId === selStructureId), [manual, selStructureId]);
@@ -301,18 +355,18 @@ export default function RecensioniPage() {
   // Insieme completo delle recensioni mostrate (Google reali + Channex reali + dirette reali + manuali).
   type Review = NormalizedReview;
   const reviews: Review[] = useMemo(() => {
-    const g = placeId && google.configured ? google.reviews : [];
+    const g = gbpOn ? gbp.reviews : placeId && google.configured ? google.reviews : [];
     return [...g, ...chxList, ...directList, ...manualReviews];
-  }, [google.reviews, google.configured, placeId, chxList, directList, manualReviews]);
+  }, [google.reviews, google.configured, placeId, gbpOn, gbp.reviews, chxList, directList, manualReviews]);
 
   const connectedSources = useMemo(() => {
     const set = new Set<SourceKey>();
-    if (googleConnected) set.add("google");
+    if (googleConnected || gbpOn) set.add("google");
     for (const r of chxList) set.add(r.source as SourceKey);
     for (const r of directList) set.add(r.source as SourceKey);
     for (const r of manualReviews) set.add(r.source as SourceKey);
     return SOURCES.filter((s) => set.has(s.k)).map((s) => s.k);
-  }, [googleConnected, chxList, directList, manualReviews]);
+  }, [googleConnected, gbpOn, chxList, directList, manualReviews]);
 
   // Precarica nel pannello risposte le risposte GIÀ pubblicate su Channex (Booking/Airbnb/Expedia),
   // così compaiono come "La tua risposta" invece di un form vuoto.
@@ -348,6 +402,35 @@ export default function RecensioniPage() {
     }
   };
   const isChx = (r: Review) => r.id.startsWith("chx-");
+  const isGbp = (r: Review) => r.id.startsWith("gbp-");
+
+  // Google Business: le risposte GIÀ pubblicate compaiono come "La tua risposta" (fonte di verità = Google).
+  useEffect(() => {
+    const withReply = gbp.reviews.filter((r) => r.reply && r.reply.trim());
+    if (!withReply.length) return;
+    setReplies((prev) => {
+      let changed = false; const n = { ...prev };
+      for (const r of withReply) if (n[r.id] === undefined) { n[r.id] = r.reply!; changed = true; }
+      return changed ? n : prev;
+    });
+  }, [gbp.reviews]);
+
+  // Pubblica DAVVERO la risposta su Google (Business Profile API). Pubblicando di nuovo, sostituisce quella precedente.
+  const publishGbpReply = async (r: Review) => {
+    const t = (draft[r.id] ?? "").trim();
+    const row = gbp.reviews.find((x) => x.id === r.id);
+    if (!t || !row) return;
+    setGbpReplyBusy((b) => ({ ...b, [r.id]: true }));
+    setGbpReplyErr((e) => ({ ...e, [r.id]: "" }));
+    try {
+      await apiPost("google-business", { action: "reply", structureId: selStructureId, reviewName: row.reviewName, text: t });
+      persistReplies({ ...replies, [r.id]: t });
+    } catch (e) {
+      setGbpReplyErr((e2) => ({ ...e2, [r.id]: e instanceof Error ? e.message : "errore di rete" }));
+    } finally {
+      setGbpReplyBusy((b) => ({ ...b, [r.id]: false }));
+    }
+  };
 
   // Precarica nel pannello risposte le risposte GIÀ pubblicate sulle recensioni dirette,
   // così compaiono come "La tua risposta" (fonte di verità = campo reply della recensione).
@@ -643,6 +726,40 @@ export default function RecensioniPage() {
               </div>
             )}
 
+            {/* Rispondere da Xenora: Google Business Profile */}
+            <div className="mt-3 rounded-lg border border-line bg-paper p-3">
+              <div className="text-sm font-semibold text-txt">Rispondi alle recensioni da qui</div>
+              {gbpMsg && <p className="mt-1 text-[12px] text-dim">{gbpMsg}</p>}
+              {!gbp.configured ? (
+                <p className="mt-1 text-[12px] text-dim">Non ancora attivo sul server: servono <code className="rounded bg-wash px-1 py-0.5 font-mono text-[11px]">GBP_CLIENT_ID</code> e <code className="rounded bg-wash px-1 py-0.5 font-mono text-[11px]">GBP_CLIENT_SECRET</code> (client OAuth del progetto Google Cloud) su Vercel. Fino ad allora la risposta si pubblica a mano su Google.</p>
+              ) : !gbp.connected ? (
+                <>
+                  <p className="mt-1 text-[12px] text-dim">Collega l&apos;account Google che gestisce il profilo: vedrai tutte le recensioni (non solo le ~5 più recenti) e pubblicherai le risposte senza uscire da Xenora.</p>
+                  <button onClick={connectGbp} className="mt-2 rounded-lg bg-focus px-3.5 py-2 text-sm font-semibold text-white hover:opacity-90">Collega account Google</button>
+                </>
+              ) : (
+                <>
+                  {gbp.mappedTitle ? <p className="mt-1 text-[12px] text-dim">Sede collegata a questa struttura: <strong className="text-txt">{gbp.mappedTitle}</strong></p> : <p className="mt-1 text-[12px] text-dim">Account collegato. Scegli la sede Google di questa struttura.</p>}
+                  {gbp.error && <p className="mt-1 text-[12px]" style={{ color: "var(--err)" }}>{gbp.error}</p>}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button onClick={loadGbpLocations} disabled={gbpLocs.loading} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-focus hover:bg-wash disabled:opacity-50">{gbpLocs.loading ? "Cerco…" : gbp.mappedTitle ? "Cambia sede" : "Mostra le mie sedi"}</button>
+                    <button onClick={unlinkGbp} className="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-dim hover:bg-wash">Scollega account</button>
+                  </div>
+                  {gbpLocs.error && <p className="mt-1 text-[12px]" style={{ color: "var(--err)" }}>{gbpLocs.error}</p>}
+                  {gbpLocs.list.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      {gbpLocs.list.map((l) => (
+                        <button key={l.location} onClick={() => pickGbpLocation(l)} className="flex w-full items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2 text-left transition hover:border-focus hover:bg-wash">
+                          <span className="min-w-0 truncate text-sm font-semibold text-txt">{l.title}</span>
+                          <span className="shrink-0 text-xs font-semibold text-focus">Usa questa →</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
             {/* Ricerca automatica */}
             <div className="mt-3">
               <label className="text-[11px] font-semibold uppercase tracking-wide text-faint">Trova la tua struttura</label>
@@ -889,7 +1006,8 @@ export default function RecensioniPage() {
             {replies[r.id] ? (
               <div className="mt-2 rounded-lg border border-line bg-wash p-2.5 text-sm text-dim"><span className="text-[10px] font-semibold uppercase tracking-wide text-faint">La tua risposta</span><div className="mt-0.5 text-txt">{replies[r.id]}</div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  {r.source === "google" && <button onClick={() => publishOnGoogle(r.id)} className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-surface" title="Copia la risposta e apri la gestione recensioni di Google">📋 Copia e rispondi su Google →</button>}
+                  {isGbp(r) && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title="La risposta è pubblicata su Google">✓ Pubblicata su Google</span>}
+                  {r.source === "google" && !isGbp(r) && <button onClick={() => publishOnGoogle(r.id)} className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[11px] font-semibold text-focus hover:bg-surface" title="Copia la risposta e apri la gestione recensioni di Google">📋 Copia e rispondi su Google →</button>}
                   {r.source === "direct" && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title="La risposta è pubblicata sul tuo mini-sito">✓ Pubblicata sul mini-sito</span>}
                   {isChx(r) && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title={`La risposta è stata inviata su ${SRC[r.source as SourceKey]?.label} tramite Channex`}>✓ Pubblicata su {SRC[r.source as SourceKey]?.label}</span>}
                   {r.source !== "direct" && !isChx(r) && <button onClick={() => { setDraft((d) => ({ ...d, [r.id]: replies[r.id] ?? "" })); const n = { ...replies }; delete n[r.id]; persistReplies(n); }} className="text-[11px] font-semibold text-focus hover:underline">Modifica</button>}
@@ -903,6 +1021,8 @@ export default function RecensioniPage() {
                   <button onClick={() => aiReply(r)} disabled={!!aiBusy[r.id]} className="flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-focus hover:bg-wash disabled:opacity-50"><Icon name="sparkles" size={13} /> {aiBusy[r.id] ? "Scrivo…" : "Suggerisci risposta AI"}</button>
                   {isChx(r) ? (
                     <button onClick={() => publishChxReply(r)} disabled={!(draft[r.id] ?? "").trim() || !!chxReplyBusy[r.id]} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title={`Invia la risposta su ${SRC[r.source as SourceKey]?.label} tramite Channex`}>{chxReplyBusy[r.id] ? "Invio…" : "Pubblica risposta"}</button>
+                  ) : isGbp(r) ? (
+                    <button onClick={() => publishGbpReply(r)} disabled={!(draft[r.id] ?? "").trim() || !!gbpReplyBusy[r.id]} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title="Pubblica la risposta su Google">{gbpReplyBusy[r.id] ? "Invio…" : "Pubblica su Google"}</button>
                   ) : r.source === "google" ? (
                     <button onClick={() => publishGoogleFromDraft(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="inline-flex items-center gap-1 rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title="Copia la risposta e apri la gestione recensioni di Google (Google non consente la pubblicazione via API)">📋 Copia e rispondi su Google →</button>
                   ) : r.source === "direct" ? (
@@ -911,6 +1031,7 @@ export default function RecensioniPage() {
                     <button onClick={() => saveLocalReply(r.id)} disabled={!(draft[r.id] ?? "").trim()} className="rounded-lg bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-40" title="Salva la risposta (solo in locale, per tua memoria)">Salva risposta</button>
                   )}
                   {isChx(r) && chxReplyErr[r.id] && <span className="text-[11px] text-[color:var(--err)]">{chxReplyErr[r.id]}</span>}
+                  {isGbp(r) && gbpReplyErr[r.id] && <span className="text-[11px] text-[color:var(--err)]">{gbpReplyErr[r.id]}</span>}
                 </div>
               </div>
             )}
