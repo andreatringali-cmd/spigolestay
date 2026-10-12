@@ -4,6 +4,7 @@
 // In produzione questi dati arriveranno da Supabase.
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { modificaMeritaEmail, spostamentoMeritaEmail } from "@/lib/notify-rules";
 import { kvGet, kvSet, kvRemove, kvKeys, kvFlush } from "./bigstore";
 import type { Structure, RoomType, Unit, Guest, Booking, Channel, CalEvent, DirectReview } from "./types";
 import { CHANNELS } from "./types";
@@ -606,7 +607,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
             const paidDelta = patch.paid != null && patch.paid !== before.paid ? patch.paid - (before.paid ?? 0) : 0;
             if (patch.paid != null && patch.paid !== before.paid && paidDelta > 0) {
               notifyOwner("payment", updated, { amount: paidDelta });
-            } else if (changed.length) {
+            } else if (modificaMeritaEmail(changed)) {
+              // Solo il cambio di camera assegnata NON genera l'email di modifica (resta nel registro attività); date, ospiti, tariffa, canale e stato sì.
               notifyOwner("modified", updated);
             }
           }
@@ -633,7 +635,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }));
         // Se è cambiata struttura, l'evento sul vecchio calendario (se diverso) va tolto.
         if (moved && crossed && cur) syncGcal(cur, "delete");
-        if (moved) { syncGcal(moved, "upsert"); notifyOwner("modified", moved); }
+        if (moved) {
+          syncGcal(moved, "upsert");
+          // Spostare solo la camera (stesse date, stessa struttura) non manda l'email di modifica; se cambiano le date o la struttura sì.
+          if (!cur || spostamentoMeritaEmail(cur, to, crossed)) notifyOwner("modified", moved);
+        }
         logAct("move", crossed ? `Prenotazione spostata a ${structures.find((s) => s.id === target!.structureId)?.name ?? "altra struttura"}` : "Prenotazione spostata di camera", cur?.structureId);
       },
       deleteBooking: (id) => {
