@@ -307,7 +307,7 @@ export default function TariffePage() {
               <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: weekendOn ? "22px" : "2px" }} />
             </button>
           </div>
-          <p className="mt-2 text-[11px] text-faint">{wkScope ? `${t("Regola valida solo per")} ${structureNameOf(wkScope)}.` : t("Regola predefinita: vale per le strutture che non hanno una regola propria (selezionane una in alto a destra per impostarne una diversa).")}</p>
+          {!wkScope && <p className="mt-2 text-[11px] text-faint">{t("Regola predefinita: vale per le strutture che non hanno una regola propria (selezionane una in alto a destra per impostarne una diversa).")}</p>}
         </Card>
       </section>
 
