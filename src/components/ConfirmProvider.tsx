@@ -4,8 +4,11 @@
 // Uso: const confirm = useConfirm(); if (await confirm({ title, message, danger })) { ... }
 
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { isConfirmWordOk, CONFIRM_WORD } from "@/lib/bulk-guard";
 
-interface ConfirmOptions { title?: string; message: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }
+// typeToConfirm: conferma forte per le cancellazioni di massa: il pulsante resta spento finché non si scrive ELIMINA.
+// count/countLabel: numero grande ben visibile (es. 1.696 + "prenotazioni").
+interface ConfirmOptions { title?: string; message: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean; typeToConfirm?: boolean; count?: number; countLabel?: string }
 type ConfirmFn = (opts: ConfirmOptions | string) => Promise<boolean>;
 
 const Ctx = createContext<ConfirmFn | null>(null);
@@ -14,9 +17,11 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<(ConfirmOptions & { resolve: (v: boolean) => void }) | null>(null);
   const confirm: ConfirmFn = (opts) => {
     const o = typeof opts === "string" ? { message: opts } : opts;
-    return new Promise<boolean>((resolve) => setState({ ...o, resolve }));
+    return new Promise<boolean>((resolve) => { setTyped(""); setState({ ...o, resolve }); });
   };
-  const close = (v: boolean) => { state?.resolve(v); setState(null); };
+  const [typed, setTyped] = useState("");
+  const wordOk = !state?.typeToConfirm || isConfirmWordOk(typed);
+  const close = (v: boolean) => { if (v && !wordOk) return; state?.resolve(v); setState(null); setTyped(""); };
 
   return (
     <Ctx.Provider value={confirm}>
@@ -34,9 +39,25 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 <p className="mt-1 text-sm text-dim">{state.message}</p>
               </div>
             </div>
+            {typeof state.count === "number" && (
+              <div className="mt-4 rounded-xl border px-4 py-3 text-center" style={{ borderColor: "color-mix(in srgb, var(--err) 45%, var(--line))", backgroundColor: "color-mix(in srgb, var(--err) 8%, transparent)" }}>
+                <div className="font-display text-3xl font-extrabold tabular-nums" style={{ color: "var(--err)" }}>{state.count.toLocaleString("it-IT")}</div>
+                {state.countLabel && <div className="text-xs font-semibold uppercase tracking-wide text-dim">{state.countLabel}</div>}
+              </div>
+            )}
+            {state.typeToConfirm && (
+              <label className="mt-4 block text-sm text-txt">
+                Per confermare scrivi <b>{CONFIRM_WORD}</b>
+                <input
+                  autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} placeholder={CONFIRM_WORD}
+                  onKeyDown={(e) => { if (e.key === "Enter" && wordOk) close(true); }}
+                  className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm font-semibold uppercase tracking-wider text-txt"
+                />
+              </label>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => close(false)} className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-dim hover:bg-wash">{state.cancelLabel ?? "Annulla"}</button>
-              <button autoFocus onClick={() => close(true)} className="rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90" style={{ backgroundColor: state.danger ? "var(--err)" : "var(--focus)" }}>{state.confirmLabel ?? "Conferma"}</button>
+              <button autoFocus={!state.typeToConfirm} disabled={!wordOk} onClick={() => close(true)} className="rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ backgroundColor: state.danger ? "var(--err)" : "var(--focus)" }}>{state.confirmLabel ?? "Conferma"}</button>
             </div>
           </div>
         </div>

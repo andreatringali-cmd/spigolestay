@@ -131,6 +131,13 @@ export interface IcsImportOpts {
   source?: "ICS" | "CSV" | string;   // etichetta provenienza per la nota
 }
 
+// Prenotazioni create da un precedente import di file/calendario che "Sostituisci" eliminerebbe (mai Channex, sito, Stripe, Octorate, né le manuali).
+// Esposta per poter chiedere la conferma forte prima di una sostituzione di massa.
+export function previousImportsToReplace(bookings: Booking[], structureId: string, forcedUnitId?: string): Booking[] {
+  const foreignExt = (x?: string) => /^(channex|site|stripe|octorate):/.test(x || "");
+  return bookings.filter((b) => (forcedUnitId ? b.unitId === forcedUnitId : b.structureId === structureId) && (b.note || "").includes("Importato da") && !foreignExt(b.extId));
+}
+
 export function importIcsEvents(events: IcsEvent[], opts: IcsImportOpts, ctx: IcsImportCtx): { created: number; updated: number } {
   const { structureId, includeBlocked = false, replacePrev = false, targetUnit = "", roomMap = {}, source = "ICS" } = opts;
   const { bookings, units, roomTypes, addGuest, addBooking, updateBooking, deleteBooking, addRoomType, addUnit, t } = ctx;
@@ -145,10 +152,7 @@ export function importIcsEvents(events: IcsEvent[], opts: IcsImportOpts, ctx: Ic
   // Sostituisci import precedenti (solo file): elimina le prenotazioni già importate per non duplicarle.
   // Si sostituiscono SOLO le prenotazioni create da un precedente import di file/calendario: mai quelle che arrivano
   // da Channex, dal sito, da Stripe o da Octorate (hanno un extId con prefisso), né quelle inserite a mano.
-  const foreignExt = (x?: string) => /^(channex|site|stripe|octorate):/.test(x || "");
-  const del = replacePrev
-    ? bookings.filter((b) => (forced ? b.unitId === forced.id : b.structureId === structureId) && (b.note || "").includes("Importato da") && !foreignExt(b.extId))
-    : [];
+  const del = replacePrev ? previousImportsToReplace(bookings, structureId, forced?.id) : [];
   const delIds = new Set(del.map((b) => b.id));
   del.forEach((b) => deleteBooking(b.id));
 

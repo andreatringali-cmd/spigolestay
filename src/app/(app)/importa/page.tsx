@@ -9,8 +9,12 @@ import { useData } from "@/lib/store";
 import { useLang } from "@/lib/i18n";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { needsBulkGuard, isConfirmWordOk } from "@/lib/bulk-guard";
+import { downloadBackup } from "@/lib/bulk-download";
+import { useBulkGuard } from "@/components/useBulkGuard";
+import { useToast } from "@/components/ToastProvider";
 import { CHANNELS } from "@/lib/types";
-import { parseICS, importIcsEvents, toChannel, toISO, toNum, normName, makeUnitAssigner, type IcsEvent } from "@/lib/ics";
+import { parseICS, importIcsEvents, previousImportsToReplace, toChannel, toISO, toNum, normName, makeUnitAssigner, type IcsEvent } from "@/lib/ics";
 import { buildTemplateCsv, bookingDedupeKey } from "@/lib/import/template";
 import { readXlsxRows } from "@/lib/import/xlsx-lite";
 
@@ -96,7 +100,19 @@ export default function ImportaPage() {
   // Solo quelle della struttura scelta qui sopra: l'annullamento non tocca gli import delle altre strutture.
   const importedBookings = useMemo(() => bookings.filter((b) => b.structureId === structureId && (b.note || "").includes("Importato da")), [bookings, structureId]);
   const undoNeedsWord = importedBookings.length > 10;
-  const undoImport = () => { if (undoNeedsWord && undoText.trim().toUpperCase() !== "ELIMINA") return; importedBookings.forEach((b) => deleteBooking(b.id)); setConfirmUndo(false); setUndoText(""); };
+  const toast = useToast();
+  const bulkGuard = useBulkGuard();
+  // Copia di sicurezza delle prenotazioni: aggiunge il nome dell'ospite (campo _ospite) per poterle ricostruire.
+  const backupRows = (list: typeof bookings) => list.map((b) => ({ ...b, _ospite: guests.find((g) => g.id === b.guestId)?.fullName ?? "" }));
+  const undoImport = () => {
+    if (undoNeedsWord && !isConfirmWordOk(undoText)) return;
+    // Da 20 prenotazioni in su: prima della cancellazione scarica la copia JSON (se il browser la blocca, si procede ma si avvisa).
+    if (needsBulkGuard(importedBookings.length)) {
+      if (downloadBackup("prenotazioni-importate", backupRows(importedBookings))) toast(t("Copia di sicurezza scaricata: la trovi nella cartella Download."), "info");
+      else toast(t("Non sono riuscito a scaricare la copia di sicurezza (il browser potrebbe averla bloccata). Procedo comunque con l'eliminazione."), "error");
+    }
+    importedBookings.forEach((b) => deleteBooking(b.id)); setConfirmUndo(false); setUndoText("");
+  };
 
   const icsRooms = useMemo(() => { const set = new Set<string>(); events.forEach((e) => { if (e.room) set.add(e.room.trim()); }); return [...set]; }, [events]);
   // Auto-mappatura camere ICS → tipologie esistenti (riempie solo le mancanti, così non fa loop).
@@ -189,7 +205,16 @@ export default function ImportaPage() {
     } finally { setFetching(false); }
   };
 
-  const runImportICS = () => {
+  const runImportICS = async () => {
+    // "Sostituisci le prenotazioni importate" può cancellare molte prenotazioni: da 20 in su conferma forte + copia JSON.
+    if (replacePrev) {
+      const forcedId = targetUnit ? units.find((u) => u.id === targetUnit && u.structureId === structureId)?.id : undefined;
+      const old = previousImportsToReplace(bookings, structureId, forcedId);
+      if (needsBulkGuard(old.length)) {
+        const ok = await bulkGuard({ kind: "prenotazioni-sostituite", items: backupRows(old), noun: t("prenotazioni importate che verranno sostituite"), title: t("Sostituire le prenotazioni importate?") });
+        if (!ok) return;
+      }
+    }
     const { created, updated } = importIcsEvents(events, { structureId, includeBlocked, replacePrev, targetUnit, roomMap, source: "ICS" },
       { bookings, units, roomTypes, addGuest, addBooking, updateBooking, deleteBooking, addRoomType, addUnit, t });
     setDone(created);
@@ -492,14 +517,16 @@ export default function ImportaPage() {
         <ConfirmDialog
           title={t("Eliminare tutte le prenotazioni importate?")}
           message={<>
+            <div className="mb-2 text-center text-3xl font-extrabold tabular-nums text-[color:var(--err)]">{importedBookings.length.toLocaleString("it-IT")}</div>
             <div>{`${importedBookings.length} ${t("prenotazioni verranno eliminate definitivamente (ospiti collegati restano). Le prenotazioni create a mano non vengono toccate.")}`}</div>
+            {needsBulkGuard(importedBookings.length) && <div className="mt-2 font-medium text-txt">{t("Prima di eliminare verrà scaricata automaticamente una copia di sicurezza (file JSON).")}</div>}
             {undoNeedsWord && (
               <label className="mt-3 block text-xs text-dim">{t("Per confermare scrivi ELIMINA")}
                 <input id="undo-confirm-word" value={undoText} onChange={(e) => setUndoText(e.target.value)} autoComplete="off" className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-txt" />
               </label>
             )}
           </>}
-          disabled={undoNeedsWord && undoText.trim().toUpperCase() !== "ELIMINA"}
+          disabled={undoNeedsWord && !isConfirmWordOk(undoText)}
           warning={t("Azione irreversibile.")}
           confirmLabel={t("Elimina")}
           tone="var(--err)"
