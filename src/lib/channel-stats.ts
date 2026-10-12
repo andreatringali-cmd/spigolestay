@@ -90,27 +90,3 @@ export function monthRanges(today: string, back: number, ahead: number): { key: 
   }
   return out;
 }
-
-// ---- Spunti calcolati dai numeri -------------------------------------------------------------------------------------------------------------------
-export interface Insight { id: string; tone: "warn" | "info" | "ok"; text: string }
-const eurTxt = (n: number) => `€ ${Math.round(n).toLocaleString("it-IT")}`;
-
-/** Osservazioni brevi sul periodo: nessuna cifra inventata, tutto deriva da `res`. Al massimo 4. */
-export function channelInsights(res: ChannelStatsResult, labelOf: (c: Channel) => string): Insight[] {
-  const out: Insight[] = [];
-  const t = res.totals;
-  if (t.gross <= 0 || res.rows.length === 0) return out;
-  const top = res.rows[0];
-  const topPct = Math.round(top.shareGross);
-  if (top.channel !== "direct" && topPct >= 60) out.push({ id: "dipendenza", tone: "warn", text: `${labelOf(top.channel)} pesa il ${topPct}% dei ricavi: un secondo canale forte riduce il rischio di dipendere da uno solo.` });
-  else out.push({ id: "dipendenza", tone: "ok", text: `Ricavi ben distribuiti: il canale principale, ${labelOf(top.channel)}, pesa il ${topPct}%.` });
-  if (t.commission > 0 && t.avgNight) out.push({ id: "commissioni", tone: "info", text: `Nel periodo hai pagato ${eurTxt(t.commission)} di commissioni: equivalgono a circa ${Math.max(1, Math.round(t.commission / t.avgNight))} notti vendute.` });
-  const otaComm = res.rows.filter((r) => r.channel !== "direct").reduce((a, r) => a + r.commission, 0);
-  if (otaComm > 0) out.push({ id: "diretto", tone: "info", text: `Se il 10% delle vendite dalle OTA diventasse diretto, risparmieresti circa ${eurTxt(otaComm * 0.1)} di commissioni (stima).` });
-  const worst = res.rows
-    .map((r) => ({ r, tot: r.bookings + r.cancelled }))
-    .filter((x) => x.tot >= 5 && x.r.cancelled / x.tot >= 0.2)
-    .sort((a, b) => b.r.cancelled / b.tot - a.r.cancelled / a.tot)[0];
-  if (worst) out.push({ id: "cancellazioni", tone: "warn", text: `${labelOf(worst.r.channel)}: ${Math.round((worst.r.cancelled / worst.tot) * 100)}% di cancellazioni (${worst.r.cancelled} su ${worst.tot}).` });
-  return out.slice(0, 4);
-}

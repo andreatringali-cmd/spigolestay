@@ -48,8 +48,7 @@ test("nessuna prenotazione: tabella vuota, totali a zero, niente divisioni per z
   assert.equal(r.totals.gross, 0); assert.equal(r.totals.avgNight, null); assert.equal(r.totals.commissionPct, null);
 });
 
-const { monthRanges, channelInsights } = await import("../src/lib/channel-stats.ts");
-const lab = (c: string) => ({ booking: "Booking.com", direct: "Diretta", expedia: "Expedia / Vrbo" } as Record<string, string>)[c] ?? c;
+const { monthRanges } = await import("../src/lib/channel-stats.ts");
 
 test("mesi: 5 prima, il corrente, 2 dopo, anche a cavallo d'anno", () => {
   const m = monthRanges("2026-10-12", 5, 2);
@@ -60,26 +59,4 @@ test("mesi: 5 prima, il corrente, 2 dopo, anche a cavallo d'anno", () => {
   const y = monthRanges("2026-01-15", 2, 1);
   assert.deepEqual([y[0].key, y[2].key], ["2025-11", "2026-01"]);
   assert.equal(y[2].to, "2026-02-01");
-});
-
-test("spunti: dipendenza da un canale, commissioni in notti equivalenti, risparmio diretto, cancellazioni", () => {
-  const rows = [
-    b("booking", "2026-10-01", "2026-10-03", 800, { commissionAmount: 200 }),
-    b("booking", "2026-10-04", "2026-10-06", 800, { commissionAmount: 200 }),
-    b("direct", "2026-10-07", "2026-10-09", 400),
-    ...Array.from({ length: 4 }, () => b("expedia", "2026-10-10", "2026-10-11", 100, { status: "cancelled" })),
-    b("expedia", "2026-10-10", "2026-10-11", 100, { commissionAmount: 20 }),
-  ];
-  const res = channelStats(rows, { from: "2026-10-01", to: "2026-11-01" });
-  const ins = channelInsights(res, lab);
-  assert.match(ins.find((i) => i.id === "dipendenza")!.text, /Booking\.com pesa il \d+% dei ricavi/);
-  assert.equal(ins.find((i) => i.id === "dipendenza")!.tone, "warn");
-  assert.ok(ins.some((i) => i.id === "commissioni"));
-  assert.equal(ins.length <= 4, true);
-});
-
-test("spunti: nessun dato = nessuno spunto; ricavi equilibrati = tono ok", () => {
-  assert.deepEqual(channelInsights(channelStats([], { from: "2026-10-01", to: "2026-11-01" }), lab), []);
-  const res = channelStats([b("booking", "2026-10-01", "2026-10-02", 100), b("direct", "2026-10-03", "2026-10-04", 100)], { from: "2026-10-01", to: "2026-11-01" });
-  assert.equal(channelInsights(res, lab)[0].tone, "ok");
 });

@@ -15,7 +15,7 @@ import { correctionLabel } from "@/lib/priceCorrection";
 import { loadChannelColor, saveChannelColor } from "@/lib/channelOverrides";
 import { defaultCommissionInfo } from "@/lib/booking";
 import { toISO } from "@/lib/dates";
-import { channelStats, channelInsights, monthRanges, periodRange, PERIOD_LABEL, type StatsPeriod, type ChannelStatsResult } from "@/lib/channel-stats";
+import { channelStats, monthRanges, periodRange, PERIOD_LABEL, type StatsPeriod, type ChannelStatsResult } from "@/lib/channel-stats";
 
 // Tavolozza di colori predefiniti per canale (dieci toni distinti, pensati per restare
 // leggibili sia su barre calendario chiare che scure). Il picker nativo resta disponibile
@@ -240,7 +240,6 @@ export default function CanaliPage() {
   const monthly = useMemo(() => months.map((m) => ({ m, res: channelStats(bookings, { from: m.from, to: m.to, structureId: effStructure === "all" ? undefined : effStructure }) })), [bookings, months, effStructure]);
   const monthMax = Math.max(1, ...monthly.map((x) => x.res.totals.gross));
   const monthlyChannels = Array.from(new Set(monthly.flatMap((x) => x.res.rows.filter((r) => r.gross > 0).map((r) => r.channel))));
-  const insights = useMemo(() => channelInsights(scope, (c) => CHANNELS[c]?.label ?? c), [scope]);
   // Canali non ancora collegati nel perimetro in vista (Airbnb è tra i canali di Xenora; Agoda e Trip.com sono altri portali collegabili da "Gestisci canali").
   const connectedText = (effStructure === "all" ? Object.values(otaByStructure ?? {}).flat() : otaByStructure?.[effStructure] ?? []).map((c) => `${c.channel} ${c.title}`.toLowerCase()).join(" | ");
   const airbnbShare = Math.round(scope.rows.find((r) => r.channel === "airbnb")?.shareGross ?? 0);
@@ -321,7 +320,8 @@ export default function CanaliPage() {
           <StatCard label={t("Commissioni")} value={eur(scope.totals.commission)} color={scope.totals.commission > 0 ? "var(--err)" : undefined} hint={scope.totals.commissionPct != null ? `${scope.totals.commissionPct}% ${t("del lordo")}` : undefined} />
           <StatCard label={t("Netto")} value={eur(scope.totals.net)} color={scope.totals.net > 0 ? "var(--ok)" : undefined} hint={scope.totals.gross > 0 ? `${Math.round((scope.totals.net / scope.totals.gross) * 100)}% ${t("del lordo")}` : undefined} />
         </div>
-        <Card className="mt-3">
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <Card>
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
             <div className="text-sm font-semibold text-txt">{t("Da dove arrivano le prenotazioni")}</div>
             {scope.rows.length > 0 && <div className="text-[11px] text-faint">{t("Vendite tramite OTA")}: <b className="text-txt">{otaShare}%</b> · {t("dirette")}: <b className="text-txt">{100 - otaShare}%</b></div>}
@@ -347,8 +347,7 @@ export default function CanaliPage() {
             </>
           )}
         </Card>
-        <div className="mt-3 grid gap-3 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
+          <Card>
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
               <div className="text-sm font-semibold text-txt">{t("Ricavi lordi per mese")}</div>
               <div className="text-[11px] text-faint">{t("per mese di arrivo · i mesi futuri mostrano il già prenotato")}</div>
@@ -379,21 +378,6 @@ export default function CanaliPage() {
               ))}
             </div>
           </Card>
-          <Card>
-            <div className="mb-3 text-sm font-semibold text-txt">{t("Spunti")}</div>
-            {insights.length === 0 ? (
-              <p className="text-sm text-faint">{t("Appena ci sono prenotazioni nel periodo, qui compaiono le osservazioni utili.")}</p>
-            ) : (
-              <ul className="flex flex-col gap-3">
-                {insights.map((i) => (
-                  <li key={i.id} className="flex items-start gap-2.5 text-[13px] leading-snug text-txt">
-                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: i.tone === "warn" ? "var(--warn)" : i.tone === "ok" ? "var(--ok)" : "var(--focus)" }} />
-                    <span>{i.text}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
         </div>
       </section>
 
@@ -406,7 +390,7 @@ export default function CanaliPage() {
           <div className="mb-3 mt-1 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm">
             <div className="relative min-w-0 flex-1">
               <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><Icon name="search" size={14} /></span>
-              <input value={channelSearch} onChange={(e) => setChannelSearch(e.target.value)} placeholder={t("Cerca canale…")} className="w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
+              <input value={channelSearch} onChange={(e) => setChannelSearch(e.target.value)} placeholder={t("Cerca canale…")} className="w-full rounded-lg border border-line bg-paper py-1.5 pl-8 pr-3 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
             </div>
             <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{channelPanel.loading ? t("Apro…") : t("Gestisci canali") + " ↗"}</button>
             <button onClick={loadOtaStatus} disabled={otaLoading} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{otaLoading ? t("Verifico…") : "⟳ " + t("Aggiorna")}</button>
