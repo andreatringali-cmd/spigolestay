@@ -335,14 +335,12 @@ export default function CanaliPage() {
                   <div key={r.channel} title={`${CHANNELS[r.channel]?.label ?? r.channel}: ${Math.round(r.shareGross)}%`} style={{ width: `${r.shareGross}%`, backgroundColor: chColor(r.channel) }} />
                 ))}
               </div>
-              <div className="mt-3 grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-x-6 gap-y-4">
                 {scope.rows.map((r) => (
-                  <div key={r.channel} className="flex items-center gap-2 text-sm">
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: chColor(r.channel) }} />
-                    <span className="min-w-0 flex-1 truncate text-txt">{CHANNELS[r.channel]?.label ?? r.channel}</span>
-                    <span className="font-mono text-xs tabular-nums text-faint">{r.bookings} {t("pren.")}</span>
-                    <span className="w-9 text-right font-mono tabular-nums text-dim">{Math.round(r.shareGross)}%</span>
-                    <span className="w-20 text-right font-mono text-xs tabular-nums text-txt">{eur(r.gross)}</span>
+                  <div key={r.channel} className="min-w-0">
+                    <div className="flex items-center gap-1.5 text-xs text-dim"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: chColor(r.channel) }} /><span className="truncate">{CHANNELS[r.channel]?.label ?? r.channel}</span></div>
+                    <div className="mt-0.5 font-mono text-xl font-bold tabular-nums text-txt">{Math.round(r.shareGross)}%</div>
+                    <div className="text-[11px] text-faint">{r.bookings} {t("pren.")} · {eur(r.gross)}</div>
                   </div>
                 ))}
               </div>
