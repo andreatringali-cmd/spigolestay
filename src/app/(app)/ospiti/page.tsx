@@ -19,6 +19,8 @@ import Icon from "@/components/Icon";
 import { exportExcel } from "@/lib/export";
 import ContattiDaCorreggere from "./_contatti";
 import { phoneShown } from "@/lib/contacts-check";
+import { needsBulkGuard } from "@/lib/bulk-guard";
+import { useBulkGuard } from "@/components/useBulkGuard";
 
 const avColor = (n: string) => AV_COLORS[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 const fmtD = (iso: string) => { try { return parseISO(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" }); } catch { return iso; } };
@@ -150,7 +152,16 @@ export default function OspitiPage() {
   const guestSorted = sorted.filter((r) => r.anyBookings && segMatch(r));
   const nlSorted = sorted.filter((r) => !r.anyBookings && isNewsletterLead(r.guest));
   // Svuota il registro newsletter: elimina gli iscritti dal sito (conferma in due passi).
-  const clearNewsletter = () => {
+  // Con 20 o più iscritti: conferma forte (si scrive ELIMINA) e copia JSON scaricata prima di cancellare.
+  const bulkGuard = useBulkGuard();
+  const clearNewsletter = async () => {
+    if (needsBulkGuard(nlSorted.length)) {
+      const list = nlSorted.map((r) => r.guest);
+      if (!(await bulkGuard({ kind: "ospiti-newsletter", items: list, noun: "iscritti alla newsletter", title: "Svuotare il registro newsletter?" }))) { setConfirmClearNl(false); return; }
+      list.forEach((g) => deleteGuest(g.id));
+      setConfirmClearNl(false);
+      return;
+    }
     if (!confirmClearNl) { setConfirmClearNl(true); return; }
     nlSorted.forEach((r) => deleteGuest(r.guest.id));
     setConfirmClearNl(false);
