@@ -20,6 +20,8 @@ export default function ChannelLogo({ channel, size = 16, title }: { channel: Ch
       return <Tile bg="#FF385C" t="Airbnb"><svg width={size * 0.6} height={size * 0.6} viewBox="0 0 24 24" fill="#fff"><path d={BELO} /></svg></Tile>;
     case "expedia":
       return <Tile bg="#FEC84C" t="Expedia / Vrbo"><svg width={size * 0.56} height={size * 0.56} viewBox="0 0 24 24" fill="none" stroke="#202843" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 18 18 6" /><path d="M8.5 6H18v9.5" /></svg></Tile>;
+    case "agoda":
+      return <Tile bg="#FFFFFF" t="Agoda"><span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: size * 0.05 }}><span style={{ color: "#2B3340", fontSize: size * 0.56, fontWeight: 800, lineHeight: 0.8 }}>a</span><span style={{ display: "flex", gap: size * 0.03 }}>{["#E9425A", "#F7B500", "#4CB963", "#3C86F4", "#8A55D1"].map((c) => <i key={c} style={{ width: size * 0.08, height: size * 0.08, borderRadius: "50%", background: c, display: "block" }} />)}</span></span></Tile>;
     case "hotelbeds":
       return <Tile bg="#E8EBF0" t="HotelBeds"><span style={{ color: "#2B3340", fontSize: size * 0.46, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.05em" }}>hb</span></Tile>;
     case "other":
@@ -47,6 +49,8 @@ export function ChannelWordmark({ channel, height = 20, title }: { channel: Chan
       return chip("Airbnb", <><svg width={height * 0.8} height={height * 0.8} viewBox="0 0 24 24" fill="#FF385C" aria-hidden><path d={BELO} /></svg><span style={{ ...base, color: "#FF385C", letterSpacing: "-0.045em" }}>airbnb</span></>);
     case "expedia":
       return chip("Expedia / Vrbo", <><span aria-hidden style={{ width: height * 0.95, height: height * 0.95, borderRadius: height * 0.24, background: "#FEC84C", display: "inline-grid", placeItems: "center", flexShrink: 0 }}><svg width={height * 0.6} height={height * 0.6} viewBox="0 0 24 24" fill="none" stroke="#202843" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 18 18 6" /><path d="M8.5 6H18v9.5" /></svg></span><span style={{ ...base, color: "#202843" }}>Expedia</span></>);
+    case "agoda":
+      return chip("Agoda", <><span style={{ ...base, color: "#2B3340" }}>agoda</span><span aria-hidden style={{ display: "inline-flex", gap: 2 }}>{["#E9425A", "#F7B500", "#4CB963", "#3C86F4", "#8A55D1"].map((c) => <i key={c} style={{ width: height * 0.16, height: height * 0.16, borderRadius: "50%", background: c, display: "block" }} />)}</span></>);
     case "hotelbeds":
       return chip("HotelBeds", <span style={{ ...base, color: "#2B3340" }}>hotelbeds</span>);
     case "other":

@@ -59,7 +59,7 @@ test("toChannel: SUMMARY Octorate -> canale Xenora", () => {
   assert.equal(toChannel("VRBO"), "expedia");
   assert.equal(toChannel("hotelBeds"), "hotelbeds");
   assert.equal(toChannel("Hotel Beds"), "hotelbeds");
-  assert.equal(toChannel("Agoda"), "other");
+  assert.equal(toChannel("Agoda"), "agoda");
   assert.equal(toChannel("Hostelworld"), "other");
   assert.equal(toChannel("octoevo"), "direct");
   assert.equal(toChannel("WuBook"), "direct");

@@ -2,7 +2,7 @@
 // Strutture → tipologie → unità; prenotazioni; folio.
 import type { OtaInfo } from "./channex-guestdata";
 
-export type Channel = "booking" | "airbnb" | "expedia" | "hotelbeds" | "other" | "direct" | "blocked";
+export type Channel = "booking" | "airbnb" | "expedia" | "agoda" | "hotelbeds" | "other" | "direct" | "blocked";
 
 export interface ChannelMeta {
   label: string;
@@ -15,6 +15,7 @@ export const CHANNELS: Record<Channel, ChannelMeta> = {
   booking: { label: "Booking.com", cssVar: "--ch-booking", text: "#ffffff", commission: 0.15 },
   airbnb: { label: "Airbnb", cssVar: "--ch-airbnb", text: "#ffffff", commission: 0.15 },
   expedia: { label: "Expedia / Vrbo", cssVar: "--ch-expedia", text: "#241a05", commission: 0.18 },
+  agoda: { label: "Agoda", cssVar: "--ch-agoda", text: "#ffffff", commission: 0.17 },
   hotelbeds: { label: "HotelBeds", cssVar: "--ch-hotelbeds", text: "#ffffff", commission: 0.15 },
   other: { label: "Altro / OTA", cssVar: "--ch-other", text: "#ffffff", commission: 0.15 },
   direct: { label: "Diretta", cssVar: "--ch-direct", text: "#ffffff", commission: 0 },

@@ -91,7 +91,8 @@ test("channelFromOta: assente o vuoto = diretta; diretta/CRS/sito = diretta; alt
   assert.equal(channelFromOta("Direct"), "direct");
   assert.equal(channelFromOta("CRS"), "direct");
   assert.equal(channelFromOta("Website"), "direct");
-  for (const n of ["Agoda", "Hostelworld", "Ctrip", "Trip.com"]) assert.equal(channelFromOta(n), "other", n);
+  for (const n of ["Hostelworld", "Ctrip", "Trip.com"]) assert.equal(channelFromOta(n), "other", n);
+  for (const n of ["Agoda", "AgodaCom"]) assert.equal(channelFromOta(n), "agoda", n); // Agoda è un canale a sé
 });
 
 test("channelFromOta: un nome come 'Direct Booking' dovrebbe essere diretta, non Booking.com", { todo: "BUG probabile: il controllo 'book' viene prima di 'direct'/'website' (channex-inbound.ts riga 59 vs 63)" }, () => {

@@ -57,7 +57,8 @@ export function toChannel(s: string): Channel {
   if (s.includes("airbnb")) return "airbnb";
   if (s.includes("expedia") || s.includes("vrbo") || s.includes("homeaway")) return "expedia";
   if (/hotel\s*beds|hotelbeds/.test(s)) return "hotelbeds";
-  if (/agoda|hostelworld|despegar|hotusa|hrs|roiback|veturis|dingus|jumbotour|restel|welcomebeds|bedsonline/.test(s)) return "other";
+  if (s.includes("agoda")) return "agoda";
+  if (/hostelworld|despegar|hotusa|hrs|roiback|veturis|dingus|jumbotour|restel|welcomebeds|bedsonline/.test(s)) return "other";
   if (s.includes("octoevo") || s.includes("octobook") || s.includes("diret") || s.includes("direct") || s.includes("wubook")) return "direct";
   return "direct";
 }
