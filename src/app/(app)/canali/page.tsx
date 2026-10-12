@@ -152,6 +152,8 @@ export default function CanaliPage() {
     setOtaLoading(false);
   };
   useEffect(() => { loadOtaStatus(); }, []);
+  // Chiudendo il pannello dei canali (dove si aggiungono/modificano) l'elenco si rilegge da solo.
+  const closeChannelPanel = () => { setChannelPanel({ open: false }); void loadOtaStatus(); };
   // "Tutte" raggruppa per struttura; una struttura specifica è un gruppo unico senza etichetta.
   const otaGroups: { sid: string; label?: string; list: { id: string; channel: string; title: string; active: boolean }[] }[] =
     effStructure === "all"
@@ -329,8 +331,7 @@ export default function CanaliPage() {
               <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint"><Icon name="search" size={14} /></span>
               <input value={channelSearch} onChange={(e) => setChannelSearch(e.target.value)} placeholder={t("Cerca canale…")} className="w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-txt outline-none placeholder:text-faint focus:border-focus" />
             </div>
-            <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{channelPanel.loading ? t("Apro…") : "+ " + t("Aggiungi")}</button>
-            <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{t("Impostazioni generali")} ↗</button>
+            <button onClick={() => openChannelManager()} disabled={channelPanel.loading} className="shrink-0 rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40">{channelPanel.loading ? t("Apro…") : t("Gestisci canali") + " ↗"}</button>
             <button onClick={loadOtaStatus} disabled={otaLoading} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-40">{otaLoading ? t("Verifico…") : "⟳ " + t("Aggiorna")}</button>
           </div>
           <Card className="mb-5">
@@ -518,14 +519,14 @@ export default function CanaliPage() {
          dietro le quinte (non replicabili lato nostro), il resto è nostro. */}
       {channelPanel.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button aria-label={t("Chiudi")} onClick={() => setChannelPanel({ open: false })} className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
+          <button aria-label={t("Chiudi")} onClick={closeChannelPanel} className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
           <div className="relative flex h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
             <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
               <div>
                 <h2 className="font-display text-base font-bold text-txt">{t("Collega i tuoi canali")}</h2>
                 <p className="text-[11px] text-dim">{t("Autorizza Booking.com, Airbnb, Expedia e gli altri portali che usi")}</p>
               </div>
-              <button onClick={() => setChannelPanel({ open: false })} className="grid h-8 w-8 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt">✕</button>
+              <button onClick={closeChannelPanel} className="grid h-8 w-8 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt">✕</button>
             </div>
             <div className="relative flex-1 bg-wash">
               {channelPanel.loading && <div className="absolute inset-0 flex items-center justify-center text-sm text-dim">{t("Preparo il collegamento…")}</div>}
