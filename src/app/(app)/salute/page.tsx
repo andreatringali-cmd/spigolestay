@@ -3,7 +3,7 @@
 // Salute del sistema: semaforo su invii automatici, attività notturne, Channex, WhatsApp e configurazione.
 // I dati arrivano già classificati da /api/health (src/lib/health.ts): qui si mostrano soltanto.
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import type { HealthReport, Light } from "@/lib/health";
@@ -22,19 +22,28 @@ export default function SalutePage() {
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true); setErr(null);
-    try {
-      const token = (await supabase?.auth.getSession())?.data.session?.access_token;
-      if (!token) { setErr("Accedi per vedere la salute del sistema."); return; }
-      const r = await fetch("/api/health", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-      if (!r.ok) { setErr(r.status === 401 || r.status === 403 ? "Non hai i permessi per vedere questa pagina." : "Non riesco a leggere lo stato del sistema. Riprova tra poco."); return; }
-      setData(await r.json());
-    } catch { setErr("Nessuna connessione: non riesco a leggere lo stato del sistema."); }
-    finally { setLoading(false); }
-  }, []);
+  const [tick, setTick] = useState(0);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      let e: string | null = null, d: (HealthReport & { generatedAt?: string }) | null = null;
+      try {
+        const token = (await supabase?.auth.getSession())?.data.session?.access_token;
+        if (!token) e = "Accedi per vedere la salute del sistema.";
+        else {
+          const r = await fetch("/api/health", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+          if (!r.ok) e = r.status === 401 || r.status === 403 ? "Non hai i permessi per vedere questa pagina." : "Non riesco a leggere lo stato del sistema. Riprova tra poco.";
+          else d = await r.json();
+        }
+      } catch { e = "Nessuna connessione: non riesco a leggere lo stato del sistema."; }
+      if (!alive) return;
+      setErr(e); if (d) setData(d); setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, [tick]);
+
+  const ricontrolla = () => { setLoading(true); setTick((n) => n + 1); };
 
   const s = data?.summary;
   return (
@@ -42,7 +51,7 @@ export default function SalutePage() {
       <PageHeader
         title="Salute del sistema"
         subtitle="Se tutto funziona, qui è tutto verde. Altrimenti ti diciamo cosa guardare."
-        actions={<button onClick={() => void load()} disabled={loading} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash disabled:opacity-60">{loading ? "Controllo…" : "Ricontrolla"}</button>}
+        actions={<button onClick={ricontrolla} disabled={loading} className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-txt hover:bg-wash disabled:opacity-60">{loading ? "Controllo…" : "Ricontrolla"}</button>}
       />
 
       {err && <Card className="mb-4"><p className="text-sm" style={{ color: "var(--err)" }}>{err}</p></Card>}
