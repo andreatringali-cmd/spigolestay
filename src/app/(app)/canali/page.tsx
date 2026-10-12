@@ -355,7 +355,6 @@ export default function CanaliPage() {
                           <th className="px-3 py-2 font-bold">{t("Stato")}</th>
                           <th className="px-3 py-2 font-bold">{t("Correzione prezzo")}</th>
                           <th className="px-3 py-2 font-bold">{t("Commissione")}</th>
-                          <th className="px-3 py-2 font-bold text-right">{t("Azioni")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -372,7 +371,7 @@ export default function CanaliPage() {
                           const commPct = commInfo.pct;
                           const color = loadChannelColor(chKey) || `var(${CHANNELS[chKey]?.cssVar ?? ""})`;
                           return (
-                            <tr key={c.id || c.channel + i} className="border-b border-line last:border-0 hover:bg-wash">
+                            <tr key={c.id || c.channel + i} onClick={() => setChannelDetail({ sid: g.sid, c })} onKeyDown={(e) => { if (e.key === "Enter") setChannelDetail({ sid: g.sid, c }); }} tabIndex={0} title={t("Clicca per modificare il canale")} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash focus:outline-none focus-visible:bg-wash">
                               <td className="px-3 py-2.5">
                                 <span className="flex items-center gap-2">
                                   <ChannelLogo channel={chKey} size={22} title={label} />
@@ -387,9 +386,6 @@ export default function CanaliPage() {
                               </td>
                               <td className="px-3 py-2.5 text-dim">{corr}</td>
                               <td className="px-3 py-2.5 text-dim" title={commInfo.source === "stima" ? "Stima dalle commissioni reali dell'ultimo anno (per le prenotazioni senza cifra)" : commInfo.source === "manuale" ? "Valore impostato da te" : "Percentuale standard: non ci sono abbastanza dati reali per stimarla"}>{commInfo.source === "stima" ? "~" : ""}{commPct}%{commInfo.source === "standard" ? <span className="ml-1 text-[10px] text-faint">standard</span> : null}</td>
-                              <td className="px-3 py-2.5 text-right">
-                                <button onClick={() => setChannelDetail({ sid: g.sid, c })} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-surface">{t("Modifica")}</button>
-                              </td>
                             </tr>
                           );
                         })}
