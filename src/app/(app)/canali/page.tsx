@@ -380,7 +380,7 @@ export default function CanaliPage() {
                   <div className="overflow-x-auto rounded-xl border border-line">
                     <table className="w-full min-w-[820px] table-fixed text-sm">
                       <colgroup>
-                        {[17, 9, 9, 12, 12, 12, 10, 14, 5].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
+                        {[16, 9, 8, 12, 12, 12, 9, 17, 5].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
                       </colgroup>
                       <thead>
                         <tr className="border-b border-line bg-wash text-left text-[10px] font-bold uppercase tracking-wide text-faint">
@@ -391,7 +391,7 @@ export default function CanaliPage() {
                           <th className={`${th} text-right`}>{t("Commissioni")}</th>
                           <th className={`${th} text-right`}>{t("Netto")}</th>
                           <th className={`${th} text-right`}>{t("€ / notte")}</th>
-                          <th className={th}>{t("Quota ricavi")}</th>
+                          <th className={`${th} pl-10`}>{t("Quota ricavi")}</th>
                           <th className={`${th} text-right`}>{t("Colore")}</th>
                         </tr>
                       </thead>
@@ -422,7 +422,7 @@ export default function CanaliPage() {
                               <td className={`${td} text-right font-mono tabular-nums text-txt`} title={commTip}>{st && st.commission > 0 ? eur(st.commission) : dash}</td>
                               <td className={`${td} text-right font-mono font-semibold tabular-nums`} style={{ color: st && st.net > 0 ? "var(--ok)" : undefined }}>{st && st.net > 0 ? eur(st.net) : dash}</td>
                               <td className={`${td} text-right font-mono tabular-nums text-dim`}>{st?.avgNight ? eur(st.avgNight) : dash}</td>
-                              <td className={td}>
+                              <td className={`${td} pl-10`}>
                                 {st ? (
                                   <div className="flex items-center gap-2">
                                     <div className="h-1.5 w-full max-w-[72px] overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${Math.max(3, Math.round(st.shareGross))}%`, backgroundColor: color }} /></div>
