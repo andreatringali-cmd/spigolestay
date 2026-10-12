@@ -269,11 +269,6 @@ export default function CanaliPage() {
       <section className="mb-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Andamento per canale")}{effStructure !== "all" && structures.find((s) => s.id === effStructure) ? ` · ${structures.find((s) => s.id === effStructure)?.name}` : ""}</div>
-          <div role="group" aria-label={t("Periodo")} className="inline-flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold">
-            {(Object.keys(PERIOD_LABEL) as StatsPeriod[]).map((p) => (
-              <button key={p} onClick={() => setPeriod(p)} aria-pressed={period === p} className={`rounded-md px-3 py-1.5 transition ${period === p ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{t(PERIOD_LABEL[p])}</button>
-            ))}
-          </div>
         </div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label={t("Prenotazioni")} value={scope.totals.bookings} hint={`${scope.totals.nights} ${t("notti")}${scope.totals.cancelled ? ` · ${scope.totals.cancelled} ${t("annullate")}` : ""}`} />
@@ -283,7 +278,14 @@ export default function CanaliPage() {
         </div>
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
           <Card className="flex h-full flex-col">
-            <SectionTitle>{t("Prenotazioni e ricavi per canale")}</SectionTitle>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Prenotazioni e ricavi per canale")}</div>
+              <div role="group" aria-label={t("Periodo")} className="inline-flex rounded-lg border border-line bg-surface p-0.5 text-[11px] font-semibold">
+                {(Object.keys(PERIOD_LABEL) as StatsPeriod[]).map((p) => (
+                  <button key={p} onClick={() => setPeriod(p)} aria-pressed={period === p} className={`rounded-md px-2.5 py-1 transition ${period === p ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{t(PERIOD_LABEL[p])}</button>
+                ))}
+              </div>
+            </div>
             <div className="flex flex-1 flex-col">
               <ChannelBars rows={scope.rows.map((r) => ({ label: CHANNELS[r.channel]?.label ?? r.channel, color: chColor(r.channel), count: r.bookings, revenue: r.gross, channel: r.channel }))} fmtEur={eur} />
               {scope.rows.length > 0 && <div className="mt-auto pt-2 text-[10px] text-faint">{t("Vendite tramite OTA")}: <b className="text-dim">{otaShare}%</b> · {t("dirette")}: <b className="text-dim">{100 - otaShare}%</b></div>}
@@ -306,7 +308,10 @@ export default function CanaliPage() {
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: chxMap[effStructure] ? "var(--ok)" : "var(--focus)" }}><Icon name="share" size={16} /></span>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-txt">{t("Distribuzione sui canali")}{chxMap[effStructure] && <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[color:var(--ok)]">● {t("Attiva")}</span>}</div>
+              <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-txt">{t("Distribuzione sui canali")}{chxMap[effStructure] && <span className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,var(--ok)_16%,transparent)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[color:var(--ok)]">● {t("Attiva")}</span>}{effStructure !== "all" && chxMap[effStructure] && (<>
+                <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-dim">{activeChannels} {t("canali attivi")}</span>
+                {lastFull && <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-normal text-dim">{t("Ultimo invio completo")}: {agoText(lastFull)}</span>}
+              </>)}</div>
               <div className="text-xs text-dim">
                 {effStructure === "all"
                   ? t("Seleziona una struttura in alto per attivare la distribuzione sui canali.")
@@ -314,12 +319,6 @@ export default function CanaliPage() {
                     ? t("Prezzi, disponibilità e fuori servizio vengono pubblicati sui canali collegati in automatico a ogni modifica. Le prenotazioni dalle OTA arrivano da sole.")
                     : t("Attiva la distribuzione: le tue camere e tariffe verranno pubblicate sui canali collegati.")}
               </div>
-              {effStructure !== "all" && chxMap[effStructure] && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-dim">
-                  <span className="rounded-full bg-wash px-2 py-0.5 font-semibold">{activeChannels} {t("canali attivi")}</span>
-                  {lastFull && <span className="rounded-full bg-wash px-2 py-0.5">{t("Ultimo invio completo")}: {agoText(lastFull)}</span>}
-                </div>
-              )}
               {chxSync.msg && <div className="mt-1 text-[11px] font-semibold" style={{ color: chxSync.ok === false ? "var(--err)" : chxSync.ok ? "var(--ok)" : "var(--dim)" }}>{chxSync.msg}</div>}
               {impSync.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: impSync.ok === false ? "var(--err)" : impSync.ok ? "var(--ok)" : "var(--dim)" }}>{impSync.msg}</div>}
               {fullSync.msg && <div className="mt-0.5 text-[11px] font-semibold" style={{ color: "var(--dim)" }}>{fullSync.msg}</div>}
@@ -375,10 +374,16 @@ export default function CanaliPage() {
                     const gs = statsBySid[g.sid];
                     const shown = list.map((c) => gs?.rows.find((r) => r.channel === (c.channel as Channel))).filter((x): x is NonNullable<typeof x> => !!x);
                     const tot = shown.reduce((a, r) => ({ n: a.n + r.bookings, nights: a.nights + r.nights, gross: a.gross + r.gross, comm: a.comm + r.commission, net: a.net + r.net }), { n: 0, nights: 0, gross: 0, comm: 0, net: 0 });
-                    const th = "px-3 py-2.5 font-bold";
+                    const th = "px-3 py-2 font-bold";
+                    const td = "px-3 py-1.5";
+                    // Prenotazioni e notti sempre nello stesso formato (righe e totale), così le colonne restano allineate.
+                    const nightsCell = (n: number, nights: number, extra = "") => <div className="whitespace-nowrap"><span className="font-mono font-semibold tabular-nums text-txt">{n}</span><span className="ml-1.5 text-[11px] font-normal text-faint">· {nights} {t("notti")}{extra}</span></div>;
                     return (
                   <div className="overflow-x-auto rounded-xl border border-line">
-                    <table className="w-full min-w-[1000px] text-sm">
+                    <table className="w-full min-w-[920px] table-fixed text-sm">
+                      <colgroup>
+                        {[15, 7, 13, 13, 10, 10, 7, 10, 8, 4, 3].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
+                      </colgroup>
                       <thead>
                         <tr className="border-b border-line bg-wash text-left text-[10px] font-bold uppercase tracking-wide text-faint">
                           <th className={th}>{t("Canale")}</th>
@@ -387,10 +392,11 @@ export default function CanaliPage() {
                           <th className={th}>{t("Quota ricavi")}</th>
                           <th className={`${th} text-right`}>{t("Lordo")}</th>
                           <th className={`${th} text-right`}>{t("Commissioni")}</th>
+                          <th className={`${th} text-right`}>{t("Comm. %")}</th>
                           <th className={`${th} text-right`}>{t("Netto")}</th>
                           <th className={`${th} text-right`}>{t("€ / notte")}</th>
-                          <th className={th}>{t("Correzione prezzo")}</th>
-                          <th className={th}>{t("Colore")}</th>
+                          <th className={`${th} text-right`}>{t("Corr.")}</th>
+                          <th className={`${th} text-right`}>{t("Colore")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -405,35 +411,32 @@ export default function CanaliPage() {
                           const dash = <span className="text-faint">—</span>;
                           return (
                             <tr key={c.id || c.channel + i} className="border-b border-line last:border-0 hover:bg-wash">
-                              <td className="px-3 py-3">
-                                <span className="flex items-center gap-2.5">
-                                  <ChannelLogo channel={chKey} size={26} title={label} />
-                                  <span className="font-semibold text-txt">{label}</span>
+                              <td className={td}>
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <ChannelLogo channel={chKey} size={20} title={label} />
+                                  <span className="truncate font-semibold text-txt">{label}</span>
                                 </span>
                               </td>
-                              <td className="px-3 py-3">
+                              <td className={td}>
                                 <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
                               </td>
-                              <td className="px-3 py-3 text-right">
-                                {st ? (<div className="whitespace-nowrap"><span className="font-mono font-semibold tabular-nums text-txt">{st.bookings}</span><span className="ml-1.5 text-[11px] text-faint">· {st.nights} {t("notti")}{st.cancelled ? ` · ${st.cancelled} ${t("annullate")}` : ""}</span></div>) : dash}
-                              </td>
-                              <td className="px-3 py-3">
+                              <td className={`${td} text-right`}>{st ? nightsCell(st.bookings, st.nights, st.cancelled ? ` · ${st.cancelled} ${t("annullate")}` : "") : dash}</td>
+                              <td className={td}>
                                 {st ? (
                                   <div className="flex items-center gap-2">
-                                    <div className="h-1.5 w-20 overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${Math.max(3, Math.round(st.shareGross))}%`, backgroundColor: color }} /></div>
+                                    <div className="h-1.5 w-full max-w-[72px] overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${Math.max(3, Math.round(st.shareGross))}%`, backgroundColor: color }} /></div>
                                     <span className="font-mono text-xs tabular-nums text-dim">{Math.round(st.shareGross)}%</span>
                                   </div>
                                 ) : dash}
                               </td>
-                              <td className="px-3 py-3 text-right font-mono tabular-nums text-txt">{st && st.gross > 0 ? eur(st.gross) : dash}</td>
-                              <td className="px-3 py-3 text-right" title={commInfo.source === "stima" ? "Percentuale stimata dalle commissioni reali dell'ultimo anno (per le prenotazioni senza cifra)" : commInfo.source === "manuale" ? "Percentuale impostata da te" : "Percentuale standard: non ci sono abbastanza dati reali per stimarla"}>
-                                <div className="whitespace-nowrap"><span className="font-mono tabular-nums text-txt">{st && st.commission > 0 ? eur(st.commission) : dash}</span><span className="ml-1.5 text-[11px] text-faint">· {commInfo.source === "stima" ? "~" : ""}{commPct}%{commInfo.source === "standard" ? <span className="ml-1 text-[10px]">standard</span> : null}</span></div>
-                              </td>
-                              <td className="px-3 py-3 text-right font-mono font-semibold tabular-nums" style={{ color: st && st.net > 0 ? "var(--ok)" : undefined }}>{st && st.net > 0 ? eur(st.net) : dash}</td>
-                              <td className="px-3 py-3 text-right font-mono tabular-nums text-dim">{st?.avgNight ? eur(st.avgNight) : dash}</td>
-                              <td className="px-3 py-3 text-dim">{corr}</td>
-                              <td className="px-3 py-3">
-                                <button onClick={() => setChannelDetail({ sid: g.sid, c })} title={t("Cambia il colore su calendario")} aria-label={t("Cambia il colore su calendario")} className="h-6 w-6 rounded-full border border-line transition hover:scale-110" style={{ backgroundColor: color }} />
+                              <td className={`${td} text-right font-mono tabular-nums text-txt`}>{st && st.gross > 0 ? eur(st.gross) : dash}</td>
+                              <td className={`${td} text-right font-mono tabular-nums text-txt`}>{st && st.commission > 0 ? eur(st.commission) : dash}</td>
+                              <td className={`${td} text-right text-xs text-faint`} title={commInfo.source === "stima" ? "Percentuale stimata dalle commissioni reali dell'ultimo anno (per le prenotazioni senza cifra)" : commInfo.source === "manuale" ? "Percentuale impostata da te" : "Percentuale standard: non ci sono abbastanza dati reali per stimarla"}>{commInfo.source === "stima" ? "~" : ""}{commPct}%</td>
+                              <td className={`${td} text-right font-mono font-semibold tabular-nums`} style={{ color: st && st.net > 0 ? "var(--ok)" : undefined }}>{st && st.net > 0 ? eur(st.net) : dash}</td>
+                              <td className={`${td} text-right font-mono tabular-nums text-dim`}>{st?.avgNight ? eur(st.avgNight) : dash}</td>
+                              <td className={`${td} text-right text-xs text-dim`}>{corr}</td>
+                              <td className={`${td} text-right`}>
+                                <button onClick={() => setChannelDetail({ sid: g.sid, c })} title={t("Cambia il colore su calendario")} aria-label={t("Cambia il colore su calendario")} className="h-4 w-4 rounded-full border border-line align-middle transition hover:scale-110" style={{ backgroundColor: color }} />
                               </td>
                             </tr>
                           );
@@ -442,13 +445,14 @@ export default function CanaliPage() {
                       {shown.length > 1 && (
                         <tfoot>
                           <tr className="border-t border-line bg-wash text-xs font-semibold text-txt">
-                            <td className="px-3 py-2.5" colSpan={2}>{t("Totale canali")}</td>
-                            <td className="px-3 py-2.5 text-right font-mono tabular-nums">{tot.n}<span className="ml-1 font-sans text-[11px] font-normal text-faint">{tot.nights} {t("notti")}</span></td>
+                            <td className="px-3 py-2" colSpan={2}>{t("Totale canali")}</td>
+                            <td className="px-3 py-2 text-right">{nightsCell(tot.n, tot.nights)}</td>
                             <td />
-                            <td className="px-3 py-2.5 text-right font-mono tabular-nums">{eur(tot.gross)}</td>
-                            <td className="px-3 py-2.5 text-right font-mono tabular-nums">{eur(tot.comm)}</td>
-                            <td className="px-3 py-2.5 text-right font-mono tabular-nums" style={{ color: "var(--ok)" }}>{eur(tot.net)}</td>
-                            <td className="px-3 py-2.5 text-right font-mono tabular-nums text-dim">{tot.nights > 0 && tot.gross > 0 ? eur(Math.round(tot.gross / tot.nights)) : "—"}</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums">{eur(tot.gross)}</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums">{eur(tot.comm)}</td>
+                            <td className="px-3 py-2 text-right text-xs font-normal text-faint">{tot.gross > 0 ? `${Math.round((tot.comm / tot.gross) * 1000) / 10}%` : "—"}</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums" style={{ color: "var(--ok)" }}>{eur(tot.net)}</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums text-dim">{tot.nights > 0 && tot.gross > 0 ? eur(Math.round(tot.gross / tot.nights)) : "—"}</td>
                             <td colSpan={2} />
                           </tr>
                         </tfoot>
