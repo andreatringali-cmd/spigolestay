@@ -318,7 +318,8 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       // Le righe rimosse si conservano: se questa revision non ha camere mappate le
       // ripristiniamo (vedi sotto) così una modifica non-mappabile non cancella il dato.
       const isUpdate = prevIdx.length > 0;
-      const removed = prevIdx.sort((a, b) => b - a).map((i) => bookings.splice(i, 1)[0]);
+      // Si tolgono dalla fine (gli indici non si spostano) e poi si rimette l'ordine ORIGINALE: serve a riabbinare ogni riga nuova alla sua vecchia (incasso, camera).
+      const removed = prevIdx.sort((a, b) => b - a).map((i) => bookings.splice(i, 1)[0]).reverse();
       removed.forEach(touchAvail);
 
       // Ospite (riusa per email)

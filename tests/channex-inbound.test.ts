@@ -424,7 +424,7 @@ test("modifica da 2 camere a 1: la camera in piu' viene lapidata, nessun residuo
   assert.ok([50, 70].includes(s.bookings[0].paid)); // l'incasso di una delle due righe vecchie e' stato riportato
 });
 
-test("modifica a 2 camere invariate: l'incasso e la camera di ogni riga restano alla riga che aveva quel prezzo", { todo: "BUG: le righe sostituite vengono abbinate in ordine inverso (prevIdx ordinato a decrescere, channex-inbound.ts riga 321 + 377): la camera 1 prende i dati della camera 2" }, async () => {
+test("modifica a 2 camere invariate: l'incasso e la camera di ogni riga restano alla riga che aveva quel prezzo", async () => {
   const sc = scenario(baseData({ bookings: [
     seedBooking({ id: "m1", groupId: "g", paid: 50, total: 200, unitId: "u1" }),
     seedBooking({ id: "m2", groupId: "g", paid: 70, total: 100, unitId: "u2" }),

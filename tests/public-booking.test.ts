@@ -380,14 +380,14 @@ test("nessuna email e nessun invio ai portali quando la prenotazione viene rifiu
 });
 
 // ───────────────────────── punti deboli noti ─────────────────────────
-test("tipologia inesistente nella struttura: dovrebbe essere rifiutata", { todo: "BUG: nessun controllo che 'rt' esista e appartenga alla struttura del sito. Con rt sconosciuto: nessuna camera, nessun 409 (solo `ofType.length` > 0 rifiuta) e stayFloor=null, quindi una riga spazzatura finisce nel calendario del proprietario (route.ts, blocco 'Camera: prima unita' libera')" }, async () => {
+test("tipologia inesistente nella struttura: dovrebbe essere rifiutata", async () => {
   const sc = scenario();
   const r = await post(body({ rt: "tipologia-inventata", total: 1 }));
   assert.notEqual(r.status, 200);
   assert.equal(sc.state().bookings.length, 0);
 });
 
-test("tipologia con tutte le camere fuori servizio: dal sito non dovrebbe essere prenotabile", { todo: "BUG: se tutte le camere della tipologia sono outOfService, ofType e' vuoto e la route accetta la prenotazione senza camera (nessun 409), mentre hasFreeUnit in server-booking-guard.ts la tratta come 'non verificabile' (null) e la route non lo usa" }, async () => {
+test("tipologia con tutte le camere fuori servizio: dal sito non dovrebbe essere prenotabile", async () => {
   const sc = scenario(baseData({ units: [{ id: "u1", roomTypeId: "rt-dbl", structureId: "st-1", outOfService: true }] }));
   const r = await post(body());
   assert.equal(r.status, 409);

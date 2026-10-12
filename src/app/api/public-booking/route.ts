@@ -110,6 +110,10 @@ export async function POST(req: Request) {
 
     // Camera: prima unità libera della tipologia. Se non ce ne sono: dal sito anonimo si rifiuta (409); se invece il pagamento
     // è già avvenuto (chiamata interna) si registra comunque, senza camera e con un avviso, invece di sovrapporla a un'altra prenotazione.
+    // La tipologia deve esistere ed essere di QUESTA struttura (dal sito anonimo): una inventata non deve passare.
+    if (!internal && !(Array.isArray(data.roomTypes) ? data.roomTypes : []).some((x) => (x as { id?: string; structureId?: string }).id === rt && (x as { structureId?: string }).structureId === sid)) {
+      return NextResponse.json({ error: "room_type_not_found" }, { status: 400 });
+    }
     const ofType = units.filter((u) => u.roomTypeId === rt && !u.outOfService);
     // Strutture che mostrano le stesse camere fisiche: la tipologia deve avere camere libere anche nel gruppo (le camere uguali si dividono le stesse camere fisiche).
     const pool = parsePool(blob[POOL_KEY]);
@@ -118,10 +122,8 @@ export async function POST(req: Request) {
     const free = poolBlocks ? undefined : ofType.find((u) => !bookings.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)));
     let overbooked = false;
     let unitId: string | null = free?.id ?? null;
-    if (!free && ofType.length) {
-      if (!internal) return NextResponse.json({ error: "no_availability" }, { status: 409 });
-      overbooked = true; unitId = null;
-    }
+    if (!free && !internal) return NextResponse.json({ error: "no_availability" }, { status: 409 }); // anche se tutte le camere della tipologia sono fuori servizio
+    if (!free && ofType.length) { overbooked = true; unitId = null; }
     // Prezzo minimo (metà del listino): impedisce soggiorni "regalati" scrivendo un totale basso nella richiesta.
     if (!internal && total !== undefined) {
       const od: OwnerStructureData | null = (Array.isArray(data.structures) ? data.structures : []).some((x) => (x as { id?: string }).id === sid)

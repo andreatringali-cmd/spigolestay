@@ -35,7 +35,7 @@ test("toISO: vuoto o non riconoscibile = stringa vuota", () => {
   assert.equal(toISO("boh"), "");
 });
 
-test("toISO: un numero corto (es. una camera '101' in una colonna sbagliata) non dovrebbe diventare una data", { todo: "BUG minore: new Date('123') e' valido in JavaScript (anno 123), quindi toISO('123') restituisce '0122-12-31' invece di '' (ics.ts, ultima riga di toISO)" }, () => {
+test("toISO: un numero corto (es. una camera '101' in una colonna sbagliata) non dovrebbe diventare una data", () => {
   assert.equal(toISO("123"), "");
   assert.equal(toISO("101"), "");
 });
@@ -169,7 +169,7 @@ test("parseICS: totale e ospiti da DESCRIPTION/SUMMARY (formati '€ 1.234,56', 
   assert.equal(evs[2].adults, undefined);
 });
 
-test("parseICS: 'Total' nella DESCRIPTION con separatore delle migliaia mantiene i centesimi", { todo: "BUG: la regex del totale (ics.ts, match su 'Total') si ferma al primo separatore: 'Total: 1.234,56' -> 1234 (persi i centesimi) e 'Total: 1,234.56' -> 1,234 -> 1.234 (mille volte meno)" }, () => {
+test("parseICS: 'Total' nella DESCRIPTION con separatore delle migliaia mantiene i centesimi", () => {
   const [a] = parseICS(cal(ev("UID:a", "DTSTART;VALUE=DATE:20260610", "DTEND;VALUE=DATE:20260611", "SUMMARY:A", "DESCRIPTION:Total: € 1.234\\,56")));
   assert.equal(a.total, 1234.56);
   const [b] = parseICS(cal(ev("UID:b", "DTSTART;VALUE=DATE:20260610", "DTEND;VALUE=DATE:20260611", "SUMMARY:B", "DESCRIPTION:Total: 1,234.56")));
@@ -197,12 +197,12 @@ test("parseICS: piu' eventi nello stesso file mantengono l'ordine e gli UID", ()
   assert.deepEqual(evs.map((e) => e.uid), ["e0", "e1", "e2", "e3", "e4"]);
 });
 
-test("parseICS: un evento con STATUS:CANCELLED non dovrebbe diventare una prenotazione", { todo: "BUG probabile: il parser non guarda STATUS, quindi un evento annullato in un feed iCal viene importato come prenotazione valida (ics.ts, parseICS)" }, () => {
+test("parseICS: un evento con STATUS:CANCELLED non dovrebbe diventare una prenotazione", () => {
   const out = parseICS(cal(ev("UID:x", "STATUS:CANCELLED", "DTSTART;VALUE=DATE:20260610", "DTEND;VALUE=DATE:20260612", "SUMMARY:Mario Rossi")));
   assert.equal(out.length === 0 || out[0].blocked === true, true);
 });
 
-test("parseICS: SUMMARY con parametri (es. SUMMARY;LANGUAGE=it:...) dovrebbe essere letto", { todo: "LIMITE: la regex cerca solo 'SUMMARY:' senza parametri, quindi un nome scritto 'SUMMARY;LANGUAGE=it:Mario' si perde (ics.ts, parseICS)" }, () => {
+test("parseICS: SUMMARY con parametri (es. SUMMARY;LANGUAGE=it:...) dovrebbe essere letto", () => {
   const [e] = parseICS(cal(ev("UID:l", "DTSTART;VALUE=DATE:20260610", "DTEND;VALUE=DATE:20260611", "SUMMARY;LANGUAGE=it:Mario Rossi")));
   assert.equal(e.guest, "Mario Rossi");
 });

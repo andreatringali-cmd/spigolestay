@@ -52,7 +52,7 @@ test("proprieta': la somma delle quote torna sempre alla commissione (casuale, 5
   }
 });
 
-test("nessuna quota dovrebbe essere negativa", { todo: "BUG: per arrotondamento l'ultima quota puo' uscire di -0,01 (es. commissione 2,51 su [246.25, 114.24, 475.04, 488.96, 1.46] -> ultima = -0,01); succede in ~1 caso su 70.000 prove casuali (commission-split.ts, ramo `i === roomTotals.length - 1`)" }, () => {
+test("nessuna quota dovrebbe essere negativa", () => {
   const r = splitCommission(2.51, [246.25, 114.24, 475.04, 488.96, 1.46]) as number[];
   assert.ok(r.every((x) => x >= 0), JSON.stringify(r));
 });

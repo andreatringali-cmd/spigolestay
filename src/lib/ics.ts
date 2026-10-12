@@ -29,11 +29,24 @@ export function toISO(s: string): string {
   // Data testuale in italiano: "24 settembre 2026", "mercoledì 24 settembre 2026", "24-set-2026".
   const it = s.toLowerCase().match(/(\d{1,2})[\s-]+([a-zàèéìòù]{3,})[a-zàèéìòù]*\.?[\s-]+(\d{4})/i);
   if (it) { const mo = MESI_IT[it[2].slice(0, 3)]; if (mo) return `${it[3]}-${mo}-${it[1].padStart(2, "0")}`; }
+  // Un numero puro non è una data (per esempio una camera "101" in una colonna sbagliata): new Date("123") in JavaScript sarebbe l'anno 123.
+  if (/^\d+$/.test(s)) return "";
   const dt = new Date(s); return isNaN(+dt) ? "" : dt.toISOString().slice(0, 10);
 }
 export function toNum(s: string): number | undefined {
   if (!s) return undefined;
-  const n = parseFloat(String(s).replace(/[^0-9,.-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", "."));
+  let t = String(s).replace(/[^0-9,.-]/g, "");
+  const lastDot = t.lastIndexOf("."), lastComma = t.lastIndexOf(",");
+  if (lastDot >= 0 && lastComma >= 0) {
+    // Entrambi i separatori: l'ultimo è il decimale ("1.234,56" all'italiana, "1,234.56" all'inglese), l'altro separa le migliaia.
+    const dec = lastDot > lastComma ? "." : ",";
+    t = t.split(dec === "." ? "," : ".").join("").replace(dec, ".");
+  } else if (/^-?\d{1,3}([.,]\d{3})+$/.test(t)) {
+    t = t.replace(/[.,]/g, ""); // solo migliaia: "1.234" o "1,234,567"
+  } else {
+    t = t.replace(",", ".");
+  }
+  const n = parseFloat(t);
   return isNaN(n) ? undefined : n;
 }
 // Riconosce il canale dal testo Octorate (SUMMARY): booking_xml, expedia, octoevo (=diretta),
@@ -63,7 +76,9 @@ export function parseICS(text: string): IcsEvent[] {
     const body = "\n" + b.split(/END:VEVENT/i)[0];
     const get = (re: RegExp) => { const m = body.match(re); return m ? icsUnescape(m[1]) : ""; };
     const dts = body.match(/\nDTSTART[^:\n]*:([0-9TZ]+)/i), dte = body.match(/\nDTEND[^:\n]*:([0-9TZ]+)/i);
-    const summary = get(/\nSUMMARY:(.*)/i), desc = get(/\nDESCRIPTION:(.*)/i), loc = get(/\nLOCATION:(.*)/i);
+    // Un evento annullato nel feed non è una prenotazione.
+    if (/cancel/i.test(get(/\nSTATUS:(.*)/i))) continue;
+    const summary = get(/\nSUMMARY(?:;[^:\n]*)?:(.*)/i), desc = get(/\nDESCRIPTION(?:;[^:\n]*)?:(.*)/i), loc = get(/\nLOCATION(?:;[^:\n]*)?:(.*)/i);
     const orgCn = get(/\nORGANIZER[^:\n]*?CN=([^:\n]*):/i);
     const uid = get(/\nUID:(.*)/i);
     // Date: preferisci il "Period : gg/mm/aaaa - gg/mm/aaaa" della DESCRIPTION (check-out reale);
@@ -76,7 +91,7 @@ export function parseICS(text: string): IcsEvent[] {
     const blocked = /closed|not available|non disponibil|bloccat|blocked|unavailable|outoforder|out.?of.?order|fuori.?servizio|maintenance|manutenzione/.test(blob);
     let guest = orgCn;
     if (!guest && !blocked) guest = summary.split(/\s*\|\s*|\s+Camera\b/i)[0].trim();
-    const totm = desc.match(/Total\s*:?\s*€?\s*([0-9]+(?:[.,][0-9]+)?)/i) || (desc + " " + summary).match(/€\s?([0-9.,]+)/);
+    const totm = desc.match(/Total\s*:?\s*€?\s*([0-9][0-9.,]*)/i) || (desc + " " + summary).match(/€\s?([0-9.,]+)/);
     const pax = summary.match(/(\d+)\s*pax/i);
     out.push({ uid, guest: blocked ? "" : guest, checkIn: ci, checkOut: co, blocked, channelText: summary, note: desc || summary, room: loc, total: totm ? toNum(totm[1]) : undefined, adults: pax ? +pax[1] : undefined });
   }
