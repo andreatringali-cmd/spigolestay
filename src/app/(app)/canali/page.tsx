@@ -380,13 +380,13 @@ export default function CanaliPage() {
                   <div className="overflow-x-auto rounded-xl border border-line">
                     <table className="w-full min-w-[820px] table-fixed text-sm">
                       <colgroup>
-                        {[16, 9, 8, 12, 12, 12, 9, 17, 5].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
+                        {[17, 9, 9, 12, 12, 12, 9, 15, 5].map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}
                       </colgroup>
                       <thead>
                         <tr className="border-b border-line bg-wash text-left text-[10px] font-bold uppercase tracking-wide text-faint">
                           <th className={th}>{t("Canale")}</th>
                           <th className={th}>{t("Stato")}</th>
-                          <th className={`${th} text-right`}>{t("Correzione")}</th>
+                          <th className={th}>{t("Correzione")}</th>
                           <th className={`${th} text-right`}>{t("Lordo")}</th>
                           <th className={`${th} text-right`}>{t("Commissioni")}</th>
                           <th className={`${th} text-right`}>{t("Netto")}</th>
@@ -417,7 +417,7 @@ export default function CanaliPage() {
                               <td className={td}>
                                 <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
                               </td>
-                              <td className={`${td} text-right text-xs text-dim`}>{corr}</td>
+                              <td className={`${td} text-xs text-dim`}>{corr}</td>
                               <td className={`${td} text-right font-mono tabular-nums text-txt`}>{st && st.gross > 0 ? eur(st.gross) : dash}</td>
                               <td className={`${td} text-right font-mono tabular-nums text-txt`} title={commTip}>{st && st.commission > 0 ? eur(st.commission) : dash}</td>
                               <td className={`${td} text-right font-mono font-semibold tabular-nums`} style={{ color: st && st.net > 0 ? "var(--ok)" : undefined }}>{st && st.net > 0 ? eur(st.net) : dash}</td>
