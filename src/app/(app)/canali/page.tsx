@@ -10,6 +10,8 @@ import { forceFullSync } from "@/components/ChannexAutoSync";
 import type { MappedExtraPlan } from "@/lib/rate-model";
 import { CHANNELS, type Channel } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
+import ChannelBars from "@/components/ChannelBars";
+import LineChart from "@/components/LineChart";
 import { usePriceCorrections } from "@/lib/usePriceCorrections";
 import { correctionLabel } from "@/lib/priceCorrection";
 import { loadChannelColor, saveChannelColor } from "@/lib/channelOverrides";
@@ -238,10 +240,6 @@ export default function CanaliPage() {
   // Grafico mensile: 5 mesi indietro, il corrente e 2 avanti, per canale (perimetro = struttura in vista o tutte).
   const months = useMemo(() => monthRanges(toISO(new Date()), 5, 2), []);
   const monthly = useMemo(() => months.map((m) => ({ m, res: channelStats(bookings, { from: m.from, to: m.to, structureId: effStructure === "all" ? undefined : effStructure }) })), [bookings, months, effStructure]);
-  const monthMax = Math.max(1, ...monthly.map((x) => x.res.totals.gross));
-  // Grafico mensile a due toni dello stesso colore (OTA e diretta): il dettaglio per canale sta nell'anello e nel suggerimento al passaggio del mouse.
-  const OTA_TONE = "var(--focus)";
-  const DIRECT_TONE = "color-mix(in srgb, var(--focus) 30%, var(--surface))";
   // Canali non ancora collegati nel perimetro in vista (Airbnb è tra i canali di Xenora; Agoda e Trip.com sono altri portali collegabili da "Gestisci canali").
   const connectedText = (effStructure === "all" ? Object.values(otaByStructure ?? {}).flat() : otaByStructure?.[effStructure] ?? []).map((c) => `${c.channel} ${c.title}`.toLowerCase()).join(" | ");
   const airbnbShare = Math.round(scope.rows.find((r) => r.channel === "airbnb")?.shareGross ?? 0);
@@ -324,81 +322,18 @@ export default function CanaliPage() {
           <StatCard label={t("Netto")} value={eur(scope.totals.net)} color={scope.totals.net > 0 ? "var(--ok)" : undefined} hint={scope.totals.gross > 0 ? `${Math.round((scope.totals.net / scope.totals.gross) * 100)}% ${t("del lordo")}` : undefined} />
         </div>
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
-        <Card className="flex flex-col">
-          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-            <div className="text-sm font-semibold text-txt">{t("Da dove arrivano le prenotazioni")}</div>
-            {scope.rows.length > 0 && <div className="text-[11px] text-faint">{t("Vendite tramite OTA")}: <b className="text-txt">{otaShare}%</b> · {t("dirette")}: <b className="text-txt">{100 - otaShare}%</b></div>}
-          </div>
-          {scope.rows.length === 0 ? (
-            <p className="text-sm text-faint">{t("Nessuna prenotazione nel periodo scelto.")}</p>
-          ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-6 py-2 sm:flex-row">
-              <div className="relative shrink-0">
-                <svg viewBox="0 0 160 160" className="h-44 w-44" role="img" aria-label={t("Quota dei ricavi per canale")}>
-                  <circle cx="80" cy="80" r="62" fill="none" strokeWidth="22" style={{ stroke: "var(--wash)" }} />
-                  {(() => {
-                    const C = 2 * Math.PI * 62;
-                    let cum = 0;
-                    return scope.rows.filter((r) => r.shareGross > 0).map((r) => {
-                      const len = (r.shareGross / 100) * C;
-                      const el = (
-                        <circle key={r.channel} cx="80" cy="80" r="62" fill="none" strokeWidth="22" transform="rotate(-90 80 80)"
-                          strokeDasharray={`${Math.max(0, len - 2)} ${C - Math.max(0, len - 2)}`} strokeDashoffset={-(cum / 100) * C}
-                          style={{ stroke: chColor(r.channel) }}><title>{`${CHANNELS[r.channel]?.label ?? r.channel}: ${Math.round(r.shareGross)}%`}</title></circle>
-                      );
-                      cum += r.shareGross;
-                      return el;
-                    });
-                  })()}
-                </svg>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="font-mono text-lg font-bold tabular-nums text-txt">{eur(scope.totals.gross)}</span>
-                  <span className="text-[11px] text-faint">{t("ricavo lordo")}</span>
-                </div>
-              </div>
-              <div className="flex w-full min-w-0 flex-1 flex-col justify-center gap-4">
-                {scope.rows.map((r) => (
-                  <div key={r.channel} className="flex items-center gap-3">
-                    <span className="shrink-0 rounded-full p-[2.5px]" style={{ backgroundColor: chColor(r.channel) }}><ChannelLogo channel={r.channel} size={24} title={CHANNELS[r.channel]?.label ?? r.channel} /></span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-txt">{CHANNELS[r.channel]?.label ?? r.channel}</div>
-                      <div className="text-[11px] text-faint">{r.bookings} {t("pren.")} · {eur(r.gross)}</div>
-                    </div>
-                    <span className="font-mono text-xl font-bold tabular-nums text-txt">{Math.round(r.shareGross)}%</span>
-                  </div>
-                ))}
-              </div>
+          <Card className="flex h-full flex-col">
+            <SectionTitle>{t("Prenotazioni e ricavi per canale")}</SectionTitle>
+            <div className="flex flex-1 flex-col">
+              <ChannelBars rows={scope.rows.map((r) => ({ label: CHANNELS[r.channel]?.label ?? r.channel, color: chColor(r.channel), count: r.bookings, revenue: r.gross, channel: r.channel }))} fmtEur={eur} />
+              {scope.rows.length > 0 && <div className="mt-auto pt-2 text-[10px] text-faint">{t("Vendite tramite OTA")}: <b className="text-dim">{otaShare}%</b> · {t("dirette")}: <b className="text-dim">{100 - otaShare}%</b></div>}
             </div>
-          )}
-        </Card>
-          <Card>
-            <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-              <div className="text-sm font-semibold text-txt">{t("Ricavi lordi per mese")}</div>
-              <div className="text-[11px] text-faint">{t("per mese di arrivo · i mesi futuri mostrano il già prenotato")}</div>
-            </div>
-            <div className="flex h-44 items-end gap-2 border-b border-line pb-px" role="img" aria-label={t("Ricavi lordi per mese e per canale")}>
-              {monthly.map(({ m, res }) => {
-                const h = (res.totals.gross / monthMax) * 100;
-                return (
-                  <div key={m.key} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1" title={`${m.label}: ${eur(res.totals.gross)}${res.rows.map((r) => `\n${CHANNELS[r.channel]?.label ?? r.channel}: ${eur(r.gross)}`).join("")}`}>
-                    <span className={`font-mono text-[10px] tabular-nums ${m.current ? "font-bold text-txt" : "text-faint"}`}>{res.totals.gross > 0 ? (res.totals.gross >= 1000 ? `${(res.totals.gross / 1000).toFixed(1).replace(".0", "")}k` : Math.round(res.totals.gross)) : ""}</span>
-                    <div className="flex w-full max-w-[44px] flex-col-reverse overflow-hidden rounded-t-md" style={{ height: `${h}%`, minHeight: res.totals.gross > 0 ? 3 : 0, opacity: m.future ? 0.55 : 1 }}>
-                      {[{ k: "ota", v: res.rows.filter((r) => r.channel !== "direct").reduce((a, r) => a + r.gross, 0), bg: OTA_TONE }, { k: "dir", v: res.rows.filter((r) => r.channel === "direct").reduce((a, r) => a + r.gross, 0), bg: DIRECT_TONE }].filter((x) => x.v > 0).map((x) => (
-                        <div key={x.k} style={{ height: `${(x.v / res.totals.gross) * 100}%`, backgroundColor: x.bg }} />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-1.5 flex gap-2">
-              {monthly.map(({ m }) => (
-                <div key={m.key} className={`min-w-0 flex-1 text-center text-[11px] capitalize ${m.current ? "font-bold text-txt" : "text-faint"}`}>{m.label}</div>
-              ))}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-dim"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: OTA_TONE }} />{t("Da OTA")}</span>
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-dim"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: DIRECT_TONE }} />{t("Diretta")}</span>
+          </Card>
+          <Card className="flex h-full flex-col">
+            <SectionTitle>{t("Ricavi lordi per mese")}</SectionTitle>
+            <div className="flex flex-1 flex-col">
+              <LineChart points={monthly.map(({ m, res }) => ({ label: m.label.charAt(0).toUpperCase() + m.label.slice(1), value: Math.round(res.totals.gross) }))} format={(n) => eur(n)} color="var(--ok)" everyLabel={1} />
+              <div className="mt-auto pt-1 text-[10px] text-faint">{t("per mese di arrivo · i mesi futuri mostrano il già prenotato")}</div>
             </div>
           </Card>
         </div>
@@ -539,7 +474,12 @@ export default function CanaliPage() {
               <div key={s.key} className="flex flex-col rounded-xl border border-dashed border-line bg-surface p-4">
                 <div className="flex items-center gap-2.5">
                   {s.channel ? (<><ChannelLogo channel={s.channel} size={26} title={s.name} /><span className="font-semibold text-txt">{s.name}</span></>) : (
-                    <span className="inline-flex h-[28px] items-center rounded-md bg-white px-2.5 text-[14px] font-extrabold tracking-tight" style={{ color: "#2B3340", boxShadow: "0 0 0 1px rgba(0,0,0,.09)" }} title={s.name}>{s.mark ?? s.name}</span>
+                    <span className="inline-flex h-[28px] items-center gap-1 rounded-md bg-white px-2.5 text-[14px] font-extrabold tracking-tight" style={{ color: "#2B3340", boxShadow: "0 0 0 1px rgba(0,0,0,.09)" }} title={s.name}>
+                      {s.key === "agoda" ? (<>agoda<span aria-hidden className="ml-0.5 inline-flex items-center gap-[2px]">{["#E9425A", "#F7B500", "#4CB963", "#3C86F4", "#8A55D1"].map((c) => <i key={c} className="h-[5px] w-[5px] rounded-full" style={{ backgroundColor: c }} />)}</span></>)
+                        : s.key === "trip" ? (<span style={{ color: "#287DFA" }}>Trip<span style={{ opacity: 0.6 }}>.com</span></span>)
+                        : s.key === "despegar" ? (<span style={{ color: "#1F4FC4" }}>despegar</span>)
+                        : (s.mark ?? s.name)}
+                    </span>
                   )}
                   <span className="ml-auto rounded-full bg-wash px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-faint">{t("Non collegato")}</span>
                 </div>
