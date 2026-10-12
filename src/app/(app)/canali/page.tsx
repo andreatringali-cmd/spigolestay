@@ -239,7 +239,9 @@ export default function CanaliPage() {
   const months = useMemo(() => monthRanges(toISO(new Date()), 5, 2), []);
   const monthly = useMemo(() => months.map((m) => ({ m, res: channelStats(bookings, { from: m.from, to: m.to, structureId: effStructure === "all" ? undefined : effStructure }) })), [bookings, months, effStructure]);
   const monthMax = Math.max(1, ...monthly.map((x) => x.res.totals.gross));
-  const monthlyChannels = Array.from(new Set(monthly.flatMap((x) => x.res.rows.filter((r) => r.gross > 0).map((r) => r.channel))));
+  // Grafico mensile a due toni dello stesso colore (OTA e diretta): il dettaglio per canale sta nell'anello e nel suggerimento al passaggio del mouse.
+  const OTA_TONE = "var(--focus)";
+  const DIRECT_TONE = "color-mix(in srgb, var(--focus) 30%, var(--surface))";
   // Canali non ancora collegati nel perimetro in vista (Airbnb è tra i canali di Xenora; Agoda e Trip.com sono altri portali collegabili da "Gestisci canali").
   const connectedText = (effStructure === "all" ? Object.values(otaByStructure ?? {}).flat() : otaByStructure?.[effStructure] ?? []).map((c) => `${c.channel} ${c.title}`.toLowerCase()).join(" | ");
   const airbnbShare = Math.round(scope.rows.find((r) => r.channel === "airbnb")?.shareGross ?? 0);
@@ -322,7 +324,7 @@ export default function CanaliPage() {
           <StatCard label={t("Netto")} value={eur(scope.totals.net)} color={scope.totals.net > 0 ? "var(--ok)" : undefined} hint={scope.totals.gross > 0 ? `${Math.round((scope.totals.net / scope.totals.gross) * 100)}% ${t("del lordo")}` : undefined} />
         </div>
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
-        <Card>
+        <Card className="flex flex-col">
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
             <div className="text-sm font-semibold text-txt">{t("Da dove arrivano le prenotazioni")}</div>
             {scope.rows.length > 0 && <div className="text-[11px] text-faint">{t("Vendite tramite OTA")}: <b className="text-txt">{otaShare}%</b> · {t("dirette")}: <b className="text-txt">{100 - otaShare}%</b></div>}
@@ -330,22 +332,43 @@ export default function CanaliPage() {
           {scope.rows.length === 0 ? (
             <p className="text-sm text-faint">{t("Nessuna prenotazione nel periodo scelto.")}</p>
           ) : (
-            <>
-              <div className="flex h-3 w-full overflow-hidden rounded-full bg-wash">
-                {scope.rows.filter((r) => r.shareGross > 0).map((r) => (
-                  <div key={r.channel} title={`${CHANNELS[r.channel]?.label ?? r.channel}: ${Math.round(r.shareGross)}%`} style={{ width: `${r.shareGross}%`, backgroundColor: chColor(r.channel) }} />
-                ))}
+            <div className="flex flex-1 flex-col items-center justify-center gap-6 py-2 sm:flex-row">
+              <div className="relative shrink-0">
+                <svg viewBox="0 0 160 160" className="h-44 w-44" role="img" aria-label={t("Quota dei ricavi per canale")}>
+                  <circle cx="80" cy="80" r="62" fill="none" strokeWidth="22" style={{ stroke: "var(--wash)" }} />
+                  {(() => {
+                    const C = 2 * Math.PI * 62;
+                    let cum = 0;
+                    return scope.rows.filter((r) => r.shareGross > 0).map((r) => {
+                      const len = (r.shareGross / 100) * C;
+                      const el = (
+                        <circle key={r.channel} cx="80" cy="80" r="62" fill="none" strokeWidth="22" transform="rotate(-90 80 80)"
+                          strokeDasharray={`${Math.max(0, len - 2)} ${C - Math.max(0, len - 2)}`} strokeDashoffset={-(cum / 100) * C}
+                          style={{ stroke: chColor(r.channel) }}><title>{`${CHANNELS[r.channel]?.label ?? r.channel}: ${Math.round(r.shareGross)}%`}</title></circle>
+                      );
+                      cum += r.shareGross;
+                      return el;
+                    });
+                  })()}
+                </svg>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="font-mono text-lg font-bold tabular-nums text-txt">{eur(scope.totals.gross)}</span>
+                  <span className="text-[11px] text-faint">{t("ricavo lordo")}</span>
+                </div>
               </div>
-              <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-x-6 gap-y-4">
+              <div className="flex w-full min-w-0 flex-1 flex-col justify-center gap-4">
                 {scope.rows.map((r) => (
-                  <div key={r.channel} className="min-w-0">
-                    <div className="flex items-center gap-1.5 text-xs text-dim"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: chColor(r.channel) }} /><span className="truncate">{CHANNELS[r.channel]?.label ?? r.channel}</span></div>
-                    <div className="mt-0.5 font-mono text-xl font-bold tabular-nums text-txt">{Math.round(r.shareGross)}%</div>
-                    <div className="text-[11px] text-faint">{r.bookings} {t("pren.")} · {eur(r.gross)}</div>
+                  <div key={r.channel} className="flex items-center gap-3">
+                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: chColor(r.channel) }} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-txt">{CHANNELS[r.channel]?.label ?? r.channel}</div>
+                      <div className="text-[11px] text-faint">{r.bookings} {t("pren.")} · {eur(r.gross)}</div>
+                    </div>
+                    <span className="font-mono text-xl font-bold tabular-nums text-txt">{Math.round(r.shareGross)}%</span>
                   </div>
                 ))}
               </div>
-            </>
+            </div>
           )}
         </Card>
           <Card>
@@ -360,8 +383,8 @@ export default function CanaliPage() {
                   <div key={m.key} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1" title={`${m.label}: ${eur(res.totals.gross)}${res.rows.map((r) => `\n${CHANNELS[r.channel]?.label ?? r.channel}: ${eur(r.gross)}`).join("")}`}>
                     <span className={`font-mono text-[10px] tabular-nums ${m.current ? "font-bold text-txt" : "text-faint"}`}>{res.totals.gross > 0 ? (res.totals.gross >= 1000 ? `${(res.totals.gross / 1000).toFixed(1).replace(".0", "")}k` : Math.round(res.totals.gross)) : ""}</span>
                     <div className="flex w-full max-w-[44px] flex-col-reverse overflow-hidden rounded-t-md" style={{ height: `${h}%`, minHeight: res.totals.gross > 0 ? 3 : 0, opacity: m.future ? 0.55 : 1 }}>
-                      {res.rows.filter((r) => r.gross > 0).map((r) => (
-                        <div key={r.channel} style={{ height: `${(r.gross / res.totals.gross) * 100}%`, backgroundColor: chColor(r.channel) }} />
+                      {[{ k: "ota", v: res.rows.filter((r) => r.channel !== "direct").reduce((a, r) => a + r.gross, 0), bg: OTA_TONE }, { k: "dir", v: res.rows.filter((r) => r.channel === "direct").reduce((a, r) => a + r.gross, 0), bg: DIRECT_TONE }].filter((x) => x.v > 0).map((x) => (
+                        <div key={x.k} style={{ height: `${(x.v / res.totals.gross) * 100}%`, backgroundColor: x.bg }} />
                       ))}
                     </div>
                   </div>
@@ -374,9 +397,8 @@ export default function CanaliPage() {
               ))}
             </div>
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-              {monthlyChannels.map((ch) => (
-                <span key={ch} className="inline-flex items-center gap-1.5 text-[11px] text-dim"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: chColor(ch) }} />{CHANNELS[ch]?.label ?? ch}</span>
-              ))}
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-dim"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: OTA_TONE }} />{t("Da OTA")}</span>
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-dim"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: DIRECT_TONE }} />{t("Diretta")}</span>
             </div>
           </Card>
         </div>
@@ -470,8 +492,7 @@ export default function CanaliPage() {
                               </td>
                               <td className="px-3 py-3 text-right font-mono tabular-nums text-txt">{st && st.gross > 0 ? eur(st.gross) : dash}</td>
                               <td className="px-3 py-3 text-right" title={commInfo.source === "stima" ? "Percentuale stimata dalle commissioni reali dell'ultimo anno (per le prenotazioni senza cifra)" : commInfo.source === "manuale" ? "Percentuale impostata da te" : "Percentuale standard: non ci sono abbastanza dati reali per stimarla"}>
-                                <div className="font-mono tabular-nums text-txt">{st && st.commission > 0 ? eur(st.commission) : dash}</div>
-                                <div className="text-[11px] text-faint">{commInfo.source === "stima" ? "~" : ""}{commPct}%{commInfo.source === "standard" ? <span className="ml-1 text-[10px]">standard</span> : null}</div>
+                                <div className="whitespace-nowrap"><span className="font-mono tabular-nums text-txt">{st && st.commission > 0 ? eur(st.commission) : dash}</span><span className="ml-1.5 text-[11px] text-faint">· {commInfo.source === "stima" ? "~" : ""}{commPct}%{commInfo.source === "standard" ? <span className="ml-1 text-[10px]">standard</span> : null}</span></div>
                               </td>
                               <td className="px-3 py-3 text-right font-mono font-semibold tabular-nums" style={{ color: st && st.net > 0 ? "var(--ok)" : undefined }}>{st && st.net > 0 ? eur(st.net) : dash}</td>
                               <td className="px-3 py-3 text-right font-mono tabular-nums text-dim">{st?.avgNight ? eur(st.avgNight) : dash}</td>
