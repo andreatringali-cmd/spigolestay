@@ -869,6 +869,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
             const gtot = b.total ? bookingPaidTotal(b) : 0; // quanto ha pagato l'ospite, senza tassa di soggiorno
             const extra = blocked ? "" : [wide && `${pax}p`, xwide && gtot ? `€${Math.round(gtot)}` : ""].filter(Boolean).join(" · ");
             const tentative = !blocked && b.status === "tentative";
+            const past = b.checkOut <= todayISO; // soggiorno già concluso: barra sbiadita, così il presente risalta
             const sotto = barStyle === "sotto";
             const barColor = blocked
               ? { backgroundColor: "#1f1f1f", backgroundImage: "repeating-linear-gradient(45deg, #3a3a3a 0 6px, #0d0d0d 6px 12px)", color: "#e8e8e8", boxShadow: "inset 0 0 0 1px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.25)" }
@@ -905,7 +906,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 onPointerDown={(e) => onBarPointerDown(e, b.id)}
                 title={`${blocked ? `Fuori servizio${b.note ? ` · ${b.note}` : ""}` : `${guestName(b.guestId)} · ${pax} ospiti${gtot ? ` · €${Math.round(gtot)}` : ""}`} · ${b.checkIn} → ${b.checkOut}${tentative ? " · opzione" : ""}${underprice?.flagged ? ` · ⚠ ${underpriceReason(b, underprice)}` : ""}`}
                 className={`absolute overflow-hidden ${sotto ? "flex cursor-grab flex-col justify-end active:cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
-                style={{ left: g.left + (sotto ? 1 : 2), width: g.width - (sotto ? 2 : 4), top: lane * rowH + (sotto ? 1 : 3), height: rowH - (sotto ? 2 : 6), opacity: dragging ? 0.35 : tentative ? 0.72 : 1, pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
+                style={{ left: g.left + (sotto ? 1 : 2), width: g.width - (sotto ? 2 : 4), top: lane * rowH + (sotto ? 1 : 3), height: rowH - (sotto ? 2 : 6), opacity: dragging ? 0.35 : past ? 0.5 : tentative ? 0.72 : 1, ...(past && !dragging ? { filter: "saturate(.65)" } : {}), pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
               >
                 {sotto ? (
                   <>
