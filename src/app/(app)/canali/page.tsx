@@ -17,6 +17,7 @@ import { correctionLabel } from "@/lib/priceCorrection";
 import { loadChannelColor, saveChannelColor } from "@/lib/channelOverrides";
 import { defaultCommissionInfo } from "@/lib/booking";
 import { toISO } from "@/lib/dates";
+import { mergeRelink } from "@/lib/channex-map-sync";
 import { channelStats, monthRanges, periodRange, PERIOD_LABEL, type StatsPeriod, type ChannelStatsResult } from "@/lib/channel-stats";
 
 // Tavolozza di colori predefiniti per canale (dieci toni distinti, pensati per restare
@@ -84,18 +85,7 @@ export default function CanaliPage() {
       // Riflette la mappatura del server nello stato locale: la struttura risulta
       // "collegata" e il pulsante «Sincronizza» sparisce (niente doppioni).
       if (linked.length) {
-        const next = { ...chxMap };
-        for (const l of linked) {
-          const rooms: Record<string, { roomTypeId: string; ratePlanId?: string }> = {};
-          // ratePlanId (dal server) è indispensabile per inviare i PREZZI in ARI, non solo la disponibilità.
-          for (const [chxRt, xid] of Object.entries(l.roomsMap || {})) {
-            rooms[xid] = { roomTypeId: chxRt, ratePlanId: l.ratePlans?.[chxRt] };
-            // Piani tariffari extra già mappati (modello tariffe, default spento): il relink non li conosce, si conservano com'erano.
-            const prev = chxMap[l.structureId]?.rooms?.[xid];
-            if (prev?.ratePlans?.length && prev.roomTypeId === chxRt) rooms[xid] = { ...prev };
-          }
-          next[l.structureId] = { propertyId: l.propertyId, rooms, at: new Date().toISOString() };
-        }
+        const next = mergeRelink(chxMap, linked) as typeof chxMap;
         setChxMap(next); try { localStorage.setItem("spigolestay:channexmap", JSON.stringify(next)); } catch {}
         // Struttura (ri)collegata → fai partire subito la sincronizzazione ARI iniziale.
         try { window.dispatchEvent(new Event("spigolestay:channex-dirty")); } catch {}

@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import { useData } from "@/lib/store";
 import { buildAriPayload, type ChxStructMap } from "@/lib/channex-ari";
 import { apiPost } from "@/lib/invoicing/client";
+import { refreshChannexMap, readChannexMap, hasLinkedStructures } from "@/lib/channex-map-sync";
 import { esitoFullSync, ESITO_NON_CONFERMATO, FULLSYNC_RESULT_EVENT, FULLSYNC_TIMEOUT_MS, type FullSyncEsito, type FullSyncDettaglio } from "@/lib/fullsync-result";
 
 // Sincronizzazione AUTOMATICA disponibilità+prezzi verso Channex.
@@ -97,7 +98,10 @@ export default function ChannexAutoSync() {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(async () => {
         let chxMap: Record<string, ChxStructMap> = {};
-        try { chxMap = JSON.parse(localStorage.getItem(CHX_MAP_KEY) || "{}"); } catch { return; }
+        try { chxMap = JSON.parse(localStorage.getItem(CHX_MAP_KEY) || "{}"); } catch { chxMap = {}; }
+        // Mappatura mancante o vecchia (browser nuovo, dati cancellati, pagina Canali mai aperta): senza, non partirebbe nessun invio. La si rilegge dal server da sola
+        // (subito se manca, altrimenti al massimo ogni 6 ore) e si riprova.
+        if (await refreshChannexMap(hasLinkedStructures(chxMap) ? 6 * 60 * 60 * 1000 : 5 * 60 * 1000)) chxMap = readChannexMap();
         const linked = Object.entries(chxMap).filter(([, m]) => m?.propertyId && m?.rooms);
         if (linked.length === 0) return; // nessuna struttura collegata a Channex
         let weekendPct = 25;
@@ -206,7 +210,7 @@ export default function ChannexAutoSync() {
   // prenotazioni compaiono senza premere nulla, anche per quelle già presenti prima del webhook.
   useEffect(() => {
     const hasLinked = () => { try { const m = JSON.parse(localStorage.getItem(CHX_MAP_KEY) || "{}"); return Object.values(m).some((x) => (x as ChxStructMap)?.propertyId); } catch { return false; } };
-    const pull = () => { if (!hasLinked()) return; apiPost("channex/import", {}).catch(() => {}); };
+    const pull = async () => { if (!hasLinked()) { await refreshChannexMap(5 * 60 * 1000); if (!hasLinked()) return; } apiPost("channex/import", {}).catch(() => {}); };
     const firstPull = setTimeout(pull, 15000); // primo controllo ~15s dopo l'apertura
     const iv = setInterval(pull, 3 * 60 * 1000); // poi ogni 3 minuti
     return () => { clearTimeout(firstPull); clearInterval(iv); };
