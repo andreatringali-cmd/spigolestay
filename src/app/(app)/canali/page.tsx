@@ -265,6 +265,40 @@ export default function CanaliPage() {
         }
       />
 
+      {/* Andamento per canale: numeri reali dalle prenotazioni (arrivi nel periodo scelto), stesse formule dell'elenco Prenotazioni. */}
+      <section className="mb-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Andamento per canale")}{effStructure !== "all" && structures.find((s) => s.id === effStructure) ? ` · ${structures.find((s) => s.id === effStructure)?.name}` : ""}</div>
+          <div role="group" aria-label={t("Periodo")} className="inline-flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold">
+            {(Object.keys(PERIOD_LABEL) as StatsPeriod[]).map((p) => (
+              <button key={p} onClick={() => setPeriod(p)} aria-pressed={period === p} className={`rounded-md px-3 py-1.5 transition ${period === p ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{t(PERIOD_LABEL[p])}</button>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard label={t("Prenotazioni")} value={scope.totals.bookings} hint={`${scope.totals.nights} ${t("notti")}${scope.totals.cancelled ? ` · ${scope.totals.cancelled} ${t("annullate")}` : ""}`} />
+          <StatCard label={t("Ricavo lordo")} value={eur(scope.totals.gross)} hint={scope.totals.avgNight ? `${eur(scope.totals.avgNight)} ${t("a notte")}` : undefined} />
+          <StatCard label={t("Commissioni")} value={eur(scope.totals.commission)} color={scope.totals.commission > 0 ? "var(--err)" : undefined} hint={scope.totals.commissionPct != null ? `${scope.totals.commissionPct}% ${t("del lordo")}` : undefined} />
+          <StatCard label={t("Netto")} value={eur(scope.totals.net)} color={scope.totals.net > 0 ? "var(--ok)" : undefined} hint={scope.totals.gross > 0 ? `${Math.round((scope.totals.net / scope.totals.gross) * 100)}% ${t("del lordo")}` : undefined} />
+        </div>
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          <Card className="flex h-full flex-col">
+            <SectionTitle>{t("Prenotazioni e ricavi per canale")}</SectionTitle>
+            <div className="flex flex-1 flex-col">
+              <ChannelBars rows={scope.rows.map((r) => ({ label: CHANNELS[r.channel]?.label ?? r.channel, color: chColor(r.channel), count: r.bookings, revenue: r.gross, channel: r.channel }))} fmtEur={eur} />
+              {scope.rows.length > 0 && <div className="mt-auto pt-2 text-[10px] text-faint">{t("Vendite tramite OTA")}: <b className="text-dim">{otaShare}%</b> · {t("dirette")}: <b className="text-dim">{100 - otaShare}%</b></div>}
+            </div>
+          </Card>
+          <Card className="flex h-full flex-col">
+            <SectionTitle>{t("Ricavi lordi per mese")}</SectionTitle>
+            <div className="flex flex-1 flex-col">
+              <LineChart points={monthly.map(({ m, res }) => ({ label: m.label.charAt(0).toUpperCase() + m.label.slice(1), value: Math.round(res.totals.gross) }))} format={(n) => eur(n)} color="var(--ok)" everyLabel={1} />
+              <div className="mt-auto pt-1 text-[10px] text-faint">{t("per mese di arrivo · i mesi futuri mostrano il già prenotato")}</div>
+            </div>
+          </Card>
+        </div>
+      </section>
+
       {/* Stato distribuzione canali. Channex è il motore dietro le quinte e resta INVISIBILE
          all'utente: niente nome fornitore, "staging" o ID tecnici — solo lo stato. */}
       <Card className="mb-5">
@@ -304,40 +338,6 @@ export default function CanaliPage() {
           </div>
         </div>
       </Card>
-
-      {/* Andamento per canale: numeri reali dalle prenotazioni (arrivi nel periodo scelto), stesse formule dell'elenco Prenotazioni. */}
-      <section className="mb-5">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Andamento per canale")}{effStructure !== "all" && structures.find((s) => s.id === effStructure) ? ` · ${structures.find((s) => s.id === effStructure)?.name}` : ""}</div>
-          <div role="group" aria-label={t("Periodo")} className="inline-flex rounded-lg border border-line bg-surface p-0.5 text-xs font-semibold">
-            {(Object.keys(PERIOD_LABEL) as StatsPeriod[]).map((p) => (
-              <button key={p} onClick={() => setPeriod(p)} aria-pressed={period === p} className={`rounded-md px-3 py-1.5 transition ${period === p ? "bg-focus text-white" : "text-dim hover:bg-wash"}`}>{t(PERIOD_LABEL[p])}</button>
-            ))}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label={t("Prenotazioni")} value={scope.totals.bookings} hint={`${scope.totals.nights} ${t("notti")}${scope.totals.cancelled ? ` · ${scope.totals.cancelled} ${t("annullate")}` : ""}`} />
-          <StatCard label={t("Ricavo lordo")} value={eur(scope.totals.gross)} hint={scope.totals.avgNight ? `${eur(scope.totals.avgNight)} ${t("a notte")}` : undefined} />
-          <StatCard label={t("Commissioni")} value={eur(scope.totals.commission)} color={scope.totals.commission > 0 ? "var(--err)" : undefined} hint={scope.totals.commissionPct != null ? `${scope.totals.commissionPct}% ${t("del lordo")}` : undefined} />
-          <StatCard label={t("Netto")} value={eur(scope.totals.net)} color={scope.totals.net > 0 ? "var(--ok)" : undefined} hint={scope.totals.gross > 0 ? `${Math.round((scope.totals.net / scope.totals.gross) * 100)}% ${t("del lordo")}` : undefined} />
-        </div>
-        <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <Card className="flex h-full flex-col">
-            <SectionTitle>{t("Prenotazioni e ricavi per canale")}</SectionTitle>
-            <div className="flex flex-1 flex-col">
-              <ChannelBars rows={scope.rows.map((r) => ({ label: CHANNELS[r.channel]?.label ?? r.channel, color: chColor(r.channel), count: r.bookings, revenue: r.gross, channel: r.channel }))} fmtEur={eur} />
-              {scope.rows.length > 0 && <div className="mt-auto pt-2 text-[10px] text-faint">{t("Vendite tramite OTA")}: <b className="text-dim">{otaShare}%</b> · {t("dirette")}: <b className="text-dim">{100 - otaShare}%</b></div>}
-            </div>
-          </Card>
-          <Card className="flex h-full flex-col">
-            <SectionTitle>{t("Ricavi lordi per mese")}</SectionTitle>
-            <div className="flex flex-1 flex-col">
-              <LineChart points={monthly.map(({ m, res }) => ({ label: m.label.charAt(0).toUpperCase() + m.label.slice(1), value: Math.round(res.totals.gross) }))} format={(n) => eur(n)} color="var(--ok)" everyLabel={1} />
-              <div className="mt-auto pt-1 text-[10px] text-faint">{t("per mese di arrivo · i mesi futuri mostrano il già prenotato")}</div>
-            </div>
-          </Card>
-        </div>
-      </section>
 
       {/* Risponde direttamente a "da dove vedo che sono collegato con Booking.com?": stato REALE
          da Channex per canale, non il vecchio flag locale mai aggiornato. Nascosta se Channex non
