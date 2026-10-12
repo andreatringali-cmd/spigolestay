@@ -247,7 +247,8 @@ export default function CanaliPage() {
     { key: "airbnb", name: "Airbnb", channel: "airbnb" as Channel, why: airbnbShare > 0 ? `Oggi vale il ${airbnbShare}% dei tuoi ricavi.` : "Porta ospiti che cercano appartamenti e camere in stile locale, un pubblico diverso da quello di Booking.com." },
     { key: "agoda", name: "Agoda", why: "Forte sul pubblico asiatico: utile se vuoi più ospiti da fuori Europa." },
     { key: "trip", name: "Trip.com", why: "Porta ospiti dalla Cina e dall'Asia, che prenotano in anticipo." },
-  ].filter((s) => !connectedText.includes(s.key));
+    { key: "despegar", name: "Despegar", why: "Il portale più usato in America Latina: utile per ospiti sudamericani." },
+  ].filter((s) => !connectedText.includes(s.key)).slice(0, 3); // se ne collega uno, al suo posto compare il successivo dell'elenco
 
   return (
     <div>
@@ -457,7 +458,7 @@ export default function CanaliPage() {
                                 <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
                               </td>
                               <td className="px-3 py-3 text-right">
-                                {st ? (<><div className="font-mono font-semibold tabular-nums text-txt">{st.bookings}</div><div className="text-[11px] text-faint">{st.nights} {t("notti")}{st.cancelled ? ` · ${st.cancelled} ${t("annullate")}` : ""}</div></>) : dash}
+                                {st ? (<div className="whitespace-nowrap"><span className="font-mono font-semibold tabular-nums text-txt">{st.bookings}</span><span className="ml-1.5 text-[11px] text-faint">· {st.nights} {t("notti")}{st.cancelled ? ` · ${st.cancelled} ${t("annullate")}` : ""}</span></div>) : dash}
                               </td>
                               <td className="px-3 py-3">
                                 {st ? (
