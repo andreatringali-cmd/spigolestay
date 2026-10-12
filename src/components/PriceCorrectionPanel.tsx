@@ -480,7 +480,7 @@ export function BulkCorrection({ sid, channels, api, rows, onLogged }: {
 const THRESH_KEY = "spigolestay:canali:corrthreshold";
 
 export function ParityPanel({ sid, channels, api, rows, onSuggest }: {
-  sid: string; channels: ChannelRef[]; api: PriceCorrectionsApi; rows: PriceRowIn[]; onSuggest: (c: ChannelRef, corr: Correction) => void;
+  sid: string; channels: ChannelRef[]; api: PriceCorrectionsApi; rows: PriceRowIn[]; onSuggest?: (c: ChannelRef, corr: Correction) => void;
 }) {
   const [threshold, setThreshold] = useState(5);
   useEffect(() => { try { const v = Number(localStorage.getItem(THRESH_KEY)); if (Number.isFinite(v) && v > 0) setThreshold(v); } catch { /* ignora */ } }, []);
@@ -534,7 +534,7 @@ export function ParityPanel({ sid, channels, api, rows, onSuggest }: {
                   <td className="px-2 py-1.5 text-right text-dim" title={commissionIsEstimate(c.channel, sid) ? "Stima dalle commissioni reali dell'ultimo anno" : undefined}>{commissionIsEstimate(c.channel, sid) ? "~" : ""}{comm}%</td>
                   <td className="px-2 py-1.5 text-right font-mono text-dim">{rows.length && readable ? eur(s.avgNetOta) : "—"}</td>
                   <td className="px-2 py-1.5 text-right font-mono" style={{ color: s.avgNetVsXenora < 0 ? "var(--err)" : "var(--ok)" }}>{rows.length && readable ? eurSigned(s.avgNetVsXenora) : "—"}</td>
-                  <td className="px-2 py-1.5 text-right">{be && readable && comm > 0 && !sameCorrection(corr, be) && <button onClick={() => onSuggest(c, be)} className="text-[11px] text-dim hover:text-focus" title="Imposta la correzione che pareggia il netto della vendita diretta">pareggio {correctionLabel(be)}</button>}</td>
+                  <td className="px-2 py-1.5 text-right">{onSuggest && be && readable && comm > 0 && !sameCorrection(corr, be) && <button onClick={() => onSuggest(c, be)} className="text-[11px] text-dim hover:text-focus" title="Imposta la correzione che pareggia il netto della vendita diretta">pareggio {correctionLabel(be)}</button>}</td>
                 </tr>
               );
             })}

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
-import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import Icon from "@/components/Icon";
 import IcalSyncPanel from "@/components/IcalSyncPanel";
@@ -13,12 +12,10 @@ import type { MappedExtraPlan } from "@/lib/rate-model";
 import { CHANNELS, type Channel } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
 import { usePriceCorrections } from "@/lib/usePriceCorrections";
-import { CorrectionEditor, CorrectionHistory, BulkCorrection, ParityPanel, buildPriceRows } from "@/components/PriceCorrectionPanel";
-import { correctionLabel, logForStructure, type Correction } from "@/lib/priceCorrection";
-import { loadChannelColor, saveChannelColor, loadChannelCommissionPct, saveChannelCommissionPct } from "@/lib/channelOverrides";
+import { ParityPanel, buildPriceRows } from "@/components/PriceCorrectionPanel";
+import { correctionLabel } from "@/lib/priceCorrection";
+import { loadChannelColor, saveChannelColor } from "@/lib/channelOverrides";
 import { defaultCommissionInfo } from "@/lib/booking";
-
-interface LogEntry { id: string; ts: number; text: string; color: string; structureId?: string }
 
 // Tavolozza di colori predefiniti per canale (dieci toni distinti, pensati per restare
 // leggibili sia su barre calendario chiare che scure). Il picker nativo resta disponibile
@@ -27,36 +24,13 @@ interface LogEntry { id: string; ts: number; text: string; color: string; struct
 const CHANNEL_BRAND_COLORS: Partial<Record<Channel, string>> = { booking: "#003B95" };
 const CHANNEL_PRESET_COLORS = ["#2563EB", "#7C3AED", "#DB2777", "#E11D48", "#EA580C", "#D97706", "#65A30D", "#0D9488", "#0891B2", "#475569"];
 
-const LOG_KEY = "spigolestay:canali:log";
-const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `x-${Math.floor(performance.now() * 1000)}`);
 
 export default function CanaliPage() {
-  const { structures, roomTypes, units, bookings, activeStructureId, rateOverrides } = useData();
-  const ask = useConfirm();
+  const { structures, roomTypes, units, activeStructureId, rateOverrides } = useData();
   const { t } = useLang();
-  const relTime = (ts: number) => {
-    const d = Math.floor((Date.now() - ts) / 1000);
-    if (d < 60) return t("adesso");
-    if (d < 3600) return `${Math.floor(d / 60)} ${t("min fa")}`;
-    if (d < 86400) return `${Math.floor(d / 3600)} ${t("h fa")}`;
-    return `${Math.floor(d / 86400)} ${t("g fa")}`;
-  };
   const [localStructure, setLocalStructure] = useState("all");
   const effStructure = activeStructureId !== "all" ? activeStructureId : localStructure;
 
-  // `allLog` = registro completo salvato (tutte le strutture); `log` = vista filtrata sulla struttura in vista.
-  const [allLog, setLog] = useState<LogEntry[]>([]);
-  const log = allLog.filter((l) => effStructure === "all" || !l.structureId || l.structureId === effStructure);
-  useEffect(() => {
-    try {
-      const l = localStorage.getItem(LOG_KEY); if (l) setLog(JSON.parse(l));
-    } catch {}
-  }, []);
-  const saveLog = (next: LogEntry[]) => { setLog(next); try { localStorage.setItem(LOG_KEY, JSON.stringify(next.slice(0, 40))); } catch {} };
-  // Aggiunge una voce in testa al registro COMPLETO, etichettata con la struttura a cui si riferisce.
-  const pushLog = (text: string, color: string, structureId?: string) => saveLog([{ id: uid(), ts: Date.now(), text, color, ...(structureId ? { structureId } : {}) }, ...allLog]);
-  // Svuota solo le voci della struttura in vista (con "Tutte" svuota tutto).
-  const clearLog = () => saveLog(effStructure === "all" ? [] : allLog.filter((l) => l.structureId && l.structureId !== effStructure));
 
   // Sincronizzazione reale verso Channex (staging): crea property + camere + tariffe da Xenora.
   const [chxMap, setChxMap] = useState<Record<string, { propertyId: string; rooms?: Record<string, { roomTypeId: string; ratePlanId?: string; ratePlans?: MappedExtraPlan[] }>; at: string }>>({});
@@ -89,7 +63,6 @@ export default function CanaliPage() {
       else if ((j.feed ?? 0) === 0) msg = "Nessuna prenotazione nel feed Channex (nessuna in attesa di conferma).";
       else msg = `${j.feed} nel feed ma 0 importate · ${j.skipped ?? 0} saltate${j.errors?.length ? ` · ${j.errors[0]}` : " (probabile tipologia non mappata o soggiorno già concluso)"}`;
       setImpSync({ running: false, ok: n > 0, msg });
-      if (n > 0) pushLog(`${t("Prenotazioni OTA importate da Channex")} — ${j.imported ?? 0}`, "var(--ok)", effStructure !== "all" ? effStructure : undefined);
     } catch (e) { setImpSync({ running: false, ok: false, msg: e instanceof Error ? e.message : "errore di rete" }); }
   };
   useEffect(() => { try { const m = localStorage.getItem("spigolestay:channexmap"); if (m) setChxMap(JSON.parse(m)); } catch {} }, []);
@@ -159,37 +132,11 @@ export default function CanaliPage() {
     effStructure === "all"
       ? structures.filter((s) => (otaByStructure?.[s.id]?.length ?? 0) > 0).map((s) => ({ sid: s.id, label: s.name, list: otaByStructure![s.id] }))
       : [{ sid: effStructure, list: otaByStructure?.[effStructure] ?? [] }];
-  // Attiva/disattiva un canale OTA già collegato, senza lasciare Xenora. Aggiornamento ottimistico
-  // della lista, ripristinato se la chiamata a Channex fallisce.
-  const [togglingChannel, setTogglingChannel] = useState<string | null>(null);
-  const toggleChannel = async (sid: string, c: { id: string; channel: string; title: string; active: boolean }) => {
-    if (c.active) {
-      const label = CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title;
-      const ok = await ask({ message: `${t("Disattivare")} ${label}? ${t("La struttura non riceverà più prenotazioni da questo canale finché non lo riattivi.")}`, danger: true, confirmLabel: t("Disattiva") });
-      if (!ok) return;
-    }
-    setTogglingChannel(c.id);
-    const prev = otaByStructure;
-    setOtaByStructure((cur) => {
-      const next = { ...(cur ?? {}) };
-      next[sid] = (next[sid] ?? []).map((x) => (x.id === c.id ? { ...x, active: !c.active } : x));
-      return next;
-    });
-    try {
-      const j = await apiPost<{ ok: boolean; error?: string }>("channex/channel", { channelId: c.id, active: !c.active });
-      if (!j.ok) setOtaByStructure(prev);
-    } catch { setOtaByStructure(prev); }
-    setTogglingChannel(null);
-  };
   // Correzione di prezzo (derived_option) a livello di connessione canale: valore REALE letto/scritto su
   // Channex (hook usePriceCorrections), con anteprima, verifica per rilettura e storico. Vedi
   // components/PriceCorrectionPanel.tsx. Il valore letto precompila il modulo e, se la lettura
   // fallisce, il salvataggio resta bloccato (niente sovrascritture alla cieca).
   const corrApi = usePriceCorrections();
-  // Bozza commissione predefinita per canale (colore invece si applica subito, senza bozza).
-  const [commDraft, setCommDraft] = useState<Record<string, string>>({});
-  const [commSaved, setCommSaved] = useState<string | null>(null);
-  const [suggest, setSuggest] = useState<Correction | null>(null);
   useEffect(() => {
     if (!otaByStructure) return;
     for (const [sid, list] of Object.entries(otaByStructure)) for (const ch of list) if (ch.id && !corrApi.current[ch.id]) corrApi.load(ch.id, sid);
@@ -242,7 +189,6 @@ export default function CanaliPage() {
       // Struttura appena creata su Channex → invia subito la finestra ARI iniziale (500 giorni).
       try { window.dispatchEvent(new Event("spigolestay:channex-dirty")); } catch {}
       setChxSync({ running: false, ok: true, msg: `Struttura creata su Channex ✓ · ${okRooms}/${rooms.length} camere` });
-      pushLog(`${t("Struttura sincronizzata su Channex")} — ${st.name}`, "var(--ok)", sid);
     } catch (e) {
       setChxSync({ running: false, ok: false, msg: e instanceof Error ? e.message : "errore di rete" });
     }
@@ -265,7 +211,6 @@ export default function CanaliPage() {
   // NB: non conosciamo ancora il percorso reale della pagina di mappatura di UN canale
   // nell'app Channex (il tentativo /channels/{id} non ci è arrivato) — finché non lo
   // confermiamo, meglio l'elenco canali generico (che funziona) che un link rotto.
-  const openChannelMapping = () => openChannelManager("/channels");
 
   // NB: l'invio di disponibilità e prezzi a Channex è ora AUTOMATICO (vedi ChannexAutoSync,
   // montato nell'AppShell): parte da solo a ogni modifica di prenotazioni, camere (anche fuori
@@ -371,7 +316,7 @@ export default function CanaliPage() {
                           const commPct = commInfo.pct;
                           const color = loadChannelColor(chKey) || `var(${CHANNELS[chKey]?.cssVar ?? ""})`;
                           return (
-                            <tr key={c.id || c.channel + i} onClick={() => setChannelDetail({ sid: g.sid, c })} onKeyDown={(e) => { if (e.key === "Enter") setChannelDetail({ sid: g.sid, c }); }} tabIndex={0} title={t("Clicca per modificare il canale")} className="cursor-pointer border-b border-line last:border-0 hover:bg-wash focus:outline-none focus-visible:bg-wash">
+                            <tr key={c.id || c.channel + i} className="border-b border-line last:border-0 hover:bg-wash">
                               <td className="px-3 py-2.5">
                                 <span className="flex items-center gap-2">
                                   <ChannelLogo channel={chKey} size={22} title={label} />
@@ -401,7 +346,7 @@ export default function CanaliPage() {
       )}
 
       {/* Correzione prezzo OTA: stato chiaro quando il collegamento non c'è, confronto Xenora ↔ canali,
-         correzione in blocco e storico. La correzione è REALE (Channex); i prezzi OTA mostrati sono STIME. */}
+         La correzione si imposta su Channex e qui si legge; i prezzi OTA mostrati sono STIME. */}
       {otaOff ? (
         <Card className="mb-5">
           <SectionTitle>{t("Correzione prezzo OTA")}</SectionTitle>
@@ -411,68 +356,42 @@ export default function CanaliPage() {
         <div className="mb-5 flex flex-col gap-4">
           <div>
             <SectionTitle>{t("Correzione prezzo OTA")}</SectionTitle>
-            <p className="-mt-2 text-xs text-dim">{t("La correzione di ogni canale è reale: viene letta da Channex e le modifiche vengono inviate e riverificate. I prezzi OTA mostrati nei confronti sono invece stime (prezzo Xenora × correzione).")}</p>
+            <p className="-mt-2 text-xs text-dim">{t("La correzione di ogni canale si imposta su Channex e qui viene letta. I prezzi OTA mostrati nei confronti sono stime (prezzo Xenora × correzione).")}</p>
           </div>
           {effStructure === "all" ? (
-            <Card><p className="text-sm text-dim">{t("Seleziona una struttura in alto per vedere il confronto prezzi, applicare una correzione in blocco e consultare lo storico: ogni correzione riguarda solo la struttura scelta.")}</p></Card>
+            <Card><p className="text-sm text-dim">{t("Seleziona una struttura in alto per vedere il confronto prezzi.")}</p></Card>
           ) : otaLoading && !otaByStructure ? (
             <Card><p className="text-sm text-faint">{t("Verifico…")}</p></Card>
           ) : structureChannels.length === 0 ? (
-            <Card><p className="text-sm text-dim">{t("Questa struttura non ha ancora canali OTA collegati: la correzione prezzo si imposta per ogni canale, appena collegato.")}</p></Card>
+            <Card><p className="text-sm text-dim">{t("Questa struttura non ha ancora canali OTA collegati.")}</p></Card>
           ) : (
             <>
-              <ParityPanel sid={effStructure} channels={structureChannels} api={corrApi} rows={priceRows} onSuggest={(c, corr) => { setSuggest(corr); setChannelDetail({ sid: effStructure, c }); }} />
-              <BulkCorrection sid={effStructure} channels={structureChannels} api={corrApi} rows={priceRows} onLogged={(text, ok) => pushLog(text, ok ? "var(--ok)" : "var(--err)", effStructure)} />
+              <ParityPanel sid={effStructure} channels={structureChannels} api={corrApi} rows={priceRows} />
             </>
           )}
-          <Card>
-            <div className="mb-3 flex items-center justify-between">
-              <SectionTitle>{t("Storico correzioni")}</SectionTitle>
-              {logForStructure(corrApi.log, effStructure).length > 0 && <button onClick={async () => { if (await ask({ message: t("Svuotare lo storico delle correzioni?"), danger: true, confirmLabel: t("Svuota") })) corrApi.clearLog(effStructure); }} className="text-xs font-medium text-dim hover:text-txt">{t("Pulisci")}</button>}
-            </div>
-            <CorrectionHistory entries={logForStructure(corrApi.log, effStructure)} allEntries={corrApi.log} api={corrApi} onLogged={(text, ok) => pushLog(text, ok ? "var(--ok)" : "var(--err)", effStructure !== "all" ? effStructure : undefined)} />
-          </Card>
         </div>
       )}
 
-      {/* Dettaglio canale: attiva/disattiva + correzione prezzo — Xenora scrive direttamente su
-         Channex (nessun passaggio manuale sul pannello Channex). */}
+      {/* Colore del canale (sul Calendario): si cambia cliccando il pallino nella tabella. Il resto si gestisce su Channex. */}
       {channelDetail && (() => {
-        const { sid, c } = channelDetail;
-        const label = CHANNELS[c.channel as keyof typeof CHANNELS]?.label ?? c.title;
+        const { c } = channelDetail;
+        const chKey = c.channel as Channel;
+        const label = CHANNELS[chKey]?.label ?? c.title;
+        const savedColor = loadChannelColor(chKey);
+        const computedColor = typeof window !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue(CHANNELS[chKey]?.cssVar ?? "").trim() : "";
+        const pickerColor = savedColor || (/^#/.test(computedColor) ? computedColor : "#888888");
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) { setChannelDetail(null); setSuggest(null); } }}>
-            <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-xl">
-              <div className="mb-4 flex items-center gap-3">
-                <ChannelLogo channel={c.channel as keyof typeof CHANNELS} size={32} title={label} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setChannelDetail(null); }}>
+            <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-xl">
+              <div className="mb-3 flex items-center gap-3">
+                <ChannelLogo channel={chKey} size={28} title={label} />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-bold text-txt">{label}</div>
-                  <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide" style={{ backgroundColor: c.active ? "color-mix(in srgb, var(--ok) 16%, transparent)" : "color-mix(in srgb, var(--err) 12%, transparent)", color: c.active ? "var(--ok)" : "var(--err)" }}>{c.active ? t("Attivo") : t("Non attivo")}</span>
+                  <div className="text-[11px] text-dim">{t("Colore su calendario")}</div>
                 </div>
-                {c.id && <button onClick={() => toggleChannel(sid, c)} disabled={togglingChannel === c.id} className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-txt hover:bg-wash disabled:opacity-40">{togglingChannel === c.id ? "…" : c.active ? t("Disattiva") : t("Attiva")}</button>}
-                <button onClick={() => { setChannelDetail(null); setSuggest(null); }} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt">✕</button>
+                <button onClick={() => setChannelDetail(null)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-lg text-dim hover:bg-wash hover:text-txt" aria-label={t("Chiudi")}>✕</button>
               </div>
-
-              {c.id && (
-                <CorrectionEditor sid={sid} c={c} api={corrApi} rows={buildPriceRows(sid, roomTypes, rateOverrides, 14)} initialDraft={suggest} onLogged={(text, ok) => pushLog(text, ok ? "var(--ok)" : "var(--err)", sid)} />
-              )}
-
-              {(() => {
-                const chKey = c.channel as Channel;
-                const savedColor = loadChannelColor(chKey);
-                const computedColor = typeof window !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue(CHANNELS[chKey]?.cssVar ?? "").trim() : "";
-                const pickerColor = savedColor || (/^#/.test(computedColor) ? computedColor : "#888888");
-                const commVal = commDraft[c.id] ?? String(defaultCommissionInfo(chKey, sid).pct);
-                // Suggerimento basato sui dati reali: media della commissione ESATTA (non stimata)
-                // comunicata dal canale sulle ultime prenotazioni — così la predefinita si imposta
-                // su un numero osservato, non a intuito.
-                const realComm = bookings.filter((b) => b.structureId === sid && b.channel === chKey && b.status !== "cancelled" && b.commissionAmount != null && b.total).slice(-10);
-                const realAvgPct = realComm.length ? Math.round((realComm.reduce((a, b) => a + (b.commissionAmount! / b.total!) * 100, 0) / realComm.length) * 10) / 10 : null;
-                return (
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    <div className="rounded-xl border border-line bg-paper p-3">
-                      <div className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-txt">{t("Colore")}<span title={t("Colora le prenotazioni di questo canale nel Calendario")} className="grid h-3.5 w-3.5 cursor-help place-items-center rounded-full bg-wash text-[9px] font-bold text-faint">?</span></div>
-                      <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                         {[...(CHANNEL_BRAND_COLORS[chKey] ? [CHANNEL_BRAND_COLORS[chKey] as string] : []), ...CHANNEL_PRESET_COLORS].map((hex) => (
                           <button key={hex} onClick={() => saveChannelColor(chKey, hex)} title={hex} className="h-5 w-5 shrink-0 rounded-full" style={{ backgroundColor: hex, boxShadow: pickerColor.toLowerCase() === hex.toLowerCase() ? "0 0 0 2px var(--surface), 0 0 0 3.5px var(--focus)" : "0 0 0 1px rgba(0,0,0,.12)" }} />
                         ))}
@@ -481,29 +400,6 @@ export default function CanaliPage() {
                           <input type="color" value={pickerColor} onChange={(e) => saveChannelColor(chKey, e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
                         </label>
                       </div>
-                    </div>
-                    <div className="rounded-xl border border-line bg-paper p-3">
-                      <div className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-txt">{t("Commissione")}<span title={t("Usata quando una prenotazione non ha una commissione esatta comunicata dal canale.")} className="grid h-3.5 w-3.5 cursor-help place-items-center rounded-full bg-wash text-[9px] font-bold text-faint">?</span></div>
-                      <div className="flex items-center gap-1.5">
-                        <input type="number" min={0} step="0.1" value={commVal} onChange={(e) => setCommDraft((cur) => ({ ...cur, [c.id]: e.target.value }))} className="w-14 min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />
-                        <span className="text-sm text-dim">%</span>
-                        <button onClick={() => { const v = Number(commVal.replace(",", ".")); if (Number.isFinite(v) && v >= 0) { saveChannelCommissionPct(chKey, v, sid); setCommSaved(c.id); window.setTimeout(() => setCommSaved(null), 1200); } }} className="shrink-0 rounded-lg border border-line px-2 py-1.5 text-xs font-semibold text-txt hover:bg-wash">{commSaved === c.id ? "✓" : t("Salva")}</button>
-                      </div>
-                      {realAvgPct != null && (
-                        <button onClick={() => setCommDraft((cur) => ({ ...cur, [c.id]: String(realAvgPct) }))} className="mt-1.5 text-left text-[11px] text-dim hover:text-focus">
-                          {t("Media reale")} <b className="text-txt">{realAvgPct}%</b> · {realComm.length} {t("prenotazioni")} — {t("usa")}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {c.id && (
-                <button onClick={() => openChannelMapping()} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">
-                  {t("Mappatura camere su Channex")} ↗
-                </button>
-              )}
             </div>
           </div>
         );
@@ -533,29 +429,11 @@ export default function CanaliPage() {
         </div>
       )}
 
-      {/* Sincronizzazione iCal reale (sola lettura) — prima del registro sincronizzazioni */}
+      {/* Sincronizzazione iCal reale (sola lettura) */}
       <div className="mt-6">
         <IcalSyncPanel />
       </div>
 
-      {/* Registro sincronizzazioni */}
-      <Card className="mt-5">
-        <div className="mb-3 flex items-center justify-between">
-          <SectionTitle>{t("Registro sincronizzazioni")}</SectionTitle>
-          {log.length > 0 && <button onClick={async () => { if (await ask({ message: t("Svuotare il registro sincronizzazioni?"), danger: true, confirmLabel: t("Svuota") })) clearLog(); }} className="text-xs font-medium text-dim hover:text-txt">{t("Pulisci")}</button>}
-        </div>
-        {log.length === 0 ? <p className="text-sm text-faint">{t("Nessuna sincronizzazione ancora.")}</p> : (
-          <div className="flex flex-col divide-y divide-[color:var(--line)]">
-            {log.slice(0, 15).map((l) => (
-              <div key={l.id} className="flex items-center gap-2.5 py-2 text-sm">
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: l.color }} />
-                <span className="flex-1 text-txt">{l.text}</span>
-                <span className="text-[11px] text-faint">{relTime(l.ts)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
     </div>
   );
 }
