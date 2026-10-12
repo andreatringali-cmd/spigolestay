@@ -238,8 +238,8 @@ export default function RecensioniPage() {
   const chxRowsSel: ChxReviewRow[] = chx.byStructure[selStructureId]?.reviews ?? [];
   // Booking spesso non dà il nome di chi recensisce ("Ospite"): se la recensione porta il codice della prenotazione, il nome si ricava dalla prenotazione in Xenora.
   const guestOfReview = (r: ChxReviewRow): string => {
-    const generic = !r.guest || /^(ospite|guest|anonym\w*|anonim\w*)$/i.test(r.guest.trim());
-    if (!generic || !r.reservationId) return r.guest || "Ospite";
+    const generic = typeof r.guest !== "string" || !r.guest || /^(ospite|guest|anonym\w*|anonim\w*)$/i.test(r.guest.trim());
+    if (!generic || !r.reservationId) return typeof r.guest === "string" && r.guest ? r.guest : "Ospite";
     const b = bookings.find((x) => String(x.code ?? "").trim() === r.reservationId);
     const g = b ? guests.find((x) => x.id === b.guestId)?.fullName : undefined;
     return g ? g : `Ospite · pren. ${r.reservationId}`;
@@ -317,7 +317,7 @@ export default function RecensioniPage() {
   // Precarica nel pannello risposte le risposte GIÀ pubblicate su Channex (Booking/Airbnb/Expedia),
   // così compaiono come "La tua risposta" invece di un form vuoto.
   useEffect(() => {
-    const withReply = chxRowsSel.filter((r) => r.reply && r.reply.trim());
+    const withReply = chxRowsSel.filter((r) => typeof r.reply === "string" && r.reply.trim());
     if (!withReply.length) return;
     setReplies((prev) => {
       let changed = false; const n = { ...prev };

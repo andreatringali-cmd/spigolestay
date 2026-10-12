@@ -39,6 +39,14 @@ export interface StructureScores { property: ScoreSummary | null; byChannel: Par
 
 function bucketOf(r10: number): "pos" | "neu" | "neg" { return r10 >= 8 ? "pos" : r10 >= 6 ? "neu" : "neg"; }
 
+// Channex a volte manda come testo un campo che altrove è un oggetto (per esempio la risposta): si riporta sempre a stringa, così la pagina non va in errore.
+const asText = (v: unknown): string => {
+  if (typeof v === "string") return v;
+  if (v == null) return "";
+  if (typeof v === "object") { const o = v as Record<string, unknown>; return asText(o.text ?? o.reply ?? o.content ?? o.message ?? ""); }
+  return String(v);
+};
+
 function normalize(r: ChxReview): ReviewRow {
   const rating = Math.max(0, Math.min(10, Math.round(Number(r.overall_score) || 0)));
   const dateRaw = r.received_at || r.inserted_at || "";
@@ -47,15 +55,15 @@ function normalize(r: ChxReview): ReviewRow {
   return {
     id: `chx-${r.id}`,
     reviewId: r.id,
-    guest: (r.guest_name || "Ospite").trim(),
-    ...(r.ota_reservation_id ? { reservationId: String(r.ota_reservation_id).trim() } : {}),
+    guest: asText(r.guest_name).trim() || "Ospite",
+    ...(r.ota_reservation_id ? { reservationId: asText(r.ota_reservation_id).trim() } : {}),
     date,
     rating,
-    text: (r.content || "").trim(),
+    text: asText(r.content).trim(),
     source: src === "booking" || src === "airbnb" || src === "expedia" ? src : "other",
     bucket: bucketOf(rating),
     isReplied: !!r.is_replied,
-    reply: r.reply || null,
+    reply: asText(r.reply).trim() || null,
     scores: normalizeReviewScores(r.scores),
   };
 }
