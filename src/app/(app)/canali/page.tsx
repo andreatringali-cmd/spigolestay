@@ -1,18 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import Icon from "@/components/Icon";
-import IcalSyncPanel from "@/components/IcalSyncPanel";
 import { apiPost } from "@/lib/invoicing/client";
 import { forceFullSync } from "@/components/ChannexAutoSync";
 import type { MappedExtraPlan } from "@/lib/rate-model";
 import { CHANNELS, type Channel } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
 import { usePriceCorrections } from "@/lib/usePriceCorrections";
-import { ParityPanel, buildPriceRows } from "@/components/PriceCorrectionPanel";
 import { correctionLabel } from "@/lib/priceCorrection";
 import { loadChannelColor, saveChannelColor } from "@/lib/channelOverrides";
 import { defaultCommissionInfo } from "@/lib/booking";
@@ -26,7 +24,7 @@ const CHANNEL_PRESET_COLORS = ["#2563EB", "#7C3AED", "#DB2777", "#E11D48", "#EA5
 
 
 export default function CanaliPage() {
-  const { structures, roomTypes, units, activeStructureId, rateOverrides } = useData();
+  const { structures, roomTypes, units, activeStructureId } = useData();
   const { t } = useLang();
   const [localStructure, setLocalStructure] = useState("all");
   const effStructure = activeStructureId !== "all" ? activeStructureId : localStructure;
@@ -143,9 +141,6 @@ export default function CanaliPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otaByStructure]);
   const corrText = (id: string) => { const cs = corrApi.current[id]; return !cs ? "…" : cs.loaded ? correctionLabel(cs.correction) : cs.loading ? "…" : "?"; };
-  // Prezzi Xenora dei prossimi 14 giorni della struttura in vista (base del confronto e delle anteprime).
-  const priceRows = useMemo(() => buildPriceRows(effStructure, roomTypes, rateOverrides, 14), [effStructure, roomTypes, rateOverrides]);
-  const structureChannels = effStructure !== "all" ? (otaByStructure?.[effStructure] ?? []).filter((c) => c.id) : [];
   // Card "essenziali" (logo + nome + stato) nella lista canali: il dettaglio (attiva/disattiva,
   // correzione prezzo) si apre al click, invece di stare tutto incollato nella card.
   const [, setColorTick] = useState(0); // il colore sta nel browser: dopo ogni scelta si ridisegna la pagina (evidenziazione e pallino in tabella)
@@ -346,31 +341,11 @@ export default function CanaliPage() {
         </>
       )}
 
-      {/* Correzione prezzo OTA: stato chiaro quando il collegamento non c'è, confronto Xenora ↔ canali,
-         La correzione si imposta su Channex e qui si legge; i prezzi OTA mostrati sono STIME. */}
-      {otaOff ? (
+      {/* Collegamento al Channel Manager non attivo su questo ambiente */}
+      {otaOff && (
         <Card className="mb-5">
-          <SectionTitle>{t("Correzione prezzo OTA")}</SectionTitle>
-          <p className="text-sm text-dim">{t("Il collegamento al Channel Manager non è attivo su questo ambiente: non posso leggere né modificare le correzioni di prezzo dei canali. Nessun dato viene inviato e nessun prezzo mostrato qui è reale.")}</p>
+          <p className="text-sm text-dim">{t("Il collegamento al Channel Manager non è attivo su questo ambiente: non posso leggere i canali collegati.")}</p>
         </Card>
-      ) : (
-        <div className="mb-5 flex flex-col gap-4">
-          <div>
-            <SectionTitle>{t("Correzione prezzo OTA")}</SectionTitle>
-            <p className="-mt-2 text-xs text-dim">{t("La correzione di ogni canale si imposta su Channex e qui viene letta. I prezzi OTA mostrati nei confronti sono stime (prezzo Xenora × correzione).")}</p>
-          </div>
-          {effStructure === "all" ? (
-            <Card><p className="text-sm text-dim">{t("Seleziona una struttura in alto per vedere il confronto prezzi.")}</p></Card>
-          ) : otaLoading && !otaByStructure ? (
-            <Card><p className="text-sm text-faint">{t("Verifico…")}</p></Card>
-          ) : structureChannels.length === 0 ? (
-            <Card><p className="text-sm text-dim">{t("Questa struttura non ha ancora canali OTA collegati.")}</p></Card>
-          ) : (
-            <>
-              <ParityPanel sid={effStructure} channels={structureChannels} api={corrApi} rows={priceRows} />
-            </>
-          )}
-        </div>
       )}
 
       {/* Colore del canale (sul Calendario): si cambia cliccando il pallino nella tabella. Il resto si gestisce su Channex. */}
@@ -430,10 +405,6 @@ export default function CanaliPage() {
         </div>
       )}
 
-      {/* Sincronizzazione iCal reale (sola lettura) */}
-      <div className="mt-6">
-        <IcalSyncPanel />
-      </div>
 
     </div>
   );
