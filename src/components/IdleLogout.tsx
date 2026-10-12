@@ -6,6 +6,10 @@ import { useEffect, useRef } from "react";
 import { useAuth } from "@/lib/authsync";
 
 const IDLE_MS = 15 * 60 * 1000; // 15 minuti
+// Finché una schermata di lavoro lunga è aperta (per esempio il pannello di collegamento dei canali, dove si lavora dentro una cornice che Xenora non vede)
+// imposta data-xn-keepalive=<ora> sull'elemento radice: il logout automatico viene rimandato, per al massimo 90 minuti.
+const KEEPALIVE_MAX_MS = 90 * 60 * 1000;
+const keepAliveActive = () => { try { const v = Number(document.documentElement.dataset.xnKeepalive); return Number.isFinite(v) && v > 0 && Date.now() - v < KEEPALIVE_MAX_MS; } catch { return false; } };
 
 export default function IdleLogout() {
   const { enabled, user, signOut } = useAuth();
@@ -18,8 +22,8 @@ export default function IdleLogout() {
   useEffect(() => {
     if (!enabled || !uid) return;
 
-    const logout = () => { void signOutRef.current(); };
-    const arm = () => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(logout, IDLE_MS); };
+    const logout = () => { if (keepAliveActive()) { arm(); return; } void signOutRef.current(); };
+    function arm() { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(logout, IDLE_MS); }
     const onActivity = () => {
       const now = Date.now();
       if (now - lastReset.current < 2000) return; // throttle: al massimo una volta ogni 2s

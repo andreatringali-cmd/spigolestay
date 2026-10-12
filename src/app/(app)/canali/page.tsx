@@ -128,6 +128,12 @@ export default function CanaliPage() {
   };
   useEffect(() => { loadOtaStatus(); }, []);
   // Chiudendo il pannello dei canali (dove si aggiungono/modificano) l'elenco si rilegge da solo.
+  // Mentre il pannello dei canali è aperto non si esce dall'account per inattività: ci si lavora dentro una cornice e magari si passa a un'altra finestra (per esempio per copiare un ID).
+  useEffect(() => {
+    if (!channelPanel.open) return;
+    document.documentElement.dataset.xnKeepalive = String(Date.now());
+    return () => { delete document.documentElement.dataset.xnKeepalive; };
+  }, [channelPanel.open]);
   const closeChannelPanel = () => { setChannelPanel({ open: false }); void loadOtaStatus(); };
   // "Tutte" raggruppa per struttura; una struttura specifica è un gruppo unico senza etichetta.
   const otaGroups: { sid: string; label?: string; list: { id: string; channel: string; title: string; active: boolean }[] }[] =
