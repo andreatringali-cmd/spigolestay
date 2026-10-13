@@ -480,10 +480,10 @@ export default function DocumentoPage() {
             <div className="flex justify-between"><span className="text-dim">IVA</span><span className="font-mono">{e2(totals.vat)}</span></div>
             {totals.out > 0 && <div className="flex justify-between"><span className="text-dim">Fuori campo IVA (art.15)</span><span className="font-mono">{e2(totals.out)}</span></div>}
             {!frozen && (
-              <div className="flex items-center justify-between"><span className="text-dim">Bollo virtuale {bolloEligible ? "(dovuto)" : ""}</span><label className="inline-flex cursor-pointer items-center gap-1"><input type="checkbox" checked={f.bollo} onChange={(e) => { bolloTouched.current = true; setF({ ...f, bollo: e.target.checked }); }} className="h-4 w-4 accent-[color:var(--focus)]" /><span className="font-mono">{e2(totals.bolloCents)}</span></label></div>
+              <div className="flex items-center"><span className="flex-1 text-dim">Bollo virtuale {bolloEligible ? "(dovuto)" : ""}</span><input type="checkbox" checked={f.bollo} onChange={(e) => { bolloTouched.current = true; setF({ ...f, bollo: e.target.checked }); }} className="h-4 w-4 cursor-pointer accent-[color:var(--focus)]" /><span className="w-24 text-right font-mono">{e2(totals.bolloCents)}</span></div>
             )}
             {frozen && totals.bolloCents > 0 && <div className="flex justify-between"><span className="text-dim">Bollo</span><span className="font-mono">{e2(totals.bolloCents)}</span></div>}
-            {!frozen && <label className="flex items-center justify-between"><span className="text-dim">Arrotonda all'euro</span><input type="checkbox" checked={f.rounding} onChange={(e) => setF({ ...f, rounding: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>}
+            {!frozen && <div className="flex items-center"><span className="flex-1 text-dim">Arrotonda all'euro</span><input type="checkbox" checked={f.rounding} onChange={(e) => setF({ ...f, rounding: e.target.checked })} className="h-4 w-4 cursor-pointer accent-[color:var(--focus)]" /><span className="w-24 text-right font-mono">{e2(totals.roundingCents)}</span></div>}
             <div className="flex justify-between border-t border-line pt-1 text-base font-bold"><span>Totale</span><span className="font-mono">{e2(totals.total)}</span></div>
           </div>
         </Card>
