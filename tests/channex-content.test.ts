@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildHotelPolicyBody, matchFacilities, buildPropertyUpdate, buildDescription, contentChecklist, countryCode } from "../src/lib/channex-content.ts";
+import { buildHotelPolicyBody, matchFacilities, buildPropertyUpdate, buildDescription, contentChecklist, countryCode, buildCancellationPolicyBody, completeCancellationBody, cancelParams } from "../src/lib/channex-content.ts";
 
 const base = { name: "Spigolehouse", city: "Siracusa", address: "Via Roma 1", phone: "+393293071740", lat: 37.0755, lng: 15.2866, services: ["Wi-Fi", "Aria condizionata", "Colazione", "Balcone"], checkInFrom: "15:00", checkOutBy: "10:30", cancelPolicy: "flessibile" as const, description: "B&B nel centro di Siracusa con camere luminose, bagno privato e colazione inclusa." };
 
@@ -59,4 +59,22 @@ test("elenco di controllo: segnala cosa manca", () => {
   const miss = contentChecklist({ name: "X" }).filter((c) => !c.ok).map((c) => c.key);
   assert.deepEqual(miss, ["description", "address", "location", "services", "times", "cancel"]);
   assert.equal(contentChecklist({ ...base, lat: 0, lng: 0 }).find((c) => c.key === "location")?.ok, false);
+});
+
+test("politica di cancellazione: parametri per livello e corpo della richiesta", () => {
+  assert.deepEqual(cancelParams("flessibile"), { deadlineHours: 24, penaltyNights: 1, nonRefundable: false });
+  assert.equal(cancelParams("moderata").deadlineHours, 120);
+  assert.equal(cancelParams("rigida").nonRefundable, true);
+  const b = buildCancellationPolicyBody("P1", "flessibile").cancellation_policy;
+  assert.equal(b.property_id, "P1"); assert.equal(b.title, "Flessibile"); assert.equal(b.cancellation_policy_deadline, 24); assert.equal(b.cancellation_policy_logic, "deadline");
+  assert.equal(buildCancellationPolicyBody("P1", "rigida").cancellation_policy.cancellation_policy_logic, "non_refundable");
+});
+
+test("politica di cancellazione: i campi che Channex dice mancanti si completano, quelli già presenti no, gli sconosciuti fermano il tentativo", () => {
+  const first = buildCancellationPolicyBody("P1", "moderata");
+  const c = completeCancellationBody(first, { guarantee_payment_policy: ["can't be blank"], non_show_policy: ["can't be blank"], title: ["x"] }, "moderata")!;
+  assert.equal(c.cancellation_policy.guarantee_payment_policy, "none"); assert.equal(c.cancellation_policy.non_show_policy, "none");
+  assert.equal(c.cancellation_policy.title, "Moderata", "già presente: non si tocca");
+  assert.equal(completeCancellationBody(first, { campo_sconosciuto: ["can't be blank"] }, "moderata"), null);
+  assert.equal(completeCancellationBody(first, undefined, "moderata"), null);
 });

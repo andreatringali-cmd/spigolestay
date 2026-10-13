@@ -535,3 +535,34 @@ export async function countPhotos(propertyId: string): Promise<{ ok: boolean; co
   const total = Number(res.data?.meta?.total);
   return { ok: true, count: Number.isFinite(total) ? total : (res.data?.data ?? []).length };
 }
+
+/** Foto di una struttura su Channex (id e indirizzo pubblico). */
+export async function listPhotos(propertyId: string): Promise<{ ok: boolean; photos: { id: string; url: string }[] }> {
+  const res = await channex<{ data?: Row[] }>(`/photos?filter[property_id]=${encodeURIComponent(propertyId)}&pagination[limit]=100`);
+  if (!res.ok) return { ok: false, photos: [] };
+  const photos = (res.data?.data ?? [])
+    .filter((r) => !r.attributes?.room_type_id)
+    .map((r) => ({ id: rowId(r), url: String(r.attributes?.url ?? "") }))
+    .filter((p) => p.id && /^https?:\/\//.test(p.url));
+  return { ok: true, photos };
+}
+export async function deletePhoto(photoId: string) {
+  return channex(`/photos/${encodeURIComponent(photoId)}`, { method: "DELETE" });
+}
+
+/** Crea la politica di cancellazione (API non documentata): prova il corpo costruito e, se la validazione elenca campi mancanti noti, li aggiunge e riprova (fino a 3 volte). */
+export async function createCancellationPolicy(body: { cancellation_policy: Record<string, unknown> }, complete: (b: { cancellation_policy: Record<string, unknown> }, details: unknown) => { cancellation_policy: Record<string, unknown> } | null): Promise<{ ok: boolean; id?: string; error?: string }> {
+  let cur = body;
+  let lastError = "";
+  for (let i = 0; i < 4; i++) {
+    const res = await channex<{ data?: Row }>("/cancellation_policies", { method: "POST", body: JSON.stringify(cur) });
+    if (res.ok) { const id = res.data?.data ? rowId(res.data.data) : ""; return id ? { ok: true, id } : { ok: false, error: "risposta senza id" }; }
+    lastError = `${res.status}: ${res.error ?? ""}`;
+    let details: unknown;
+    try { details = (JSON.parse(res.error ?? "{}") as { details?: unknown }).details; } catch { /* errore non JSON */ }
+    const next = res.status === 422 ? complete(cur, details) : null;
+    if (!next) break;
+    cur = next;
+  }
+  return { ok: false, error: lastError };
+}

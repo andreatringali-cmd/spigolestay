@@ -150,3 +150,50 @@ export function buildPropertyUpdate(c: StructureContent, x: { hotelPolicyId?: st
   p.content = { description: buildDescription(c) };
   return { property: p };
 }
+
+// ── Politica di cancellazione ──────────────────────────────────────────────────────────────────────────────────
+// Channex non documenta questa risorsa: i nomi dei campi derivano dall'oggetto che restituisce nelle API di lettura (cancellation_policy_*). Se la creazione viene rifiutata
+// con un errore di validazione che elenca campi mancanti, si completano con valori di ripiego e si riprova (vedi completeCancellationBody).
+export type CancelKind = "flessibile" | "moderata" | "rigida";
+export const CANCEL_TITLES: Record<CancelKind, string> = { flessibile: "Flessibile", moderata: "Moderata", rigida: "Rigida (non rimborsabile)" };
+
+/** Parametri della politica: ore di preavviso per la cancellazione gratuita e penale (in notti) dopo quel termine. Rigida = nessun rimborso: preavviso 0 e penale di tutto il soggiorno. */
+export function cancelParams(kind: CancelKind): { deadlineHours: number; penaltyNights: number; nonRefundable: boolean } {
+  if (kind === "moderata") return { deadlineHours: 120, penaltyNights: 1, nonRefundable: false };
+  if (kind === "rigida") return { deadlineHours: 0, penaltyNights: 1, nonRefundable: true };
+  return { deadlineHours: 24, penaltyNights: 1, nonRefundable: false };
+}
+
+/** Primo tentativo di corpo per la creazione (campi con e senza prefisso: Channex ignora quelli che non conosce). */
+export function buildCancellationPolicyBody(propertyId: string, kind: CancelKind, currency = "EUR"): { cancellation_policy: Record<string, unknown> } {
+  const p = cancelParams(kind);
+  return {
+    cancellation_policy: {
+      property_id: propertyId, title: CANCEL_TITLES[kind], currency: currency.toUpperCase().slice(0, 3),
+      cancellation_policy_logic: p.nonRefundable ? "non_refundable" : "deadline",
+      cancellation_policy_mode: "nights", cancellation_policy_penalty: String(p.penaltyNights),
+      cancellation_policy_deadline: p.deadlineHours, cancellation_policy_deadline_type: "hours",
+    },
+  };
+}
+
+// Valori di ripiego per i campi che Channex dovesse chiedere (nome → valore). Usati solo dopo un errore di validazione "can't be blank".
+const FALLBACKS: Record<string, (kind: CancelKind) => unknown> = {
+  title: (k) => CANCEL_TITLES[k], currency: () => "EUR",
+  logic: (k) => (cancelParams(k).nonRefundable ? "non_refundable" : "deadline"), mode: () => "nights", penalty: (k) => String(cancelParams(k).penaltyNights),
+  deadline: (k) => cancelParams(k).deadlineHours, deadline_type: () => "hours",
+  guarantee_payment_policy: () => "none", guarantee_payment_amount: () => "0.00", non_show_policy: () => "none",
+};
+/** Aggiunge al corpo i campi che l'errore di validazione dice mancanti. Ritorna null se non c'è nulla da aggiungere (inutile riprovare). */
+export function completeCancellationBody(body: { cancellation_policy: Record<string, unknown> }, details: unknown, kind: CancelKind): { cancellation_policy: Record<string, unknown> } | null {
+  if (!details || typeof details !== "object") return null;
+  const next = { ...body.cancellation_policy };
+  let added = false;
+  for (const key of Object.keys(details as Record<string, unknown>)) {
+    if (key in next) continue;
+    const bare = key.replace(/^cancellation_policy_/, "");
+    const f = FALLBACKS[key] ?? FALLBACKS[bare];
+    if (f) { next[key] = f(kind); added = true; }
+  }
+  return added ? { cancellation_policy: next } : null;
+}
