@@ -19,7 +19,10 @@ import { resolveFicSendConfig } from "./fic-oauth";
 import { buildAutofatturaXml, autofatturaFileName } from "./fatturapa";
 import { logBookingEvent } from "@/lib/booking-events";
 import { decryptCred, encryptCred } from "@/lib/crypto-creds";
-import { isTrialMessage, isTrialSend, unchangedStatusMessage } from "./sdi-status";
+import {
+  isTrialMessage, isTrialSend, unchangedStatusMessage, rejectionReason, shouldNotifyRejection, REJECTED_NOTIFIED_KIND,
+  selectDocsToPoll, emptyTally, tallyOutcome, SDI_POLL_MAX_AGE_DAYS, type PollCandidate, type PollTally,
+} from "./sdi-status";
 
 // Decifra i campi segreti della config provider (salvati come <campo>_enc) e li
 // espone col nome atteso dal provider (token, accessToken, clientSecret…).
@@ -413,6 +416,85 @@ export async function refreshDocumentStatus(admin: SupabaseClient, tenantId: str
   });
   await logBookingEvent(admin, tenantId, doc.booking_id, "documento", st.status === "scartata" ? "Documento SCARTATO dallo SdI" : "Documento consegnato (SdI)");
   return { stato: st.status, message: st.message, changed: true };
+}
+
+// --- Aggiornamento automatico degli esiti SdI (usato dal cron /api/cron/sdi-status) ---
+
+export type NotifyResult = "sent" | "no_recipient" | "failed";
+export interface RejectionNotice { documentId: string; numberLabel: string | null; issueDate: string | null; customer: string | null; reason: string }
+export interface TenantPollResult extends PollTally { selected: number; skippedTrial: number; skippedOld: number; skippedOverLimit: number; errorMessages: string[] }
+
+type EvRow = { kind: string; message?: string | null; meta?: Record<string, unknown> | null };
+
+// Invia (via `notify`) l'avviso di scarto di UN documento, una sola volta: se esiste già il marcatore "rejected_notified" non fa nulla.
+// Il marcatore si scrive se l'email è partita o se non c'è un destinatario; se l'invio fallisce (o è rallentato) non si scrive,
+// così il passaggio successivo (documenti scartati negli ultimi giorni) riprova.
+async function notifyRejectedOnce(admin: SupabaseClient, tenantId: string, documentId: string, notify: (n: RejectionNotice) => Promise<NotifyResult>): Promise<NotifyResult | "already"> {
+  const { data: evs } = await admin.from("document_events").select("kind, message, meta").eq("document_id", documentId).in("kind", ["rejected", REJECTED_NOTIFIED_KIND]).order("ts", { ascending: false });
+  const events = (evs ?? []) as EvRow[];
+  if (!shouldNotifyRejection(events)) return "already";
+  const { data: doc } = await admin.from("documents").select("number_label, issue_date, counterpart").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
+  const cp = ((doc?.counterpart ?? {}) as Record<string, string>);
+  const customer = [cp.name, cp.lastName].filter(Boolean).join(" ").trim() || null;
+  const res = await notify({ documentId, numberLabel: (doc?.number_label as string) ?? null, issueDate: (doc?.issue_date as string) ?? null, customer, reason: rejectionReason(events) });
+  if (res !== "failed") {
+    await admin.from("document_events").insert({ tenant_id: tenantId, document_id: documentId, kind: REJECTED_NOTIFIED_KIND, message: res === "sent" ? "Avviso di scarto inviato al titolare" : "Avviso di scarto non inviato: nessun indirizzo del titolare", meta: { notified: res === "sent", ...(res === "no_recipient" ? { reason: "no_recipient" } : {}) } });
+  }
+  return res;
+}
+
+/**
+ * Controlla gli esiti SdI dei documenti in attesa di UN tenant (Fatture in Cloud, solo lettura) e avvisa dei nuovi scarti.
+ * Salta i documenti in prova, quelli inviati da oltre 60 giorni e quelli senza riferimento "fic:"; massimo 50 per esecuzione.
+ * Un errore su un documento non ferma gli altri. `notify` è opzionale: senza, nessun avviso.
+ */
+export async function pollTenantSdiStatus(admin: SupabaseClient, tenantId: string, opts: { nowMs?: number; notify?: (n: RejectionNotice) => Promise<NotifyResult> } = {}): Promise<TenantPollResult> {
+  const nowMs = opts.nowMs ?? Date.now();
+  const res: TenantPollResult = { ...emptyTally(), selected: 0, skippedTrial: 0, skippedOld: 0, skippedOverLimit: 0, errorMessages: [] };
+  const cutoff = new Date(nowMs - SDI_POLL_MAX_AGE_DAYS * 86_400_000).toISOString();
+
+  const { data: rows, error } = await admin.from("documents").select("id, stato, provider, provider_ref, sent_at")
+    .eq("tenant_id", tenantId).eq("stato", "inviata_intermediario").eq("provider", "fattureincloud").like("provider_ref", "fic:%").gte("sent_at", cutoff)
+    .order("sent_at", { ascending: false }).limit(500);
+  if (error) { res.errors++; res.errorMessages.push(`documents: ${error.message}`); return res; }
+  const candidates = (rows ?? []) as PollCandidate[];
+
+  // Eventi "sent" dei candidati (per riconoscere i documenti creati in prova).
+  const eventsByDoc: Record<string, EvRow[]> = {};
+  if (candidates.length) {
+    const { data: evs } = await admin.from("document_events").select("document_id, kind, message, meta").in("document_id", candidates.map((c) => c.id)).eq("kind", "sent").order("ts", { ascending: false });
+    for (const e of (evs ?? []) as (EvRow & { document_id: string })[]) (eventsByDoc[e.document_id] ??= []).push(e);
+  }
+  const sel = selectDocsToPoll(candidates, eventsByDoc, nowMs);
+  res.selected = sel.selected.length; res.skippedTrial = sel.skippedTrial; res.skippedOld = sel.skippedOld; res.skippedOverLimit = sel.skippedOverLimit;
+
+  let tally: PollTally = emptyTally();
+  for (const c of sel.selected) {
+    try {
+      const out = await refreshDocumentStatus(admin, tenantId, c.id);
+      tally = tallyOutcome(tally, out);
+      if (out.changed && out.stato === "scartata" && opts.notify) {
+        const r = await notifyRejectedOnce(admin, tenantId, c.id, opts.notify);
+        if (r === "sent") tally.notified++;
+      }
+    } catch (e) {
+      tally = tallyOutcome(tally, null);
+      res.errorMessages.push(`${c.id}: ${e instanceof Error ? e.message : "errore"}`);
+    }
+  }
+
+  // Recupero: scarti degli ultimi giorni mai notificati (avviso fallito/rallentato, o esito letto a mano dal pulsante prima del cron).
+  if (opts.notify) {
+    try {
+      const since = new Date(nowMs - 7 * 86_400_000).toISOString();
+      const { data: rej } = await admin.from("documents").select("id").eq("tenant_id", tenantId).eq("stato", "scartata").eq("provider", "fattureincloud").gte("sent_at", since).limit(20);
+      for (const d of (rej ?? []) as { id: string }[]) {
+        try { if ((await notifyRejectedOnce(admin, tenantId, d.id, opts.notify)) === "sent") tally.notified++; }
+        catch (e) { res.errorMessages.push(`avviso ${d.id}: ${e instanceof Error ? e.message : "errore"}`); }
+      }
+    } catch (e) { res.errorMessages.push(`recupero scarti: ${e instanceof Error ? e.message : "errore"}`); }
+  }
+  return { ...res, ...tally };
 }
 
 // Recupera l'XML del documento dall'intermediario (per download).

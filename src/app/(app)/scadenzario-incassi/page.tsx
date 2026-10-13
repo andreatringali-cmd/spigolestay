@@ -14,7 +14,7 @@ import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 import { roundCents } from "@/lib/money";
-import { DOC_KIND_LABEL } from "@/lib/invoicing/client";
+import { DOC_KIND_LABEL, invPost } from "@/lib/invoicing/client";
 import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import { computeResidui, daysOverdue, todayLocalISO, agingBucket, AGING_LABEL, type AgingKey } from "@/lib/invoicing/receivables";
 import { reminderText, reminderSubject, waReminderLink, mailReminderLink, waDigits } from "@/lib/invoicing/reminders";
@@ -22,7 +22,7 @@ import { reminderText, reminderSubject, waReminderLink, mailReminderLink, waDigi
 interface Doc {
   id: string; number_label: string | null; issue_date: string | null; due_date: string | null; total_cents: number;
   counterpart: { name?: string; lastName?: string; email?: string | null } | null; booking_code: string | null; structure_id: string | null;
-  doc_kind: string; stato: string; related_document_id: string | null;
+  doc_kind: string; stato: string; related_document_id: string | null; provider_ref?: string | null;
 }
 interface Reminder { count: number; last: string }
 const cents = (c: number) => c / 100;
@@ -45,11 +45,12 @@ export default function ScadenzarioIncassiPage() {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
+  const [ficNote, setFicNote] = useState<{ ok: boolean; text: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!supabase) { setLoading(false); return; }
     const [d, p, ev] = await Promise.all([
-      supabase.from("documents").select("id, number_label, issue_date, due_date, total_cents, counterpart, booking_code, structure_id, doc_kind, stato, related_document_id").in("stato", ["emessa", "inviata_intermediario", "consegnata"]),
+      supabase.from("documents").select("id, number_label, issue_date, due_date, total_cents, counterpart, booking_code, structure_id, doc_kind, stato, related_document_id, provider_ref").in("stato", ["emessa", "inviata_intermediario", "consegnata"]),
       supabase.from("document_payments").select("document_id, amount_cents"),
       supabase.from("document_events").select("document_id, ts").eq("kind", "reminder"),
     ]);
@@ -120,6 +121,14 @@ export default function ScadenzarioIncassiPage() {
     // Fonte di verità incassi = prenotazione (come nella scheda documento).
     const b = r.booking_code ? bookings.find((x) => x.code === r.booking_code) : undefined;
     if (b) updateBooking(b.id, { paid: roundCents((b.paid ?? 0) + Math.round(r.residuo) / 100) });
+    // Segna il pagamento anche su Fatture in Cloud (in background: non blocca né fa fallire l'incasso).
+    if (r.provider_ref?.startsWith("fic:")) {
+      const lbl = r.number_label ?? "documento";
+      setFicNote(null);
+      invPost<{ ok?: boolean; skipped?: boolean; message?: string }>("fic/payments", { documentId: r.id, paid: true })
+        .then((x) => { if (x.skipped && x.ok) return; setFicNote({ ok: !!x.ok, text: x.ok ? `${lbl}: ${x.message ?? ""}` : `Incasso di ${lbl} registrato; su Fatture in Cloud non aggiornato: ${x.message ?? "motivo sconosciuto"}` }); })
+        .catch((e) => setFicNote({ ok: false, text: `Incasso di ${lbl} registrato; su Fatture in Cloud non aggiornato: ${e instanceof Error ? e.message : "errore"}` }));
+    }
     await load(); setBusy("");
   };
 
@@ -153,6 +162,7 @@ export default function ScadenzarioIncassiPage() {
           <span className="ml-auto text-xs text-dim">{rows.length} documenti · <b className="font-mono text-txt">{eur(cents(shownTot))}</b></span>
         </div>
         {err && <p className="mt-2 text-sm text-[color:var(--err)]">{err}</p>}
+        {ficNote && <p className="mt-2 text-[11px] font-medium" style={{ color: ficNote.ok ? "var(--ok)" : "var(--dim)" }}>{ficNote.text}</p>}
       </Card>
 
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">

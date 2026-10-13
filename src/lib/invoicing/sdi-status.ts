@@ -95,3 +95,96 @@ export function unchangedStatusMessage(trial: boolean, providerMessage: string):
   if (trial) return `${TRIAL_NOTE} Nessun esito da aggiornare: per l'invio reale disattiva la prova e invia da Fatture in Cloud.`;
   return `Ancora in attesa dell'esito dello SdI. ${providerMessage}`.trim();
 }
+
+// ───────────────────────── Aggiornamento automatico degli esiti (cron) ─────────────────────────
+
+/** Massimo di documenti controllati per tenant a ogni esecuzione del cron. */
+export const SDI_POLL_LIMIT = 50;
+/** Oltre questi giorni dall'invio un documento ancora "in attesa" non viene più interrogato. */
+export const SDI_POLL_MAX_AGE_DAYS = 60;
+
+export interface PollCandidate { id: string; stato: string; provider: string | null; provider_ref: string | null; sent_at: string | null }
+
+/** Il riferimento è di Fatture in Cloud ("fic:...")? */
+export function isFicRef(ref: string | null | undefined): boolean {
+  return typeof ref === "string" && ref.startsWith("fic:") && ref.length > 4;
+}
+
+export interface PollSelection { selected: PollCandidate[]; skippedTrial: number; skippedOld: number; skippedOther: number; skippedOverLimit: number }
+
+/**
+ * Quali documenti interrogare presso lo SdI (tramite il provider):
+ * - solo stato "inviata_intermediario", provider fattureincloud, provider_ref "fic:...";
+ * - NON quelli creati in prova (ultimo evento "sent" con dry_run o messaggio di prova);
+ * - solo inviati da meno di `maxAgeDays` giorni (data sent_at; se manca, il documento non è valutabile e si salta);
+ * - dal più recente al più vecchio (l'esito arriva di solito in pochi giorni: i documenti fermi da settimane non devono occupare il limite), al massimo `limit`.
+ * `eventsByDoc`: eventi di ogni documento ordinati dal più recente (come in isTrialSend).
+ */
+export function selectDocsToPoll(
+  candidates: PollCandidate[],
+  eventsByDoc: Record<string, EventLike[] | undefined>,
+  nowMs: number,
+  opts: { limit?: number; maxAgeDays?: number } = {},
+): PollSelection {
+  const limit = opts.limit ?? SDI_POLL_LIMIT;
+  const maxAgeMs = (opts.maxAgeDays ?? SDI_POLL_MAX_AGE_DAYS) * 86_400_000;
+  const out: PollSelection = { selected: [], skippedTrial: 0, skippedOld: 0, skippedOther: 0, skippedOverLimit: 0 };
+  const eligible: { c: PollCandidate; t: number }[] = [];
+  for (const c of candidates) {
+    if (c.stato !== "inviata_intermediario" || c.provider !== "fattureincloud" || !isFicRef(c.provider_ref)) { out.skippedOther++; continue; }
+    if (isTrialSend(eventsByDoc[c.id] ?? [])) { out.skippedTrial++; continue; }
+    const t = c.sent_at ? Date.parse(c.sent_at) : NaN;
+    if (!Number.isFinite(t)) { out.skippedOther++; continue; }
+    if (nowMs - t > maxAgeMs) { out.skippedOld++; continue; }
+    eligible.push({ c, t });
+  }
+  eligible.sort((a, b) => b.t - a.t);
+  out.selected = eligible.slice(0, limit).map((x) => x.c);
+  out.skippedOverLimit = Math.max(0, eligible.length - limit);
+  return out;
+}
+
+export interface PollTally { checked: number; changed: number; rejected: number; delivered: number; errors: number; notified: number }
+export const emptyTally = (): PollTally => ({ checked: 0, changed: 0, rejected: 0, delivered: 0, errors: 0, notified: 0 });
+
+/** Somma i conteggi di più tenant. */
+export function addTally(a: PollTally, b: PollTally): PollTally {
+  return { checked: a.checked + b.checked, changed: a.changed + b.changed, rejected: a.rejected + b.rejected, delivered: a.delivered + b.delivered, errors: a.errors + b.errors, notified: a.notified + b.notified };
+}
+
+/** Registra l'esito di UN documento controllato (outcome = null → errore). */
+export function tallyOutcome(t: PollTally, outcome: { stato: string; changed: boolean } | null): PollTally {
+  if (!outcome) return { ...t, checked: t.checked + 1, errors: t.errors + 1 };
+  return {
+    ...t,
+    checked: t.checked + 1,
+    changed: t.changed + (outcome.changed ? 1 : 0),
+    rejected: t.rejected + (outcome.changed && outcome.stato === "scartata" ? 1 : 0),
+    delivered: t.delivered + (outcome.changed && outcome.stato === "consegnata" ? 1 : 0),
+  };
+}
+
+/** Evento marcatore: l'avviso di scarto è già stato gestito per questo documento. */
+export const REJECTED_NOTIFIED_KIND = "rejected_notified";
+
+/** Va inviato l'avviso di scarto? Sì se il documento è scartato e non esiste già un marcatore "rejected_notified". */
+export function shouldNotifyRejection(events: EventLike[]): boolean {
+  return events.some((e) => e.kind === "rejected") && !events.some((e) => e.kind === REJECTED_NOTIFIED_KIND);
+}
+
+const itDate = (iso: string | null | undefined): string => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso ?? "");
+};
+
+/** Oggetto e testo (semplice, italiano) dell'email al titolare per una fattura scartata. */
+export function rejectionEmail(d: { numberLabel?: string | null; issueDate?: string | null; customer?: string | null; reason?: string | null }): { subject: string; text: string } {
+  const num = d.numberLabel?.trim() || "(senza numero)";
+  const date = d.issueDate ? ` del ${itDate(d.issueDate)}` : "";
+  const cust = d.customer?.trim() ? ` a ${d.customer.trim()}` : "";
+  const reason = d.reason?.trim() || "motivo non indicato dall'intermediario";
+  return {
+    subject: `Fattura ${num} scartata dallo SdI`,
+    text: `La fattura n. ${num}${date}${cust} è stata scartata dallo SdI: ${reason}.\n\nAprila in Xenora per correggere ed emettere una nota di credito / nuovo documento.`,
+  };
+}

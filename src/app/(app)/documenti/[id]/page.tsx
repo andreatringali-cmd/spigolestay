@@ -54,6 +54,7 @@ export default function DocumentoPage() {
   const [pays, setPays] = useState<Pay[]>([]);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
+  const [ficNote, setFicNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Buffer di editing (solo in bozza)
@@ -297,6 +298,14 @@ export default function DocumentoPage() {
       else setVies({ status: "unknown", msg: r.message || "Verifica non disponibile" });
     } catch (e) { setVies({ status: "unknown", msg: e instanceof Error ? e.message : "Errore" }); }
   };
+  // Dopo l'incasso in Xenora, segna il pagamento anche sul documento di Fatture in Cloud (in background: non blocca né fa fallire l'incasso).
+  const syncFicPayment = (paidFlag: boolean) => {
+    if (!doc?.provider_ref?.startsWith("fic:")) return;
+    setFicNote(null);
+    invPost<{ ok?: boolean; skipped?: boolean; kind?: string; message?: string }>("fic/payments", { documentId: id, paid: paidFlag })
+      .then((r) => { if (r.skipped && r.ok) return; setFicNote({ ok: !!r.ok, text: r.ok ? (r.message ?? "") : "Incasso registrato; su Fatture in Cloud non aggiornato: " + (r.message ?? "motivo sconosciuto") }); })
+      .catch((e) => setFicNote({ ok: false, text: "Incasso registrato; su Fatture in Cloud non aggiornato: " + (e instanceof Error ? e.message : "errore") }));
+  };
   const addPayment = async (amountCents: number, method: string) => {
     if (!supabase || !user || amountCents <= 0) return;
     await act("pay", async () => {
@@ -305,6 +314,7 @@ export default function DocumentoPage() {
       if (payErr) throw new Error("Pagamento non registrato: " + payErr.message);
       // Fonte di verità = prenotazione: propaga l'incasso su booking.paid (in €).
       if (link.bookingId) { const b = bookings.find((x) => x.id === link.bookingId); if (b) updateBooking(b.id, { paid: roundCents((b.paid ?? 0) + Math.round(amountCents) / 100) }); }
+      syncFicPayment(true);
     });
   };
   const deleteDraft = async () => {
@@ -542,6 +552,7 @@ export default function DocumentoPage() {
               {pays.map((p) => <div key={p.id} className="flex justify-between text-sm text-dim"><span>{new Date(p.paid_at).toLocaleDateString("it-IT")} · {p.method}</span><span className="font-mono">{e2(p.amount_cents)}</span></div>)}
               {credited > 0 && <div className="flex justify-between text-sm text-dim"><span>Stornato da note di credito</span><span className="font-mono">−{e2(credited)}</span></div>}
               {residuo < 0 && <p className="mt-1 text-[11px] font-semibold text-[color:var(--warn)]">Incassato/stornato oltre il totale di {e2(-residuo)}: verifica gli incassi.</p>}
+              {ficNote && <p className="mt-1 text-[11px] font-medium" style={{ color: ficNote.ok ? "var(--ok)" : "var(--dim)" }}>{ficNote.text}</p>}
               {residuo > 0 && (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <input value={payAmt} onChange={(e) => setPayAmt(e.target.value)} inputMode="decimal" placeholder={`€ (max ${e2(residuo)})`} className="w-28 rounded border border-line bg-paper px-2 py-1.5 text-sm" />

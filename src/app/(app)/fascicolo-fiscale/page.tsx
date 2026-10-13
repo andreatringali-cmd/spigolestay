@@ -18,13 +18,17 @@ import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import FascicoloFiscaleDoc, { type ChannelRow } from "@/components/pdf/FascicoloFiscaleDoc";
+import AccountantPackPanel from "@/components/AccountantPackPanel";
+import { isTrialSend } from "@/lib/invoicing/sdi-status";
+import type { PackPayment, PackPurchase } from "@/lib/accountant-pack";
 
 const daysInYear = (yr: number) => ((yr % 4 === 0 && yr % 100 !== 0) || yr % 400 === 0 ? 366 : 365);
 
 interface DocRow {
   id: string; structure_id: string | null; doc_kind: string; stato: string;
-  issue_date: string | null; created_at: string; number_label: string | null; counterpart: { name?: string; lastName?: string; vat?: string | null; tax_code?: string | null } | null;
+  issue_date: string | null; created_at: string; number_label: string | null; counterpart: { name?: string; lastName?: string; vat?: string | null; tax_code?: string | null; country?: string } | null;
   taxable_cents: number; vat_cents: number; out_of_scope_cents: number; bollo_cents: number; total_cents: number;
+  regime?: string | null; send_sdi?: boolean | null; related_document_id?: string | null; due_date?: string | null; // usati dal riepilogo per il commercialista
 }
 const ISSUED = new Set(["emessa", "inviata_intermediario", "consegnata"]);
 
@@ -90,19 +94,52 @@ export default function FascicoloFiscalePage() {
   const [invoiceModuleReady, setInvoiceModuleReady] = useState(false);
   const [loadingDocs, setLoadingDocs] = useState(true);
   const [docsErr, setDocsErr] = useState("");
+  // Dati aggiuntivi per il riepilogo per il commercialista (pagamenti, invii in prova, fatture passive, provider).
+  const [payRows, setPayRows] = useState<PackPayment[]>([]);
+  const [trialIds, setTrialIds] = useState<Set<string>>(new Set());
+  const [purchaseRows, setPurchaseRows] = useState<PackPurchase[]>([]);
+  const [ficLinked, setFicLinked] = useState(false);
+  const [packWarn, setPackWarn] = useState<string[]>([]);
   useEffect(() => {
     if (!supabase) { setLoadingDocs(false); return; }
     setLoadingDocs(true);
     Promise.all([
-      supabase.from("documents").select("id, structure_id, doc_kind, stato, issue_date, created_at, number_label, counterpart, taxable_cents, vat_cents, out_of_scope_cents, bollo_cents, total_cents"),
-      supabase.from("tenant_invoice_settings").select("denominazione, vat, tax_code").maybeSingle(),
-    ]).then(([docs, settings]) => {
+      supabase.from("documents").select("id, structure_id, doc_kind, stato, issue_date, created_at, number_label, counterpart, taxable_cents, vat_cents, out_of_scope_cents, bollo_cents, total_cents, regime, send_sdi, related_document_id, due_date"),
+      supabase.from("tenant_invoice_settings").select("denominazione, vat, tax_code, default_provider").maybeSingle(),
+      supabase.from("document_payments").select("document_id, amount_cents, method, paid_at"),
+      supabase.from("document_events").select("document_id, kind, message, meta, ts").eq("kind", "sent").order("ts", { ascending: false }),
+      supabase.from("purchase_documents").select("id, structure_id, supplier_name, doc_number, doc_date, doc_type, category, taxable_cents, vat_cents, total_cents, due_date, paid, paid_at, payment_method"),
+    ]).then(([docs, settings, pays, evs, purch]) => {
       if (docs.error) setDocsErr(docs.error.message); else setDocRows((docs.data ?? []) as DocRow[]);
-      const s = settings.data as { denominazione?: string; vat?: string; tax_code?: string } | null;
+      const s = settings.data as { denominazione?: string; vat?: string; tax_code?: string; default_provider?: string } | null;
       setInvoiceModuleReady(!!s && !!(s.denominazione || s.vat || s.tax_code));
+      setFicLinked(s?.default_provider === "fattureincloud");
+      setPayRows((pays.data ?? []) as PackPayment[]);
+      setPurchaseRows((purch.data ?? []) as PackPurchase[]);
+      // Per ogni documento vale l'ULTIMO invio (eventi già ordinati dal più recente): se creato in prova, non è stato trasmesso allo SdI.
+      const seen = new Set<string>(); const trials = new Set<string>();
+      for (const x of (evs.data ?? []) as { document_id: string; kind: string; message: string | null; meta: Record<string, unknown> | null }[]) {
+        if (seen.has(x.document_id)) continue;
+        seen.add(x.document_id);
+        if (isTrialSend([x])) trials.add(x.document_id);
+      }
+      setTrialIds(trials);
+      const w: string[] = [];
+      if (pays.error) w.push("Pagamenti dei documenti non disponibili: incassi e fatture non incassate potrebbero essere incompleti.");
+      if (evs.error) w.push("Stato di invio allo SdI non disponibile: i documenti in prova potrebbero non essere segnalati.");
+      if (purch.error) w.push("Fatture passive non disponibili.");
+      setPackWarn(w);
       setLoadingDocs(false);
     });
   }, []);
+
+  // Anni selezionabili nel riepilogo per il commercialista: quelli con documenti/fatture passive, più quelli delle prenotazioni.
+  const packYears = useMemo(() => {
+    const ys = new Set<number>(yearOptions);
+    docRows.forEach((r) => ys.add(Number((r.issue_date ?? r.created_at ?? "").slice(0, 4))));
+    purchaseRows.forEach((r) => ys.add(Number((r.doc_date ?? "").slice(0, 4))));
+    return [...ys].filter((n) => n >= 2000).sort((a, b) => b - a);
+  }, [yearOptions, docRows, purchaseRows]);
 
   // Documenti dell'anno nello scope struttura (esclusi bozze e ricevute). "Emessi" = emessa/inviata/consegnata:
   // gli scartati dallo SdI non entrano nei totali (vengono solo contati e segnalati).
@@ -198,6 +235,11 @@ export default function FascicoloFiscalePage() {
       </Card>
 
       {docsErr && <Card className="mb-4"><p className="text-sm text-[color:var(--err)]">{docsErr}</p></Card>}
+
+      <AccountantPackPanel
+        docs={docRows} payments={payRows} trialIds={trialIds} purchases={purchaseRows} bookings={bookings} getStructure={getStructure}
+        structureId={activeStructureId} structureLabel={structureLabel} years={packYears} ficLinked={ficLinked} loading={loadingDocs} warnings={packWarn}
+      />
 
       {/* Anteprima a schermo — stessi numeri del PDF */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
