@@ -14,7 +14,7 @@ import { loadPromos } from "@/lib/promos";
 import { inScope } from "@/lib/scope";
 import { bookingErrorMessage, BOOKING_NETWORK_ERROR } from "@/lib/booking-errors";
 import AdsConsent from "@/components/AdsConsent";
-import { trackBookingConversion } from "@/lib/ads";
+import { trackBookingConversion, resolveAdsConfig } from "@/lib/ads";
 import { loadPublicSite, lsGet, isPublicMode, publicSlug, findAvailableSibling, findNetworkSuggestions, type SiblingSuggestion } from "@/lib/publicdata";
 
 // ---- pricing helpers --------------------------------------------------------
@@ -32,6 +32,15 @@ const DEFAULT_PLANS: Plan[] = [
 
 const box = "rounded-xl border border-line bg-surface";
 const field = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
+
+// Slug del sito pubblico (?site=<slug>) della pagina aperta.
+const siteFromUrl = (): string => { try { return (new URLSearchParams(window.location.search).get("site") || "").trim(); } catch { return ""; } };
+
+// Avviso cookie di Google Ads: compare solo se la struttura di questo sito ha un account Google Ads (Impostazioni → Google Ads; per Spigolehouse anche i valori storici).
+function AdsGate() {
+  const { structures } = useData();
+  return <AdsConsent config={resolveAdsConfig(siteFromUrl(), structures)} />;
+}
 
 export default function PrenotaPage() {
   // Se si arriva da un Xenosite pubblico (xenora.it/<slug> → ?site=<slug>), carica
@@ -53,7 +62,7 @@ export default function PrenotaPage() {
   }, []);
   if (!ready) return null;
   const engine = <Engine embed={embed} />;
-  return <DataProvider>{accent ? <div style={{ ["--focus" as string]: accent } as React.CSSProperties}>{engine}</div> : engine}{!embed && <AdsConsent />}</DataProvider>;
+  return <DataProvider>{accent ? <div style={{ ["--focus" as string]: accent } as React.CSSProperties}>{engine}</div> : engine}{!embed && <AdsGate />}</DataProvider>;
 }
 
 // `embed`: versione compatta per l'iframe incorporato sul sito del gestore
@@ -303,7 +312,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     const c = doneSummary?.code || code;
     // Valore della conversione = ricavo della struttura: il totale mostrato all'ospite senza la tassa di soggiorno (non è un ricavo, si riscuote per il Comune).
     const v = (Number(doneSummary?.total ?? total) || 0) - (Number(doneSummary?.cityTax ?? cityTax) || 0);
-    if (c) trackBookingConversion({ value: Math.max(0, v), transactionId: c });
+    if (c) trackBookingConversion(resolveAdsConfig(siteFromUrl(), structures), { value: Math.max(0, v), transactionId: c });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, doneSummary, code]);
 

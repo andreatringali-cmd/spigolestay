@@ -54,6 +54,8 @@ export interface Structure {
   linkedin?: string;       // URL profilo LinkedIn
   tiktok?: string;         // URL profilo TikTok
   googlePlaceId?: string;  // Google Place ID (per le recensioni Google, anche sul sito pubblico)
+  googleAdsId?: string;    // ID del tag Google Ads (AW-…): misura le prenotazioni dirette dal sito pubblico (vedi lib/ads.ts); non è un segreto
+  googleAdsLabel?: string; // etichetta della conversione "Prenotazione diretta" (parte dopo la barra di send_to)
   gcalId?: string;         // ID calendario Google condiviso col service account: scrittura in tempo reale (vedi googleCalendarSync.ts)
   gcalVerifiedId?: string; // ID calendario che ha superato l'ultima verifica riuscita (per mostrare "✓ Collegato e verificato" senza doverlo rifare ogni volta)
   // Indirizzo / ubicazione

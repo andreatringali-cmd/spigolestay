@@ -6,6 +6,7 @@ import { RATEMODEL_DEF, RATEMODEL_KEY, parseRateModel, type RatePlanDef, type Si
 import { useEffect, useRef, useState } from "react";
 import { kvGet, kvSet, kvKeys, kvFlush } from "@/lib/bigstore";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
+import AdsSettingsCard from "@/components/AdsSettingsCard";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useTheme } from "@/lib/theme";
 import { useLang } from "@/lib/i18n";
@@ -344,6 +345,8 @@ export default function ImpostazioniPage() {
           </>
         )}
       </Card>
+
+      <AdsSettingsCard />
 
       <Card className="mt-4">
         <SectionTitle>{t("Backup & dati")}</SectionTitle>
