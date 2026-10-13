@@ -5,6 +5,16 @@ export const ADS_ID = "AW-18509493463";
 /** Etichetta della conversione "Prenotazione diretta" (Google Ads → Obiettivi → Conversioni → Prenotazione diretta → snippet evento, parte dopo la barra di `send_to`). Se fosse vuota il tag si caricherebbe ma non si invierebbe nessuna conversione. */
 export const ADS_CONVERSION_LABEL = "cx6hCPOAmpsdENfpgfpE";
 
+// Questo account Google Ads è di Spigolehouse: il tag vale SOLO per i siti pubblici elencati qui. La pagina /prenota è la stessa per tutti i clienti di Xenora
+// (il sito si riconosce da ?site=<slug>): senza questo elenco il tag e l'avviso cookie comparirebbero anche per le strutture di altri e le loro prenotazioni
+// finirebbero in questo account.
+export const ADS_SITE_SLUGS: readonly string[] = ["spigolehouse", "spigolerooms", "central-perk"];
+
+/** La pagina aperta è il sito pubblico di una delle strutture di questo account? */
+export function adsAllowedHere(): boolean {
+  try { const slug = (new URLSearchParams(window.location.search).get("site") || "").trim().toLowerCase(); return ADS_SITE_SLUGS.includes(slug); } catch { return false; }
+}
+
 const CONSENT_KEY = "xn-consent-ads"; // "granted" | "denied"
 
 type Gtag = (...args: unknown[]) => void;
@@ -19,7 +29,7 @@ export function setAdsConsent(v: "granted" | "denied"): void {
 
 /** Carica il tag di Google (una sola volta). Da chiamare solo con il consenso. */
 export function loadAdsTag(): void {
-  if (typeof window === "undefined" || window.gtag) return;
+  if (typeof window === "undefined" || window.gtag || !adsAllowedHere()) return;
   window.dataLayer = window.dataLayer || [];
   const gtag: Gtag = function (...args: unknown[]) { window.dataLayer!.push(args); };
   window.gtag = gtag;
@@ -36,7 +46,7 @@ export function loadAdsTag(): void {
  * Non fa nulla senza consenso, senza etichetta di conversione o senza importo valido.
  */
 export function trackBookingConversion(opts: { value: number; transactionId: string }): boolean {
-  if (typeof window === "undefined" || !ADS_CONVERSION_LABEL) return false;
+  if (typeof window === "undefined" || !ADS_CONVERSION_LABEL || !adsAllowedHere()) return false;
   if (getAdsConsent() !== "granted" || !window.gtag) return false;
   if (!opts.transactionId || !(opts.value >= 0)) return false;
   const key = `xn-ads-conv:${opts.transactionId}`;

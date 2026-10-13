@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getAdsConsent, setAdsConsent, loadAdsTag, trackBookingConversion, ADS_ID } from "../src/lib/ads.ts";
+import { getAdsConsent, setAdsConsent, loadAdsTag, trackBookingConversion, adsAllowedHere, ADS_ID } from "../src/lib/ads.ts";
 
 // Il browser non c'è nei test: si simulano window, localStorage e document quanto basta.
 const store = new Map<string, string>();
 const calls: unknown[][] = [];
 const g = globalThis as unknown as Record<string, unknown>;
-g.window = { dataLayer: undefined as unknown, gtag: undefined as unknown };
+g.window = { dataLayer: undefined as unknown, gtag: undefined as unknown, location: { search: "?site=spigolehouse" } };
 g.localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); }, removeItem: (k: string) => { store.delete(k); } };
 g.document = { head: { appendChild: () => {} }, createElement: () => ({}) };
 
@@ -42,4 +42,17 @@ test("conversione: parte una sola volta per codice prenotazione, con importo, va
 test("senza consenso non parte nessuna conversione", () => {
   setAdsConsent("denied");
   assert.equal(trackBookingConversion({ value: 50, transactionId: "XEN-9" }), false);
+});
+
+test("il tag vale solo per i siti di questo account: altri siti Xenora o /prenota senza sito non tracciano", () => {
+  const w = g.window as { location: { search: string } };
+  const prev = w.location.search;
+  setAdsConsent("granted");
+  for (const q of ["", "?site=altro-cliente", "?site=", "?embed=1"]) {
+    w.location.search = q;
+    assert.equal(adsAllowedHere(), false, q);
+    assert.equal(trackBookingConversion({ value: 90, transactionId: "ALTRO-" + q }), false, q);
+  }
+  for (const q of ["?site=spigolehouse", "?site=Spigolerooms", "?site=central-perk&x=1"]) { w.location.search = q; assert.equal(adsAllowedHere(), true, q); }
+  w.location.search = prev;
 });
