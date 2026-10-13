@@ -22,7 +22,7 @@ export const UNDERPRICE_MIN_EXPECTED_PER_NIGHT = 15;
 // si controllano qui: un eventuale sconto lì è sempre una promo approvata dal gestore stesso nel
 // modulo Promozioni di Xenora (src/app/(app)/promozioni), applicata in fase di prenotazione sul
 // sito — non un'anomalia da segnalare.
-const CHANNELS_TO_CHECK: Channel[] = ["booking", "airbnb", "expedia", "agoda", "hotelbeds", "other"];
+const CHANNELS_TO_CHECK: Channel[] = ["booking", "airbnb", "expedia", "agoda", "google", "hotelbeds", "other"];
 
 export interface UnderpriceCheck {
   flagged: boolean;
@@ -82,6 +82,6 @@ export function checkUnderpriced(b: BookingForCheck, roomTypes: RoomType[], over
 // Riga di spiegazione pronta per un title/tooltip: cifre + ipotesi più probabile.
 export function underpriceReason(b: Pick<Booking, "channel">, chk: UnderpriceCheck): string {
   const pct = Math.round(chk.diffPct * 100);
-  const chLabel = b.channel === "booking" ? "Booking.com" : b.channel === "airbnb" ? "Airbnb" : b.channel === "expedia" ? "Expedia/Vrbo" : b.channel === "hotelbeds" ? "HotelBeds" : b.channel === "agoda" ? "Agoda" : "questo canale";
+  const chLabel = b.channel === "booking" ? "Booking.com" : b.channel === "airbnb" ? "Airbnb" : b.channel === "expedia" ? "Expedia/Vrbo" : b.channel === "hotelbeds" ? "HotelBeds" : b.channel === "agoda" ? "Agoda" : b.channel === "google" ? "Google Hotel" : "questo canale";
   return `Prezzo sotto costo: atteso ~€${Math.round(chk.expectedPerNight)}/notte, registrato €${Math.round(chk.actualPerNight)}/notte (−${pct}%). Prezzo insolitamente basso per il canale — controlla eventuali promozioni attive su ${chLabel} (es. offerte last minute o programma Genius).`;
 }

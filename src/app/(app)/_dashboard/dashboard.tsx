@@ -36,7 +36,7 @@ import { useDashboard2Dati } from "./_dati";
 
 const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
 const MESI_BREVI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
-const OTA_CH = ["booking", "airbnb", "expedia", "agoda", "hotelbeds"];
+const OTA_CH = ["booking", "airbnb", "expedia", "agoda", "google", "hotelbeds"];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const shortDate = (iso: string) => `${Number(iso.slice(8, 10))} ${MESI_BREVI[Number(iso.slice(5, 7)) - 1]}`;
 

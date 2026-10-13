@@ -20,6 +20,8 @@ export default function ChannelLogo({ channel, size = 16, title }: { channel: Ch
       return <Tile bg="#FF385C" t="Airbnb"><svg width={size * 0.6} height={size * 0.6} viewBox="0 0 24 24" fill="#fff"><path d={BELO} /></svg></Tile>;
     case "expedia":
       return <Tile bg="#FEC84C" t="Expedia / Vrbo"><svg width={size * 0.56} height={size * 0.56} viewBox="0 0 24 24" fill="none" stroke="#202843" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 18 18 6" /><path d="M8.5 6H18v9.5" /></svg></Tile>;
+    case "google":
+      return <Tile bg="#FFFFFF" t="Google Hotel"><svg width={size * 0.62} height={size * 0.62} viewBox="0 0 48 48" aria-hidden><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.1 0 24 0 14.6 0 6.4 5.4 2.5 13.3l7.8 6.1C12.2 13.3 17.6 9.5 24 9.5z" /><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.1 5.5c4.2-3.9 6.9-9.6 6.9-16.9z" /><path fill="#FBBC05" d="M10.3 28.6c-.5-1.4-.8-2.9-.8-4.6s.3-3.2.8-4.6l-7.8-6.1C.9 16.5 0 20.1 0 24s.9 7.5 2.5 10.7l7.8-6.1z" /><path fill="#34A853" d="M24 48c6.1 0 11.3-2 15-5.5l-7.1-5.5c-2 1.3-4.6 2.1-7.9 2.1-6.4 0-11.8-3.8-13.7-9.4l-7.8 6.1C6.4 42.6 14.6 48 24 48z" /></svg></Tile>;
     case "agoda":
       return <Tile bg="#FFFFFF" t="Agoda"><span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: size * 0.05 }}><span style={{ color: "#2B3340", fontSize: size * 0.56, fontWeight: 800, lineHeight: 0.8 }}>a</span><span style={{ display: "flex", gap: size * 0.03 }}>{["#E9425A", "#F7B500", "#4CB963", "#3C86F4", "#8A55D1"].map((c) => <i key={c} style={{ width: size * 0.08, height: size * 0.08, borderRadius: "50%", background: c, display: "block" }} />)}</span></span></Tile>;
     case "hotelbeds":
@@ -49,6 +51,8 @@ export function ChannelWordmark({ channel, height = 20, title }: { channel: Chan
       return chip("Airbnb", <><svg width={height * 0.8} height={height * 0.8} viewBox="0 0 24 24" fill="#FF385C" aria-hidden><path d={BELO} /></svg><span style={{ ...base, color: "#FF385C", letterSpacing: "-0.045em" }}>airbnb</span></>);
     case "expedia":
       return chip("Expedia / Vrbo", <><span aria-hidden style={{ width: height * 0.95, height: height * 0.95, borderRadius: height * 0.24, background: "#FEC84C", display: "inline-grid", placeItems: "center", flexShrink: 0 }}><svg width={height * 0.6} height={height * 0.6} viewBox="0 0 24 24" fill="none" stroke="#202843" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M6 18 18 6" /><path d="M8.5 6H18v9.5" /></svg></span><span style={{ ...base, color: "#202843" }}>Expedia</span></>);
+    case "google":
+      return chip("Google Hotel", <span style={{ ...base, color: "#4285F4" }}>G<span style={{ color: "#EA4335" }}>o</span><span style={{ color: "#FBBC05" }}>o</span>g<span style={{ color: "#34A853" }}>l</span><span style={{ color: "#EA4335" }}>e</span> <span style={{ color: "#5F6368", fontWeight: 600 }}>Hotel</span></span>);
     case "agoda":
       return chip("Agoda", <><span style={{ ...base, color: "#2B3340" }}>agoda</span><span aria-hidden style={{ display: "inline-flex", gap: 2 }}>{["#E9425A", "#F7B500", "#4CB963", "#3C86F4", "#8A55D1"].map((c) => <i key={c} style={{ width: height * 0.16, height: height * 0.16, borderRadius: "50%", background: c, display: "block" }} />)}</span></>);
     case "hotelbeds":

@@ -61,6 +61,7 @@ export function channelFromOta(ota?: string): string {
   if (s.includes("expedia") || s.includes("vrbo") || s.includes("homeaway")) return "expedia";
   if (s.includes("hotelbed") || s.includes("hotel bed") || s.includes("hbeds")) return "hotelbeds";
   if (s.includes("agoda")) return "agoda";
+  if (s.includes("google")) return "google"; // Google Hotel Search (link gratuiti di prenotazione) via Channex
   if (s.includes("direct") || s.includes("crs") || s.includes("website")) return "direct";
   return "other";
 }

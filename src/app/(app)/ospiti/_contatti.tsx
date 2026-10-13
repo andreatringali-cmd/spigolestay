@@ -11,7 +11,7 @@ import { CHANNELS } from "@/lib/types";
 import { contactReportCached, isRelayEmail } from "@/lib/contacts-check";
 import { upcomingContactIssues, URGENT_DAYS, type UpcomingIssue } from "@/lib/contacts-upcoming";
 
-const OTA = new Set(["booking", "airbnb", "expedia", "agoda", "hotelbeds"]);
+const OTA = new Set(["booking", "airbnb", "expedia", "agoda", "google", "hotelbeds"]);
 const LIMIT = 6;
 
 const whenLabel = (days: number, iso: string) => {
