@@ -527,3 +527,11 @@ export async function uploadPhotoFile(bytes: Uint8Array, mime: string, name: str
 export async function createPhoto(propertyId: string, url: string, description?: string) {
   return channex("/photos", { method: "POST", body: JSON.stringify({ photo: { property_id: propertyId, url, kind: "photo", ...(description ? { description: description.slice(0, 200) } : {}) } }) });
 }
+
+/** Quante foto ha la struttura su Channex. */
+export async function countPhotos(propertyId: string): Promise<{ ok: boolean; count: number }> {
+  const res = await channex<{ data?: unknown[]; meta?: { total?: number } }>(`/photos?filter[property_id]=${encodeURIComponent(propertyId)}&pagination[limit]=1`);
+  if (!res.ok) return { ok: false, count: 0 };
+  const total = Number(res.data?.meta?.total);
+  return { ok: true, count: Number.isFinite(total) ? total : (res.data?.data ?? []).length };
+}

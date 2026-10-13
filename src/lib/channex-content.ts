@@ -15,6 +15,7 @@ export interface StructureContent {
   lng?: number;
   services?: string[];
   checkInFrom?: string;      // "15:00"
+  checkInTo?: string;        // "20:00"
   checkOutBy?: string;       // "10:30"
   smoking?: boolean;
   pets?: boolean;
@@ -65,13 +66,22 @@ const has = (services: string[] | undefined, re: RegExp) => (services ?? []).som
 export function buildHotelPolicyBody(propertyId: string | null, c: StructureContent): { hotel_policy: Record<string, unknown> } {
   const wifi = has(c.services, /wi-?fi|internet/i);
   const parking = has(c.services, /parcheggio|parking/i);
+  const checkInFrom = pad(c.checkInFrom ?? "") ?? "15:00";
+  const checkInTo = pad(c.checkInTo ?? "") ?? (checkInFrom < "20:00" ? "20:00" : "23:59");
+  const checkOutTo = pad(c.checkOutBy ?? "") ?? "10:30";
+  const checkOutFrom = checkOutTo > "07:00" ? "07:00" : "00:00";
   const policy: Record<string, unknown> = {
     title: "Politica della struttura",
     currency: (c.currency || "EUR").toUpperCase().slice(0, 3),
     is_adults_only: (c.minAge ?? 0) >= 18,
     max_count_of_guests: Math.max(1, Math.round(c.maxGuests || 6)),
-    checkin_time: pad(c.checkInFrom ?? "") ?? "15:00",
-    checkout_time: pad(c.checkOutBy ?? "") ?? "10:30",
+    // Channex (API reale) vuole quattro orari: da/a per il check-in e per il check-out. La documentazione parla di checkin_time/checkout_time: si inviano anche quelli.
+    checkin_from_time: checkInFrom,
+    checkin_to_time: checkInTo,
+    checkout_from_time: checkOutFrom,
+    checkout_to_time: checkOutTo,
+    checkin_time: checkInFrom,
+    checkout_time: checkOutTo,
     internet_access_type: wifi ? "wifi" : "none",
     internet_access_coverage: "entire_property",
     internet_access_cost: null, // gratuito

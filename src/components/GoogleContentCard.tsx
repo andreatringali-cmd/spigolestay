@@ -27,7 +27,7 @@ export default function GoogleContentCard({ structureId, propertyId }: { structu
   const maxGuests = Math.max(2, ...roomTypes.filter((r) => r.structureId === structureId).map((r) => r.maxOccupancy ?? r.beds ?? 2));
   const content: StructureContent = {
     name: st.name, description: st.description, type: st.type, city: st.city, address: [st.address, st.streetNumber].filter(Boolean).join(" ") || undefined, postalCode: st.postalCode,
-    country: st.country, phone: st.phone, email: st.email, lat: st.lat, lng: st.lng, services: st.services, checkInFrom: st.checkInFrom, checkOutBy: st.checkOutBy,
+    country: st.country, phone: st.phone, email: st.email, lat: st.lat, lng: st.lng, services: st.services, checkInFrom: st.checkInFrom, checkInTo: st.checkInTo, checkOutBy: st.checkOutBy,
     smoking: st.smoking, pets: st.pets, minAge: st.minAge, cancelPolicy: st.cancelPolicy, maxGuests, currency: st.currency,
   };
   const checks = contentChecklist(content);

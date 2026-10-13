@@ -7,6 +7,7 @@ const base = { name: "Spigolehouse", city: "Siracusa", address: "Via Roma 1", ph
 test("politica della struttura: orari, wifi, parcheggio, animali, fumo", () => {
   const p = buildHotelPolicyBody("PROP", { ...base, pets: true, smoking: false, services: ["Wi-Fi", "Parcheggio"], checkInFrom: "14:00", checkOutBy: "11:00", maxGuests: 4 }).hotel_policy;
   assert.equal(p.property_id, "PROP");
+  assert.equal(p.checkin_from_time, "14:00"); assert.equal(p.checkin_to_time, "20:00"); assert.equal(p.checkout_from_time, "07:00"); assert.equal(p.checkout_to_time, "11:00");
   assert.equal(p.checkin_time, "14:00"); assert.equal(p.checkout_time, "11:00");
   assert.equal(p.internet_access_type, "wifi"); assert.equal(p.internet_access_cost, null);
   assert.equal(p.parking_type, "on_site"); assert.equal(p.pets_policy, "allowed"); assert.equal(p.smoking_policy, "no_smoking");
@@ -16,10 +17,16 @@ test("politica della struttura: orari, wifi, parcheggio, animali, fumo", () => {
 test("politica: valori di ripiego sensati e orari non validi scartati; senza property_id nell'aggiornamento", () => {
   const p = buildHotelPolicyBody(null, { name: "X", checkInFrom: "boh", checkOutBy: "25:99", services: [] }).hotel_policy;
   assert.equal("property_id" in p, false);
-  assert.equal(p.checkin_time, "15:00"); assert.equal(p.checkout_time, "10:30");
+  assert.equal(p.checkin_from_time, "15:00"); assert.equal(p.checkin_to_time, "20:00"); assert.equal(p.checkout_from_time, "07:00"); assert.equal(p.checkout_to_time, "10:30");
   assert.equal(p.internet_access_type, "none"); assert.equal(p.parking_type, "none");
   assert.equal(p.pets_policy, "not_allowed"); assert.equal(p.max_count_of_guests, 6);
   assert.equal(buildHotelPolicyBody("P", { name: "X", minAge: 18 }).hotel_policy.is_adults_only, true);
+});
+
+test("orari: check-in tardivo, check-out presto e check-in fino a mezzanotte", () => {
+  const a = buildHotelPolicyBody(null, { name: "X", checkInFrom: "21:00", checkInTo: "23:00", checkOutBy: "06:30" }).hotel_policy;
+  assert.equal(a.checkin_to_time, "23:00"); assert.equal(a.checkout_from_time, "00:00"); assert.equal(a.checkout_to_time, "06:30");
+  assert.equal(buildHotelPolicyBody(null, { name: "X", checkInFrom: "21:00" }).hotel_policy.checkin_to_time, "23:59");
 });
 
 test("servizi → facility di Channex per parole chiave, senza doppioni e con l'elenco di quelli non trovati", () => {

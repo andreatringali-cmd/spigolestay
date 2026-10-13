@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { allowedChannexProperties } from "@/lib/channex-guard";
 import {
-  channexEnabled, listFacilityOptions, findHotelPolicyId, saveHotelPolicy, findCancellationPolicyId, updateProperty, uploadPhotoFile, createPhoto,
+  channexEnabled, listFacilityOptions, findHotelPolicyId, saveHotelPolicy, findCancellationPolicyId, updateProperty, uploadPhotoFile, createPhoto, countPhotos,
 } from "@/lib/channex";
 import { buildHotelPolicyBody, buildPropertyUpdate, matchFacilities, type StructureContent } from "@/lib/channex-content";
 
@@ -30,7 +30,7 @@ function sanitizeContent(raw: unknown): StructureContent | null {
     name, description: str(r.description, 4000), type: str(r.type, 80), city: str(r.city, 120), address: str(r.address, 255), postalCode: str(r.postalCode, 20),
     country: str(r.country, 60), phone: str(r.phone, 32), email: str(r.email, 200), lat: num(r.lat), lng: num(r.lng),
     services: Array.isArray(r.services) ? r.services.filter((x): x is string => typeof x === "string").slice(0, 60).map((x) => x.slice(0, 80)) : [],
-    checkInFrom: str(r.checkInFrom, 5), checkOutBy: str(r.checkOutBy, 5), smoking: r.smoking === true, pets: r.pets === true, minAge: num(r.minAge),
+    checkInFrom: str(r.checkInFrom, 5), checkInTo: str(r.checkInTo, 5), checkOutBy: str(r.checkOutBy, 5), smoking: r.smoking === true, pets: r.pets === true, minAge: num(r.minAge),
     cancelPolicy: cp === "flessibile" || cp === "moderata" || cp === "rigida" ? cp : undefined, maxGuests: num(r.maxGuests), currency: str(r.currency, 3),
   };
 }
@@ -91,6 +91,10 @@ export async function POST(req: Request) {
   // 4) Descrizione, indirizzo, posizione, collegamento di politica e servizi alla struttura
   const upd = await updateProperty(propertyId, buildPropertyUpdate(content, { hotelPolicyId, cancellationPolicyId, facilityIds }));
   steps.push({ key: "property", label: "Descrizione, indirizzo e posizione", ok: upd.ok, detail: upd.ok ? "Inviati" : `Non inviati: ${upd.error ?? "errore"}` });
+
+  // 5) Foto già presenti su Channex (Google ne richiede almeno una): le carichi con "Carica foto per Google"
+  const ph = await countPhotos(propertyId);
+  steps.push({ key: "photos", label: "Foto", ok: ph.ok && ph.count > 0, detail: !ph.ok ? "Non riesco a leggere le foto di Channex" : ph.count > 0 ? `${ph.count} foto su Channex` : "Nessuna foto su Channex: usa \"Carica foto per Google\" (scegli i file originali dal computer)." });
 
   return NextResponse.json({ ok: steps.every((s) => s.ok), steps });
 }
