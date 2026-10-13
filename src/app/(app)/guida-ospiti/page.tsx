@@ -530,18 +530,6 @@ export default function GuidaOspitiPage() {
       (s.items?.some((it) => it.h?.trim() || it.p?.trim() || (it.list?.length ?? 0))) ||
       (s.steps?.some((st) => st.h?.trim() || st.p?.trim())) || (s.amenities?.length))
   );
-  // L'esempio sostituisce i TESTI della guida, ma non tocca dati reali: dei dati struttura e delle credenziali
-  // (WiFi, orari, telefoni, link) compila solo i campi ancora vuoti.
-  const loadDemo = () => {
-    if (hasRealContent && !confirm("Sostituire i testi della guida con l'esempio di Siracusa?\n\nI dati già inseriti (indirizzo, telefoni, WiFi, orari, link) NON vengono toccati: l'esempio compila solo i campi vuoti. Le traduzioni verranno rigenerate.")) return;
-    const sRec = (struct ?? {}) as unknown as Record<string, unknown>;
-    const structPatch = Object.fromEntries(Object.entries(DEMO_STRUCT).filter(([k]) => !String(sRec[k] ?? "").trim()));
-    if (Object.keys(structPatch).length) updateStructure(sid, structPatch);
-    const gRec = guide as unknown as Record<string, unknown>;
-    const guidePatch = Object.fromEntries(Object.entries(DEMO_GUIDE).filter(([k]) => !String(gRec[k] ?? "").trim()));
-    set({ ...guidePatch, content: DEMO_CONTENT, i18n: {} });
-    refresh();
-  };
 
   // Stato "pronta" mostrato nell'header di ogni card a tendina (✓ compilata / ○ da compilare).
   const secReady = (s: GSection) => { const op = (s.id === "wifi" && !!(guide.wifiNetwork || guide.wifiPassword)) || (s.id === "contacts" && !!(guide.phone || guide.whatsapp || guide.phoneGreta)) || (s.id === "review" && !!guide.reviewUrl); return !s.hidden && (sectionFilled(s) || op); };
@@ -809,6 +797,18 @@ export default function GuidaOspitiPage() {
   // la modifica sul punto in cui stai lavorando senza tornare alla welcome.
   const reloadPreview = () => { const w = previewRef.current?.contentWindow; if (w) { try { w.location.reload(); return; } catch { /* fallback */ } } setPreviewKey((k) => k + 1); };
   const refresh = () => reloadPreview();
+  // L'esempio sostituisce i TESTI della guida, ma non tocca dati reali: dei dati struttura e delle credenziali
+  // (WiFi, orari, telefoni, link) compila solo i campi ancora vuoti.
+  const loadDemo = () => {
+    if (hasRealContent && !confirm("Sostituire i testi della guida con l'esempio di Siracusa?\n\nI dati già inseriti (indirizzo, telefoni, WiFi, orari, link) NON vengono toccati: l'esempio compila solo i campi vuoti. Le traduzioni verranno rigenerate.")) return;
+    const sRec = (struct ?? {}) as unknown as Record<string, unknown>;
+    const structPatch = Object.fromEntries(Object.entries(DEMO_STRUCT).filter(([k]) => !String(sRec[k] ?? "").trim()));
+    if (Object.keys(structPatch).length) updateStructure(sid, structPatch);
+    const gRec = guide as unknown as Record<string, unknown>;
+    const guidePatch = Object.fromEntries(Object.entries(DEMO_GUIDE).filter(([k]) => !String(gRec[k] ?? "").trim()));
+    set({ ...guidePatch, content: DEMO_CONTENT, i18n: {} });
+    refresh();
+  };
   const savedThis = !!all[sid];
 
   // Anteprima in tempo reale: ogni modifica è già scritta in localStorage da set(); qui,
@@ -927,6 +927,7 @@ export default function GuidaOspitiPage() {
             <span className="flex items-center gap-1.5 text-xs font-semibold text-dim"><span className="text-faint">🏠 Struttura:</span> <span className="text-txt">{struct?.name ?? ""}</span></span>
           )}
           <div className="flex flex-wrap items-center gap-2">
+          <button onClick={loadDemo} title="Copia i testi della guida di esempio (Siracusa) in questa guida: i tuoi dati non vengono toccati" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">✨ Parti dall&apos;esempio</button>
           <button onClick={refresh} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">↻ Aggiorna</button>
           <select value={pvLang} onChange={(e) => setPvLang(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-dim outline-none focus:border-focus">
             <option value="it">🇮🇹 Italiano</option>
@@ -955,6 +956,15 @@ export default function GuidaOspitiPage() {
         {/* Pannello personalizzazione */}
         <div className="space-y-4">
         {(<>
+          {!hasRealContent && (
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-wash px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-txt">La guida è ancora vuota</div>
+                <div className="text-xs text-dim">Parti dall&apos;esempio: ti copia i testi già pronti (arrivo, Wi-Fi, colazione, dintorni, domande frequenti) e cambi solo quello che serve. I tuoi dati (indirizzo, telefoni, Wi-Fi, orari) non vengono toccati.</div>
+              </div>
+              <button onClick={loadDemo} className="shrink-0 rounded-lg bg-[color:var(--focus)] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90">✨ Parti dall&apos;esempio</button>
+            </div>
+          )}
           <SectionTitle>Sezioni della guida ({content.sections.length})</SectionTitle>
           <div className="anim-in overflow-hidden rounded-2xl border bg-surface shadow-sm" style={{ borderColor: guideIssues.length ? (issueErr ? "var(--err)" : "var(--warn)") : "var(--ok)" }}>
             <button onClick={() => setOpenCheck((o) => !o)} className="flex w-full min-w-0 items-center gap-2.5 px-4 py-2.5 text-left">

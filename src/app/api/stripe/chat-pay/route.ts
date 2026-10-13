@@ -8,6 +8,21 @@ import { PAY_TOKEN_TTL_DAYS, paySecret, signPayToken } from "@/lib/chat-pay-toke
 import type { Booking, Structure } from "@/lib/types";
 
 export const runtime = "nodejs";
+
+const SL_ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789";
+const randomCode = () => Array.from({ length: 6 }, () => SL_ALPHABET[Math.floor(Math.random() * SL_ALPHABET.length)]).join("");
+/** /g/<codice> al posto dell'indirizzo lungo (il token firmato resta nella tabella short_links). Se qualcosa va storto, ritorna il link originale. */
+async function shortPayLink(admin: { from: (t: string) => { insert: (v: object) => PromiseLike<{ error: unknown }> } }, origin: string, longUrl: string): Promise<string> {
+  try {
+    const target = new URL(longUrl).pathname + new URL(longUrl).search;
+    for (let i = 0; i < 3; i++) {
+      const code = randomCode();
+      const { error } = await admin.from("short_links").insert({ code, target });
+      if (!error) return `${origin}/g/${code}`;
+    }
+  } catch { /* link lungo */ }
+  return longUrl;
+}
 export const dynamic = "force-dynamic";
 
 // "Il pagamento dentro la chat" — passo 1: il GESTORE (autenticato) chiede un link di pagamento
@@ -43,7 +58,7 @@ export async function POST(req: Request) {
     const origin = (process.env.NEXT_PUBLIC_SITE_URL || req.headers.get("origin") || new URL(req.url).origin).replace(/\/+$/, "");
     return NextResponse.json({
       ok: true,
-      url: `${origin}/api/stripe/chat-pay/go?t=${token}`,
+      url: await shortPayLink(auth.admin as never, origin, `${origin}/api/stripe/chat-pay/go?t=${token}`),
       amount: plan.cents / 100,
       maxAmount: plan.maxCents / 100,
       kind,

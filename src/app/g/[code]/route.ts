@@ -13,8 +13,8 @@ function payPreview(origin: string, target: string): Response {
   const html = `<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
 <title>${title}</title><meta name="description" content="${desc}">
 <meta property="og:type" content="website"><meta property="og:title" content="${title}"><meta property="og:description" content="${desc}">
-<meta property="og:image" content="${origin}/og-checkin.png"><meta property="og:image:width" content="128"><meta property="og:image:height" content="128">
-<meta name="twitter:card" content="summary"><meta name="twitter:title" content="${title}"><meta name="twitter:description" content="${desc}"><meta name="twitter:image" content="${origin}/og-checkin.png">
+<meta property="og:image" content="${origin}/og-pagamento.png"><meta property="og:image:width" content="256"><meta property="og:image:height" content="256">
+<meta name="twitter:card" content="summary"><meta name="twitter:title" content="${title}"><meta name="twitter:description" content="${desc}"><meta name="twitter:image" content="${origin}/og-pagamento.png">
 <meta http-equiv="refresh" content="0;url=${esc(target)}"></head>
 <body style="font-family:system-ui,sans-serif;text-align:center;padding:40px 16px;color:#3b4553"><p>Ti stiamo portando al pagamento…</p><p><a href="${esc(target)}">Continua</a></p></body></html>`;
   return new Response(html, { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
