@@ -3,6 +3,7 @@
 // costruiamo in modo deterministico. Copre i casi B&B: fattura (TD01) e nota di
 // credito (TD04), regime ordinario o forfettario (con Natura es. N2.2), bollo.
 import type { EInvoicePayload } from "./provider";
+import { sdiPaymentCode } from "./payment-codes";
 
 const esc = (s: string | null | undefined) =>
   (s ?? "").toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -85,7 +86,7 @@ export function buildFatturaPaXml(p: EInvoicePayload): string {
     ? `<DatiFattureCollegate><IdDocumento>${esc(p.relatedNumberLabel)}</IdDocumento></DatiFattureCollegate>` : "";
   const pagamento = p.payment?.method
     ? `<DatiPagamento><CondizioniPagamento>TP02</CondizioniPagamento><DettaglioPagamento>` +
-      `<ModalitaPagamento>${esc(p.payment.method)}</ModalitaPagamento>` +
+      `<ModalitaPagamento>${sdiPaymentCode(p.payment.method)}</ModalitaPagamento>` +
       (p.payment.dueDate ? `<DataScadenzaPagamento>${ymd(p.payment.dueDate)}</DataScadenzaPagamento>` : "") +
       `<ImportoPagamento>${eur(p.totals.totalCents)}</ImportoPagamento>` +
       `</DettaglioPagamento></DatiPagamento>` : "";

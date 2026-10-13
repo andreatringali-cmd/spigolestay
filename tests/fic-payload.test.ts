@@ -63,3 +63,8 @@ test("FIC: se i totali coincidono il pagamento non cambia", async () => {
   const { data } = await sendAndCapture({ taxableCents: 9900, vatCents: 0, outOfScopeCents: 396, bolloCents: 200, totalCents: 10496 }, 104.96);
   assert.equal((data.payments_list as { amount: number }[])[0].amount, 104.96);
 });
+
+test("FIC: documento elettronico con metodo di pagamento in codice SdI (ei_data.payment_method)", async () => {
+  const { data } = await sendAndCapture({ taxableCents: 9900, vatCents: 0, outOfScopeCents: 396, bolloCents: 200, totalCents: 10496 });
+  assert.deepEqual(data.ei_data, { payment_method: "MP05" }); // "Bonifico bancario"
+});

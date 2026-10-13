@@ -4,6 +4,7 @@
 // (dev/test) + provider REALE Openapi.it + scheletro Fatture in Cloud.
 import { buildFatturaPaXml, fatturaPaFileName } from "./fatturapa";
 import { FIC_API_BASE } from "./fic-oauth";
+import { sdiPaymentCode } from "./payment-codes";
 
 export type ProviderName = "mock" | "openapi" | "fattureincloud";
 
@@ -335,6 +336,8 @@ export class FattureInCloudProvider implements EInvoiceProvider {
         status: "not_paid",
       }],
       e_invoice: eInvoice,
+      // Fatture in Cloud pretende il metodo di pagamento in un documento elettronico, come codice SdI (MP05 = bonifico, MP08 = carta, MP01 = contanti…).
+      ei_data: { payment_method: sdiPaymentCode(payload.payment?.method) },
       ...(payload.notes ? { notes: payload.notes } : {}),
     };
   }
