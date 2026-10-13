@@ -2,8 +2,8 @@
 // Il tag si carica SOLO dopo il consenso esplicito del visitatore (GDPR): prima non viene caricato nulla e non si impostano cookie.
 // Account Google Ads: Spigolehouse (nuovo). L'ID del tag (AW-…) non è un segreto: compare nel codice di ogni pagina che lo usa.
 export const ADS_ID = "AW-18509493463";
-/** Etichetta della conversione "Prenotazione diretta" (Google Ads → Obiettivi → Conversioni → Prenotazione diretta → snippet evento, parte dopo la barra di `send_to`). Finché è vuota il tag si carica ma non si invia nessuna conversione. */
-export const ADS_CONVERSION_LABEL = "";
+/** Etichetta della conversione "Prenotazione diretta" (Google Ads → Obiettivi → Conversioni → Prenotazione diretta → snippet evento, parte dopo la barra di `send_to`). Se fosse vuota il tag si caricherebbe ma non si invierebbe nessuna conversione. */
+export const ADS_CONVERSION_LABEL = "cx6hCPOAmpsdENfpgfpE";
 
 const CONSENT_KEY = "xn-consent-ads"; // "granted" | "denied"
 

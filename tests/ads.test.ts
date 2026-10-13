@@ -29,9 +29,17 @@ test("con consenso il tag si carica una volta sola con l'ID dell'account", () =>
   assert.equal((cfg[0] as unknown[])[1], ADS_ID);
 });
 
-test("senza etichetta di conversione (ancora vuota) non parte nessuna conversione", () => {
+test("conversione: parte una sola volta per codice prenotazione, con importo, valuta e codice verso l'etichetta giusta", () => {
   const w = g.window as { gtag: (...a: unknown[]) => void };
   const orig = w.gtag; w.gtag = (...a: unknown[]) => { calls.push(a); orig(...a); };
-  assert.equal(trackBookingConversion({ value: 100, transactionId: "XEN-2" }), false);
-  assert.equal(calls.length, 0);
+  assert.equal(trackBookingConversion({ value: 123.456, transactionId: "XEN-2" }), true);
+  assert.equal(trackBookingConversion({ value: 123.456, transactionId: "XEN-2" }), false, "stesso codice: niente doppione");
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0], ["event", "conversion", { send_to: "AW-18509493463/cx6hCPOAmpsdENfpgfpE", value: 123.46, currency: "EUR", transaction_id: "XEN-2" }]);
+  assert.equal(trackBookingConversion({ value: 80, transactionId: "XEN-3" }), true, "un altro codice parte");
+});
+
+test("senza consenso non parte nessuna conversione", () => {
+  setAdsConsent("denied");
+  assert.equal(trackBookingConversion({ value: 50, transactionId: "XEN-9" }), false);
 });
