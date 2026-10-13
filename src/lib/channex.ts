@@ -475,3 +475,55 @@ export async function updateRatePlanOccupancy(ratePlanId: string, occupancy: num
     } }),
   });
 }
+
+// ── Contenuto della struttura per Google Hotel (descrizione, servizi, politiche, foto) ──
+// Endpoint dalla documentazione Channex: Properties (PUT), Hotel Policy, Facilities, Photos. Le politiche di cancellazione non hanno una pagina nella documentazione:
+// si prova solo a LEGGERE le esistenti (se l'endpoint c'è) per usarne una come predefinita.
+type Row = { id?: string; attributes?: Record<string, unknown> };
+const rowId = (r: Row): string => String(r.attributes?.id ?? r.id ?? "");
+
+export async function listFacilityOptions(): Promise<{ ok: boolean; error?: string; options: { id: string; title: string }[] }> {
+  const res = await channex<{ data?: Row[] }>("/property_facilities/options");
+  if (!res.ok) return { ok: false, error: res.error, options: [] };
+  const options = (res.data?.data ?? []).map((r) => ({ id: rowId(r), title: String(r.attributes?.title ?? "") })).filter((o) => o.id && o.title);
+  return { ok: true, options };
+}
+export async function findHotelPolicyId(propertyId: string): Promise<{ ok: boolean; error?: string; id?: string }> {
+  const res = await channex<{ data?: Row[] }>(`/hotel_policies?filter[property_id]=${encodeURIComponent(propertyId)}`);
+  if (!res.ok) return { ok: false, error: res.error };
+  const first = (res.data?.data ?? [])[0];
+  return { ok: true, id: first ? rowId(first) : undefined };
+}
+export async function saveHotelPolicy(existingId: string | undefined, body: unknown): Promise<{ ok: boolean; error?: string; id?: string }> {
+  const res = await channex<{ data?: Row }>(existingId ? `/hotel_policies/${encodeURIComponent(existingId)}` : "/hotel_policies", { method: existingId ? "PUT" : "POST", body: JSON.stringify(body) });
+  if (!res.ok) return { ok: false, error: res.error };
+  return { ok: true, id: (res.data?.data ? rowId(res.data.data) : "") || existingId };
+}
+export async function findCancellationPolicyId(propertyId: string): Promise<{ ok: boolean; status: number; id?: string }> {
+  const res = await channex<{ data?: Row[] }>(`/cancellation_policies?filter[property_id]=${encodeURIComponent(propertyId)}`);
+  if (!res.ok) return { ok: false, status: res.status };
+  const first = (res.data?.data ?? [])[0];
+  return { ok: true, status: res.status, id: first ? rowId(first) : undefined };
+}
+export async function updateProperty(propertyId: string, body: unknown) {
+  return channex(`/properties/${encodeURIComponent(propertyId)}`, { method: "PUT", body: JSON.stringify(body) });
+}
+/** Carica un file immagine su Channex (multipart) e restituisce l'indirizzo temporaneo da usare per creare la foto. */
+export async function uploadPhotoFile(bytes: Uint8Array, mime: string, name: string): Promise<{ ok: boolean; error?: string; url?: string }> {
+  if (!KEY) return { ok: false, error: "CHANNEX_API_KEY non configurata" };
+  try {
+    const form = new FormData();
+    form.append("photo", new Blob([bytes as BlobPart], { type: mime }), name);
+    const res = await channexFetch(`${BASE}/photos/upload`, { method: "POST", headers: { "user-api-key": KEY, Accept: "application/json" }, body: form, cache: "no-store" });
+    const text = await res.text();
+    let j: Record<string, unknown> = {};
+    try { j = text ? JSON.parse(text) : {}; } catch { /* non JSON */ }
+    if (!res.ok) return { ok: false, error: text.slice(0, 300) || res.statusText };
+    const d = (j.data ?? {}) as Record<string, unknown>;
+    const url = String((d.attributes as Record<string, unknown> | undefined)?.url ?? d.url ?? j.url ?? "");
+    return url ? { ok: true, url } : { ok: false, error: "Channex non ha restituito l'indirizzo della foto" };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "errore di rete" }; }
+}
+export async function createPhoto(propertyId: string, url: string, description?: string) {
+  return channex("/photos", { method: "POST", body: JSON.stringify({ photo: { property_id: propertyId, url, kind: "photo", ...(description ? { description: description.slice(0, 200) } : {}) } }) });
+}
