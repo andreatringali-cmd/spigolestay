@@ -24,7 +24,7 @@ async function sendAndCapture(totals: { taxableCents: number; vatCents: number; 
     const p = new FattureInCloudProvider({ accessToken: "t", companyId: "9", dryRun: true });
     await p.send({
       docKind: "fattura", numberLabel: "2/2026", issueDate: "2026-10-13", currency: "EUR", notes: "",
-      cliente: { name: "Mario Rossi", taxCode: "RSSMRA80A01H501U", country: "IT", sdiCode: "0000000" },
+      cliente: { kind: "privato", name: "Mario", lastName: "Rossi", taxCode: "RSSMRA80A01H501U", country: "IT", sdiCode: "0000000" },
       lines: [
         { description: "DELUXE", qty: 1, unitPriceCents: 9900, vatRate: 0, vatNature: "N2.2" },
         { description: "Imposta di soggiorno", qty: 1, unitPriceCents: 396, vatRate: 0, vatNature: "N1" },
@@ -67,4 +67,13 @@ test("FIC: se i totali coincidono il pagamento non cambia", async () => {
 test("FIC: documento elettronico con metodo di pagamento in codice SdI (ei_data.payment_method)", async () => {
   const { data } = await sendAndCapture({ taxableCents: 9900, vatCents: 0, outOfScopeCents: 396, bolloCents: 200, totalCents: 10496 });
   assert.deepEqual(data.ei_data, { payment_method: "MP05" }); // "Bonifico bancario"
+});
+
+test("FIC: cliente privato con nome e cognome → tipo person con first_name e last_name", async () => {
+  const { data } = await sendAndCapture({ taxableCents: 9900, vatCents: 0, outOfScopeCents: 396, bolloCents: 200, totalCents: 10496 });
+  const e = data.entity as Record<string, unknown>;
+  assert.equal(e.type, "person");
+  assert.equal(e.first_name, "Mario");
+  assert.equal(e.last_name, "Rossi");
+  assert.equal(e.name, "Mario Rossi");
 });

@@ -24,7 +24,7 @@ export interface EInvoicePayload {
     pec?: string;
   };
   cliente: {
-    kind: string; name: string; vat?: string | null; taxCode?: string | null;
+    kind: string; name: string; lastName?: string | null; vat?: string | null; taxCode?: string | null; // privato: name = nome, lastName = cognome
     address?: string | null; city?: string | null; cap?: string | null;
     province?: string | null; country?: string; sdiCode?: string; pec?: string | null;
   };
@@ -309,7 +309,9 @@ export class FattureInCloudProvider implements EInvoiceProvider {
     return {
       type,
       entity: {
-        name: c.name,
+        // Privato con cognome: Fatture in Cloud vuole tipo "person" con nome e cognome separati; senza, il cliente risultava solo "andrea".
+        ...(c.kind === "privato" && c.lastName ? { type: "person", first_name: c.name, last_name: c.lastName } : {}),
+        name: c.kind === "privato" && c.lastName ? `${c.name} ${c.lastName}`.trim() : c.name,
         vat_number: c.vat || undefined,
         tax_code: c.taxCode || undefined,
         address_street: c.address || undefined,

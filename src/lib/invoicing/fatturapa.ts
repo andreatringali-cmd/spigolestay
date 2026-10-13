@@ -18,6 +18,7 @@ const tipoDoc = (kind: string, sdiType?: string) => sdiType || (kind === "nota_d
 function anagraficaCliente(c: EInvoicePayload["cliente"]): string {
   // Privato → Nome/Cognome se possibile; altrimenti Denominazione.
   if (c.kind === "privato") {
+    if (c.name?.trim() && c.lastName?.trim()) return `<Nome>${esc(c.name.trim())}</Nome><Cognome>${esc(c.lastName.trim())}</Cognome>`; // nome e cognome già separati
     const parts = (c.name || "").trim().split(/\s+/);
     if (parts.length >= 2) {
       const nome = parts.shift()!; const cognome = parts.join(" ");

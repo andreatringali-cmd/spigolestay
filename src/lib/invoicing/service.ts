@@ -324,7 +324,7 @@ async function buildPayload(admin: SupabaseClient, tenantId: string, documentId:
       country: settings?.country ?? "IT", regimeFiscale: regimeFiscale(doc.regime), pec: settings?.pec,
     },
     cliente: {
-      kind: cp.kind ?? "privato", name: cp.name ?? "Cliente", vat: cp.vat ?? null, taxCode: cp.tax_code ?? null,
+      kind: cp.kind ?? "privato", name: cp.name ?? "Cliente", lastName: cp.lastName ?? null, vat: cp.vat ?? null, taxCode: cp.tax_code ?? null,
       address: cp.address ?? null, city: cp.city ?? null, cap: cp.cap ?? null, province: cp.province ?? null,
       country: cp.country ?? "IT", sdiCode: cp.sdi_code ?? "0000000", pec: cp.pec ?? null,
     },
