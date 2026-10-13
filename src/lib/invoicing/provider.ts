@@ -102,7 +102,8 @@ function mapSdiStatus(raw: string | undefined | null): DocStatus {
 
 export class OpenapiProvider implements EInvoiceProvider {
   readonly name = "openapi" as const;
-  constructor(private cfg: OpenapiConfig) {}
+  private cfg: OpenapiConfig;
+  constructor(cfg: OpenapiConfig) { this.cfg = cfg; } // senza parameter property: i test girano con il solo strip dei tipi di node
 
   private base() { return this.cfg.sandbox ? "https://test.sdi.openapi.it" : "https://sdi.openapi.it"; }
   private headers() { return { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${this.cfg.token ?? ""}` }; }
@@ -220,7 +221,8 @@ function mapEiStatus(raw: string | undefined | null): DocStatus {
 export class FattureInCloudProvider implements EInvoiceProvider {
   readonly name = "fattureincloud" as const;
   private vatCache: FicVatType[] | null = null;
-  constructor(private cfg: FicConfig) {}
+  private cfg: FicConfig;
+  constructor(cfg: FicConfig) { this.cfg = cfg; }
 
   private base() { return FIC_API_BASE; }
   private headers() { return { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${this.cfg.accessToken ?? ""}` }; }
@@ -320,6 +322,9 @@ export class FattureInCloudProvider implements EInvoiceProvider {
       currency: { id: payload.currency || "EUR" },
       language: { code: "it" },
       items_list: items,
+      // Il bollo (2 € forfettario) NON è una voce: in Fatture in Cloud è il campo del documento "stamp_duty", che entra nel totale da pagare.
+      // Senza, FIC calcola il totale senza bollo e rifiuta il pagamento da totalEuro ("Il totale dei pagamenti non corrisponde al totale da pagare", 422).
+      ...(payload.totals.bolloCents > 0 ? { stamp_duty: payload.totals.bolloCents / 100 } : {}),
       payments_list: [{
         amount: totalEuro,
         due_date: (payload.payment?.dueDate || payload.issueDate || "").slice(0, 10) || undefined,
