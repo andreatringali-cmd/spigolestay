@@ -97,7 +97,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const [bookError, setBookError] = useState<string | null>(null); // esito negativo dell'invio: la conferma NON va mostrata
   // Riepilogo per la schermata di conferma dopo il ritorno dal pagamento Stripe (lo stato
   // del form si perde nel redirect: lo ripristiniamo da sessionStorage).
-  const [doneSummary, setDoneSummary] = useState<null | { code: string; structureName?: string; roomName?: string; ci: string; co: string; total: number; deposit: number; guestFirst?: string; email?: string }>(null);
+  const [doneSummary, setDoneSummary] = useState<null | { code: string; structureName?: string; roomName?: string; ci: string; co: string; total: number; cityTax?: number; deposit: number; guestFirst?: string; email?: string }>(null);
   const [adults, setAdults] = useState(() => Number(qp("ad")) || 2);
   const [children, setChildren] = useState(() => Number(qp("ch")) || 0);
   const [childAges, setChildAges] = useState<number[]>(() => {
@@ -253,7 +253,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     if (isPublicMode() && publicSlug()) {
       const token = (globalThis.crypto?.randomUUID?.() ?? String(Date.now()));
       const guestBody = { firstName: guest.firstName.trim(), lastName: guest.lastName.trim(), email: guest.email.trim(), phone: guest.phone.trim(), country: guest.country };
-      try { sessionStorage.setItem("xn-lastbooking", JSON.stringify({ code: bkCode, structureName: structure?.name, roomName: `${selRt.name}${selPlan ? " · " + selPlan.name : ""}`, ci: checkIn, co: checkOut, total, deposit, guestFirst: guest.firstName.trim(), email: guest.email.trim() })); } catch {}
+      try { sessionStorage.setItem("xn-lastbooking", JSON.stringify({ code: bkCode, structureName: structure?.name, roomName: `${selRt.name}${selPlan ? " · " + selPlan.name : ""}`, ci: checkIn, co: checkOut, total, cityTax, deposit, guestFirst: guest.firstName.trim(), email: guest.email.trim() })); } catch {}
       setProcessing(true);
       let failure: string | null = null;
       try {
@@ -301,8 +301,9 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   useEffect(() => {
     if (step !== "done") return;
     const c = doneSummary?.code || code;
-    const v = doneSummary?.total ?? total;
-    if (c) trackBookingConversion({ value: Number(v) || 0, transactionId: c });
+    // Valore della conversione = ricavo della struttura: il totale mostrato all'ospite senza la tassa di soggiorno (non è un ricavo, si riscuote per il Comune).
+    const v = (Number(doneSummary?.total ?? total) || 0) - (Number(doneSummary?.cityTax ?? cityTax) || 0);
+    if (c) trackBookingConversion({ value: Math.max(0, v), transactionId: c });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, doneSummary, code]);
 
