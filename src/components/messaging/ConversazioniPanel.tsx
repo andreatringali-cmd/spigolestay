@@ -601,7 +601,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     try {
       const r = await apiPost<{ ok: boolean; url: string; amount: number }>("stripe/chat-pay", { bookingId: b.id, kind: payKind, amount: plan.cents / 100 });
       const g = guests.find((x) => x.id === current.id);
-      const msg = chatPayGuestMessage(langOf(g), payKind, Math.round(r.amount * 100), r.url);
+      const msg = chatPayGuestMessage(langOf(g), payKind, Math.round(r.amount * 100), await shortenLink(r.url));
       setDraft((d) => `${d.trim()}${d.trim() ? "\n\n" : ""}${msg}`);
       setPayFor(null);
     } catch (e) { setPayErr(e instanceof Error ? e.message : t("Errore")); }

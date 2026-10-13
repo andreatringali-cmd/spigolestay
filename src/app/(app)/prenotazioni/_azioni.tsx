@@ -149,7 +149,8 @@ export default function StepActions(p: StepActionsProps) {
     const build = async () => {
       const url = await shortenLink(fullCheckin);
       const core = partial ? CHECKIN_MORE_MSG[lang](missing, url) : CHECKIN_MSG[lang](url);
-      return { text: `${intro("checkin")}${greeting(lang, guest)}${core}`, subject: `Check-in online${structure?.name ? ` · ${structure.name}` : ""}` };
+      const hi = greeting(lang, guest).trim(); // saluto su una riga a sé: dopo la virgola la frase riparte con la maiuscola senza stonare
+      return { text: `${hi ? `${hi}\n` : ""}${intro("checkin")}${core}`, subject: `Check-in online${structure?.name ? ` · ${structure.name}` : ""}` };
     };
     body = (<>
       <p className="text-sm text-dim">{partial
@@ -165,7 +166,9 @@ export default function StepActions(p: StepActionsProps) {
       const asked = amount.trim() ? Number(amount.replace(",", ".")) : undefined;
       if (asked !== undefined && (!isFinite(asked) || asked <= 0)) throw new Error("Importo non valido.");
       const r = await apiPost<{ ok: boolean; url: string; amount: number }>("stripe/chat-pay", { bookingId: b.id, kind, ...(asked !== undefined ? { amount: asked } : {}) });
-      return { text: `${intro(remKind) || (sent ? REMINDER_INTRO[lang] : "")}${greeting(lang, guest)}${chatPayGuestMessage(lang, kind, Math.round(r.amount * 100), r.url)}`, subject: `${structure?.name ? structure.name + " · " : ""}${kind === "saldo" ? "Saldo del soggiorno" : "Tassa di soggiorno"}` };
+      const hi = greeting(lang, guest).trim(); // saluto su una riga a sé
+      const link = await shortenLink(r.url); // link corto /g/<codice>
+      return { text: `${hi ? `${hi}\n` : ""}${intro(remKind) || (sent ? REMINDER_INTRO[lang] : "")}${chatPayGuestMessage(lang, kind, Math.round(r.amount * 100), link)}`, subject: `${structure?.name ? structure.name + " · " : ""}${kind === "saldo" ? "Saldo del soggiorno" : "Tassa di soggiorno"}` };
     };
     const manual = async () => {
       if (kind === "saldo") {

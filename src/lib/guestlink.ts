@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabase";
 
 type RoomCode = { label?: string; value?: string; cond?: "always" | "parking" | "noparking" };
 
-// Accorcia un link ospite (guida `/guida/...` o self check-in `/checkin...`) in `origin/g/<code>`
+// Accorcia un link ospite (guida `/guida/...`, self check-in `/checkin...` o pagamento `/api/stripe/chat-pay/go...`) in `origin/g/<code>`
 // salvando la parte lunga su Supabase. Se Supabase non c'è o va in errore, ritorna il link originale.
 const SL_ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789";
 export async function shortenLink(fullUrl: string): Promise<string> {
@@ -16,7 +16,7 @@ export async function shortenLink(fullUrl: string): Promise<string> {
     if (!supabase || typeof window === "undefined") return fullUrl;
     const u = new URL(fullUrl);
     const target = u.pathname + u.search; // es. /guida/index.html?... oppure /checkin?b=...
-    if (!target.startsWith("/guida/") && !target.startsWith("/checkin") && !target.startsWith("/preventivo")) return fullUrl;
+    if (!target.startsWith("/guida/") && !target.startsWith("/checkin") && !target.startsWith("/preventivo") && !target.startsWith("/api/stripe/chat-pay/go")) return fullUrl;
     let code = "";
     for (let i = 0; i < 6; i++) code += SL_ALPHABET[Math.floor(Math.random() * SL_ALPHABET.length)];
     const { error } = await supabase.from("short_links").insert({ code, target });

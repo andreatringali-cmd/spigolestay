@@ -17,7 +17,7 @@ export const GUIDE_MSG: Record<Lang, (u: string) => string> = {
   es: (u) => `Aquí tienes la guía con toda la información útil: ${u}`,
 };
 export const CHECKIN_MSG: Record<Lang, (u: string) => string> = {
-  it: (u) => `Per velocizzare l'arrivo, compila il check-in online (dati e documento) qui: ${u}`,
+  it: (u) => `Per velocizzare il suo arrivo la invitiamo a completare il check-in online (dati e documento, bastano due minuti): ${u}`,
   en: (u) => `To speed up your arrival, please complete the online check-in (details and ID) here: ${u}`,
   fr: (u) => `Pour accélérer votre arrivée, remplissez le check-in en ligne (données et pièce d'identité) ici : ${u}`,
   de: (u) => `Um Ihre Ankunft zu beschleunigen, füllen Sie bitte den Online-Check-in (Daten und Ausweis) hier aus: ${u}`,
