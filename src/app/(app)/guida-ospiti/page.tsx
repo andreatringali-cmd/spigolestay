@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import Icon from "@/components/Icon";
+import { copyGuideContent, guideHasText } from "@/lib/guide-copy";
 
 // Forma dati "guida" = window.PROPERTY del motore (public/guida). Multi-tenant: una per struttura.
 interface Guide {
@@ -425,6 +426,11 @@ export default function GuidaOspitiPage() {
   const [loaded, setLoaded] = useState(false); // true quando i dati salvati sono stati caricati
 
   const [storageFull, setStorageFull] = useState(false);
+  // "Copia da un'altra struttura": pannello, struttura sorgente e opzioni
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copySrc, setCopySrc] = useState("");
+  const [copyTv, setCopyTv] = useState(false);
+  const [copyMsg, setCopyMsg] = useState(false);
 
   useEffect(() => { try { setAll(JSON.parse(localStorage.getItem("spigolestay:guides") || "{}")); } catch {} finally { setLoaded(true); } }, []);
   const persist = (next: Record<string, Guide>) => {
@@ -810,6 +816,23 @@ export default function GuidaOspitiPage() {
     refresh();
   };
   const savedThis = !!all[sid];
+  // Copia testi + traduzioni (e a richiesta TV / messaggio) da un'altra struttura. Dati della struttura, contatti, WiFi, orari, link e codici NON si toccano.
+  const copyFromOther = () => {
+    const srcG = all[copySrc];
+    const srcS = structures.find((x) => x.id === copySrc);
+    if (!srcG || !guideHasText(srcG.content)) { alert("La guida di quella struttura è ancora vuota: non c'è niente da copiare."); return; }
+    if (hasRealContent && !confirm(`Sostituire i testi della guida di "${struct?.name ?? ""}" con quelli di "${srcS?.name ?? ""}"?\n\nI dati della struttura (indirizzo, telefoni, WiFi, orari, link, codici) NON vengono toccati. Le traduzioni già fatte vengono copiate insieme ai testi.`)) return;
+    const patch = copyGuideContent(srcG, guide, { tv: copyTv, inviteMsg: copyMsg }) as Partial<Guide>;
+    // Controllo quota PRIMA di toccare lo stato: se non entra, la guida attuale resta com'è.
+    try { localStorage.setItem("spigolestay:guides", JSON.stringify({ ...all, [sid]: { ...guide, ...patch, id: sid } })); }
+    catch { alert("Memoria piena: non riesco a copiare la guida (di solito per le foto pesanti). Non è stato cambiato nulla: togli qualche foto dalla guida di origine o di destinazione e riprova."); return; }
+    // Se la sorgente ha già le traduzioni, segno questo contenuto come "già tradotto": niente ri-traduzione automatica.
+    if (TR_LANGS.some((l) => !!patch.i18n?.[l])) lastTrSig.current = JSON.stringify(patch.content);
+    set(patch);
+    setCopyOpen(false);
+    refresh();
+  };
+  const otherStructs = structures.filter((x) => x.id !== sid);
 
   // Anteprima in tempo reale: ogni modifica è già scritta in localStorage da set(); qui,
   // con un piccolo debounce, ricarichiamo l'iframe per rispecchiare subito ciò che compili.
@@ -927,6 +950,25 @@ export default function GuidaOspitiPage() {
             <span className="flex items-center gap-1.5 text-xs font-semibold text-dim"><span className="text-faint">🏠 Struttura:</span> <span className="text-txt">{struct?.name ?? ""}</span></span>
           )}
           <div className="flex flex-wrap items-center gap-2">
+          {otherStructs.length > 0 && (
+            <div className="relative">
+              <button onClick={() => { setCopyOpen((o) => !o); if (!copySrc || !otherStructs.some((x) => x.id === copySrc)) setCopySrc(otherStructs.find((x) => guideHasText(all[x.id]?.content))?.id ?? otherStructs[0].id); }} title="Copia testi e traduzioni dalla guida di un'altra tua struttura: i dati di questa struttura non vengono toccati" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">⧉ Copia da un&apos;altra struttura</button>
+              {copyOpen && (
+                <div className="absolute right-0 top-full z-20 mt-1 w-64 space-y-2 rounded-lg border border-line bg-paper p-2.5 text-xs shadow-lg">
+                  <select value={copySrc} onChange={(e) => setCopySrc(e.target.value)} className="w-full rounded-lg border border-line bg-paper px-2 py-1 text-xs font-semibold text-txt outline-none focus:border-focus">
+                    {otherStructs.map((x) => <option key={x.id} value={x.id} disabled={!guideHasText(all[x.id]?.content)}>{x.name}{guideHasText(all[x.id]?.content) ? "" : " (guida vuota)"}</option>)}
+                  </select>
+                  <label className="flex items-center gap-1.5 text-dim"><input type="checkbox" checked={copyTv} onChange={(e) => setCopyTv(e.target.checked)} /> Copia anche le impostazioni TV</label>
+                  <label className="flex items-center gap-1.5 text-dim"><input type="checkbox" checked={copyMsg} onChange={(e) => setCopyMsg(e.target.checked)} /> Copia anche il messaggio di benvenuto</label>
+                  <div className="text-[11px] leading-snug text-faint">Si copiano testi, foto e traduzioni. Indirizzo, contatti, WiFi, orari, link e codici restano quelli di questa struttura.</div>
+                  <div className="flex justify-end gap-1.5">
+                    <button onClick={() => setCopyOpen(false)} className="rounded-lg border border-line px-2.5 py-1 font-semibold text-dim hover:bg-wash">Annulla</button>
+                    <button onClick={copyFromOther} disabled={!copySrc || !guideHasText(all[copySrc]?.content)} className="rounded-lg bg-[color:var(--focus)] px-2.5 py-1 font-bold text-white hover:opacity-90 disabled:opacity-40">Copia</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <button onClick={loadDemo} title="Copia i testi della guida di esempio (Siracusa) in questa guida: i tuoi dati non vengono toccati" className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">✨ Parti dall&apos;esempio</button>
           <button onClick={refresh} className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">↻ Aggiorna</button>
           <select value={pvLang} onChange={(e) => setPvLang(e.target.value)} className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-dim outline-none focus:border-focus">

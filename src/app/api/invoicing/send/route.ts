@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const documentId = String(body?.documentId || "").trim();
     if (!documentId) return NextResponse.json({ error: "missing_document" }, { status: 400 });
-    const res = await sendDocument(auth.admin, auth.tenantId, documentId);
+    const res = await sendDocument(auth.admin, auth.tenantId, documentId, { enableSdi: body?.enableSdi === true });
     return NextResponse.json({ ok: true, ...res });
   } catch (e) {
     return NextResponse.json({ error: "send_failed", message: (e as Error)?.message ?? "errore" }, { status: 400 });

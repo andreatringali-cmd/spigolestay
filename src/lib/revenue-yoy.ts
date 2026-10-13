@@ -6,6 +6,7 @@
 // quello di oggi, e il "ritmo a questa data" richiede la data di prenotazione (bookedOn).
 // Logica pura, testabile.
 import type { Booking, Channel, Unit } from "./types";
+import { isNetPayout } from "./commission-estimate";
 
 const DAY = 86_400_000;
 const toUTC = (iso: string) => { const [y, m, d] = iso.split("-").map(Number); return Date.UTC(y, m - 1, d); };
@@ -92,6 +93,7 @@ export function realChannelCommission(bookings: Booking[], channel: Channel, str
     if (b.checkIn < sinceISO) continue;
     const total = b.total ?? 0;
     if (total <= 0) continue;
+    if (isNetPayout(b)) continue; // totale già netto (es. Expedia): nessuna commissione da sommare
     const amount = typeof b.commissionAmount === "number" ? b.commissionAmount : typeof b.commissionPct === "number" ? total * b.commissionPct / 100 : null;
     if (amount == null) continue;
     comm += amount; tot += total; n++;

@@ -4,7 +4,18 @@
 // dello stesso canale e della stessa struttura con commissione reale, nell'ultimo anno. Modulo puro (niente rete): lo usano il calcolo delle
 // commissioni, la pagina Canali e i test.
 
-type B = { channel?: string; structureId?: string; status?: string; total?: number; commissionAmount?: number | null; checkIn: string };
+type B = { channel?: string; structureId?: string; status?: string; total?: number; commissionAmount?: number | null; checkIn: string; netTotal?: boolean; extId?: string };
+
+/**
+ * Il totale della prenotazione è già il pagamento netto all'hotel (niente da sottrarre)? Vale per Expedia importata dall'OTA (extId "channex:…"):
+ * lì l'importo ricevuto è quanto Expedia versa alla struttura e le trattenute (allineamento tariffe, acceleratore, commissione) sono già tolte.
+ * Il flag netTotal, se presente, vince (netTotal:false la riporta al calcolo normale con commissionAmount/commissionPct);
+ * per le righe già importate prima del flag vale la regola sul canale.
+ */
+export function isNetPayout(b: { channel?: string; netTotal?: boolean; extId?: string }): boolean {
+  if (b.netTotal !== undefined) return b.netTotal;
+  return b.channel === "expedia" && typeof b.extId === "string" && b.extId.startsWith("channex:");
+}
 
 /** Servono almeno tante prenotazioni con cifra reale, altrimenti la stima non è affidabile e si usa la percentuale standard. */
 export const MIN_ESTIMATE_SAMPLES = 5;
@@ -21,6 +32,7 @@ export function computeCommissionEstimates(bookings: B[], todayIso: string): Rec
   const acc = new Map<string, { amt: number; tot: number; n: number }>();
   for (const b of bookings) {
     if (b.status === "cancelled" || !b.channel || b.channel === "direct" || b.channel === "blocked") continue;
+    if (isNetPayout(b)) continue; // totale già netto: non è una commissione
     if (b.commissionAmount == null || !(b.total && b.total > 0) || !(b.commissionAmount >= 0)) continue;
     if (b.checkIn < from) continue;
     const k = key(b.channel, b.structureId);

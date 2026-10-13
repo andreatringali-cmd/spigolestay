@@ -2,8 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { simulateImpact, typeDayAvailability } from "../src/lib/revenue-impact.ts";
 import { scanGaps } from "../src/lib/revenue-gaps.ts";
-import { yoyCompare, realChannelCommission, lastYearDayOcc } from "../src/lib/revenue-yoy.ts";
 import { buildChanges, planUndo } from "../src/lib/revenue-history.ts";
+import { register } from "node:module";
+
+// revenue-yoy.ts importa ora commission-estimate (import senza estensione): serve il risolutore dei test, e va registrato prima dell'import dinamico.
+register("./helpers/alias-loader.mjs", import.meta.url);
+const { yoyCompare, realChannelCommission, lastYearDayOcc } = await import("../src/lib/revenue-yoy.ts");
 
 // Dati minimi: una struttura, una tipologia "t1" con 2 camere.
 const units = [

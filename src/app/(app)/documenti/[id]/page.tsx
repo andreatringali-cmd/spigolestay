@@ -14,6 +14,7 @@ import { cityTaxOfBooking } from "@/lib/booking";
 import { invPost, centsEur, DOC_KIND_LABEL, STATO } from "@/lib/invoicing/client";
 import { BOLLO_THRESHOLD_CENTS } from "@/lib/invoicing/folio";
 import { validateDocument, hasErrors, type Issue } from "@/lib/invoicing/validate";
+import { sendAction, sendButtonLabel, sendConfirmText, isTrialSend, rejectionReason, sdiBadge, TRIAL_NOTE } from "@/lib/invoicing/sdi-status";
 
 interface Doc { id: string; tenant_id: string; structure_id: string | null; booking_id: string | null; booking_code: string | null;
   doc_kind: string; sdi_type: string; regime: string | null; number_label: string | null; stato: string; issue_date: string | null;
@@ -21,7 +22,7 @@ interface Doc { id: string; tenant_id: string; structure_id: string | null; book
   counterpart: Record<string, string> | null; taxable_cents: number; vat_cents: number; out_of_scope_cents: number;
   bollo_cents: number; rounding_cents: number; total_cents: number; advance_cents: number; send_sdi: boolean; provider: string | null; provider_ref: string | null; related_document_id: string | null; }
 interface DbLine { id: string; pos: number; description: string; qty: number; unit_price_cents: number; vat_rate: number; vat_nature: string | null; line_total_cents: number; source_kind: string | null }
-interface Ev { id: string; ts: string; kind: string; message: string }
+interface Ev { id: string; ts: string; kind: string; message: string; meta?: Record<string, unknown> | null }
 interface Pay { id: string; amount_cents: number; method: string | null; paid_at: string; note: string | null }
 interface Related { id: string; number_label: string | null; doc_kind: string; role: string; stato?: string; total_cents?: number }
 // Dati emittente letti da tenant_invoice_settings (per account).
@@ -269,7 +270,20 @@ export default function DocumentoPage() {
   const blockMsg = () => setMsg("Non posso emettere: correggi prima gli errori elencati in “Controlli prima dell'emissione”.");
   const onIssue = () => { if (blocked) { blockMsg(); return; } act("issue", async () => { if (await saveDraft()) { await invPost("issue", { documentId: id }); setMsg("Documento emesso ✓"); } }); };
   const onSaveSend = () => { if (blocked) { blockMsg(); return; } act("savesend", async () => { if (await saveDraft()) { await invPost("issue", { documentId: id }); const r = await invPost<{ message?: string }>("send", { documentId: id }); setMsg(r.message || "Emesso e inviato"); } }); };
-  const send = () => act("send", async () => { const r = await invPost<{ message?: string }>("send", { documentId: id }); if (r.message) setMsg(r.message); });
+  // Invio di un documento emesso. Se era stato emesso con "Comunica al SDI" spento, il server lo accende e poi invia (enableSdi).
+  // Prima di inviare si chiede conferma, dicendo se è modalità prova (non arriva allo SdI) o invio reale.
+  const send = async () => {
+    if (!doc) return;
+    const action = sendAction(doc);
+    if (!action) return;
+    let dryRun: boolean | null = null;
+    if (doc.provider === "fattureincloud") {
+      try { const r = await invPost<{ dryRun?: boolean }>("provider", { provider: "fattureincloud", action: "status" }); dryRun = !!r.dryRun; } catch { dryRun = null; }
+    }
+    const t = sendConfirmText({ provider: doc.provider, dryRun, enableSdi: action === "enable_and_send", numberLabel: doc.number_label });
+    if (!(await ask({ title: t.title, message: t.message, confirmLabel: t.confirmLabel }))) return;
+    await act("send", async () => { const r = await invPost<{ message?: string }>("send", { documentId: id, ...(action === "enable_and_send" ? { enableSdi: true } : {}) }); if (r.message) setMsg(r.message); });
+  };
   const refresh = () => act("status", async () => { const r = await invPost<{ message?: string }>("status", { documentId: id }); if (r.message) setMsg(r.message); });
   const downloadXml = () => act("xml", async () => { const r = await invPost<{ xml: string }>("xml", { documentId: id }); const b = new Blob([r.xml], { type: "application/xml" }); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${(doc?.number_label ?? id).replace(/[^\w-]/g, "_")}.xml`; a.click(); URL.revokeObjectURL(a.href); });
   const creditNote = () => act("nc", async () => { const r = await invPost<{ documentId: string }>("credit-note", { documentId: id }); router.push(`/documenti/${r.documentId}`); });
@@ -350,7 +364,11 @@ export default function DocumentoPage() {
   if (loading) return <div className="p-6 text-sm text-faint">Caricamento…</div>;
   if (!doc) return <div className="p-6 text-sm text-faint">Documento non trovato. <button onClick={() => router.push("/documenti")} className="font-semibold text-focus hover:underline">Torna ai documenti</button></div>;
 
-  const st = STATO[doc.stato] ?? { label: doc.stato, color: "var(--dim)" };
+  const trial = isTrialSend(events);
+  const stBase = STATO[doc.stato] ?? { label: doc.stato, color: "var(--dim)" };
+  const st = sdiBadge(doc.stato, trial, stBase);
+  const sendAct = sendAction(doc);
+  const rejected = doc.stato === "scartata" ? rejectionReason(events) : "";
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
   const e2 = (c: number) => eur(centsEur(c));
@@ -511,6 +529,11 @@ export default function DocumentoPage() {
           <div className="flex flex-col gap-1.5">
             {events.map((ev) => <div key={ev.id} className="flex gap-2 text-[13px]"><span className="w-24 shrink-0 text-[11px] text-faint">{new Date(ev.ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span><span className="text-txt">{ev.message}</span></div>)}
           </div>
+          {doc.stato === "inviata_intermediario" && (trial
+            ? <p className="mt-2 rounded-lg px-3 py-2 text-[12px] font-medium text-dim" style={{ backgroundColor: "color-mix(in srgb, var(--dim) 12%, transparent)" }}>{TRIAL_NOTE} Verificala su Fatture in Cloud: l&apos;esito dello SdI non arriverà finché non viene inviata davvero.</p>
+            : <p className="mt-2 text-[12px] text-dim">Trasmessa allo SdI: in attesa dell&apos;esito. Usa “Aggiorna esito” per controllare se è stata consegnata o scartata.</p>)}
+          {doc.stato === "scartata" && <p className="mt-2 rounded-lg px-3 py-2 text-[12px] font-medium text-[color:var(--err)]" style={{ backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" }}>Scartata dallo SdI{rejected ? ": " + rejected : "."} Correggi i dati e riemetti il documento (con nota di credito se serve).</p>}
+          {sendAct === "enable_and_send" && <p className="mt-2 text-[12px] text-dim">Emesso senza comunicazione allo SdI: non è ancora stato inviato. Puoi inviarlo con il pulsante in basso.</p>}
           <div className="mt-3 border-t border-line pt-2">
             {isCreditNote ? (
               <p className="text-[12px] text-dim">La nota di credito riduce l&apos;importo dovuto dal documento di origine: non ha incassi propri.</p>
@@ -565,7 +588,7 @@ export default function DocumentoPage() {
           {f.send_sdi && f.doc_kind !== "ricevuta_non_fiscale" && <button onClick={onSaveSend} disabled={!!busy || blocked} title={blocked ? "Correggi prima gli errori nei controlli" : undefined} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "savesend" ? "…" : "Salva e invia"}</button>}
           <button onClick={deleteDraft} disabled={!!busy} className="rounded-lg border border-[color:var(--err)] px-3 py-2 text-sm font-semibold text-[color:var(--err)] hover:bg-[color:color-mix(in_srgb,var(--err)_10%,transparent)] disabled:opacity-50">{busy === "del" ? "Elimino…" : "Elimina bozza"}</button>
         </>}
-        {doc.stato === "emessa" && doc.send_sdi && <button onClick={send} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "send" ? "Invio…" : "Invia allo SdI"}</button>}
+        {sendAct && <button onClick={send} disabled={!!busy} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{busy === "send" ? "Invio…" : sendButtonLabel(doc.provider)}</button>}
         {doc.stato === "inviata_intermediario" && <button onClick={refresh} disabled={!!busy} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash disabled:opacity-50">{busy === "status" ? "Controllo…" : "Aggiorna esito"}</button>}
         <button onClick={previewDoc} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Anteprima</button>
         <button onClick={printPdf} className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Stampa PDF</button>

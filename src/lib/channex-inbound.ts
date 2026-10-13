@@ -340,8 +340,12 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       // @/lib/booking). Se assente, si lascia undefined e vale la % di default del canale (CHANNELS).
       const commAmt = num(r.ota_commission ?? r.commission, NaN);
       const bookingTotal = num(r.amount, NaN);
-      const commissionAmount = (Number.isFinite(commAmt) && commAmt > 0) ? Math.round(commAmt * 100) / 100 : undefined;
-      const commissionPct = (commissionAmount == null && Number.isFinite(commAmt) && commAmt > 0 && Number.isFinite(bookingTotal) && bookingTotal > 0)
+      // Expedia: l'importo ricevuto è il pagamento NETTO all'hotel e ota_commission è la somma di tutte le trattenute (allineamento tariffe, acceleratore, commissione),
+      // già tolte da quell'importo. Salvarle come commissionAmount le sottrarrebbe una seconda volta dal netto: restano solo come dato informativo (otaDeductions) e la riga è netTotal.
+      const netPayout = channel === "expedia";
+      const commissionAmount = (!netPayout && Number.isFinite(commAmt) && commAmt > 0) ? Math.round(commAmt * 100) / 100 : undefined;
+      const otaDeductions = (netPayout && Number.isFinite(commAmt) && commAmt > 0) ? Math.round(commAmt * 100) / 100 : undefined;
+      const commissionPct = (!netPayout && commissionAmount == null && Number.isFinite(commAmt) && commAmt > 0 && Number.isFinite(bookingTotal) && bookingTotal > 0)
         ? Math.round((commAmt / bookingTotal) * 1000) / 10
         : undefined;
       // Carta virtuale OTA: SOLO metadati (mai numero/CVV). Se una revision precedente aveva
@@ -357,6 +361,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       // (all'ultima va il resto, così la somma torna al centesimo), non ripetuta su ognuna.
       const roomTotals = roomsArr.map((room, i) => readRevisionGuestData(r as unknown as Record<string, unknown>, room as unknown as Record<string, unknown>, i === 0).total ?? 0);
       const commShares = splitCommission(commissionAmount, roomTotals);
+      const deductShares = splitCommission(otaDeductions, roomTotals);
       // Costo d'incasso dell'OTA ("Payment charge" nelle note di Booking): anche questo è dell'intera prenotazione, quindi diviso tra le camere.
       const feeShares = splitCommission(parsePaymentCharge(String((r as unknown as { notes?: unknown }).notes ?? "")), roomTotals);
       let added = 0;
@@ -383,6 +388,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
         const oldNote = String(old?.note ?? "");
         const keep: Record<string, unknown> = {};
         if (old) for (const k of CARRY) { const v = (old as unknown as Record<string, unknown>)[k]; if (v !== undefined && v !== null && v !== "") keep[k] = v; }
+        if (netPayout) { delete keep.commissionAmount; delete keep.commissionPct; } // totale già netto: nessuna commissione (anche vecchia) da sottrarre
         // Camera: si tiene quella già assegnata se è ancora libera; altrimenti la prima libera. MAI una occupata se ce n'è una libera.
         const prevUnit = old?.unitId && ofType.some((u) => u.id === old.unitId) && isFree(old.unitId) ? old.unitId : undefined;
         // Dati ospite dalla revision (note, orario di arrivo, età bambini, tipo di pagamento, penali) e totale CON i
@@ -404,6 +410,8 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
           ...fromOta,
           ...(otaInfo ? { otaInfo } : {}),
           ...(commShares[idx] != null ? { commissionAmount: commShares[idx] } : {}),
+          ...(netPayout ? { netTotal: true } : {}),
+          ...(deductShares[idx] != null ? { otaDeductions: deductShares[idx] } : {}),
           ...(feeShares[idx] != null ? { paymentFee: feeShares[idx] } : {}),
           ...(commissionPct != null ? { commissionPct } : {}),
           ...(otaCard && idx === 0 ? { otaCard } : {}), // la VCC copre la prenotazione: la attacchiamo alla prima camera

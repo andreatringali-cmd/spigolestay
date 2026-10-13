@@ -8,9 +8,12 @@ import { PageHeader, Card } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { apiPost } from "@/lib/invoicing/client";
 
 interface CP { id: string; kind: string; name: string; vat: string | null; tax_code: string | null; address: string | null; city: string | null; cap: string | null; province: string | null; country: string | null; sdi_code: string | null; pec: string | null; email: string | null }
 const KIND: Record<string, string> = { privato: "Privato", societa: "Società", estero: "Estero", ota: "OTA / Agenzia" };
+interface SyncItem { id: string; name: string; kind: string; vat: string | null; tax_code: string | null; city: string | null }
+interface SyncPreview { xenoraTotal: number; ficTotal: number; aligned: number; duplicates: number; truncated: boolean; toSend: SyncItem[]; toImport: SyncItem[] }
 const emptyForm = () => ({ id: "", kind: "societa", name: "", vat: "", tax_code: "", address: "", city: "", cap: "", province: "", country: "IT", sdi_code: "", pec: "", email: "" });
 
 export default function AnagraficaClientiPage() {
@@ -22,6 +25,9 @@ export default function AnagraficaClientiPage() {
   const [kind, setKind] = useState("all");
   const [edit, setEdit] = useState<ReturnType<typeof emptyForm> | null>(null);
   const [saving, setSaving] = useState(false);
+  // Sincronizzazione con Fatture in Cloud (visibile solo se è il provider fatture ed è collegato).
+  const [ficOn, setFicOn] = useState(false);
+  const [sync, setSync] = useState<{ open: boolean; busy: boolean; msg: string; prev: SyncPreview | null; send: Set<string>; imp: Set<string> }>({ open: false, busy: false, msg: "", prev: null, send: new Set(), imp: new Set() });
 
   const load = useCallback(async () => {
     if (!supabase) { setLoading(false); return; }
@@ -29,6 +35,34 @@ export default function AnagraficaClientiPage() {
     setList((data ?? []) as CP[]); setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!supabase || !user) return;
+    supabase.from("tenant_invoice_settings").select("default_provider").maybeSingle().then(({ data }) => {
+      if (data?.default_provider !== "fattureincloud") return;
+      apiPost<{ connected: boolean }>("invoicing/provider", { provider: "fattureincloud", action: "status" }).then((r) => setFicOn(!!r.connected)).catch(() => {});
+    });
+  }, [user]);
+
+  const openSync = async () => {
+    setSync({ open: true, busy: true, msg: "", prev: null, send: new Set(), imp: new Set() });
+    try {
+      const p = await apiPost<SyncPreview>("invoicing/fic/clients", { action: "preview" });
+      setSync({ open: true, busy: false, msg: "", prev: p, send: new Set(p.toSend.map((x) => x.id)), imp: new Set(p.toImport.map((x) => x.id)) });
+    } catch (e) { setSync((p) => ({ ...p, busy: false, msg: (e as Error).message })); }
+  };
+  const toggle = (which: "send" | "imp", id: string) => setSync((p) => { const n = new Set(p[which]); if (n.has(id)) n.delete(id); else n.add(id); return { ...p, [which]: n }; });
+  const applySync = async () => {
+    setSync((p) => ({ ...p, busy: true, msg: "" }));
+    try {
+      const r = await apiPost<{ created: number; imported: number; errors: string[]; remaining: number }>("invoicing/fic/clients", { action: "sync", sendIds: [...sync.send], importIds: [...sync.imp] });
+      const parts = [`Creati su Fatture in Cloud: ${r.created}`, `importati in Xenora: ${r.imported}`];
+      if (r.remaining > 0) parts.push(`ne restano ${r.remaining}: ripeti la sincronizzazione`);
+      if (r.errors.length) parts.push(`Errori: ${r.errors.slice(0, 3).join(" · ")}`);
+      setSync((p) => ({ ...p, busy: false, prev: null, msg: parts.join(" — ") }));
+      load();
+    } catch (e) { setSync((p) => ({ ...p, busy: false, msg: (e as Error).message })); }
+  };
 
   const filtered = useMemo(() => list.filter((c) => (kind === "all" || c.kind === kind) && (!q.trim() || `${c.name} ${c.vat ?? ""} ${c.tax_code ?? ""}`.toLowerCase().includes(q.trim().toLowerCase()))), [list, q, kind]);
 
@@ -54,6 +88,7 @@ export default function AnagraficaClientiPage() {
           <SearchInput value={q} onChange={setQ} placeholder="Cerca nome, P.IVA, CF…" />
           <select value={kind} onChange={(e) => setKind(e.target.value)} className={sel}><option value="all">Tutti</option>{Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
           <button onClick={() => setEdit(emptyForm())} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuovo</button>
+          {ficOn && <button onClick={openSync} className="ml-auto rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-dim hover:bg-wash">Sincronizza con Fatture in Cloud</button>}
         </div>
       </Card>
 
@@ -74,6 +109,44 @@ export default function AnagraficaClientiPage() {
           </tbody>
         </table>
       </div>
+
+      {sync.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button aria-label="Chiudi" onClick={() => setSync((p) => ({ ...p, open: false }))} className="absolute inset-0 bg-black/40" />
+          <div className="relative flex max-h-[88vh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="mb-2 flex items-center justify-between"><span className="text-base font-bold text-txt">Sincronizza con Fatture in Cloud</span><button onClick={() => setSync((p) => ({ ...p, open: false }))} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            {sync.busy && <p className="text-xs text-dim">Un attimo…</p>}
+            {sync.msg && <p className="mb-2 rounded-lg bg-paper px-3 py-2 text-xs text-txt">{sync.msg}</p>}
+            {sync.prev && (
+              <>
+                <p className="mb-3 text-xs text-dim">Xenora: {sync.prev.xenoraTotal} clienti · Fatture in Cloud: {sync.prev.ficTotal} · già allineati: {sync.prev.aligned}{sync.prev.duplicates > 0 ? ` · doppioni ignorati: ${sync.prev.duplicates}` : ""}. I clienti già presenti non vengono mai ricreati e su Fatture in Cloud non si modifica né si cancella nulla.</p>
+                {sync.prev.truncated && <p className="mb-2 text-xs text-[color:var(--err)]">L&apos;elenco di Fatture in Cloud è molto lungo: il confronto è parziale, per sicurezza la sincronizzazione è bloccata.</p>}
+                {([["send", "Da inviare a Fatture in Cloud", sync.prev.toSend], ["imp", "Da importare in Xenora", sync.prev.toImport]] as const).map(([w, title, items]) => (
+                  <div key={w} className="mb-3">
+                    <div className="mb-1 text-xs font-semibold text-txt">{title} ({items.length})</div>
+                    {items.length === 0 ? <p className="text-xs text-faint">Nessuno: già tutto allineato.</p> : (
+                      <div className="max-h-48 overflow-y-auto rounded-lg border border-line bg-paper">
+                        {items.map((it) => (
+                          <label key={it.id} className="flex cursor-pointer items-center gap-2 border-b border-line px-2 py-1.5 text-xs last:border-0">
+                            <input type="checkbox" checked={sync[w].has(it.id)} onChange={() => toggle(w, it.id)} />
+                            <span className="font-medium text-txt">{it.name}</span>
+                            <span className="ml-auto font-mono text-[11px] text-dim">{it.vat || it.tax_code || "—"}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <div className="flex items-center gap-2">
+                  <button onClick={applySync} disabled={sync.busy || sync.prev.truncated || (sync.send.size + sync.imp.size === 0)} className="rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">Applica ({sync.send.size + sync.imp.size})</button>
+                  <button onClick={() => setSync((p) => ({ ...p, open: false }))} className="ml-auto rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Chiudi</button>
+                </div>
+              </>
+            )}
+            {!sync.prev && !sync.busy && <div className="mt-2"><button onClick={() => setSync((p) => ({ ...p, open: false }))} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash">Chiudi</button></div>}
+          </div>
+        </div>
+      )}
 
       {edit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

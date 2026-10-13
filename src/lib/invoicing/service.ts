@@ -19,6 +19,7 @@ import { resolveFicSendConfig } from "./fic-oauth";
 import { buildAutofatturaXml, autofatturaFileName } from "./fatturapa";
 import { logBookingEvent } from "@/lib/booking-events";
 import { decryptCred, encryptCred } from "@/lib/crypto-creds";
+import { isTrialMessage, isTrialSend, unchangedStatusMessage } from "./sdi-status";
 
 // Decifra i campi segreti della config provider (salvati come <campo>_enc) e li
 // espone col nome atteso dal provider (token, accessToken, clientSecret…).
@@ -345,23 +346,43 @@ async function buildPayload(admin: SupabaseClient, tenantId: string, documentId:
 }
 
 export interface SendOutcome { providerRef: string; stato: string; message?: string; skipped?: boolean }
+export interface SendOptions { enableSdi?: boolean }
 
 // Invia il documento emesso all'intermediario (SDI). Ricevuta non fiscale: nessun invio.
-export async function sendDocument(admin: SupabaseClient, tenantId: string, documentId: string): Promise<SendOutcome> {
-  const { data: doc } = await admin.from("documents").select("id, stato, doc_kind, send_sdi, booking_id").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
+// enableSdi: per un documento emesso con "Comunica al SDI" spento (send_sdi non è un campo fiscale bloccato dopo
+// l'emissione) lo accende e poi invia; se l'invio fallisce la spunta torna com'era.
+export async function sendDocument(admin: SupabaseClient, tenantId: string, documentId: string, opts: SendOptions = {}): Promise<SendOutcome> {
+  const { data: doc } = await admin.from("documents").select("id, stato, doc_kind, send_sdi, provider, booking_id").eq("id", documentId).eq("tenant_id", tenantId).maybeSingle();
   if (!doc) throw new Error("document_not_found");
   if (doc.stato === "bozza") throw new Error("not_issued");
-  if (!doc.send_sdi) return { providerRef: "", stato: doc.stato, skipped: true, message: "Documento non trasmesso allo SdI (ricevuta/impostazione)." };
+  if (doc.doc_kind === "ricevuta_non_fiscale") return { providerRef: "", stato: doc.stato, skipped: true, message: "La ricevuta non è un documento fiscale: non si invia allo SdI." };
+  if (!doc.send_sdi && !opts.enableSdi) return { providerRef: "", stato: doc.stato, skipped: true, message: "Documento non trasmesso allo SdI (ricevuta/impostazione)." };
   if (doc.stato !== "emessa") return { providerRef: "", stato: doc.stato, skipped: true, message: "Documento già trasmesso." };
 
-  const { payload, docKind, providerName, providerCfg } = await buildPayload(admin, tenantId, documentId);
-  const provider = getProvider(providerName, providerCfg);
-  const res = docKind === "nota_di_credito" ? await provider.sendCreditNote(payload) : await provider.send(payload);
+  let enabledNow = false;
+  if (!doc.send_sdi) {
+    if (!doc.provider) throw new Error("Nessun intermediario impostato: collega Fatture in Cloud in Impostazioni fattura.");
+    const { error: upErr } = await admin.from("documents").update({ send_sdi: true }).eq("id", documentId).eq("tenant_id", tenantId).eq("stato", "emessa");
+    if (upErr) throw new Error("Non riesco ad attivare la comunicazione allo SdI: " + upErr.message);
+    enabledNow = true;
+  }
 
-  await admin.from("documents").update({ stato: "inviata_intermediario", provider: providerName, provider_ref: res.providerRef, sent_at: new Date().toISOString() }).eq("id", documentId);
-  await admin.from("document_events").insert({ tenant_id: tenantId, document_id: documentId, kind: "sent", message: res.message || "Documento inviato all'intermediario", meta: { provider: providerName, ref: res.providerRef } });
-  await logBookingEvent(admin, tenantId, doc.booking_id, "documento", "Documento inviato allo SdI");
-  return { providerRef: res.providerRef, stato: "inviata_intermediario", message: res.message };
+  try {
+    const { payload, docKind, providerName, providerCfg } = await buildPayload(admin, tenantId, documentId);
+    const provider = getProvider(providerName, providerCfg);
+    const res = docKind === "nota_di_credito" ? await provider.sendCreditNote(payload) : await provider.send(payload);
+    // In prova (Fatture in Cloud) il documento è creato ma NON trasmesso allo SdI: lo segno nell'evento, così l'interfaccia può dirlo.
+    const dryRun = (providerName === "fattureincloud" && providerCfg.dryRun === true) || isTrialMessage(res.message);
+
+    await admin.from("documents").update({ stato: "inviata_intermediario", provider: providerName, provider_ref: res.providerRef, sent_at: new Date().toISOString() }).eq("id", documentId);
+    const baseMsg = res.message || "Documento inviato all'intermediario";
+    await admin.from("document_events").insert({ tenant_id: tenantId, document_id: documentId, kind: "sent", message: enabledNow ? `Comunicazione allo SdI attivata dopo l'emissione. ${baseMsg}` : baseMsg, meta: { provider: providerName, ref: res.providerRef, dry_run: dryRun, ...(enabledNow ? { sdi_enabled_later: true } : {}) } });
+    await logBookingEvent(admin, tenantId, doc.booking_id, "documento", dryRun ? "Documento creato in prova (non trasmesso allo SdI)" : "Documento inviato allo SdI");
+    return { providerRef: res.providerRef, stato: "inviata_intermediario", message: res.message };
+  } catch (e) {
+    if (enabledNow) await admin.from("documents").update({ send_sdi: false }).eq("id", documentId).eq("tenant_id", tenantId).eq("stato", "emessa");
+    throw e;
+  }
 }
 
 export interface StatusOutcome { stato: string; message: string; changed: boolean }
@@ -375,6 +396,12 @@ export async function refreshDocumentStatus(admin: SupabaseClient, tenantId: str
   const { providerCfg } = await buildPayload(admin, tenantId, documentId);
   const provider = getProvider((doc.provider as string) || "mock", providerCfg);
   const st = await provider.getStatus(doc.provider_ref as string);
+
+  // Stato invariato (es. ancora in attesa, o documento creato solo in prova): nessun evento in timeline né log prenotazione.
+  if (st.status === doc.stato) {
+    const { data: sentEv } = await admin.from("document_events").select("kind, message, meta").eq("document_id", documentId).eq("kind", "sent").order("ts", { ascending: false }).limit(1);
+    return { stato: doc.stato as string, message: unchangedStatusMessage(isTrialSend((sentEv ?? []) as { kind: string; message?: string | null; meta?: Record<string, unknown> | null }[]), st.message), changed: false };
+  }
 
   const patch: Record<string, unknown> = { stato: st.status };
   if (st.status === "consegnata") patch.delivered_at = new Date().toISOString();

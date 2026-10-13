@@ -5,7 +5,8 @@ import { Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useData } from "@/lib/store";
-import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
+import { mergeSeedTemplates } from "@/lib/msg-templates";
+import ReviewSettingsCard from "@/components/messaging/ReviewSettingsCard";
 import { waTemplateFrom } from "@/lib/wa-template";
 import VarLegend, { MSG_VARS } from "@/components/VarLegend";
 
@@ -47,8 +48,7 @@ export default function ModelliPanel() {
     try {
       const r = localStorage.getItem("spigolestay:msgtemplates"); const parsed = r ? JSON.parse(r) : null;
       const base: MsgTemplate[] = Array.isArray(parsed) ? parsed : [];
-      const haveIds = new Set(base.map((x) => x.id));
-      setTemplates([...base, ...(DEFAULT_TEMPLATES as unknown as MsgTemplate[]).filter((d) => !haveIds.has(d.id))]);
+      setTemplates(mergeSeedTemplates(base));
     } catch {}
     setReady(true);
   }, []);
@@ -88,6 +88,9 @@ export default function ModelliPanel() {
           ))}
         </div>
       </div>
+
+      {/* Richiesta di recensione: link ai portali e regole di esclusione (lette dal cron dei messaggi automatici) */}
+      <ReviewSettingsCard />
 
       {/* Modelli raggruppati per fase del ciclo ospite, in ordine cronologico */}
       <div className="space-y-6">

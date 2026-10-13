@@ -4,7 +4,8 @@
 import { nights, shiftISO } from "./dates";
 import { CHANNELS, type Channel, type Structure } from "./types";
 import { loadChannelCommissionPct } from "./channelOverrides";
-import { commissionEstimateFor } from "./commission-estimate";
+import { commissionEstimateFor, isNetPayout } from "./commission-estimate";
+export { isNetPayout };
 
 // Tassa di soggiorno. Due modalità:
 //  - "fixed":   € a persona per notte × persone × notti tassabili
@@ -76,7 +77,7 @@ export function bookingPaidTotal(b: BookingLike): number {
 // Calcolo UNICO della commissione OTA, condiviso ovunque venga mostrata o sommata.
 // Se è nota la cifra esatta (commissionAmount, es. da Booking.com/Channex) ha sempre priorità
 // sul calcolo via percentuale, che resta una stima quando la cifra esatta non c'è.
-type CommissionBookingLike = { total?: number; cleaningFee?: number; extras?: { price?: number }[]; channel: Channel; commissionPct?: number; commissionAmount?: number | null; paymentFee?: number | null; structureId?: string };
+type CommissionBookingLike = { total?: number; cleaningFee?: number; extras?: { price?: number }[]; channel: Channel; commissionPct?: number; commissionAmount?: number | null; paymentFee?: number | null; structureId?: string; netTotal?: boolean; extId?: string };
 /**
  * Percentuale da usare quando una prenotazione NON ha la cifra reale: 1) quella impostata a mano in Canali, 2) la stima dai dati reali (media pesata
  * delle commissioni vere dello stesso canale e struttura nell'ultimo anno, vedi commission-estimate.ts), 3) la percentuale standard del canale.
@@ -89,11 +90,13 @@ export function defaultCommissionInfo(channel: Channel, structureId?: string): {
   return { pct: CHANNELS[channel].commission * 100, source: "standard" };
 }
 export function commissionPctOf(b: CommissionBookingLike): number {
+  if (isNetPayout(b)) return 0;
   if (b.commissionAmount != null && b.total) return Math.round(((b.commissionAmount + paymentFeeOf(b)) / b.total) * 1000) / 10;
   return b.commissionPct ?? defaultCommissionInfo(b.channel, b.structureId).pct;
 }
 /** Solo la commissione di intermediazione dell'OTA (senza il costo d'incasso). */
 export function commissionBaseOf(b: CommissionBookingLike): number {
+  if (isNetPayout(b)) return 0; // il totale è già netto: la commissione non si sottrae due volte
   if (b.commissionAmount != null) return b.commissionAmount;
   const pct = b.commissionPct ?? defaultCommissionInfo(b.channel, b.structureId).pct;
   return Math.round((b.total ?? 0) * pct) / 100; // ai centesimi, non all'euro intero

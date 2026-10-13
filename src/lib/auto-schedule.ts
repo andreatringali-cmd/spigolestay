@@ -46,14 +46,22 @@ export function slotDateOf(t: Pick<AutoTpl, "trigger" | "days">, checkIn: string
   }
 }
 
-/** A quale passaggio appartiene un modello: lo dicono i segnaposto che usa (link check-in, link guida, saldo) o il suo scopo (recensione). */
-export function stepOfTemplate(t: AutoTpl): AutoStepKey | null {
+/**
+ * A quali passaggi appartiene un modello: lo dicono i segnaposto che usa (link check-in, link guida, saldo, link recensioni) o il suo scopo (recensione).
+ * Un solo messaggio può coprirne più d'uno (es. pre-arrivo con link check-in E guida): vale per tutti.
+ */
+export function stepsOfTemplate(t: AutoTpl): AutoStepKey[] {
   const text = Object.values(t.texts ?? {}).join("\n");
-  if (/\{link_checkin\}/i.test(text)) return "checkin";
-  if (/\{link_guida\}/i.test(text)) return "guide";
-  if (/\{saldo\}/i.test(text)) return "pay";
-  if ((t.trigger === "after_checkout" || t.trigger === "on_checkout") && /recension|review|feedback|bewertung|avis|reseña/i.test(`${t.name ?? ""}\n${text}`)) return "review";
-  return null;
+  const out: AutoStepKey[] = [];
+  if (/\{link_checkin\}/i.test(text)) out.push("checkin");
+  if (/\{link_guida\}/i.test(text)) out.push("guide");
+  if (/\{saldo\}/i.test(text)) out.push("pay");
+  if (/\{link_(recensioni|google|tripadvisor)\}/i.test(text) || ((t.trigger === "after_checkout" || t.trigger === "on_checkout") && /recension|review|feedback|bewertung|avis|reseña/i.test(`${t.name ?? ""}\n${text}`))) out.push("review");
+  return out;
+}
+/** Il passaggio principale del modello (il primo di stepsOfTemplate), o null. */
+export function stepOfTemplate(t: AutoTpl): AutoStepKey | null {
+  return stepsOfTemplate(t)[0] ?? null;
 }
 
 /** "tra 25 minuti" · "previsto alle 10:00" · "previsto domani alle 10:00" · "previsto il 7/10 alle 10:00"; null se l'istante è già passato. */
@@ -103,7 +111,7 @@ export function autoLineFor(key: AutoStepKey, b: AutoBooking, g: AutoGuest | und
   // Modelli automatici: partono dal cron dei messaggi, solo se l'invio automatico è attivo e l'ospite ha email o telefono.
   if (email || phone) {
     for (const t of a.templates) {
-      if (!t.active || t.trigger === "manual" || stepOfTemplate(t) !== key) continue;
+      if (!t.active || t.trigger === "manual" || !stepsOfTemplate(t).includes(key)) continue;
       if (t.structureIds?.length && !t.structureIds.includes(b.structureId)) continue;
       const slot = slotDateOf(t, b.checkIn, b.checkOut);
       if (!slot) continue;

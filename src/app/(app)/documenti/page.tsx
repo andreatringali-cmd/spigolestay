@@ -11,13 +11,14 @@ import { eur } from "@/lib/format";
 import { centsEur, DOC_KIND_LABEL, STATO, apiPost } from "@/lib/invoicing/client";
 import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import { computeResidui, todayLocalISO } from "@/lib/invoicing/receivables";
+import { isTrialSend, sdiBadge } from "@/lib/invoicing/sdi-status";
 
 interface DocRow {
   id: string; structure_id: string | null; booking_code: string | null; doc_kind: string; regime: string | null;
   number_label: string | null; serie: string | null; stato: string; issue_date: string | null; due_date: string | null;
   counterpart: { name?: string; lastName?: string; vat?: string | null; tax_code?: string | null; country?: string } | null;
   taxable_cents: number; vat_cents: number; out_of_scope_cents: number; bollo_cents: number;
-  total_cents: number; advance_cents: number; related_document_id: string | null; created_at: string;
+  total_cents: number; advance_cents: number; related_document_id: string | null; created_at: string; send_sdi: boolean;
 }
 
 const MONTHS = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
@@ -31,6 +32,7 @@ export default function DocumentiPage() {
   const [creating, setCreating] = useState(false);
   const [rows, setRows] = useState<DocRow[]>([]);
   const [paid, setPaid] = useState<Record<string, number>>({});
+  const [trialIds, setTrialIds] = useState<Set<string>>(new Set()); // documenti creati solo in prova (non trasmessi allo SdI)
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
@@ -42,16 +44,25 @@ export default function DocumentiPage() {
   const load = async () => {
     if (!supabase) { setErr("Devi essere connesso per vedere i documenti."); setLoading(false); return; }
     setLoading(true); setErr("");
-    const [d, p] = await Promise.all([
+    const [d, p, ev] = await Promise.all([
       supabase.from("documents")
-        .select("id, structure_id, booking_code, doc_kind, regime, number_label, serie, stato, issue_date, due_date, counterpart, taxable_cents, vat_cents, out_of_scope_cents, bollo_cents, total_cents, advance_cents, related_document_id, created_at")
+        .select("id, structure_id, booking_code, doc_kind, regime, number_label, serie, stato, issue_date, due_date, counterpart, taxable_cents, vat_cents, out_of_scope_cents, bollo_cents, total_cents, advance_cents, related_document_id, created_at, send_sdi")
         .order("created_at", { ascending: false }),
       supabase.from("document_payments").select("document_id, amount_cents"),
+      supabase.from("document_events").select("document_id, kind, message, meta, ts").eq("kind", "sent").order("ts", { ascending: false }),
     ]);
     if (d.error) setErr(d.error.message); else setRows((d.data ?? []) as DocRow[]);
     const m: Record<string, number> = {};
     for (const x of (p.data ?? []) as { document_id: string; amount_cents: number }[]) m[x.document_id] = (m[x.document_id] ?? 0) + x.amount_cents;
     setPaid(m);
+    // Per ogni documento vale l'ULTIMO invio (eventi già ordinati dal più recente).
+    const seen = new Set<string>(); const trials = new Set<string>();
+    for (const x of (ev.data ?? []) as { document_id: string; kind: string; message: string | null; meta: Record<string, unknown> | null }[]) {
+      if (seen.has(x.document_id)) continue;
+      seen.add(x.document_id);
+      if (isTrialSend([x])) trials.add(x.document_id);
+    }
+    setTrialIds(trials);
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -202,7 +213,8 @@ export default function DocumentiPage() {
           </thead>
           <tbody>
             {filtered.map((r) => {
-              const st = STATO[r.stato] ?? { label: r.stato, color: "var(--dim)" };
+              const st = sdiBadge(r.stato, trialIds.has(r.id), STATO[r.stato] ?? { label: r.stato, color: "var(--dim)" });
+              const notSent = r.stato === "emessa" && !r.send_sdi && r.doc_kind !== "ricevuta_non_fiscale";
               const res = residuoOf(r);
               const late = res !== null && res > 0 && !!r.due_date && r.due_date < today;
               const isNc = r.doc_kind === "nota_di_credito";
@@ -218,7 +230,7 @@ export default function DocumentiPage() {
                   <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-dim">{r.out_of_scope_cents ? `${isNc ? "−" : ""}${eur(centsEur(r.out_of_scope_cents))}` : "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono font-semibold text-txt">{isNc ? "−" : ""}{eur(centsEur(r.total_cents))}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono" style={{ color: late ? "var(--err)" : "var(--dim)" }}>{res === null ? "—" : res === 0 ? "saldato" : eur(centsEur(res))}</td>
-                  <td className="px-3 py-2.5"><span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 16%, transparent)`, color: st.color }}>{st.label}</span></td>
+                  <td className="px-3 py-2.5"><span title={st.title} className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 16%, transparent)`, color: st.color }}>{st.label}</span>{notSent && <div className="mt-0.5 text-[10px] text-faint">non inviata allo SdI</div>}</td>
                 </tr>
               );
             })}

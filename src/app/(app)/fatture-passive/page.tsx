@@ -14,6 +14,7 @@ import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { eur } from "@/lib/format";
 import { apiPost } from "@/lib/invoicing/client";
+import type { PreviewItem } from "@/lib/invoicing/fic-received";
 import { groupTotals, dueSummary, matchesDue, toCashRow, findDuplicate, signedCents, csvCell, type DueFilter } from "@/lib/purchases";
 
 // Dati fornitore per le OTA (per l'autofattura: sede estera del cedente).
@@ -87,8 +88,10 @@ export default function FatturePassivePage() {
   const [af, setAf] = useState<{ number?: string; status?: string }>({});
   const [afBusy, setAfBusy] = useState("");
   const [afMsg, setAfMsg] = useState("");
+  // import fatture ricevute da Fatture in Cloud (sola lettura)
+  const [fic, setFic] = useState<{ from: string; to: string; items: PreviewItem[] | null; pick: Set<number>; structureId: string; busy: "" | "list" | "import"; msg: string; reconnect: boolean } | null>(null);
 
-  const load = useCallback(async () => {
+  const load =useCallback(async () => {
     if (!supabase) { setErr("Devi essere connesso."); setLoading(false); return; }
     setLoading(true); setErr("");
     const [d, s] = await Promise.all([
@@ -295,6 +298,39 @@ export default function FatturePassivePage() {
     dl(`riepilogo-fatture-passive-${sumBy}-${year}.csv`, [head.map(csvCell).join(";"), ...summary.map((r) => [r.key, r.count, money(r.taxable), money(r.vat), money(r.total), money(r.unpaid)].map(csvCell).join(";"))]);
   };
 
+  // ---- Import da Fatture in Cloud: periodo → anteprima con spunte → importa (nessuna scrittura su FIC).
+  const openFic = () => {
+    const d = new Date(); const to = todayISO(); d.setMonth(d.getMonth() - 3);
+    const from = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    setFic({ from, to, items: null, pick: new Set(), structureId: defStructure, busy: "", msg: "", reconnect: false });
+  };
+  const ficPreview = async () => {
+    if (!fic) return;
+    setFic({ ...fic, busy: "list", msg: "", reconnect: false, items: null });
+    try {
+      const r = await apiPost<{ ok: boolean; needsReconnect?: boolean; message?: string; items?: PreviewItem[] }>("invoicing/fic/received", { action: "preview", from: fic.from, to: fic.to });
+      if (!r.ok) { setFic((p) => p && { ...p, busy: "", msg: r.message || "Impossibile leggere le fatture ricevute.", reconnect: !!r.needsReconnect }); return; }
+      const items = r.items ?? [];
+      setFic((p) => p && { ...p, busy: "", items, pick: new Set(items.filter((i) => i.status === "new").map((i) => i.ficId)), msg: items.length ? "" : "Nessuna fattura ricevuta nel periodo." });
+    } catch (e) { setFic((p) => p && { ...p, busy: "", msg: e instanceof Error ? e.message : "Errore" }); }
+  };
+  const ficImport = async () => {
+    if (!fic || !fic.pick.size) return;
+    if (!fic.structureId && !single && structures.length > 1) { setFic({ ...fic, msg: "Scegli la struttura a cui assegnare le fatture (o «Comune a tutte»)." }); return; }
+    setFic({ ...fic, busy: "import", msg: "" });
+    try {
+      const r = await apiPost<{ ok: boolean; imported?: number; skipped?: number; suppliersCreated?: number; needsReconnect?: boolean; message?: string }>("invoicing/fic/received", { action: "import", from: fic.from, to: fic.to, ficIds: Array.from(fic.pick), structureId: fic.structureId || null });
+      if (!r.ok) { setFic((p) => p && { ...p, busy: "", msg: r.message || "Import non riuscito.", reconnect: !!r.needsReconnect }); return; }
+      setInfo(`${r.imported ?? 0} ${r.imported === 1 ? "fattura importata" : "fatture importate"} da Fatture in Cloud${r.suppliersCreated ? ` · ${r.suppliersCreated} ${r.suppliersCreated === 1 ? "nuovo fornitore" : "nuovi fornitori"}` : ""}${r.skipped ? ` · ${r.skipped} già presenti, saltate` : ""}.`);
+      setFic(null); await load();
+    } catch (e) { setFic((p) => p && { ...p, busy: "", msg: e instanceof Error ? e.message : "Errore" }); }
+  };
+  // Stesso flusso di Impostazioni fattura: ottiene l'URL di autorizzazione e vi reindirizza.
+  const ficReconnect = async () => {
+    try { const r = await apiPost<{ url: string }>("invoicing/fic/start", {}); window.location.href = r.url; }
+    catch (e) { setFic((p) => p && { ...p, msg: e instanceof Error ? e.message : "Errore" }); }
+  };
+
   const selCls = "rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const inp = "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
   const lbl = "block text-xs font-medium text-dim";
@@ -348,6 +384,7 @@ export default function FatturePassivePage() {
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <button onClick={view === "elenco" ? exportCsv : exportSummary} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{view === "elenco" ? "Esporta CSV" : "Esporta riepilogo"}</button>
             <button onClick={() => { setOta(true); setCsvTotal(null); setCsvInfo(""); }} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash" title="Precompila una fattura passiva OTA dalle commissioni tracciate o da un CSV">⚡ Autofattura OTA</button>
+            <button onClick={openFic} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash" title="Legge le fatture dei fornitori già presenti in Fatture in Cloud (sola lettura)">Importa da Fatture in Cloud</button>
             <button onClick={openNew} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90">+ Nuova fattura</button>
           </div>
         </div>
@@ -443,6 +480,65 @@ export default function FatturePassivePage() {
           </tbody>
         </table>
       </div>
+      )}
+
+      {fic && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button aria-label="Chiudi" onClick={() => setFic(null)} className="absolute inset-0 bg-black/40" />
+          <div className="relative flex max-h-[88vh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="mb-1 flex items-center justify-between"><span className="text-lg font-bold text-txt">Importa da Fatture in Cloud</span><button onClick={() => setFic(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <p className="mb-3 text-[11px] text-faint">Legge le fatture e le spese dei fornitori che Fatture in Cloud ha ricevuto (anche dal cassetto fiscale). Sola lettura: su Fatture in Cloud non viene modificato nulla.</p>
+            <div className="flex flex-wrap items-end gap-2">
+              <label className={lbl}>Dal<input type="date" value={fic.from} max={fic.to} onChange={(e) => setFic({ ...fic, from: e.target.value, items: null })} className={inp} /></label>
+              <label className={lbl}>Al<input type="date" value={fic.to} min={fic.from} onChange={(e) => setFic({ ...fic, to: e.target.value, items: null })} className={inp} /></label>
+              <button onClick={ficPreview} disabled={fic.busy !== "" || !fic.from || !fic.to} className="rounded-lg bg-focus px-3 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50">{fic.busy === "list" ? "Leggo…" : "Mostra anteprima"}</button>
+            </div>
+            {fic.msg && (
+              <div className="mt-3 rounded-lg border border-line bg-wash px-3 py-2 text-xs text-txt">
+                {fic.msg}
+                {fic.reconnect && <button onClick={ficReconnect} className="mt-2 block rounded-lg bg-focus px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">Ricollega Fatture in Cloud</button>}
+              </div>
+            )}
+            {fic.items && fic.items.length > 0 && (
+              <>
+                {!single && (
+                  <label className={`${lbl} mt-3`}>Struttura a cui assegnare le fatture importate
+                    <select value={fic.structureId} onChange={(e) => setFic({ ...fic, structureId: e.target.value })} className={inp}>
+                      <option value="">— scegli —</option>
+                      {structures.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      <option value="common">Comune a tutte le strutture</option>
+                    </select>
+                  </label>
+                )}
+                <div className="mt-3 max-h-[40vh] overflow-auto rounded-lg border border-line">
+                  <table className="w-full min-w-[560px] text-xs">
+                    <thead><tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-faint">
+                      <th className="w-8 px-2 py-1.5"><input type="checkbox" aria-label="Seleziona tutte" checked={fic.items.filter((i) => i.status !== "imported").every((i) => fic.pick.has(i.ficId))} onChange={(e) => setFic({ ...fic, pick: e.target.checked ? new Set(fic.items!.filter((i) => i.status !== "imported").map((i) => i.ficId)) : new Set() })} /></th>
+                      <th className="px-2 py-1.5 font-semibold">Data</th><th className="px-2 py-1.5 font-semibold">Fornitore</th><th className="px-2 py-1.5 font-semibold">Numero</th><th className="px-2 py-1.5 text-right font-semibold">Totale</th><th className="px-2 py-1.5 font-semibold">Stato</th>
+                    </tr></thead>
+                    <tbody>
+                      {fic.items.map((i) => (
+                        <tr key={i.ficId} className={`border-b border-line last:border-0 ${i.status === "imported" ? "opacity-50" : ""}`}>
+                          <td className="px-2 py-1.5"><input type="checkbox" aria-label="Seleziona" disabled={i.status === "imported"} checked={fic.pick.has(i.ficId)} onChange={(e) => setFic((p) => { if (!p) return p; const n = new Set(p.pick); if (e.target.checked) n.add(i.ficId); else n.delete(i.ficId); return { ...p, pick: n }; })} /></td>
+                          <td className="whitespace-nowrap px-2 py-1.5 text-dim">{i.doc_date ? new Date(i.doc_date).toLocaleDateString("it-IT") : "—"}</td>
+                          <td className="px-2 py-1.5 font-medium text-txt">{i.supplier_name || "—"}</td>
+                          <td className="whitespace-nowrap px-2 py-1.5 font-mono text-dim">{i.doc_number || "—"}{i.doc_type === "nota_credito" ? " · NC" : ""}</td>
+                          <td className="whitespace-nowrap px-2 py-1.5 text-right font-mono font-semibold text-txt">{eur(cents(i.doc_type === "nota_credito" ? -i.total_cents : i.total_cents))}</td>
+                          <td className="px-2 py-1.5 text-dim">{i.status === "imported" ? "Già importata" : i.status === "possible" ? "Forse già presente" : i.paid ? "Pagata" : "Da pagare"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-1 text-[11px] text-faint">Le «Forse già presente» hanno stesso fornitore, numero e anno di una fattura inserita a mano: non sono selezionate di default.</p>
+                <div className="mt-3 flex items-center gap-2">
+                  <button onClick={ficImport} disabled={fic.busy !== "" || fic.pick.size === 0} className="rounded-lg bg-focus px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{fic.busy === "import" ? "Importo…" : `Importa ${fic.pick.size} ${fic.pick.size === 1 ? "fattura" : "fatture"}`}</button>
+                  <button onClick={() => setFic(null)} className="ml-auto rounded-lg border border-line px-4 py-2 text-sm font-semibold text-txt hover:bg-wash">Annulla</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {ota && (

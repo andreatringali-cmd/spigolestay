@@ -18,6 +18,8 @@ export const MSG_VARS: VarItem[] = [
   { token: "{saldo}", desc: "Importo ancora da saldare" },
   { token: "{link_guida}", desc: "Link alla guida ospiti personalizzata" },
   { token: "{link_checkin}", desc: "Link al self check-in online" },
+  { token: "{whatsapp}", desc: "Numero WhatsApp della struttura (per scriverle all'arrivo)" },
+  { token: "{link_recensioni}", desc: "Link per lasciare una recensione (Google e Tripadvisor, se impostati)" },
 ];
 
 export const PROMO_VARS: VarItem[] = [

@@ -4,6 +4,9 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { sendWhatsapp } from "@/lib/whatsapp";
 import { logInvio } from "@/lib/invii-log";
 import { waTemplateFrom } from "@/lib/wa-template";
+import { stepsOfTemplate } from "@/lib/auto-schedule";
+import { REVIEW_SETTINGS_KEY, parseReviewSettings, reviewLinksFor, reviewTokens, reviewDecision, usesReviewLinks, oneLine } from "@/lib/auto-review";
+import { buildGuideUrl, structureWhatsapp, WHATSAPP_FALLBACK } from "@/lib/auto-guide-link";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +24,10 @@ export const dynamic = "force-dynamic";
 // server). Senza, il cron gira in "dry-run": calcola quanti messaggi partirebbero
 // ma NON invia nulla. Così niente email agli ospiti finché non lo attivi tu.
 //
+// RICHIESTA RECENSIONE (modelli con {link_recensioni}/{link_google}/{link_tripadvisor} o dello scopo "recensione" dopo il check-out): si invia solo se
+// la prenotazione è confermata, non già sollecitata a mano, l'ospite non è «Da recuperare» (e, se l'host lo accende, non ha segnalato problemi) e c'è almeno un
+// link (Google/Tripadvisor); vedi lib/auto-review.ts. PRE-ARRIVO: {link_guida} è il link personale della guida (con codici camera), {whatsapp} il numero della struttura.
+//
 // Auth: Bearer <CRON_SECRET> (Vercel Cron) oppure ?secret= per test.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -28,6 +35,9 @@ const errText = (j: { error?: unknown; message?: unknown } | null | undefined, s
 type Json = Record<string, unknown>;
 const DATA_KEY = "spigolestay:data:v1";
 const TPL_KEY = "spigolestay:msgtemplates";
+const GUIDES_KEY = "spigolestay:guides";
+const ROOMACCESS_KEY = "spigolestay:roomaccess";
+const SL_ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789";
 const arr = (x: unknown): Json[] => (Array.isArray(x) ? (x as Json[]) : []);
 const s = (v: unknown) => (typeof v === "string" ? v : "");
 const num = (v: unknown) => (typeof v === "number" ? v : 0);
@@ -63,6 +73,18 @@ function fillTokens(text: string, ctx: Record<string, string>): string {
   return text.replace(/\{([a-z_]+)\}/gi, (m, k: string) => (k in ctx ? ctx[k] : m));
 }
 
+/** /g/<codice> al posto del link lungo della guida/check-in (come il pulsante «Invia guida»). Se qualcosa va storto resta il link originale. */
+async function shorten(admin: SupabaseClient, fullUrl: string): Promise<string> {
+  try {
+    const u = new URL(fullUrl);
+    const target = u.pathname + u.search;
+    if (!target.startsWith("/guida/") && !target.startsWith("/checkin")) return fullUrl;
+    let code = ""; for (let i = 0; i < 6; i++) code += SL_ALPHABET[Math.floor(Math.random() * SL_ALPHABET.length)];
+    const { error } = await admin.from("short_links").insert({ code, target });
+    return error ? fullUrl : `${u.origin}/g/${code}`;
+  } catch { return fullUrl; }
+}
+
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ ok: false, skipped: "no_secret" });
@@ -85,7 +107,7 @@ export async function GET(req: Request) {
   // oggi al run giornaliero (l'orario del modello è indicativo). Dedup per giorno.
   const { ymd: todayRome } = romeNow();
 
-  let accounts = 0, candidates = 0, sent = 0, waSent = 0;
+  let accounts = 0, candidates = 0, sent = 0, waSent = 0, skippedReview = 0, skippedNoLink = 0;
   const errors: string[] = [];
   const CAP = 300; // tetto di sicurezza per esecuzione
 
@@ -100,6 +122,8 @@ export async function GET(req: Request) {
     const structures = new Map(arr(data.structures).map((x) => [s((x as Json).id), x as Json]));
     const units = new Map(arr(data.units).map((u) => [s((u as Json).id), u as Json]));
     const roomTypes = new Map(arr(data.roomTypes).map((r) => [s((r as Json).id), r as Json]));
+    const reviewSettings = parseReviewSettings(blob[REVIEW_SETTINGS_KEY]);
+    let guides: Record<string, Json> = {}; try { guides = JSON.parse(blob[GUIDES_KEY] || "{}") as Record<string, Json>; } catch { guides = {}; }
 
     for (const bk of bookings) {
       const b = bk as Json;
@@ -125,7 +149,16 @@ export async function GET(req: Request) {
         codice_accesso: s(unit.accessInfo) || s(st.accessInfo),
         saldo: balance > 0 ? `€ ${balance.toLocaleString("it-IT")}` : "€ 0",
         link_checkin: `${origin}/checkin?b=${s(b.id)}`,
-        link_guida: s(st.guideUrl) || s(st.website) || "",
+        // Link PERSONALE della guida (struttura + camera + codici + nome), come quello copiato a mano dalla chat; l'indirizzo scelto a mano nella struttura ha la precedenza.
+        link_guida: s(st.guideUrl) || buildGuideUrl({
+          origin, structureId: s(b.structureId), guestName: s(g.fullName) || [s(g.firstName), s(g.lastName)].filter(Boolean).join(" "), roomAccess: blob[ROOMACCESS_KEY],
+          rooms: (b.groupId ? bookings.filter((x) => s((x as Json).groupId) === s(b.groupId) && s((x as Json).status) !== "cancelled") : [bk]).map((x) => {
+            const xu = units.get(s((x as Json).unitId)) || {};
+            return { unitId: s((x as Json).unitId) || null, unitCode: s(xu.code) || s(xu.name), parking: !!(x as Json).parking };
+          }),
+        }) || s(st.website) || "",
+        whatsapp: structureWhatsapp(st) || WHATSAPP_FALLBACK[lang] || WHATSAPP_FALLBACK.it,
+        ...reviewTokens(reviewLinksFor({ structureId: s(b.structureId), placeId: s(st.googlePlaceId), guideReviewUrl: s(guides[s(b.structureId)]?.reviewUrl), settings: reviewSettings })),
       };
 
       for (const tp of tpls) {
@@ -133,6 +166,11 @@ export async function GET(req: Request) {
         if (tp.structureIds?.length && !tp.structureIds.includes(s(b.structureId))) continue;
         const slot = slotDate(tp, checkIn, checkOut);
         if (!slot || slot !== todayRome) continue;
+        // Richiesta di recensione: regole di esclusione e almeno un link, altrimenti non si invia nulla (e non si consuma lo slot).
+        if (stepsOfTemplate(tp).includes("review")) {
+          if (!reviewDecision({ status, channel, reviewRequestedAt: num(b.reviewRequestedAt) || undefined, note: s(b.note), guestRequests: s(b.guestRequests) }, { tags: Array.isArray(g.tags) ? (g.tags as string[]) : [], notes: s(g.notes) }, reviewSettings).send) { skippedReview++; continue; }
+          if (usesReviewLinks(Object.values(tp.texts ?? {}).join("\n")) && !ctx.link_recensioni) { skippedNoLink++; continue; }
+        }
         candidates++;
         if (!live) continue; // dry-run: non inviare
         if (sent >= CAP) { errors.push("cap_reached"); return; }
@@ -142,7 +180,12 @@ export async function GET(req: Request) {
           .select("id");
         if (claim.error) { errors.push(`claim: ${claim.error.message}`); continue; }
         if (!claim.data || claim.data.length === 0) continue; // già inviato in precedenza
-        const text = fillTokens(tp.texts?.[lang] || tp.texts?.it || "", ctx).trim();
+        const raw0 = tp.texts?.[lang] || tp.texts?.it || "";
+        // Link lunghi (guida con codici, check-in) accorciati solo se il testo li usa.
+        const sctx = { ...ctx };
+        if (/\{link_guida\}/i.test(raw0)) sctx.link_guida = await shorten(admin, ctx.link_guida);
+        if (/\{link_checkin\}/i.test(raw0)) sctx.link_checkin = await shorten(admin, ctx.link_checkin);
+        const text = fillTokens(raw0, sctx).trim();
         if (!text) { continue; }
         let okAny = false;
         // Canale 1: EMAIL (se l'ospite ha email).
@@ -165,7 +208,7 @@ export async function GET(req: Request) {
           try {
             // Col modello approvato: i valori delle variabili {{1}}, {{2}}… sono i segnaposto del testo, in ordine di apparizione (vedi lib/wa-template).
             const rawText = tp.texts?.[lang] || tp.texts?.it || "";
-            const params = tp.waTemplate ? waTemplateFrom(rawText).tokens.map((k) => ctx[k] || "-") : undefined;
+            const params = tp.waTemplate ? waTemplateFrom(rawText).tokens.map((k) => oneLine(sctx[k] || "-")) : undefined; // Meta non ammette a capo nei valori
             const w = await sendWhatsapp(admin, tenantId, { to: phone, country: s(g.country), text, templateName: tp.waTemplate || undefined, lang, params });
             if (w.ok) { okAny = true; waSent++; await logInvio(admin, tenantId, { job: "messaggi", ref: s(b.id), channel: "whatsapp", ok: true, wamid: w.id, detail: `${tp.name || tp.id} → ${phone}` }); }
             else if (w.message && !/non collegato/i.test(w.message)) { errors.push(`wa ${s(b.id)}/${tp.id}: ${w.message}`); await logInvio(admin, tenantId, { job: "messaggi", ref: s(b.id), channel: "whatsapp", ok: false, detail: `${tp.name || tp.id} → ${phone}: ${w.message}` }); }
@@ -193,5 +236,5 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "scan_failed", accounts, candidates, sent }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, live, today: todayRome, accounts, candidates, sent, waSent, ...(errors.length ? { errors: errors.slice(0, 50) } : {}) });
+  return NextResponse.json({ ok: true, live, today: todayRome, accounts, candidates, sent, waSent, skippedReview, skippedNoLink, ...(errors.length ? { errors: errors.slice(0, 50) } : {}) });
 }

@@ -4,7 +4,7 @@
 // per struttura e "adesso" che avanza ogni 30 secondi (così "invio tra 25 minuti" si aggiorna da solo).
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabase";
-import { MSG_TEMPLATES_KEY, DEFAULT_TEMPLATES } from "./msg-templates";
+import { MSG_TEMPLATES_KEY, mergeSeedTemplates } from "./msg-templates";
 import type { AutoCtx, AutoTpl } from "./auto-schedule";
 
 type Status = { messagesLive: boolean; alloggiatiLive: boolean };
@@ -34,9 +34,8 @@ function readTemplates(): AutoTpl[] {
     const raw = localStorage.getItem(MSG_TEMPLATES_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
     const base = Array.isArray(parsed) ? parsed : [];
-    const have = new Set(base.map((x: AutoTpl) => x.id));
-    return [...base, ...DEFAULT_TEMPLATES.filter((d) => !have.has(d.id))] as AutoTpl[];
-  } catch { return DEFAULT_TEMPLATES as AutoTpl[]; }
+    return mergeSeedTemplates(base as AutoTpl[]);
+  } catch { return mergeSeedTemplates<AutoTpl>([]); }
 }
 
 export function useAutoCtx(): AutoCtx {

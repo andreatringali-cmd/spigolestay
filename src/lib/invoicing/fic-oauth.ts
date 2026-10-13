@@ -25,8 +25,9 @@ const AUTH_URL = `${FIC_API_BASE}/oauth/authorize`;
 const TOKEN_URL = `${FIC_API_BASE}/oauth/token`;
 const PROVIDER = "fattureincloud";
 
-// Scope: gestione clienti + fatture emesse + lettura/scrittura impostazioni azienda.
-export const FIC_SCOPES = "entity.clients:a issued_documents.invoices:a settings:a";
+// Scope: gestione clienti + fatture emesse + lettura/scrittura impostazioni azienda
+// + lettura (sola) dei documenti ricevuti dai fornitori (import in Fatture passive).
+export const FIC_SCOPES = "entity.clients:a issued_documents.invoices:a settings:a received_documents:r";
 
 export function ficConfigured(): boolean {
   return !!process.env.FIC_CLIENT_ID && !!process.env.FIC_CLIENT_SECRET;

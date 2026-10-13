@@ -14,7 +14,9 @@ import VoiceNote from "@/components/messaging/VoiceNote";
 import { GUIDE_MSG, CHECKIN_MSG, type Lang } from "@/lib/guest-messages";
 import { isThreadUnread, markThreadSeen } from "@/lib/navbadges";
 import { eur } from "@/lib/format";
-import { DEFAULT_TEMPLATES } from "@/lib/msg-templates";
+import { mergeSeedTemplates } from "@/lib/msg-templates";
+import { REVIEW_SETTINGS_KEY, parseReviewSettings, reviewLinksFor, reviewTokens } from "@/lib/auto-review";
+import { structureWhatsapp, WHATSAPP_FALLBACK } from "@/lib/auto-guide-link";
 import { apiPost } from "@/lib/invoicing/client";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
@@ -117,10 +119,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     try {
       const r = localStorage.getItem(TPL_KEY); const parsed = r ? JSON.parse(r) : null;
       const base = Array.isArray(parsed) ? parsed : [];
-      const haveIds = new Set(base.map((x: MsgTemplate) => x.id));
-      const merged = [...base, ...DEFAULT_TEMPLATES.filter((d) => !haveIds.has(d.id))];
+      const merged = mergeSeedTemplates(base as MsgTemplate[]);
       setTemplates(merged);
-      if (merged.length !== base.length) localStorage.setItem(TPL_KEY, JSON.stringify(merged));
+      if (JSON.stringify(merged) !== JSON.stringify(base)) localStorage.setItem(TPL_KEY, JSON.stringify(merged));
     } catch {}
     try { const s = localStorage.getItem(SENT_KEY); if (s) setSent(JSON.parse(s)); } catch {}
   }, []);
@@ -530,6 +531,13 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const checkinUrlFor = (b: Booking) => `${typeof window !== "undefined" ? window.location.origin : ""}/checkin?b=${encodeURIComponent(b.id)}`;
   const nightsOf = (b: Booking) => Math.max(1, Math.round((new Date(b.checkOut).getTime() - new Date(b.checkIn).getTime()) / 86400000));
   const fmtLong = (iso: string) => new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "long" });
+  // Link ai portali per la richiesta di recensione (impostazioni in Modelli & automazioni; Google dal Place ID o dalla guida).
+  const reviewLinksOf = (b: Booking) => {
+    let guideReviewUrl = "";
+    try { guideReviewUrl = JSON.parse(localStorage.getItem("spigolestay:guides") || "{}")?.[b.structureId]?.reviewUrl || ""; } catch { /* nessuna guida */ }
+    let raw: string | null = null; try { raw = localStorage.getItem(REVIEW_SETTINGS_KEY); } catch { /* storage non disponibile */ }
+    return reviewLinksFor({ structureId: b.structureId, placeId: getStructure(b.structureId)?.googlePlaceId, guideReviewUrl, settings: parseReviewSettings(raw) });
+  };
   const fillFor = (raw: string, b: Booking, g: Guest) => {
     const st = getStructure(b.structureId); const unit = getUnit(b.unitId);
     const access = unit?.accessInfo || st?.accessInfo || "—";
@@ -544,7 +552,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       .replace(/\{saldo\}/g, eur(Math.max(0, balance)))
       .replace(/\{notti\}/g, String(nightsOf(b)))
       .replace(/\{link_guida\}/g, guideUrlFor(b))
-      .replace(/\{link_checkin\}/g, checkinUrlFor(b));
+      .replace(/\{link_checkin\}/g, checkinUrlFor(b))
+      .replace(/\{whatsapp\}/g, structureWhatsapp(st ?? {}) || WHATSAPP_FALLBACK[langOf(g)] || WHATSAPP_FALLBACK.it)
+      .replace(/\{link_(recensioni|google|tripadvisor)\}/g, (_m, k: string) => reviewTokens(reviewLinksOf(b))[`link_${k}`] ?? "");
   };
   const insertTemplate = (id: string) => {
     const tpl = templates.find((x) => x.id === id); if (!tpl || !current) return;

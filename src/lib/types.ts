@@ -349,6 +349,8 @@ export interface Booking {
   commissionPct?: number; // % di commissione OTA specifica di questa prenotazione
   paymentFee?: number; // € costo d'incasso trattenuto dall'OTA (es. "Payment charge" di Booking.com): si toglie dal netto, separato dalla commissione
   commissionAmount?: number; // € commissione esatta (con centesimi), es. da un'OTA — se presente ha priorità sul calcolo via %
+  netTotal?: boolean; // il totale è GIÀ quanto incassa la struttura (pagamento netto dell'OTA, es. Expedia): nessuna commissione da sottrarre. Solo una cifra impostata a mano (commissionAmount) la rimette.
+  otaDeductions?: number; // € trattenute dichiarate dall'OTA (solo informativo: sono già comprese nel totale netto, non si sottraggono)
   // Carta virtuale OTA (VCC): SOLO METADATI, MAI il numero carta o il CVV. Il numero completo
   // viene inviato da Channex esclusivamente ai partner certificati PCI DSS; Xenora non lo è e
   // NON lo riceve/salva. Qui teniamo solo importo, valuta, quando è addebitabile e la scadenza,
