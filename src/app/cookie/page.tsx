@@ -15,6 +15,7 @@ export default function CookiePage() {
       <ul>
         <li><strong>Tecnici / necessari</strong>: indispensabili per l'accesso e il funzionamento del gestionale (sessione di login, sicurezza). Non richiedono consenso.</li>
         <li><strong>Di preferenza</strong>: memorizzano scelte come la lingua o le impostazioni dell'interfaccia.</li>
+        <li><strong>Pubblicitari (Google Ads)</strong>: sulle pagine pubbliche di prenotazione, solo se acconsenti con l&apos;avviso cookie, usiamo il tag di Google Ads per misurare quali annunci portano a una prenotazione (importo e codice della prenotazione). Se rifiuti, il tag non viene caricato. Puoi cambiare scelta cancellando i dati del sito dal browser.</li>
         <li><strong>Analitici</strong> (se attivati): ci aiutano a capire in forma aggregata come viene usato il servizio, per migliorarlo. Utilizzati solo previo consenso.</li>
       </ul>
 

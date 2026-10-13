@@ -13,6 +13,8 @@ import { amenityIcon } from "@/lib/amenities";
 import { loadPromos } from "@/lib/promos";
 import { inScope } from "@/lib/scope";
 import { bookingErrorMessage, BOOKING_NETWORK_ERROR } from "@/lib/booking-errors";
+import AdsConsent from "@/components/AdsConsent";
+import { trackBookingConversion } from "@/lib/ads";
 import { loadPublicSite, lsGet, isPublicMode, publicSlug, findAvailableSibling, findNetworkSuggestions, type SiblingSuggestion } from "@/lib/publicdata";
 
 // ---- pricing helpers --------------------------------------------------------
@@ -51,7 +53,7 @@ export default function PrenotaPage() {
   }, []);
   if (!ready) return null;
   const engine = <Engine embed={embed} />;
-  return <DataProvider>{accent ? <div style={{ ["--focus" as string]: accent } as React.CSSProperties}>{engine}</div> : engine}</DataProvider>;
+  return <DataProvider>{accent ? <div style={{ ["--focus" as string]: accent } as React.CSSProperties}>{engine}</div> : engine}{!embed && <AdsConsent />}</DataProvider>;
 }
 
 // `embed`: versione compatta per l'iframe incorporato sul sito del gestore
@@ -294,6 +296,15 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Conversione Google Ads: prenotazione diretta confermata (solo con consenso, una volta per codice; vedi lib/ads.ts).
+  useEffect(() => {
+    if (step !== "done") return;
+    const c = doneSummary?.code || code;
+    const v = doneSummary?.total ?? total;
+    if (c) trackBookingConversion({ value: Number(v) || 0, transactionId: c });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, doneSummary, code]);
 
   // Deep link Meta Search con ?rt=<id>: porta la tipologia richiesta in vista.
   useEffect(() => {
