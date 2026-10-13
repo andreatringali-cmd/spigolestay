@@ -245,7 +245,11 @@ export class FattureInCloudProvider implements EInvoiceProvider {
   private errMsg(json: Record<string, unknown>): string {
     const e = json.error as Record<string, unknown> | string | undefined;
     if (typeof e === "string") return e;
-    if (e && typeof e === "object") return (e.message as string) || JSON.stringify(e);
+    if (e && typeof e === "object") {
+      const msg = (e.message as string) || JSON.stringify(e);
+      const vr = e.validation_result;
+      return vr && typeof vr === "object" ? `${msg} [${JSON.stringify(vr).slice(0, 300)}]` : msg;
+    }
     return (json.message as string) || "";
   }
 
@@ -335,9 +339,29 @@ export class FattureInCloudProvider implements EInvoiceProvider {
     };
   }
 
+  /** Totale da pagare secondo Fatture in Cloud (servizio ufficiale dei totali, stesse voci e bollo del documento). null se non disponibile: in quel caso si resta sul totale di Xenora. */
+  private async ficAmountDue(data: Record<string, unknown>): Promise<number | null> {
+    try {
+      const { payments_list: _p, number: _n, numeration: _nu, ...forTotals } = data; // eslint-disable-line @typescript-eslint/no-unused-vars
+      const r = await this.req("POST", `/c/${this.company()}/issued_documents/totals`, { data: forTotals });
+      if (!r.ok) return null;
+      const due = Number(this.data(r.json).amount_due);
+      return Number.isFinite(due) && due > 0 ? Math.round(due * 100) / 100 : null;
+    } catch { return null; }
+  }
+
   async send(payload: EInvoicePayload): Promise<SendResult> {
     const type = payload.docKind === "nota_di_credito" ? "credit_note" : "invoice";
     const data = await this.buildData(payload, type);
+    // Il totale dei pagamenti DEVE coincidere con il totale che Fatture in Cloud calcola da sé (bollo, arrotondamenti, natura IVA): si usa il suo.
+    const ours = payload.totals.totalCents / 100;
+    const due = await this.ficAmountDue(data);
+    let totalNote = "";
+    if (due != null && Math.abs(due - ours) > 0.004) {
+      const pl = data.payments_list as { amount: number }[];
+      if (pl?.[0]) pl[0].amount = due;
+      totalNote = ` Attenzione: Fatture in Cloud calcola un totale di € ${due.toFixed(2).replace(".", ",")} invece di € ${ours.toFixed(2).replace(".", ",")} (Xenora): controlla bollo e voci sul documento.`;
+    }
     const r = await this.req("POST", `/c/${this.company()}/issued_documents`, { data });
     if (!r.ok) throw new Error(`Fatture in Cloud ${r.status}: ${this.errMsg(r.json) || "creazione documento non riuscita"}`);
     const docId = (this.data(r.json).id as number | string) ?? "";
@@ -346,12 +370,12 @@ export class FattureInCloudProvider implements EInvoiceProvider {
 
     // Modalità prova: il documento è creato in Fatture in Cloud ma NON trasmesso allo SdI.
     if (this.cfg.dryRun) {
-      return { providerRef, status: "inviata_intermediario", message: "Documento creato in Fatture in Cloud (MODALITÀ PROVA — non inviato allo SdI). Verificalo su Fatture in Cloud, poi disattiva la prova per l'invio reale." };
+      return { providerRef, status: "inviata_intermediario", message: "Documento creato in Fatture in Cloud (MODALITÀ PROVA — non inviato allo SdI). Verificalo su Fatture in Cloud, poi disattiva la prova per l'invio reale." + totalNote };
     }
     // Invio reale allo SdI.
     const s = await this.req("POST", `/c/${this.company()}/issued_documents/${docId}/e_invoice/send`);
     if (!s.ok) throw new Error(`Fatture in Cloud invio SdI ${s.status}: ${this.errMsg(s.json) || "invio non riuscito"}`);
-    return { providerRef, status: "inviata_intermediario", message: "Fattura creata e trasmessa allo SdI tramite Fatture in Cloud." };
+    return { providerRef, status: "inviata_intermediario", message: "Fattura creata e trasmessa allo SdI tramite Fatture in Cloud." + totalNote };
   }
   async sendCreditNote(payload: EInvoicePayload): Promise<SendResult> { return this.send(payload); }
 

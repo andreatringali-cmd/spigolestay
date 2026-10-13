@@ -6,12 +6,15 @@ register("./helpers/alias-loader.mjs", import.meta.url);
 const { FattureInCloudProvider } = await import("../src/lib/invoicing/provider.ts");
 
 // Cattura la richiesta di creazione documento che Xenora manda a Fatture in Cloud (fetch simulato: nessuna rete).
-async function sendAndCapture(totals: { taxableCents: number; vatCents: number; outOfScopeCents: number; bolloCents: number; totalCents: number }) {
+async function sendAndCapture(totals: { taxableCents: number; vatCents: number; outOfScopeCents: number; bolloCents: number; totalCents: number }, ficAmountDue?: number) {
   const calls: { method: string; url: string; body?: Record<string, unknown> }[] = [];
   const realFetch = globalThis.fetch;
   globalThis.fetch = (async (url: string, init?: { method?: string; body?: string }) => {
     const u = String(url);
     calls.push({ method: init?.method ?? "GET", url: u, body: init?.body ? JSON.parse(init.body) : undefined });
+    if (u.endsWith("/issued_documents/totals")) {
+      return ficAmountDue == null ? new Response("{}", { status: 404 }) : new Response(JSON.stringify({ data: { amount_due: ficAmountDue } }), { status: 200 });
+    }
     if (u.endsWith("/info/vat_types")) {
       return new Response(JSON.stringify({ data: [{ id: 1, value: 0, ei_type: "N2.2" }, { id: 2, value: 0, ei_type: "N1" }] }), { status: 200 });
     }
@@ -44,4 +47,19 @@ test("FIC: il bollo va nel campo stamp_duty, così il totale dei pagamenti coinc
 test("FIC: senza bollo non si manda stamp_duty", async () => {
   const { data } = await sendAndCapture({ taxableCents: 5000, vatCents: 0, outOfScopeCents: 0, bolloCents: 0, totalCents: 5000 });
   assert.ok(!("stamp_duty" in data));
+});
+
+test("FIC: il pagamento usa il totale da pagare calcolato da Fatture in Cloud, se diverso da quello di Xenora", async () => {
+  const { data } = await sendAndCapture({ taxableCents: 9900, vatCents: 0, outOfScopeCents: 396, bolloCents: 200, totalCents: 10496 }, 102.96);
+  assert.equal((data.payments_list as { amount: number }[])[0].amount, 102.96);
+});
+
+test("FIC: se il servizio dei totali non risponde, si resta sul totale di Xenora", async () => {
+  const { data } = await sendAndCapture({ taxableCents: 9900, vatCents: 0, outOfScopeCents: 396, bolloCents: 200, totalCents: 10496 });
+  assert.equal((data.payments_list as { amount: number }[])[0].amount, 104.96);
+});
+
+test("FIC: se i totali coincidono il pagamento non cambia", async () => {
+  const { data } = await sendAndCapture({ taxableCents: 9900, vatCents: 0, outOfScopeCents: 396, bolloCents: 200, totalCents: 10496 }, 104.96);
+  assert.equal((data.payments_list as { amount: number }[])[0].amount, 104.96);
 });
