@@ -18,7 +18,8 @@ import { supabase } from "@/lib/supabase";
 import { CO_LEVELS, coManagerPerms, levelOf, type CoLevel } from "@/lib/comanager";
 import { loadDeposit, type DepositCfg } from "@/lib/deposit";
 import Toggle from "@/components/Toggle";
-import { GoogleContentForStructure } from "@/components/GoogleContentCard";
+import GoogleHotelSection from "@/components/GoogleHotelSection";
+import { pushStructureContent } from "@/lib/google-content-client";
 
 function Info({ children }: { children: React.ReactNode }) {
   return (
@@ -37,7 +38,7 @@ export default function StrutturaSchedaPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const isNew = params.id === "nuovo";
-  const { structures, units, addStructure, updateStructure, setActiveStructure, addActivity } = useData();
+  const { structures, units, roomTypes, addStructure, updateStructure, setActiveStructure, addActivity } = useData();
   const { t } = useLang();
   const ask = useConfirm();
   const toast = useToast();
@@ -242,7 +243,11 @@ export default function StrutturaSchedaPage() {
     const patch: Partial<Structure> = { ...f };
     delete (patch as { id?: string }).id;
     if (isNew) { const sid = addStructure({ name: f.name.trim(), groupName: (f.groupName || f.name).trim(), city: f.city, address: f.address }); updateStructure(sid, patch); }
-    else { updateStructure(params.id, patch); addActivity("config", `Struttura modificata — ${f.name.trim()}`); }
+    else {
+      updateStructure(params.id, patch); addActivity("config", `Struttura modificata — ${f.name.trim()}`);
+      // Se la struttura è collegata ai portali, i dati per Google partono da soli (in background, senza aspettare).
+      void pushStructureContent({ ...(existing as Structure), ...patch } as Structure, roomTypes);
+    }
     router.push("/strutture");
   };
 
@@ -724,7 +729,7 @@ export default function StrutturaSchedaPage() {
           )}
         </div>
       </div>
-      {!isNew && existing && <div className="mt-4"><GoogleContentForStructure structureId={existing.id} /></div>}
+      {!isNew && existing && <GoogleHotelSection structure={f as Structure} />}
     </div>
   );
 }

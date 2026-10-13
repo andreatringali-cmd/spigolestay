@@ -12,7 +12,6 @@ import { CHANNELS, type Channel } from "@/lib/types";
 import ChannelLogo from "@/components/ChannelLogo";
 import ChannelBars from "@/components/ChannelBars";
 import LineChart from "@/components/LineChart";
-import GoogleContentCard from "@/components/GoogleContentCard";
 import { usePriceCorrections } from "@/lib/usePriceCorrections";
 import { correctionLabel } from "@/lib/priceCorrection";
 import { loadChannelColor, saveChannelColor } from "@/lib/channelOverrides";
@@ -334,9 +333,6 @@ export default function CanaliPage() {
           </div>
         </div>
       </Card>
-
-      {/* Dati della struttura per Google Hotel: si inviano a Channex da qui */}
-      {effStructure !== "all" && chxMap[effStructure]?.propertyId && <GoogleContentCard key={effStructure} structureId={effStructure} propertyId={chxMap[effStructure].propertyId} />}
 
       {/* Risponde direttamente a "da dove vedo che sono collegato con Booking.com?": stato REALE
          da Channex per canale, non il vecchio flag locale mai aggiornato. Nascosta se Channex non
