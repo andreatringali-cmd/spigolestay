@@ -134,12 +134,16 @@ export default function SchedaGiorno({ groupSize, b, j: jIn, code, dim, typeLabe
 }
 
 function StepButton({ s, onStep }: { s: JourneyStep; onStep: (s: JourneyStep) => void }) {
+  const col = s.sent && s.state === "late" ? "var(--warn)" : STATE_COLOR[s.state]; // inviato: arancione, non rosso come se non fosse partito
+  const m = /\s·\s(inviato \d+ volt[ae])(?:\s·\sultimo [^·]+)?$/.exec(s.detail);
+  const sentTag = m?.[1] ?? "";                                  // "inviato 2 volte", accanto al nome
+  const detail = m ? s.detail.slice(0, m.index) : s.detail;       // il dettaglio senza il tratto già mostrato accanto al nome
   return (
     <button onClick={(e) => { e.stopPropagation(); onStep(s); }} title={`${s.label}: ${s.detail}`} className="flex min-w-0 items-start gap-2 rounded-lg text-left transition hover:bg-wash">
-      <span className="mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full text-[10px] font-extrabold" style={{ color: STATE_COLOR[s.state], border: `1.5px solid ${STATE_COLOR[s.state]}`, background: s.state === "done" ? `color-mix(in srgb, ${STATE_COLOR[s.state]} 14%, transparent)` : "transparent" }}>{STATE_GLYPH[s.state]}</span>
+      <span className="mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full text-[10px] font-extrabold" style={{ color: col, border: `1.5px solid ${col}`, background: s.state === "done" ? `color-mix(in srgb, ${col} 14%, transparent)` : "transparent" }}>{STATE_GLYPH[s.state]}</span>
       <span className="min-w-0">
-        <span className="block truncate text-xs font-semibold text-txt">{s.label}</span>
-        <span className="block truncate text-[11px]" style={{ color: s.state === "late" ? "var(--err)" : "var(--faint)" }}>{s.detail}</span>
+        <span className="flex min-w-0 items-baseline gap-1.5"><span className="truncate text-xs font-semibold text-txt">{s.label}</span>{sentTag && <span className="shrink-0 text-[10px] font-semibold" style={{ color: "var(--warn)" }}>{sentTag}</span>}</span>
+        <span className="block truncate text-[11px]" style={{ color: s.state === "late" ? (s.sent ? "var(--warn)" : "var(--err)") : "var(--faint)" }}>{detail}</span>
         {s.auto && <span className="block truncate text-[11px] font-medium" title={s.auto.text} style={{ color: s.auto.tone === "warn" ? "var(--warn)" : "var(--focus)" }}>⏱ {s.auto.text}</span>}
       </span>
     </button>

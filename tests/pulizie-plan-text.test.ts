@@ -58,3 +58,20 @@ test("campi per il modello WhatsApp a righe: una voce per lavoro, mai vuota, per
   assert.equal(f.niente, "2");
   for (const v of Object.values(f)) assert.ok(v.length > 0 && !v.includes("\n"));
 });
+
+test("campi dettagliati: come il messaggio condiviso a mano (chi esce, chi entra, persone, fino a quando), una riga e mai vuoti", () => {
+  const f = buildPuliziePlanFields({ ...(args as object), detailed: true } as never);
+  assert.equal(f.cambio, "1 — esce SUN HE · entra Karl Josef (2 pers., fino al 13/10)");
+  assert.equal(f.partenze, "3 — esce SUN HE");
+  assert.equal(f.riassetto, "10 — Thomas Pies (1 pers., fino al 13/10)");
+  assert.equal(f.fuori, "5 — perdita d'acqua");
+  assert.equal(f.arrivi, "nessuna");
+  for (const v of Object.values(f)) assert.ok(v.length > 0 && !/[\r\n\t]/.test(v) && !/ {5}/.test(v));
+});
+
+test("campi dettagliati: più camere dello stesso lavoro separate da punto e virgola", () => {
+  const two = [...(rooms as unknown[]), room("4", "turnover", { dep: bk("b5", "g3", "2026-10-09", "2026-10-11"), arr: bk("b6", "g1", "2026-10-11", "2026-10-14") })];
+  const f = buildPuliziePlanFields({ date: "2026-10-11", scopedStructures: [S], rooms: two, guests, detailed: true } as never);
+  assert.equal(f.cambio.split("; ").length, 2);
+  assert.match(f.cambio, /^1 — .*; 4 — esce Thomas Pies · entra SUN HE \(2 pers\., fino al 14\/10\)$/);
+});

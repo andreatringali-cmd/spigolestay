@@ -6,7 +6,7 @@ import { bookingPaidTotal, cityTaxOf } from "./booking";
 import { autoLineFor, type AutoCtx, type AutoLine, type AutoStepKey } from "./auto-schedule";
 
 export type StepState = "done" | "todo" | "late" | "na";
-export interface JourneyStep { key: string; label: string; state: StepState; detail: string; href?: string; auto?: AutoLine /* invio automatico: "Non inviato · invio previsto alle 10:00" */ }
+export interface JourneyStep { key: string; label: string; state: StepState; detail: string; href?: string; auto?: AutoLine /* invio automatico: "Non inviato · invio previsto alle 10:00" */; sent?: boolean /* sollecito già inviato: si attende la risposta (arancione, non rosso) */ }
 export interface Chip { key: string; label: string; tone: "info" | "warn" | "err" }
 
 export interface JourneyCtx {
@@ -116,6 +116,10 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   // Ordine di lettura voluto: check-in, pagamento, guida, schedina, osservatorio, tassa, fattura, check-out (recensione per ultima).
   const ORDER = ["checkin", "pay", "guide", "alloggiati", "istat", "tax", "invoice", "checkout", "review"];
   steps.sort((a, b2) => ORDER.indexOf(a.key) - ORDER.indexOf(b2.key));
+
+  // Sollecito già inviato (anche a mano): il passaggio resta da fare ma "in attesa" dell'ospite, non "fermo": in arancione.
+  const NOTE_OF: Record<string, "checkin" | "pay" | "tax" | "guide" | "review"> = { checkin: "checkin", pay: "pay", tax: "tax", guide: "guide", review: "review" };
+  for (const st of steps) if ((st.state === "todo" || st.state === "late") && NOTE_OF[st.key] && c.reminderNotes?.[NOTE_OF[st.key]]) st.sent = true;
 
   // Invii automatici: sotto il passaggio ancora da fare, se ne esiste uno programmato, quando parte.
   if (c.auto) {

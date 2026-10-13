@@ -17,6 +17,7 @@ export function romeNowSlot(): { ymd: string; hm: string } {
   return { ymd: `${g("year")}-${g("month")}-${g("day")}`, hm: `${g("hour")}:${g("minute")}` };
 }
 
+const DETAIL_MAX = 780; // caratteri di variabili: il resto del corpo del modello occupa circa 200 dei 1024 ammessi
 const errText = (j: { error?: unknown; message?: unknown } | null | undefined, status: number): string => (typeof j?.error === "string" ? j.error : j?.error ? JSON.stringify(j.error) : j?.message ? String(j.message) : `HTTP ${status}`);
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
@@ -32,7 +33,11 @@ export async function deliverPuliziePlan(a: {
   const text = buildPuliziePlanText({ ...planArgs, style: "whatsapp" });   // testo completo con grassetti: WhatsApp (ripiego a testo libero)
   const emailText = buildPuliziePlanText({ ...planArgs, style: "plain" }); // email: niente asterischi
   const summary = buildPuliziePlanSummary(planArgs);
-  const f = buildPuliziePlanFields(planArgs);                              // una voce per tipo di lavoro: modello WhatsApp "a righe"                       // una riga, per il modello WhatsApp (Meta non ammette a capo)
+  // Una voce per tipo di lavoro, per il modello WhatsApp "a righe". Prima la versione dettagliata (chi esce, chi entra, persone, fino a quando: come nel messaggio condiviso a mano);
+  // il corpo del modello Meta ha un limite (1024 caratteri in tutto), quindi se il dettaglio non ci sta si ripiega sulla versione con i soli numeri delle camere.
+  const detailedF = buildPuliziePlanFields({ ...planArgs, detailed: true });
+  const detailedLen = Object.values(detailedF).reduce((n, v) => n + v.length, 0);
+  const f = detailedLen <= DETAIL_MAX ? detailedF : buildPuliziePlanFields(planArgs);
   const dateLong = fmtLongIT(date);                                         // "domenica 11 ottobre" invece di "2026-10-11"
   const subject = `Planning pulizie · ${name} · ${dateLong}`;
   const out: PulizieSendResult[] = [];

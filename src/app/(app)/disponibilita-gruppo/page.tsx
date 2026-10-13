@@ -14,8 +14,12 @@ import Toggle from "@/components/Toggle";
 const NONE = ""; // famiglia "non condivisa"
 const tint = (c: string, pct: number) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
 
-/** Pallino con l'iniziale della struttura, nel suo colore. */
-function Dot({ name, color, size = 22 }: { name: string; color?: string; size?: number }) {
+/** Il logo della struttura (se l'ha caricato), altrimenti un pallino con l'iniziale nel suo colore: due strutture con la stessa iniziale e lo stesso colore si distinguono dal logo. */
+function Dot({ name, color, logo, size = 22 }: { name: string; color?: string; logo?: string; size?: number }) {
+  if (logo) return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={logo} alt="" aria-hidden className="shrink-0 rounded-full border border-line bg-white object-contain" style={{ width: size, height: size }} />
+  );
   return (
     <span className="grid shrink-0 place-items-center rounded-full font-bold text-white" style={{ width: size, height: size, fontSize: Math.round(size * 0.46), backgroundColor: color ?? "var(--focus)" }} aria-hidden>
       {(name || "?")[0]?.toUpperCase()}
@@ -43,6 +47,7 @@ export default function GruppoPage() {
   const sOf = (id: string) => structures.find((s) => s.id === id);
   const sName = (id: string) => sOf(id)?.name ?? "—";
   const sColor = (id: string) => sOf(id)?.photoColor;
+  const sLogo = (id: string) => sOf(id)?.logo;
   // Il gruppo si legge anche se ancora spento (la pagina deve poter mostrare le tipologie mentre si imposta).
   const view: PoolConfig = useMemo(() => ({ ...cfg, enabled: true }), [cfg]);
   const listings = useMemo(() => poolListings(view, raw.roomTypes, raw.units), [view, raw.roomTypes, raw.units]);
@@ -95,7 +100,7 @@ export default function GruppoPage() {
               <button key={st.id} type="button" aria-pressed={on} onClick={() => save({ structureIds: on ? cfg.structureIds.filter((x) => x !== st.id) : [...cfg.structureIds, st.id] })}
                 className={`flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-xs font-semibold transition ${on ? "border-focus text-txt" : "border-line text-dim hover:bg-wash"}`}
                 style={on ? { backgroundColor: tint("var(--focus)", 9) } : undefined}>
-                <Dot name={st.name} color={st.photoColor} size={24} />
+                <Dot name={st.name} color={st.photoColor} logo={st.logo} size={24} />
                 {st.name}
                 {on && <span aria-hidden className="text-[color:var(--focus)]">✓</span>}
               </button>
@@ -153,7 +158,7 @@ export default function GruppoPage() {
                     return (
                       <div key={l.typeId} className="text-xs">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <Dot name={sName(l.structureId)} color={sColor(l.structureId)} size={18} />
+                          <Dot name={sName(l.structureId)} color={sColor(l.structureId)} logo={sLogo(l.structureId)} size={18} />
                           <span className="font-semibold text-txt">{sName(l.structureId)}</span>
                           <span className="text-dim">{l.name}</span>
                           <span className="ml-auto text-faint"><b className="font-mono font-semibold text-dim">{l.listed}</b> {l.listed === 1 ? "camera" : "camere"} in questa struttura</span>
@@ -180,7 +185,7 @@ export default function GruppoPage() {
                 <div className="mt-2 flex flex-col divide-y divide-line">
                   {unshared.map((l) => (
                     <div key={l.typeId} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2 text-xs">
-                      <Dot name={sName(l.structureId)} color={sColor(l.structureId)} size={18} />
+                      <Dot name={sName(l.structureId)} color={sColor(l.structureId)} logo={sLogo(l.structureId)} size={18} />
                       <span className="font-semibold text-txt">{sName(l.structureId)}</span>
                       <span className="text-dim">{l.name}</span>
                       <span className="font-mono text-faint">{l.listed} in Xenora</span>
@@ -235,7 +240,7 @@ export default function GruppoPage() {
                       {g.items.map((l) => (
                         <tr key={l.typeId}>
                           <td className="sticky left-0 z-10 whitespace-nowrap bg-surface px-3 py-1.5">
-                            <span className="inline-flex items-center gap-2"><Dot name={sName(l.structureId)} color={sColor(l.structureId)} size={16} /><span className="font-medium text-txt">{sName(l.structureId)}</span><span className="text-dim">{l.name}</span></span>
+                            <span className="inline-flex items-center gap-2"><Dot name={sName(l.structureId)} color={sColor(l.structureId)} logo={sLogo(l.structureId)} size={16} /><span className="font-medium text-txt">{sName(l.structureId)}</span><span className="text-dim">{l.name}</span></span>
                           </td>
                           {days.map((d) => {
                             const a = occ.availFor(l.typeId, d);

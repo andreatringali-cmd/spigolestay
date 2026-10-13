@@ -176,8 +176,10 @@ export function buildPuliziePlanText(opts: {
 // Una voce per tipo di lavoro, per il modello WhatsApp "a righe" (ogni riga del modello è una variabile: Meta non ammette a capo DENTRO una variabile, ma il modello li ha già).
 // Ogni valore è su una sola riga e mai vuoto (Meta rifiuta le variabili vuote): "nessuna" se non c'è nulla. Per cambi e arrivi si indica anche quante persone entrano (servono per i letti).
 export interface PlanFields { cambio: string; arrivi: string; partenze: string; riassetto: string; fuori: string; niente: string }
-export function buildPuliziePlanFields(opts: { scopedStructures: Structure[]; rooms: PlanRoom[]; notes?: Record<string, string>; date: string; t?: (s: string) => string }): PlanFields {
-  const { scopedStructures, rooms, notes = {}, date, t = (x: string) => x } = opts;
+// Con detailed (e guests) ogni camera porta anche chi esce, chi entra, quante persone e fino a quando, come nel messaggio condiviso a mano; le camere sono separate da "; "
+// (Meta non ammette a capo dentro una variabile, né più di 4 spazi di fila: i testi si ripuliscono).
+export function buildPuliziePlanFields(opts: { scopedStructures: Structure[]; rooms: PlanRoom[]; notes?: Record<string, string>; date: string; t?: (s: string) => string; detailed?: boolean; guests?: Guest[] }): PlanFields {
+  const { scopedStructures, rooms, notes = {}, date, t = (x: string) => x, detailed = false, guests = [] } = opts;
   const ids = new Set(scopedStructures.map((s) => s.id));
   const list = rooms.filter((r) => ids.has(r.structure.id)).sort(byUnit);
   const none = t("nessuna");
@@ -185,6 +187,21 @@ export function buildPuliziePlanFields(opts: { scopedStructures: Structure[]; ro
   const join = (rs: PlanRoom[], label: (r: PlanRoom) => string) => (rs.length ? rs.map((r) => `${label(r)}${note(r)}`).join(", ") : none);
   const withPers = (r: PlanRoom) => (r.arr ? `${r.unit.name} (${r.arr.adults + r.arr.children} ${t("pers.")})` : r.unit.name);
   const of = (k: ActionKey) => list.filter((r) => !r.oos && r.action === k);
+  if (detailed) {
+    const clean = (x: string) => x.replace(/[\r\n\t]+/g, " ").replace(/ {2,}/g, " ").trim();
+    const gname = (id: string) => clean(guests.find((g) => g.id === id)?.fullName ?? "");
+    const pers = (b: Booking) => `${b.adults + b.children} ${t("pers.")}`;
+    const until = (b: Booking) => `${t("fino al")} ${fmtDM(b.checkOut)}`;
+    const joinD = (rs: PlanRoom[], label: (r: PlanRoom) => string) => (rs.length ? rs.map((r) => clean(`${label(r)}${note(r)}`)).join("; ") : none);
+    return {
+      cambio: joinD(of("turnover"), (r) => (r.dep && r.arr ? `${r.unit.name} — ${t("esce")} ${gname(r.dep.guestId)} · ${t("entra")} ${gname(r.arr.guestId)} (${pers(r.arr)}, ${until(r.arr)})` : withPers(r))),
+      arrivi: joinD(of("arrivo"), (r) => (r.arr ? `${r.unit.name} — ${t("entra")} ${gname(r.arr.guestId)} (${pers(r.arr)}, ${until(r.arr)})` : r.unit.name)),
+      partenze: joinD(of("partenza"), (r) => (r.dep ? `${r.unit.name} — ${t("esce")} ${gname(r.dep.guestId)}` : r.unit.name)),
+      riassetto: joinD(of("riassetto"), (r) => { const b = r.stay ?? r.arr ?? r.dep; return b ? `${r.unit.name} — ${gname(b.guestId)} (${pers(b)}, ${until(b)})` : r.unit.name; }),
+      fuori: joinD(list.filter((r) => r.oos), (r) => `${r.unit.name}${r.oosNote ? ` — ${r.oosNote}` : ""}`),
+      niente: join(of("niente"), (r) => r.unit.name),
+    };
+  }
   return {
     cambio: join(of("turnover"), withPers),
     arrivi: join(of("arrivo"), withPers),

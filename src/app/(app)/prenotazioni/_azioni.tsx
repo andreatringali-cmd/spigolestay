@@ -276,7 +276,7 @@ export default function StepActions(p: StepActionsProps) {
         <div className="border-b border-line px-5 py-3.5">
           <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-faint">{step.label}</div>
           <div className="text-base font-bold text-txt">{guestLabel}</div>
-          <div className="text-xs" style={{ color: step.state === "late" ? "var(--err)" : "var(--dim)" }}>{step.detail}</div>
+          <div className="text-xs" style={{ color: step.state === "late" ? (step.sent ? "var(--warn)" : "var(--err)") : "var(--dim)" }}>{step.detail}</div>
         </div>
         <div className="flex flex-col gap-3 overflow-y-auto px-5 py-4">
           {body}
