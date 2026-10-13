@@ -99,3 +99,16 @@ export default function GoogleContentCard({ structureId, propertyId }: { structu
     </Card>
   );
 }
+
+// Versione per la scheda di una struttura (Strutture → scheda): legge dal browser la property Channex collegata a quella struttura.
+// Se la struttura non è collegata a Channex, non mostra nulla.
+import { useSyncExternalStore } from "react";
+import { readChannexMap } from "@/lib/channex-map-sync";
+
+const subscribe = (cb: () => void) => { window.addEventListener("storage", cb); window.addEventListener("spigolestay:channex-dirty", cb); return () => { window.removeEventListener("storage", cb); window.removeEventListener("spigolestay:channex-dirty", cb); }; };
+
+export function GoogleContentForStructure({ structureId }: { structureId: string }) {
+  const propertyId = useSyncExternalStore(subscribe, () => readChannexMap()[structureId]?.propertyId ?? "", () => "");
+  if (!propertyId) return null;
+  return <GoogleContentCard key={structureId} structureId={structureId} propertyId={propertyId} />;
+}

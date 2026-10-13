@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabase";
 import { CO_LEVELS, coManagerPerms, levelOf, type CoLevel } from "@/lib/comanager";
 import { loadDeposit, type DepositCfg } from "@/lib/deposit";
 import Toggle from "@/components/Toggle";
+import { GoogleContentForStructure } from "@/components/GoogleContentCard";
 
 function Info({ children }: { children: React.ReactNode }) {
   return (
@@ -723,6 +724,7 @@ export default function StrutturaSchedaPage() {
           )}
         </div>
       </div>
+      {!isNew && existing && <div className="mt-4"><GoogleContentForStructure structureId={existing.id} /></div>}
     </div>
   );
 }
