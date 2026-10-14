@@ -158,11 +158,13 @@ export default function CassaPage() {
   const futureView = !!from && from >= today;       // si guarda da oggi in avanti: previsione
   const inPeriod = (iso: string) => (!from || iso >= from) && (!to || iso <= to);
   const periodWord = futureView ? t("previste") : preset === "all" ? t("totali") : t("del periodo");
-  const listHorizon = to || shiftISO(today, 90);    // senza "Al" la lista prevede i prossimi 90 giorni
+  // Previsione a 6 mesi: dal mese in corso fino a fine del sesto mese (es. oggi 14.10 → 31.03).
+  const fcEnd = useMemo(() => { const [y, m] = today.split("-").map(Number); const d = new Date(y, m - 1 + 6, 0); return fmt(d.getFullYear(), d.getMonth(), d.getDate()); }, [today]);
+  const listHorizon = to || fcEnd;                   // senza "Al" la lista prevede i prossimi 6 mesi
   const [chartsOn, setChartsOn] = useState(true);
   const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
 
-  const forecastChart = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, activeStructureId, today, shiftISO(today, 365), principal), [bookings, guests, getStructure, rules, activeStructureId, today, principal]);
+  const forecastChart = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, activeStructureId, today, fcEnd, principal), [bookings, guests, getStructure, rules, activeStructureId, today, fcEnd, principal]);
   const forecastView = useMemo(() => forecastChart.filter((x) => x.date <= listHorizon), [forecastChart, listHorizon]);
   const rows = [...all, ...forecastView]
     .filter((m) => inPeriod(m.date) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
@@ -178,14 +180,14 @@ export default function CassaPage() {
   const saldoConti: Record<string, number> = Object.fromEntries(CONTI.filter((c) => balances[c.key]?.since).map((c) => [c.key, balances[c.key].saldo])); // solo i conti con saldo di partenza: gli altri non hanno uno storico completo
   const saldoTot = sumCents(Object.values(saldoConti));
   const hasOpening = CONTI.some((c) => balances[c.key]?.since);
-  const forecastTutte = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, "all", today, to || shiftISO(today, 90), principal), [bookings, guests, getStructure, rules, today, to, principal]);
+  const forecastTutte = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, "all", today, to || fcEnd, principal), [bookings, guests, getStructure, rules, today, to, fcEnd, principal]);
   // Estratto conto: saldo dopo ogni movimento (tutti i movimenti di tutte le strutture) e ordine coerente nello stesso giorno.
   const ledger = useMemo(() => computeLedger([...autoTutte, ...programmateTutte, ...manual, ...forecastTutte]), [autoTutte, programmateTutte, manual, forecastTutte]);
   const ledgerOrd = (x: Mov) => ledger.order.get(x.id) ?? 0;
   const bkOf = (x: Mov) => (x.ref && /^(auto-in|auto-comm|fc-in)-/.test(x.id) ? bookings.find((b) => b.id === x.ref) : undefined); // prenotazione da cui nasce il movimento
   const rowsOrdered = [...rows].sort((a, b) => { const d = a.date < b.date ? -1 : a.date > b.date ? 1 : ledgerOrd(a) - ledgerOrd(b); return futureView ? d : -d; });
   const listRows = groupBookingRows(rowsOrdered);
-  const projectedEnd = useMemo(() => projectBalance([...autoTutte, ...manual, ...forecastTutte], balances, today, to || shiftISO(today, 90)), [autoTutte, manual, forecastTutte, balances, today, to]);
+  const projectedEnd = useMemo(() => projectBalance([...autoTutte, ...manual, ...forecastTutte], balances, today, to || fcEnd), [autoTutte, manual, forecastTutte, balances, today, to, fcEnd]);
 
   // ---- Saldo di partenza: scrivi quanto hai oggi su un conto, da lì il saldo si aggiorna ----
   const [opening, setOpening] = useState<{ date: string; amounts: Record<string, string>; newName: string; startOfDay: boolean } | null>(null);
@@ -258,12 +260,13 @@ export default function CassaPage() {
 
   const chartSrc = useMemo(() => [...all, ...(futureView ? forecastChart : [])], [all, forecastChart, futureView]);
   const trend = useMemo(() => {
-    const base = futureView ? monthKey(shiftISO(today, 335)) : to ? monthKey(to) : monthKey(today); // previsione: oggi + 11 mesi; altrimenti 12 mesi fino a "Al" o a oggi
+    const n = futureView ? 6 : 12; // previsione: 6 mesi da quello in corso; altrimenti 12 mesi fino a "Al" o a oggi
+    const base = futureView ? monthKey(fcEnd) : to ? monthKey(to) : monthKey(today);
     const [by, bm] = base.split("-").map(Number);
     const list: { ym: string; in: number; out: number }[] = [];
-    for (let i = 11; i >= 0; i--) { const d = new Date(by, bm - 1 - i, 1); const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; const mm = chartSrc.filter((m) => monthKey(m.date) === ym && m.cat !== OPENING_CAT); list.push({ ym, in: sumCents(mm.filter((m) => m.kind === "in").map((m) => m.amount)), out: sumCents(mm.filter((m) => m.kind === "out").map((m) => m.amount)) }); }
+    for (let i = n - 1; i >= 0; i--) { const d = new Date(by, bm - 1 - i, 1); const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; const mm = chartSrc.filter((m) => monthKey(m.date) === ym && m.cat !== OPENING_CAT); list.push({ ym, in: sumCents(mm.filter((m) => m.kind === "in").map((m) => m.amount)), out: sumCents(mm.filter((m) => m.kind === "out").map((m) => m.amount)) }); }
     return list;
-  }, [chartSrc, futureView, to, today]);
+  }, [chartSrc, futureView, to, today, fcEnd]);
   const maxTrend = Math.max(1, ...trend.flatMap((t) => [t.in, t.out]));
   const axis = niceAxis(maxTrend); // asse Y a 4 intervalli con massimo "tondo"
   const axisTicks = [0, 1, 2, 3, 4].map((i) => i * axis.step);
@@ -425,7 +428,7 @@ export default function CassaPage() {
         </Card>
         <Card>
           <div className="mb-2 flex items-center justify-between gap-3">
-            <SectionTitle>{futureView ? t("Previsione prossimi 12 mesi") : t("Andamento ultimi 12 mesi")}</SectionTitle>
+            <SectionTitle>{futureView ? t("Previsione prossimi 6 mesi") : t("Andamento ultimi 12 mesi")}</SectionTitle>
             <div className="flex items-center gap-4 text-xs text-dim"><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--ok)" }} />{t("Entrate")}</span><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--err)" }} />{t("Uscite")}</span></div>
           </div>
           <div className="flex" style={{ height: 160 }}>
