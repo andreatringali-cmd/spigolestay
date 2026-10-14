@@ -6,10 +6,11 @@ import { CHANNELS } from "./types";
 import type { Booking, Guest, Structure } from "./types";
 import { commissionOf } from "./booking";
 import { shiftISO } from "./dates";
+import { payoutDate, loadPayoutSettings, type PayoutSettings } from "./payouts";
 import { roundCents, sumCents } from "./money";
 
 export type Kind = "in" | "out";
-export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string; forecast?: boolean }
+export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string; forecast?: boolean; channel?: string /* canale della prenotazione da cui nasce */ }
 export interface Rule { id: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; freq: "monthly" | "weekly" | "yearly"; day: number; start: string; end?: string; auto: boolean; note?: string }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -53,19 +54,20 @@ export const scopeVisible = (structureId: string | undefined | null, active: str
   active === "all" || structureId === active;
 
 // Movimenti automatici dalle prenotazioni (dirette → contanti, OTA → banca + commissione).
-export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, active: string, principal: string = loadContiPrefs().principal): Mov[] {
+export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, active: string, principal: string = loadContiPrefs().principal, payouts: PayoutSettings = loadPayoutSettings()): Mov[] {
   const out: Mov[] = [];
   for (const b of bookings) {
     if (b.status === "cancelled" || b.channel === "blocked") continue;
     if (active !== "all" && b.structureId !== active) continue;
+    const when = payoutDate(b, payouts); // data in cui i soldi arrivano davvero (impostazioni del canale)
     const g = guests.find((x) => x.id === b.guestId);
     const st = getStructure(b.structureId);
     // Incasso automatico = quanto realmente incassato sulla prenotazione (fonte di
     // verità = prenotazione), non l'intero totale: così la cassa/chiusura riflette il reale.
     const incassato = roundCents(b.paid ?? 0);
-    if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: b.checkIn, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: b.channel === "direct" ? "contanti" : principal, auto: true, ref: b.id });
+    if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: when, channel: b.channel, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: b.channel === "direct" ? "contanti" : principal, auto: true, ref: b.id });
     const comm = roundCents(commissionOf(b));
-    if (comm > 0) out.push({ id: `auto-comm-${b.id}`, date: b.checkIn, kind: "out", cat: "commissioni", desc: `Commissione ${CHANNELS[b.channel].label} · ${g?.fullName ?? "Ospite"}`, amount: comm, conto: principal, auto: true, ref: b.id });
+    if (comm > 0) out.push({ id: `auto-comm-${b.id}`, date: when, channel: b.channel, kind: "out", cat: "commissioni", desc: `Commissione ${CHANNELS[b.channel].label} · ${g?.fullName ?? "Ospite"}`, amount: comm, conto: principal, auto: true, ref: b.id });
   }
   return out;
 }
@@ -162,9 +164,12 @@ export async function migrateLocalCash(tenantId: string): Promise<boolean> {
 // (l'incasso automatico e la commissione OTA della stessa prenotazione). I totali restano calcolati dai movimenti separati: cambia solo come si leggono.
 export type CassaListRow =
   | { type: "mov"; mov: Mov }
-  | { type: "booking"; id: string; income: Mov; commission?: Mov; gross: number; comm: number; net: number };
+  | { type: "booking"; id: string; income: Mov; commission?: Mov; gross: number; comm: number; net: number }
+  // un bonifico/pagamento dell'OTA che riunisce più prenotazioni (stesso canale, stessa data di incasso)
+  | { type: "payout"; id: string; channel: string; date: string; items: CassaListRow[]; gross: number; comm: number; net: number; count: number; movIds: string[]; forecast: boolean };
 
-export function groupBookingRows(rows: Mov[]): CassaListRow[] {
+const BOOKING_MOV = /^(auto-in|auto-comm|fc-in)-/;
+export function groupBookingRows(rows: Mov[], groupChannels: ReadonlySet<string> = new Set()): CassaListRow[] {
   const commByRef = new Map<string, Mov>();
   for (const m of rows) if (m.id.startsWith("auto-comm-") && m.ref) commByRef.set(m.ref, m);
   // L'incasso della voce unica è quello già incassato (auto-in); se non c'è ancora nulla incassato, è il "da incassare" previsto (fc-in).
@@ -179,7 +184,27 @@ export function groupBookingRows(rows: Mov[]): CassaListRow[] {
       out.push({ type: "booking", id: m.ref as string, income: m, commission: c, gross: m.amount, comm: c.amount, net: roundCents(m.amount - c.amount) });
     } else out.push({ type: "mov", mov: m });
   }
-  return out;
+  if (groupChannels.size === 0) return out;
+  // Canali con bonifico settimanale/mensile: le prenotazioni incassate nella stessa data si riuniscono in una voce.
+  const res: CassaListRow[] = [];
+  const groups = new Map<string, Extract<CassaListRow, { type: "payout" }>>();
+  const refs = new Map<string, Set<string>>();
+  for (const r of out) {
+    if (r.type === "payout") { res.push(r); continue; }
+    const m = r.type === "booking" ? r.income : r.mov;
+    if (!(m.channel && groupChannels.has(m.channel) && BOOKING_MOV.test(m.id))) { res.push(r); continue; }
+    const key = `${m.channel}|${m.date}`;
+    let g = groups.get(key);
+    if (!g) { g = { type: "payout", id: `po-${key}`, channel: m.channel, date: m.date, items: [], gross: 0, comm: 0, net: 0, count: 0, movIds: [], forecast: true }; groups.set(key, g); refs.set(key, new Set()); res.push(g); }
+    const gross = r.type === "booking" ? r.gross : m.kind === "in" ? m.amount : 0;
+    const comm = r.type === "booking" ? r.comm : m.kind === "out" ? m.amount : 0;
+    g.items.push(r);
+    g.gross = roundCents(g.gross + gross); g.comm = roundCents(g.comm + comm); g.net = roundCents(g.gross - g.comm);
+    g.movIds.push(...(r.type === "booking" ? [r.income.id, ...(r.commission ? [r.commission.id] : [])] : [m.id]));
+    if (!m.forecast) g.forecast = false;
+    refs.get(key)!.add(m.ref ?? m.id); g.count = refs.get(key)!.size;
+  }
+  return res;
 }
 
 // ── Saldo di partenza ("tirare una riga") ───────────────────────────────────────────────────────────────────────────────
@@ -309,17 +334,18 @@ export function contoKeyFromLabel(label: string, existing: ContoDef[]): string {
 // ── Flusso di cassa: oggi e futuro ──────────────────────────────────────────────────────────────────────────────────────
 // Movimenti PREVISTI da oggi in poi: il saldo ancora da incassare delle prenotazioni in arrivo (alla data di arrivo) e le occorrenze future dei pagamenti
 // programmati. Le commissioni OTA delle prenotazioni future e gli acconti già incassati sono già nei movimenti automatici (computeAuto).
-export function computeForecast(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, rules: Rule[], active: string, today: string, horizon: string, principal: string = loadContiPrefs().principal): Mov[] {
+export function computeForecast(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, rules: Rule[], active: string, today: string, horizon: string, principal: string = loadContiPrefs().principal, payouts: PayoutSettings = loadPayoutSettings()): Mov[] {
   const out: Mov[] = [];
   for (const b of bookings) {
     if (b.status === "cancelled" || b.channel === "blocked") continue;
     if (active !== "all" && b.structureId !== active) continue;
-    if (b.checkIn < today || b.checkIn > horizon) continue;
+    const when = payoutDate(b, payouts);
+    if (when < today || when > horizon) continue;
     const remaining = roundCents(Math.max(0, (b.total ?? 0) + (b.cleaningFee ?? 0) - (b.paid ?? 0)));
     if (remaining <= 0) continue;
     const g = guests.find((x) => x.id === b.guestId);
     const st = getStructure(b.structureId);
-    out.push({ id: `fc-in-${b.id}`, date: b.checkIn, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label} · da incassare`, amount: remaining, conto: b.channel === "direct" ? "contanti" : principal, auto: true, forecast: true, ref: b.id });
+    out.push({ id: `fc-in-${b.id}`, date: when, channel: b.channel, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label} · da incassare`, amount: remaining, conto: b.channel === "direct" ? "contanti" : principal, auto: true, forecast: true, ref: b.id });
   }
   const from = shiftISO(today, 1);
   if (from <= horizon) {

@@ -20,7 +20,8 @@ import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
 import { fmtDMY } from "@/lib/dates";
 import ChannelLogo from "@/components/ChannelLogo";
-import { CHANNELS } from "@/lib/types";
+import { CHANNELS, type Channel } from "@/lib/types";
+import { type PayoutMode, type PayoutSettings, PAYOUT_CHANNELS, WEEKDAY_LABELS, cleanRule, loadPayoutSettings, savePayoutSettings } from "@/lib/payouts";
 
 // ---- Conti cassa ------------------------------------------------------------
 
@@ -69,6 +70,12 @@ export default function CassaPage() {
   const [cats, setCats] = useState<Cat[]>(DEFAULT_CATS);
   const [conti, setConti] = useState<ContoDef[]>(() => (typeof window === "undefined" ? [...DEFAULT_CONTI] : loadConti())); // conti di base + quelli aggiunti (più banche…)
   const CONTI = conti;
+  // Impostazioni incassi per canale: quando i soldi arrivano davvero sul conto (arrivo, check-out, bonifico settimanale o mensile).
+  const [payouts, setPayouts] = useState<PayoutSettings>(() => (typeof window === "undefined" ? {} : loadPayoutSettings()));
+  const [payoutModal, setPayoutModal] = useState(false);
+  const [openPayouts, setOpenPayouts] = useState<Set<string>>(() => new Set()); // bonifici aperti nell'elenco
+  const setPayoutRule = (ch: Channel, patch: Record<string, unknown>) => { const next = { ...payouts, [ch]: cleanRule({ ...(payouts[ch] ?? { mode: "arrival" }), ...patch }) }; setPayouts(next); savePayoutSettings(next); };
+  const groupChannels = useMemo(() => new Set<string>(PAYOUT_CHANNELS.filter((c) => payouts[c]?.mode === "weekly" || payouts[c]?.mode === "monthly")), [payouts]);
   const [principal, setPrincipalState] = useState<string>(() => (typeof window === "undefined" ? "banca" : loadContiPrefs().principal)); // dove arrivano i soldi delle prenotazioni OTA
   useEffect(() => { try { const r = localStorage.getItem(CATS_KEY); if (r) { const saved = JSON.parse(r); const customs = saved.filter((c: Cat) => c.custom); setCats([...DEFAULT_CATS, ...customs]); } } catch {} }, []);
   const saveCats = (list: Cat[]) => { setCats(list); try { localStorage.setItem(CATS_KEY, JSON.stringify(list.filter((c) => c.custom))); } catch {} };
@@ -97,7 +104,7 @@ export default function CassaPage() {
   const today = todayISO();
 
   // Movimenti automatici dalle prenotazioni + occorrenze programmate (logica condivisa con la Chiusura cassa).
-  const auto = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, activeStructureId, principal), [bookings, guests, activeStructureId, getStructure, principal]);
+  const auto = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, activeStructureId, principal, payouts), [bookings, guests, activeStructureId, getStructure, principal, payouts]);
   const ruleVisible = (structureId?: string) => scopeVisible(structureId, activeStructureId);
   const scheduled = useMemo<Mov[]>(() => computeScheduled(rules, paidSet, activeStructureId, today), [rules, activeStructureId, today, paidSet]);
 
@@ -155,7 +162,7 @@ export default function CassaPage() {
   const [chartsOn, setChartsOn] = useState(true);
   const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
 
-  const forecastChart = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, activeStructureId, today, fcEnd, principal), [bookings, guests, getStructure, rules, activeStructureId, today, fcEnd, principal]);
+  const forecastChart = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, activeStructureId, today, fcEnd, principal, payouts), [bookings, guests, getStructure, rules, activeStructureId, today, fcEnd, principal, payouts]);
   const forecastView = useMemo(() => forecastChart.filter((x) => x.date <= listHorizon), [forecastChart, listHorizon]);
   const rows = [...all, ...forecastView]
     .filter((m) => inPeriod(m.date) && matchesTipo(m) && (!catF || m.cat === catF) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
@@ -165,7 +172,7 @@ export default function CassaPage() {
   const uscite = sumCents(rowsStat.filter((m) => m.kind === "out").map((m) => m.amount));
   const saldo = roundCents(entrate - uscite);
 
-  const autoTutte = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, "all", principal), [bookings, guests, getStructure, principal]);
+  const autoTutte = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, "all", principal, payouts), [bookings, guests, getStructure, principal, payouts]);
   const programmateTutte = useMemo<Mov[]>(() => computeScheduled(rules, paidSet, "all", today), [rules, paidSet, today]);
   const balances = useMemo(() => computeBalances([...autoTutte, ...programmateTutte, ...manual], today, CONTI.map((c) => c.key)), [autoTutte, programmateTutte, manual, today, CONTI]);
   const saldoConti: Record<string, number> = Object.fromEntries(CONTI.filter((c) => balances[c.key]?.since).map((c) => [c.key, balances[c.key].saldo])); // solo i conti con saldo di partenza: gli altri non hanno uno storico completo
@@ -180,7 +187,15 @@ export default function CassaPage() {
   const ledgerOrd = (x: Mov) => ledger.order.get(x.id) ?? 0;
   const bkOf = (x: Mov) => (x.ref && /^(auto-in|auto-comm|fc-in)-/.test(x.id) ? bookings.find((b) => b.id === x.ref) : undefined); // prenotazione da cui nasce il movimento
   const rowsOrdered = [...rows].sort((a, b) => { const d = a.date < b.date ? -1 : a.date > b.date ? 1 : ledgerOrd(a) - ledgerOrd(b); return futureView ? d : -d; });
-  const listRows = groupBookingRows(rowsOrdered);
+  const listRows = groupBookingRows(rowsOrdered, groupChannels);
+  // cella "saldo conti" (riusata dalle voci bonifico)
+  const balCell = (bal: number | null, inc: boolean, forecast?: boolean) => (
+    <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2">
+      {inc
+        ? <span className="justify-self-end px-2 text-right text-[11px] italic text-faint" title={t("Questo movimento è del giorno in cui hai impostato il saldo: è già compreso nell'importo che hai scritto.")}>{t("già nel saldo")}</span>
+        : <span className={"justify-self-end rounded-md px-2 py-0.5 text-right font-mono text-sm font-semibold tabular-nums " + (bal === null ? "text-faint" : bal < 0 ? "text-[color:var(--err)]" : "text-txt") + (forecast && bal !== null ? " opacity-70" : "")} style={bal !== null && bal < 0 ? { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" } : undefined}>{bal === null ? "—" : eur(bal)}</span>}
+    </div>
+  );
 
   // ---- Saldo di partenza: scrivi quanto hai oggi su un conto, da lì il saldo si aggiorna ----
   const [opening, setOpening] = useState<{ date: string; amounts: Record<string, string>; newName: string; startOfDay: boolean } | null>(null);
@@ -489,6 +504,7 @@ export default function CassaPage() {
         </select>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
+          <button onClick={() => setPayoutModal(true)} title={t("Impostazioni incassi")} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-dim hover:bg-wash">⚙ {t("Impostazioni")}</button>
           <button onClick={openNewMov} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Nuovo movimento")}</button>
           <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
         </div>
@@ -505,6 +521,46 @@ export default function CassaPage() {
               </div>
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {listRows.map((r) => {
+                  if (r.type === "payout") {
+                    const open = openPayouts.has(r.id);
+                    const lastId = r.movIds.reduce((best, id) => ((ledger.order.get(id) ?? 0) > (ledger.order.get(best) ?? 0) ? id : best), r.movIds[0]);
+                    const ch = r.channel as Channel;
+                    return (
+                      <div key={r.id}>
+                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} title={open ? t("Chiudi il dettaglio") : t("Mostra le prenotazioni di questo pagamento")} className="grid grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap rounded py-1.5 hover:bg-wash">
+                          <span className="font-mono text-xs text-dim">{fmtDMY(r.date)}</span>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <ChannelLogo channel={ch} size={24} title={CHANNELS[ch]?.label} />
+                            <span className="truncate text-sm font-medium text-txt">{CHANNELS[ch]?.label} · {t("pagamento")} · {r.count} {r.count === 1 ? t("prenotazione") : t("prenotazioni")}</span>
+                            {r.forecast && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span>}
+                            <span className="shrink-0 text-faint">{open ? "▾" : "▸"}</span>
+                          </div>
+                          <span className="text-right font-mono text-xs" style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span>
+                          <span className="text-right font-mono text-xs" style={{ color: "var(--err)" }}>− {eur(r.comm)}</span>
+                          <span className="text-right font-mono text-sm font-bold text-txt">{eur(r.net)}</span>
+                          {balCell(ledger.balanceAfter.get(lastId) ?? null, ledger.included.has(lastId), r.forecast)}
+                        </div>
+                        {open && r.items.map((it) => {
+                          if (it.type === "payout") return null;
+                          const im = it.type === "booking" ? it.income : it.mov;
+                          const ib = bkOf(im);
+                          const gn = ib ? (guests.find((g) => g.id === ib.guestId)?.fullName || "Ospite") : im.desc;
+                          const g2 = it.type === "booking" ? it.gross : im.kind === "in" ? im.amount : 0;
+                          const c2 = it.type === "booking" ? it.comm : im.kind === "out" ? im.amount : 0;
+                          return (
+                            <div key={"i-" + im.id} className="grid grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs text-dim">
+                              <span />
+                              <span className="truncate pl-9">{gn}{ib ? <span className="text-faint"> · {t("check-out")} {fmtDMY(ib.checkOut)}</span> : null}</span>
+                              <span className="text-right font-mono">{g2 ? `+ ${eur(g2)}` : ""}</span>
+                              <span className="text-right font-mono">{c2 ? `− ${eur(c2)}` : ""}</span>
+                              <span className="text-right font-mono">{eur(roundCents(g2 - c2))}</span>
+                              <div className="-my-1 self-stretch border-l border-line" />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
                   const isBooking = r.type === "booking";
                   const m = isBooking ? r.income : r.mov;
                   const c = catOf(m.cat);
@@ -674,6 +730,49 @@ export default function CassaPage() {
       )}
 
       {/* --- Modale selezione / gestione categorie --- */}
+      {/* --- Modale impostazioni incassi --- */}
+      {payoutModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[6vh]">
+          <button aria-label={t("Chiudi")} onClick={() => setPayoutModal(false)} className="absolute inset-0 bg-black/40" />
+          <div className="relative max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="mb-1 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Impostazioni incassi")}</h2><button onClick={() => setPayoutModal(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <p className="mb-3 text-xs text-dim">{t("Indica quando ogni portale ti paga. Cassa registra l'incasso nella data in cui i soldi arrivano sul conto e, per i bonifici, riunisce in una voce le prenotazioni dello stesso pagamento. Le impostazioni valgono per tutte le strutture.")}</p>
+            <div className="flex flex-col gap-2">
+              {PAYOUT_CHANNELS.map((ch) => {
+                const rule = payouts[ch] ?? { mode: "arrival" as PayoutMode };
+                const sel = "mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus";
+                const wd = rule.weekday ?? 4, md = rule.monthDay ?? 1, dd = rule.days ?? 0;
+                return (
+                  <div key={ch} className="rounded-xl border border-line p-3">
+                    <div className="mb-2 flex items-center gap-2"><ChannelLogo channel={ch} size={22} title={CHANNELS[ch].label} /><span className="text-sm font-semibold text-txt">{CHANNELS[ch].label}</span></div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block"><span className="text-xs text-dim">{t("Quando arriva il pagamento")}</span>
+                        <select value={rule.mode} onChange={(e) => setPayoutRule(ch, { mode: e.target.value })} className={sel}>
+                          <option value="arrival">{t("Alla data di arrivo")}</option>
+                          <option value="checkout">{t("Dopo il check-out (carta virtuale)")}</option>
+                          <option value="weekly">{t("Bonifico settimanale")}</option>
+                          <option value="monthly">{t("Bonifico mensile")}</option>
+                        </select>
+                      </label>
+                      {rule.mode === "checkout" && <label className="block"><span className="text-xs text-dim">{t("Giorni dopo il check-out")}</span><input type="number" min={0} max={60} value={dd} onChange={(e) => setPayoutRule(ch, { days: Number(e.target.value) || 0 })} className={sel} /></label>}
+                      {rule.mode === "weekly" && <label className="block"><span className="text-xs text-dim">{t("Giorno del bonifico")}</span><select value={wd} onChange={(e) => setPayoutRule(ch, { weekday: Number(e.target.value) })} className={sel}>{WEEKDAY_LABELS.map((w, i) => <option key={w} value={i}>{t(w)}</option>)}</select></label>}
+                      {rule.mode === "monthly" && <label className="block"><span className="text-xs text-dim">{t("Giorno del mese successivo")}</span><input type="number" min={1} max={31} value={md} onChange={(e) => setPayoutRule(ch, { monthDay: Number(e.target.value) || 1 })} className={sel} /></label>}
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-faint">
+                      {rule.mode === "arrival" && t("I soldi risultano incassati il giorno dell'arrivo.")}
+                      {rule.mode === "checkout" && (dd ? `${t("Incasso")} ${dd} ${t("giorni dopo il check-out dell'ospite (es. carta virtuale).")}` : t("Incasso il giorno del check-out (es. carta virtuale)."))}
+                      {rule.mode === "weekly" && `${t("Un unico bonifico ogni")} ${t(WEEKDAY_LABELS[wd]).toLowerCase()}: ${t("copre i check-out dal")} ${t(WEEKDAY_LABELS[wd]).toLowerCase()} ${t("della settimana prima al giorno precedente.")}`}
+                      {rule.mode === "monthly" && `${t("Un unico bonifico il")} ${md} ${t("del mese successivo: copre tutti i check-out del mese, dal 1 all'ultimo giorno.")}`}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+            <button onClick={() => setPayoutModal(false)} className="mt-3 w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{t("Fatto")}</button>
+          </div>
+        </div>
+      )}
+
       {/* --- Modale modifica movimento --- */}
       {editingMov && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[6vh]">
