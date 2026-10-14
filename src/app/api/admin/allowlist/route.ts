@@ -29,7 +29,7 @@ const isEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 export async function GET(req: Request) {
   const a = await requireOwner(req);
   if (a instanceof NextResponse) return a;
-  const { data, error } = await a.admin.from("access_allowlist").select("email, note, added_by, created_at").order("created_at", { ascending: false });
+  const { data, error } = await a.admin.from("access_allowlist").select("email, note, added_by, created_at, kind").order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 200 });
   return NextResponse.json({ ok: true, items: data ?? [] });
 }
@@ -37,11 +37,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const a = await requireOwner(req);
   if (a instanceof NextResponse) return a;
-  const body = await req.json().catch(() => null) as { email?: string; note?: string } | null;
+  const body = await req.json().catch(() => null) as { email?: string; note?: string; kind?: string } | null;
   const email = normEmail(body?.email);
   if (!isEmail(email)) return NextResponse.json({ error: "email_non_valida" }, { status: 400 });
   const note = String(body?.note ?? "").slice(0, 200) || null;
-  const { error } = await a.admin.from("access_allowlist").upsert({ email, note, added_by: a.email }, { onConflict: "email" });
+  const { error } = await a.admin.from("access_allowlist").upsert({ email, note, added_by: a.email, kind: body?.kind === "collaboratore" ? "collaboratore" : "titolare" }, { onConflict: "email" });
   if (error) return NextResponse.json({ error: error.message }, { status: 200 });
   const notified = await notifyAccessApproved(email);
   return NextResponse.json({ ok: true, notified });

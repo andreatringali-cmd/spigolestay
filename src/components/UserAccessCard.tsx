@@ -45,7 +45,7 @@ export default function UserAccessCard({ user, structures, onShared }: UserAcces
     if (!valid) return;
     setBusy("invite"); setLines([]);
     try {
-      const { status, j } = await call("/api/admin/allowlist", { email, note: `Utente: ${user.firstName} ${user.lastName}`.trim() });
+      const { status, j } = await call("/api/admin/allowlist", { email, note: `Utente: ${user.firstName} ${user.lastName}`.trim(), kind: "collaboratore" });
       if (status === 403) { done([{ ok: false, text: "Solo il titolare dell'account può invitare nuovi utenti." }]); return; }
       if (!j.ok) { done([{ ok: false, text: humanInviteError(String(j.error ?? ""), String(j.message ?? "")) }]); return; }
       setLink(signupLink(window.location.origin, email));
