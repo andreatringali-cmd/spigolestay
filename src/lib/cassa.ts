@@ -209,3 +209,35 @@ export function niceAxis(maxValue: number): { max: number; step: number } {
   const step = 10 ** (exp + 1);
   return { max: step * 4, step };
 }
+
+// ── Conti ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// I conti di base (contanti, banca, PayPal, carta) ci sono sempre; si possono aggiungere altri conti (più banche: Revolut, Intesa…).
+// I movimenti salvano la chiave del conto (testo libero nel database); l'elenco dei conti aggiunti vive nel browser e si sincronizza con l'account
+// (come tutte le chiavi "spigolestay:").
+export interface ContoDef { key: string; label: string }
+export const DEFAULT_CONTI: ContoDef[] = [
+  { key: "contanti", label: "Contanti" },
+  { key: "banca", label: "Banca" },
+  { key: "paypal", label: "PayPal" },
+  { key: "carta", label: "Carta / POS" },
+];
+const CONTI_KEY = "spigolestay:cassa:conti";
+const isDefault = (k: string) => DEFAULT_CONTI.some((d) => d.key === k);
+
+export function loadConti(): ContoDef[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CONTI_KEY) || "[]") as ContoDef[];
+    const customs = saved.filter((c) => c && typeof c.key === "string" && typeof c.label === "string" && c.key && c.label && !isDefault(c.key));
+    return [...DEFAULT_CONTI, ...customs];
+  } catch { return [...DEFAULT_CONTI]; }
+}
+export function saveConti(list: ContoDef[]) {
+  try { localStorage.setItem(CONTI_KEY, JSON.stringify(list.filter((c) => !isDefault(c.key)))); } catch { /* storage non disponibile */ }
+}
+/** Chiave stabile per un nuovo conto a partire dal nome ("Revolut" → "conto-revolut"); se esiste già si aggiunge un numero. */
+export function contoKeyFromLabel(label: string, existing: ContoDef[]): string {
+  const slug = label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24) || "conto";
+  let key = `conto-${slug}`; let n = 2;
+  while (existing.some((c) => c.key === key)) key = `conto-${slug}-${n++}`;
+  return key;
+}

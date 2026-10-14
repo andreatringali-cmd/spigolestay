@@ -11,7 +11,7 @@ import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 import { roundCents, sumCents } from "@/lib/money";
 import { exportExcel } from "@/lib/export";
-import { type Mov, type Rule, computeAuto, computeScheduled, scopeVisible, loadCash } from "@/lib/cassa";
+import { type Mov, type Rule, computeAuto, computeScheduled, scopeVisible, loadCash, loadConti } from "@/lib/cassa";
 
 const CONTI = [
   { key: "contanti", label: "Contanti" },
@@ -77,7 +77,7 @@ export default function ChiusuraCassaPage() {
   const expected = useMemo(() => sumCents(all.filter((m) => m.conto === conto && m.date <= day).map((m) => (m.kind === "in" ? m.amount : -m.amount))), [all, conto, day]);
   const diff = roundCents(numv(counted) - expected);
 
-  const contoLabel = (k: string) => CONTI.find((c) => c.key === k)?.label ?? k;
+  const contoLabel = (k: string) => CONTI.find((c) => c.key === k)?.label ?? loadConti().find((c) => c.key === k)?.label ?? k;
   const structOf = (id: string | null) => (!id || id === "all" ? "Tutte" : getStructure(id)?.name ?? "—");
 
   const save = async () => {
