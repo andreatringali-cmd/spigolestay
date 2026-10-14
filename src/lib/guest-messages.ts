@@ -41,6 +41,19 @@ export const REMINDER_INTRO: Record<Lang, string> = {
   es: "Un breve recordatorio de nuestra parte. ",
 };
 
+// Promemoria di partenza: data e orario del check-out, come contattare la struttura, ringraziamento.
+export function checkoutMessage(lang: Lang, o: { date: string; time?: string; structure?: string }): string {
+  const d = o.date, t = (o.time ?? "").trim(), s = (o.structure ?? "").trim();
+  const T: Record<Lang, string> = {
+    it: `Il check-out è previsto il ${d}${t ? ` entro le ${t}` : ""}. Per qualsiasi esigenza (ad esempio il deposito bagagli) ci scriva pure qui. Grazie per aver scelto ${s || "la nostra struttura"}: è stato un piacere ospitarla!`,
+    en: `Check-out is on ${d}${t ? ` by ${t}` : ""}. If you need anything (for example luggage storage), just reply here. Thank you for choosing ${s || "us"}, it was a pleasure to host you!`,
+    fr: `Le check-out est prévu le ${d}${t ? ` avant ${t}` : ""}. Pour toute demande (par exemple la consigne à bagages), répondez simplement ici. Merci d'avoir choisi ${s || "notre établissement"}, ce fut un plaisir de vous accueillir !`,
+    de: `Der Check-out ist am ${d}${t ? ` bis ${t} Uhr` : ""}. Bei Fragen (zum Beispiel zur Gepäckaufbewahrung) schreiben Sie uns einfach hier. Vielen Dank, dass Sie sich für ${s || "uns"} entschieden haben, es war uns eine Freude!`,
+    es: `El check-out es el ${d}${t ? ` antes de las ${t}` : ""}. Para cualquier necesidad (por ejemplo, consigna de equipaje), escríbanos aquí. Gracias por elegir ${s || "nuestro alojamiento"}, ¡ha sido un placer recibirle!`,
+  };
+  return T[lang];
+}
+
 export const langOf = (g?: Guest): Lang => guestLangOf(g); // lingua della scheda, altrimenti dal Paese o dal prefisso del telefono (gli ospiti OTA non hanno la lingua)
 export const greeting = (lang: Lang, g?: Guest): string => {
   const first = (g?.firstName || g?.fullName || "").split(" ")[0];
@@ -198,9 +211,9 @@ export function reminderSummary(list: ReminderEntry[] | undefined, now = Date.no
 export const REMINDER_COOLDOWN_MS = 60 * 60 * 1000;
 
 /** Note brevi per le schede (una per passaggio) ricavate dalla cronologia di una prenotazione. */
-export function reminderNotes(log: Record<string, ReminderEntry[]> | undefined): Partial<Record<"checkin" | "pay" | "tax" | "guide" | "review", string>> {
+export function reminderNotes(log: Record<string, ReminderEntry[]> | undefined): Partial<Record<"checkin" | "pay" | "tax" | "guide" | "review" | "checkout", string>> {
   if (!log) return {};
-  return { checkin: reminderSummary(log.checkin), pay: reminderSummary(log["pay-saldo"]), tax: reminderSummary(log["pay-tassa"]), guide: reminderSummary(log.guide), review: reminderSummary(log.review) };
+  return { checkin: reminderSummary(log.checkin), pay: reminderSummary(log["pay-saldo"]), tax: reminderSummary(log["pay-tassa"]), guide: reminderSummary(log.guide), review: reminderSummary(log.review), checkout: reminderSummary(log.checkout) };
 }
 
 /** La guida ospiti è già stata inviata PER QUESTA prenotazione? Contano solo i messaggi partiti dopo la creazione della prenotazione

@@ -12,7 +12,7 @@ import { shortenLink, buildGuestLink, buildGroupGuestLink } from "@/lib/guestlin
 import { chatPayGuestMessage } from "@/lib/chat-pay-core";
 import { bookingPaidTotal } from "@/lib/booking";
 import { googleReviewUrl, reviewRequestMessage } from "@/lib/reviews";
-import { CHECKIN_MSG, CHECKIN_MORE_MSG, GUIDE_MSG, REMINDER_INTRO, greeting, langOf, markReminder, useReminderLog, whenLabel, agoLabel, REMINDER_COOLDOWN_MS, sendEmailToGuest, sendWhatsAppToGuest, type SendResult } from "@/lib/guest-messages";
+import { checkoutMessage, CHECKIN_MSG, CHECKIN_MORE_MSG, GUIDE_MSG, REMINDER_INTRO, greeting, langOf, markReminder, useReminderLog, whenLabel, agoLabel, REMINDER_COOLDOWN_MS, sendEmailToGuest, sendWhatsAppToGuest, type SendResult } from "@/lib/guest-messages";
 import type { Booking, Guest, Structure } from "@/lib/types";
 import type { JourneyStep } from "@/lib/booking-journey";
 import { eur } from "@/lib/format";
@@ -250,6 +250,14 @@ export default function StepActions(p: StepActionsProps) {
           ? <button className={btnPrimary} style={{ background: "var(--focus)" }} onClick={() => { p.onClose(); router.push(`/documenti/${draftDoc.id}`); }}>{draftDoc.stato === "bozza" ? "Apri la bozza" : "Apri la fattura"}</button>
           : <button className={btnPrimary} style={{ background: "var(--focus)" }} disabled={!!busy || draftDoc === undefined} onClick={() => run("inv", async () => { const r = await apiPost<{ documentId: string }>("invoicing/create", { bookingId: b.id }); p.onClose(); p.onChanged(); router.push(`/documenti/${r.documentId}`); })}>{busy === "inv" ? "Creo…" : "Crea la fattura"}</button>}
       </div>
+    </>);
+  } else if (step.key === "checkout") {
+    const hi = greeting(lang, guest).trim();
+    const dm = (() => { const [, m, d] = b.checkOut.split("-"); return `${+d}/${+m}`; })();
+    const build = async () => ({ text: `${hi ? `${hi}\n` : ""}${intro("checkout")}${checkoutMessage(lang, { date: dm, time: structure?.checkOutBy, structure: structure?.name })}`, subject: `Check-out${structure?.name ? ` · ${structure.name}` : ""}` });
+    body = (<>
+      <p className="text-sm text-dim">Manda all&apos;ospite il promemoria della partenza: data e orario del check-out, come contattarti per qualsiasi necessità e un ringraziamento.</p>
+      {sendButtons(build, "checkout", "Invia il promemoria", undefined, <button className={btnGhost} onClick={() => { p.onClose(); router.push("/pulizie"); }}>Apri Pulizie</button>)}
     </>);
   } else if (step.key === "review") {
     const url = googleReviewUrl(structure?.googlePlaceId);

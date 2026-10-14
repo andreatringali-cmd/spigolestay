@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 import type { Booking } from "@/lib/types";
 import { parseISO, toISO } from "@/lib/dates";
 import { bookingCode } from "@/lib/bookingCode";
-import { journeyBucket, journeyOf, isLiveBooking } from "@/lib/booking-journey";
+import { journeyBucket, journeyOf, isLiveBooking, stepOpensModal } from "@/lib/booking-journey";
 import EmptyState from "@/components/EmptyState";
 import { groupSizes, isRealGroup } from "@/lib/groups";
 import { isGuideSent, readReminders, reminderNotes, useReminderLog } from "@/lib/guest-messages";
@@ -148,7 +148,7 @@ export default function PrenotazioniDettaglio({ bookings, guestName, unitLabel, 
         tag={t.tag} tagTone={t.tone}
         avvisi={live && j ? avvisiOf(b, j, colonnaOggi(b, today), { today, unit, guest: guests.find((g) => g.id === b.guestId) }) : []}
         onOpen={() => openBooking(b.id)}
-        onStep={(s) => { if (s.state !== "done" && s.state !== "na") setModal({ id: b.id, key: s.key }); else if (s.href) router.push(s.href); }}
+        onStep={(s) => { if (stepOpensModal(s)) setModal({ id: b.id, key: s.key }); else if (s.href) router.push(s.href); }}
       />
     );
   });

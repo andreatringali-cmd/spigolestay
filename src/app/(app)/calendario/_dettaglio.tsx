@@ -13,7 +13,7 @@ import Icon from "@/components/Icon";
 import { useData } from "@/lib/store";
 import { inScope as inScopeOf, scopeFilter } from "@/lib/scope";
 import { toISO, shiftISO, parseISO } from "@/lib/dates";
-import { journeyOf, isLiveBooking, type JourneyStep } from "@/lib/booking-journey";
+import { journeyOf, isLiveBooking, stepOpensModal, type JourneyStep } from "@/lib/booking-journey";
 import type { Booking } from "@/lib/types";
 import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
@@ -177,7 +177,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   const evs = useMemo(() => scopeFilter(events, activeStructureId).filter((e) => e.from <= to && e.to > from), [events, activeStructureId, from, to]);
 
   const openStep = (r: Row, s: JourneyStep) => {
-    if (s.state !== "done" && s.state !== "na") setModal({ id: r.b.id, key: s.key });
+    if (stepOpensModal(s)) setModal({ id: r.b.id, key: s.key });
     else if (s.href) router.push(s.href);
   };
   const modalRow = modal ? rows.get(modal.id) : undefined;

@@ -18,7 +18,7 @@ export interface JourneyCtx {
   guideSent: boolean;                              // guida ospiti già inviata in chat
   invoiceStato?: string;                           // stato del documento fiscale collegato (se esiste)
   auto?: AutoCtx;                                  // invii automatici (modelli attivi, interruttori del server): per scrivere "invio previsto alle 10:00"
-  reminderNotes?: Partial<Record<"checkin" | "pay" | "tax" | "guide" | "review", string>>; // "inviato 2 volte · ultimo oggi 10:12", dalla cronologia dei solleciti
+  reminderNotes?: Partial<Record<"checkin" | "pay" | "tax" | "guide" | "review" | "checkout", string>>; // "inviato 2 volte · ultimo oggi 10:12", dalla cronologia dei solleciti
 }
 
 const expectedPax = (b: Booking) => Math.max(1, (b.adults ?? 1) + (b.children ?? 0));
@@ -40,7 +40,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   const departed = b.checkOut < c.today;
   const arrivesIn = daysTo(b.checkIn, c.today);
   const g = c.guest;
-  const note = (k: "checkin" | "pay" | "tax" | "guide" | "review") => (c.reminderNotes?.[k] ? ` · ${c.reminderNotes[k]}` : "");
+  const note = (k: "checkin" | "pay" | "tax" | "guide" | "review" | "checkout") => (c.reminderNotes?.[k] ? ` · ${c.reminderNotes[k]}` : "");
 
   // 1 · Check-in online (dati di tutti gli ospiti)
   const exp = expectedPax(b), dec = declaredPax(b);
@@ -103,7 +103,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   steps.push({
     key: "checkout", label: "Check-out", href: "/pulizie",
     state: departed ? "done" : b.checkOut === c.today ? "todo" : "na",
-    detail: departed ? "Partito" : b.checkOut === c.today ? "Parte oggi" : `Il ${fmtShort(b.checkOut)}`,
+    detail: `${departed ? "Partito" : b.checkOut === c.today ? "Parte oggi" : `Il ${fmtShort(b.checkOut)}`}${note("checkout")}`,
   });
 
   // 9 · Recensione (dopo la partenza)
@@ -118,7 +118,7 @@ export function journeyOf(b: Booking, c: JourneyCtx): { steps: JourneyStep[]; do
   steps.sort((a, b2) => ORDER.indexOf(a.key) - ORDER.indexOf(b2.key));
 
   // Sollecito già inviato (anche a mano): il passaggio resta da fare ma "in attesa" dell'ospite, non "fermo": in arancione.
-  const NOTE_OF: Record<string, "checkin" | "pay" | "tax" | "guide" | "review"> = { checkin: "checkin", pay: "pay", tax: "tax", guide: "guide", review: "review" };
+  const NOTE_OF: Record<string, "checkin" | "pay" | "tax" | "guide" | "review" | "checkout"> = { checkin: "checkin", pay: "pay", tax: "tax", guide: "guide", review: "review", checkout: "checkout" };
   for (const st of steps) if ((st.state === "todo" || st.state === "late") && NOTE_OF[st.key] && c.reminderNotes?.[NOTE_OF[st.key]]) st.sent = true;
 
   // Invii automatici: sotto il passaggio ancora da fare, se ne esiste uno programmato, quando parte.
@@ -168,4 +168,11 @@ export function journeyBucket(b: Booking, today: string, j: ReturnType<typeof jo
   if (b.checkOut === today) out.push("leave");
   if (b.checkIn <= today && today < b.checkOut) out.push("inhouse");
   return out;
+}
+
+/** Il clic su un passaggio apre la finestra di invio (messaggio all'ospite)? Per i passaggi da fare sì; il check-out anche in anticipo
+ *  (il promemoria di partenza si manda il giorno prima), finché l'ospite non è partito. Altrimenti si va alla pagina collegata. */
+export function stepOpensModal(s: Pick<JourneyStep, "key" | "state">): boolean {
+  if (s.key === "checkout") return s.state !== "done";
+  return s.state !== "done" && s.state !== "na";
 }

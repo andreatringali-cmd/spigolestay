@@ -8,7 +8,7 @@ import { createContext, useContext, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { toISO } from "@/lib/dates";
-import { journeyOf, isLiveBooking, type StepState } from "@/lib/booking-journey";
+import { journeyOf, isLiveBooking, stepOpensModal, type StepState } from "@/lib/booking-journey";
 import { isGuideSent, reminderNotes, useReminderLog } from "@/lib/guest-messages";
 import { useAutoCtx } from "@/lib/use-auto-ctx";
 import { useDatiPercorso } from "@/app/(app)/calendario/_dati";
@@ -83,7 +83,7 @@ export function StatoProvider({ ids, children }: { ids: string[]; children: Reac
     // Stesso comportamento della Dettagliata: non ancora fatto → finestra "Risolvi"; fatto/non applicabile → pagina collegata.
     open: (b, s) => {
       if (!s.step) return;
-      if (s.state !== "done" && s.state !== "na") setModal({ id: b.id, key: s.key });
+      if (stepOpensModal(s)) setModal({ id: b.id, key: s.key });
       else if (s.step.href) router.push(s.step.href);
     },
   }), [slotMap, progMap, router]);
