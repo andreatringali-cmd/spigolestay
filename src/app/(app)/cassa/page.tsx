@@ -161,14 +161,15 @@ export default function CassaPage() {
   const saldoConti: Record<string, number> = Object.fromEntries(CONTI.filter((c) => balances[c.key]?.since).map((c) => [c.key, balances[c.key].saldo])); // solo i conti con saldo di partenza: gli altri non hanno uno storico completo
   const saldoTot = sumCents(Object.values(saldoConti));
   const hasOpening = CONTI.some((c) => balances[c.key]?.since);
-  const forecastTutte = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, "all", today, to || fcEnd, principal), [bookings, guests, getStructure, rules, today, to, fcEnd, principal]);
-  // Estratto conto: saldo dopo ogni movimento (tutti i movimenti di tutte le strutture) e ordine coerente nello stesso giorno.
-  const ledger = useMemo(() => computeLedger([...autoTutte, ...programmateTutte, ...manual, ...forecastTutte]), [autoTutte, programmateTutte, manual, forecastTutte]);
+  // Estratto conto: saldo dopo ogni movimento, solo per la struttura selezionata in alto a destra (con "tutte" sono tutte). I saldi di partenza dei conti valgono sempre.
+  const ledgerManual = useMemo(() => manual.filter((m) => m.cat === OPENING_CAT || ruleVisible(m.structureId)), [manual, activeStructureId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ledger = useMemo(() => computeLedger([...auto, ...scheduled, ...ledgerManual, ...forecastView]), [auto, scheduled, ledgerManual, forecastView]);
   const ledgerOrd = (x: Mov) => ledger.order.get(x.id) ?? 0;
   const bkOf = (x: Mov) => (x.ref && /^(auto-in|auto-comm|fc-in)-/.test(x.id) ? bookings.find((b) => b.id === x.ref) : undefined); // prenotazione da cui nasce il movimento
   const rowsOrdered = [...rows].sort((a, b) => { const d = a.date < b.date ? -1 : a.date > b.date ? 1 : ledgerOrd(a) - ledgerOrd(b); return futureView ? d : -d; });
   const listRows = groupBookingRows(rowsOrdered);
-  const projectedEnd = useMemo(() => projectBalance([...autoTutte, ...manual, ...forecastTutte], balances, today, to || fcEnd), [autoTutte, manual, forecastTutte, balances, today, to, fcEnd]);
+  // Saldo previsto: saldo attuale dei conti + entrate e uscite future della struttura selezionata (le stesse delle card accanto).
+  const projectedEnd = useMemo(() => projectBalance([...auto, ...ledgerManual, ...forecastView], balances, today, to || fcEnd), [auto, ledgerManual, forecastView, balances, today, to, fcEnd]);
 
   // ---- Saldo di partenza: scrivi quanto hai oggi su un conto, da lì il saldo si aggiorna ----
   const [opening, setOpening] = useState<{ date: string; amounts: Record<string, string>; newName: string; startOfDay: boolean } | null>(null);
@@ -476,7 +477,7 @@ export default function CassaPage() {
               <div className="-mx-1 max-h-[640px] overflow-auto px-1">
               <div className="min-w-[820px]">
               <div className="grid grid-cols-[78px_minmax(0,1fr)_92px_92px_100px_104px] items-center gap-x-3 sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
-                <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right">{t("Lordo")}</span><span className="text-right">{t("Commissioni")}</span><span className="text-right">{t("Netto")}</span><span className="text-right" title={t("Saldo di tutti i conti e di tutte le strutture dopo ogni movimento")}>{t("Saldo conti")}</span>
+                <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right">{t("Lordo")}</span><span className="text-right">{t("Commissioni")}</span><span className="text-right">{t("Netto")}</span><span className="text-right" title={t("Saldo dei conti dopo ogni movimento, per la struttura selezionata")}>{t("Saldo conti")}</span>
               </div>
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {listRows.map((r) => {
