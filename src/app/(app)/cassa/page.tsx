@@ -13,7 +13,10 @@ import Icon from "@/components/Icon";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, deleteMovement, insertRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, deleteMovement, insertRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, projectBalance, presetRange, matchesQuery, type Preset } from "@/lib/cassa";
+import SearchInput from "@/components/SearchInput";
+import DateField from "@/components/DateField";
+import { shiftISO } from "@/lib/dates";
 import { fmtDMY } from "@/lib/dates";
 
 // ---- Conti cassa ------------------------------------------------------------
@@ -141,16 +144,24 @@ export default function CassaPage() {
   const all = useMemo(() => [...auto, ...scheduled, ...visibleManual].sort((a, b) => (a.date < b.date ? 1 : -1)), [auto, scheduled, visibleManual]);
 
   // Selettore mese.
-  const years = useMemo(() => { const s = new Set(all.map((m) => m.date.slice(0, 4))); s.add(today.slice(0, 4)); return Array.from(s).sort().reverse(); }, [all, today]);
-  const [year, setYear] = useState<string>("all");   // "all" | "2026"
-  const [mon, setMon] = useState<string>("all");     // "all" | "01".."12"
-  const month = year !== "all" && mon !== "all" ? `${year}-${mon}` : "all"; // mese singolo (andamento, nomi file)
-  const inPeriod = (iso: string) => (year === "all" || iso.slice(0, 4) === year) && (mon === "all" || iso.slice(5, 7) === mon);
-  const periodWord = month !== "all" ? t("del mese") : year !== "all" ? t("dell'anno") : mon !== "all" ? t("del mese (tutti gli anni)") : t("totali");
+  // Filtro: ricerca + periodo. All'apertura: OGGI E FUTURE (flusso di cassa da qui in avanti); si può passare a tutto lo storico o a un periodo.
+  const [q, setQ] = useState("");
+  const [preset, setPreset] = useState<Preset>("future");
+  const [from, setFrom] = useState<string>(() => todayISO());
+  const [to, setTo] = useState<string>("");
+  const applyPreset = (p: Preset) => { setPreset(p); if (p !== "custom") { const r = presetRange(p, today); setFrom(r.from); setTo(r.to); } };
+  const futureView = !!from && from >= today;       // si guarda da oggi in avanti: previsione
+  const inPeriod = (iso: string) => (!from || iso >= from) && (!to || iso <= to);
+  const periodWord = futureView ? t("previste") : preset === "all" ? t("totali") : t("del periodo");
+  const listHorizon = to || shiftISO(today, 90);    // senza "Al" la lista prevede i prossimi 90 giorni
   const [chartsOn, setChartsOn] = useState(true);
   const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
 
-  const rows = all.filter((m) => inPeriod(m.date));
+  const forecastChart = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, activeStructureId, today, shiftISO(today, 365)), [bookings, guests, getStructure, rules, activeStructureId, today]);
+  const forecastView = useMemo(() => forecastChart.filter((x) => x.date <= listHorizon), [forecastChart, listHorizon]);
+  const rows = [...all, ...forecastView]
+    .filter((m) => inPeriod(m.date) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
+    .sort((a, b) => (futureView ? (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) : (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))); // da oggi: dal più vicino; storico: dal più recente
   const listRows = groupBookingRows(rows);
   const rowsStat = rows.filter((m) => m.cat !== OPENING_CAT); // il saldo di partenza non è un incasso né una spesa del periodo
   const entrate = sumCents(rowsStat.filter((m) => m.kind === "in").map((m) => m.amount));
@@ -163,6 +174,8 @@ export default function CassaPage() {
   const saldoConti: Record<string, number> = Object.fromEntries(CONTI.filter((c) => balances[c.key]?.since).map((c) => [c.key, balances[c.key].saldo])); // solo i conti con saldo di partenza: gli altri non hanno uno storico completo
   const saldoTot = sumCents(Object.values(saldoConti));
   const hasOpening = CONTI.some((c) => balances[c.key]?.since);
+  const forecastTutte = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, "all", today, to || shiftISO(today, 90)), [bookings, guests, getStructure, rules, today, to]);
+  const projectedEnd = useMemo(() => projectBalance([...autoTutte, ...manual, ...forecastTutte], balances, today, to || shiftISO(today, 90)), [autoTutte, manual, forecastTutte, balances, today, to]);
 
   // ---- Saldo di partenza: scrivi quanto hai oggi su un conto, da lì il saldo si aggiorna ----
   const [opening, setOpening] = useState<{ date: string; amounts: Record<string, string>; newName: string } | null>(null);
@@ -179,6 +192,27 @@ export default function CassaPage() {
     const next = [...conti, { key, label }];
     setConti(next); saveConti(next);
     setOpening((o) => (o ? { ...o, newName: "", amounts: { ...o.amounts, [key]: "" } } : o));
+  };
+  const [renaming, setRenaming] = useState<{ key: string; label: string } | null>(null);
+  const renameConto = () => {
+    if (!renaming) return;
+    const label = renaming.label.trim();
+    if (label) { const next = conti.map((c) => (c.key === renaming.key ? { ...c, label } : c)); setConti(next); saveConti(next); }
+    setRenaming(null);
+  };
+  const deleteConto = async (c: ContoDef) => {
+    const chk = canDeleteConto(c.key, [...autoTutte, ...programmateTutte, ...manual], rules);
+    if (!chk.ok) { await ask({ title: t("Conto non eliminabile"), message: t(chk.reason ?? ""), confirmLabel: t("Ho capito") }); return; }
+    if (!(await ask({ title: t("Elimina conto"), message: `${t("Eliminare il conto")} «${c.label}»? ${t("Il suo saldo di partenza verrà tolto.")}`, danger: true, confirmLabel: t("Elimina") }))) return;
+    const next = conti.filter((x) => x.key !== c.key);
+    setConti(next); saveConti(next);
+    const olds = manual.filter((x) => x.cat === OPENING_CAT && x.conto === c.key);
+    if (olds.length) {
+      const ids = new Set(olds.map((o) => o.id));
+      setManual((prev) => prev.filter((x) => !ids.has(x.id)));
+      if (user) for (const o of olds) checkWrite(deleteMovement(o.id), "Il saldo di partenza", () => setManual((prev) => (prev.some((x) => x.id === o.id) ? prev : [o, ...prev])));
+    }
+    setOpening((o) => { if (!o) return o; const { [c.key]: _gone, ...rest } = o.amounts; void _gone; return { ...o, amounts: rest }; });
   };
   const openingTotal = opening ? sumCents(CONTI.map((c) => { const v = parseFloat((opening.amounts[c.key] ?? "").replace(/\s/g, "").replace(",", ".")); return Number.isFinite(v) ? v : 0; })) : 0;
   const saveOpening = () => {
@@ -206,13 +240,14 @@ export default function CassaPage() {
   const perCat = useMemo(() => { const map: Record<string, number> = {}; for (const m of rowsStat) if (m.kind === "out") map[m.cat] = roundCents((map[m.cat] ?? 0) + m.amount); return Object.entries(map).map(([k, v]) => ({ cat: catOf(k), v })).filter((x) => x.cat).sort((a, b) => b.v - a.v); }, [rowsStat]);
   const maxCat = Math.max(1, ...perCat.map((x) => x.v));
 
+  const chartSrc = useMemo(() => [...all, ...(futureView ? forecastChart : [])], [all, forecastChart, futureView]);
   const trend = useMemo(() => {
-    const base = month !== "all" ? month : year !== "all" ? (year === today.slice(0, 4) ? monthKey(today) : `${year}-12`) : monthKey(today);
+    const base = futureView ? monthKey(shiftISO(today, 335)) : to ? monthKey(to) : monthKey(today); // previsione: oggi + 11 mesi; altrimenti 12 mesi fino a "Al" o a oggi
     const [by, bm] = base.split("-").map(Number);
     const list: { ym: string; in: number; out: number }[] = [];
-    for (let i = 11; i >= 0; i--) { const d = new Date(by, bm - 1 - i, 1); const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; const mm = all.filter((m) => monthKey(m.date) === ym && m.cat !== OPENING_CAT); list.push({ ym, in: sumCents(mm.filter((m) => m.kind === "in").map((m) => m.amount)), out: sumCents(mm.filter((m) => m.kind === "out").map((m) => m.amount)) }); }
+    for (let i = 11; i >= 0; i--) { const d = new Date(by, bm - 1 - i, 1); const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; const mm = chartSrc.filter((m) => monthKey(m.date) === ym && m.cat !== OPENING_CAT); list.push({ ym, in: sumCents(mm.filter((m) => m.kind === "in").map((m) => m.amount)), out: sumCents(mm.filter((m) => m.kind === "out").map((m) => m.amount)) }); }
     return list;
-  }, [all, month, year, today]);
+  }, [chartSrc, futureView, to, today]);
   const maxTrend = Math.max(1, ...trend.flatMap((t) => [t.in, t.out]));
   const axis = niceAxis(maxTrend); // asse Y a 4 intervalli con massimo "tondo"
   const axisTicks = [0, 1, 2, 3, 4].map((i) => i * axis.step);
@@ -278,7 +313,7 @@ export default function CassaPage() {
   const structNameOf = (id?: string) => (!id || id === "all" ? t("Tutte") : getStructure(id)?.name ?? "—");
 
   // ---- Export ---------------------------------------------------------------
-  const periodLabel = month !== "all" ? month : year !== "all" ? year : mon !== "all" ? `mese-${mon}` : "storico";
+  const periodLabel = from || to ? `${from || "inizio"}_${to || "in-poi"}` : "storico";
   const doExcel = () => {
     const headers = [t("Data"), t("Tipo"), t("Categoria"), t("Descrizione"), t("Conto"), t("Struttura"), `${t("Entrata")} €`, `${t("Uscita")} €`];
     const body = rows.map((m) => [m.date, m.kind === "in" ? t("Entrata") : t("Uscita"), catOf(m.cat)?.label ? t(catOf(m.cat)!.label) : m.cat, m.desc + (m.sched ? ` (${t("programmato")})` : m.auto ? ` (${t("auto")})` : ""), CONTI.find((x) => x.key === m.conto)?.label ? t(CONTI.find((x) => x.key === m.conto)!.label) : m.conto, structNameOf(m.structureId), m.kind === "in" ? m.amount : "", m.kind === "out" ? m.amount : ""]);
@@ -305,10 +340,10 @@ export default function CassaPage() {
 
       {/* Riepilogo */}
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label={t("Saldo attuale")} value={hasOpening ? eur(saldoTot) : "—"} color={hasOpening && saldoTot < 0 ? "var(--err)" : undefined} onClick={() => openOpening()} hint={hasOpening ? `${t("conti con saldo impostato")} (${Object.keys(saldoConti).length}) · ${t("tutte le strutture")}` : t("Imposta il saldo di partenza →")} />
+        <StatCard label={t("Saldo attuale")} value={hasOpening ? eur(saldoTot) : "—"} color={hasOpening && saldoTot < 0 ? "var(--err)" : undefined} onClick={() => openOpening()} hint={hasOpening ? <>{Object.keys(saldoConti).length} {t("conti")} · {t("tutte le strutture")}<br />{t("Previsto al")} {fmtDMY(listHorizon)}: <b className="font-mono text-dim">{eur(projectedEnd)}</b></> : t("Imposta il saldo di partenza →")} />
         <StatCard label={`${t("Entrate")} ${periodWord}`} value={eur(entrate)} color="var(--ok)" hint={`${rows.filter((m) => m.kind === "in").length} ${t("movimenti")}`} />
         <StatCard label={`${t("Uscite")} ${periodWord}`} value={eur(uscite)} color="var(--err)" hint={`${rows.filter((m) => m.kind === "out").length} ${t("movimenti")}`} />
-        <StatCard label={`${t("Saldo")} ${month !== "all" ? t("del mese") : year !== "all" ? t("dell'anno") : mon !== "all" ? t("del mese (tutti gli anni)") : t("totale")}`} value={eur(saldo)} color={saldo >= 0 ? undefined : "var(--err)"} hint={t("entrate − uscite")} />
+        <StatCard label={`${t("Saldo")} ${futureView ? t("previsto") : preset === "all" ? t("totale") : t("del periodo")}`} value={eur(saldo)} color={saldo >= 0 ? undefined : "var(--err)"} hint={t("entrate − uscite")} />
       </div>
 
       {chartsOn && (
@@ -329,7 +364,7 @@ export default function CassaPage() {
         </Card>
         <Card className="lg:col-span-3">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <SectionTitle>{t("Andamento ultimi 12 mesi")}</SectionTitle>
+            <SectionTitle>{futureView ? t("Previsione prossimi 12 mesi") : t("Andamento ultimi 12 mesi")}</SectionTitle>
             <div className="flex items-center gap-4 text-xs text-dim"><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--ok)" }} />{t("Entrate")}</span><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--err)" }} />{t("Uscite")}</span></div>
           </div>
           <div className="flex" style={{ height: 160 }}>
@@ -365,15 +400,21 @@ export default function CassaPage() {
 
       {/* Riga filtri + toggle grafici + Esporta */}
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
-        <select aria-label={t("Anno")} value={year} onChange={(e) => setYear(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
-          <option value="all">{t("Tutti gli anni")}</option>
-          {years.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
-        <select aria-label={t("Mese")} value={mon} onChange={(e) => setMon(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
-          <option value="all">{t("Tutti i mesi")}</option>
-          {["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"].map((n, i) => <option key={n} value={pad(i + 1)}>{t(n)}</option>)}
-        </select>
-        {(year !== "all" || mon !== "all") && <button onClick={() => { setYear("all"); setMon("all"); }} className="text-xs font-semibold text-focus hover:underline">{t("Azzera")}</button>}
+        <SearchInput value={q} onChange={setQ} placeholder={t("Cerca movimento…")} className="w-56" />
+        <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
+          <select aria-label={t("Periodo")} value={preset} onChange={(e) => applyPreset(e.target.value as Preset)} className="rounded-md border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
+            <option value="future">{t("Oggi e future")}</option>
+            <option value="all">{t("Tutto lo storico")}</option>
+            <option value="month">{t("Questo mese")}</option>
+            <option value="prevMonth">{t("Mese scorso")}</option>
+            <option value="year">{t("Quest'anno")}</option>
+            <option value="prevYear">{t("Anno scorso")}</option>
+            <option value="custom">{t("Personalizzato")}</option>
+          </select>
+          <DateField value={from} onChange={(v) => { setFrom(v); setPreset("custom"); }} title={t("Dal")} placeholder={t("Dal")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
+          <span className="text-xs text-faint">→</span>
+          <DateField value={to} onChange={(v) => { setTo(v); setPreset("custom"); }} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
+        </div>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
           <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
@@ -539,7 +580,7 @@ export default function CassaPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="truncate text-sm font-medium text-txt">{m.desc}</span>
-                          {m.auto && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>}
+                          {m.forecast ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span> : (m.auto && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>)}
                           {m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
                         </div>
                         <div className="mt-0.5 flex items-center gap-2 text-[11px] text-faint">
@@ -586,11 +627,15 @@ export default function CassaPage() {
             <p className="mt-1 text-xs text-dim">{t("Scrivi quanto hai oggi su ogni conto. Da qui ogni saldo parte dal suo importo e si aggiorna con le entrate e le uscite dei giorni successivi: lo storico passato non serve. I conti lasciati vuoti non vengono toccati.")}</p>
             <div className="mt-3 flex flex-col gap-2">
               {CONTI.map((c) => (
-                <label key={c.key} className="flex items-center gap-2">
-                  <span className="w-36 shrink-0 truncate text-sm text-txt">{t(c.label)}</span>
-                  <input inputMode="decimal" value={opening.amounts[c.key] ?? ""} onChange={(e) => setOpening((o) => (o ? { ...o, amounts: { ...o.amounts, [c.key]: e.target.value } } : o))} placeholder="—" className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-right font-mono text-sm text-txt outline-none focus:border-focus" />
+                <div key={c.key} className="flex items-center gap-2">
+                  {renaming?.key === c.key
+                    ? <input autoFocus value={renaming.label} maxLength={30} onChange={(e) => setRenaming({ key: c.key, label: e.target.value })} onBlur={renameConto} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); renameConto(); } if (e.key === "Escape") setRenaming(null); }} className="w-36 shrink-0 rounded-lg border border-focus bg-paper px-2 py-1.5 text-sm text-txt outline-none" />
+                    : <span className="w-36 shrink-0 truncate text-sm text-txt" title={t(c.label)}>{t(c.label)}</span>}
+                  <input aria-label={`${t("Importo")} ${c.label}`} inputMode="decimal" value={opening.amounts[c.key] ?? ""} onChange={(e) => setOpening((o) => (o ? { ...o, amounts: { ...o.amounts, [c.key]: e.target.value } } : o))} placeholder="—" className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-right font-mono text-sm text-txt outline-none focus:border-focus" />
                   <span className="text-xs text-faint">€</span>
-                </label>
+                  <button type="button" onClick={() => setRenaming({ key: c.key, label: c.label })} title={t("Rinomina il conto")} aria-label={`${t("Rinomina")} ${c.label}`} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-txt">✎</button>
+                  <button type="button" onClick={() => void deleteConto(c)} title={t("Elimina il conto")} aria-label={`${t("Elimina")} ${c.label}`} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]">✕</button>
+                </div>
               ))}
             </div>
             <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">

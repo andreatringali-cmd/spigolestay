@@ -5,10 +5,11 @@ import { supabase } from "./supabase";
 import { CHANNELS } from "./types";
 import type { Booking, Guest, Structure } from "./types";
 import { commissionOf } from "./booking";
+import { shiftISO } from "./dates";
 import { roundCents, sumCents } from "./money";
 
 export type Kind = "in" | "out";
-export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string }
+export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string; forecast?: boolean }
 export interface Rule { id: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; freq: "monthly" | "weekly" | "yearly"; day: number; start: string; end?: string; auto: boolean; note?: string }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -211,7 +212,7 @@ export function niceAxis(maxValue: number): { max: number; step: number } {
 }
 
 // ── Conti ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
-// I conti di base (contanti, banca, PayPal, carta) ci sono sempre; si possono aggiungere altri conti (più banche: Revolut, Intesa…).
+// I conti di base (contanti, banca, PayPal, carta) si possono rinominare; PayPal e carta anche eliminare. Si possono aggiungere altri conti (più banche: Revolut, Intesa…).
 // I movimenti salvano la chiave del conto (testo libero nel database); l'elenco dei conti aggiunti vive nel browser e si sincronizza con l'account
 // (come tutte le chiavi "spigolestay:").
 export interface ContoDef { key: string; label: string }
@@ -224,15 +225,41 @@ export const DEFAULT_CONTI: ContoDef[] = [
 const CONTI_KEY = "spigolestay:cassa:conti";
 const isDefault = (k: string) => DEFAULT_CONTI.some((d) => d.key === k);
 
+// Salvataggio: per i conti di base solo ciò che cambia (nome nuovo o conto eliminato), per quelli aggiunti nome e chiave.
+type SavedConto = { key: string; label: string; removed?: boolean };
 export function loadConti(): ContoDef[] {
   try {
-    const saved = JSON.parse(localStorage.getItem(CONTI_KEY) || "[]") as ContoDef[];
-    const customs = saved.filter((c) => c && typeof c.key === "string" && typeof c.label === "string" && c.key && c.label && !isDefault(c.key));
-    return [...DEFAULT_CONTI, ...customs];
+    const saved = (JSON.parse(localStorage.getItem(CONTI_KEY) || "[]") as SavedConto[]).filter((c) => c && typeof c.key === "string" && typeof c.label === "string" && c.key && c.label);
+    const out: ContoDef[] = [];
+    for (const d of DEFAULT_CONTI) {
+      const o = saved.find((c) => c.key === d.key);
+      if (o?.removed) continue;
+      out.push({ key: d.key, label: o ? o.label : d.label });
+    }
+    for (const c of saved) if (!isDefault(c.key) && !c.removed) out.push({ key: c.key, label: c.label });
+    return out;
   } catch { return [...DEFAULT_CONTI]; }
 }
 export function saveConti(list: ContoDef[]) {
-  try { localStorage.setItem(CONTI_KEY, JSON.stringify(list.filter((c) => !isDefault(c.key)))); } catch { /* storage non disponibile */ }
+  try {
+    const entries: SavedConto[] = [];
+    for (const d of DEFAULT_CONTI) {
+      const cur = list.find((c) => c.key === d.key);
+      if (!cur) entries.push({ key: d.key, label: d.label, removed: true });
+      else if (cur.label !== d.label) entries.push({ key: d.key, label: cur.label });
+    }
+    for (const c of list) if (!isDefault(c.key)) entries.push({ key: c.key, label: c.label });
+    localStorage.setItem(CONTI_KEY, JSON.stringify(entries));
+  } catch { /* storage non disponibile */ }
+}
+/** Conti che non si possono eliminare: i movimenti automatici delle prenotazioni vanno su "contanti" (dirette) e "banca" (OTA). */
+export const CONTI_FISSI = ["contanti", "banca"];
+/** Un conto si può eliminare solo se non è fisso e non ha movimenti né pagamenti programmati (il saldo di partenza non conta: si toglie con il conto). */
+export function canDeleteConto(key: string, movs: Mov[], rules: { conto: string }[]): { ok: boolean; reason?: string } {
+  if (CONTI_FISSI.includes(key)) return { ok: false, reason: "Su questo conto arrivano le prenotazioni in automatico: puoi rinominarlo ma non eliminarlo." };
+  const n = movs.filter((m) => m.conto === key && m.cat !== OPENING_CAT).length + rules.filter((r) => r.conto === key).length;
+  if (n > 0) return { ok: false, reason: `Ha ${n} movimenti o pagamenti programmati: rinominalo, oppure elimina prima quei movimenti.` };
+  return { ok: true };
 }
 /** Chiave stabile per un nuovo conto a partire dal nome ("Revolut" → "conto-revolut"); se esiste già si aggiunge un numero. */
 export function contoKeyFromLabel(label: string, existing: ContoDef[]): string {
@@ -240,4 +267,60 @@ export function contoKeyFromLabel(label: string, existing: ContoDef[]): string {
   let key = `conto-${slug}`; let n = 2;
   while (existing.some((c) => c.key === key)) key = `conto-${slug}-${n++}`;
   return key;
+}
+
+// ── Flusso di cassa: oggi e futuro ──────────────────────────────────────────────────────────────────────────────────────
+// Movimenti PREVISTI da oggi in poi: il saldo ancora da incassare delle prenotazioni in arrivo (alla data di arrivo) e le occorrenze future dei pagamenti
+// programmati. Le commissioni OTA delle prenotazioni future e gli acconti già incassati sono già nei movimenti automatici (computeAuto).
+export function computeForecast(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, rules: Rule[], active: string, today: string, horizon: string): Mov[] {
+  const out: Mov[] = [];
+  for (const b of bookings) {
+    if (b.status === "cancelled" || b.channel === "blocked") continue;
+    if (active !== "all" && b.structureId !== active) continue;
+    if (b.checkIn < today || b.checkIn > horizon) continue;
+    const remaining = roundCents(Math.max(0, (b.total ?? 0) + (b.cleaningFee ?? 0) - (b.paid ?? 0)));
+    if (remaining <= 0) continue;
+    const g = guests.find((x) => x.id === b.guestId);
+    const st = getStructure(b.structureId);
+    out.push({ id: `fc-in-${b.id}`, date: b.checkIn, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label} · da incassare`, amount: remaining, conto: b.channel === "direct" ? "contanti" : "banca", auto: true, forecast: true, ref: b.id });
+  }
+  const from = shiftISO(today, 1);
+  if (from <= horizon) {
+    for (const r of rules) {
+      if (!scopeVisible(r.structureId, active)) continue;
+      for (const iso of occurrences(r, from, horizon)) out.push({ id: `fc-r-${r.id}-${iso}`, date: iso, kind: r.kind, cat: r.cat, desc: r.desc, amount: r.amount, conto: r.conto, structureId: r.structureId, sched: true, forecast: true, ref: r.id });
+    }
+  }
+  return out;
+}
+
+/** Saldo previsto a una data: il saldo attuale dei conti con saldo di partenza + i movimenti dei giorni dopo oggi, fino a quella data. */
+export function projectBalance(movs: Mov[], balances: Record<string, Balance>, today: string, until: string): number {
+  const withOpening = new Set(Object.keys(balances).filter((k) => balances[k].since));
+  const base = sumCents([...withOpening].map((k) => balances[k].saldo));
+  const future = movs.filter((m) => withOpening.has(m.conto) && m.cat !== OPENING_CAT && m.date > today && m.date <= until);
+  return roundCents(base + sumCents(future.map(signed)));
+}
+
+// ── Filtro periodo e ricerca (stessi del filtro delle Prenotazioni) ─────────────────────────────────────────────────────
+export type Preset = "future" | "all" | "month" | "prevMonth" | "year" | "prevYear" | "custom";
+const p2 = (n: number) => String(n).padStart(2, "0");
+const lastDay = (y: number, m0: number) => new Date(y, m0 + 1, 0).getDate();
+/** Date "dal" e "al" di un periodo predefinito ("" = nessun limite). */
+export function presetRange(p: Preset, today: string): { from: string; to: string } {
+  const y = Number(today.slice(0, 4)), m0 = Number(today.slice(5, 7)) - 1;
+  if (p === "future") return { from: today, to: "" };
+  if (p === "month") return { from: `${y}-${p2(m0 + 1)}-01`, to: `${y}-${p2(m0 + 1)}-${p2(lastDay(y, m0))}` };
+  if (p === "prevMonth") { const d = new Date(y, m0 - 1, 1); const yy = d.getFullYear(), mm = d.getMonth(); return { from: `${yy}-${p2(mm + 1)}-01`, to: `${yy}-${p2(mm + 1)}-${p2(lastDay(yy, mm))}` }; }
+  if (p === "year") return { from: `${y}-01-01`, to: `${y}-12-31` };
+  if (p === "prevYear") return { from: `${y - 1}-01-01`, to: `${y - 1}-12-31` };
+  return { from: "", to: "" };
+}
+
+/** Il movimento corrisponde alla ricerca? Cerca nella descrizione, nella categoria, nel conto e nell'importo (anche "854,37"). */
+export function matchesQuery(m: Mov, q: string, labels: { cat?: string; conto?: string }): boolean {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return true;
+  const hay = [m.desc, labels.cat, labels.conto, m.amount.toFixed(2), m.amount.toFixed(2).replace(".", ",")].filter(Boolean).join(" ").toLowerCase();
+  return needle.split(/\s+/).every((w) => hay.includes(w));
 }
