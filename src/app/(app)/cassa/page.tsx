@@ -620,13 +620,14 @@ export default function CassaPage() {
                   const rowClick = isBooking ? undefined : m.sched && m.ref ? () => openOcc(m) : m.auto || m.forecast ? undefined : m.cat === OPENING_CAT ? () => openOpening() : () => startEditMov(m);
                   const included = ledger.included.has(lastId); // del giorno del saldo di partenza: già nell'importo scritto
                   return (
-                    <div key={isBooking ? "b-" + r.id : m.id} onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap py-1.5" + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
+                    <div key={isBooking ? "b-" + r.id : m.id} onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap py-1.5" + (m.variable ? " rounded bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)]" : "") + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
                       <span className="font-mono text-xs text-dim">{fmtDMY(m.date)}</span>
                       <div className="flex min-w-0 items-center gap-2">
                         {bk ? <ChannelLogo channel={bk.channel} size={24} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 24)}
                         <span className="truncate text-sm font-medium text-txt">{title}</span>
                         {m.forecast ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span> : (m.auto && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>)}
                         {!isBooking && m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
+                        {!isBooking && m.variable && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 22%, transparent)", color: "var(--warn)" }} title={t("Importo variabile: è una stima, alla scadenza registri quello reale")}>{t("variabile")}</span>}
                         {!isBooking && m.edited && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim" title={t("Riga modificata solo per questa scadenza")}>{t("modificato")}</span>}
                         <span className="min-w-0 truncate text-[11px] text-faint">{[c?.label ? t(c.label) : "", (() => { const l = CONTI.find((x) => x.key === m.conto)?.label; return l ? t(l) : ""; })(), activeStructureId === "all" && m.structureId && m.structureId !== "all" ? structNameOf(m.structureId) : ""].filter(Boolean).join(" · ")}</span>
                       </div>
@@ -640,7 +641,7 @@ export default function CassaPage() {
                         <>
                           <span />
                           <span />
-                          <span className="text-right font-mono text-sm font-semibold" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
+                          <span className="text-right font-mono text-sm font-semibold" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.variable ? "~ " : ""}{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
                         </>
                       )}
                       <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2">
@@ -669,7 +670,7 @@ export default function CassaPage() {
                 {pending.map(({ rule, iso }) => {
                   const c = catOf(rule.cat);
                   return (
-                    <div key={`${rule.id}-${iso}`} className="flex items-center gap-3 py-2.5">
+                    <div key={`${rule.id}-${iso}`} className={"flex items-center gap-3 py-2.5" + (rule.variable ? " rounded px-2 bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)]" : "")}>
                       {iconCircle(c, 32)}
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-txt">{rule.desc}</div>
@@ -814,7 +815,7 @@ export default function CassaPage() {
                       const c = catOf(r.cat);
                       const next = upcoming.find((u) => u.rule.id === r.id)?.date;
                       return (
-                        <div key={r.id} className="flex items-center gap-3 py-2.5">
+                        <div key={r.id} className={"flex items-center gap-3 py-2.5" + (r.variable ? " rounded px-2 bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)]" : "")}>
                           <button type="button" onClick={() => { resetForm(); openEditRule(r); }} title={t("Modifica")} className="flex min-w-0 flex-1 items-center gap-3 rounded text-left hover:bg-wash">
                           {iconCircle(c, 32)}
                           <div className="min-w-0 flex-1">

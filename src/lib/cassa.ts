@@ -10,7 +10,7 @@ import { payoutDate, loadPayoutSettings, type PayoutSettings } from "./payouts";
 import { roundCents, sumCents } from "./money";
 
 export type Kind = "in" | "out";
-export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string; forecast?: boolean; channel?: string /* canale della prenotazione da cui nasce */; edited?: boolean /* riga di una scadenza modificata a mano */; occKey?: string /* chiave originale della scadenza (regola|data) */ }
+export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string; forecast?: boolean; channel?: string /* canale della prenotazione da cui nasce */; edited?: boolean /* riga di una scadenza modificata a mano */; occKey?: string /* chiave originale della scadenza (regola|data) */; variable?: boolean /* scadenza a importo variabile: l'importo è una stima */ }
 export interface Rule { id: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; freq: "monthly" | "weekly" | "yearly"; day: number; start: string; end?: string; auto: boolean; note?: string; variable?: boolean /* importo variabile: l'importo è una stima, alla scadenza si registra quello reale */ }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -352,7 +352,7 @@ export function computeForecast(bookings: Booking[], guests: Guest[], getStructu
   if (from <= horizon) {
     for (const r of rules) {
       if (!scopeVisible(r.structureId, active)) continue;
-      for (const iso of occurrences(r, from, horizon)) out.push({ id: `fc-r-${r.id}-${iso}`, date: iso, kind: r.kind, cat: r.cat, desc: r.desc, amount: r.amount, conto: r.conto, structureId: r.structureId, sched: true, forecast: true, ref: r.id });
+      for (const iso of occurrences(r, from, horizon)) out.push({ id: `fc-r-${r.id}-${iso}`, date: iso, kind: r.kind, cat: r.cat, desc: r.desc, amount: r.amount, conto: r.conto, structureId: r.structureId, sched: true, forecast: true, ref: r.id, ...(r.variable ? { variable: true } : {}) });
     }
   }
   return out;

@@ -78,3 +78,9 @@ test("scadenza modificata: cambiano solo i dati di quel mese (importo, data, des
   assert.deepEqual([out[1].amount, out[1].edited], [500, undefined]); // le altre scadenze non cambiano
   assert.equal(applyOverrides(f, {}), f);
 });
+
+test("previsione: le scadenze di una regola a importo variabile sono segnate come tali (stima) e non diventano movimenti automatici", () => {
+  const rule = { id: "rv", kind: "out" as const, cat: "pulizie", desc: "Pulizie", amount: 500, conto: "banca", freq: "monthly" as const, day: 4, start: "2026-10-04", auto: false, variable: true };
+  const f = computeForecast([], [], st as never, [rule], "all", TODAY, "2026-12-31");
+  assert.ok(f.length === 2 && f.every((m) => m.variable === true && m.forecast === true));
+});
