@@ -67,14 +67,11 @@ export async function ratePlanBelongsTo(ratePlanId: string, props: { propertyId:
   return false;
 }
 
-/** Può inviare prezzi/disponibilità a queste property? Solo chi le possiede: il tenant della riga personale o il PROPRIETARIO dell'organizzazione.
- *  Un collaboratore (membership "member") no: le sue impostazioni (chiusure, pool, modello tariffe) vivono ancora nel suo browser e invierebbe valori sbagliati. */
-export async function canWriteChannexProperties(admin: SupabaseClient, userId: string, propertyIds: string[]): Promise<boolean> {
-  const ids = Array.from(new Set(propertyIds.filter(Boolean)));
-  if (!ids.length) return false;
-  const { data: rows } = await admin.from("channex_map").select("channex_property_id, tenant_id, org_id").in("channex_property_id", ids);
-  const { data: mem } = await admin.from("memberships").select("org_id, role").eq("user_id", userId);
-  const ownerOrgs = new Set(((mem ?? []) as { org_id?: string; role?: string }[]).filter((m) => m.role === "owner").map((m) => m.org_id as string));
-  const byId = new Map(((rows ?? []) as { channex_property_id: string; tenant_id?: string; org_id?: string | null }[]).map((r) => [r.channex_property_id, r]));
-  return ids.every((id) => { const r = byId.get(id); return !!r && (r.org_id ? ownerOrgs.has(r.org_id) : r.tenant_id === userId); });
+/** Collaboratore invitato da "Utenti" (non un titolare che co-gestisce la struttura di un socio): lavora sull'account di chi lo ha invitato. */
+export async function isCollaborator(admin: SupabaseClient, userId: string): Promise<boolean> {
+  const { data: u } = await admin.auth.admin.getUserById(userId);
+  const email = u?.user?.email;
+  if (!email) return false;
+  const { data: al } = await admin.from("access_allowlist").select("kind").ilike("email", email).maybeSingle();
+  return al?.kind === "collaboratore";
 }

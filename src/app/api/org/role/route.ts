@@ -49,7 +49,9 @@ export async function POST(req: Request) {
     }
 
     const { data: ms } = await admin.from("memberships").select("role").eq("user_id", caller.id).neq("role", "owner").limit(1);
-    return NextResponse.json({ ok: true, collaborator: invitedAsCollaborator || (ms ?? []).length > 0, accepted, profile, email: caller.email ?? null });
+    // collaborator = invitato da "Utenti" (lavora sull'account di chi lo ha invitato). member = ha strutture condivise (anche un titolare che co-gestisce
+    // la struttura di un socio): quest'ultimo NON è un collaboratore e continua a usare Xenora come prima.
+    return NextResponse.json({ ok: true, collaborator: invitedAsCollaborator, member: invitedAsCollaborator || (ms ?? []).length > 0, accepted, profile, email: caller.email ?? null });
   } catch (e) {
     return NextResponse.json({ error: "server_error", message: (e as Error)?.message ?? "errore" }, { status: 500 });
   }

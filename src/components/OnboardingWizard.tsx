@@ -66,14 +66,16 @@ export default function OnboardingWizard() {
     let cancelled = false;
     (async () => {
       let collaborator = false;
+      let member = false;
       for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const token = supabase ? (await supabase.auth.getSession())?.data.session?.access_token : undefined;
         if (token) {
           // a ogni accesso: accetta gli inviti di condivisione in attesa sulla sua email e dice se è un collaboratore
           const r = await fetch("/api/org/role", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-          const j = (await r.json().catch(() => ({}))) as { collaborator?: boolean; accepted?: number; profile?: Record<string, unknown> | null; email?: string | null };
+          const j = (await r.json().catch(() => ({}))) as { collaborator?: boolean; member?: boolean; accepted?: number; profile?: Record<string, unknown> | null; email?: string | null };
           collaborator = !!j.collaborator;
+          member = !!(j.member || j.collaborator);
           // ricordato nel browser (non sincronizzato) per il cancello dei permessi e per non inviare prezzi/disponibilità da qui
           try { if (collaborator) localStorage.setItem("xn-collab", "1"); else localStorage.removeItem("xn-collab"); window.dispatchEvent(new Event("xn-collab")); } catch { /* niente */ }
           // la scheda utente compilata dal titolare diventa la sua (dati, permessi, strutture)
@@ -86,7 +88,7 @@ export default function OnboardingWizard() {
       }
       if (cancelled) return;
       if (!wants) { setActive(false); return; }
-      if (collaborator) { markCollaborator(); setActive(false); return; }
+      if (collaborator || member) { markCollaborator(); setActive(false); return; } // chi lavora su strutture altrui non registra una struttura propria
       setActive(true);
     })();
     return () => { cancelled = true; };
