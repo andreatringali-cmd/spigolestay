@@ -12,6 +12,7 @@ import { eur } from "@/lib/format";
 import { roundCents, sumCents } from "@/lib/money";
 import { exportExcel } from "@/lib/export";
 import { type Mov, type Rule, computeAuto, computeScheduled, scopeVisible, loadCash, loadConti } from "@/lib/cassa";
+import { useTenantId } from "@/lib/tenant";
 
 const CONTI = [
   { key: "contanti", label: "Contanti" },
@@ -27,6 +28,7 @@ interface Closure { id: string; day: string; conto: string | null; structure_id:
 
 export default function ChiusuraCassaPage() {
   const { user } = useAuth();
+  const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
   const { bookings, guests, structures, getStructure, activeStructureId } = useData();
 
   // Dati Cassa dal server (movimenti manuali + regole + occorrenze saldate).
@@ -82,7 +84,7 @@ export default function ChiusuraCassaPage() {
 
   const save = async () => {
     if (!supabase || !user) { setMsg("Devi essere connesso."); return; }
-    const { error } = await supabase.from("cash_closures").insert({ tenant_id: user.id, day, conto: conto || null, structure_id: scope === "all" ? null : scope, expected_cents: Math.round(expected * 100), counted_cents: Math.round(numv(counted) * 100), diff_cents: Math.round(diff * 100), note: note || null });
+    const { error } = await supabase.from("cash_closures").insert({ tenant_id: tenantId ?? user.id, day, conto: conto || null, structure_id: scope === "all" ? null : scope, expected_cents: Math.round(expected * 100), counted_cents: Math.round(numv(counted) * 100), diff_cents: Math.round(diff * 100), note: note || null });
     setMsg(error ? "Errore: " + error.message : "Chiusura salvata ✓");
     if (!error) { setCounted(""); setNote(""); loadClosures(); }
   };

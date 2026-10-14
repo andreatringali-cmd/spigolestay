@@ -16,6 +16,7 @@ import { eur } from "@/lib/format";
 import { apiPost } from "@/lib/invoicing/client";
 import type { PreviewItem } from "@/lib/invoicing/fic-received";
 import { groupTotals, dueSummary, matchesDue, toCashRow, findDuplicate, signedCents, csvCell, type DueFilter } from "@/lib/purchases";
+import { useTenantId } from "@/lib/tenant";
 
 // Dati fornitore per le OTA (per l'autofattura: sede estera del cedente).
 const OTA_META: Record<string, { name: string; country: string }> = {
@@ -51,6 +52,7 @@ const prevMonth = () => { const d = new Date(); d.setMonth(d.getMonth() - 1); re
 
 export default function FatturePassivePage() {
   const { user } = useAuth();
+  const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
   const ask = useConfirm();
   const { bookings: allBookings, structures, activeStructureId } = useData();
   const single = activeStructureId !== "all";
@@ -222,12 +224,12 @@ export default function FatturePassivePage() {
     if (nameTrim) {
       const existing = suppliers.find((s) => s.name.toLowerCase() === nameTrim.toLowerCase());
       if (existing) { supplierId = existing.id; if (edit.supplierCountry) await supabase.from("suppliers").update({ country: edit.supplierCountry }).eq("id", existing.id); }
-      else { const { data: ns } = await supabase.from("suppliers").insert({ tenant_id: user.id, name: nameTrim, category: edit.category || null, country: edit.supplierCountry || null }).select("id").single(); supplierId = ns?.id ?? null; }
+      else { const { data: ns } = await supabase.from("suppliers").insert({ tenant_id: tenantId ?? user.id, name: nameTrim, category: edit.category || null, country: edit.supplierCountry || null }).select("id").single(); supplierId = ns?.id ?? null; }
     }
     const taxable = Math.round(numv(edit.taxableEur) * 100);
     const vat = Math.round(numv(edit.vatEur) * 100);
     const row = {
-      tenant_id: user.id, structure_id: edit.structureId && edit.structureId !== "common" ? edit.structureId : null, supplier_id: supplierId, supplier_name: nameTrim || null, doc_number: edit.doc_number || null,
+      tenant_id: tenantId ?? user.id, structure_id: edit.structureId && edit.structureId !== "common" ? edit.structureId : null, supplier_id: supplierId, supplier_name: nameTrim || null, doc_number: edit.doc_number || null,
       doc_date: edit.doc_date || null, doc_type: edit.doc_type, category: edit.category || null,
       taxable_cents: taxable, vat_cents: vat, total_cents: taxable + vat, due_date: edit.due_date || null,
       paid: edit.paid, paid_at: edit.paid ? (edit.paid_at || todayISO()) : null, payment_method: edit.payment_method || null,
@@ -251,13 +253,13 @@ export default function FatturePassivePage() {
   // ---- Collegamento alla Cassa: il movimento ha lo stesso id del documento (nessun doppione possibile).
   const syncCash = async (d: Doc) => {
     if (!supabase || !user) return;
-    const row = toCashRow(d, user.id, todayISO());
+    const row = toCashRow(d, tenantId ?? user.id, todayISO());
     if (!row) { await supabase.from("cash_movements").delete().eq("id", d.id); return; }
     await supabase.from("cash_movements").upsert(row, { onConflict: "id" });
   };
   const registerCash = async (list: Doc[]) => {
     if (!supabase || !user) return;
-    const rows = list.map((d) => toCashRow(d, user.id, todayISO())).filter((x): x is NonNullable<typeof x> => !!x);
+    const rows = list.map((d) => toCashRow(d, tenantId ?? user.id, todayISO())).filter((x): x is NonNullable<typeof x> => !!x);
     if (!rows.length) { setInfo("Nessun documento pagato da registrare in Cassa."); return; }
     const { error } = await supabase.from("cash_movements").upsert(rows, { onConflict: "id" });
     if (error) { setErr(error.message); return; }

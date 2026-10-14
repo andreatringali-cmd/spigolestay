@@ -9,6 +9,7 @@ import SearchInput from "@/components/SearchInput";
 import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { apiPost } from "@/lib/invoicing/client";
+import { useTenantId } from "@/lib/tenant";
 
 interface CP { id: string; kind: string; name: string; vat: string | null; tax_code: string | null; address: string | null; city: string | null; cap: string | null; province: string | null; country: string | null; sdi_code: string | null; pec: string | null; email: string | null }
 const KIND: Record<string, string> = { privato: "Privato", societa: "Società", estero: "Estero", ota: "OTA / Agenzia" };
@@ -18,6 +19,7 @@ const emptyForm = () => ({ id: "", kind: "societa", name: "", vat: "", tax_code:
 
 export default function AnagraficaClientiPage() {
   const { user } = useAuth();
+  const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
   const ask = useConfirm();
   const [list, setList] = useState<CP[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +72,7 @@ export default function AnagraficaClientiPage() {
   const save = async () => {
     if (!supabase || !user || !edit || !edit.name.trim()) return;
     setSaving(true);
-    const row = { tenant_id: user.id, kind: edit.kind, name: edit.name.trim(), vat: edit.vat || null, tax_code: edit.tax_code || null, address: edit.address || null, city: edit.city || null, cap: edit.cap || null, province: edit.province || null, country: edit.country || "IT", sdi_code: edit.sdi_code || null, pec: edit.pec || null, email: edit.email || null };
+    const row = { tenant_id: tenantId ?? user.id, kind: edit.kind, name: edit.name.trim(), vat: edit.vat || null, tax_code: edit.tax_code || null, address: edit.address || null, city: edit.city || null, cap: edit.cap || null, province: edit.province || null, country: edit.country || "IT", sdi_code: edit.sdi_code || null, pec: edit.pec || null, email: edit.email || null };
     const res = edit.id ? await supabase.from("counterparts").update(row).eq("id", edit.id) : await supabase.from("counterparts").insert(row);
     setSaving(false); if (!res.error) { setEdit(null); load(); }
   };

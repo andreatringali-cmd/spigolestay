@@ -17,7 +17,10 @@ export async function authTenant(req: Request): Promise<AuthOk | NextResponse> {
   if (error || !who?.user?.id) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   try { if (!(await isUserAllowed(admin, who.user))) return NextResponse.json({ error: "not_approved" }, { status: 403 }); }
   catch { return NextResponse.json({ error: "access_check_failed" }, { status: 503 }); }
-  return { admin, tenantId: who.user.id };
+  // Un collaboratore (invitato da "Utenti") opera sull'account di chi lo ha invitato; tutti gli altri sul proprio.
+  let tenantId = who.user.id;
+  try { const { data: ws } = await admin.rpc("workspace_owner", { uid: who.user.id }); if (typeof ws === "string" && ws) tenantId = ws; } catch { /* resta il proprio */ }
+  return { admin, tenantId };
 }
 
 export const isResponse = (x: unknown): x is NextResponse => x instanceof NextResponse;

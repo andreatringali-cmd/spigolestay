@@ -22,6 +22,7 @@ import { fmtDMY } from "@/lib/dates";
 import ChannelLogo from "@/components/ChannelLogo";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { type PayoutMode, type PayoutSettings, PAYOUT_CHANNELS, WEEKDAY_LABELS, cleanRule, loadPayoutSettings, savePayoutSettings } from "@/lib/payouts";
+import { useTenantId } from "@/lib/tenant";
 
 // ---- Conti cassa ------------------------------------------------------------
 
@@ -66,6 +67,7 @@ export default function CassaPage() {
   const toast = useToast();
   const { t } = useLang();
   const { user } = useAuth();
+  const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
 
   // Categorie (default + personalizzate).
   const [cats, setCats] = useState<Cat[]>(DEFAULT_CATS);
@@ -98,7 +100,7 @@ export default function CassaPage() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      await migrateLocalCash(user.id); // una-tantum: sale i vecchi dati locali sul server
+      await migrateLocalCash(tenantId ?? user.id); // una-tantum: sale i vecchi dati locali sul server
       const c = await loadCash();
       setManual(c.movements); setRules(c.rules); setPaid(c.paid);
     })();
@@ -123,7 +125,7 @@ export default function CassaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rules, activeStructureId, today, paidSet]);
   const dropPaid = (keys: string[]) => setPaid((p) => p.filter((x) => !keys.includes(x)));
-  const markPaid = (r: Rule, iso: string) => { const k = `${r.id}|${iso}`; setPaid((p) => [...p, k]); if (user) checkWrite(addPaid(user.id, [k]), "Il pagamento", () => dropPaid([k])); };
+  const markPaid = (r: Rule, iso: string) => { const k = `${r.id}|${iso}`; setPaid((p) => [...p, k]); if (user) checkWrite(addPaid(tenantId ?? user.id, [k]), "Il pagamento", () => dropPaid([k])); };
   const [pendAmt, setPendAmt] = useState<Record<string, string>>({}); // importo reale digitato per le scadenze a importo variabile
   const confirmVariable = (r: Rule, iso: string) => {
     const key = `${r.id}|${iso}`;
@@ -131,11 +133,11 @@ export default function CassaPage() {
     if (amt <= 0) { toast(t("Inserisci l'importo reale."), "error"); return; }
     const mov: Mov = { id: uid(), date: iso, kind: r.kind, cat: r.cat, desc: r.desc, amount: amt, conto: r.conto, structureId: r.structureId };
     setManual((prev) => [mov, ...prev]);
-    if (user) checkWrite(insertMovement(user.id, mov), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
+    if (tenantId) checkWrite(insertMovement(tenantId, mov), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
     markPaid(r, iso);
     toast(`${t("Registrato")} · ${r.desc} · ${eur(amt)}`, "success");
   };
-  const markAllPaid = () => { const keys = pending.filter((p) => !p.rule.variable).map((p) => `${p.rule.id}|${p.iso}`); setPaid((p) => [...p, ...keys]); if (user) checkWrite(addPaid(user.id, keys), "I pagamenti", () => dropPaid(keys)); };
+  const markAllPaid = () => { const keys = pending.filter((p) => !p.rule.variable).map((p) => `${p.rule.id}|${p.iso}`); setPaid((p) => [...p, ...keys]); if (user) checkWrite(addPaid(tenantId ?? user.id, keys), "I pagamenti", () => dropPaid(keys)); };
 
   // Prossime scadenze (dopo oggi).
   const upcoming = useMemo(() => {
@@ -277,7 +279,7 @@ export default function CassaPage() {
     setManual((prev) => [...newMovs, ...prev.filter((x) => !oldIds.has(x.id))]);
     if (user) {
       for (const o of olds) checkWrite(deleteMovement(o.id), "Il saldo di partenza precedente", () => setManual((prev) => (prev.some((x) => x.id === o.id) ? prev : [o, ...prev])));
-      for (const mv of newMovs) checkWrite(insertMovement(user.id, mv), "Il saldo di partenza", () => setManual((prev) => prev.filter((x) => x.id !== mv.id)));
+      for (const mv of newMovs) checkWrite(insertMovement(tenantId ?? user.id, mv), "Il saldo di partenza", () => setManual((prev) => prev.filter((x) => x.id !== mv.id)));
     }
     setOpening(null);
   };
@@ -360,7 +362,7 @@ export default function CassaPage() {
     }
     const mov: Mov = { id: uid(), date: form.date, kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura };
     setManual((prev) => [mov, ...prev]);
-    if (user) checkWrite(insertMovement(user.id, mov), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
+    if (tenantId) checkWrite(insertMovement(tenantId, mov), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
     showDate(form.date);
     toast(`${t("Movimento registrato")} · ${summary}`, "success");
     // Ricorrente: crea la regola che riparte dal periodo SUCCESSIVO (questo è già registrato come movimento).
@@ -372,7 +374,7 @@ export default function CassaPage() {
       const nextStart = fmt(d.getFullYear(), d.getMonth(), d.getDate());
       const rule: Rule = { id: uid(), kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura, freq: form.repeat, day: parseInt(form.date.slice(8, 10)) || 1, start: nextStart, auto: true };
       setRules((prev) => [...prev, rule]);
-      if (user) checkWrite(insertRule(user.id, rule), "Il pagamento ricorrente", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
+      if (tenantId) checkWrite(insertRule(tenantId, rule), "Il pagamento ricorrente", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
     }
     resetForm();
   };
@@ -421,7 +423,7 @@ export default function CassaPage() {
     }
     const rule: Rule = { id: uid(), kind: rf.kind, cat: rf.cat, desc: rf.desc.trim() || catOf(rf.cat)?.label || "", amount: amt, conto: rf.conto, structureId: rf.struttura, freq: rf.freq, day: parseInt(rf.day) || 1, start: rf.start, auto: rf.variable ? false : rf.auto, end: rf.end || undefined, note: rf.note?.trim() || undefined, variable: rf.variable };
     setRules((prev) => [...prev, rule]);
-    if (user) checkWrite(insertRule(user.id, rule), "Il pagamento programmato", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
+    if (tenantId) checkWrite(insertRule(tenantId, rule), "Il pagamento programmato", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
     closeRuleModal();
     setRf((f) => ({ ...f, desc: "", amount: "" }));
   };

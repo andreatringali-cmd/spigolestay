@@ -9,6 +9,7 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
+import { useTenantId } from "@/lib/tenant";
 
 interface Billing { businessName: string; vat: string; taxCode: string; address: string; streetNumber: string; city: string; province: string; sdi: string; pec: string; email: string }
 const KEY = "spigolestay:billing";
@@ -17,6 +18,7 @@ const empty: Billing = { businessName: "", vat: "", taxCode: "", address: "", st
 export default function PagamentoPage() {
   const { t } = useLang();
   const { user } = useAuth();
+  const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
   const [b, setB] = useState<Billing>(empty);
   const [saved, setSaved] = useState(false);
   const [customer, setCustomer] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export default function PagamentoPage() {
     // Cache locale immediata (per non mostrare vuoto), poi il SERVER è autorevole per i dati fiscali.
     try { const r = localStorage.getItem(KEY); if (r) setB({ ...empty, ...JSON.parse(r) }); } catch {}
     if (!supabase || !user) return;
-    supabase.from("tenant_invoice_settings").select("denominazione, vat, tax_code, pec, sdi, address, city, province").eq("tenant_id", user.id).maybeSingle().then(({ data }) => {
+    supabase.from("tenant_invoice_settings").select("denominazione, vat, tax_code, pec, sdi, address, city, province").eq("tenant_id", tenantId ?? user.id).maybeSingle().then(({ data }) => {
       if (!data) return;
       // Preferisco il valore presente (server o locale) per non azzerare mai un campo compilato.
       setB((p) => ({ ...p,
@@ -58,7 +60,7 @@ export default function PagamentoPage() {
     if (supabase && user) {
       try {
         await supabase.from("tenant_invoice_settings").upsert({
-          tenant_id: user.id, denominazione: data.businessName, vat: data.vat, tax_code: data.taxCode,
+          tenant_id: tenantId ?? user.id, denominazione: data.businessName, vat: data.vat, tax_code: data.taxCode,
           pec: data.pec, sdi: data.sdi, address: data.address, city: data.city, province: data.province,
           updated_at: new Date().toISOString(),
         }, { onConflict: "tenant_id" });

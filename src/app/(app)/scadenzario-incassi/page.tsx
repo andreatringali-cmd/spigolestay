@@ -18,6 +18,7 @@ import { DOC_KIND_LABEL, invPost } from "@/lib/invoicing/client";
 import { buildCsv, centsToCsv, downloadCsv } from "@/lib/invoicing/csv";
 import { computeResidui, daysOverdue, todayLocalISO, agingBucket, AGING_LABEL, type AgingKey } from "@/lib/invoicing/receivables";
 import { reminderText, reminderSubject, waReminderLink, mailReminderLink, waDigits } from "@/lib/invoicing/reminders";
+import { useTenantId } from "@/lib/tenant";
 
 interface Doc {
   id: string; number_label: string | null; issue_date: string | null; due_date: string | null; total_cents: number;
@@ -32,6 +33,7 @@ const BUCKETS: AgingKey[] = ["future", "nodue", "d30", "d60", "d90", "over90"];
 export default function ScadenzarioIncassiPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
   const ask = useConfirm();
   const { activeStructureId, bookings, getGuest, getStructure, updateBooking } = useData();
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -105,7 +107,7 @@ export default function ScadenzarioIncassiPage() {
   // Registra nello storico del documento che il sollecito è stato preparato/inviato (tabella document_events già esistente).
   const logReminder = async (docId: string, via: string) => {
     if (!supabase || !user) return;
-    const { error } = await supabase.from("document_events").insert({ tenant_id: user.id, document_id: docId, kind: "reminder", message: `Sollecito di pagamento inviato via ${via}` });
+    const { error } = await supabase.from("document_events").insert({ tenant_id: tenantId ?? user.id, document_id: docId, kind: "reminder", message: `Sollecito di pagamento inviato via ${via}` });
     if (!error) { setReminders((p) => ({ ...p, [docId]: { count: (p[docId]?.count ?? 0) + 1, last: new Date().toISOString() } })); }
   };
   const copy = async (docId: string) => {
@@ -116,7 +118,7 @@ export default function ScadenzarioIncassiPage() {
     if (!supabase || !user) return;
     if (!(await ask({ title: "Segna come incassato", message: `Registrare l'incasso di ${eur(cents(r.residuo))} per ${r.number_label ?? "il documento"}?`, confirmLabel: "Registra incasso" }))) return;
     setBusy(r.id); setErr("");
-    const { error } = await supabase.from("document_payments").insert({ document_id: r.id, tenant_id: user.id, amount_cents: r.residuo, method: "manuale" });
+    const { error } = await supabase.from("document_payments").insert({ document_id: r.id, tenant_id: tenantId ?? user.id, amount_cents: r.residuo, method: "manuale" });
     if (error) { setErr("Errore incasso: " + error.message); setBusy(""); return; }
     // Fonte di verità incassi = prenotazione (come nella scheda documento).
     const b = r.booking_code ? bookings.find((x) => x.code === r.booking_code) : undefined;

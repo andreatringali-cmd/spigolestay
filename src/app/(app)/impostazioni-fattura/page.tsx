@@ -7,6 +7,7 @@ import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { FORFETTARIO_NOTE } from "@/lib/invoicing/folio";
 import { apiPost } from "@/lib/invoicing/client";
 import { validateIssuerSettings, hasErrors, normalizeVat, normalizeCf } from "@/lib/invoicing/validate";
+import { useTenantId } from "@/lib/tenant";
 
 interface Settings {
   regime: string; denominazione: string; vat: string; tax_code: string;
@@ -23,6 +24,7 @@ const DEF: Settings = {
 
 export default function ImpostazioniFatturaPage() {
   const { user } = useAuth();
+  const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
   const [s, setS] = useState<Settings>(DEF);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -115,7 +117,7 @@ export default function ImpostazioniFatturaPage() {
       address: s.address.trim(), city: s.city.trim(), cap: s.cap.trim(), province: s.province.trim().toUpperCase(),
       pec: s.pec.trim().toLowerCase(), sdi: s.sdi.trim().toUpperCase(), regime_note,
     };
-    const { error } = await supabase.from("tenant_invoice_settings").upsert({ tenant_id: user.id, ...clean, updated_at: new Date().toISOString() });
+    const { error } = await supabase.from("tenant_invoice_settings").upsert({ tenant_id: tenantId ?? user.id, ...clean, updated_at: new Date().toISOString() });
     setSaving(false);
     if (!error) { setS(clean); setDirty(false); }
     setMsg(error ? "Errore: " + error.message : "Impostazioni salvate ✓");
