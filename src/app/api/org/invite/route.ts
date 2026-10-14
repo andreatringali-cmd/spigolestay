@@ -130,6 +130,9 @@ export async function POST(req: Request) {
       const { error: osErr } = await admin.from("org_state").insert({ org_id: orgId, data: { [DATA_KEY]: JSON.stringify(orgData) } });
       if (osErr) return NextResponse.json({ error: "org_state_failed", message: osErr.message }, { status: 500 });
 
+      // Il collegamento al Channel Manager segue la struttura nella nuova organizzazione: senza questo i soci non lo vedrebbero.
+      await admin.from("channex_map").update({ org_id: orgId }).eq("tenant_id", caller.id).eq("structure_id", structureId).is("org_id", null);
+
       // Rimuovi la struttura (e ciò che le appartiene) dal personale del chiamante.
       d.structures = structures.filter((s) => s?.id !== structureId);
       d.roomTypes = roomTypes.filter((rt) => rt?.structureId !== structureId);

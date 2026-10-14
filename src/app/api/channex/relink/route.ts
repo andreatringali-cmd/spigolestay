@@ -81,12 +81,23 @@ export async function POST(req: Request) {
   const mine = await allowedChannexProperties(auth.admin, auth.tenantId);
   const { data: mapped } = await auth.admin.from("channex_map").select("channex_property_id");
   const takenByOthers = new Set(((mapped ?? []) as { channex_property_id?: string }[]).map((r) => r.channex_property_id).filter((id): id is string => !!id && !mine.has(id)));
+  // Se la struttura ha GIÀ un collegamento (suo o della sua organizzazione), vale quello: su Channex possono esistere property con lo stesso
+  // nome (doppioni) e "la più completa" non deve sostituire quella già in uso, nemmeno quando a riallinearsi è un collaboratore.
+  const { data: rowsAll } = await auth.admin.from("channex_map").select("structure_id, channex_property_id");
+  const existingByStruct = new Map<string, Set<string>>();
+  for (const r of (rowsAll ?? []) as { structure_id?: string; channex_property_id?: string }[]) {
+    if (!r.structure_id || !r.channex_property_id || !mine.has(r.channex_property_id)) continue;
+    if (!propList.some((pp) => pp.id === r.channex_property_id)) continue; // collegamento a una property che non esiste più: si può riabbinare
+    (existingByStruct.get(r.structure_id) ?? existingByStruct.set(r.structure_id, new Set()).get(r.structure_id)!).add(r.channex_property_id);
+  }
   const bestByStruct = new Map<string, Match>();
   const unmatched: string[] = [];
   for (const p of propList) {
     const title = norm(p.attributes?.title);
     const c = candidates.find((x) => norm(x.name) === title);
     if (!c || takenByOthers.has(p.id)) { unmatched.push(p.attributes?.title || p.id); continue; }
+    const keep = existingByStruct.get(c.structureId);
+    if (keep && !keep.has(p.id)) continue; // doppione della property già collegata
     const rt = await listRoomTypesFor(p.id);
     const rooms: Record<string, string> = {}; // channex_room_type_id → xenora_room_type_id
     const ratePlans: Record<string, string> = {}; // channex_room_type_id → channex_rate_plan_id (per inviare i prezzi)
