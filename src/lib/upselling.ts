@@ -7,6 +7,7 @@ import type { Booking, ExtraKind, ExtraService, Guest, UpsellOffer } from "./typ
 import { DEFAULT_EXTRAS } from "./types";
 import { nights as nightsBetween, parseISO, toISO } from "./dates";
 import { eur } from "./format";
+import { guestLangOf } from "./guest-lang";
 
 type BookingExtra = NonNullable<Booking["extras"]>[number];
 
@@ -235,13 +236,8 @@ export const patchDeleteOffer = (b: Booking, offerId: string): Partial<Booking> 
 
 // ── Lingua e testo del messaggio ────────────────────────────────────────────────────────────
 export type Lang = "it" | "en" | "fr" | "de" | "es";
-const COUNTRY_LANG: Record<string, Lang> = { IT: "it", FR: "fr", DE: "de", AT: "de", CH: "de", ES: "es", MX: "es", AR: "es", CO: "es", CL: "es" };
-export function guestLang(g?: Pick<Guest, "language" | "country">): Lang {
-  const l = (g?.language ?? "").slice(0, 2).toLowerCase();
-  if (l === "it" || l === "en" || l === "fr" || l === "de" || l === "es") return l;
-  const c = (g?.country ?? "").trim().toUpperCase();
-  if (COUNTRY_LANG[c]) return COUNTRY_LANG[c];
-  return "it";
+export function guestLang(g?: Pick<Guest, "language" | "country"> & { phone?: string }): Lang {
+  return guestLangOf(g);
 }
 
 const MSG: Record<Lang, { hello: (n: string) => string; intro: (d: string) => string; reply: string; link: string; bye: string; loc: string; total: string }> = {

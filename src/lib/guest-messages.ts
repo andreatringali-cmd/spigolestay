@@ -6,6 +6,7 @@ import { windowOpenFrom } from "./wa-window";
 import type { Guest } from "./types";
 import { apiPost } from "./invoicing/client";
 import { waDigits } from "./contacts-check";
+import { guestLangOf } from "./guest-lang";
 
 export type Lang = "it" | "en" | "fr" | "de" | "es";
 
@@ -40,7 +41,7 @@ export const REMINDER_INTRO: Record<Lang, string> = {
   es: "Un breve recordatorio de nuestra parte. ",
 };
 
-export const langOf = (g?: Guest): Lang => (["it", "en", "fr", "de", "es"].includes(g?.language ?? "") ? (g!.language as Lang) : "it");
+export const langOf = (g?: Guest): Lang => guestLangOf(g); // lingua della scheda, altrimenti dal Paese o dal prefisso del telefono (gli ospiti OTA non hanno la lingua)
 export const greeting = (lang: Lang, g?: Guest): string => {
   const first = (g?.firstName || g?.fullName || "").split(" ")[0];
   const hi: Record<Lang, string> = { it: "Gentile", en: "Dear", fr: "Cher/Chère", de: "Liebe/r", es: "Estimado/a" };

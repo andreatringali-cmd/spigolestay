@@ -7,6 +7,7 @@ import { waTemplateFrom } from "@/lib/wa-template";
 import { stepsOfTemplate } from "@/lib/auto-schedule";
 import { REVIEW_SETTINGS_KEY, parseReviewSettings, reviewLinksFor, reviewTokens, reviewDecision, usesReviewLinks, oneLine } from "@/lib/auto-review";
 import { buildGuideUrl, structureWhatsapp, WHATSAPP_FALLBACK } from "@/lib/auto-guide-link";
+import { guestLangOf } from "@/lib/guest-lang";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -137,7 +138,7 @@ export async function GET(req: Request) {
       const st = structures.get(s(b.structureId)) || {};
       const unit = units.get(s(b.unitId)) || {};
       const rt = roomTypes.get(s(b.roomTypeId)) || {};
-      const lang = (s(g.lang) || s(g.language) || "it").slice(0, 2);
+      const lang = guestLangOf({ language: s(g.lang) || s(g.language), country: s(g.country), phone: s(g.phone) }); // lingua della scheda, altrimenti Paese/prefisso
       const nn = nights(checkIn, checkOut);
       const balance = Math.max(0, num(b.total) + num(b.cleaningFee) - num(b.paid));
       const ctx: Record<string, string> = {

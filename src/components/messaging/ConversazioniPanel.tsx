@@ -12,6 +12,7 @@ import ChannelLogo from "@/components/ChannelLogo";
 import LinkPreview from "@/components/messaging/LinkPreview";
 import VoiceNote from "@/components/messaging/VoiceNote";
 import { GUIDE_MSG, CHECKIN_MSG, type Lang } from "@/lib/guest-messages";
+import { guestLangOf } from "@/lib/guest-lang";
 import { isThreadUnread, markThreadSeen } from "@/lib/navbadges";
 import { eur } from "@/lib/format";
 import { mergeSeedTemplates } from "@/lib/msg-templates";
@@ -516,7 +517,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   };
 
   // ── Segnaposto e modelli ──
-  const langOf = (g?: Guest): Lang => (["it", "en", "fr", "de", "es"].includes(g?.language ?? "") ? (g!.language as Lang) : "it");
+  const langOf = (g?: Guest): Lang => guestLangOf(g);
   // Link della guida NUOVA, costruito dalla prenotazione: struttura + camera + codici (per camera,
   // filtrati dal parcheggio) + nome ospite. Legge i codici impostati per quella camera.
   const guideUrlFor = (b: Booking) => {
