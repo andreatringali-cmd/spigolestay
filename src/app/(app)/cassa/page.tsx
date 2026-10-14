@@ -132,6 +132,16 @@ export default function CassaPage() {
   // Selettore mese.
   // Filtro: ricerca + periodo. All'apertura: OGGI E FUTURE (flusso di cassa da qui in avanti); si può passare a tutto lo storico o a un periodo.
   const [q, setQ] = useState("");
+  const [tipo, setTipo] = useState<"all" | "in" | "out" | "booking" | "sched" | "manual">("all"); // filtro per tipo di movimento
+  const [catF, setCatF] = useState(""); // filtro per categoria
+  const matchesTipo = (m: Mov) => {
+    if (tipo === "all") return true;
+    if (m.cat === OPENING_CAT) return false; // il saldo di partenza non è un movimento del periodo
+    if (tipo === "in" || tipo === "out") return m.kind === tipo;
+    if (tipo === "booking") return /^(auto-in|auto-comm|fc-in)-/.test(m.id);
+    if (tipo === "sched") return !!m.sched;
+    return !m.auto && !m.sched && !m.forecast; // inseriti a mano
+  };
   const [preset, setPreset] = useState<Preset>("future");
   const [from, setFrom] = useState<string>(() => todayISO());
   const [to, setTo] = useState<string>("");
@@ -148,7 +158,7 @@ export default function CassaPage() {
   const forecastChart = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, activeStructureId, today, fcEnd, principal), [bookings, guests, getStructure, rules, activeStructureId, today, fcEnd, principal]);
   const forecastView = useMemo(() => forecastChart.filter((x) => x.date <= listHorizon), [forecastChart, listHorizon]);
   const rows = [...all, ...forecastView]
-    .filter((m) => inPeriod(m.date) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
+    .filter((m) => inPeriod(m.date) && matchesTipo(m) && (!catF || m.cat === catF) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
     .sort((a, b) => (futureView ? (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) : (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))); // da oggi: dal più vicino; storico: dal più recente
   const rowsStat = rows.filter((m) => m.cat !== OPENING_CAT); // il saldo di partenza non è un incasso né una spesa del periodo
   const entrate = sumCents(rowsStat.filter((m) => m.kind === "in").map((m) => m.amount));
@@ -449,6 +459,18 @@ export default function CassaPage() {
       {/* Riga filtri + toggle grafici + Esporta */}
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca movimento…")} className="min-w-[220px] max-w-md flex-1" />
+        <select aria-label={t("Tipo di movimento")} value={tipo} onChange={(e) => setTipo(e.target.value as typeof tipo)} className={`rounded-lg border bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus ${tipo === "all" ? "border-line" : "border-focus"}`}>
+          <option value="all">{t("Tutti i movimenti")}</option>
+          <option value="in">{t("Solo entrate")}</option>
+          <option value="out">{t("Solo uscite")}</option>
+          <option value="booking">{t("Prenotazioni")}</option>
+          <option value="sched">{t("Pagamenti programmati")}</option>
+          <option value="manual">{t("Inseriti a mano")}</option>
+        </select>
+        <select aria-label={t("Categoria")} value={catF} onChange={(e) => setCatF(e.target.value)} className={`rounded-lg border bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus ${catF ? "border-focus" : "border-line"}`}>
+          <option value="">{t("Tutte le categorie")}</option>
+          {cats.filter((c) => c.key !== OPENING_CAT).map((c) => <option key={c.key} value={c.key}>{c.label ? t(c.label) : c.key}</option>)}
+        </select>
         <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
           <select aria-label={t("Periodo")} value={preset} onChange={(e) => applyPreset(e.target.value as Preset)} className="rounded-md border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
             <option value="future">{t("Oggi e future")}</option>
