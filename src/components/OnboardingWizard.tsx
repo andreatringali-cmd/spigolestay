@@ -5,7 +5,8 @@ import { kvGet, kvSet, kvFlush } from "@/lib/bigstore";
 import Image from "next/image";
 import { STRUCTURE_TYPES, ROOM_TYPE_OPTIONS } from "@/lib/types";
 import { blankUser, fullPerms, USER_LANGS } from "@/lib/users";
-import { isOnboardingActive, markOnboarded } from "@/lib/onboarding";
+import { isOnboardingActive, markOnboarded, markCollaborator } from "@/lib/onboarding";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { TIERS as PLAN_TIERS, TRIAL_DAYS } from "@/lib/plans";
 
@@ -50,8 +51,37 @@ export default function OnboardingWizard() {
   const [active, setActive] = useState(false);
   const [hasData, setHasData] = useState(false); // utente di ritorno con dati già presenti
   useEffect(() => {
-    setActive(isOnboardingActive());
-    try { const d = JSON.parse(kvGet("spigolestay:data:v1") || "{}"); setHasData(Array.isArray(d.structures) && d.structures.length > 0); } catch {}
+    // Xenora è ad invito: la guida "registra la tua struttura" è solo per i titolari. Un collaboratore (invitato da un titolare a co-gestire
+    // la sua struttura) deve solo entrare e vedere le strutture condivise, quindi per lui la guida non compare mai.
+    const wants = isOnboardingActive();
+    let sharedStructure = false;
+    try {
+      const d = JSON.parse(kvGet("spigolestay:data:v1") || "{}");
+      const sts = Array.isArray(d.structures) ? (d.structures as { orgId?: string }[]) : [];
+      setHasData(sts.length > 0);
+      sharedStructure = sts.some((x) => !!x?.orgId);
+    } catch {}
+    if (!wants) { setActive(false); return; }
+    if (sharedStructure) { markCollaborator(); setActive(false); return; } // ha già le strutture condivise
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = supabase ? (await supabase.auth.getSession())?.data.session?.access_token : undefined;
+        if (token) {
+          // accetta gli inviti in attesa sulla sua email e dice se è un collaboratore
+          const r = await fetch("/api/org/role", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+          const j = (await r.json().catch(() => ({}))) as { collaborator?: boolean; accepted?: number };
+          if (j.collaborator) {
+            markCollaborator();
+            if (!cancelled) setActive(false);
+            if (j.accepted && j.accepted > 0) window.location.reload(); // appena entrata in una struttura: ricarica per scaricarla
+            return;
+          }
+        }
+      } catch { /* senza rete si comporta come prima */ }
+      if (!cancelled) setActive(true);
+    })();
+    return () => { cancelled = true; };
   }, []);
   const skipOnboarding = () => { markOnboarded(); setActive(false); };
   const { enabled: authEnabled, signOut, user: authUser } = useAuth();

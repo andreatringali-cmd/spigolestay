@@ -19,6 +19,11 @@ export function markOnboarded(): void {
   } catch {}
 }
 
+// Collaboratore invitato da un titolare: non deve registrare nessuna struttura. Niente data di registrazione né prova gratuita: entra e vede le strutture di chi lo ha invitato.
+export function markCollaborator(): void {
+  try { localStorage.setItem(ONBOARDED_KEY, "1"); } catch {}
+}
+
 const EMPTY_DATA = { structures: [], roomTypes: [], units: [], guests: [], bookings: [], events: [], rateOverrides: {} };
 
 // Svuota tutto e riparte come primo accesso: dati vuoti + wizard attivo.
