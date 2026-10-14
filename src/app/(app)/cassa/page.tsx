@@ -58,25 +58,6 @@ const fmt = (y: number, m0: number, d: number) => `${y}-${pad(m0 + 1)}-${pad(d)}
 
 const CATS_KEY = "spigolestay:cassa:cats";
 
-// Grafico a ciambella (torta) per la composizione delle uscite.
-function Donut({ data, center, size = 148 }: { data: { label: string; value: number; color: string }[]; center?: string; size?: number }) {
-  const total = data.reduce((a, d) => a + d.value, 0);
-  const r = 42, C = 2 * Math.PI * r, cx = 50, cy = 50;
-  let acc = 0;
-  return (
-    <svg viewBox="0 0 100 100" width={size} height={size} className="shrink-0">
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--wash)" strokeWidth="15" />
-      {total > 0 && data.map((d, i) => {
-        const frac = d.value / total;
-        const seg = <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={d.color} strokeWidth="15" strokeLinecap="butt" strokeDasharray={`${frac * C} ${C}`} strokeDashoffset={-acc * C} transform={`rotate(-90 ${cx} ${cy})`} />;
-        acc += frac;
-        return seg;
-      })}
-      {center && <text x="50" y="52" textAnchor="middle" className="fill-[color:var(--txt)]" style={{ fontSize: 11, fontWeight: 700, fontFamily: "var(--font-mono, monospace)" }}>{center}</text>}
-    </svg>
-  );
-}
-
 export default function CassaPage() {
   const { bookings, guests, structures, activeStructureId, getStructure } = useData();
   const ask = useConfirm();
@@ -413,16 +394,18 @@ export default function CassaPage() {
       {chartsOn && (
       <div className="mb-4 grid gap-3 lg:grid-cols-2">
         <Card>
-          <SectionTitle>{t("Composizione uscite")}</SectionTitle>
-          {perCat.length === 0 ? <div className="grid h-[160px] place-items-center text-sm text-faint">{t("Nessuna uscita nel periodo")}</div> : (
-            <div className="flex items-center gap-4">
-              <Donut data={perCat.map((x) => ({ label: x.cat!.label, value: x.v, color: x.cat!.color }))} center={uscite >= 1000 ? `${(uscite / 1000).toFixed(1)}k` : `${uscite}`} />
-              <div className="flex flex-col gap-1">
-                {perCat.slice(0, 6).map(({ cat, v }) => (
-                  <div key={cat!.key} className="flex items-center gap-1.5 text-xs"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: cat!.color }} /><span className="text-dim">{t(cat!.label)}</span><span className="ml-2 font-mono text-faint">{Math.round((v / uscite) * 100)}%</span></div>
-                ))}
-                {perCat.length > 6 && <div className="text-[11px] text-faint">+{perCat.length - 6} {t("altre")}</div>}
-              </div>
+          <SectionTitle>{t("Uscite per categoria")}</SectionTitle>
+          {perCat.length === 0 ? <p className="text-sm text-faint">{t("Nessuna uscita nel periodo.")}</p> : (
+            <div className="flex flex-col gap-2.5">
+              {perCat.map(({ cat, v }) => (
+                <div key={cat!.key}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5 text-dim"><span style={{ color: cat!.color }}><CatIcon name={cat!.icon} size={15} /></span>{t(cat!.label)}</span>
+                    <span className="font-mono text-txt">{eur(v)}</span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${(v / maxCat) * 100}%`, backgroundColor: cat!.color }} /></div>
+                </div>
+              ))}
             </div>
           )}
         </Card>
@@ -490,9 +473,10 @@ export default function CassaPage() {
           <Card>
             <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Movimenti")}</SectionTitle><span className="text-xs text-faint">{listRows.length} {t("nel periodo")}</span></div>
             {rows.length === 0 ? <EmptyState title={t("Nessun movimento.")} /> : (
-              <div className="-mx-1 max-h-[640px] overflow-y-auto px-1">
-              <div className="grid grid-cols-[84px_minmax(0,1fr)_auto_104px] items-center gap-x-3 sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
-                <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right">{t("Importo")}</span><span className="text-right" title={t("Saldo di tutti i conti e di tutte le strutture dopo ogni movimento")}>{t("Saldo conti")}</span>
+              <div className="-mx-1 max-h-[640px] overflow-auto px-1">
+              <div className="min-w-[820px]">
+              <div className="grid grid-cols-[78px_minmax(0,1fr)_92px_92px_100px_104px] items-center gap-x-3 sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
+                <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right">{t("Lordo")}</span><span className="text-right">{t("Commissioni")}</span><span className="text-right">{t("Netto")}</span><span className="text-right" title={t("Saldo di tutti i conti e di tutte le strutture dopo ogni movimento")}>{t("Saldo conti")}</span>
               </div>
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {listRows.map((r) => {
@@ -509,33 +493,27 @@ export default function CassaPage() {
                   const rowClick = isBooking || m.auto || m.sched || m.forecast ? undefined : m.cat === OPENING_CAT ? () => openOpening() : () => startEditMov(m);
                   const included = ledger.included.has(lastId); // del giorno del saldo di partenza: già nell'importo scritto
                   return (
-                    <div key={isBooking ? "b-" + r.id : m.id} onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid grid-cols-[84px_minmax(0,1fr)_auto_104px] items-center gap-x-3 py-2.5" + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
+                    <div key={isBooking ? "b-" + r.id : m.id} onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid grid-cols-[78px_minmax(0,1fr)_92px_92px_100px_104px] items-center gap-x-3 whitespace-nowrap py-1.5" + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
                       <span className="font-mono text-xs text-dim">{fmtDMY(m.date)}</span>
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        {bk ? <ChannelLogo channel={bk.channel} size={30} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 30)}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="truncate text-sm font-medium text-txt">{title}</span>
-                            {m.forecast ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span> : (m.auto && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>)}
-                            {!isBooking && m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
-                          </div>
-                          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-faint">
-                            <span>{c?.label ? t(c.label) : ""}</span>
-                            <span>·</span><span className="capitalize">{(() => { const l = CONTI.find((x) => x.key === m.conto)?.label; return l ? t(l) : ""; })()}</span>
-                            {activeStructureId === "all" && m.structureId && m.structureId !== "all" && <><span>·</span><span>{structNameOf(m.structureId)}</span></>}
-                          </div>
-                        </div>
+                      <div className="flex min-w-0 items-center gap-2">
+                        {bk ? <ChannelLogo channel={bk.channel} size={24} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 24)}
+                        <span className="truncate text-sm font-medium text-txt">{title}</span>
+                        {m.forecast ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span> : (m.auto && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>)}
+                        {!isBooking && m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
+                        <span className="min-w-0 truncate text-[11px] text-faint">{[c?.label ? t(c.label) : "", (() => { const l = CONTI.find((x) => x.key === m.conto)?.label; return l ? t(l) : ""; })(), activeStructureId === "all" && m.structureId && m.structureId !== "all" ? structNameOf(m.structureId) : ""].filter(Boolean).join(" · ")}</span>
                       </div>
                       {isBooking ? (
-                        <div className="whitespace-nowrap font-mono text-[11px] leading-tight">
-                          <div className="flex justify-between gap-4"><span className="font-sans text-faint">{t("Lordo")}</span><span style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span></div>
-                          <div className="flex justify-between gap-4"><span className="font-sans text-faint">{t("Commissioni")}</span><span style={{ color: "var(--err)" }}>− {eur(r.comm)}</span></div>
-                          <div className="mt-0.5 flex justify-between gap-4 border-t border-line pt-0.5 text-sm font-bold"><span className="font-sans text-[11px] font-semibold text-dim">{t("Netto")}</span><span className="text-txt">{eur(r.net)}</span></div>
-                        </div>
+                        <>
+                          <span className="text-right font-mono text-xs" style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span>
+                          <span className="text-right font-mono text-xs" style={{ color: "var(--err)" }}>− {eur(r.comm)}</span>
+                          <span className="text-right font-mono text-sm font-bold text-txt">{eur(r.net)}</span>
+                        </>
                       ) : (
-                        <div className="flex items-center justify-end gap-1.5">
-                          <span className="font-mono text-sm font-semibold" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
-                        </div>
+                        <>
+                          <span />
+                          <span />
+                          <span className="text-right font-mono text-sm font-semibold" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
+                        </>
                       )}
                       {included
                         ? <span className="text-right text-[11px] font-medium text-faint" title={t("Questo movimento è del giorno in cui hai impostato il saldo: è già compreso nell'importo che hai scritto.")}>{t("già nel saldo")}</span>
@@ -545,12 +523,6 @@ export default function CassaPage() {
                 })}
               </div>
               </div>
-            )}
-            {rows.length > 0 && (
-              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3 text-center">
-                <div><div className="text-[11px] text-faint">{t("Entrate")}</div><div className="font-mono text-sm font-semibold" style={{ color: "var(--ok)" }}>+ {eur(entrate)}</div></div>
-                <div><div className="text-[11px] text-faint">{t("Uscite")}</div><div className="font-mono text-sm font-semibold" style={{ color: "var(--err)" }}>− {eur(uscite)}</div></div>
-                <div><div className="text-[11px] text-faint">{t("Entrate − uscite")}</div><div className={`font-mono text-sm font-bold ${saldo >= 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{eur(saldo)}</div></div>
               </div>
             )}
           </Card>
@@ -622,28 +594,6 @@ export default function CassaPage() {
           )}
 
           {/* Uscite per categoria */}
-          <Card>
-            <SectionTitle>{t("Uscite per categoria")}</SectionTitle>
-            {perCat.length === 0 ? <p className="text-sm text-faint">{t("Nessuna uscita nel periodo.")}</p> : (
-              <div className="flex flex-col gap-2.5">
-                {perCat.map(({ cat, v }) => (
-                  <div key={cat!.key}>
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="flex items-center gap-1.5 text-dim"><span style={{ color: cat!.color }}><CatIcon name={cat!.icon} size={15} /></span>{t(cat!.label)}</span>
-                      <span className="font-mono text-txt">{eur(v)}</span>
-                    </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${(v / maxCat) * 100}%`, backgroundColor: cat!.color }} /></div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-          <Card>
-            <SectionTitle>{t("Saldo per conto")}</SectionTitle>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {CONTI.map((c) => <div key={c.key} className="rounded-lg border border-line p-3"><div className="flex items-center justify-between gap-1"><span className="text-xs text-dim">{c.key === principal && <span className="mr-1 text-[color:var(--warn)]" title={t("Conto principale")}>★</span>}{t(c.label)}</span></div><div className={`mt-0.5 font-mono text-lg font-bold ${balances[c.key]?.since ? ((saldoConti[c.key] ?? 0) >= 0 ? "text-txt" : "text-[color:var(--err)]") : "text-faint"}`}>{balances[c.key]?.since ? eur(saldoConti[c.key] ?? 0) : "—"}</div><div className="text-[10px] text-faint">{balances[c.key]?.since ? `${t("da")} ${fmtDMY(balances[c.key].since)}` : t("da impostare")}</div></div>)}
-            </div>
-          </Card>
         </div>
       </div>
 
