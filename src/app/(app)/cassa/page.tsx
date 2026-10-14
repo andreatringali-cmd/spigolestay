@@ -579,7 +579,7 @@ export default function CassaPage() {
             {rows.length === 0 ? <EmptyState title={t("Nessun movimento.")} /> : (
               <div className="-mx-1 max-h-[640px] overflow-y-auto px-1">
               <div className="grid grid-cols-[84px_minmax(0,1fr)_auto_104px] items-center gap-x-3 sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
-                <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right">{t("Importo")}</span><span className="text-right">{t("Saldo")}</span>
+                <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right">{t("Importo")}</span><span className="text-right" title={t("Saldo di tutti i conti e di tutte le strutture dopo ogni movimento")}>{t("Saldo conti")}</span>
               </div>
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {listRows.map((r) => {
@@ -636,7 +636,7 @@ export default function CassaPage() {
               <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3 text-center">
                 <div><div className="text-[11px] text-faint">{t("Entrate")}</div><div className="font-mono text-sm font-semibold" style={{ color: "var(--ok)" }}>+ {eur(entrate)}</div></div>
                 <div><div className="text-[11px] text-faint">{t("Uscite")}</div><div className="font-mono text-sm font-semibold" style={{ color: "var(--err)" }}>− {eur(uscite)}</div></div>
-                <div><div className="text-[11px] text-faint">{t("Saldo")}</div><div className={`font-mono text-sm font-bold ${saldo >= 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{eur(saldo)}</div></div>
+                <div><div className="text-[11px] text-faint">{t("Entrate − uscite")}</div><div className={`font-mono text-sm font-bold ${saldo >= 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{eur(saldo)}</div></div>
               </div>
             )}
           </Card>
