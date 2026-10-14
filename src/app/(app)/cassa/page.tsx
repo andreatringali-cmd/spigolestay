@@ -500,7 +500,7 @@ export default function CassaPage() {
               <div className="-mx-1 max-h-[640px] overflow-auto px-1">
               <div className="min-w-[820px]">
               <div className="grid grid-cols-[78px_minmax(0,1fr)_92px_92px_100px_104px] items-center gap-x-3 sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
-                <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right">{t("Lordo")}</span><span className="text-right">{t("Commissioni")}</span><span className="text-right">{t("Netto")}</span><span className="text-right" title={t("Saldo dei conti dopo ogni movimento, per la struttura selezionata")}>{t("Saldo conti")}</span>
+                <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right">{t("Lordo")}</span><span className="text-right">{t("Commissioni")}</span><span className="text-right">{t("Netto")}</span><span className="-mb-1.5 self-stretch border-l border-line pb-1.5 pl-2 text-right" title={t("Saldo dei conti dopo ogni movimento, per la struttura selezionata")}>{t("Saldo conti")}</span>
               </div>
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {listRows.map((r) => {
@@ -539,9 +539,11 @@ export default function CassaPage() {
                           <span className="text-right font-mono text-sm font-semibold" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
                         </>
                       )}
+                      <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2">
                       {included
                         ? <span className="justify-self-end px-2 text-right text-[11px] italic text-faint" title={t("Questo movimento è del giorno in cui hai impostato il saldo: è già compreso nell'importo che hai scritto.")}>{t("già nel saldo")}</span>
                         : <span className={"justify-self-end rounded-md px-2 py-0.5 text-right font-mono text-sm font-semibold tabular-nums " + (bal === null ? "text-faint" : bal < 0 ? "text-[color:var(--err)]" : "text-txt") + (m.forecast && bal !== null ? " opacity-70" : "")} style={bal !== null && bal < 0 ? { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" } : undefined} title={bal === null ? t("Imposta il saldo di partenza per vedere il saldo") : m.forecast ? t("Saldo previsto") : t("Saldo dopo questo movimento")}>{bal === null ? "—" : eur(bal)}</span>}
+                      </div>
                     </div>
                   );
                 })}
