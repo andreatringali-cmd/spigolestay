@@ -319,17 +319,19 @@ export default function CassaPage() {
 
   // ---- Modale selezione/gestione categorie ----------------------------------
   const [catPicker, setCatPicker] = useState(false);
+  const [catFor, setCatFor] = useState<"form" | "rule">("form"); // il selettore categoria serve il modulo movimento o il pagamento programmato
   const [newCat, setNewCat] = useState<{ label: string; color: string; icon: string } | null>(null);
   const openNewCat = () => setNewCat({ label: "", color: PALETTE[8], icon: "star" });
   const createCat = () => {
     if (!newCat || !newCat.label.trim()) return;
     const key = `c-${uid().slice(0, 8)}`;
-    const cat: Cat = { key, label: newCat.label.trim(), kind: form.kind, color: newCat.color, icon: newCat.icon, custom: true };
+    const cat: Cat = { key, label: newCat.label.trim(), kind: catFor === "rule" ? rf.kind : form.kind, color: newCat.color, icon: newCat.icon, custom: true };
     saveCats([...cats, cat]);
-    setForm((f) => ({ ...f, cat: key }));
+    if (catFor === "rule") setRf((f) => ({ ...f, cat: key })); else setForm((f) => ({ ...f, cat: key }));
     setNewCat(null);
   };
-  const deleteCat = async (key: string) => { if (!(await ask({ message: t("Eliminare questa categoria?"), danger: true, confirmLabel: t("Elimina") }))) return; saveCats(cats.filter((c) => c.key !== key)); if (form.cat === key) setForm((f) => ({ ...f, cat: cats.find((c) => c.kind === f.kind && !c.auto && c.key !== key)!.key })); };
+  const deleteCat = async (key: string) => { if (!(await ask({ message: t("Eliminare questa categoria?"), danger: true, confirmLabel: t("Elimina") }))) return; saveCats(cats.filter((c) => c.key !== key)); if (form.cat === key) setForm((f) => ({ ...f, cat: cats.find((c) => c.kind === f.kind && !c.auto && c.key !== key)!.key }));
+    if (rf.cat === key) setRf((f) => ({ ...f, cat: cats.find((c) => c.kind === f.kind && !c.auto && c.key !== key)?.key ?? f.cat })); };
 
   // ---- Modale pagamento programmato -----------------------------------------
   const [ruleModal, setRuleModal] = useState(false);
@@ -337,7 +339,6 @@ export default function CassaPage() {
   const [rf, setRf] = useState<{ kind: Kind; cat: string; desc: string; amount: string; conto: string; struttura: string; freq: Rule["freq"]; day: string; start: string; auto: boolean; end: string; note?: string }>(() => ({ kind: "out", cat: "affitto", desc: "", amount: "", conto: "banca", struttura: activeStructureId, freq: "monthly", day: "1", start: todayISO(), auto: true, end: "", note: "" }));
   // La struttura del nuovo movimento/regola segue la struttura selezionata in alto a destra.
   useEffect(() => { setForm((f) => ({ ...f, struttura: activeStructureId })); setRf((f) => ({ ...f, struttura: activeStructureId })); }, [activeStructureId]);
-  const rfCats = cats.filter((c) => c.kind === rf.kind && !c.auto);
   const openNewRule = () => { setEditingRule(null); setRuleModal(true); };
   const openEditRule = (r: Rule) => {
     setEditingRule(r.id);
@@ -498,8 +499,8 @@ export default function CassaPage() {
             <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Movimenti")}</SectionTitle><span className="text-xs text-faint">{listRows.length} {t("nel periodo")}</span></div>
             {rows.length === 0 ? <EmptyState title={t("Nessun movimento.")} /> : (
               <div className="-mx-1 max-h-[640px] overflow-auto px-1">
-              <div className="min-w-[820px]">
-              <div className="grid grid-cols-[78px_minmax(0,1fr)_92px_92px_100px_104px] items-center gap-x-3 sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
+              <div className="min-w-[920px]">
+              <div className="grid grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
                 <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right">{t("Lordo")}</span><span className="text-right">{t("Commissioni")}</span><span className="text-right">{t("Netto")}</span><span className="-mb-1.5 self-stretch border-l border-line pb-1.5 pl-2 text-right" title={t("Saldo dei conti dopo ogni movimento, per la struttura selezionata")}>{t("Saldo conti")}</span>
               </div>
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
@@ -517,7 +518,7 @@ export default function CassaPage() {
                   const rowClick = isBooking || m.auto || m.sched || m.forecast ? undefined : m.cat === OPENING_CAT ? () => openOpening() : () => startEditMov(m);
                   const included = ledger.included.has(lastId); // del giorno del saldo di partenza: già nell'importo scritto
                   return (
-                    <div key={isBooking ? "b-" + r.id : m.id} onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid grid-cols-[78px_minmax(0,1fr)_92px_92px_100px_104px] items-center gap-x-3 whitespace-nowrap py-1.5" + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
+                    <div key={isBooking ? "b-" + r.id : m.id} onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap py-1.5" + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
                       <span className="font-mono text-xs text-dim">{fmtDMY(m.date)}</span>
                       <div className="flex min-w-0 items-center gap-2">
                         {bk ? <ChannelLogo channel={bk.channel} size={24} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 24)}
@@ -686,7 +687,7 @@ export default function CassaPage() {
             <label className="mb-2 block"><span className="text-xs text-dim">{t("Importo (€)")}</span><input inputMode="decimal" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} placeholder="0,00" className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 font-mono text-lg text-txt outline-none focus:border-focus" /></label>
             <div className="mb-2 block">
               <span className="text-xs text-dim">{t("Categoria")}</span>
-              <button onClick={() => setCatPicker(true)} className="mt-0.5 flex w-full items-center gap-2 rounded-lg border border-line bg-paper px-2 py-1.5 text-left text-sm text-txt hover:bg-wash">
+              <button onClick={() => { setCatFor("form"); setCatPicker(true); }} className="mt-0.5 flex w-full items-center gap-2 rounded-lg border border-line bg-paper px-2 py-1.5 text-left text-sm text-txt hover:bg-wash">
                 {iconCircle(selCat, 28)}<span className="flex-1 font-medium">{selCat?.label ? t(selCat.label) : t("Scegli…")}</span><span className="text-faint">▾</span>
               </button>
             </div>
@@ -713,13 +714,13 @@ export default function CassaPage() {
         </div>
       )}
       {catPicker && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh]">
+        <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[8vh]">
           <button aria-label={t("Chiudi")} onClick={() => { setCatPicker(false); setNewCat(null); }} className="absolute inset-0 bg-black/40" />
           <div className="relative max-h-[80vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Categorie")} {form.kind === "in" ? t("entrata") : t("uscita")}</h2><button onClick={() => { setCatPicker(false); setNewCat(null); }} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Categorie")} {(catFor === "rule" ? rf.kind : form.kind) === "in" ? t("entrata") : t("uscita")}</h2><button onClick={() => { setCatPicker(false); setNewCat(null); }} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <div className="grid grid-cols-3 gap-2">
-              {cats.filter((c) => c.kind === form.kind && !c.auto).map((c) => (
-                <button key={c.key} onClick={() => { setForm((f) => ({ ...f, cat: c.key })); setCatPicker(false); }} className={`group relative flex flex-col items-center gap-1.5 rounded-xl border p-3 transition hover:bg-wash ${form.cat === c.key ? "border-focus ring-1 ring-[color:var(--focus)]" : "border-line"}`}>
+              {cats.filter((c) => c.kind === (catFor === "rule" ? rf.kind : form.kind) && !c.auto).map((c) => (
+                <button key={c.key} onClick={() => { if (catFor === "rule") setRf((f) => ({ ...f, cat: c.key })); else setForm((f) => ({ ...f, cat: c.key })); setCatPicker(false); }} className={`group relative flex flex-col items-center gap-1.5 rounded-xl border p-3 transition hover:bg-wash ${(catFor === "rule" ? rf.cat : form.cat) === c.key ? "border-focus ring-1 ring-[color:var(--focus)]" : "border-line"}`}>
                   {iconCircle(c, 40)}
                   <span className="text-center text-[11px] font-medium leading-tight text-txt">{t(c.label)}</span>
                   {c.custom && <span onClick={(e) => { e.stopPropagation(); deleteCat(c.key); }} title={t("Elimina categoria")} className="absolute right-1 top-1 hidden h-5 w-5 place-items-center rounded-full bg-wash text-[10px] text-faint group-hover:grid hover:text-[color:var(--err)]">✕</span>}
@@ -732,7 +733,7 @@ export default function CassaPage() {
 
             {newCat && (
               <div className="mt-4 rounded-xl border border-line p-3">
-                <div className="mb-2 text-sm font-semibold text-txt">{t("Nuova categoria")} {form.kind === "in" ? t("entrata") : t("uscita")}</div>
+                <div className="mb-2 text-sm font-semibold text-txt">{t("Nuova categoria")} {(catFor === "rule" ? rf.kind : form.kind) === "in" ? t("entrata") : t("uscita")}</div>
                 <input autoFocus value={newCat.label} onChange={(e) => setNewCat({ ...newCat, label: e.target.value })} placeholder={t("Nome categoria")} className="mb-3 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
                 <div className="mb-1 text-xs text-dim">{t("Colore")}</div>
                 <div className="mb-3 flex flex-wrap gap-1.5">{PALETTE.map((col) => <button key={col} onClick={() => setNewCat({ ...newCat, color: col })} className={`h-6 w-6 rounded-full border-2 ${newCat.color === col ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: col }} />)}</div>
@@ -760,7 +761,7 @@ export default function CassaPage() {
             <label className="mb-2 block"><span className="text-xs text-dim">{t("Descrizione")}</span><input value={rf.desc} onChange={(e) => setRf((f) => ({ ...f, desc: e.target.value }))} placeholder={t("es. Rata mutuo · Bolletta telefono")} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             <div className="mb-2 grid grid-cols-2 gap-2">
               <label className="block"><span className="text-xs text-dim">{t("Importo (€)")}</span><input inputMode="decimal" value={rf.amount} onChange={(e) => setRf((f) => ({ ...f, amount: e.target.value }))} placeholder="0,00" className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 font-mono text-txt outline-none focus:border-focus" /></label>
-              <label className="block"><span className="text-xs text-dim">{t("Categoria")}</span><select value={rf.cat} onChange={(e) => setRf((f) => ({ ...f, cat: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{rfCats.map((c) => <option key={c.key} value={c.key}>{t(c.label)}</option>)}</select></label>
+              <label className="block"><span className="text-xs text-dim">{t("Categoria")}</span><button type="button" onClick={() => { setCatFor("rule"); setCatPicker(true); }} className="mt-0.5 flex w-full items-center gap-2 rounded-lg border border-line bg-paper px-2 py-1.5 text-left text-sm text-txt hover:bg-wash">{iconCircle(catOf(rf.cat), 26)}<span className="min-w-0 flex-1 truncate font-medium">{catOf(rf.cat)?.label ? t(catOf(rf.cat)!.label) : t("Scegli…")}</span><span className="text-faint">▾</span></button></label>
             </div>
             <div className="mb-2 grid grid-cols-2 gap-2">
               <label className="block"><span className="text-xs text-dim">{t("Frequenza")}</span><select value={rf.freq} onChange={(e) => setRf((f) => ({ ...f, freq: e.target.value as Rule["freq"] }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus"><option value="monthly">{t("Ogni mese")}</option><option value="weekly">{t("Ogni settimana")}</option><option value="yearly">{t("Ogni anno")}</option></select></label>
