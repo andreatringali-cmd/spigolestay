@@ -61,25 +61,24 @@ export default function OnboardingWizard() {
       setHasData(sts.length > 0);
       sharedStructure = sts.some((x) => !!x?.orgId);
     } catch {}
-    if (!wants) { setActive(false); return; }
-    if (sharedStructure) { markCollaborator(); setActive(false); return; } // ha già le strutture condivise
+    if (wants && sharedStructure) { markCollaborator(); setActive(false); return; } // ha già le strutture condivise
     let cancelled = false;
     (async () => {
+      let collaborator = false;
       try {
         const token = supabase ? (await supabase.auth.getSession())?.data.session?.access_token : undefined;
         if (token) {
-          // accetta gli inviti in attesa sulla sua email e dice se è un collaboratore
+          // a ogni accesso: accetta gli inviti di condivisione in attesa sulla sua email e dice se è un collaboratore
           const r = await fetch("/api/org/role", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
           const j = (await r.json().catch(() => ({}))) as { collaborator?: boolean; accepted?: number };
-          if (j.collaborator) {
-            markCollaborator();
-            if (!cancelled) setActive(false);
-            if (j.accepted && j.accepted > 0) window.location.reload(); // appena entrata in una struttura: ricarica per scaricarla
-            return;
-          }
+          collaborator = !!j.collaborator;
+          if (j.accepted && j.accepted > 0) { markCollaborator(); window.location.reload(); return; } // appena entrata in una struttura: ricarica per scaricarla
         }
       } catch { /* senza rete si comporta come prima */ }
-      if (!cancelled) setActive(true);
+      if (cancelled) return;
+      if (!wants) { setActive(false); return; }
+      if (collaborator) { markCollaborator(); setActive(false); return; }
+      setActive(true);
     })();
     return () => { cancelled = true; };
   }, []);

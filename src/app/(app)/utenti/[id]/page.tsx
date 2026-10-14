@@ -148,6 +148,28 @@ export default function UserSchedaPage() {
   if (!u.username.trim()) errs.push(t("Username"));
   const valid = errs.length === 0;
 
+  // Condivide le strutture del profilo con l'email della persona (invito silenzioso: lei le trova al primo accesso). Idempotente.
+  const shareProfileStructures = async (usr: User, token: string): Promise<number> => {
+    let ok = 0;
+    for (const st of structuresToShare(structures, usr)) {
+      try {
+        const rs = await fetch("/api/org/invite", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ structureId: st.id, email: usr.email.trim(), silent: true }) });
+        const sj = await rs.json().catch(() => ({}));
+        if (sj?.ok) { ok += 1; if (sj.orgId) updateStructure(st.id, { orgId: String(sj.orgId) }); }
+      } catch { /* la scheda utente permette di riprovare */ }
+    }
+    return ok;
+  };
+  const autoShare = async (usr: User) => {
+    if (!isValidEmail(usr.email) || (authUser?.email && authUser.email.trim().toLowerCase() === usr.email.trim().toLowerCase())) return;
+    if (usr.id === "u-owner") return;
+    try {
+      const token = (await supabase?.auth.getSession())?.data.session?.access_token;
+      if (!token) return;
+      const n = await shareProfileStructures(usr, token);
+      if (n > 0) toast(`${n} ${t("strutture condivise con")} ${usr.email}`, "success");
+    } catch { /* silenzioso */ }
+  };
   const autoInvite = async (usr: User) => {
     if (!isValidEmail(usr.email) || (authUser?.email && authUser.email.trim().toLowerCase() === usr.email.trim().toLowerCase())) return;
     try {
@@ -156,16 +178,7 @@ export default function UserSchedaPage() {
       const r = await fetch("/api/admin/allowlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ email: usr.email.trim(), note: `Utente: ${usr.firstName} ${usr.lastName}`.trim(), kind: "collaboratore" }) });
       const j = await r.json().catch(() => ({}));
       // Un solo passaggio: dopo l'abilitazione si condividono subito le strutture del profilo (la persona le trova al primo accesso).
-      let shared = 0;
-      if (j?.ok) {
-        for (const st of structuresToShare(structures, usr)) {
-          try {
-            const rs = await fetch("/api/org/invite", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ structureId: st.id, email: usr.email.trim(), silent: true }) });
-            const sj = await rs.json().catch(() => ({}));
-            if (sj?.ok) { shared += 1; if (sj.orgId) updateStructure(st.id, { orgId: String(sj.orgId) }); }
-          } catch { /* la scheda utente permette di riprovare */ }
-        }
-      }
+      const shared = j?.ok ? await shareProfileStructures(usr, token) : 0;
       if (r.status === 403) toast(t("Utente creato. L'invito può partire solo dal titolare dell'account."), "error");
       else if (j?.ok && j.notified) toast(shared ? `${t("Invito inviato a")} ${usr.email} · ${shared} ${t("strutture condivise")}` : `${t("Invito inviato a")} ${usr.email}`, "success");
       else if (j?.ok) toast(`${usr.email} ${t("è abilitata ma l'email non è partita: apri la scheda e copia il link.")}`, "error");
@@ -179,7 +192,7 @@ export default function UserSchedaPage() {
     const clean: User = { ...u, avatarColor: u.avatarColor ?? AV_COLORS[0] };
     const next = isNew || !list.some((x) => x.id === u.id) ? [...list, { ...clean, status: clean.status }] : list.map((x) => (x.id === u.id ? clean : x));
     saveUsers(next);
-    if (isNew) void autoInvite(clean);
+    if (isNew) void autoInvite(clean); else void autoShare(clean);
     router.push("/utenti");
   };
   // Non eliminabile: l'utente principale e l'ultimo "Titolare" rimasto. Un altro utente con il modello Titolare (es. un collaboratore) si può eliminare.

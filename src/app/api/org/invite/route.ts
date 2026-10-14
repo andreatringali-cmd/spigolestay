@@ -143,12 +143,19 @@ export async function POST(req: Request) {
       await admin.from("app_state").update({ data: blob, updated_at: new Date().toISOString() }).eq("user_id", caller.id);
     }
 
-    // Crea l'invito.
-    const code = (globalThis.crypto?.randomUUID?.() ?? `inv_${Date.now()}`).replace(/-/g, "").slice(0, 24);
-    await admin.from("org_invites").insert({
-      org_id: orgId, structure_id: structureId, structure_name: (S.name as string) || "",
-      email, code, invited_by: caller.id, inviter_email: caller.email ?? null, status: "pending",
-    });
+    // Idempotente: già membro di questa organizzazione → niente da fare; invito già in attesa per questa struttura → lo riusa (niente doppioni).
+    if (prof?.user_id) {
+      const { data: mem } = await admin.from("memberships").select("id").eq("org_id", orgId).eq("user_id", prof.user_id).maybeSingle();
+      if (mem) return NextResponse.json({ ok: true, orgId, already: true, emailSent: false });
+    }
+    const { data: pend } = await admin.from("org_invites").select("code").eq("org_id", orgId).eq("structure_id", structureId).ilike("email", email).eq("status", "pending").maybeSingle();
+    const code = pend?.code ?? (globalThis.crypto?.randomUUID?.() ?? `inv_${Date.now()}`).replace(/-/g, "").slice(0, 24);
+    if (!pend) {
+      await admin.from("org_invites").insert({
+        org_id: orgId, structure_id: structureId, structure_name: (S.name as string) || "",
+        email, code, invited_by: caller.id, inviter_email: caller.email ?? null, status: "pending",
+      });
+    }
 
     // Invia l'email con il link per accettare.
     const origin = siteOrigin(req);
