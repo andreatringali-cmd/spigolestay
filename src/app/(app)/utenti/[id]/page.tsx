@@ -209,6 +209,40 @@ export default function UserSchedaPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         {/* ---------------- Colonna sinistra ---------------- */}
         <div className="flex flex-col gap-4">
+          {/* Informazioni generali */}
+          <Card>
+            <SectionTitle>{t("Informazioni generali")}</SectionTitle>
+            <div className="mb-3 flex items-center gap-3">
+              <button type="button" onClick={() => fileRef.current?.click()} title={t("Carica foto")} className="group relative shrink-0 rounded-full">
+                {avatar(56)}
+                <span className="absolute inset-0 grid place-items-center rounded-full bg-black/45 text-base text-white opacity-0 transition group-hover:opacity-100">📷</span>
+              </button>
+              <div>
+                {u.photo && <button onClick={() => set("photo", undefined)} className="text-xs font-medium text-faint hover:text-[color:var(--err)]">{t("Rimuovi foto")}</button>}
+                <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif" hidden onChange={(e) => onFile(e.target.files?.[0])} />
+                <div className="mt-0.5 text-[11px] text-faint">{t("Clicca il tondino per caricare la foto. In alternativa scegli un colore:")}</div>
+                <div className="mt-1 flex gap-1.5">{AV_COLORS.map((c) => <button key={c} onClick={() => set("avatarColor", c)} className={`h-5 w-5 rounded-full border-2 ${u.avatarColor === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-xs font-medium text-dim">{t("Nome")} *<input value={u.firstName} onChange={(e) => set("firstName", e.target.value)} className={`${inp} mt-1`} /></label>
+              <label className="block text-xs font-medium text-dim">{t("Cognome")} *<input value={u.lastName} onChange={(e) => set("lastName", e.target.value)} className={`${inp} mt-1`} /></label>
+            </div>
+            <label className="mt-3 block text-xs font-medium text-dim">{t("Email")} *
+              <input value={u.email} onChange={(e) => set("email", e.target.value)} className={`${inp} mt-1`} placeholder={t("nome@dominio.it")} />
+            </label>
+            <Info>{t("Inseriscila con cura: la usiamo per comunicazioni importanti e per confermare l'identità in fase di accesso.")}</Info>
+            <label className="mt-3 block text-xs font-medium text-dim">{t("Cellulare")} * <span className="text-faint">({t("obbligatorio")})</span>
+              <input value={u.phone} onChange={(e) => set("phone", e.target.value)} className={`${inp} mt-1`} placeholder="+39 3xx xxx xxxx" />
+            </label>
+            <Info>{t("Serve per il secondo fattore di autenticazione e per i contatti urgenti.")}</Info>
+            <label className="mt-3 block text-xs font-medium text-dim">{t("Lingua")}
+              <select value={u.language} onChange={(e) => set("language", e.target.value)} className={`${inp} mt-1`}>
+                {USER_LANGS.map((l) => <option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}
+              </select>
+            </label>
+          </Card>
+
           {/* Account */}
           <Card>
             <div className="mb-3 flex items-center justify-between">
@@ -249,40 +283,6 @@ export default function UserSchedaPage() {
           </Card>
 
           {!isNew && <UserAccessCard user={u} structures={structures.map((x) => ({ id: x.id, name: x.name }))} onShared={(sid, orgId) => updateStructure(sid, { orgId })} />}
-
-          {/* Informazioni generali */}
-          <Card>
-            <SectionTitle>{t("Informazioni generali")}</SectionTitle>
-            <div className="mb-3 flex items-center gap-3">
-              <button type="button" onClick={() => fileRef.current?.click()} title={t("Carica foto")} className="group relative shrink-0 rounded-full">
-                {avatar(56)}
-                <span className="absolute inset-0 grid place-items-center rounded-full bg-black/45 text-base text-white opacity-0 transition group-hover:opacity-100">📷</span>
-              </button>
-              <div>
-                {u.photo && <button onClick={() => set("photo", undefined)} className="text-xs font-medium text-faint hover:text-[color:var(--err)]">{t("Rimuovi foto")}</button>}
-                <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif" hidden onChange={(e) => onFile(e.target.files?.[0])} />
-                <div className="mt-0.5 text-[11px] text-faint">{t("Clicca il tondino per caricare la foto. In alternativa scegli un colore:")}</div>
-                <div className="mt-1 flex gap-1.5">{AV_COLORS.map((c) => <button key={c} onClick={() => set("avatarColor", c)} className={`h-5 w-5 rounded-full border-2 ${u.avatarColor === c ? "border-txt" : "border-transparent"}`} style={{ backgroundColor: c }} />)}</div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block text-xs font-medium text-dim">{t("Nome")} *<input value={u.firstName} onChange={(e) => set("firstName", e.target.value)} className={`${inp} mt-1`} /></label>
-              <label className="block text-xs font-medium text-dim">{t("Cognome")} *<input value={u.lastName} onChange={(e) => set("lastName", e.target.value)} className={`${inp} mt-1`} /></label>
-            </div>
-            <label className="mt-3 block text-xs font-medium text-dim">{t("Email")} *
-              <input value={u.email} onChange={(e) => set("email", e.target.value)} className={`${inp} mt-1`} placeholder={t("nome@dominio.it")} />
-            </label>
-            <Info>{t("Inseriscila con cura: la usiamo per comunicazioni importanti e per confermare l'identità in fase di accesso.")}</Info>
-            <label className="mt-3 block text-xs font-medium text-dim">{t("Cellulare")} * <span className="text-faint">({t("obbligatorio")})</span>
-              <input value={u.phone} onChange={(e) => set("phone", e.target.value)} className={`${inp} mt-1`} placeholder="+39 3xx xxx xxxx" />
-            </label>
-            <Info>{t("Serve per il secondo fattore di autenticazione e per i contatti urgenti.")}</Info>
-            <label className="mt-3 block text-xs font-medium text-dim">{t("Lingua")}
-              <select value={u.language} onChange={(e) => set("language", e.target.value)} className={`${inp} mt-1`}>
-                {USER_LANGS.map((l) => <option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}
-              </select>
-            </label>
-          </Card>
 
           {/* Sicurezza & accessi */}
           <Card>
