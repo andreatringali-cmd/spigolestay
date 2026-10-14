@@ -243,7 +243,6 @@ export default function CassaPage() {
     exportExcel(`cassa-${periodLabel}`, headers, body);
   };
 
-  const structLabel = activeStructureId === "all" ? t("tutte le strutture") : getStructure(activeStructureId)?.name ?? "";
   const iconCircle = (c?: Cat, size = 34) => (
     <span className="grid shrink-0 place-items-center rounded-full" style={{ width: size, height: size, backgroundColor: `color-mix(in srgb, ${c?.color ?? "#888"} 16%, transparent)`, color: c?.color ?? "#888" }}>
       <CatIcon name={c?.icon} size={size * 0.52} />
@@ -315,7 +314,6 @@ export default function CassaPage() {
         {(year !== "all" || mon !== "all") && <button onClick={() => { setYear("all"); setMon("all"); }} className="text-xs font-semibold text-focus hover:underline">{t("Azzera")}</button>}
         <div className="ml-auto flex items-center gap-2">
           <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
-          <span className="rounded-full bg-wash px-3 py-1 text-xs text-dim">{structLabel}</span>
           <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
         </div>
       </div>
