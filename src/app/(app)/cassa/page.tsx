@@ -533,7 +533,7 @@ export default function CassaPage() {
                     const next = upcoming.find((u) => u.rule.id === r.id)?.date;
                     return (
                       <div key={r.id} className="flex items-center gap-3 py-2.5">
-                        <button type="button" onClick={() => openEditRule(r)} title={t("Modifica")} className="flex min-w-0 flex-1 items-center gap-3 rounded text-left hover:opacity-80">
+                        <button type="button" onClick={() => openEditRule(r)} title={t("Modifica")} className="flex min-w-0 flex-1 items-center gap-3 rounded text-left hover:bg-wash">
                         {iconCircle(c, 32)}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
@@ -544,8 +544,6 @@ export default function CassaPage() {
                         </div>
                         <span className="shrink-0 font-mono text-sm font-semibold" style={{ color: r.kind === "in" ? "var(--ok)" : "var(--err)" }}>{r.kind === "in" ? "+" : "−"} {eur(r.amount)}</span>
                         </button>
-                        <button onClick={() => openEditRule(r)} title={t("Modifica")} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-txt">✎</button>
-                        <button onClick={() => delRule(r.id)} title={t("Elimina")} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]">✕</button>
                       </div>
                     );
                   })}
@@ -802,6 +800,7 @@ export default function CassaPage() {
               <span className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: rf.auto ? "var(--ok)" : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: rf.auto ? "22px" : "2px" }} /></span>
             </button>
             <button onClick={addRule} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{editingRule ? t("Salva modifiche") : t("Salva pagamento programmato")}</button>
+            {editingRule && <button onClick={async () => { const id = editingRule; closeRuleModal(); await delRule(id); }} className="mt-1.5 w-full rounded-lg border border-line py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina pagamento")}</button>}
           </div>
         </div>
       )}
