@@ -8,6 +8,7 @@ import { paySecret, verifyPayToken } from "@/lib/chat-pay-token";
 import { adminFromEnv, recordChatPayment } from "@/lib/chat-pay-server";
 import { estimatedStripeFeeCents } from "@/lib/payments/fee";
 import type { Booking, Structure } from "@/lib/types";
+import { fmtDMY } from "@/lib/dates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,7 +69,7 @@ async function handleStart(url: URL) {
   };
   const origin = (process.env.NEXT_PUBLIC_SITE_URL || url.origin).replace(/\/+$/, "");
   const label = `${kind === "tassa" ? "Tassa di soggiorno" : "Saldo soggiorno"} · ${structName}`.slice(0, 250);
-  const desc = `${bk.checkIn} → ${bk.checkOut}`;
+  const desc = `${fmtDMY(bk.checkIn)} → ${fmtDMY(bk.checkOut)}`;
   try {
     const stripe = new Stripe(key);
     const session = await stripe.checkout.sessions.create({

@@ -12,6 +12,7 @@ import {
   CATEGORY_LABEL, CATEGORY_ORDER, mapUrlOf, renderEntry, resolveEntries,
   type AutoSource, type ConciergeEntry, type ConciergeLang,
 } from "@/lib/concierge-kb";
+import { fmtDMY } from "@/lib/dates";
 
 const AUTO_LABEL: Record<AutoSource, string> = {
   access_code: "Codice di accesso", city_tax: "Tassa di soggiorno", checkin_time: "Orario check-in", checkout_time: "Orario check-out",
@@ -305,7 +306,7 @@ export default function ConciergeKb({ sid, prefill, onCreated }: { sid: string; 
       const g = guests.find((x) => x.id === b.guestId);
       const name = (g?.fullName || "").trim();
       const last = name.split(/\s+/).slice(-1)[0] || "Ospite";
-      return { id: b.id, label: `${last} · ${b.checkIn} → ${b.checkOut}` };
+      return { id: b.id, label: `${last} · ${fmtDMY(b.checkIn)} → ${fmtDMY(b.checkOut)}` };
     }), [bookings, guests, sid]);
   useEffect(() => { setBookingId(""); setRes(null); setAskErr(""); }, [sid]);
 

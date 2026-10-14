@@ -14,6 +14,7 @@ import { loadUsers } from "./users";
 import { isPublicMode, lsGet, DATA_KEY } from "./publicdata";
 import { apiPost } from "./invoicing/client";
 import { loadNotifPrefs } from "./notifPrefs";
+import { fmtDMY } from "./dates";
 
 export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "rateplan" | "quote" | "payment" | "login" | "auth" | "message" | "config";
 export interface Activity {
@@ -215,7 +216,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const lines = [
       guestName,
       roomLabel,
-      `${b.checkIn} → ${b.checkOut}`,
+      `${fmtDMY(b.checkIn)} → ${fmtDMY(b.checkOut)}`,
       `Canale: ${chLabel}`,
       typeof b.total === "number" ? `Totale: € ${b.total}` : "",
       ev === "payment" && extra?.amount ? `Incasso registrato: € ${extra.amount}` : "",

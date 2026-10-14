@@ -15,6 +15,7 @@ import { parseNotifPrefs } from "@/lib/notifPrefs";
 import { readRevisionGuestData, mergeOtaOverCarried, type OtaInfo } from "@/lib/channex-guestdata";
 import { splitCommission } from "@/lib/commission-split";
 import { parsePaymentCharge } from "@/lib/payment-fee";
+import { fmtDMY } from "./dates";
 
 // Property di test della certificazione: le sue prenotazioni non sono in channex_map (non è una
 // struttura reale), ma vanno comunque ACKate dal flusso di import automatico — che è quello che
@@ -271,7 +272,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       const lines = [
         guestName,
         code && `Codice: ${code}`,
-        `${b.checkIn} → ${b.checkOut}`,
+        `${fmtDMY(b.checkIn)} → ${fmtDMY(b.checkOut)}`,
         `Canale: ${chLabel}`,
         typeof b.total === "number" ? `Totale: € ${b.total}` : "",
       ].filter(Boolean) as string[];
