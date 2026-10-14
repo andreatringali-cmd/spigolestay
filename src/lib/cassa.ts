@@ -10,7 +10,7 @@ import { payoutDate, loadPayoutSettings, type PayoutSettings } from "./payouts";
 import { roundCents, sumCents } from "./money";
 
 export type Kind = "in" | "out";
-export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string; forecast?: boolean; channel?: string /* canale della prenotazione da cui nasce */ }
+export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string; forecast?: boolean; channel?: string /* canale della prenotazione da cui nasce */; edited?: boolean /* riga di una scadenza modificata a mano */; occKey?: string /* chiave originale della scadenza (regola|data) */ }
 export interface Rule { id: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; freq: "monthly" | "weekly" | "yearly"; day: number; start: string; end?: string; auto: boolean; note?: string; variable?: boolean /* importo variabile: l'importo è una stima, alla scadenza si registra quello reale */ }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -418,4 +418,28 @@ export function computeLedger(movs: Mov[]): Ledger {
     balanceAfter.set(m.id, started ? sumCents([...bal.values()]) : null);
   });
   return { order, balanceAfter, included };
+}
+
+// ── Riga modificata per una singola scadenza ────────────────────────────────────────────────────────────────────────────
+// Un pagamento programmato ripetuto può avere dati diversi in un mese (importo, data, descrizione, icona, conto): la modifica vale solo per
+// quella scadenza e lascia intatta la regola. Chiave sincronizzata con l'account: { "<regola>|<data originale>": riga modificata }.
+const OVERRIDES_KEY = "spigolestay:cassa:overrides";
+export interface OccOverride { amount: number; date: string; desc: string; cat: string; conto: string }
+export type OccOverrides = Record<string, OccOverride>;
+export const occurrenceKey = (m: { ref?: string; date: string; occKey?: string }) => m.occKey ?? `${m.ref ?? ""}|${m.date}`;
+export function loadOverrides(): OccOverrides {
+  try {
+    const raw = JSON.parse(localStorage.getItem(OVERRIDES_KEY) || "{}") as Record<string, Partial<OccOverride>>;
+    const out: OccOverrides = {};
+    for (const [k, v] of Object.entries(raw)) {
+      if (v && typeof v.amount === "number" && v.amount > 0 && typeof v.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.date) && typeof v.desc === "string" && typeof v.cat === "string" && typeof v.conto === "string") out[k] = { amount: roundCents(v.amount), date: v.date, desc: v.desc, cat: v.cat, conto: v.conto };
+    }
+    return out;
+  } catch { return {}; }
+}
+export function saveOverrides(o: OccOverrides) { try { localStorage.setItem(OVERRIDES_KEY, JSON.stringify(o)); } catch { /* storage non disponibile */ } }
+/** Sostituisce i dati delle scadenze programmate modificate a mano. */
+export function applyOverrides(list: Mov[], o: OccOverrides): Mov[] {
+  if (Object.keys(o).length === 0) return list;
+  return list.map((m) => { const k = m.sched && m.ref ? occurrenceKey(m) : ""; const ov = k ? o[k] : undefined; return ov ? { ...m, ...ov, edited: true, occKey: k } : m; });
 }

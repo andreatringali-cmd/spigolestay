@@ -63,3 +63,18 @@ test("ricerca: descrizione, categoria, conto e importo", () => {
   assert.equal(matchesQuery(m, "854.37", {}), true);
   assert.equal(matchesQuery(m, "utenze", { cat: "Prenotazioni" }), false);
 });
+
+test("scadenza modificata: cambiano solo i dati di quel mese (importo, data, descrizione, categoria, conto), la regola resta uguale", async () => {
+  const { applyOverrides, occurrenceKey } = await import("../src/lib/cassa.ts");
+  const rule = { id: "r1", kind: "out" as const, cat: "pulizie", desc: "Pulizie", amount: 500, conto: "banca", freq: "monthly" as const, day: 4, start: "2026-10-04", auto: true };
+  const f = computeForecast([], [], st as never, [rule], "all", TODAY, "2027-01-31");
+  assert.deepEqual(f.map((m) => m.date), ["2026-11-04", "2026-12-04", "2027-01-04"]);
+  const key = occurrenceKey(f[0]);
+  assert.equal(key, "r1|2026-11-04");
+  const out = applyOverrides(f, { [key]: { amount: 640.5, date: "2026-11-06", desc: "Pulizie + biancheria", cat: "forniture", conto: "contanti" } });
+  assert.deepEqual([out[0].amount, out[0].date, out[0].desc, out[0].cat, out[0].conto, out[0].edited], [640.5, "2026-11-06", "Pulizie + biancheria", "forniture", "contanti", true]);
+  assert.equal(out[0].id, f[0].id);                       // stessa riga, stesso id
+  assert.equal(occurrenceKey(out[0]), key);               // la chiave resta quella originale anche dopo aver spostato la data
+  assert.deepEqual([out[1].amount, out[1].edited], [500, undefined]); // le altre scadenze non cambiano
+  assert.equal(applyOverrides(f, {}), f);
+});

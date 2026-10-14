@@ -14,7 +14,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveItem, computeLedger } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveItem, computeLedger, loadOverrides, saveOverrides, applyOverrides, occurrenceKey, type OccOverrides } from "@/lib/cassa";
 import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
@@ -74,6 +74,8 @@ export default function CassaPage() {
   // Impostazioni incassi per canale: quando i soldi arrivano davvero sul conto (arrivo, check-out, bonifico settimanale o mensile).
   const [payouts, setPayouts] = useState<PayoutSettings>(() => (typeof window === "undefined" ? {} : loadPayoutSettings()));
   const [payoutModal, setPayoutModal] = useState(false);
+  const [overrides, setOverrides] = useState<OccOverrides>(() => (typeof window === "undefined" ? {} : loadOverrides())); // righe modificate per singola scadenza
+  const [occCtx, setOccCtx] = useState<{ key: string; ruleId: string; orig: { amount: number; date: string; desc: string; cat: string; conto: string } } | null>(null);
   const [openPayouts, setOpenPayouts] = useState<Set<string>>(() => new Set()); // bonifici aperti nell'elenco
   const setPayoutRule = (ch: Channel, patch: Record<string, unknown>) => { const next = { ...payouts, [ch]: cleanRule({ ...(payouts[ch] ?? { mode: "arrival" }), ...patch }) }; setPayouts(next); savePayoutSettings(next); };
   const groupChannels = useMemo(() => new Set<string>(PAYOUT_CHANNELS.filter((c) => payouts[c]?.mode === "weekly" || payouts[c]?.mode === "monthly")), [payouts]);
@@ -107,7 +109,7 @@ export default function CassaPage() {
   // Movimenti automatici dalle prenotazioni + occorrenze programmate (logica condivisa con la Chiusura cassa).
   const auto = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, activeStructureId, principal, payouts), [bookings, guests, activeStructureId, getStructure, principal, payouts]);
   const ruleVisible = (structureId?: string) => scopeVisible(structureId, activeStructureId);
-  const scheduled = useMemo<Mov[]>(() => computeScheduled(rules, paidSet, activeStructureId, today), [rules, activeStructureId, today, paidSet]);
+  const scheduled = useMemo<Mov[]>(() => applyOverrides(computeScheduled(rules, paidSet, activeStructureId, today), overrides), [rules, activeStructureId, today, paidSet, overrides]);
 
   // Scadenze da registrare: occorrenze passate di regole NON automatiche, non ancora saldate (stato SCADUTA).
   const pending = useMemo(() => {
@@ -174,7 +176,7 @@ export default function CassaPage() {
   const [chartsOn, setChartsOn] = useState(true);
   const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
 
-  const forecastChart = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, activeStructureId, today, fcEnd, principal, payouts), [bookings, guests, getStructure, rules, activeStructureId, today, fcEnd, principal, payouts]);
+  const forecastChart = useMemo<Mov[]>(() => applyOverrides(computeForecast(bookings, guests, getStructure, rules, activeStructureId, today, fcEnd, principal, payouts), overrides), [bookings, guests, getStructure, rules, activeStructureId, today, fcEnd, principal, payouts, overrides]);
   const forecastView = useMemo(() => forecastChart.filter((x) => x.date <= listHorizon), [forecastChart, listHorizon]);
   const rows = [...all, ...forecastView]
     .filter((m) => inPeriod(m.date) && matchesTipo(m) && (!catF || m.cat === catF) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
@@ -186,7 +188,7 @@ export default function CassaPage() {
   const saldo = roundCents(entrate - uscite);
 
   const autoTutte = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, "all", principal, payouts), [bookings, guests, getStructure, principal, payouts]);
-  const programmateTutte = useMemo<Mov[]>(() => computeScheduled(rules, paidSet, "all", today), [rules, paidSet, today]);
+  const programmateTutte = useMemo<Mov[]>(() => applyOverrides(computeScheduled(rules, paidSet, "all", today), overrides), [rules, paidSet, today, overrides]);
   const balances = useMemo(() => computeBalances([...autoTutte, ...programmateTutte, ...manual], today, CONTI.map((c) => c.key)), [autoTutte, programmateTutte, manual, today, CONTI]);
   const saldoConti: Record<string, number> = Object.fromEntries(CONTI.filter((c) => balances[c.key]?.since).map((c) => [c.key, balances[c.key].saldo])); // solo i conti con saldo di partenza: gli altri non hanno uno storico completo
   const saldoTot = sumCents(Object.values(saldoConti));
@@ -300,9 +302,34 @@ export default function CassaPage() {
   const [form, setForm] = useState<{ kind: Kind; date: string; cat: string; desc: string; amount: string; conto: string; struttura: string; repeat: "once" | "monthly" | "weekly" | "yearly" }>(() => ({ kind: "out", date: todayISO(), cat: "pulizie", desc: "", amount: "", conto: "contanti", struttura: activeStructureId, repeat: "once" }));
   const setKind = (k: Kind) => setForm((f) => ({ ...f, kind: k, cat: cats.find((c) => c.kind === k && !c.auto)!.key }));
   const NEW_MOV = "__nuovo__";
+  const OCC_MOV = "__scadenza__"; // la finestra movimento modifica UNA scadenza di un pagamento programmato
   const [editingMov, setEditingMov] = useState<string | null>(null); // finestra movimento: id del movimento in modifica, NEW_MOV per uno nuovo, null = chiusa
   const openNewMov = () => { setForm((f) => ({ ...f, kind: "out", cat: cats.find((c) => c.kind === "out" && !c.auto)!.key, desc: "", amount: "", repeat: "once", date: todayISO(), struttura: activeStructureId })); setEditingMov(NEW_MOV); };
-  const resetForm = () => { setEditingMov(null); setForm((f) => ({ ...f, desc: "", amount: "", repeat: "once", date: todayISO() })); };
+  const resetForm = () => { setEditingMov(null); setOccCtx(null); setForm((f) => ({ ...f, desc: "", amount: "", repeat: "once", date: todayISO() })); };
+  const openOcc = (m: Mov) => {
+    const r = rules.find((x) => x.id === m.ref);
+    if (!r) return;
+    const key = occurrenceKey(m);
+    const origDate = key.split("|")[1] ?? m.date;
+    setOccCtx({ key, ruleId: r.id, orig: { amount: r.amount, date: origDate, desc: r.desc, cat: r.cat, conto: r.conto } });
+    setForm({ kind: m.kind, date: m.date, cat: m.cat, desc: m.desc, amount: String(m.amount).replace(".", ","), conto: m.conto, struttura: m.structureId ?? activeStructureId, repeat: "once" });
+    setEditingMov(OCC_MOV);
+  };
+  const saveOcc = () => {
+    if (!occCtx) return;
+    const amt = roundCents(parseFloat(form.amount.replace(",", ".")) || 0);
+    if (amt <= 0) { toast(t("Inserisci un importo maggiore di zero."), "error"); return; }
+    if (!form.date) { toast(t("Inserisci la data."), "error"); return; }
+    const desc = form.desc.trim() || occCtx.orig.desc;
+    const o = occCtx.orig;
+    const next = { ...overrides };
+    if (amt === o.amount && form.date === o.date && desc === o.desc && form.cat === o.cat && form.conto === o.conto) delete next[occCtx.key];
+    else next[occCtx.key] = { amount: amt, date: form.date, desc, cat: form.cat, conto: form.conto };
+    setOverrides(next); saveOverrides(next);
+    toast(`${t("Scadenza modificata")} · ${fmtDMY(form.date)} · ${eur(amt)}`, "success");
+    resetForm();
+  };
+  const resetOcc = () => { if (!occCtx) return; const next = { ...overrides }; delete next[occCtx.key]; setOverrides(next); saveOverrides(next); resetForm(); };
   const startEditMov = (m: Mov) => {
     setEditingMov(m.id);
     setForm({ kind: m.kind, date: m.date, cat: m.cat, desc: m.desc, amount: String(m.amount).replace(".", ","), conto: m.conto, struttura: m.structureId ?? activeStructureId, repeat: "once" });
@@ -313,6 +340,7 @@ export default function CassaPage() {
     if (to && d > to) { setTo(d); setPreset("custom"); }
   };
   const add = () => {
+    if (editingMov === OCC_MOV) { saveOcc(); return; }
     const amt = roundCents(parseFloat(form.amount.replace(",", ".")) || 0); // al centesimo (prima era arrotondato all'euro)
     if (amt <= 0) { toast(t("Inserisci un importo maggiore di zero."), "error"); return; }
     if (!form.date) { toast(t("Inserisci la data."), "error"); return; }
@@ -588,7 +616,7 @@ export default function CassaPage() {
                   const lastId = isBooking && r.commission && ledgerOrd(r.commission) > ledgerOrd(r.income) ? r.commission.id : m.id;
                   const bal = ledger.balanceAfter.get(lastId) ?? null;
                   // riga modificabile: movimento inserito a mano (si apre la finestra di modifica) o saldo di partenza (si apre la finestra del saldo)
-                  const rowClick = isBooking || m.auto || m.sched || m.forecast ? undefined : m.cat === OPENING_CAT ? () => openOpening() : () => startEditMov(m);
+                  const rowClick = isBooking ? undefined : m.sched && m.ref ? () => openOcc(m) : m.auto || m.forecast ? undefined : m.cat === OPENING_CAT ? () => openOpening() : () => startEditMov(m);
                   const included = ledger.included.has(lastId); // del giorno del saldo di partenza: già nell'importo scritto
                   return (
                     <div key={isBooking ? "b-" + r.id : m.id} onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap py-1.5" + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
@@ -598,6 +626,7 @@ export default function CassaPage() {
                         <span className="truncate text-sm font-medium text-txt">{title}</span>
                         {m.forecast ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span> : (m.auto && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>)}
                         {!isBooking && m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
+                        {!isBooking && m.edited && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim" title={t("Riga modificata solo per questa scadenza")}>{t("modificato")}</span>}
                         <span className="min-w-0 truncate text-[11px] text-faint">{[c?.label ? t(c.label) : "", (() => { const l = CONTI.find((x) => x.key === m.conto)?.label; return l ? t(l) : ""; })(), activeStructureId === "all" && m.structureId && m.structureId !== "all" ? structNameOf(m.structureId) : ""].filter(Boolean).join(" · ")}</span>
                       </div>
                       {isBooking ? (
@@ -804,10 +833,11 @@ export default function CassaPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[6vh]">
           <button aria-label={t("Chiudi")} onClick={resetForm} className="absolute inset-0 bg-black/40" />
           <div className="relative max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{editingMov === NEW_MOV ? t("Nuovo movimento") : t("Modifica movimento")}</h2><button onClick={resetForm} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{editingMov === NEW_MOV ? t("Nuovo movimento") : editingMov === OCC_MOV ? t("Modifica scadenza") : t("Modifica movimento")}</h2><button onClick={resetForm} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            {editingMov === OCC_MOV && <p className="mb-3 -mt-1 text-xs text-dim">{t("La modifica vale solo per questa scadenza: il pagamento programmato resta uguale per le altre.")}</p>}
             <div className="mb-3 grid grid-cols-2 gap-2">
-              <button onClick={() => setKind("out")} className={`rounded-lg border py-2 text-sm font-semibold transition ${form.kind === "out" ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:bg-wash"}`}>− {t("Uscita")}</button>
-              <button onClick={() => setKind("in")} className={`rounded-lg border py-2 text-sm font-semibold transition ${form.kind === "in" ? "border-[color:var(--ok)] text-[color:var(--ok)]" : "border-line text-dim hover:bg-wash"}`}>+ {t("Entrata")}</button>
+              <button onClick={() => setKind("out")} disabled={editingMov === OCC_MOV} className={`rounded-lg border py-2 text-sm font-semibold transition disabled:opacity-60 ${form.kind === "out" ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:bg-wash"}`}>− {t("Uscita")}</button>
+              <button onClick={() => setKind("in")} disabled={editingMov === OCC_MOV} className={`rounded-lg border py-2 text-sm font-semibold transition disabled:opacity-60 ${form.kind === "in" ? "border-[color:var(--ok)] text-[color:var(--ok)]" : "border-line text-dim hover:bg-wash"}`}>+ {t("Entrata")}</button>
             </div>
             <label className="mb-2 block"><span className="text-xs text-dim">{t("Importo (€)")}</span><input inputMode="decimal" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} placeholder="0,00" className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 font-mono text-lg text-txt outline-none focus:border-focus" /></label>
             <div className="mb-2 block">
@@ -834,7 +864,13 @@ export default function CassaPage() {
             </div>
             )}
             <button onClick={add} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{editingMov === NEW_MOV ? (form.repeat === "once" ? t("Registra movimento") : t("Registra e programma")) : t("Salva modifiche")}</button>
-            {editingMov !== NEW_MOV && <button onClick={() => { const id = editingMov; resetForm(); void del(id); }} className="mt-1.5 w-full rounded-lg border border-line py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina movimento")}</button>}
+            {editingMov === OCC_MOV && occCtx && (
+              <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                <button onClick={() => { const r = rules.find((x) => x.id === occCtx.ruleId); resetForm(); if (r) openEditRule(r); }} className="rounded-lg border border-line py-2 text-sm font-medium text-dim hover:bg-wash">{t("Modifica la regola")}</button>
+                <button onClick={resetOcc} disabled={overrides[occCtx.key] == null} className="rounded-lg border border-line py-2 text-sm font-medium text-dim hover:bg-wash disabled:opacity-40">{t("Ripristina originale")}</button>
+              </div>
+            )}
+            {editingMov !== NEW_MOV && editingMov !== OCC_MOV && <button onClick={() => { const id = editingMov; resetForm(); void del(id); }} className="mt-1.5 w-full rounded-lg border border-line py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina movimento")}</button>}
           </div>
         </div>
       )}
