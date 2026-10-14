@@ -14,7 +14,7 @@ import { cityTaxOfBooking } from "@/lib/booking";
 import { invPost, centsEur, DOC_KIND_LABEL, STATO } from "@/lib/invoicing/client";
 import { BOLLO_THRESHOLD_CENTS } from "@/lib/invoicing/folio";
 import { validateDocument, hasErrors, type Issue } from "@/lib/invoicing/validate";
-import { sendAction, sendButtonLabel, sendConfirmText, isTrialSend, rejectionReason, sdiBadge, TRIAL_NOTE } from "@/lib/invoicing/sdi-status";
+import { sendAction, sendButtonLabel, sendConfirmText, isTrialSend, rejectionReason, sdiBadge, TRIAL_NOTE, eventDisplay } from "@/lib/invoicing/sdi-status";
 
 interface Doc { id: string; tenant_id: string; structure_id: string | null; booking_id: string | null; booking_code: string | null;
   doc_kind: string; sdi_type: string; regime: string | null; number_label: string | null; stato: string; issue_date: string | null;
@@ -396,7 +396,7 @@ export default function DocumentoPage() {
         subtitle={doc.booking_code ? `Prenotazione ${doc.booking_code}` : undefined}
         actions={<button onClick={() => router.push("/documenti")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">← Documenti</button>} />
 
-      {frozen && <div className="mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white" style={{ backgroundColor: "var(--err)" }}>🔒 Le informazioni fiscali non sono più modificabili ({st.label.toLowerCase()}). Per correggere si emette una nota di credito.</div>}
+      {frozen && <div className="mb-4 flex items-center gap-2 rounded-xl border border-line bg-wash px-4 py-2.5 text-sm text-dim"><span aria-hidden>🔒</span><span>Documento emesso: i dati fiscali non si modificano più. Per correggerli si emette una <b className="text-txt">nota di credito</b>.</span></div>}
       {msg && <Card className="mb-4"><p className="text-sm text-dim">{msg}</p></Card>}
 
       {bookingPicker && (
@@ -419,7 +419,8 @@ export default function DocumentoPage() {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <div className="flex min-w-0 flex-col gap-4">
         {/* FATTURA */}
         <Card>
           <SectionTitle>Documento</SectionTitle>
@@ -457,6 +458,42 @@ export default function DocumentoPage() {
           )}
         </Card>
 
+        {/* INTESTAZIONE */}
+        <Card>
+          <SectionTitle>Intestazione</SectionTitle>
+          {frozen ? (
+            <div className="mt-2 space-y-1 text-sm"><div className="font-semibold text-txt">{cp.name} {cp.lastName}</div>{cp.vat && <div className="text-dim">P.IVA {cp.vat}</div>}{cp.tax_code && <div className="text-dim">CF {cp.tax_code}</div>}<div className="text-dim">{[cp.address, cp.cap, cp.city, cp.province].filter(Boolean).join(" ")}</div><div className="text-faint">Cod. dest. {f.sdi_code}{f.pec ? ` · PEC ${f.pec}` : ""}</div></div>
+          ) : (
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <div className="sm:col-span-2 flex flex-wrap items-end gap-2">
+                <label className="flex-1"><span className={lbl}>Scegli da anagrafica / OTA</span>
+                  <select value="" onChange={(e) => { const v = e.target.value; if (v.startsWith("cp:")) { const c = cpList.find((x) => x.id === v.slice(3)); if (c) applyCounterpart(c); } else if (v.startsWith("ota:")) applyCounterpart(OTA_PRESETS[Number(v.slice(4))]); }} className={inp}>
+                    <option value="">— nuovo intestatario —</option>
+                    {cpList.length > 0 && <optgroup label="Anagrafica">{cpList.map((c) => <option key={c.id} value={`cp:${c.id}`}>{c.name}</option>)}</optgroup>}
+                    <optgroup label="OTA">{OTA_PRESETS.map((o, i) => <option key={i} value={`ota:${i}`}>{o.name}</option>)}</optgroup>
+                  </select>
+                </label>
+                <button type="button" onClick={saveCounterpart} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash">Salva in anagrafica</button>
+              </div>
+              <label className={`${lbl} sm:col-span-2`}>Tipologia persona<select value={cp.kind} onChange={(e) => setCp({ ...cp, kind: e.target.value })} className={inp}><option value="privato">Privato</option><option value="societa">Società</option><option value="estero">Estero</option><option value="ota">OTA</option></select></label>
+              <label className={cp.kind === "privato" ? lbl : `${lbl} sm:col-span-2`}>{cp.kind === "societa" ? "Ragione sociale" : "Nome"}<input value={cp.name} onChange={(e) => setCp({ ...cp, name: e.target.value })} className={inp} /></label>
+              {cp.kind === "privato" && <label className={lbl}>Cognome<input value={cp.lastName} onChange={(e) => setCp({ ...cp, lastName: e.target.value })} className={inp} /></label>}
+              <label className={lbl}>Nazione<input value={cp.country} onChange={(e) => setCp({ ...cp, country: e.target.value })} className={inp} /></label>
+              {cp.kind !== "privato" && <div><span className={lbl}>Partita IVA</span><div className="mt-1 flex gap-1"><input value={cp.vat} onChange={(e) => { setCp({ ...cp, vat: e.target.value }); setVies({}); }} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /><button type="button" onClick={verifyVies} className="shrink-0 rounded-lg border border-line px-2 text-xs font-semibold text-txt hover:bg-wash">VIES</button></div>{vies.status && vies.status !== "loading" && <span className="mt-0.5 block text-[11px] font-semibold" style={{ color: vies.status === "valid" ? "var(--ok)" : vies.status === "invalid" ? "var(--err)" : "var(--dim)" }}>{vies.status === "valid" ? "✓ " : vies.status === "invalid" ? "✕ " : ""}{vies.msg}</span>}{vies.status === "loading" && <span className="mt-0.5 block text-[11px] text-faint">Verifica…</span>}</div>}
+              {cp.kind === "privato" && <label className={lbl}>Codice fiscale<input value={cp.tax_code} onChange={(e) => setCp({ ...cp, tax_code: e.target.value })} className={inp} /></label>}
+              <label className={`${lbl} sm:col-span-2`}>Indirizzo<input value={cp.address} onChange={(e) => setCp({ ...cp, address: e.target.value })} className={inp} /></label>
+              <label className={lbl}>Città<input value={cp.city} onChange={(e) => setCp({ ...cp, city: e.target.value })} className={inp} /></label>
+              <div className="grid grid-cols-2 gap-2"><label className={lbl}>CAP<input value={cp.cap} onChange={(e) => setCp({ ...cp, cap: e.target.value })} className={inp} /></label><label className={lbl}>Prov.<input value={cp.province} onChange={(e) => setCp({ ...cp, province: e.target.value })} className={inp} /></label></div>
+              <div className="sm:col-span-2 mt-1 border-t border-line pt-2">
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">Fattura elettronica</div>
+                <label className="flex items-center justify-between"><span className="text-sm text-txt">Comunica documento al SDI</span><input type="checkbox" checked={f.send_sdi} onChange={(e) => setF({ ...f, send_sdi: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
+                <div className="mt-2 grid grid-cols-2 gap-2"><label className={lbl}>Codice destinatario<input value={f.sdi_code} onChange={(e) => setF({ ...f, sdi_code: e.target.value })} className={inp} /></label><label className={lbl}>PEC<input value={f.pec} onChange={(e) => setF({ ...f, pec: e.target.value })} className={inp} /></label></div>
+              </div>
+            </div>
+          )}
+        </Card>
+        </div>
+        <div className="flex min-w-0 flex-col gap-4">
         {/* VOCI */}
         <Card>
           <SectionTitle>Voci del documento</SectionTitle>
@@ -498,46 +535,11 @@ export default function DocumentoPage() {
           </div>
         </Card>
 
-        {/* INTESTAZIONE */}
-        <Card>
-          <SectionTitle>Intestazione</SectionTitle>
-          {frozen ? (
-            <div className="mt-2 space-y-1 text-sm"><div className="font-semibold text-txt">{cp.name} {cp.lastName}</div>{cp.vat && <div className="text-dim">P.IVA {cp.vat}</div>}{cp.tax_code && <div className="text-dim">CF {cp.tax_code}</div>}<div className="text-dim">{[cp.address, cp.cap, cp.city, cp.province].filter(Boolean).join(" ")}</div><div className="text-faint">Cod. dest. {f.sdi_code}{f.pec ? ` · PEC ${f.pec}` : ""}</div></div>
-          ) : (
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              <div className="sm:col-span-2 flex flex-wrap items-end gap-2">
-                <label className="flex-1"><span className={lbl}>Scegli da anagrafica / OTA</span>
-                  <select value="" onChange={(e) => { const v = e.target.value; if (v.startsWith("cp:")) { const c = cpList.find((x) => x.id === v.slice(3)); if (c) applyCounterpart(c); } else if (v.startsWith("ota:")) applyCounterpart(OTA_PRESETS[Number(v.slice(4))]); }} className={inp}>
-                    <option value="">— nuovo intestatario —</option>
-                    {cpList.length > 0 && <optgroup label="Anagrafica">{cpList.map((c) => <option key={c.id} value={`cp:${c.id}`}>{c.name}</option>)}</optgroup>}
-                    <optgroup label="OTA">{OTA_PRESETS.map((o, i) => <option key={i} value={`ota:${i}`}>{o.name}</option>)}</optgroup>
-                  </select>
-                </label>
-                <button type="button" onClick={saveCounterpart} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-txt hover:bg-wash">Salva in anagrafica</button>
-              </div>
-              <label className={`${lbl} sm:col-span-2`}>Tipologia persona<select value={cp.kind} onChange={(e) => setCp({ ...cp, kind: e.target.value })} className={inp}><option value="privato">Privato</option><option value="societa">Società</option><option value="estero">Estero</option><option value="ota">OTA</option></select></label>
-              <label className={cp.kind === "privato" ? lbl : `${lbl} sm:col-span-2`}>{cp.kind === "societa" ? "Ragione sociale" : "Nome"}<input value={cp.name} onChange={(e) => setCp({ ...cp, name: e.target.value })} className={inp} /></label>
-              {cp.kind === "privato" && <label className={lbl}>Cognome<input value={cp.lastName} onChange={(e) => setCp({ ...cp, lastName: e.target.value })} className={inp} /></label>}
-              <label className={lbl}>Nazione<input value={cp.country} onChange={(e) => setCp({ ...cp, country: e.target.value })} className={inp} /></label>
-              {cp.kind !== "privato" && <div><span className={lbl}>Partita IVA</span><div className="mt-1 flex gap-1"><input value={cp.vat} onChange={(e) => { setCp({ ...cp, vat: e.target.value }); setVies({}); }} className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /><button type="button" onClick={verifyVies} className="shrink-0 rounded-lg border border-line px-2 text-xs font-semibold text-txt hover:bg-wash">VIES</button></div>{vies.status && vies.status !== "loading" && <span className="mt-0.5 block text-[11px] font-semibold" style={{ color: vies.status === "valid" ? "var(--ok)" : vies.status === "invalid" ? "var(--err)" : "var(--dim)" }}>{vies.status === "valid" ? "✓ " : vies.status === "invalid" ? "✕ " : ""}{vies.msg}</span>}{vies.status === "loading" && <span className="mt-0.5 block text-[11px] text-faint">Verifica…</span>}</div>}
-              {cp.kind === "privato" && <label className={lbl}>Codice fiscale<input value={cp.tax_code} onChange={(e) => setCp({ ...cp, tax_code: e.target.value })} className={inp} /></label>}
-              <label className={`${lbl} sm:col-span-2`}>Indirizzo<input value={cp.address} onChange={(e) => setCp({ ...cp, address: e.target.value })} className={inp} /></label>
-              <label className={lbl}>Città<input value={cp.city} onChange={(e) => setCp({ ...cp, city: e.target.value })} className={inp} /></label>
-              <div className="grid grid-cols-2 gap-2"><label className={lbl}>CAP<input value={cp.cap} onChange={(e) => setCp({ ...cp, cap: e.target.value })} className={inp} /></label><label className={lbl}>Prov.<input value={cp.province} onChange={(e) => setCp({ ...cp, province: e.target.value })} className={inp} /></label></div>
-              <div className="sm:col-span-2 mt-1 border-t border-line pt-2">
-                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">Fattura elettronica</div>
-                <label className="flex items-center justify-between"><span className="text-sm text-txt">Comunica documento al SDI</span><input type="checkbox" checked={f.send_sdi} onChange={(e) => setF({ ...f, send_sdi: e.target.checked })} className="h-4 w-4 accent-[color:var(--focus)]" /></label>
-                <div className="mt-2 grid grid-cols-2 gap-2"><label className={lbl}>Codice destinatario<input value={f.sdi_code} onChange={(e) => setF({ ...f, sdi_code: e.target.value })} className={inp} /></label><label className={lbl}>PEC<input value={f.pec} onChange={(e) => setF({ ...f, pec: e.target.value })} className={inp} /></label></div>
-              </div>
-            </div>
-          )}
-        </Card>
-
         {/* STATO + INCASSI */}
         <Card>
           <div className="mb-2 flex items-center justify-between"><SectionTitle>Stato e incassi</SectionTitle><span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${st.color} 16%, transparent)`, color: st.color }}>{st.label}</span></div>
           <div className="flex flex-col gap-1.5">
-            {events.map((ev) => <div key={ev.id} className="flex gap-2 text-[13px]"><span className="w-24 shrink-0 text-[11px] text-faint">{new Date(ev.ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span><span className="text-txt">{ev.message}</span></div>)}
+            {events.map((ev) => <div key={ev.id} className="flex gap-2 text-[13px]"><span className="w-24 shrink-0 text-[11px] text-faint">{new Date(ev.ts).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>{(() => { const d = eventDisplay(ev.message); return <span className="text-txt">{d.text}{d.warn && <span className="mt-0.5 block text-[12px] font-medium text-[color:var(--warn)]">{d.warn}</span>}</span>; })()}</div>)}
           </div>
           {doc.stato === "inviata_intermediario" && (trial
             ? <p className="mt-2 rounded-lg px-3 py-2 text-[12px] font-medium text-dim" style={{ backgroundColor: "color-mix(in srgb, var(--dim) 12%, transparent)" }}>{TRIAL_NOTE} Verificala su Fatture in Cloud: l&apos;esito dello SdI non arriverà finché non viene inviata davvero.</p>
@@ -575,6 +577,7 @@ export default function DocumentoPage() {
             </div>
           )}
         </Card>
+        </div>
       </div>
 
       {/* CONTROLLI PRIMA DELL'EMISSIONE */}

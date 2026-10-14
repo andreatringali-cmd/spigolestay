@@ -188,3 +188,14 @@ export function rejectionEmail(d: { numberLabel?: string | null; issueDate?: str
     text: `La fattura n. ${num}${date}${cust} è stata scartata dallo SdI: ${reason}.\n\nAprila in Xenora per correggere ed emettere una nota di credito / nuovo documento.`,
   };
 }
+
+/** Messaggio di un evento in forma breve per la scheda documento: il lungo "Documento creato… (MODALITÀ PROVA…)" si accorcia e
+ *  la parte "Attenzione: Fatture in Cloud calcola un totale di € X invece di € Y (Xenora)…" diventa un avviso a parte. */
+export function eventDisplay(message: string): { text: string; warn?: string } {
+  const m = (message ?? "").trim();
+  const att = /\s*Attenzione:\s*Fatture in Cloud calcola un totale di (€\s?[\d.,]+) invece di (€\s?[\d.,]+) \(Xenora\)[^.]*\.?/i.exec(m);
+  let text = att ? m.replace(att[0], "").trim() : m;
+  const warn = att ? `Totale diverso su Fatture in Cloud: ${att[1]} invece di ${att[2]} (Xenora). Controlla bollo e voci.` : undefined;
+  if (/MODALIT[ÀA] PROVA/i.test(text) && /Documento creato in Fatture in Cloud/i.test(text)) text = "Creato su Fatture in Cloud in prova, non inviato allo SdI.";
+  return { text, warn };
+}

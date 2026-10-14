@@ -67,3 +67,12 @@ test("aggiornamento senza cambio di stato", () => {
   assert.match(unchangedStatusMessage(true, "Stato e-fattura: not_sent"), /in prova, non trasmessa allo SdI/);
   assert.match(unchangedStatusMessage(false, "Stato e-fattura: sent"), /in attesa dell'esito/);
 });
+
+test("eventDisplay: accorcia il messaggio di prova e separa l'avviso sul totale", async () => {
+  const { eventDisplay } = await import("../src/lib/invoicing/sdi-status.ts");
+  const long = "Documento creato in Fatture in Cloud (MODALITÀ PROVA — non inviato allo SdI). Verificalo su Fatture in Cloud, poi disattiva la prova per l'invio reale. Attenzione: Fatture in Cloud calcola un totale di € 83,20 invece di € 85,20 (Xenora): controlla bollo e voci sul documento.";
+  const d = eventDisplay(long);
+  assert.equal(d.text, "Creato su Fatture in Cloud in prova, non inviato allo SdI.");
+  assert.equal(d.warn, "Totale diverso su Fatture in Cloud: € 83,20 invece di € 85,20 (Xenora). Controlla bollo e voci.");
+  assert.deepEqual(eventDisplay("Documento emesso n. 2/2026"), { text: "Documento emesso n. 2/2026", warn: undefined });
+});

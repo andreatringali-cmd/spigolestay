@@ -187,9 +187,9 @@ export default function DocumentiPage() {
             {Object.entries(STATO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={() => router.push("/impostazioni-fattura")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Impostazioni</button>
-            <button onClick={exportCsv} title="CSV per Excel/commercialista (separatore ; e decimali con virgola; le note di credito con segno negativo)" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
             <button onClick={createNew} disabled={creating} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{creating ? "Creo…" : "+ Nuovo documento"}</button>
+            <button onClick={exportCsv} title="CSV per Excel/commercialista (separatore ; e decimali con virgola; le note di credito con segno negativo)" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Esporta CSV</button>
+            <button onClick={() => router.push("/impostazioni-fattura")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">Impostazioni</button>
           </div>
         </div>
       </Card>
