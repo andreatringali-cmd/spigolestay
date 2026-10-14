@@ -148,6 +148,21 @@ export default function DocumentiPage() {
     <div>
       <PageHeader title="Documenti fiscali" subtitle="Fatture, note di credito e ricevute — con stato SDI" />
 
+      {!loading && (
+        <div className="mb-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <StatCard label="Imponibile (netto NC)" value={eur(centsEur(summary.taxable))} hint={`${summary.nFatt} fatture · ${summary.nNc} NC`} />
+            <StatCard label="IVA (netto NC)" value={eur(centsEur(summary.vat))} />
+            <StatCard label="Tassa sogg. (fuori campo)" value={eur(centsEur(summary.out))} />
+            <StatCard label="Totale (netto NC)" value={eur(centsEur(summary.total))} color="var(--focus)" hint={summary.bollo ? `di cui bollo ${eur(centsEur(summary.bollo))}` : undefined} />
+            <StatCard label="Da incassare" value={eur(centsEur(summary.open))} color={summary.open > 0 ? "var(--warn)" : "var(--ok)"} onClick={() => router.push("/scadenzario-incassi")} hint="vai allo scadenzario" />
+          </div>
+          <p className="mt-1.5 text-[11px] text-faint">
+            Riepilogo dei soli documenti emessi nel filtro attivo: fatture meno note di credito; escluse ricevute{summary.drafts ? `, ${summary.drafts} bozze` : ""}{summary.rejected ? <> e <button onClick={() => setStato("scartata")} className="font-semibold text-[color:var(--err)] hover:underline">{summary.rejected} scartate dallo SdI (da correggere)</button></> : ""}.
+          </p>
+        </div>
+      )}
+
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
           <SearchInput value={q} onChange={setQ} placeholder="Cerca numero, cliente, P.IVA, CF, prenotazione…" />
@@ -179,20 +194,6 @@ export default function DocumentiPage() {
 
       {err && <Card className="mb-4"><p className="text-sm text-[color:var(--err)]">{err}</p></Card>}
 
-      {!loading && (
-        <div className="mb-4">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <StatCard label="Imponibile (netto NC)" value={eur(centsEur(summary.taxable))} hint={`${summary.nFatt} fatture · ${summary.nNc} NC`} />
-            <StatCard label="IVA (netto NC)" value={eur(centsEur(summary.vat))} />
-            <StatCard label="Tassa sogg. (fuori campo)" value={eur(centsEur(summary.out))} />
-            <StatCard label="Totale (netto NC)" value={eur(centsEur(summary.total))} color="var(--focus)" hint={summary.bollo ? `di cui bollo ${eur(centsEur(summary.bollo))}` : undefined} />
-            <StatCard label="Da incassare" value={eur(centsEur(summary.open))} color={summary.open > 0 ? "var(--warn)" : "var(--ok)"} onClick={() => router.push("/scadenzario-incassi")} hint="vai allo scadenzario" />
-          </div>
-          <p className="mt-1.5 text-[11px] text-faint">
-            Riepilogo dei soli documenti emessi nel filtro attivo: fatture meno note di credito; escluse ricevute{summary.drafts ? `, ${summary.drafts} bozze` : ""}{summary.rejected ? <> e <button onClick={() => setStato("scartata")} className="font-semibold text-[color:var(--err)] hover:underline">{summary.rejected} scartate dallo SdI (da correggere)</button></> : ""}.
-          </p>
-        </div>
-      )}
 
       <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <table className="w-full min-w-[960px] text-sm">
