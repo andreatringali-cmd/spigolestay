@@ -41,13 +41,15 @@ export async function POST(req: Request) {
 
     // invitato da "Utenti" come collaboratore ma senza ancora strutture condivise: è comunque un collaboratore
     let invitedAsCollaborator = false;
+    let profile: Record<string, unknown> | null = null;
     if (caller.email) {
-      const { data: al } = await admin.from("access_allowlist").select("kind").ilike("email", caller.email).maybeSingle();
+      const { data: al } = await admin.from("access_allowlist").select("kind, profile").ilike("email", caller.email).maybeSingle();
       invitedAsCollaborator = al?.kind === "collaboratore";
+      profile = (al?.profile as Record<string, unknown> | null) ?? null; // la scheda compilata dal titolare
     }
 
     const { data: ms } = await admin.from("memberships").select("role").eq("user_id", caller.id).neq("role", "owner").limit(1);
-    return NextResponse.json({ ok: true, collaborator: invitedAsCollaborator || (ms ?? []).length > 0, accepted });
+    return NextResponse.json({ ok: true, collaborator: invitedAsCollaborator || (ms ?? []).length > 0, accepted, profile, email: caller.email ?? null });
   } catch (e) {
     return NextResponse.json({ error: "server_error", message: (e as Error)?.message ?? "errore" }, { status: 500 });
   }

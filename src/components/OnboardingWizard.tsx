@@ -7,6 +7,7 @@ import { STRUCTURE_TYPES, ROOM_TYPE_OPTIONS } from "@/lib/types";
 import { blankUser, fullPerms, USER_LANGS } from "@/lib/users";
 import { isOnboardingActive, markOnboarded, markCollaborator } from "@/lib/onboarding";
 import { supabase } from "@/lib/supabase";
+import { adoptProfile } from "@/lib/adopt-profile";
 import { useAuth } from "@/lib/authsync";
 import { TIERS as PLAN_TIERS, TRIAL_DAYS } from "@/lib/plans";
 
@@ -70,8 +71,10 @@ export default function OnboardingWizard() {
         if (token) {
           // a ogni accesso: accetta gli inviti di condivisione in attesa sulla sua email e dice se è un collaboratore
           const r = await fetch("/api/org/role", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-          const j = (await r.json().catch(() => ({}))) as { collaborator?: boolean; accepted?: number };
+          const j = (await r.json().catch(() => ({}))) as { collaborator?: boolean; accepted?: number; profile?: Record<string, unknown> | null; email?: string | null };
           collaborator = !!j.collaborator;
+          // la scheda utente compilata dal titolare diventa la sua (dati, permessi, strutture)
+          if (collaborator && j.profile && j.email) adoptProfile(j.profile, j.email);
           if (j.accepted && j.accepted > 0) { markCollaborator(); window.location.reload(); return; } // appena entrata in una struttura: ricarica per scaricarla
         }
       } catch { /* senza rete si comporta come prima */ }

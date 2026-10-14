@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui";
 import { loadUsers, PERM_TEMPLATES, initials, userHasStructure, type User } from "@/lib/users";
 import { useLang } from "@/lib/i18n";
 import { useAccess } from "@/lib/access";
+import { supabase } from "@/lib/supabase";
 
 export default function UtentiPage() {
   const router = useRouter();
@@ -15,7 +16,25 @@ export default function UtentiPage() {
   const { moduleOn } = useAccess();
   const canMulti = moduleOn("team"); // il multiutente è nei piani superiori
   const [users, setUsers] = useState<User[]>([]);
-  useEffect(() => { setUsers(loadUsers()); }, []);
+  const [lastSeen, setLastSeen] = useState<Record<string, string | null>>({}); // ultimo accesso reale (dall'autenticazione), per email
+  useEffect(() => {
+    const list = loadUsers();
+    setUsers(list);
+    const emails = list.map((u) => u.email.trim().toLowerCase()).filter((e) => /S+@S+/.test(e));
+    if (!supabase || !emails.length) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = (await supabase!.auth.getSession())?.data.session?.access_token;
+        if (!token) return;
+        const r = await fetch("/api/access/last-seen", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ emails }) });
+        const j = (await r.json().catch(() => ({}))) as { seen?: Record<string, string | null> };
+        if (!cancelled && j.seen) setLastSeen(j.seen);
+      } catch { /* resta quello del profilo */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const lastAccess = (u: User) => { const at = lastSeen[u.email.trim().toLowerCase()] || u.lastLogin?.at; return at ? new Date(at).toLocaleDateString("it-IT") : null; };
 
   const templateLabel = (k: string) => (k === "custom" ? t("Personalizzato") : t(PERM_TEMPLATES.find((t) => t.key === k)?.label ?? "—"));
   // Con una struttura selezionata: solo gli utenti che vi hanno accesso (chi ha accesso a tutte le strutture compare ovunque).
@@ -65,7 +84,7 @@ export default function UtentiPage() {
                 <td className="px-3 py-2.5 whitespace-nowrap text-xs text-dim">{u.phone || <span className="text-faint">—</span>}</td>
                 <td className="px-3 py-2.5"><span className="rounded-full bg-wash px-2 py-0.5 text-xs font-semibold text-dim">{templateLabel(u.templateKey)}</span></td>
                 <td className="px-3 py-2.5 max-w-[220px] truncate text-xs text-dim" title={structLabel(u)}>{structLabel(u)}</td>
-                <td className="px-3 py-2.5 text-xs text-dim">{u.lastLogin ? new Date(u.lastLogin.at).toLocaleDateString("it-IT") : <span className="text-faint">{t("Mai")}</span>}</td>
+                <td className="px-3 py-2.5 text-xs text-dim">{lastAccess(u) ?? <span className="text-faint">{t("Mai")}</span>}</td>
                 <td className="px-3 py-2.5">
                   <span className="flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: `color-mix(in srgb, ${u.active ? "var(--ok)" : "var(--faint)"} 18%, transparent)`, color: u.active ? "var(--ok)" : "var(--dim)" }}>
                     <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: u.active ? "var(--ok)" : "var(--faint)" }} />{u.active ? t("Attivo") : t("Disattivo")}

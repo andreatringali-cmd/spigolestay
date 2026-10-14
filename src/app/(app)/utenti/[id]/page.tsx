@@ -166,6 +166,8 @@ export default function UserSchedaPage() {
     try {
       const token = (await supabase?.auth.getSession())?.data.session?.access_token;
       if (!token) return;
+      // il profilo aggiornato raggiunge la sua scheda (nessuna email)
+      await fetch("/api/admin/allowlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ email: usr.email.trim(), profileOnly: true, profile: { id: usr.id, firstName: usr.firstName, lastName: usr.lastName, username: usr.username, phone: usr.phone, language: usr.language, avatarColor: usr.avatarColor, templateKey: usr.templateKey, perms: usr.perms, allStructures: usr.allStructures, structureIds: usr.structureIds } }) }).catch(() => null);
       const n = await shareProfileStructures(usr, token);
       if (n > 0) toast(`${n} ${t("strutture condivise con")} ${usr.email}`, "success");
     } catch { /* silenzioso */ }
@@ -175,7 +177,7 @@ export default function UserSchedaPage() {
     try {
       const token = (await supabase?.auth.getSession())?.data.session?.access_token;
       if (!token) return;
-      const r = await fetch("/api/admin/allowlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ email: usr.email.trim(), note: `Utente: ${usr.firstName} ${usr.lastName}`.trim(), kind: "collaboratore" }) });
+      const r = await fetch("/api/admin/allowlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ email: usr.email.trim(), note: `Utente: ${usr.firstName} ${usr.lastName}`.trim(), kind: "collaboratore", profile: { id: usr.id, firstName: usr.firstName, lastName: usr.lastName, username: usr.username, phone: usr.phone, language: usr.language, avatarColor: usr.avatarColor, templateKey: usr.templateKey, perms: usr.perms, allStructures: usr.allStructures, structureIds: usr.structureIds } }) });
       const j = await r.json().catch(() => ({}));
       // Un solo passaggio: dopo l'abilitazione si condividono subito le strutture del profilo (la persona le trova al primo accesso).
       const shared = j?.ok ? await shareProfileStructures(usr, token) : 0;

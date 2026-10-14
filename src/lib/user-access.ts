@@ -30,3 +30,17 @@ export function permsForMember(perms: Record<string, string> | undefined): Recor
   for (const [k, v] of Object.entries(perms ?? {})) if (v === "none" || v === "view" || v === "edit") out[k] = v;
   return out;
 }
+
+/** Profilo di un collaboratore che viaggia con l'invito: solo i campi noti, con tipi e lunghezze controllati. */
+export function sanitizeProfile(p: unknown): Record<string, unknown> | null {
+  if (!p || typeof p !== "object") return null;
+  const o = p as Record<string, unknown>;
+  const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : undefined);
+  const out: Record<string, unknown> = {};
+  const fields: [string, number][] = [["id", 60], ["firstName", 80], ["lastName", 80], ["username", 60], ["phone", 40], ["language", 8], ["avatarColor", 20], ["templateKey", 30]];
+  for (const [k, max] of fields) { const v = str(o[k], max); if (v !== undefined) out[k] = v; }
+  if (o.perms && typeof o.perms === "object") out.perms = permsForMember(o.perms as Record<string, string>);
+  if (typeof o.allStructures === "boolean") out.allStructures = o.allStructures;
+  if (Array.isArray(o.structureIds)) out.structureIds = o.structureIds.filter((x) => typeof x === "string").slice(0, 100);
+  return Object.keys(out).length ? out : null;
+}

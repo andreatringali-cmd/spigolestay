@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { notifyAccessApproved } from "@/lib/allowlist-approve";
+import { sanitizeProfile } from "@/lib/user-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,11 +38,19 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const a = await requireOwner(req);
   if (a instanceof NextResponse) return a;
-  const body = await req.json().catch(() => null) as { email?: string; note?: string; kind?: string } | null;
+  const body = await req.json().catch(() => null) as { email?: string; note?: string; kind?: string; profile?: unknown; profileOnly?: boolean } | null;
   const email = normEmail(body?.email);
   if (!isEmail(email)) return NextResponse.json({ error: "email_non_valida" }, { status: 400 });
   const note = String(body?.note ?? "").slice(0, 200) || null;
-  const { error } = await a.admin.from("access_allowlist").upsert({ email, note, added_by: a.email, kind: body?.kind === "collaboratore" || (note ?? "").startsWith("Utente:") ? "collaboratore" : "titolare" }, { onConflict: "email" });
+  const profile = sanitizeProfile(body?.profile);
+  // Solo aggiornamento del profilo di chi è già invitato: nessuna email, nessun nuovo accesso.
+  if (body?.profileOnly) {
+    if (!profile) return NextResponse.json({ ok: true, updated: false });
+    const { data: upd, error: upErr } = await a.admin.from("access_allowlist").update({ profile }).eq("email", email).select("email");
+    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 200 });
+    return NextResponse.json({ ok: true, updated: (upd ?? []).length > 0 });
+  }
+  const { error } = await a.admin.from("access_allowlist").upsert({ email, note, added_by: a.email, kind: body?.kind === "collaboratore" || (note ?? "").startsWith("Utente:") ? "collaboratore" : "titolare", ...(profile ? { profile } : {}) }, { onConflict: "email" });
   if (error) return NextResponse.json({ error: error.message }, { status: 200 });
   const notified = await notifyAccessApproved(email);
   return NextResponse.json({ ok: true, notified });
