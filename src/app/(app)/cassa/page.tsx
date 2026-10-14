@@ -192,8 +192,12 @@ export default function CassaPage() {
   const saldoTot = sumCents(Object.values(saldoConti));
   const hasOpening = CONTI.some((c) => balances[c.key]?.since);
   // Ultima card in vista "oggi e future": saldo previsto = saldo attuale dei conti + entrate − uscite dei giorni dopo oggi (quelli di oggi sono già nel saldo attuale).
-  const saldoPrevisto = roundCents(saldoTot + sumCents(rowsStat.filter((m) => m.date > today).map((m) => (m.kind === "in" ? m.amount : -m.amount))));
   const prevCard = futureView && hasOpening;
+  // Con il saldo attuale come base, le card contano solo i movimenti dopo oggi (quelli di oggi e prima sono già nel saldo attuale): così saldo attuale + entrate − uscite = saldo previsto.
+  const cardRows = prevCard ? rowsStat.filter((m) => m.date > today) : rowsStat;
+  const entrateCard = sumCents(cardRows.filter((m) => m.kind === "in").map((m) => m.amount));
+  const usciteCard = sumCents(cardRows.filter((m) => m.kind === "out").map((m) => m.amount));
+  const saldoPrevisto = roundCents(saldoTot + entrateCard - usciteCard);
   // Estratto conto: saldo dopo ogni movimento, solo per la struttura selezionata in alto a destra (con "tutte" sono tutte). I saldi di partenza dei conti valgono sempre.
   const ledgerManual = useMemo(() => manual.filter((m) => m.cat === OPENING_CAT || ruleVisible(m.structureId)), [manual, activeStructureId]); // eslint-disable-line react-hooks/exhaustive-deps
   const ledger = useMemo(() => computeLedger([...auto, ...scheduled, ...ledgerManual, ...forecastView]), [auto, scheduled, ledgerManual, forecastView]);
@@ -427,8 +431,8 @@ export default function CassaPage() {
       {/* Riepilogo */}
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label={t("Saldo attuale")} value={hasOpening ? eur(saldoTot) : "—"} color={hasOpening && saldoTot < 0 ? "var(--err)" : undefined} onClick={() => openOpening()} hint={hasOpening ? <>{Object.keys(saldoConti).length} {t("conti")}</> : t("Imposta il saldo di partenza →")} />
-        <StatCard label={`${t("Entrate")} ${periodWord}`} value={eur(entrate)} color="var(--ok)" hint={`${rows.filter((m) => m.kind === "in").length} ${t("movimenti")}`} />
-        <StatCard label={`${t("Uscite")} ${periodWord}`} value={eur(uscite)} color="var(--err)" hint={`${rows.filter((m) => m.kind === "out").length} ${t("movimenti")}`} />
+        <StatCard label={`${t("Entrate")} ${periodWord}`} value={eur(entrateCard)} color="var(--ok)" hint={`${cardRows.filter((m) => m.kind === "in").length} ${t("movimenti")}`} />
+        <StatCard label={`${t("Uscite")} ${periodWord}`} value={eur(usciteCard)} color="var(--err)" hint={`${cardRows.filter((m) => m.kind === "out").length} ${t("movimenti")}`} />
         <StatCard label={`${t("Saldo")} ${futureView ? t("previsto") : preset === "all" ? t("totale") : t("del periodo")}`} value={eur(prevCard ? saldoPrevisto : saldo)} color={(prevCard ? saldoPrevisto : saldo) >= 0 ? undefined : "var(--err)"} hint={prevCard ? <>{t("con saldo attuale")} · {t("al")} {fmtDMY(listHorizon)}</> : t("entrate − uscite")} />
       </div>
 
