@@ -13,7 +13,7 @@ import Icon from "@/components/Icon";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, deleteMovement, insertRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, projectBalance, presetRange, matchesQuery, type Preset } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, deleteMovement, insertRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, projectBalance, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveItem } from "@/lib/cassa";
 import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
@@ -84,6 +84,7 @@ export default function CassaPage() {
   const [cats, setCats] = useState<Cat[]>(DEFAULT_CATS);
   const [conti, setConti] = useState<ContoDef[]>(() => (typeof window === "undefined" ? [...DEFAULT_CONTI] : loadConti())); // conti di base + quelli aggiunti (più banche…)
   const CONTI = conti;
+  const [principal, setPrincipalState] = useState<string>(() => (typeof window === "undefined" ? "banca" : loadContiPrefs().principal)); // dove arrivano i soldi delle prenotazioni OTA
   useEffect(() => { try { const r = localStorage.getItem(CATS_KEY); if (r) { const saved = JSON.parse(r); const customs = saved.filter((c: Cat) => c.custom); setCats([...DEFAULT_CATS, ...customs]); } } catch {} }, []);
   const saveCats = (list: Cat[]) => { setCats(list); try { localStorage.setItem(CATS_KEY, JSON.stringify(list.filter((c) => c.custom))); } catch {} };
   const catOf = (k: string) => cats.find((c) => c.key === k);
@@ -111,7 +112,7 @@ export default function CassaPage() {
   const today = todayISO();
 
   // Movimenti automatici dalle prenotazioni + occorrenze programmate (logica condivisa con la Chiusura cassa).
-  const auto = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, activeStructureId), [bookings, guests, activeStructureId, getStructure]);
+  const auto = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, activeStructureId, principal), [bookings, guests, activeStructureId, getStructure, principal]);
   const ruleVisible = (structureId?: string) => scopeVisible(structureId, activeStructureId);
   const scheduled = useMemo<Mov[]>(() => computeScheduled(rules, paidSet, activeStructureId, today), [rules, activeStructureId, today, paidSet]);
 
@@ -157,7 +158,7 @@ export default function CassaPage() {
   const [chartsOn, setChartsOn] = useState(true);
   const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
 
-  const forecastChart = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, activeStructureId, today, shiftISO(today, 365)), [bookings, guests, getStructure, rules, activeStructureId, today]);
+  const forecastChart = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, activeStructureId, today, shiftISO(today, 365), principal), [bookings, guests, getStructure, rules, activeStructureId, today, principal]);
   const forecastView = useMemo(() => forecastChart.filter((x) => x.date <= listHorizon), [forecastChart, listHorizon]);
   const rows = [...all, ...forecastView]
     .filter((m) => inPeriod(m.date) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
@@ -168,13 +169,13 @@ export default function CassaPage() {
   const uscite = sumCents(rowsStat.filter((m) => m.kind === "out").map((m) => m.amount));
   const saldo = roundCents(entrate - uscite);
 
-  const autoTutte = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, "all"), [bookings, guests, getStructure]);
+  const autoTutte = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, "all", principal), [bookings, guests, getStructure, principal]);
   const programmateTutte = useMemo<Mov[]>(() => computeScheduled(rules, paidSet, "all", today), [rules, paidSet, today]);
   const balances = useMemo(() => computeBalances([...autoTutte, ...programmateTutte, ...manual], today, CONTI.map((c) => c.key)), [autoTutte, programmateTutte, manual, today, CONTI]);
   const saldoConti: Record<string, number> = Object.fromEntries(CONTI.filter((c) => balances[c.key]?.since).map((c) => [c.key, balances[c.key].saldo])); // solo i conti con saldo di partenza: gli altri non hanno uno storico completo
   const saldoTot = sumCents(Object.values(saldoConti));
   const hasOpening = CONTI.some((c) => balances[c.key]?.since);
-  const forecastTutte = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, "all", today, to || shiftISO(today, 90)), [bookings, guests, getStructure, rules, today, to]);
+  const forecastTutte = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, "all", today, to || shiftISO(today, 90), principal), [bookings, guests, getStructure, rules, today, to, principal]);
   const projectedEnd = useMemo(() => projectBalance([...autoTutte, ...manual, ...forecastTutte], balances, today, to || shiftISO(today, 90)), [autoTutte, manual, forecastTutte, balances, today, to]);
 
   // ---- Saldo di partenza: scrivi quanto hai oggi su un conto, da lì il saldo si aggiorna ----
@@ -193,6 +194,11 @@ export default function CassaPage() {
     setConti(next); saveConti(next);
     setOpening((o) => (o ? { ...o, newName: "", amounts: { ...o.amounts, [key]: "" } } : o));
   };
+  const moveConto = (key: string, dir: -1 | 1) => { const next = moveItem(conti, conti.findIndex((c) => c.key === key), dir); if (next !== conti) { setConti(next); saveConti(next); } };
+  const makePrincipal = (key: string) => {
+    setPrincipalState(key); saveContiPrefs({ ...loadContiPrefs(), principal: key });
+    const first = [...conti].sort((a, b) => (a.key === key ? -1 : b.key === key ? 1 : 0)); setConti(first); saveConti(first); // il principale va in cima
+  };
   const [renaming, setRenaming] = useState<{ key: string; label: string } | null>(null);
   const renameConto = () => {
     if (!renaming) return;
@@ -201,7 +207,7 @@ export default function CassaPage() {
     setRenaming(null);
   };
   const deleteConto = async (c: ContoDef) => {
-    const chk = canDeleteConto(c.key, [...autoTutte, ...programmateTutte, ...manual], rules);
+    const chk = canDeleteConto(c.key, [...autoTutte, ...programmateTutte, ...manual], rules, [principal, "contanti"]);
     if (!chk.ok) { await ask({ title: t("Conto non eliminabile"), message: t(chk.reason ?? ""), confirmLabel: t("Ho capito") }); return; }
     if (!(await ask({ title: t("Elimina conto"), message: `${t("Eliminare il conto")} «${c.label}»? ${t("Il suo saldo di partenza verrà tolto.")}`, danger: true, confirmLabel: t("Elimina") }))) return;
     const next = conti.filter((x) => x.key !== c.key);
@@ -610,7 +616,7 @@ export default function CassaPage() {
           <Card>
             <SectionTitle>{t("Saldo per conto")}</SectionTitle>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {CONTI.map((c) => <div key={c.key} className="rounded-lg border border-line p-3"><div className="flex items-center justify-between gap-1"><span className="text-xs text-dim">{t(c.label)}</span><button onClick={() => openOpening()} title={t("Imposta il saldo di partenza dei tuoi conti")} className="rounded px-1 text-[11px] font-semibold text-focus hover:bg-wash">{t("Imposta")}</button></div><div className={`mt-0.5 font-mono text-lg font-bold ${balances[c.key]?.since ? ((saldoConti[c.key] ?? 0) >= 0 ? "text-txt" : "text-[color:var(--err)]") : "text-faint"}`}>{balances[c.key]?.since ? eur(saldoConti[c.key] ?? 0) : "—"}</div><div className="text-[10px] text-faint">{balances[c.key]?.since ? `${t("da")} ${fmtDMY(balances[c.key].since)}` : t("da impostare")}</div></div>)}
+              {CONTI.map((c) => <div key={c.key} className="rounded-lg border border-line p-3"><div className="flex items-center justify-between gap-1"><span className="text-xs text-dim">{c.key === principal && <span className="mr-1 text-[color:var(--warn)]" title={t("Conto principale")}>★</span>}{t(c.label)}</span></div><div className={`mt-0.5 font-mono text-lg font-bold ${balances[c.key]?.since ? ((saldoConti[c.key] ?? 0) >= 0 ? "text-txt" : "text-[color:var(--err)]") : "text-faint"}`}>{balances[c.key]?.since ? eur(saldoConti[c.key] ?? 0) : "—"}</div><div className="text-[10px] text-faint">{balances[c.key]?.since ? `${t("da")} ${fmtDMY(balances[c.key].since)}` : t("da impostare")}</div></div>)}
             </div>
           </Card>
         </div>
@@ -622,17 +628,21 @@ export default function CassaPage() {
       {opening && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh]">
           <button aria-label={t("Chiudi")} onClick={() => setOpening(null)} className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
-          <div role="dialog" aria-label={t("Saldo di partenza")} className="relative max-h-[84vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+          <div role="dialog" aria-label={t("Saldo di partenza")} className="relative max-h-[84vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="text-base font-bold text-txt">{t("Saldo di partenza")}</div>
             <p className="mt-1 text-xs text-dim">{t("Scrivi quanto hai oggi su ogni conto. Da qui ogni saldo parte dal suo importo e si aggiorna con le entrate e le uscite dei giorni successivi: lo storico passato non serve. I conti lasciati vuoti non vengono toccati.")}</p>
+            <p className="mt-1 text-[11px] text-faint">{t("★ = conto principale: qui arrivano i soldi delle prenotazioni dai portali. ↑ ↓ cambiano l'ordine dei conti.")}</p>
             <div className="mt-3 flex flex-col gap-2">
               {CONTI.map((c) => (
-                <div key={c.key} className="flex items-center gap-2">
+                <div key={c.key} className="flex items-center gap-1.5">
+                  <button type="button" onClick={() => makePrincipal(c.key)} title={c.key === principal ? t("Conto principale: qui arrivano i soldi delle prenotazioni") : t("Imposta come conto principale (dove arrivano i soldi delle prenotazioni)")} aria-label={`${t("Conto principale")} ${c.label}`} className={`shrink-0 rounded p-0.5 text-sm leading-none ${c.key === principal ? "text-[color:var(--warn)]" : "text-faint hover:text-[color:var(--warn)]"}`}>{c.key === principal ? "★" : "☆"}</button>
                   {renaming?.key === c.key
-                    ? <input autoFocus value={renaming.label} maxLength={30} onChange={(e) => setRenaming({ key: c.key, label: e.target.value })} onBlur={renameConto} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); renameConto(); } if (e.key === "Escape") setRenaming(null); }} className="w-36 shrink-0 rounded-lg border border-focus bg-paper px-2 py-1.5 text-sm text-txt outline-none" />
-                    : <span className="w-36 shrink-0 truncate text-sm text-txt" title={t(c.label)}>{t(c.label)}</span>}
+                    ? <input autoFocus value={renaming.label} maxLength={30} onChange={(e) => setRenaming({ key: c.key, label: e.target.value })} onBlur={renameConto} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); renameConto(); } if (e.key === "Escape") setRenaming(null); }} className="w-32 shrink-0 rounded-lg border border-focus bg-paper px-2 py-1.5 text-sm text-txt outline-none" />
+                    : <span className="w-32 shrink-0 truncate text-sm text-txt" title={t(c.label)}>{t(c.label)}</span>}
                   <input aria-label={`${t("Importo")} ${c.label}`} inputMode="decimal" value={opening.amounts[c.key] ?? ""} onChange={(e) => setOpening((o) => (o ? { ...o, amounts: { ...o.amounts, [c.key]: e.target.value } } : o))} placeholder="—" className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-right font-mono text-sm text-txt outline-none focus:border-focus" />
                   <span className="text-xs text-faint">€</span>
+                  <button type="button" onClick={() => moveConto(c.key, -1)} disabled={conti[0]?.key === c.key} title={t("Sposta su")} aria-label={`${t("Sposta su")} ${c.label}`} className="shrink-0 rounded p-0.5 text-faint hover:bg-wash hover:text-txt disabled:opacity-30">↑</button>
+                  <button type="button" onClick={() => moveConto(c.key, 1)} disabled={conti[conti.length - 1]?.key === c.key} title={t("Sposta giù")} aria-label={`${t("Sposta giù")} ${c.label}`} className="shrink-0 rounded p-0.5 text-faint hover:bg-wash hover:text-txt disabled:opacity-30">↓</button>
                   <button type="button" onClick={() => setRenaming({ key: c.key, label: c.label })} title={t("Rinomina il conto")} aria-label={`${t("Rinomina")} ${c.label}`} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-txt">✎</button>
                   <button type="button" onClick={() => void deleteConto(c)} title={t("Elimina il conto")} aria-label={`${t("Elimina")} ${c.label}`} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]">✕</button>
                 </div>

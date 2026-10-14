@@ -53,7 +53,7 @@ export const scopeVisible = (structureId: string | undefined | null, active: str
   active === "all" || structureId === active;
 
 // Movimenti automatici dalle prenotazioni (dirette → contanti, OTA → banca + commissione).
-export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, active: string): Mov[] {
+export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, active: string, principal: string = loadContiPrefs().principal): Mov[] {
   const out: Mov[] = [];
   for (const b of bookings) {
     if (b.status === "cancelled" || b.channel === "blocked") continue;
@@ -63,9 +63,9 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
     // Incasso automatico = quanto realmente incassato sulla prenotazione (fonte di
     // verità = prenotazione), non l'intero totale: così la cassa/chiusura riflette il reale.
     const incassato = roundCents(b.paid ?? 0);
-    if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: b.checkIn, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: b.channel === "direct" ? "contanti" : "banca", auto: true, ref: b.id });
+    if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: b.checkIn, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: b.channel === "direct" ? "contanti" : principal, auto: true, ref: b.id });
     const comm = roundCents(commissionOf(b));
-    if (comm > 0) out.push({ id: `auto-comm-${b.id}`, date: b.checkIn, kind: "out", cat: "commissioni", desc: `Commissione ${CHANNELS[b.channel].label} · ${g?.fullName ?? "Ospite"}`, amount: comm, conto: "banca", auto: true, ref: b.id });
+    if (comm > 0) out.push({ id: `auto-comm-${b.id}`, date: b.checkIn, kind: "out", cat: "commissioni", desc: `Commissione ${CHANNELS[b.channel].label} · ${g?.fullName ?? "Ospite"}`, amount: comm, conto: principal, auto: true, ref: b.id });
   }
   return out;
 }
@@ -225,6 +225,29 @@ export const DEFAULT_CONTI: ContoDef[] = [
 const CONTI_KEY = "spigolestay:cassa:conti";
 const isDefault = (k: string) => DEFAULT_CONTI.some((d) => d.key === k);
 
+// Preferenze dei conti: ORDINE di visualizzazione e CONTO PRINCIPALE (dove arrivano i soldi delle prenotazioni OTA). Chiave sincronizzata con l'account.
+const CONTI_PREFS_KEY = "spigolestay:cassa:conti-prefs";
+export interface ContiPrefs { order: string[]; principal: string }
+export function loadContiPrefs(): ContiPrefs {
+  try {
+    const p = JSON.parse(localStorage.getItem(CONTI_PREFS_KEY) || "{}") as Partial<ContiPrefs>;
+    return { order: Array.isArray(p.order) ? p.order.filter((k) => typeof k === "string") : [], principal: typeof p.principal === "string" && p.principal ? p.principal : "banca" };
+  } catch { return { order: [], principal: "banca" }; }
+}
+export function saveContiPrefs(p: ContiPrefs) { try { localStorage.setItem(CONTI_PREFS_KEY, JSON.stringify(p)); } catch { /* storage non disponibile */ } }
+/** Sposta un elemento di una posizione (−1 = su, +1 = giù). Fuori dai limiti non cambia nulla. */
+export function moveItem<T>(list: T[], index: number, dir: -1 | 1): T[] {
+  const j = index + dir;
+  if (index < 0 || index >= list.length || j < 0 || j >= list.length) return list;
+  const next = list.slice(); [next[index], next[j]] = [next[j], next[index]];
+  return next;
+}
+/** Mette in ordine i conti secondo l'ordine salvato; quelli non elencati restano in coda nell'ordine originale. */
+export function sortConti(list: ContoDef[], order: string[]): ContoDef[] {
+  const idx = (k: string) => { const i = order.indexOf(k); return i < 0 ? Number.MAX_SAFE_INTEGER : i; };
+  return list.map((c, i) => ({ c, i })).sort((a, b) => idx(a.c.key) - idx(b.c.key) || a.i - b.i).map((x) => x.c);
+}
+
 // Salvataggio: per i conti di base solo ciò che cambia (nome nuovo o conto eliminato), per quelli aggiunti nome e chiave.
 type SavedConto = { key: string; label: string; removed?: boolean };
 export function loadConti(): ContoDef[] {
@@ -237,7 +260,7 @@ export function loadConti(): ContoDef[] {
       out.push({ key: d.key, label: o ? o.label : d.label });
     }
     for (const c of saved) if (!isDefault(c.key) && !c.removed) out.push({ key: c.key, label: c.label });
-    return out;
+    return sortConti(out, loadContiPrefs().order);
   } catch { return [...DEFAULT_CONTI]; }
 }
 export function saveConti(list: ContoDef[]) {
@@ -250,13 +273,14 @@ export function saveConti(list: ContoDef[]) {
     }
     for (const c of list) if (!isDefault(c.key)) entries.push({ key: c.key, label: c.label });
     localStorage.setItem(CONTI_KEY, JSON.stringify(entries));
+    saveContiPrefs({ ...loadContiPrefs(), order: list.map((c) => c.key) }); // anche l'ordine
   } catch { /* storage non disponibile */ }
 }
-/** Conti che non si possono eliminare: i movimenti automatici delle prenotazioni vanno su "contanti" (dirette) e "banca" (OTA). */
+/** Conti che non si possono eliminare: i movimenti automatici delle prenotazioni vanno su "contanti" (dirette) e sul conto principale (OTA). */
 export const CONTI_FISSI = ["contanti", "banca"];
 /** Un conto si può eliminare solo se non è fisso e non ha movimenti né pagamenti programmati (il saldo di partenza non conta: si toglie con il conto). */
-export function canDeleteConto(key: string, movs: Mov[], rules: { conto: string }[]): { ok: boolean; reason?: string } {
-  if (CONTI_FISSI.includes(key)) return { ok: false, reason: "Su questo conto arrivano le prenotazioni in automatico: puoi rinominarlo ma non eliminarlo." };
+export function canDeleteConto(key: string, movs: Mov[], rules: { conto: string }[], fixed: string[] = CONTI_FISSI): { ok: boolean; reason?: string } {
+  if (fixed.includes(key)) return { ok: false, reason: "Su questo conto arrivano le prenotazioni in automatico: puoi rinominarlo ma non eliminarlo." };
   const n = movs.filter((m) => m.conto === key && m.cat !== OPENING_CAT).length + rules.filter((r) => r.conto === key).length;
   if (n > 0) return { ok: false, reason: `Ha ${n} movimenti o pagamenti programmati: rinominalo, oppure elimina prima quei movimenti.` };
   return { ok: true };
@@ -272,7 +296,7 @@ export function contoKeyFromLabel(label: string, existing: ContoDef[]): string {
 // ── Flusso di cassa: oggi e futuro ──────────────────────────────────────────────────────────────────────────────────────
 // Movimenti PREVISTI da oggi in poi: il saldo ancora da incassare delle prenotazioni in arrivo (alla data di arrivo) e le occorrenze future dei pagamenti
 // programmati. Le commissioni OTA delle prenotazioni future e gli acconti già incassati sono già nei movimenti automatici (computeAuto).
-export function computeForecast(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, rules: Rule[], active: string, today: string, horizon: string): Mov[] {
+export function computeForecast(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, rules: Rule[], active: string, today: string, horizon: string, principal: string = loadContiPrefs().principal): Mov[] {
   const out: Mov[] = [];
   for (const b of bookings) {
     if (b.status === "cancelled" || b.channel === "blocked") continue;
@@ -282,7 +306,7 @@ export function computeForecast(bookings: Booking[], guests: Guest[], getStructu
     if (remaining <= 0) continue;
     const g = guests.find((x) => x.id === b.guestId);
     const st = getStructure(b.structureId);
-    out.push({ id: `fc-in-${b.id}`, date: b.checkIn, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label} · da incassare`, amount: remaining, conto: b.channel === "direct" ? "contanti" : "banca", auto: true, forecast: true, ref: b.id });
+    out.push({ id: `fc-in-${b.id}`, date: b.checkIn, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label} · da incassare`, amount: remaining, conto: b.channel === "direct" ? "contanti" : principal, auto: true, forecast: true, ref: b.id });
   }
   const from = shiftISO(today, 1);
   if (from <= horizon) {
