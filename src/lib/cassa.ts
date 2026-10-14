@@ -120,6 +120,11 @@ export async function insertRule(tenantId: string, r: Rule): Promise<WriteResult
   const { error } = await supabase.from("cash_rules").insert({ ...(isUuid(r.id) ? { id: r.id } : {}), tenant_id: tenantId, structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null });
   return errMsg(error);
 }
+export async function updateRule(id: string, r: Rule): Promise<WriteResult> {
+  if (!supabase) return NO_CONN;
+  const { error } = await supabase.from("cash_rules").update({ structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null }).eq("id", id);
+  return errMsg(error);
+}
 export async function deleteRule(id: string): Promise<WriteResult> {
   if (!supabase) return NO_CONN;
   const { error } = await supabase.from("cash_rules").delete().eq("id", id);
@@ -352,7 +357,7 @@ export function matchesQuery(m: Mov, q: string, labels: { cat?: string; conto?: 
 // ── Estratto conto: saldo in quella data ────────────────────────────────────────────────────────────────────────────────
 // Per ogni movimento il saldo totale dei conti con un saldo di partenza, DOPO quel movimento. Ogni conto parte dal suo saldo di partenza
 // e si muove solo con i movimenti dei giorni successivi (stessa regola del saldo attuale); prima del primo saldo di partenza non c'è saldo (null).
-export interface Ledger { order: Map<string, number>; balanceAfter: Map<string, number | null> }
+export interface Ledger { order: Map<string, number>; balanceAfter: Map<string, number | null>; included: Set<string> /* movimenti del giorno del saldo di partenza: già compresi nell'importo scritto */ }
 export function computeLedger(movs: Mov[]): Ledger {
   const seq = movs.map((m, i) => ({ m, i })).sort((a, b) => {
     if (a.m.date !== b.m.date) return a.m.date < b.m.date ? -1 : 1;
@@ -365,12 +370,17 @@ export function computeLedger(movs: Mov[]): Ledger {
   const bal = new Map<string, number>();
   const order = new Map<string, number>();
   const balanceAfter = new Map<string, number | null>();
+  const included = new Set<string>();
   let started = false;
   seq.forEach(({ m }, idx) => {
     order.set(m.id, idx);
     if (m.cat === OPENING_CAT) { if (effective.get(m.conto)?.id === m.id) { bal.set(m.conto, signed(m)); started = true; } }
-    else { const op = effective.get(m.conto); if (op && m.date > op.date && bal.has(m.conto)) bal.set(m.conto, roundCents((bal.get(m.conto) ?? 0) + signed(m))); }
+    else {
+      const op = effective.get(m.conto);
+      if (op && m.date > op.date && bal.has(m.conto)) bal.set(m.conto, roundCents((bal.get(m.conto) ?? 0) + signed(m)));
+      else if (op && m.date === op.date) included.add(m.id);
+    }
     balanceAfter.set(m.id, started ? sumCents([...bal.values()]) : null);
   });
-  return { order, balanceAfter };
+  return { order, balanceAfter, included };
 }

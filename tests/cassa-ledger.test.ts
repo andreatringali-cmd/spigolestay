@@ -19,6 +19,8 @@ test("estratto conto: saldo dopo ogni movimento, dal saldo di partenza", () => {
   assert.equal(l.balanceAfter.get("vecchio"), null);
   assert.equal(l.balanceAfter.get("op"), 1500);
   assert.equal(l.balanceAfter.get("stesso-giorno"), 1500);
+  assert.ok(l.included.has("stesso-giorno"), "i movimenti del giorno di partenza sono già compresi");
+  assert.ok(!l.included.has("a") && !l.included.has("vecchio"));
   assert.equal(l.balanceAfter.get("a"), 1700.5);
   assert.equal(l.balanceAfter.get("b"), 1600.25);
 });
