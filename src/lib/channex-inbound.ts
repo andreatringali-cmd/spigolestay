@@ -16,6 +16,7 @@ import { readRevisionGuestData, mergeOtaOverCarried, type OtaInfo } from "@/lib/
 import { splitCommission } from "@/lib/commission-split";
 import { parsePaymentCharge } from "@/lib/payment-fee";
 import { fmtDMY } from "./dates";
+import { notifyBookingLines } from "./booking-notify";
 
 // Property di test della certificazione: le sue prenotazioni non sono in channex_map (non è una
 // struttura reale), ma vanno comunque ACKate dal flusso di import automatico — che è quello che
@@ -237,6 +238,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
     const bookings = (Array.isArray(data.bookings) ? data.bookings : []) as Booking[];
     const guests = (Array.isArray(data.guests) ? data.guests : []) as (Json & { id: string; email?: string; fullName?: string })[];
     const units = (Array.isArray(data.units) ? data.units : []) as Unit[];
+    const roomTypesArr = (Array.isArray(data.roomTypes) ? data.roomTypes : []) as { id: string; name?: string }[];
     const structuresArr = (Array.isArray(data.structures) ? data.structures : []) as (Json & { id: string; gcalId?: string; email?: string })[];
     // Preferenze di notifica (Impostazioni → Notifiche), sincronizzate nello stesso blob con la
     // chiave "spigolestay:notifs" (stessa forma di localStorage, vedi notifPrefs.ts).
@@ -269,16 +271,16 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       const code = typeof b.code === "string" ? b.code : "";
       const chLabel = CHANNELS[b.channel as Channel]?.label ?? String(b.channel ?? "");
       const subject = ev === "newBooking" ? `Nuova prenotazione OTA · ${guestName}` : `Prenotazione OTA cancellata · ${guestName}`;
-      const lines = [
-        guestName,
-        code && `Codice: ${code}`,
-        `${fmtDMY(b.checkIn)} → ${fmtDMY(b.checkOut)}`,
-        `Canale: ${chLabel}`,
-        typeof b.total === "number" ? `Totale: € ${b.total}` : "",
-      ].filter(Boolean) as string[];
+      const unit = units.find((u) => u.id === b.unitId);
+      const roomType = roomTypesArr.find((r) => r.id === (unit?.roomTypeId ?? b.roomTypeId));
+      const roomLabel = [roomType?.name, (unit as { name?: string } | undefined)?.name].filter(Boolean).join(" · ");
+      const lines = notifyBookingLines({
+        ev, booking: b, guest: guest ? { fullName: guest.fullName, phone: guest.phone as string | undefined, email: guest.email, country: guest.country as string | undefined } : undefined,
+        structureName: (st as { name?: string } | undefined)?.name, roomLabel, channelLabel: chLabel,
+      });
       void internalFetch(`${origin}/api/email`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "notify", to, subject, text: lines.join("\n") }),
+        body: JSON.stringify({ kind: "notify", to, subject, text: lines.join("\n"), ctaUrl: `${origin}/prenotazioni`, ctaLabel: "Apri le prenotazioni →" }),
       }).catch(() => {});
     };
 

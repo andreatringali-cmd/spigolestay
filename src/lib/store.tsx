@@ -15,6 +15,7 @@ import { isPublicMode, lsGet, DATA_KEY } from "./publicdata";
 import { apiPost } from "./invoicing/client";
 import { loadNotifPrefs } from "./notifPrefs";
 import { fmtDMY } from "./dates";
+import { notifyBookingLines } from "./booking-notify";
 
 export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "rateplan" | "quote" | "payment" | "login" | "auth" | "message" | "config";
 export interface Activity {
@@ -214,17 +215,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       : ev === "cancel" ? `Prenotazione cancellata · ${guestName}`
       : ev === "payment" ? `Pagamento ricevuto · ${guestName}`
       : `Prenotazione modificata · ${guestName}`;
-    const lines = [
-      guestName,
-      roomLabel,
-      `${fmtDMY(b.checkIn)} → ${fmtDMY(b.checkOut)}`,
-      `Canale: ${chLabel}`,
-      typeof b.total === "number" ? `Totale: € ${b.total}` : "",
-      ev === "payment" && extra?.amount ? `Incasso registrato: € ${extra.amount}` : "",
-    ].filter(Boolean);
+    // Tutte le informazioni utili nell'email (ospite e contatti, camera, date, persone, canale, codice, importi, richieste) + pulsante per aprire Xenora.
+    const lines = notifyBookingLines({
+      ev, booking: b, guest: g ? { fullName: g.fullName, phone: g.phone, email: g.email, country: g.country } : undefined,
+      structureName: st?.name, roomLabel, channelLabel: chLabel, paymentAmount: extra?.amount,
+    });
     fetch("/api/email", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "notify", to, subject, text: lines.join("\n"), accent: st?.photoColor }),
+      body: JSON.stringify({ kind: "notify", to, subject, text: lines.join("\n"), accent: st?.photoColor, ctaUrl: typeof window !== "undefined" ? `${window.location.origin}/prenotazioni` : undefined, ctaLabel: "Apri le prenotazioni →" }),
     }).catch(() => {});
   };
 
