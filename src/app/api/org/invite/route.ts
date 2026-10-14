@@ -33,6 +33,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const structureId = String(body?.structureId || "").trim();
     const email = String(body?.email || "").trim().toLowerCase();
+    const silent = body?.silent === true; // niente email di accettazione: il collaboratore entra e trova già la struttura
     if (!structureId) return NextResponse.json({ error: "missing_structure", message: "Struttura mancante." }, { status: 400 });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "invalid_email", message: "Email non valida." }, { status: 400 });
 
@@ -46,7 +47,14 @@ export async function POST(req: Request) {
     // Così non si invita per errore un indirizzo sbagliato/non registrato (che, registrandosi
     // dopo, potrebbe entrare nella struttura). Il socio deve prima creare l'account con quell'email.
     const { data: prof } = await admin.from("profiles").select("user_id").ilike("email", email).maybeSingle();
-    if (!prof?.user_id) {
+    // Eccezione: un indirizzo che il titolare ha già abilitato in "Utenti" (elenco accessi) non è un errore di battitura: l'invito
+    // resta in attesa e viene accettato in automatico al suo primo accesso.
+    let allowlisted = false;
+    if (!prof?.user_id && silent) {
+      const { data: al } = await admin.from("access_allowlist").select("email").ilike("email", email).maybeSingle();
+      allowlisted = !!al;
+    }
+    if (!prof?.user_id && !allowlisted) {
       return NextResponse.json({ error: "email_not_registered", message: `L'email ${email} non è registrata su Xenora. Il socio deve prima creare un account con questa email, poi potrai invitarlo.` }, { status: 400 });
     }
 
@@ -146,7 +154,7 @@ export async function POST(req: Request) {
     const origin = siteOrigin(req);
     const link = `${origin}/accetta-invito?code=${code}`;
     let emailSent = false;
-    if (RESEND) {
+    if (RESEND && !silent) {
       const inviter = caller.email || "un collega";
       const html = `<!doctype html><html lang="it"><body style="margin:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2430;">
       <div style="max-width:520px;margin:0 auto;padding:24px 16px;">

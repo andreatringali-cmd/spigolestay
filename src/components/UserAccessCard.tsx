@@ -49,9 +49,19 @@ export default function UserAccessCard({ user, structures, onShared }: UserAcces
       if (status === 403) { done([{ ok: false, text: "Solo il titolare dell'account può invitare nuovi utenti." }]); return; }
       if (!j.ok) { done([{ ok: false, text: humanInviteError(String(j.error ?? ""), String(j.message ?? "")) }]); return; }
       setLink(signupLink(window.location.origin, email));
-      done([j.notified
+      const head: Line = j.notified
         ? { ok: true, text: `Invito inviato a ${email}: riceve un'email con il link per registrarsi e scegliere la password.` }
-        : { ok: true, text: `${email} è abilitata, ma l'email non è partita (invio email non attivo). Copia il link qui sotto e mandaglielo tu.` }]);
+        : { ok: true, text: `${email} è abilitata, ma l'email non è partita (invio email non attivo). Copia il link qui sotto e mandaglielo tu.` };
+      // Stesso passaggio: le strutture del profilo restano pronte per lei, al primo accesso le trova già.
+      const out: Line[] = [head];
+      for (const s of targets) {
+        try {
+          const { j: sj } = await call("/api/org/invite", { structureId: s.id, email, silent: true });
+          if (sj.ok) { if (sj.orgId) onShared(s.id, String(sj.orgId)); out.push({ ok: true, text: `${s.name}: condivisa, la trova al primo accesso.` }); }
+          else out.push({ ok: false, text: `${s.name}: ${humanInviteError(String(sj.error ?? ""), String(sj.message ?? ""))}` });
+        } catch { out.push({ ok: false, text: `${s.name}: rete non disponibile.` }); }
+      }
+      done(out);
     } catch { done([{ ok: false, text: "Rete non disponibile." }]); }
   };
 
@@ -64,7 +74,7 @@ export default function UserAccessCard({ user, structures, onShared }: UserAcces
     const out: Line[] = [];
     for (const s of targets) {
       try {
-        const { j } = await call("/api/org/invite", { structureId: s.id, email });
+        const { j } = await call("/api/org/invite", { structureId: s.id, email, silent: true });
         if (j.ok) { if (j.orgId) onShared(s.id, String(j.orgId)); out.push({ ok: true, text: `${s.name}: invito inviato.` }); }
         else out.push({ ok: false, text: `${s.name}: ${humanInviteError(String(j.error ?? ""), String(j.message ?? ""))}` });
       } catch { out.push({ ok: false, text: `${s.name}: rete non disponibile.` }); }
@@ -98,13 +108,12 @@ export default function UserAccessCard({ user, structures, onShared }: UserAcces
     <Card>
       <SectionTitle>Accesso a Xenora</SectionTitle>
       <p className="mt-1 text-xs text-dim">
-        Per entrare con il suo account serve un invito: riceve un&apos;email con il link di registrazione e <b className="text-txt">sceglie lei la password</b> al primo accesso.
-        I permessi del profilo qui sotto vengono applicati come permessi di co-gestore sulle strutture condivise.
+        Con <b className="text-txt">Invita</b> riceve l&apos;email con il link di registrazione e <b className="text-txt">sceglie lei la password</b>; le strutture del profilo le trova già al primo accesso, senza altri passaggi.
+        Quando è entrata, <b className="text-txt">Applica i permessi</b> imposta i permessi del profilo sulle strutture.
       </p>
       {!valid && <p className="mt-2 text-xs font-medium text-[color:var(--warn)]">Inserisci prima un&apos;email valida e salva.</p>}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button className={btnMain} disabled={!valid || !!busy} onClick={() => void invite()}>{busy === "invite" ? "Invio…" : "Invia invito"}</button>
-        <button className={btn} disabled={!valid || !!busy || !targets.length} onClick={() => void share()} title={targets.length ? "" : "Nessuna struttura assegnata al profilo"}>{busy === "share" ? "Condivido…" : `Condividi le strutture (${targets.length})`}</button>
+        <button className={btnMain} disabled={!valid || !!busy} onClick={() => void invite()}>{busy === "invite" ? "Invio…" : targets.length ? `Invita e condividi (${targets.length})` : "Invita"}</button>
         <button className={btn} disabled={!valid || !!busy || !targets.length} onClick={() => void applyPerms()}>{busy === "perms" ? "Applico…" : "Applica i permessi"}</button>
       </div>
       {link && (

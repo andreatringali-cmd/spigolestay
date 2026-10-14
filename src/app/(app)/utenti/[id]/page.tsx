@@ -19,7 +19,7 @@ import { useAuth } from "@/lib/authsync";
 import MfaSetup from "@/components/MfaSetup";
 import UserAccessCard from "@/components/UserAccessCard";
 import { useToast } from "@/components/ToastProvider";
-import { isValidEmail } from "@/lib/user-access";
+import { isValidEmail, structuresToShare } from "@/lib/user-access";
 
 // --- Micro-componenti ---------------------------------------------------------
 function Toggle({ on, onClick, disabled, color = "var(--focus)" }: { on: boolean; onClick?: () => void; disabled?: boolean; color?: string }) {
@@ -155,8 +155,19 @@ export default function UserSchedaPage() {
       if (!token) return;
       const r = await fetch("/api/admin/allowlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ email: usr.email.trim(), note: `Utente: ${usr.firstName} ${usr.lastName}`.trim(), kind: "collaboratore" }) });
       const j = await r.json().catch(() => ({}));
+      // Un solo passaggio: dopo l'abilitazione si condividono subito le strutture del profilo (la persona le trova al primo accesso).
+      let shared = 0;
+      if (j?.ok) {
+        for (const st of structuresToShare(structures, usr)) {
+          try {
+            const rs = await fetch("/api/org/invite", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ structureId: st.id, email: usr.email.trim(), silent: true }) });
+            const sj = await rs.json().catch(() => ({}));
+            if (sj?.ok) { shared += 1; if (sj.orgId) updateStructure(st.id, { orgId: String(sj.orgId) }); }
+          } catch { /* la scheda utente permette di riprovare */ }
+        }
+      }
       if (r.status === 403) toast(t("Utente creato. L'invito può partire solo dal titolare dell'account."), "error");
-      else if (j?.ok && j.notified) toast(`${t("Invito inviato a")} ${usr.email}`, "success");
+      else if (j?.ok && j.notified) toast(shared ? `${t("Invito inviato a")} ${usr.email} · ${shared} ${t("strutture condivise")}` : `${t("Invito inviato a")} ${usr.email}`, "success");
       else if (j?.ok) toast(`${usr.email} ${t("è abilitata ma l'email non è partita: apri la scheda e copia il link.")}`, "error");
       else toast(t("Utente creato, ma l'invito non è partito."), "error");
     } catch { toast(t("Utente creato, ma l'invito non è partito."), "error"); }
