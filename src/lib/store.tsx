@@ -134,6 +134,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Lapidi (tombstone): id delle entità cancellate qui. Servono a impedire che la fusione a 3 vie
   // con il server le "resusciti" al refresh (la base di fusione è vuota alla prima idratazione).
   const deletedRef = useRef<Record<string, string[]>>({});
+  const freshGuests = useRef<Map<string, Guest>>(new Map()); // ospiti appena creati: lo stato si aggiorna dopo, ma la prenotazione creata nello stesso passaggio deve già trovarli (nome nell'email di notifica)
   const notifyTimes = useRef<number[]>([]); // orari delle ultime email di notifica inviate da questo browser (freno per le operazioni di massa)
   const tomb = (key: string, ...ids: (string | undefined | null)[]) => {
     const set = new Set(deletedRef.current[key] ?? []);
@@ -176,7 +177,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       apiPost("calendar/sync-event", { action: "delete", bookingId: b.id, calendarId }).catch(() => {});
       return;
     }
-    const g = guests.find((x) => x.id === b.guestId);
+    const g = guests.find((x) => x.id === b.guestId) ?? freshGuests.current.get(b.guestId);
     const unit = units.find((u) => u.id === b.unitId);
     const rt = roomTypes.find((r) => r.id === (unit?.roomTypeId ?? b.roomTypeId));
     const roomLabel = [rt?.name, unit?.name].filter(Boolean).join(" · ");
@@ -203,7 +204,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const st = structures.find((s) => s.id === b.structureId);
     const to = st?.email?.trim();
     if (!to) return;
-    const g = guests.find((x) => x.id === b.guestId);
+    const g = guests.find((x) => x.id === b.guestId) ?? freshGuests.current.get(b.guestId);
     const unit = units.find((u) => u.id === b.unitId);
     const rt = roomTypes.find((r) => r.id === (unit?.roomTypeId ?? b.roomTypeId));
     const roomLabel = [rt?.name, unit?.name].filter(Boolean).join(" · ");
@@ -519,7 +520,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addGuest: (g) => {
         const id = uid();
         const fullName = g.fullName ?? `${g.firstName ?? ""} ${g.lastName ?? ""}`.trim();
-        setGuests((prev) => [...prev, { id, ...g, fullName, updatedAt: Date.now() }]);
+        const rec = { id, ...g, fullName, updatedAt: Date.now() };
+        freshGuests.current.set(id, rec);
+        setGuests((prev) => [...prev, rec]);
         return id;
       },
       updateGuest: (id, patch) => setGuests((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch, updatedAt: Date.now() } : g))),
@@ -567,7 +570,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         // "Prenotata il" = oggi di default (se non fornita, es. import/iCal la passano esplicita).
         const rec: Booking = { id: uid(), bookedOn: new Date().toISOString().slice(0, 10), ...b, code, updatedAt: Date.now() };
         setBookings((prev) => [...prev, rec]);
-        const gName = guests.find((g) => g.id === b.guestId)?.fullName;
+        const gName = (guests.find((g) => g.id === b.guestId) ?? freshGuests.current.get(b.guestId))?.fullName;
         if (b.channel === "blocked") logAct("block", `Fuori servizio${b.note ? " — " + b.note : ""}`, b.structureId);
         else logAct("booking", `Nuova prenotazione${gName ? " — " + gName : ""} · ${b.channel}`, b.structureId);
         if (rec.status !== "cancelled") { syncGcal(rec, "upsert"); notifyOwner("newBooking", rec); }
