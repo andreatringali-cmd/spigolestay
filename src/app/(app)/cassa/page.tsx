@@ -14,7 +14,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useToast } from "@/components/ToastProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, projectBalance, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveItem, computeLedger } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveItem, computeLedger } from "@/lib/cassa";
 import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
@@ -181,8 +181,6 @@ export default function CassaPage() {
   const bkOf = (x: Mov) => (x.ref && /^(auto-in|auto-comm|fc-in)-/.test(x.id) ? bookings.find((b) => b.id === x.ref) : undefined); // prenotazione da cui nasce il movimento
   const rowsOrdered = [...rows].sort((a, b) => { const d = a.date < b.date ? -1 : a.date > b.date ? 1 : ledgerOrd(a) - ledgerOrd(b); return futureView ? d : -d; });
   const listRows = groupBookingRows(rowsOrdered);
-  // Saldo previsto: saldo attuale dei conti + entrate e uscite future della struttura selezionata (le stesse delle card accanto).
-  const projectedEnd = useMemo(() => projectBalance([...auto, ...ledgerManual, ...forecastView], balances, today, to || fcEnd), [auto, ledgerManual, forecastView, balances, today, to, fcEnd]);
 
   // ---- Saldo di partenza: scrivi quanto hai oggi su un conto, da lì il saldo si aggiorna ----
   const [opening, setOpening] = useState<{ date: string; amounts: Record<string, string>; newName: string; startOfDay: boolean } | null>(null);
@@ -399,10 +397,10 @@ export default function CassaPage() {
 
       {/* Riepilogo */}
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label={t("Saldo attuale")} value={hasOpening ? eur(saldoTot) : "—"} color={hasOpening && saldoTot < 0 ? "var(--err)" : undefined} onClick={() => openOpening()} hint={hasOpening ? <>{Object.keys(saldoConti).length} {t("conti")}<br />{t("Previsto al")} {fmtDMY(listHorizon)}: <b className="font-mono text-dim">{eur(projectedEnd)}</b></> : t("Imposta il saldo di partenza →")} />
+        <StatCard label={t("Saldo attuale")} value={hasOpening ? eur(saldoTot) : "—"} color={hasOpening && saldoTot < 0 ? "var(--err)" : undefined} onClick={() => openOpening()} hint={hasOpening ? <>{Object.keys(saldoConti).length} {t("conti")}</> : t("Imposta il saldo di partenza →")} />
         <StatCard label={`${t("Entrate")} ${periodWord}`} value={eur(entrate)} color="var(--ok)" hint={`${rows.filter((m) => m.kind === "in").length} ${t("movimenti")}`} />
         <StatCard label={`${t("Uscite")} ${periodWord}`} value={eur(uscite)} color="var(--err)" hint={`${rows.filter((m) => m.kind === "out").length} ${t("movimenti")}`} />
-        <StatCard label={`${t("Saldo")} ${futureView ? t("previsto") : preset === "all" ? t("totale") : t("del periodo")}`} value={eur(prevCard ? saldoPrevisto : saldo)} color={(prevCard ? saldoPrevisto : saldo) >= 0 ? undefined : "var(--err)"} hint={prevCard ? t("saldo attuale + entrate − uscite") : t("entrate − uscite")} />
+        <StatCard label={`${t("Saldo")} ${futureView ? t("previsto") : preset === "all" ? t("totale") : t("del periodo")}`} value={eur(prevCard ? saldoPrevisto : saldo)} color={(prevCard ? saldoPrevisto : saldo) >= 0 ? undefined : "var(--err)"} hint={prevCard ? <>{t("saldo attuale + entrate − uscite")}<br />{t("al")} {fmtDMY(listHorizon)}</> : t("entrate − uscite")} />
       </div>
 
       {chartsOn && (
@@ -462,18 +460,6 @@ export default function CassaPage() {
       {/* Riga filtri + toggle grafici + Esporta */}
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca movimento…")} className="min-w-[220px] max-w-md flex-1" />
-        <select aria-label={t("Tipo di movimento")} value={tipo} onChange={(e) => setTipo(e.target.value as typeof tipo)} className={`rounded-lg border bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus ${tipo === "all" ? "border-line" : "border-focus"}`}>
-          <option value="all">{t("Tutti i movimenti")}</option>
-          <option value="in">{t("Solo entrate")}</option>
-          <option value="out">{t("Solo uscite")}</option>
-          <option value="booking">{t("Prenotazioni")}</option>
-          <option value="sched">{t("Pagamenti programmati")}</option>
-          <option value="manual">{t("Inseriti a mano")}</option>
-        </select>
-        <select aria-label={t("Categoria")} value={catF} onChange={(e) => setCatF(e.target.value)} className={`rounded-lg border bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus ${catF ? "border-focus" : "border-line"}`}>
-          <option value="">{t("Tutte le categorie")}</option>
-          {cats.filter((c) => c.key !== OPENING_CAT).map((c) => <option key={c.key} value={c.key}>{c.label ? t(c.label) : c.key}</option>)}
-        </select>
         <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
           <select aria-label={t("Periodo")} value={preset} onChange={(e) => applyPreset(e.target.value as Preset)} className="rounded-md border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
             <option value="future">{t("Oggi e future")}</option>
@@ -488,6 +474,18 @@ export default function CassaPage() {
           <span className="text-xs text-faint">→</span>
           <DateField value={to} onChange={(v) => { setTo(v); setPreset("custom"); }} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
         </div>
+        <select aria-label={t("Tipo di movimento")} value={tipo} onChange={(e) => setTipo(e.target.value as typeof tipo)} className={`rounded-lg border bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus ${tipo === "all" ? "border-line" : "border-focus"}`}>
+          <option value="all">{t("Tutti i movimenti")}</option>
+          <option value="in">{t("Solo entrate")}</option>
+          <option value="out">{t("Solo uscite")}</option>
+          <option value="booking">{t("Prenotazioni")}</option>
+          <option value="sched">{t("Pagamenti programmati")}</option>
+          <option value="manual">{t("Inseriti a mano")}</option>
+        </select>
+        <select aria-label={t("Categoria")} value={catF} onChange={(e) => setCatF(e.target.value)} className={`rounded-lg border bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus ${catF ? "border-focus" : "border-line"}`}>
+          <option value="">{t("Tutte le categorie")}</option>
+          {cats.filter((c) => c.key !== OPENING_CAT).map((c) => <option key={c.key} value={c.key}>{c.label ? t(c.label) : c.key}</option>)}
+        </select>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
           <button onClick={openNewMov} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Nuovo movimento")}</button>
