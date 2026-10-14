@@ -13,7 +13,7 @@ import Icon from "@/components/Icon";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, deleteMovement, insertRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, projectBalance, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveItem } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, deleteMovement, insertRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, projectBalance, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveItem, computeLedger } from "@/lib/cassa";
 import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
@@ -163,7 +163,6 @@ export default function CassaPage() {
   const rows = [...all, ...forecastView]
     .filter((m) => inPeriod(m.date) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
     .sort((a, b) => (futureView ? (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) : (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))); // da oggi: dal più vicino; storico: dal più recente
-  const listRows = groupBookingRows(rows);
   const rowsStat = rows.filter((m) => m.cat !== OPENING_CAT); // il saldo di partenza non è un incasso né una spesa del periodo
   const entrate = sumCents(rowsStat.filter((m) => m.kind === "in").map((m) => m.amount));
   const uscite = sumCents(rowsStat.filter((m) => m.kind === "out").map((m) => m.amount));
@@ -176,6 +175,11 @@ export default function CassaPage() {
   const saldoTot = sumCents(Object.values(saldoConti));
   const hasOpening = CONTI.some((c) => balances[c.key]?.since);
   const forecastTutte = useMemo<Mov[]>(() => computeForecast(bookings, guests, getStructure, rules, "all", today, to || shiftISO(today, 90), principal), [bookings, guests, getStructure, rules, today, to, principal]);
+  // Estratto conto: saldo dopo ogni movimento (tutti i movimenti di tutte le strutture) e ordine coerente nello stesso giorno.
+  const ledger = useMemo(() => computeLedger([...autoTutte, ...programmateTutte, ...manual, ...forecastTutte]), [autoTutte, programmateTutte, manual, forecastTutte]);
+  const ledgerOrd = (x: Mov) => ledger.order.get(x.id) ?? 0;
+  const rowsOrdered = [...rows].sort((a, b) => { const d = a.date < b.date ? -1 : a.date > b.date ? 1 : ledgerOrd(a) - ledgerOrd(b); return futureView ? d : -d; });
+  const listRows = groupBookingRows(rowsOrdered);
   const projectedEnd = useMemo(() => projectBalance([...autoTutte, ...manual, ...forecastTutte], balances, today, to || shiftISO(today, 90)), [autoTutte, manual, forecastTutte, balances, today, to]);
 
   // ---- Saldo di partenza: scrivi quanto hai oggi su un conto, da lì il saldo si aggiorna ----
@@ -550,54 +554,48 @@ export default function CassaPage() {
             <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Movimenti")}</SectionTitle><span className="text-xs text-faint">{listRows.length} {t("nel periodo")}</span></div>
             {rows.length === 0 ? <EmptyState title={t("Nessun movimento.")} /> : (
               <div className="-mx-1 max-h-[640px] overflow-y-auto px-1">
+              <div className="grid grid-cols-[84px_minmax(0,1fr)_auto_104px] items-center gap-x-3 sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
+                <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right">{t("Importo")}</span><span className="text-right">{t("Saldo")}</span>
+              </div>
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {listRows.map((r) => {
-                  if (r.type === "booking") {
-                    // UNA voce per prenotazione: lordo, commissioni e netto (i totali restano calcolati dai movimenti separati)
-                    const m = r.income, c = catOf(m.cat);
-                    return (
-                      <div key={"b-" + r.id} className="flex items-center gap-3 py-2.5">
-                        {iconCircle(c, 34)}
+                  const isBooking = r.type === "booking";
+                  const m = isBooking ? r.income : r.mov;
+                  const c = catOf(m.cat);
+                  // saldo in quella data = dopo l'ultimo movimento della riga (per la prenotazione: dopo incasso e commissione)
+                  const lastId = isBooking && r.commission && ledgerOrd(r.commission) > ledgerOrd(r.income) ? r.commission.id : m.id;
+                  const bal = ledger.balanceAfter.get(lastId) ?? null;
+                  return (
+                    <div key={isBooking ? "b-" + r.id : m.id} className="grid grid-cols-[84px_minmax(0,1fr)_auto_104px] items-center gap-x-3 py-2.5">
+                      <span className="font-mono text-xs text-dim">{fmtDMY(m.date)}</span>
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        {iconCircle(c, 30)}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="truncate text-sm font-medium text-txt">{m.desc}</span>
-                            <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>
+                            {m.forecast ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span> : (m.auto && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>)}
+                            {!isBooking && m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
                           </div>
                           <div className="mt-0.5 flex items-center gap-2 text-[11px] text-faint">
-                            <span>{new Date(m.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</span>
-                            <span>·</span><span>{c?.label ? t(c.label) : ""}</span>
+                            <span>{c?.label ? t(c.label) : ""}</span>
                             <span>·</span><span className="capitalize">{(() => { const l = CONTI.find((x) => x.key === m.conto)?.label; return l ? t(l) : ""; })()}</span>
                             {m.structureId && m.structureId !== "all" && <><span>·</span><span>{structNameOf(m.structureId)}</span></>}
                           </div>
                         </div>
-                        <div className="shrink-0 whitespace-nowrap font-mono text-[11px] leading-tight">
+                      </div>
+                      {isBooking ? (
+                        <div className="whitespace-nowrap font-mono text-[11px] leading-tight">
                           <div className="flex justify-between gap-4"><span className="font-sans text-faint">{t("Lordo")}</span><span style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span></div>
                           <div className="flex justify-between gap-4"><span className="font-sans text-faint">{t("Commissioni")}</span><span style={{ color: "var(--err)" }}>− {eur(r.comm)}</span></div>
                           <div className="mt-0.5 flex justify-between gap-4 border-t border-line pt-0.5 text-sm font-bold"><span className="font-sans text-[11px] font-semibold text-dim">{t("Netto")}</span><span className="text-txt">{eur(r.net)}</span></div>
                         </div>
-                      </div>
-                    );
-                  }
-                  const m = r.mov;
-                  const c = catOf(m.cat);
-                  return (
-                    <div key={m.id} className="flex items-center gap-3 py-2.5">
-                      {iconCircle(c, 34)}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-medium text-txt">{m.desc}</span>
-                          {m.forecast ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span> : (m.auto && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>)}
-                          {m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
+                      ) : (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="font-mono text-sm font-semibold" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
+                          {!m.auto && !m.sched && <button onClick={() => del(m.id)} title={t("Elimina")} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]">✕</button>}
                         </div>
-                        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-faint">
-                          <span>{new Date(m.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</span>
-                          <span>·</span><span>{c?.label ? t(c.label) : ""}</span>
-                          <span>·</span><span className="capitalize">{(() => { const l = CONTI.find((x) => x.key === m.conto)?.label; return l ? t(l) : ""; })()}</span>
-                          {m.structureId && m.structureId !== "all" && <><span>·</span><span>{structNameOf(m.structureId)}</span></>}
-                        </div>
-                      </div>
-                      <span className="shrink-0 font-mono text-sm font-semibold" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
-                      {!m.auto && !m.sched && <button onClick={() => del(m.id)} title={t("Elimina")} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]">✕</button>}
+                      )}
+                      <span className={"text-right font-mono text-sm font-bold " + (bal === null ? "text-faint" : m.forecast ? "text-dim" : bal >= 0 ? "text-txt" : "text-[color:var(--err)]")} title={bal === null ? t("Imposta il saldo di partenza per vedere il saldo") : m.forecast ? t("Saldo previsto") : t("Saldo dopo questo movimento")}>{bal === null ? "—" : eur(bal)}</span>
                     </div>
                   );
                 })}

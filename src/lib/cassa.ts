@@ -348,3 +348,29 @@ export function matchesQuery(m: Mov, q: string, labels: { cat?: string; conto?: 
   const hay = [m.desc, labels.cat, labels.conto, m.amount.toFixed(2), m.amount.toFixed(2).replace(".", ",")].filter(Boolean).join(" ").toLowerCase();
   return needle.split(/\s+/).every((w) => hay.includes(w));
 }
+
+// ── Estratto conto: saldo in quella data ────────────────────────────────────────────────────────────────────────────────
+// Per ogni movimento il saldo totale dei conti con un saldo di partenza, DOPO quel movimento. Ogni conto parte dal suo saldo di partenza
+// e si muove solo con i movimenti dei giorni successivi (stessa regola del saldo attuale); prima del primo saldo di partenza non c'è saldo (null).
+export interface Ledger { order: Map<string, number>; balanceAfter: Map<string, number | null> }
+export function computeLedger(movs: Mov[]): Ledger {
+  const seq = movs.map((m, i) => ({ m, i })).sort((a, b) => {
+    if (a.m.date !== b.m.date) return a.m.date < b.m.date ? -1 : 1;
+    const oa = a.m.cat === OPENING_CAT ? 0 : 1, ob = b.m.cat === OPENING_CAT ? 0 : 1; // nello stesso giorno prima i saldi di partenza
+    return oa - ob || a.i - b.i;
+  });
+  // saldo di partenza in vigore per conto: il più recente
+  const effective = new Map<string, Mov>();
+  for (const { m } of seq) if (m.cat === OPENING_CAT) effective.set(m.conto, m);
+  const bal = new Map<string, number>();
+  const order = new Map<string, number>();
+  const balanceAfter = new Map<string, number | null>();
+  let started = false;
+  seq.forEach(({ m }, idx) => {
+    order.set(m.id, idx);
+    if (m.cat === OPENING_CAT) { if (effective.get(m.conto)?.id === m.id) { bal.set(m.conto, signed(m)); started = true; } }
+    else { const op = effective.get(m.conto); if (op && m.date > op.date && bal.has(m.conto)) bal.set(m.conto, roundCents((bal.get(m.conto) ?? 0) + signed(m))); }
+    balanceAfter.set(m.id, started ? sumCents([...bal.values()]) : null);
+  });
+  return { order, balanceAfter };
+}
