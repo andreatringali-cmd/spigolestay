@@ -11,9 +11,10 @@ import { exportExcel, exportPdf } from "@/lib/export";
 import CatIcon, { ICON_KEYS } from "@/components/CatIcon";
 import Icon from "@/components/Icon";
 import { useConfirm } from "@/components/ConfirmProvider";
+import { useToast } from "@/components/ToastProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, projectBalance, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveItem, computeLedger } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, updateMovement, deleteMovement, insertRule, updateRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis, DEFAULT_CONTI, loadConti, saveConti, contoKeyFromLabel, type ContoDef, canDeleteConto, computeForecast, projectBalance, presetRange, matchesQuery, type Preset, loadContiPrefs, saveContiPrefs, moveItem, computeLedger } from "@/lib/cassa";
 import SearchInput from "@/components/SearchInput";
 import DateField from "@/components/DateField";
 import { shiftISO } from "@/lib/dates";
@@ -79,6 +80,7 @@ function Donut({ data, center, size = 148 }: { data: { label: string; value: num
 export default function CassaPage() {
   const { bookings, guests, structures, activeStructureId, getStructure } = useData();
   const ask = useConfirm();
+  const toast = useToast();
   const { t } = useLang();
   const { user } = useAuth();
 
@@ -269,13 +271,40 @@ export default function CassaPage() {
   // ---- Form nuovo movimento -------------------------------------------------
   const [form, setForm] = useState<{ kind: Kind; date: string; cat: string; desc: string; amount: string; conto: string; struttura: string; repeat: "once" | "monthly" | "weekly" | "yearly" }>(() => ({ kind: "out", date: todayISO(), cat: "pulizie", desc: "", amount: "", conto: "contanti", struttura: activeStructureId, repeat: "once" }));
   const setKind = (k: Kind) => setForm((f) => ({ ...f, kind: k, cat: cats.find((c) => c.kind === k && !c.auto)!.key }));
+  const [editingMov, setEditingMov] = useState<string | null>(null); // id del movimento in modifica (null = nuovo)
+  const resetForm = () => { setEditingMov(null); setForm((f) => ({ ...f, desc: "", amount: "", repeat: "once", date: todayISO() })); };
+  const startEditMov = (m: Mov) => {
+    setEditingMov(m.id);
+    setForm({ kind: m.kind, date: m.date, cat: m.cat, desc: m.desc, amount: String(m.amount).replace(".", ","), conto: m.conto, struttura: m.structureId ?? activeStructureId, repeat: "once" });
+    document.getElementById("form-movimento")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  // Se la data del movimento cade fuori dal periodo mostrato, allarga il periodo: la riga appena registrata deve vedersi nell'elenco.
+  const showDate = (d: string) => {
+    if (from && d < from) { setFrom(d); setPreset("custom"); }
+    if (to && d > to) { setTo(d); setPreset("custom"); }
+  };
   const add = () => {
     const amt = roundCents(parseFloat(form.amount.replace(",", ".")) || 0); // al centesimo (prima era arrotondato all'euro)
-    if (amt <= 0) return;
+    if (amt <= 0) { toast(t("Inserisci un importo maggiore di zero."), "error"); return; }
+    if (!form.date) { toast(t("Inserisci la data."), "error"); return; }
     const desc = form.desc.trim() || catOf(form.cat)?.label || "";
+    const summary = `${fmtDMY(form.date)} · ${form.kind === "in" ? "+" : "−"} ${eur(amt)}`;
+    if (editingMov) {
+      const prev = manual.find((m) => m.id === editingMov);
+      if (!prev) { resetForm(); return; }
+      const next: Mov = { ...prev, date: form.date, kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura };
+      setManual((all) => all.map((m) => (m.id === prev.id ? next : m)));
+      if (user) checkWrite(updateMovement(prev.id, next), "La modifica", () => setManual((all) => all.map((m) => (m.id === prev.id ? prev : m))));
+      showDate(form.date);
+      toast(`${t("Movimento modificato")} · ${summary}`, "success");
+      resetForm();
+      return;
+    }
     const mov: Mov = { id: uid(), date: form.date, kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura };
     setManual((prev) => [mov, ...prev]);
     if (user) checkWrite(insertMovement(user.id, mov), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
+    showDate(form.date);
+    toast(`${t("Movimento registrato")} · ${summary}`, "success");
     // Ricorrente: crea la regola che riparte dal periodo SUCCESSIVO (questo è già registrato come movimento).
     if (form.repeat !== "once") {
       const d = new Date(form.date);
@@ -456,7 +485,8 @@ export default function CassaPage() {
         {/* Colonna sinistra */}
         <div className="flex flex-col gap-4">
           <Card>
-            <SectionTitle>{t("Nuovo movimento")}</SectionTitle>
+            <div id="form-movimento" className="-mt-2 pt-2" />
+            <SectionTitle>{editingMov ? t("Modifica movimento") : t("Nuovo movimento")}</SectionTitle>
             <div className="mb-3 grid grid-cols-2 gap-2">
               <button onClick={() => setKind("out")} className={`rounded-lg border py-2 text-sm font-semibold transition ${form.kind === "out" ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:bg-wash"}`}>− {t("Uscita")}</button>
               <button onClick={() => setKind("in")} className={`rounded-lg border py-2 text-sm font-semibold transition ${form.kind === "in" ? "border-[color:var(--ok)] text-[color:var(--ok)]" : "border-line text-dim hover:bg-wash"}`}>+ {t("Entrata")}</button>
@@ -474,7 +504,7 @@ export default function CassaPage() {
             </div>
             {activeStructureId === "all" && <label className="mb-2 block"><span className="text-xs text-dim">{t("Struttura")}</span><select value={form.struttura} onChange={(e) => setForm((f) => ({ ...f, struttura: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{activeStructureId === "all" && <option value="all">{t("Tutte le strutture")}</option>}{structures.filter((s) => activeStructureId === "all" || s.id === activeStructureId).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Descrizione (facoltativa)")}</span><input value={form.desc} onChange={(e) => setForm((f) => ({ ...f, desc: e.target.value }))} placeholder={t("es. Bolletta Enel agosto")} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
-            <div className="mb-3">
+            {!editingMov && <div className="mb-3">
               <span className="text-xs text-dim">{t("Si ripete?")}</span>
               <div className="mt-1 grid grid-cols-4 gap-1.5">
                 {([["once", "Solo una volta"], ["monthly", "Ogni mese"], ["weekly", "Ogni settimana"], ["yearly", "Ogni anno"]] as [typeof form.repeat, string][]).map(([v, lab]) => (
@@ -482,8 +512,9 @@ export default function CassaPage() {
                 ))}
               </div>
               {form.repeat !== "once" && <p className="mt-1 text-[11px] text-faint">{t("Registro questo movimento oggi e creo un pagamento programmato che si ripete da solo.")}</p>}
-            </div>
-            <button onClick={add} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{form.repeat === "once" ? t("Registra movimento") : t("Registra e programma")}</button>
+            </div>}
+            <button onClick={add} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{editingMov ? t("Salva modifiche") : form.repeat === "once" ? t("Registra movimento") : t("Registra e programma")}</button>
+            {editingMov && <button onClick={resetForm} className="mt-1.5 w-full rounded-lg border border-line py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla modifica")}</button>}
           </Card>
 
           {/* Pagamenti programmati */}
@@ -620,6 +651,7 @@ export default function CassaPage() {
                       ) : (
                         <div className="flex items-center justify-end gap-1.5">
                           <span className="font-mono text-sm font-semibold" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
+                          {!m.auto && !m.sched && !m.forecast && m.cat !== OPENING_CAT && <button onClick={() => startEditMov(m)} title={t("Modifica")} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-txt">✎</button>}
                           {!m.auto && !m.sched && <button onClick={() => del(m.id)} title={t("Elimina")} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]">✕</button>}
                         </div>
                       )}

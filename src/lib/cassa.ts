@@ -110,6 +110,11 @@ export async function insertMovement(tenantId: string, m: Mov): Promise<WriteRes
   const { error } = await supabase.from("cash_movements").insert({ ...(isUuid(m.id) ? { id: m.id } : {}), tenant_id: tenantId, structure_id: m.structureId ?? null, date: m.date, kind: m.kind, cat: m.cat, descr: m.desc, amount_cents: e2c(m.amount), conto: m.conto });
   return errMsg(error);
 }
+export async function updateMovement(id: string, m: Mov): Promise<WriteResult> {
+  if (!supabase) return NO_CONN;
+  const { error } = await supabase.from("cash_movements").update({ structure_id: m.structureId ?? null, date: m.date, kind: m.kind, cat: m.cat, descr: m.desc, amount_cents: e2c(m.amount), conto: m.conto }).eq("id", id);
+  return errMsg(error);
+}
 export async function deleteMovement(id: string): Promise<WriteResult> {
   if (!supabase) return NO_CONN;
   const { error } = await supabase.from("cash_movements").delete().eq("id", id);
