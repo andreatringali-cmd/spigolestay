@@ -437,8 +437,8 @@ export default function CassaPage() {
         <Card>
           <SectionTitle>{t("Uscite per categoria")}</SectionTitle>
           {perCat.length === 0 ? <p className="text-sm text-faint">{t("Nessuna uscita nel periodo.")}</p> : (
-            <div className="flex flex-col gap-2.5">
-              {perCat.slice(0, 5).map(({ cat, v }) => (
+            <div className="flex max-h-[172px] flex-col gap-2.5 overflow-y-auto pr-2">
+              {perCat.map(({ cat, v }) => (
                 <div key={cat!.key}>
                   <div className="mb-1 flex items-center justify-between text-xs">
                     <span className="flex items-center gap-1.5 text-dim"><span style={{ color: cat!.color }}><CatIcon name={cat!.icon} size={15} /></span>{t(cat!.label)}</span>
@@ -447,7 +447,6 @@ export default function CassaPage() {
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${(v / maxCat) * 100}%`, backgroundColor: cat!.color }} /></div>
                 </div>
               ))}
-              {perCat.length > 5 && <div className="text-[11px] text-faint">+{perCat.length - 5} {t("altre categorie")} · {eur(sumCents(perCat.slice(5).map((x) => x.v)))}</div>}
             </div>
           )}
         </Card>
