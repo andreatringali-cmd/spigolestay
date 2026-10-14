@@ -187,3 +187,25 @@ export function computeBalances(movs: Mov[], today: string, conti: string[]): Re
   }
   return out;
 }
+
+// ── Asse e etichette dei grafici ────────────────────────────────────────────────────────────────────────────────────────
+/** Importo in forma breve per etichette strette: 850 · 1,2k · 12k · 1,5M. */
+export function compactEuro(n: number): string {
+  const a = Math.abs(n);
+  if (a >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(".", ",")}M`;
+  if (a >= 10_000) return `${Math.round(n / 1000)}k`;
+  if (a >= 1_000) return `${(n / 1000).toFixed(1).replace(".", ",")}k`;
+  return String(Math.round(n));
+}
+
+/** Massimo "tondo" dell'asse Y e passo tra le linee (4 intervalli): 1, 1,5, 2, 2,5, 5 × potenza di 10. */
+export function niceAxis(maxValue: number): { max: number; step: number } {
+  if (!(maxValue > 0)) return { max: 4, step: 1 };
+  const exp = Math.floor(Math.log10(maxValue / 4));
+  for (const mult of [1, 1.5, 2, 2.5, 5, 10]) {
+    const step = mult * 10 ** exp;
+    if (step * 4 >= maxValue - 1e-9) return { max: step * 4, step };
+  }
+  const step = 10 ** (exp + 1);
+  return { max: step * 4, step };
+}

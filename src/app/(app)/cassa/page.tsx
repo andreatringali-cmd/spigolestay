@@ -13,7 +13,7 @@ import Icon from "@/components/Icon";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, deleteMovement, insertRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, deleteMovement, insertRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT, compactEuro, niceAxis } from "@/lib/cassa";
 import { fmtDMY } from "@/lib/dates";
 
 // ---- Conti cassa ------------------------------------------------------------
@@ -164,7 +164,7 @@ export default function CassaPage() {
   const autoTutte = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, "all"), [bookings, guests, getStructure]);
   const programmateTutte = useMemo<Mov[]>(() => computeScheduled(rules, paidSet, "all", today), [rules, paidSet, today]);
   const balances = useMemo(() => computeBalances([...autoTutte, ...programmateTutte, ...manual], today, CONTI.map((c) => c.key)), [autoTutte, programmateTutte, manual, today]);
-  const saldoConti: Record<string, number> = Object.fromEntries(CONTI.map((c) => [c.key, balances[c.key]?.saldo ?? 0]));
+  const saldoConti: Record<string, number> = Object.fromEntries(CONTI.filter((c) => balances[c.key]?.since).map((c) => [c.key, balances[c.key].saldo])); // solo i conti con saldo di partenza: gli altri non hanno uno storico completo
   const saldoTot = sumCents(Object.values(saldoConti));
   const hasOpening = CONTI.some((c) => balances[c.key]?.since);
 
@@ -197,6 +197,8 @@ export default function CassaPage() {
     return list;
   }, [all, month, year, today]);
   const maxTrend = Math.max(1, ...trend.flatMap((t) => [t.in, t.out]));
+  const axis = niceAxis(maxTrend); // asse Y a 4 intervalli con massimo "tondo"
+  const axisTicks = [0, 1, 2, 3, 4].map((i) => i * axis.step);
 
   // ---- Form nuovo movimento -------------------------------------------------
   const [form, setForm] = useState<{ kind: Kind; date: string; cat: string; desc: string; amount: string; conto: string; struttura: string; repeat: "once" | "monthly" | "weekly" | "yearly" }>(() => ({ kind: "out", date: todayISO(), cat: "pulizie", desc: "", amount: "", conto: "contanti", struttura: activeStructureId, repeat: "once" }));
@@ -286,7 +288,7 @@ export default function CassaPage() {
 
       {/* Riepilogo */}
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label={t("Saldo attuale")} value={eur(saldoTot)} color={saldoTot >= 0 ? undefined : "var(--err)"} onClick={() => openOpening("banca")} hint={hasOpening ? t("tutti i conti · tutte le strutture · aggiornato a oggi") : t("Imposta il saldo di partenza →")} />
+        <StatCard label={t("Saldo attuale")} value={hasOpening ? eur(saldoTot) : "—"} color={hasOpening && saldoTot < 0 ? "var(--err)" : undefined} onClick={() => openOpening("banca")} hint={hasOpening ? `${t("conti con saldo impostato")} (${Object.keys(saldoConti).length}) · ${t("tutte le strutture")}` : t("Imposta il saldo di partenza →")} />
         <StatCard label={`${t("Entrate")} ${periodWord}`} value={eur(entrate)} color="var(--ok)" hint={`${rows.filter((m) => m.kind === "in").length} ${t("movimenti")}`} />
         <StatCard label={`${t("Uscite")} ${periodWord}`} value={eur(uscite)} color="var(--err)" hint={`${rows.filter((m) => m.kind === "out").length} ${t("movimenti")}`} />
         <StatCard label={`${t("Saldo")} ${month !== "all" ? t("del mese") : year !== "all" ? t("dell'anno") : mon !== "all" ? t("del mese (tutti gli anni)") : t("totale")}`} value={eur(saldo)} color={saldo >= 0 ? undefined : "var(--err)"} hint={t("entrate − uscite")} />
@@ -313,16 +315,32 @@ export default function CassaPage() {
             <SectionTitle>{t("Andamento ultimi 12 mesi")}</SectionTitle>
             <div className="flex items-center gap-4 text-xs text-dim"><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--ok)" }} />{t("Entrate")}</span><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--err)" }} />{t("Uscite")}</span></div>
           </div>
-          <div className="flex items-end justify-between gap-2 pt-2" style={{ height: 160 }}>
-            {trend.map((tr) => (
-              <div key={tr.ym} className="flex flex-1 flex-col items-center gap-1">
-                <div className="flex w-full items-end justify-center gap-1.5" style={{ height: 120 }}>
-                  <div className="w-1/3 max-w-[26px] rounded-t" title={`${t("Entrate")} ${eur(tr.in)}`} style={{ height: `${(tr.in / maxTrend) * 100}%`, backgroundColor: "var(--ok)", minHeight: tr.in > 0 ? 3 : 0 }} />
-                  <div className="w-1/3 max-w-[26px] rounded-t" title={`${t("Uscite")} ${eur(tr.out)}`} style={{ height: `${(tr.out / maxTrend) * 100}%`, backgroundColor: "var(--err)", minHeight: tr.out > 0 ? 3 : 0 }} />
-                </div>
-                <span className="text-[10px] capitalize text-faint">{monthLabel(tr.ym).split(" ")[0].slice(0, 3)}</span>
+          <div className="flex" style={{ height: 160 }}>
+            {/* asse Y */}
+            <div className="relative mr-2 w-9 shrink-0" style={{ marginTop: 18, height: 120 }}>
+              {axisTicks.map((v) => <span key={v} className="absolute right-0 -translate-y-1/2 font-mono text-[9px] leading-none text-faint" style={{ top: `${100 - (v / axis.max) * 100}%` }}>{compactEuro(v)}</span>)}
+            </div>
+            <div className="relative min-w-0 flex-1">
+              {/* linee di riferimento */}
+              <div className="pointer-events-none absolute inset-x-0" style={{ top: 18, height: 120 }}>
+                {axisTicks.map((v) => <div key={v} className="absolute inset-x-0 border-t border-dashed border-line" style={{ top: `${100 - (v / axis.max) * 100}%`, opacity: v === 0 ? 1 : 0.7 }} />)}
               </div>
-            ))}
+              <div className="relative flex items-end justify-between gap-2 pt-[18px]" style={{ height: 160 }}>
+                {trend.map((tr) => (
+                  <div key={tr.ym} className="flex flex-1 flex-col items-center gap-1">
+                    <div className="flex w-full items-end justify-center gap-1.5" style={{ height: 120 }}>
+                      <div className="relative w-1/3 max-w-[26px] rounded-t" title={`${t("Entrate")} ${eur(tr.in)}`} style={{ height: `${(tr.in / axis.max) * 100}%`, backgroundColor: "var(--ok)", minHeight: tr.in > 0 ? 3 : 0 }}>
+                        {tr.in > 0 && <span className="absolute bottom-full left-1/2 mb-0.5 hidden -translate-x-1/2 whitespace-nowrap font-mono text-[8px] leading-none text-dim sm:block">{compactEuro(tr.in)}</span>}
+                      </div>
+                      <div className="relative w-1/3 max-w-[26px] rounded-t" title={`${t("Uscite")} ${eur(tr.out)}`} style={{ height: `${(tr.out / axis.max) * 100}%`, backgroundColor: "var(--err)", minHeight: tr.out > 0 ? 3 : 0 }}>
+                        {tr.out > 0 && <span className="absolute bottom-full left-1/2 mb-0.5 hidden -translate-x-1/2 whitespace-nowrap font-mono text-[8px] leading-none text-dim sm:block">{compactEuro(tr.out)}</span>}
+                      </div>
+                    </div>
+                    <span className="text-[10px] capitalize text-faint">{monthLabel(tr.ym).split(" ")[0].slice(0, 3)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </Card>
       </div>
@@ -534,7 +552,7 @@ export default function CassaPage() {
           <Card>
             <SectionTitle>{t("Saldo per conto")}</SectionTitle>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {CONTI.map((c) => <div key={c.key} className="rounded-lg border border-line p-3"><div className="flex items-center justify-between gap-1"><span className="text-xs text-dim">{t(c.label)}</span><button onClick={() => openOpening(c.key)} title={t("Imposta il saldo di partenza di questo conto")} className="rounded px-1 text-[11px] font-semibold text-focus hover:bg-wash">{t("Imposta")}</button></div><div className={`mt-0.5 font-mono text-lg font-bold ${(saldoConti[c.key] ?? 0) >= 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{eur(saldoConti[c.key] ?? 0)}</div>{balances[c.key]?.since && <div className="text-[10px] text-faint">{t("da")} {fmtDMY(balances[c.key].since)}</div>}</div>)}
+              {CONTI.map((c) => <div key={c.key} className="rounded-lg border border-line p-3"><div className="flex items-center justify-between gap-1"><span className="text-xs text-dim">{t(c.label)}</span><button onClick={() => openOpening(c.key)} title={t("Imposta il saldo di partenza di questo conto")} className="rounded px-1 text-[11px] font-semibold text-focus hover:bg-wash">{t("Imposta")}</button></div><div className={`mt-0.5 font-mono text-lg font-bold ${balances[c.key]?.since ? ((saldoConti[c.key] ?? 0) >= 0 ? "text-txt" : "text-[color:var(--err)]") : "text-faint"}`}>{balances[c.key]?.since ? eur(saldoConti[c.key] ?? 0) : "—"}</div><div className="text-[10px] text-faint">{balances[c.key]?.since ? `${t("da")} ${fmtDMY(balances[c.key].since)}` : t("da impostare")}</div></div>)}
             </div>
           </Card>
         </div>
