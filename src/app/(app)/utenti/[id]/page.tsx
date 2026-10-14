@@ -17,6 +17,9 @@ import { useLang } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import MfaSetup from "@/components/MfaSetup";
+import UserAccessCard from "@/components/UserAccessCard";
+import { useToast } from "@/components/ToastProvider";
+import { isValidEmail } from "@/lib/user-access";
 
 // --- Micro-componenti ---------------------------------------------------------
 function Toggle({ on, onClick, disabled, color = "var(--focus)" }: { on: boolean; onClick?: () => void; disabled?: boolean; color?: string }) {
@@ -53,7 +56,8 @@ export default function UserSchedaPage() {
   const { t } = useLang();
   const params = useParams<{ id: string }>();
   const isNew = params.id === "nuovo";
-  const { structures, addActivity } = useData();
+  const { structures, addActivity, updateStructure } = useData();
+  const toast = useToast();
   const ask = useConfirm();
 
   const [u, setU] = useState<User>(() => {
@@ -144,12 +148,27 @@ export default function UserSchedaPage() {
   if (!u.username.trim()) errs.push(t("Username"));
   const valid = errs.length === 0;
 
+  const autoInvite = async (usr: User) => {
+    if (!isValidEmail(usr.email) || (authUser?.email && authUser.email.trim().toLowerCase() === usr.email.trim().toLowerCase())) return;
+    try {
+      const token = (await supabase?.auth.getSession())?.data.session?.access_token;
+      if (!token) return;
+      const r = await fetch("/api/admin/allowlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ email: usr.email.trim(), note: `Utente: ${usr.firstName} ${usr.lastName}`.trim() }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.status === 403) toast(t("Utente creato. L'invito può partire solo dal titolare dell'account."), "error");
+      else if (j?.ok && j.notified) toast(`${t("Invito inviato a")} ${usr.email}`, "success");
+      else if (j?.ok) toast(`${usr.email} ${t("è abilitata ma l'email non è partita: apri la scheda e copia il link.")}`, "error");
+      else toast(t("Utente creato, ma l'invito non è partito."), "error");
+    } catch { toast(t("Utente creato, ma l'invito non è partito."), "error"); }
+  };
+
   const save = () => {
     if (!valid) return;
     const list = loadUsers();
     const clean: User = { ...u, avatarColor: u.avatarColor ?? AV_COLORS[0] };
     const next = isNew || !list.some((x) => x.id === u.id) ? [...list, { ...clean, status: clean.status }] : list.map((x) => (x.id === u.id ? clean : x));
     saveUsers(next);
+    if (isNew) void autoInvite(clean);
     router.push("/utenti");
   };
   const isAdmin = u.templateKey === "owner" || u.id === "u-owner"; // l'amministratore non è eliminabile
@@ -226,6 +245,8 @@ export default function UserSchedaPage() {
             </div>
             <MfaSetup />
           </Card>
+
+          {!isNew && <UserAccessCard user={u} structures={structures.map((x) => ({ id: x.id, name: x.name }))} onShared={(sid, orgId) => updateStructure(sid, { orgId })} />}
 
           {/* Informazioni generali */}
           <Card>
