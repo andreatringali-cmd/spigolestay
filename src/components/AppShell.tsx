@@ -26,6 +26,7 @@ import AppFooter from "./AppFooter";
 import AssistantBar from "./AssistantBar";
 import StyleLoader from "./StyleLoader";
 import OnboardingWizard from "./OnboardingWizard";
+import CollaboratorSync from "./CollaboratorSync";
 import IdleLogout from "./IdleLogout";
 import PendingInvite from "./PendingInvite";
 
@@ -83,6 +84,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <NewBookingModal />
           <SupportWidget />
           <OnboardingWizard />
+          <CollaboratorSync />
           <IdleLogout />
         </div>
         </ToastProvider>

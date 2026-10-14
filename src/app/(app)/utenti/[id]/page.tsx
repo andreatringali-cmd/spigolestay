@@ -19,7 +19,7 @@ import { useAuth } from "@/lib/authsync";
 import MfaSetup from "@/components/MfaSetup";
 import UserAccessCard from "@/components/UserAccessCard";
 import { useToast } from "@/components/ToastProvider";
-import { isValidEmail, structuresToShare } from "@/lib/user-access";
+import { isValidEmail, structuresToShare, humanInviteError } from "@/lib/user-access";
 
 // --- Micro-componenti ---------------------------------------------------------
 function Toggle({ on, onClick, disabled, color = "var(--focus)" }: { on: boolean; onClick?: () => void; disabled?: boolean; color?: string }) {
@@ -151,12 +151,15 @@ export default function UserSchedaPage() {
   // Condivide le strutture del profilo con l'email della persona (invito silenzioso: lei le trova al primo accesso). Idempotente.
   const shareProfileStructures = async (usr: User, token: string): Promise<number> => {
     let ok = 0;
-    for (const st of structuresToShare(structures, usr)) {
+    const targets = structuresToShare(structures, usr);
+    if (targets.length === 0 && (usr.allStructures === false || (usr.structureIds ?? []).length > 0)) toast(t("Nessuna delle strutture assegnate è stata trovata nel tuo account: ricarica la pagina e riprova."), "error");
+    for (const st of targets) {
       try {
         const rs = await fetch("/api/org/invite", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ structureId: st.id, email: usr.email.trim(), silent: true }) });
         const sj = await rs.json().catch(() => ({}));
         if (sj?.ok) { ok += 1; if (sj.orgId) updateStructure(st.id, { orgId: String(sj.orgId) }); }
-      } catch { /* la scheda utente permette di riprovare */ }
+        else toast(`${st.name}: ${humanInviteError(String(sj?.error ?? ""), String(sj?.message ?? ""))}`, "error"); // prima l'errore restava nascosto
+      } catch { toast(`${st.name}: ${t("rete non disponibile")}`, "error"); }
     }
     return ok;
   };
