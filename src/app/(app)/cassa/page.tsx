@@ -42,7 +42,8 @@ const DEFAULT_CATS: Cat[] = [
   { key: "tasse", label: "Tasse e imposte", kind: "out", color: "#7C3AED", icon: "file" },
   { key: "personale", label: "Personale", kind: "out", color: "#2563EB", icon: "users" },
   { key: "marketing", label: "Marketing", kind: "out", color: "#0891B2", icon: "megaphone" },
-  { key: "affitto", label: "Affitto / Mutuo", kind: "out", color: "#DB2777", icon: "home" },
+  { key: "affitto", label: "Affitto", kind: "out", color: "#DB2777", icon: "home" },
+  { key: "mutuo", label: "Mutuo", kind: "out", color: "#9D174D", icon: "bank" },
   { key: "altro_out", label: "Altra uscita", kind: "out", color: "#6B7280", icon: "box" },
 ];
 
@@ -121,7 +122,18 @@ export default function CassaPage() {
   }, [rules, activeStructureId, today, paidSet]);
   const dropPaid = (keys: string[]) => setPaid((p) => p.filter((x) => !keys.includes(x)));
   const markPaid = (r: Rule, iso: string) => { const k = `${r.id}|${iso}`; setPaid((p) => [...p, k]); if (user) checkWrite(addPaid(user.id, [k]), "Il pagamento", () => dropPaid([k])); };
-  const markAllPaid = () => { const keys = pending.map((p) => `${p.rule.id}|${p.iso}`); setPaid((p) => [...p, ...keys]); if (user) checkWrite(addPaid(user.id, keys), "I pagamenti", () => dropPaid(keys)); };
+  const [pendAmt, setPendAmt] = useState<Record<string, string>>({}); // importo reale digitato per le scadenze a importo variabile
+  const confirmVariable = (r: Rule, iso: string) => {
+    const key = `${r.id}|${iso}`;
+    const amt = roundCents(parseFloat((pendAmt[key] ?? String(r.amount)).replace(",", ".")) || 0);
+    if (amt <= 0) { toast(t("Inserisci l'importo reale."), "error"); return; }
+    const mov: Mov = { id: uid(), date: iso, kind: r.kind, cat: r.cat, desc: r.desc, amount: amt, conto: r.conto, structureId: r.structureId };
+    setManual((prev) => [mov, ...prev]);
+    if (user) checkWrite(insertMovement(user.id, mov), "Il movimento", () => setManual((prev) => prev.filter((m) => m.id !== mov.id)));
+    markPaid(r, iso);
+    toast(`${t("Registrato")} · ${r.desc} · ${eur(amt)}`, "success");
+  };
+  const markAllPaid = () => { const keys = pending.filter((p) => !p.rule.variable).map((p) => `${p.rule.id}|${p.iso}`); setPaid((p) => [...p, ...keys]); if (user) checkWrite(addPaid(user.id, keys), "I pagamenti", () => dropPaid(keys)); };
 
   // Prossime scadenze (dopo oggi).
   const upcoming = useMemo(() => {
@@ -167,6 +179,7 @@ export default function CassaPage() {
   const rows = [...all, ...forecastView]
     .filter((m) => inPeriod(m.date) && matchesTipo(m) && (!catF || m.cat === catF) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
     .sort((a, b) => (futureView ? (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) : (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))); // da oggi: dal più vicino; storico: dal più recente
+  const catsInRegister = new Set([...all, ...forecastView].map((m) => m.cat)); // categorie presenti nel registro (filtro Categoria: solo quelle attive)
   const rowsStat = rows.filter((m) => m.cat !== OPENING_CAT); // il saldo di partenza non è un incasso né una spesa del periodo
   const entrate = sumCents(rowsStat.filter((m) => m.kind === "in").map((m) => m.amount));
   const uscite = sumCents(rowsStat.filter((m) => m.kind === "out").map((m) => m.amount));
@@ -351,13 +364,13 @@ export default function CassaPage() {
   // ---- Modale pagamento programmato -----------------------------------------
   const [ruleModal, setRuleModal] = useState(false);
   const [editingRule, setEditingRule] = useState<string | null>(null); // id della regola in modifica (null = nuova)
-  const [rf, setRf] = useState<{ kind: Kind; cat: string; desc: string; amount: string; conto: string; struttura: string; freq: Rule["freq"]; day: string; start: string; auto: boolean; end: string; note?: string }>(() => ({ kind: "out", cat: "affitto", desc: "", amount: "", conto: "banca", struttura: activeStructureId, freq: "monthly", day: "1", start: todayISO(), auto: true, end: "", note: "" }));
+  const [rf, setRf] = useState<{ kind: Kind; cat: string; desc: string; amount: string; conto: string; struttura: string; freq: Rule["freq"]; day: string; start: string; auto: boolean; end: string; note?: string; variable: boolean }>(() => ({ kind: "out", cat: "affitto", desc: "", amount: "", conto: "banca", struttura: activeStructureId, freq: "monthly", day: "1", start: todayISO(), auto: true, end: "", note: "", variable: false }));
   // La struttura del nuovo movimento/regola segue la struttura selezionata in alto a destra.
   useEffect(() => { setForm((f) => ({ ...f, struttura: activeStructureId })); setRf((f) => ({ ...f, struttura: activeStructureId })); }, [activeStructureId]);
   const openNewRule = () => { setEditingRule(null); setRuleModal(true); };
   const openEditRule = (r: Rule) => {
     setEditingRule(r.id);
-    setRf({ kind: r.kind, cat: r.cat, desc: r.desc, amount: String(r.amount).replace(".", ","), conto: r.conto, struttura: r.structureId ?? activeStructureId, freq: r.freq, day: String(r.day), start: r.start, auto: r.auto, end: r.end ?? "", note: r.note ?? "" });
+    setRf({ kind: r.kind, cat: r.cat, desc: r.desc, amount: String(r.amount).replace(".", ","), conto: r.conto, struttura: r.structureId ?? activeStructureId, freq: r.freq, day: String(r.day), start: r.start, auto: r.auto, end: r.end ?? "", note: r.note ?? "", variable: !!r.variable });
     setRuleModal(true);
   };
   const closeRuleModal = () => { setRuleModal(false); setEditingRule(null); };
@@ -367,13 +380,13 @@ export default function CassaPage() {
     if (editingRule) {
       const prev = rules.find((r) => r.id === editingRule);
       if (!prev) return closeRuleModal();
-      const next: Rule = { ...prev, kind: rf.kind, cat: rf.cat, desc: rf.desc.trim() || catOf(rf.cat)?.label || "", amount: amt, conto: rf.conto, structureId: rf.struttura, freq: rf.freq, day: parseInt(rf.day) || 1, start: rf.start, auto: rf.auto, end: rf.end || undefined, note: rf.note?.trim() || undefined };
+      const next: Rule = { ...prev, kind: rf.kind, cat: rf.cat, desc: rf.desc.trim() || catOf(rf.cat)?.label || "", amount: amt, conto: rf.conto, structureId: rf.struttura, freq: rf.freq, day: parseInt(rf.day) || 1, start: rf.start, auto: rf.variable ? false : rf.auto, end: rf.end || undefined, note: rf.note?.trim() || undefined, variable: rf.variable };
       setRules((all) => all.map((r) => (r.id === prev.id ? next : r)));
       if (user) checkWrite(updateRule(prev.id, next), "La modifica", () => setRules((all) => all.map((r) => (r.id === prev.id ? prev : r))));
       closeRuleModal();
       return;
     }
-    const rule: Rule = { id: uid(), kind: rf.kind, cat: rf.cat, desc: rf.desc.trim() || catOf(rf.cat)?.label || "", amount: amt, conto: rf.conto, structureId: rf.struttura, freq: rf.freq, day: parseInt(rf.day) || 1, start: rf.start, auto: rf.auto, end: rf.end || undefined, note: rf.note?.trim() || undefined };
+    const rule: Rule = { id: uid(), kind: rf.kind, cat: rf.cat, desc: rf.desc.trim() || catOf(rf.cat)?.label || "", amount: amt, conto: rf.conto, structureId: rf.struttura, freq: rf.freq, day: parseInt(rf.day) || 1, start: rf.start, auto: rf.variable ? false : rf.auto, end: rf.end || undefined, note: rf.note?.trim() || undefined, variable: rf.variable };
     setRules((prev) => [...prev, rule]);
     if (user) checkWrite(insertRule(user.id, rule), "Il pagamento programmato", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
     closeRuleModal();
@@ -416,7 +429,7 @@ export default function CassaPage() {
         <StatCard label={t("Saldo attuale")} value={hasOpening ? eur(saldoTot) : "—"} color={hasOpening && saldoTot < 0 ? "var(--err)" : undefined} onClick={() => openOpening()} hint={hasOpening ? <>{Object.keys(saldoConti).length} {t("conti")}</> : t("Imposta il saldo di partenza →")} />
         <StatCard label={`${t("Entrate")} ${periodWord}`} value={eur(entrate)} color="var(--ok)" hint={`${rows.filter((m) => m.kind === "in").length} ${t("movimenti")}`} />
         <StatCard label={`${t("Uscite")} ${periodWord}`} value={eur(uscite)} color="var(--err)" hint={`${rows.filter((m) => m.kind === "out").length} ${t("movimenti")}`} />
-        <StatCard label={`${t("Saldo")} ${futureView ? t("previsto") : preset === "all" ? t("totale") : t("del periodo")}`} value={eur(prevCard ? saldoPrevisto : saldo)} color={(prevCard ? saldoPrevisto : saldo) >= 0 ? undefined : "var(--err)"} hint={prevCard ? <>{t("saldo attuale + entrate − uscite")} {t("al")} {fmtDMY(listHorizon)}</> : t("entrate − uscite")} />
+        <StatCard label={`${t("Saldo")} ${futureView ? t("previsto") : preset === "all" ? t("totale") : t("del periodo")}`} value={eur(prevCard ? saldoPrevisto : saldo)} color={(prevCard ? saldoPrevisto : saldo) >= 0 ? undefined : "var(--err)"} hint={prevCard ? <>{t("con saldo attuale")} · {t("al")} {fmtDMY(listHorizon)}</> : t("entrate − uscite")} />
       </div>
 
       {chartsOn && (
@@ -500,7 +513,7 @@ export default function CassaPage() {
         </select>
         <select aria-label={t("Categoria")} value={catF} onChange={(e) => setCatF(e.target.value)} className={`rounded-lg border bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus ${catF ? "border-focus" : "border-line"}`}>
           <option value="">{t("Tutte le categorie")}</option>
-          {cats.filter((c) => c.key !== OPENING_CAT).map((c) => <option key={c.key} value={c.key}>{c.label ? t(c.label) : c.key}</option>)}
+          {cats.filter((c) => c.key !== OPENING_CAT && (c.key === catF || catsInRegister.has(c.key))).map((c) => <option key={c.key} value={c.key}>{c.label ? t(c.label) : c.key}</option>)}
         </select>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
@@ -632,11 +645,11 @@ export default function CassaPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
                             <span className="truncate text-sm font-medium text-txt">{r.desc}</span>
-                            <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={r.auto ? { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{r.auto ? t("auto") : t("manuale")}</span>
+                            <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={r.auto ? { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{r.variable ? t("variabile") : r.auto ? t("auto") : t("manuale")}</span>
                           </div>
                           <div className="mt-0.5 text-[11px] text-faint">{t(FREQ[r.freq])}{r.freq === "monthly" ? ` · ${t("il")} ${r.day}` : ""}{r.end ? ` · ${t("fino al")} ${new Date(r.end).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" })}` : ""}{next ? ` · ${t("prossima")} ${new Date(next).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}` : ""}</div>
                         </div>
-                        <span className="shrink-0 font-mono text-sm font-semibold" style={{ color: r.kind === "in" ? "var(--ok)" : "var(--err)" }}>{r.kind === "in" ? "+" : "−"} {eur(r.amount)}</span>
+                        <span className="shrink-0 font-mono text-sm font-semibold" style={{ color: r.kind === "in" ? "var(--ok)" : "var(--err)" }}>{r.variable ? "~ " : ""}{r.kind === "in" ? "+" : "−"} {eur(r.amount)}</span>
                         </button>
                       </div>
                     );
@@ -652,7 +665,7 @@ export default function CassaPage() {
             <Card className="border-[color:var(--warn)]">
               <div className="mb-3 flex items-center justify-between">
                 <SectionTitle>{t("Scadenze da registrare")}</SectionTitle>
-                <button onClick={markAllPaid} className="rounded-md px-2 py-1 text-xs font-semibold text-white" style={{ backgroundColor: "var(--ok)" }}>{t("Segna tutte pagate")}</button>
+                {pending.some((p) => !p.rule.variable) && <button onClick={markAllPaid} className="rounded-md px-2 py-1 text-xs font-semibold text-white" style={{ backgroundColor: "var(--ok)" }}>{t("Segna tutte pagate")}</button>}
               </div>
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {pending.map(({ rule, iso }) => {
@@ -667,8 +680,17 @@ export default function CassaPage() {
                           <span className="text-faint">{new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" })}</span>
                         </div>
                       </div>
-                      <span className="shrink-0 font-mono text-sm font-semibold" style={{ color: rule.kind === "in" ? "var(--ok)" : "var(--err)" }}>{rule.kind === "in" ? "+" : "−"} {eur(rule.amount)}</span>
-                      <button onClick={() => markPaid(rule, iso)} className="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--ok)" }}>{t("Segna pagata")}</button>
+                      {rule.variable ? (
+                        <>
+                          <input inputMode="decimal" aria-label={t("Importo reale")} title={t("Importo reale (la stima è precompilata)")} value={pendAmt[`${rule.id}|${iso}`] ?? String(rule.amount).replace(".", ",")} onChange={(e) => setPendAmt((p) => ({ ...p, [`${rule.id}|${iso}`]: e.target.value }))} className="w-24 shrink-0 rounded-lg border border-line bg-paper px-2 py-1 text-right font-mono text-sm text-txt outline-none focus:border-focus" />
+                          <button onClick={() => confirmVariable(rule, iso)} className="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--ok)" }}>{t("Registra")}</button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="shrink-0 font-mono text-sm font-semibold" style={{ color: rule.kind === "in" ? "var(--ok)" : "var(--err)" }}>{rule.kind === "in" ? "+" : "−"} {eur(rule.amount)}</span>
+                          <button onClick={() => markPaid(rule, iso)} className="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90" style={{ backgroundColor: "var(--ok)" }}>{t("Segna pagata")}</button>
+                        </>
+                      )}
                     </div>
                   );
                 })}
@@ -859,7 +881,7 @@ export default function CassaPage() {
             </div>
             <label className="mb-2 block"><span className="text-xs text-dim">{t("Descrizione")}</span><input value={rf.desc} onChange={(e) => setRf((f) => ({ ...f, desc: e.target.value }))} placeholder={t("es. Rata mutuo · Bolletta telefono")} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
             <div className="mb-2 grid grid-cols-2 gap-2">
-              <label className="block"><span className="text-xs text-dim">{t("Importo (€)")}</span><input inputMode="decimal" value={rf.amount} onChange={(e) => setRf((f) => ({ ...f, amount: e.target.value }))} placeholder="0,00" className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 font-mono text-txt outline-none focus:border-focus" /></label>
+              <label className="block"><span className="text-xs text-dim">{rf.variable ? t("Importo stimato (€)") : t("Importo (€)")}</span><input inputMode="decimal" value={rf.amount} onChange={(e) => setRf((f) => ({ ...f, amount: e.target.value }))} placeholder="0,00" className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 font-mono text-txt outline-none focus:border-focus" /></label>
               <label className="block"><span className="text-xs text-dim">{t("Categoria")}</span><button type="button" onClick={() => { setCatFor("rule"); setCatPicker(true); }} className="mt-0.5 flex w-full items-center gap-2 rounded-lg border border-line bg-paper px-2 py-1.5 text-left text-sm text-txt hover:bg-wash">{iconCircle(catOf(rf.cat), 26)}<span className="min-w-0 flex-1 truncate font-medium">{catOf(rf.cat)?.label ? t(catOf(rf.cat)!.label) : t("Scegli…")}</span><span className="text-faint">▾</span></button></label>
             </div>
             <div className="mb-2 grid grid-cols-2 gap-2">
@@ -877,10 +899,16 @@ export default function CassaPage() {
             {rf.freq === "monthly" && <label className="mb-2 block"><span className="text-xs text-dim">{t("A partire da")}</span><input type="date" value={rf.start} onChange={(e) => setRf((f) => ({ ...f, start: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>}
             <label className="mb-2 block"><span className="text-xs text-dim">{t("Termina ripetizione")}</span><input type="date" value={rf.end} onChange={(e) => setRf((f) => ({ ...f, end: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /><span className="mt-0.5 block text-[11px] text-faint">{t("Lascia vuoto per «Mai».")}</span></label>
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Nota (facoltativa)")}</span><input value={rf.note ?? ""} onChange={(e) => setRf((f) => ({ ...f, note: e.target.value }))} placeholder={t("es. IBAN, numero pratica…")} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
+            <button type="button" onClick={() => setRf((f) => ({ ...f, variable: !f.variable, auto: f.variable ? f.auto : false }))} className="mb-2 flex w-full items-center justify-between rounded-lg border border-line px-3 py-2.5 text-left hover:bg-wash">
+              <span><span className="text-sm font-medium text-txt">{t("Importo variabile")}</span><span className="mt-0.5 block text-[11px] text-faint">{rf.variable ? t("L'importo qui sopra è una stima per la previsione. Alla scadenza ti chiedo quanto hai speso davvero.") : t("Per spese che cambiano ogni mese: pulizie, biancheria, colazioni…")}</span></span>
+              <span className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: rf.variable ? "var(--ok)" : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: rf.variable ? "22px" : "2px" }} /></span>
+            </button>
+            {!rf.variable && (
             <button type="button" onClick={() => setRf((f) => ({ ...f, auto: !f.auto }))} className="mb-3 flex w-full items-center justify-between rounded-lg border border-line px-3 py-2.5 text-left hover:bg-wash">
               <span><span className="text-sm font-medium text-txt">{t("Registrazione automatica")}</span><span className="mt-0.5 block text-[11px] text-faint">{rf.auto ? t("Alla scadenza il movimento si registra da solo.") : t("Alla scadenza dovrai confermarlo con «Segna come pagata».")}</span></span>
               <span className="relative h-6 w-11 shrink-0 rounded-full transition" style={{ backgroundColor: rf.auto ? "var(--ok)" : "var(--line)" }}><span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all" style={{ left: rf.auto ? "22px" : "2px" }} /></span>
             </button>
+            )}
             <button onClick={addRule} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{editingRule ? t("Salva modifiche") : t("Salva pagamento programmato")}</button>
             {editingRule && <button onClick={async () => { const id = editingRule; closeRuleModal(); await delRule(id); }} className="mt-1.5 w-full rounded-lg border border-line py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina pagamento")}</button>}
           </div>

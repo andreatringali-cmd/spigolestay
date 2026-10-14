@@ -11,7 +11,7 @@ import { roundCents, sumCents } from "./money";
 
 export type Kind = "in" | "out";
 export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string; forecast?: boolean; channel?: string /* canale della prenotazione da cui nasce */ }
-export interface Rule { id: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; freq: "monthly" | "weekly" | "yearly"; day: number; start: string; end?: string; auto: boolean; note?: string }
+export interface Rule { id: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; freq: "monthly" | "weekly" | "yearly"; day: number; start: string; end?: string; auto: boolean; note?: string; variable?: boolean /* importo variabile: l'importo è una stima, alla scadenza si registra quello reale */ }
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const fmt = (y: number, m0: number, d: number) => `${y}-${pad(m0 + 1)}-${pad(d)}`;
@@ -78,6 +78,7 @@ export function computeScheduled(rules: Rule[], paid: Set<string>, active: strin
   const from = fmt(new Date().getFullYear() - 2, new Date().getMonth(), 1);
   for (const r of rules) {
     if (!scopeVisible(r.structureId, active)) continue;
+    if (r.variable) continue; // importo variabile: alla scadenza si registra un movimento con l'importo reale
     for (const iso of occurrences(r, from, uptoISO)) {
       if (!r.auto && !paid.has(`${r.id}|${iso}`)) continue;
       out.push({ id: `sched-${r.id}-${iso}`, date: iso, kind: r.kind, cat: r.cat, desc: r.desc, amount: r.amount, conto: r.conto, structureId: r.structureId, sched: true, ref: r.id });
@@ -96,7 +97,7 @@ export async function loadCash(): Promise<{ movements: Mov[]; rules: Rule[]; pai
     supabase.from("cash_paid").select("k"),
   ]);
   const movements = ((mv.data ?? []) as Row[]).map((r) => ({ id: String(r.id), date: String(r.date), kind: r.kind as Kind, cat: String(r.cat), desc: (r.descr as string) ?? "", amount: c2e(Number(r.amount_cents)), conto: String(r.conto), structureId: (r.structure_id as string) ?? undefined }));
-  const rules = ((rl.data ?? []) as Row[]).map((r) => ({ id: String(r.id), kind: r.kind as Kind, cat: String(r.cat), desc: (r.descr as string) ?? "", amount: c2e(Number(r.amount_cents)), conto: String(r.conto), structureId: (r.structure_id as string) ?? undefined, freq: r.freq as Rule["freq"], day: Number(r.day) || 1, start: String(r.start_date), end: (r.end_date as string) ?? undefined, auto: !!r.auto, note: (r.note as string) ?? undefined }));
+  const rules = ((rl.data ?? []) as Row[]).map((r) => ({ id: String(r.id), kind: r.kind as Kind, cat: String(r.cat), desc: (r.descr as string) ?? "", amount: c2e(Number(r.amount_cents)), conto: String(r.conto), structureId: (r.structure_id as string) ?? undefined, freq: r.freq as Rule["freq"], day: Number(r.day) || 1, start: String(r.start_date), end: (r.end_date as string) ?? undefined, auto: !!r.auto, note: (r.note as string) ?? undefined, variable: !!r.variable }));
   const paid = ((pd.data ?? []) as Row[]).map((r) => String(r.k));
   return { movements, rules, paid };
 }
@@ -124,12 +125,12 @@ export async function deleteMovement(id: string): Promise<WriteResult> {
 }
 export async function insertRule(tenantId: string, r: Rule): Promise<WriteResult> {
   if (!supabase) return NO_CONN;
-  const { error } = await supabase.from("cash_rules").insert({ ...(isUuid(r.id) ? { id: r.id } : {}), tenant_id: tenantId, structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null });
+  const { error } = await supabase.from("cash_rules").insert({ ...(isUuid(r.id) ? { id: r.id } : {}), tenant_id: tenantId, structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null, variable: !!r.variable });
   return errMsg(error);
 }
 export async function updateRule(id: string, r: Rule): Promise<WriteResult> {
   if (!supabase) return NO_CONN;
-  const { error } = await supabase.from("cash_rules").update({ structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null }).eq("id", id);
+  const { error } = await supabase.from("cash_rules").update({ structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null, variable: !!r.variable }).eq("id", id);
   return errMsg(error);
 }
 export async function deleteRule(id: string): Promise<WriteResult> {
@@ -153,7 +154,7 @@ export async function migrateLocalCash(tenantId: string): Promise<boolean> {
     const rules: Rule[] = JSON.parse(localStorage.getItem("spigolestay:cassa:rules") || "[]");
     const paid: string[] = JSON.parse(localStorage.getItem("spigolestay:cassa:paid") || "[]");
     if (movs.length) await supabase.from("cash_movements").insert(movs.map((m) => ({ ...(isUuid(m.id) ? { id: m.id } : {}), tenant_id: tenantId, structure_id: m.structureId ?? null, date: m.date, kind: m.kind, cat: m.cat, descr: m.desc, amount_cents: e2c(m.amount), conto: m.conto })));
-    if (rules.length) await supabase.from("cash_rules").insert(rules.map((r) => ({ ...(isUuid(r.id) ? { id: r.id } : {}), tenant_id: tenantId, structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null })));
+    if (rules.length) await supabase.from("cash_rules").insert(rules.map((r) => ({ ...(isUuid(r.id) ? { id: r.id } : {}), tenant_id: tenantId, structure_id: r.structureId ?? null, kind: r.kind, cat: r.cat, descr: r.desc, amount_cents: e2c(r.amount), conto: r.conto, freq: r.freq, day: r.day, start_date: r.start, end_date: r.end ?? null, auto: r.auto, note: r.note ?? null, variable: !!r.variable })));
     if (paid.length) await supabase.from("cash_paid").upsert(paid.map((k) => ({ tenant_id: tenantId, k })), { onConflict: "tenant_id,k" });
     localStorage.setItem("spigolestay:cassa:migrated", "1");
     return movs.length > 0 || rules.length > 0 || paid.length > 0;
