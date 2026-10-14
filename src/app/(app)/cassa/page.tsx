@@ -13,7 +13,8 @@ import Icon from "@/components/Icon";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, deleteMovement, insertRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, deleteMovement, insertRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows, computeBalances, OPENING_CAT } from "@/lib/cassa";
+import { fmtDMY } from "@/lib/dates";
 
 // ---- Conti cassa ------------------------------------------------------------
 const CONTI = [
@@ -32,6 +33,7 @@ const DEFAULT_CATS: Cat[] = [
   { key: "altro_in", label: "Altra entrata", kind: "in", color: "#65A30D", icon: "cash" },
   // Uscite
   { key: "commissioni", label: "Commissioni OTA", kind: "out", color: "#DC2626", icon: "percent", auto: true },
+  { key: "apertura", label: "Saldo di partenza", kind: "in", color: "#2563EB", icon: "cash", auto: true },
   { key: "pulizie", label: "Pulizie", kind: "out", color: "#EA580C", icon: "sparkles" },
   { key: "utenze", label: "Utenze", kind: "out", color: "#D97706", icon: "bolt" },
   { key: "manutenzione", label: "Manutenzione", kind: "out", color: "#CA8A04", icon: "wrench" },
@@ -154,21 +156,44 @@ export default function CassaPage() {
 
   const rows = all.filter((m) => inPeriod(m.date));
   const listRows = groupBookingRows(rows);
-  const entrate = sumCents(rows.filter((m) => m.kind === "in").map((m) => m.amount));
-  const uscite = sumCents(rows.filter((m) => m.kind === "out").map((m) => m.amount));
+  const rowsStat = rows.filter((m) => m.cat !== OPENING_CAT); // il saldo di partenza non è un incasso né una spesa del periodo
+  const entrate = sumCents(rowsStat.filter((m) => m.kind === "in").map((m) => m.amount));
+  const uscite = sumCents(rowsStat.filter((m) => m.kind === "out").map((m) => m.amount));
   const saldo = roundCents(entrate - uscite);
 
-  const saldoConti = useMemo(() => { const map: Record<string, number> = {}; for (const m of all) map[m.conto] = roundCents((map[m.conto] ?? 0) + (m.kind === "in" ? m.amount : -m.amount)); return map; }, [all]);
+  const autoTutte = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, "all"), [bookings, guests, getStructure]);
+  const programmateTutte = useMemo<Mov[]>(() => computeScheduled(rules, paidSet, "all", today), [rules, paidSet, today]);
+  const balances = useMemo(() => computeBalances([...autoTutte, ...programmateTutte, ...manual], today, CONTI.map((c) => c.key)), [autoTutte, programmateTutte, manual, today]);
+  const saldoConti: Record<string, number> = Object.fromEntries(CONTI.map((c) => [c.key, balances[c.key]?.saldo ?? 0]));
   const saldoTot = sumCents(Object.values(saldoConti));
+  const hasOpening = CONTI.some((c) => balances[c.key]?.since);
 
-  const perCat = useMemo(() => { const map: Record<string, number> = {}; for (const m of rows) if (m.kind === "out") map[m.cat] = roundCents((map[m.cat] ?? 0) + m.amount); return Object.entries(map).map(([k, v]) => ({ cat: catOf(k), v })).filter((x) => x.cat).sort((a, b) => b.v - a.v); }, [rows]);
+  // ---- Saldo di partenza: scrivi quanto hai oggi su un conto, da lì il saldo si aggiorna ----
+  const [opening, setOpening] = useState<{ conto: string; amount: string; date: string } | null>(null);
+  const openOpening = (conto: string) => { const cur = balances[conto]; setOpening({ conto, amount: cur?.since ? String(cur.start ?? "").replace(".", ",") : "", date: todayISO() }); };
+  const saveOpening = () => {
+    if (!opening) return;
+    const raw = parseFloat(opening.amount.replace(/\s/g, "").replace(",", "."));
+    if (!Number.isFinite(raw)) return;
+    const amt = roundCents(Math.abs(raw));
+    const mov: Mov = { id: uid(), date: opening.date || todayISO(), kind: raw >= 0 ? "in" : "out", cat: OPENING_CAT, desc: t("Saldo di partenza"), amount: amt, conto: opening.conto };
+    const old = manual.filter((x) => x.cat === OPENING_CAT && x.conto === opening.conto); // il nuovo sostituisce quello di prima
+    setManual((prev) => [mov, ...prev.filter((x) => !old.some((o) => o.id === x.id))]);
+    if (user) {
+      for (const o of old) checkWrite(deleteMovement(o.id), "Il saldo di partenza precedente", () => setManual((prev) => (prev.some((x) => x.id === o.id) ? prev : [o, ...prev])));
+      checkWrite(insertMovement(user.id, mov), "Il saldo di partenza", () => setManual((prev) => prev.filter((x) => x.id !== mov.id)));
+    }
+    setOpening(null);
+  };
+
+  const perCat = useMemo(() => { const map: Record<string, number> = {}; for (const m of rowsStat) if (m.kind === "out") map[m.cat] = roundCents((map[m.cat] ?? 0) + m.amount); return Object.entries(map).map(([k, v]) => ({ cat: catOf(k), v })).filter((x) => x.cat).sort((a, b) => b.v - a.v); }, [rowsStat]);
   const maxCat = Math.max(1, ...perCat.map((x) => x.v));
 
   const trend = useMemo(() => {
     const base = month !== "all" ? month : year !== "all" ? (year === today.slice(0, 4) ? monthKey(today) : `${year}-12`) : monthKey(today);
     const [by, bm] = base.split("-").map(Number);
     const list: { ym: string; in: number; out: number }[] = [];
-    for (let i = 11; i >= 0; i--) { const d = new Date(by, bm - 1 - i, 1); const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; const mm = all.filter((m) => monthKey(m.date) === ym); list.push({ ym, in: sumCents(mm.filter((m) => m.kind === "in").map((m) => m.amount)), out: sumCents(mm.filter((m) => m.kind === "out").map((m) => m.amount)) }); }
+    for (let i = 11; i >= 0; i--) { const d = new Date(by, bm - 1 - i, 1); const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; const mm = all.filter((m) => monthKey(m.date) === ym && m.cat !== OPENING_CAT); list.push({ ym, in: sumCents(mm.filter((m) => m.kind === "in").map((m) => m.amount)), out: sumCents(mm.filter((m) => m.kind === "out").map((m) => m.amount)) }); }
     return list;
   }, [all, month, year, today]);
   const maxTrend = Math.max(1, ...trend.flatMap((t) => [t.in, t.out]));
@@ -177,7 +202,7 @@ export default function CassaPage() {
   const [form, setForm] = useState<{ kind: Kind; date: string; cat: string; desc: string; amount: string; conto: string; struttura: string; repeat: "once" | "monthly" | "weekly" | "yearly" }>(() => ({ kind: "out", date: todayISO(), cat: "pulizie", desc: "", amount: "", conto: "contanti", struttura: activeStructureId, repeat: "once" }));
   const setKind = (k: Kind) => setForm((f) => ({ ...f, kind: k, cat: cats.find((c) => c.kind === k && !c.auto)!.key }));
   const add = () => {
-    const amt = Math.round(parseFloat(form.amount.replace(",", ".")) || 0);
+    const amt = roundCents(parseFloat(form.amount.replace(",", ".")) || 0); // al centesimo (prima era arrotondato all'euro)
     if (amt <= 0) return;
     const desc = form.desc.trim() || catOf(form.cat)?.label || "";
     const mov: Mov = { id: uid(), date: form.date, kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura };
@@ -219,7 +244,7 @@ export default function CassaPage() {
   useEffect(() => { setForm((f) => ({ ...f, struttura: activeStructureId })); setRf((f) => ({ ...f, struttura: activeStructureId })); }, [activeStructureId]);
   const rfCats = cats.filter((c) => c.kind === rf.kind && !c.auto);
   const addRule = () => {
-    const amt = Math.round(parseFloat(rf.amount.replace(",", ".")) || 0);
+    const amt = roundCents(parseFloat(rf.amount.replace(",", ".")) || 0);
     if (amt <= 0) return;
     const rule: Rule = { id: uid(), kind: rf.kind, cat: rf.cat, desc: rf.desc.trim() || catOf(rf.cat)?.label || "", amount: amt, conto: rf.conto, structureId: rf.struttura, freq: rf.freq, day: parseInt(rf.day) || 1, start: rf.start, auto: rf.auto, end: rf.end || undefined, note: rf.note?.trim() || undefined };
     setRules((prev) => [...prev, rule]);
@@ -261,7 +286,7 @@ export default function CassaPage() {
 
       {/* Riepilogo */}
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label={t("Saldo cassa")} value={eur(saldoTot)} color={saldoTot >= 0 ? undefined : "var(--err)"} hint={t("tutti i conti · storico")} />
+        <StatCard label={t("Saldo attuale")} value={eur(saldoTot)} color={saldoTot >= 0 ? undefined : "var(--err)"} onClick={() => openOpening("banca")} hint={hasOpening ? t("tutti i conti · tutte le strutture · aggiornato a oggi") : t("Imposta il saldo di partenza →")} />
         <StatCard label={`${t("Entrate")} ${periodWord}`} value={eur(entrate)} color="var(--ok)" hint={`${rows.filter((m) => m.kind === "in").length} ${t("movimenti")}`} />
         <StatCard label={`${t("Uscite")} ${periodWord}`} value={eur(uscite)} color="var(--err)" hint={`${rows.filter((m) => m.kind === "out").length} ${t("movimenti")}`} />
         <StatCard label={`${t("Saldo")} ${month !== "all" ? t("del mese") : year !== "all" ? t("dell'anno") : mon !== "all" ? t("del mese (tutti gli anni)") : t("totale")}`} value={eur(saldo)} color={saldo >= 0 ? undefined : "var(--err)"} hint={t("entrate − uscite")} />
@@ -507,13 +532,40 @@ export default function CassaPage() {
           <Card>
             <SectionTitle>{t("Saldo per conto")}</SectionTitle>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {CONTI.map((c) => <div key={c.key} className="rounded-lg border border-line p-3"><div className="text-xs text-dim">{t(c.label)}</div><div className={`mt-0.5 font-mono text-lg font-bold ${(saldoConti[c.key] ?? 0) >= 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{eur(saldoConti[c.key] ?? 0)}</div></div>)}
+              {CONTI.map((c) => <div key={c.key} className="rounded-lg border border-line p-3"><div className="flex items-center justify-between gap-1"><span className="text-xs text-dim">{t(c.label)}</span><button onClick={() => openOpening(c.key)} title={t("Imposta il saldo di partenza di questo conto")} className="rounded px-1 text-[11px] font-semibold text-focus hover:bg-wash">{t("Imposta")}</button></div><div className={`mt-0.5 font-mono text-lg font-bold ${(saldoConti[c.key] ?? 0) >= 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{eur(saldoConti[c.key] ?? 0)}</div>{balances[c.key]?.since && <div className="text-[10px] text-faint">{t("da")} {fmtDMY(balances[c.key].since)}</div>}</div>)}
             </div>
           </Card>
         </div>
       </div>
 
       <p className="mt-4 text-xs text-faint">{t("Le entrate")} <b className="text-dim">{t("Prenotazioni")}</b> {t("e le")} <b className="text-dim">{t("Commissioni OTA")}</b> {t("sono automatiche (badge «auto»). I")} <b className="text-dim">{t("Pagamenti programmati")}</b> {t("si registrano da soli ogni mese (badge «programmato»). Aggiungi manualmente le altre voci e crea le categorie che ti servono.")}</p>
+
+      {/* --- Modale saldo di partenza --- */}
+      {opening && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh]">
+          <button aria-label={t("Chiudi")} onClick={() => setOpening(null)} className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
+          <div role="dialog" aria-label={t("Saldo di partenza")} className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="text-base font-bold text-txt">{t("Saldo di partenza")}</div>
+            <p className="mt-1 text-xs text-dim">{t("Scrivi quanto hai su questo conto oggi. Da qui il saldo parte da quell'importo e si aggiorna con le entrate e le uscite dei giorni successivi: lo storico passato non serve.")}</p>
+            <label className="mt-3 block"><span className="text-xs text-dim">{t("Conto")}</span>
+              <select value={opening.conto} onChange={(e) => setOpening((o) => (o ? { ...o, conto: e.target.value } : o))} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus">
+                {CONTI.map((c) => <option key={c.key} value={c.key}>{t(c.label)}</option>)}
+              </select>
+            </label>
+            <label className="mt-2 block"><span className="text-xs text-dim">{t("Importo oggi (€)")}</span>
+              <input inputMode="decimal" autoFocus value={opening.amount} onChange={(e) => setOpening((o) => (o ? { ...o, amount: e.target.value } : o))} placeholder="0,00" className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 font-mono text-sm text-txt outline-none focus:border-focus" />
+            </label>
+            <label className="mt-2 block"><span className="text-xs text-dim">{t("Valido dal giorno")}</span>
+              <input type="date" value={opening.date} onChange={(e) => setOpening((o) => (o ? { ...o, date: e.target.value } : o))} className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" />
+            </label>
+            <p className="mt-2 text-[11px] text-faint">{t("I movimenti di quel giorno sono già compresi nell'importo che scrivi; si sommano solo quelli dei giorni dopo. Le prenotazioni entrano nel saldo alla data di arrivo.")}</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setOpening(null)} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-txt hover:bg-wash">{t("Annulla")}</button>
+              <button onClick={saveOpening} disabled={!Number.isFinite(parseFloat(opening.amount.replace(/\s/g, "").replace(",", ".")))} className="rounded-lg bg-focus px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">{t("Imposta il saldo")}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --- Modale selezione / gestione categorie --- */}
       {catPicker && (

@@ -5,7 +5,7 @@ import { supabase } from "./supabase";
 import { CHANNELS } from "./types";
 import type { Booking, Guest, Structure } from "./types";
 import { commissionOf } from "./booking";
-import { roundCents } from "./money";
+import { roundCents, sumCents } from "./money";
 
 export type Kind = "in" | "out";
 export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string }
@@ -164,6 +164,26 @@ export function groupBookingRows(rows: Mov[]): CassaListRow[] {
       const c = commByRef.get(m.ref)!;
       out.push({ type: "booking", id: m.ref, income: m, commission: c, gross: m.amount, comm: c.amount, net: roundCents(m.amount - c.amount) });
     } else out.push({ type: "mov", mov: m });
+  }
+  return out;
+}
+
+// ── Saldo di partenza ("tirare una riga") ───────────────────────────────────────────────────────────────────────────────
+// Senza lo storico delle uscite passate, l'host scrive quanto ha oggi su un conto: da quella data il saldo parte da quell'importo e si aggiorna
+// con le entrate e le uscite dei giorni SUCCESSIVI (fino a oggi). Il movimento di partenza è un normale movimento con categoria "apertura".
+export const OPENING_CAT = "apertura";
+const signed = (m: Mov) => (m.kind === "in" ? m.amount : -m.amount);
+export interface Balance { saldo: number; since?: string; start?: number }
+
+/** Saldo attuale per conto. Con un saldo di partenza: importo di partenza + movimenti dei giorni dopo la data di partenza, fino a oggi.
+ *  Senza saldo di partenza resta la somma di tutti i movimenti, come prima. Il saldo di partenza più recente vince. */
+export function computeBalances(movs: Mov[], today: string, conti: string[]): Record<string, Balance> {
+  const out: Record<string, Balance> = {};
+  for (const conto of conti) {
+    const op = movs.filter((m) => m.cat === OPENING_CAT && m.conto === conto).reduce<Mov | undefined>((best, m) => (!best || m.date >= best.date ? m : best), undefined);
+    if (!op) { out[conto] = { saldo: sumCents(movs.filter((m) => m.conto === conto && m.cat !== OPENING_CAT).map(signed)) }; continue; }
+    const after = movs.filter((m) => m.conto === conto && m.cat !== OPENING_CAT && m.date > op.date && m.date <= today);
+    out[conto] = { saldo: roundCents(signed(op) + sumCents(after.map(signed))), since: op.date, start: signed(op) };
   }
   return out;
 }
