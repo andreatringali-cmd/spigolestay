@@ -276,7 +276,6 @@ export default function CassaPage() {
   const startEditMov = (m: Mov) => {
     setEditingMov(m.id);
     setForm({ kind: m.kind, date: m.date, cat: m.cat, desc: m.desc, amount: String(m.amount).replace(".", ","), conto: m.conto, struttura: m.structureId ?? activeStructureId, repeat: "once" });
-    document.getElementById("form-movimento")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
   // Se la data del movimento cade fuori dal periodo mostrato, allarga il periodo: la riga appena registrata deve vedersi nell'elenco.
   const showDate = (d: string) => {
@@ -485,8 +484,7 @@ export default function CassaPage() {
         {/* Colonna sinistra */}
         <div className="flex flex-col gap-4">
           <Card>
-            <div id="form-movimento" className="-mt-2 pt-2" />
-            <SectionTitle>{editingMov ? t("Modifica movimento") : t("Nuovo movimento")}</SectionTitle>
+            <SectionTitle>{t("Nuovo movimento")}</SectionTitle>
             <div className="mb-3 grid grid-cols-2 gap-2">
               <button onClick={() => setKind("out")} className={`rounded-lg border py-2 text-sm font-semibold transition ${form.kind === "out" ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:bg-wash"}`}>− {t("Uscita")}</button>
               <button onClick={() => setKind("in")} className={`rounded-lg border py-2 text-sm font-semibold transition ${form.kind === "in" ? "border-[color:var(--ok)] text-[color:var(--ok)]" : "border-line text-dim hover:bg-wash"}`}>+ {t("Entrata")}</button>
@@ -504,7 +502,7 @@ export default function CassaPage() {
             </div>
             {activeStructureId === "all" && <label className="mb-2 block"><span className="text-xs text-dim">{t("Struttura")}</span><select value={form.struttura} onChange={(e) => setForm((f) => ({ ...f, struttura: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{activeStructureId === "all" && <option value="all">{t("Tutte le strutture")}</option>}{structures.filter((s) => activeStructureId === "all" || s.id === activeStructureId).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Descrizione (facoltativa)")}</span><input value={form.desc} onChange={(e) => setForm((f) => ({ ...f, desc: e.target.value }))} placeholder={t("es. Bolletta Enel agosto")} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
-            {!editingMov && <div className="mb-3">
+            <div className="mb-3">
               <span className="text-xs text-dim">{t("Si ripete?")}</span>
               <div className="mt-1 grid grid-cols-4 gap-1.5">
                 {([["once", "Solo una volta"], ["monthly", "Ogni mese"], ["weekly", "Ogni settimana"], ["yearly", "Ogni anno"]] as [typeof form.repeat, string][]).map(([v, lab]) => (
@@ -512,9 +510,8 @@ export default function CassaPage() {
                 ))}
               </div>
               {form.repeat !== "once" && <p className="mt-1 text-[11px] text-faint">{t("Registro questo movimento oggi e creo un pagamento programmato che si ripete da solo.")}</p>}
-            </div>}
-            <button onClick={add} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{editingMov ? t("Salva modifiche") : form.repeat === "once" ? t("Registra movimento") : t("Registra e programma")}</button>
-            {editingMov && <button onClick={resetForm} className="mt-1.5 w-full rounded-lg border border-line py-2 text-sm font-medium text-dim hover:bg-wash">{t("Annulla modifica")}</button>}
+            </div>
+            <button onClick={add} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{form.repeat === "once" ? t("Registra movimento") : t("Registra e programma")}</button>
           </Card>
 
           {/* Pagamenti programmati */}
@@ -621,9 +618,11 @@ export default function CassaPage() {
                   // saldo in quella data = dopo l'ultimo movimento della riga (per la prenotazione: dopo incasso e commissione)
                   const lastId = isBooking && r.commission && ledgerOrd(r.commission) > ledgerOrd(r.income) ? r.commission.id : m.id;
                   const bal = ledger.balanceAfter.get(lastId) ?? null;
+                  // riga modificabile: movimento inserito a mano (si apre la finestra di modifica) o saldo di partenza (si apre la finestra del saldo)
+                  const rowClick = isBooking || m.auto || m.sched || m.forecast ? undefined : m.cat === OPENING_CAT ? () => openOpening() : () => startEditMov(m);
                   const included = ledger.included.has(lastId); // del giorno del saldo di partenza: già nell'importo scritto
                   return (
-                    <div key={isBooking ? "b-" + r.id : m.id} className="grid grid-cols-[84px_minmax(0,1fr)_auto_104px] items-center gap-x-3 py-2.5">
+                    <div key={isBooking ? "b-" + r.id : m.id} onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid grid-cols-[84px_minmax(0,1fr)_auto_104px] items-center gap-x-3 py-2.5" + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
                       <span className="font-mono text-xs text-dim">{fmtDMY(m.date)}</span>
                       <div className="flex min-w-0 items-center gap-2.5">
                         {bk ? <ChannelLogo channel={bk.channel} size={30} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 30)}
@@ -649,8 +648,6 @@ export default function CassaPage() {
                       ) : (
                         <div className="flex items-center justify-end gap-1.5">
                           <span className="font-mono text-sm font-semibold" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
-                          {!m.auto && !m.sched && !m.forecast && m.cat !== OPENING_CAT && <button onClick={() => startEditMov(m)} title={t("Modifica")} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-txt">✎</button>}
-                          {!m.auto && !m.sched && <button onClick={() => del(m.id)} title={t("Elimina")} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]">✕</button>}
                         </div>
                       )}
                       {included
@@ -730,6 +727,34 @@ export default function CassaPage() {
       )}
 
       {/* --- Modale selezione / gestione categorie --- */}
+      {/* --- Modale modifica movimento --- */}
+      {editingMov && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[6vh]">
+          <button aria-label={t("Chiudi")} onClick={resetForm} className="absolute inset-0 bg-black/40" />
+          <div className="relative max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Modifica movimento")}</h2><button onClick={resetForm} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <button onClick={() => setKind("out")} className={`rounded-lg border py-2 text-sm font-semibold transition ${form.kind === "out" ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:bg-wash"}`}>− {t("Uscita")}</button>
+              <button onClick={() => setKind("in")} className={`rounded-lg border py-2 text-sm font-semibold transition ${form.kind === "in" ? "border-[color:var(--ok)] text-[color:var(--ok)]" : "border-line text-dim hover:bg-wash"}`}>+ {t("Entrata")}</button>
+            </div>
+            <label className="mb-2 block"><span className="text-xs text-dim">{t("Importo (€)")}</span><input inputMode="decimal" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} placeholder="0,00" className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 font-mono text-lg text-txt outline-none focus:border-focus" /></label>
+            <div className="mb-2 block">
+              <span className="text-xs text-dim">{t("Categoria")}</span>
+              <button onClick={() => setCatPicker(true)} className="mt-0.5 flex w-full items-center gap-2 rounded-lg border border-line bg-paper px-2 py-1.5 text-left text-sm text-txt hover:bg-wash">
+                {iconCircle(selCat, 28)}<span className="flex-1 font-medium">{selCat?.label ? t(selCat.label) : t("Scegli…")}</span><span className="text-faint">▾</span>
+              </button>
+            </div>
+            <div className="mb-2 grid grid-cols-2 gap-2">
+              <label className="block"><span className="text-xs text-dim">{t("Conto")}</span><select value={form.conto} onChange={(e) => setForm((f) => ({ ...f, conto: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{CONTI.map((c) => <option key={c.key} value={c.key}>{t(c.label)}</option>)}</select></label>
+              <label className="block"><span className="text-xs text-dim">{t("Data")}</span><input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
+            </div>
+            {activeStructureId === "all" && <label className="mb-2 block"><span className="text-xs text-dim">{t("Struttura")}</span><select value={form.struttura} onChange={(e) => setForm((f) => ({ ...f, struttura: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
+            <label className="mb-3 block"><span className="text-xs text-dim">{t("Descrizione (facoltativa)")}</span><input value={form.desc} onChange={(e) => setForm((f) => ({ ...f, desc: e.target.value }))} placeholder={t("es. Bolletta Enel agosto")} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
+            <button onClick={add} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{t("Salva modifiche")}</button>
+            <button onClick={() => { const id = editingMov; resetForm(); void del(id); }} className="mt-1.5 w-full rounded-lg border border-line py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina movimento")}</button>
+          </div>
+        </div>
+      )}
       {catPicker && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh]">
           <button aria-label={t("Chiudi")} onClick={() => { setCatPicker(false); setNewCat(null); }} className="absolute inset-0 bg-black/40" />
