@@ -487,7 +487,7 @@ export default function FatturePassivePage() {
       {fic && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setFic(null)} className="absolute inset-0 bg-black/40" />
-          <div className="relative flex max-h-[88vh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+          <div className="relative flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-1 flex items-center justify-between"><span className="text-lg font-bold text-txt">Importa da Fatture in Cloud</span><button onClick={() => setFic(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <p className="mb-3 text-[11px] text-faint">Legge le fatture e le spese dei fornitori che Fatture in Cloud ha ricevuto (anche dal cassetto fiscale). Sola lettura: su Fatture in Cloud non viene modificato nulla.</p>
             <div className="flex flex-wrap items-end gap-2">
@@ -512,7 +512,7 @@ export default function FatturePassivePage() {
                     </select>
                   </label>
                 )}
-                <div className="mt-3 max-h-[40vh] overflow-auto rounded-lg border border-line">
+                <div className="mt-3 max-h-[40dvh] overflow-auto rounded-lg border border-line">
                   <table className="w-full min-w-[560px] text-xs">
                     <thead><tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-faint">
                       <th className="w-8 px-2 py-1.5"><input type="checkbox" aria-label="Seleziona tutte" checked={fic.items.filter((i) => i.status !== "imported").every((i) => fic.pick.has(i.ficId))} onChange={(e) => setFic({ ...fic, pick: e.target.checked ? new Set(fic.items!.filter((i) => i.status !== "imported").map((i) => i.ficId)) : new Set() })} /></th>
@@ -546,7 +546,7 @@ export default function FatturePassivePage() {
       {ota && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setOta(false)} className="absolute inset-0 bg-black/40" />
-          <div className="relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+          <div className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">Autofattura OTA — precompila</span><button onClick={() => setOta(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <div className="grid gap-2 sm:grid-cols-2">
               <label className={lbl}>Canale<select value={otaChannel} onChange={(e) => setOtaChannel(e.target.value as Channel)} className={inp}>{(["booking", "airbnb", "expedia", "agoda", "google", "hotelbeds", "other"] as Channel[]).map((c) => <option key={c} value={c}>{CHANNELS[c].label}</option>)}</select></label>
@@ -579,7 +579,7 @@ export default function FatturePassivePage() {
       {edit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setEdit(null)} className="absolute inset-0 bg-black/40" />
-          <div className="relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+          <div className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">{edit.id ? "Modifica fattura passiva" : "Nuova fattura passiva"}</span><button onClick={() => setEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <div className="grid gap-2 sm:grid-cols-2">
               {single ? (

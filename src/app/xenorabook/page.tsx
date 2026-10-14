@@ -55,7 +55,7 @@ export default function XenoraBookPublicPage() {
 
   useEffect(() => {
     const h = (e: MouseEvent) => { if (guestsRef.current && !guestsRef.current.contains(e.target as Node)) setGuestsOpen(false); };
-    document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
+    document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h);
   }, []);
 
   // Vocabolari dei filtri: calcolati dalle strutture REALI caricate, non da liste fisse
@@ -100,7 +100,7 @@ export default function XenoraBookPublicPage() {
   }, [stats]);
 
   return (
-    <div className="min-h-screen bg-wash">
+    <div className="min-h-dvh bg-wash">
       {/* Barra pubblica */}
       <header className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">

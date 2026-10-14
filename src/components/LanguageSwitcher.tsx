@@ -9,7 +9,7 @@ export default function LanguageSwitcher() {
   const { lang, setLang } = useLang();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
+  useEffect(() => { const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
   const cur = LANGS.find((l) => l.code === lang) ?? LANGS[0];
 
   return (

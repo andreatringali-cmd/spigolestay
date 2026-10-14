@@ -108,7 +108,7 @@ export default function NewBookingModal() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button aria-label={t("Chiudi")} onClick={closeNewBooking} className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
-      <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
+      <div className="relative flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
         {/* Header — banda colorata in stile widget */}
         <div className="flex items-center justify-between gap-3 px-5 py-4 text-white" style={{ background: "linear-gradient(135deg, var(--focus), color-mix(in srgb, var(--focus) 62%, #000))" }}>
           <div className="flex items-center gap-3">

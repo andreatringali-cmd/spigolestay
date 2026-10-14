@@ -27,9 +27,9 @@ export default function DateField({
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", h);
+    document.addEventListener("pointerdown", h);
     document.addEventListener("keydown", k);
-    return () => { document.removeEventListener("mousedown", h); document.removeEventListener("keydown", k); };
+    return () => { document.removeEventListener("pointerdown", h); document.removeEventListener("keydown", k); };
   }, []);
   // All'apertura: mese del valore selezionato, o il mese di OGGI se il campo è vuoto — senza
   // questo, un campo svuotato restava fermo sull'ultimo mese aperto (es. gennaio) invece che oggi.

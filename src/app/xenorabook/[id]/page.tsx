@@ -56,7 +56,7 @@ function Engine() {
   const nights = Math.max(1, Math.round((Date.parse(to) - Date.parse(from)) / 86400000) || 1);
 
   const shell = (inner: React.ReactNode) => (
-    <div className="min-h-screen bg-wash">
+    <div className="min-h-dvh bg-wash">
       <header className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <Link href="/xenorabook" className="flex items-center gap-2">

@@ -29,7 +29,7 @@ const typeColor = (rt: RoomType, i: number) => rt.color ?? AV_COLORS[i % AV_COLO
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const { t } = useLang();
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6vh]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6dvh]">
       <button aria-label={t("Chiudi")} onClick={onClose} className="absolute inset-0 bg-black/40" />
       <div className="relative w-full max-w-lg rounded-2xl border border-line bg-surface p-5 shadow-2xl">
         <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{title}</h2><button onClick={onClose} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
@@ -352,7 +352,7 @@ export default function CamerePage() {
       </div>
 
       {sel.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 z-50 max-h-[70vh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 overflow-y-auto rounded-xl border border-line bg-surface p-3 shadow-2xl">
+        <div className="fixed bottom-4 left-1/2 z-50 max-h-[70dvh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 overflow-y-auto rounded-xl border border-line bg-surface p-3 shadow-2xl">
           <div className="flex flex-wrap items-center gap-2.5">
             <span className="text-sm font-semibold text-txt">{sel.size} {sel.size === 1 ? t("camera selezionata") : t("camere selezionate")}</span>
             <label className="flex items-center gap-1.5 text-xs text-dim">{t("Piano")}<input value={bulkFloor} onChange={(e) => setBulkFloor(e.target.value)} placeholder={t("Terra / 1° / 2°")} className="w-28 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></label>

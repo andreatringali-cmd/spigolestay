@@ -68,7 +68,7 @@ export default function AlloggiatiSettingsModal({ sid, onClose }: { sid: string;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
-      <div className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-txt">Impostazioni Alloggiati Web</h2>

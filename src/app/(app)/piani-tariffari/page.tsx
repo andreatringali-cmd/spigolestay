@@ -56,7 +56,7 @@ function Toggle({ on, onClick, color = "var(--focus)" }: { on: boolean; onClick?
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const { t } = useLang();
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[5vh]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[5dvh]">
       <button aria-label={t("Chiudi")} onClick={onClose} className="absolute inset-0 bg-black/40" />
       <div className="relative w-full max-w-xl rounded-2xl border border-line bg-surface p-5 shadow-2xl">
         <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{title}</h2><button onClick={onClose} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>

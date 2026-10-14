@@ -1,10 +1,13 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Archivo, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const archivo = Archivo({ subsets: ["latin"], variable: "--font-archivo" });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains" });
+
+// Tastiera virtuale: la pagina si ridimensiona invece di essere coperta (Chrome/Samsung); il colore della barra segue il brand.
+export const viewport: Viewport = { width: "device-width", initialScale: 1, interactiveWidget: "resizes-content", themeColor: "#2f6bb0" };
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://xenora.it"),

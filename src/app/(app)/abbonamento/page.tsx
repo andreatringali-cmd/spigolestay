@@ -303,7 +303,7 @@ export default function AbbonamentoPage() {
       {/* Form di contatto "Su misura" */}
       {contactOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setContactOpen(false)}>
-          <div className="relative max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-line bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <button onClick={() => setContactOpen(false)} aria-label={t("Chiudi")} className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-lg text-faint hover:bg-wash hover:text-txt">✕</button>
             <div className="grid md:grid-cols-[0.82fr_1fr]">
               {/* Pannello valore (enterprise) */}

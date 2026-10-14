@@ -23,7 +23,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={toast}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-[100] flex max-w-[92vw] flex-col gap-2" aria-live="polite">
+      <div className="pointer-events-none fixed bottom-4 right-4 max-md:bottom-20 z-[100] flex max-w-[calc(100vw-2rem)] flex-col gap-2" aria-live="polite">
         {items.map((x) => (
           <div key={x.id} onClick={() => setItems((xs) => xs.filter((i) => i.id !== x.id))}
             className="pointer-events-auto flex items-start gap-2 rounded-xl border border-line bg-surface px-4 py-3 text-sm text-txt shadow-2xl"

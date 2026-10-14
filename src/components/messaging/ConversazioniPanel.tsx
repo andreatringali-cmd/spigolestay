@@ -158,8 +158,8 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     if (!queueOpen) return;
     const h = (e: MouseEvent) => { if (queueRef.current && !queueRef.current.contains(e.target as Node)) setQueueOpen(false); };
     const k = (e: KeyboardEvent) => { if (e.key === "Escape") setQueueOpen(false); };
-    document.addEventListener("mousedown", h); document.addEventListener("keydown", k);
-    return () => { document.removeEventListener("mousedown", h); document.removeEventListener("keydown", k); };
+    document.addEventListener("pointerdown", h); document.addEventListener("keydown", k);
+    return () => { document.removeEventListener("pointerdown", h); document.removeEventListener("keydown", k); };
   }, [queueOpen]);
   const [showInvii, setShowInvii] = useState(false); // gli invii programmati si aprono su richiesta, non di default
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -733,7 +733,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                   </button>
                   <button onClick={() => toggleToRead(p.id)} title={needsReply ? t("Segna come letta") : t("Segna come da leggere")} aria-label={needsReply ? t("Segna come letta") : t("Segna come da leggere")} className={`shrink-0 rounded-lg px-1.5 py-1.5 text-sm transition hover:bg-line ${needsReply ? "text-[color:var(--ok)] opacity-100" : "text-faint opacity-0 hover:text-txt group-hover:opacity-100"}`}>{needsReply ? "✓" : "✉"}</button>
                   <button onClick={() => togglePin(p.id)} title={pin ? t("Togli dalle fissate") : t("Fissa in alto")} aria-pressed={pin} className={`shrink-0 rounded-lg px-1.5 py-1.5 text-sm transition hover:bg-line ${pin ? "text-focus opacity-100" : "text-faint opacity-0 hover:text-txt group-hover:opacity-100"}`}>📌</button>
-                  <button onClick={() => toggleArch(p.id)} title={isArch(p.id) ? t("Ripristina dalla archiviazione") : t("Archivia conversazione")} className={`shrink-0 rounded-lg px-1.5 py-1.5 text-sm text-faint transition hover:bg-line hover:text-txt ${isArch(p.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>{isArch(p.id) ? "⬆" : "🗄"}</button>
+                  <button onClick={() => toggleArch(p.id)} title={isArch(p.id) ? t("Ripristina dalla archiviazione") : t("Archivia conversazione")} className={`shrink-0 rounded-lg px-1.5 py-1.5 text-sm text-faint transition hover:bg-line hover:text-txt ${isArch(p.id) ? "opacity-100" : "[@media(hover:hover)]:opacity-0 group-hover:opacity-100"}`}>{isArch(p.id) ? "⬆" : "🗄"}</button>
                 </div>
               </div>
             );

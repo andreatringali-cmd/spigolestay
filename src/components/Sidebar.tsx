@@ -54,7 +54,7 @@ export default function Sidebar({
     <>
       {mobileOpen && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={onCloseMobile} />}
       <aside
-        className={`${mobileOpen ? "fixed inset-y-0 left-0 z-50 flex w-64" : "hidden"} flex-col border-r border-line bg-surface md:sticky md:top-0 md:flex md:h-screen ${collapsed ? "md:w-[70px]" : "md:w-64"}`}
+        className={`${mobileOpen ? "fixed inset-y-0 left-0 z-50 flex w-64" : "hidden"} flex-col border-r border-line bg-surface md:sticky md:top-0 md:flex md:h-dvh ${collapsed ? "md:w-[70px]" : "md:w-64"}`}
       >
         {/* Header */}
         <div className="flex h-14 items-center gap-2.5 border-b border-line px-3">

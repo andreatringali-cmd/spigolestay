@@ -158,7 +158,7 @@ export default function ChiusuraCassaPage() {
 
         <Card>
           <SectionTitle>Dettaglio movimenti del giorno</SectionTitle>
-          <div className="mt-2 max-h-[42vh] overflow-y-auto">
+          <div className="mt-2 max-h-[42dvh] overflow-y-auto">
             {dayMovs.map((m) => (
               <div key={m.id} className="flex items-center justify-between gap-2 border-b border-line py-2 last:border-0 text-sm">
                 <div className="min-w-0"><div className="truncate text-txt">{m.desc}</div><div className="text-[11px] text-faint">{m.auto ? "automatico" : m.sched ? "programmato" : "manuale"}</div></div>

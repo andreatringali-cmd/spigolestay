@@ -470,7 +470,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     const dTotal = doneSummary?.total ?? total, dDeposit = doneSummary?.deposit ?? deposit;
     const dFirst = doneSummary?.guestFirst || guest.firstName, dEmail = doneSummary?.email || guest.email;
     return (
-      <div className={embed ? "flex flex-col" : "flex min-h-screen flex-col bg-wash"}>
+      <div className={embed ? "flex flex-col" : "flex min-h-dvh flex-col bg-wash"}>
         {!embed && header}
         <div className={`mx-auto w-full max-w-2xl flex-1 ${embed ? "px-3 py-5" : "px-4 py-10"}`}>
           <div className={`${box} p-8 text-center`}>
@@ -498,7 +498,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   }
 
   return (
-    <div className={embed ? "flex flex-col" : "flex min-h-screen flex-col bg-wash"}>
+    <div className={embed ? "flex flex-col" : "flex min-h-dvh flex-col bg-wash"}>
       {!embed && header}
       <div className={`mx-auto w-full max-w-7xl flex-1 ${embed ? "px-3 py-4" : "px-4 py-6"}`}>
         {step === "rooms" && (

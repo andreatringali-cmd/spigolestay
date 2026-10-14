@@ -19,7 +19,7 @@ export default function ImpactPreview({ open, title, subtitle, impact, examples,
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
       <button aria-label="Annulla" onClick={onCancel} className="absolute inset-0 bg-black/45" />
-      <div className="anim-in relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+      <div className="anim-in relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
         <h2 className="font-display text-base font-bold text-txt">{title}</h2>
         {subtitle && <p className="mt-0.5 text-sm text-dim">{subtitle}</p>}
 

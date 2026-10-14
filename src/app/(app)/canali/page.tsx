@@ -530,7 +530,7 @@ export default function CanaliPage() {
       {channelPanel.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label={t("Chiudi")} onClick={closeChannelPanel} className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
-          <div className="relative flex h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
+          <div className="relative flex h-[88dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
             <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
               <div>
                 <h2 className="font-display text-base font-bold text-txt">{t("Collega i tuoi canali")}</h2>

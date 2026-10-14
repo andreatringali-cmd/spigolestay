@@ -5,7 +5,7 @@ import Link from "next/link";
 // Tema chiaro, leggibile, coerente con il login. Include l'avviso "bozza".
 export default function LegalShell({ title, updated, children }: { title: string; updated?: string; children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-white text-[#1f1b16]">
+    <div className="min-h-dvh bg-white text-[#1f1b16]">
       <header className="border-b border-[#eceae4]">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <Link href="/login" className="text-sm font-bold tracking-tight">Xenora</Link>

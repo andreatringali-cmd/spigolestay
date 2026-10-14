@@ -711,7 +711,7 @@ export function Site() {
       {lightbox && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setLightbox(null)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={lightbox} alt="" className="max-h-[90vh] max-w-full rounded-lg object-contain" />
+          <img src={lightbox} alt="" className="max-h-[90dvh] max-w-full rounded-lg object-contain" />
           <button onClick={() => setLightbox(null)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/15 text-white">✕</button>
         </div>
       )}
@@ -767,7 +767,7 @@ export function Site() {
       {/* Informativa privacy */}
       {showPrivacy && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={() => setShowPrivacy(false)}>
-          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between"><h3 className="font-display text-lg font-bold text-txt">Informativa sulla privacy</h3><button onClick={() => setShowPrivacy(false)} className="text-faint hover:text-txt">✕</button></div>
             <div className="space-y-2.5 text-xs leading-relaxed text-dim">
               <p><b className="text-txt">Titolare del trattamento.</b> {name}{structure?.email ? ` · ${structure.email}` : ""}{structure?.phone ? ` · ${structure.phone}` : ""}.</p>

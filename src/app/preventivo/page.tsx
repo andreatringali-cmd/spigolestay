@@ -134,7 +134,7 @@ export default function PreventivoPubblico() {
   const accent = data?.accent || undefined;
 
   return (
-    <div className="min-h-screen py-8" style={{ background: "var(--wash)" }}>
+    <div className="min-h-dvh py-8" style={{ background: "var(--wash)" }}>
       <div className="mx-auto w-full max-w-2xl space-y-4 px-4">
         {/* Header */}
         <div className="flex items-center gap-3 px-1">

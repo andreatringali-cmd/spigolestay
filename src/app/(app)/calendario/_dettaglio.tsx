@@ -193,7 +193,7 @@ export default function CalendarioDettaglio({ viewSwitch }: { viewSwitch?: React
   // Selettore mese e frecce ±1 giorno: stessi controlli della riga filtri del calendario a griglia
   const [monthOpen, setMonthOpen] = useState(false);
   const monthRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { const h = (e: MouseEvent) => { if (monthRef.current && !monthRef.current.contains(e.target as Node)) setMonthOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
+  useEffect(() => { const h = (e: MouseEvent) => { if (monthRef.current && !monthRef.current.contains(e.target as Node)) setMonthOpen(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
   const monthList = useMemo(() => { const base = new Date(); const first = new Date(base.getFullYear(), base.getMonth() - 2, 1); return Array.from({ length: 18 }, (_, i) => { const d = new Date(first.getFullYear(), first.getMonth() + i, 1); return { y: d.getFullYear(), m: d.getMonth(), iso: toISO(d), label: d.toLocaleDateString("it-IT", { month: "long", year: "numeric" }) }; }); }, []);
   const selDate = parseISO(sel);
   const stepDay = (n: number) => { const next = shiftISO(sel, n); setSel(next); if (!winDays.includes(next)) setWinStart(next); };

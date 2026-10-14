@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { DataProvider } from "@/lib/store";
 import { AuthProvider } from "@/lib/authsync";
@@ -35,6 +35,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Sotto i 768px il menu è un cassetto: "compresso" vale solo dal tablet in su (piegando un telefono il cassetto restava a sole icone) e il cassetto si chiude da solo.
+  const [isMd, setIsMd] = useState(() => (typeof window === "undefined" ? true : window.matchMedia("(min-width: 768px)").matches));
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const on = () => { setIsMd(mq.matches); if (mq.matches) setMobileOpen(false); };
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
 
   return (
     <AuthProvider>
@@ -48,11 +56,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <ChannexAutoSync />
         <PendingInvite />
         <StyleLoader />
-        <div className="relative min-h-screen bg-paper text-txt">
-          <div className="relative z-10 flex min-h-screen">
+        <div className="relative min-h-dvh bg-paper text-txt">
+          <div className="relative z-10 flex min-h-dvh">
           <Sidebar
             pathname={pathname}
-            collapsed={collapsed}
+            collapsed={collapsed && isMd}
             onToggleCollapse={() => setCollapsed((c) => !c)}
             mobileOpen={mobileOpen}
             onCloseMobile={() => setMobileOpen(false)}
@@ -61,7 +69,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <div className="flex min-w-0 flex-1 flex-col">
             {/* Barra superiore: menu (mobile) + ricerca globale al centro. Nessun menu orizzontale. */}
             <header className="no-print sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface px-4">
-              <button onClick={() => setMobileOpen(true)} className="rounded-lg p-1.5 text-dim hover:bg-wash hover:text-txt md:hidden">
+              <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2.5 text-dim hover:bg-wash hover:text-txt md:hidden">
                 <Icon name="menu" size={18} />
               </button>
               <AssistantBar />

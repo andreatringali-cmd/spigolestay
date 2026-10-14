@@ -117,7 +117,7 @@ export default function PrenotazioniPage() {
   // Cambiando struttura attiva il filtro locale struttura/camera non ha più senso: si azzera.
   useEffect(() => { setLoc("all"); }, [activeStructureId]);
   const chartRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { const h = (e: MouseEvent) => { if (chartRef.current && !chartRef.current.contains(e.target as Node)) setChartMenu(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
+  useEffect(() => { const h = (e: MouseEvent) => { if (chartRef.current && !chartRef.current.contains(e.target as Node)) setChartMenu(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
   useEffect(() => { try { const o = localStorage.getItem("spigolestay:prenchartorder"); if (o) setChartOrder(JSON.parse(o)); } catch {} }, []);
 
   const now = new Date();
@@ -536,7 +536,7 @@ export default function PrenotazioniPage() {
 
       {/* Tabella (tablet/desktop) */}
       <StatoGate on={view === "compact"} ids={visibleIds}>
-      <div className="hidden max-h-[60vh] overflow-auto rounded-xl border border-line bg-surface shadow-sm md:block" style={view === "detail" ? { display: "none" } : undefined}>
+      <div className="hidden max-h-[60dvh] overflow-auto rounded-xl border border-line bg-surface shadow-sm md:block" style={view === "detail" ? { display: "none" } : undefined}>
         <table className="w-max min-w-full whitespace-nowrap text-sm">
           <thead className="sticky top-0 z-20">
             <tr className="text-left text-xs uppercase tracking-wide text-faint">
@@ -654,8 +654,8 @@ function StructureFilter({ value, onChange, structures, units, roomTypes, single
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
+    document.addEventListener("pointerdown", h);
+    return () => document.removeEventListener("pointerdown", h);
   }, []);
   const allLabel = single ? t("Tutte le camere") : t("Tutte le strutture e camere");
   const label =

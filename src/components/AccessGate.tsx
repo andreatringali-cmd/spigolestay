@@ -32,7 +32,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
     // così l'utente vede in cosa consiste la pagina ed è invogliato ad abbonarsi.
     if (moduleOff) {
       return (
-        <div className="relative min-h-[70vh]">
+        <div className="relative min-h-[70dvh]">
           <div className="pointer-events-none select-none blur-[3px] opacity-40" aria-hidden="true">{children}</div>
           <div className="absolute inset-0 z-20 flex items-start justify-center px-4 pt-16 sm:pt-24">
             <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-6 text-center shadow-2xl">

@@ -71,7 +71,7 @@ export default function AssistantBar() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[9vh]">
+        <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[9dvh]">
           <button aria-label="Chiudi" onClick={close} className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
           <div className="anim-pop relative flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
             {/* Barra di richiesta */}
@@ -91,7 +91,7 @@ export default function AssistantBar() {
             </div>
 
             {/* Conversazione / risposta */}
-            <div className="max-h-[62vh] overflow-y-auto p-3.5">
+            <div className="max-h-[62dvh] overflow-y-auto p-3.5">
               {(res.kind === "help" || (res.kind === "empty" && res.suggestions && !aiShown)) && (
                 <div>
                   {res.detail && (

@@ -3,7 +3,7 @@ import Image from "next/image";
 // Schermata di caricamento mostrata durante il passaggio tra le pagine del gestionale.
 export default function Loading() {
   return (
-    <div className="flex min-h-[70vh] w-full items-center justify-center">
+    <div className="flex min-h-[70dvh] w-full items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <Image
           src="/xenora-mark.png"

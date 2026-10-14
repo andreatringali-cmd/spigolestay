@@ -29,7 +29,7 @@ export default function AppFooter() {
   ] as { k: string; u: string; c: string }[];
 
   return (
-    <footer className="no-print sticky bottom-0 z-30 flex flex-row items-center justify-between gap-3 border-t bg-surface px-4 py-3 text-left text-xs text-faint md:px-6" style={{ borderTopColor: "color-mix(in srgb, var(--txt) 14%, var(--line))" }}>
+    <footer className="no-print md:sticky md:bottom-0 z-30 flex flex-row items-center justify-between gap-3 border-t bg-surface px-4 py-3 text-left text-xs text-faint md:px-6" style={{ borderTopColor: "color-mix(in srgb, var(--txt) 14%, var(--line))" }}>
       <span className="min-w-0">© {new Date().getFullYear()} Xenora · Channel Manager — All rights reserved</span>
       {socials.length > 0 && (
         <div className="flex shrink-0 items-center gap-1">

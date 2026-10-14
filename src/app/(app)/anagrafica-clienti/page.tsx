@@ -115,7 +115,7 @@ export default function AnagraficaClientiPage() {
       {sync.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setSync((p) => ({ ...p, open: false }))} className="absolute inset-0 bg-black/40" />
-          <div className="relative flex max-h-[88vh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+          <div className="relative flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-2 flex items-center justify-between"><span className="text-base font-bold text-txt">Sincronizza con Fatture in Cloud</span><button onClick={() => setSync((p) => ({ ...p, open: false }))} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             {sync.busy && <p className="text-xs text-dim">Un attimo…</p>}
             {sync.msg && <p className="mb-2 rounded-lg bg-paper px-3 py-2 text-xs text-txt">{sync.msg}</p>}
@@ -153,7 +153,7 @@ export default function AnagraficaClientiPage() {
       {edit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <button aria-label="Chiudi" onClick={() => setEdit(null)} className="absolute inset-0 bg-black/40" />
-          <div className="relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+          <div className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-2 flex items-center justify-between"><span className="text-lg font-bold text-txt">{edit.id ? "Modifica intestatario" : "Nuovo intestatario"}</span><button onClick={() => setEdit(null)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <div className="grid gap-2 sm:grid-cols-2">
               <label className={`${lbl} sm:col-span-2`}>Tipo<select value={edit.kind} onChange={(e) => setEdit({ ...edit, kind: e.target.value })} className={inp}>{Object.entries(KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>

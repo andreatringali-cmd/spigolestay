@@ -60,7 +60,7 @@ export default function GlobalSearch() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[10vh]">
+        <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[10dvh]">
           <button aria-label={t("Chiudi")} onClick={close} className="absolute inset-0 bg-black/40" />
           <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
             <div className="flex items-center gap-2 border-b border-line px-4 py-3 text-txt">
@@ -68,7 +68,7 @@ export default function GlobalSearch() {
               <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Cerca prenotazioni, ospiti, camere, pagine…")} className="w-full bg-transparent text-sm outline-none placeholder:text-faint" />
               <button onClick={close} className="text-dim hover:text-txt">Esc</button>
             </div>
-            <div className="max-h-[60vh] overflow-y-auto p-2">
+            <div className="max-h-[60dvh] overflow-y-auto p-2">
               {!term && <div className="p-4 text-sm text-faint">{t("Scrivi per cercare in tutto il gestionale: prenotazioni, ospiti, camere, pagine.")}</div>}
               {nothing && <div className="p-4 text-sm text-faint">{t("Nessun risultato per")} “{q}”.</div>}
 

@@ -38,8 +38,8 @@ export default function ExportMenu({ onExcel, onPdf, excelFields }: { onExcel: (
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
+    document.addEventListener("pointerdown", h);
+    return () => document.removeEventListener("pointerdown", h);
   }, []);
   const openExcel = () => {
     setOpen(false);
@@ -63,7 +63,7 @@ export default function ExportMenu({ onExcel, onPdf, excelFields }: { onExcel: (
         </div>
       )}
       {picker && excelFields && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[10dvh]">
           <button aria-label={t("Chiudi")} onClick={() => setPicker(null)} className="absolute inset-0 bg-black/40" />
           <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-1 flex items-center justify-between">

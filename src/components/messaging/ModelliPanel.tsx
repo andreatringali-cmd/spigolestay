@@ -133,7 +133,7 @@ export default function ModelliPanel() {
 
       {/* Editor */}
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6vh]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-[6dvh]">
           <button aria-label={t("Chiudi")} onClick={() => setEditing(null)} className="absolute inset-0 bg-black/40" />
           <Card className="relative w-full max-w-xl">
             <div className="mb-3 flex items-center justify-between">

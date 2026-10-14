@@ -27,8 +27,8 @@ export default function OnlineUsers() {
 
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
+    document.addEventListener("pointerdown", h);
+    return () => document.removeEventListener("pointerdown", h);
   }, []);
 
   // Stato di rete reale: il pallino è verde quando SEI online (connesso), non solo se c'è un socio.

@@ -17,8 +17,8 @@ export default function StructureSwitcher() {
 
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    window.addEventListener("mousedown", h);
-    return () => window.removeEventListener("mousedown", h);
+    window.addEventListener("pointerdown", h);
+    return () => window.removeEventListener("pointerdown", h);
   }, []);
 
   // Selezione multipla: spunta le strutture che vuoi vedere (insieme). Una sola = come prima; tutte = "Tutte le strutture".

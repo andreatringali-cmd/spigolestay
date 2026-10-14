@@ -137,11 +137,11 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   const patchView = (p: Partial<ViewCfg>) => setVw((v) => { const n = { ...v, ...p }; try { localStorage.setItem("spigolestay:calview:v2", JSON.stringify(n)); } catch {} return n; });
   const [vizOpen, setVizOpen] = useState(false);
   const vizRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { const h = (e: MouseEvent) => { if (vizRef.current && !vizRef.current.contains(e.target as Node)) setVizOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
+  useEffect(() => { const h = (e: MouseEvent) => { if (vizRef.current && !vizRef.current.contains(e.target as Node)) setVizOpen(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
   // Selettore mese (tendina)
   const [monthOpen, setMonthOpen] = useState(false);
   const monthRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { const h = (e: MouseEvent) => { if (monthRef.current && !monthRef.current.contains(e.target as Node)) setMonthOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
+  useEffect(() => { const h = (e: MouseEvent) => { if (monthRef.current && !monthRef.current.contains(e.target as Node)) setMonthOpen(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
   const monthList = useMemo(() => { const base = new Date(); const first = new Date(base.getFullYear(), base.getMonth() - 2, 1); return Array.from({ length: 18 }, (_, i) => { const d = new Date(first.getFullYear(), first.getMonth() + i, 1); return { y: d.getFullYear(), m: d.getMonth(), label: d.toLocaleDateString("it-IT", { month: "long", year: "numeric" }) }; }); }, []);
   const rowH = vw.dense ? 31 : 42;
   // Stato pulizie di oggi (dalla pagina Pulizie): chiave = `unitId:YYYY-MM-DD`.
@@ -284,7 +284,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   const onCardsDblClick = (e: RMouseEvent) => { const k = (e.target as HTMLElement).closest<HTMLElement>("[data-cardkey]")?.dataset.cardkey; if (k) setActiveCard((p) => (p === k ? null : k)); };
   const moveActiveCard = (dir: -1 | 1) => { if (!activeCard) return; const order = INSIGHT_CARDS.map((c) => c.key).filter(showCard).sort((a, b) => orderOf(a) - orderOf(b)); const i = order.indexOf(activeCard), j = i + dir; if (j < 0 || j >= order.length) return; [order[i], order[j]] = [order[j], order[i]]; const rest = cardOrder.filter((k) => !order.includes(k)); persistOrder([...order, ...rest]); };
   const cardsRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { const h = (e: MouseEvent) => { if (cardsRef.current && !cardsRef.current.contains(e.target as Node)) setCardsMenuOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
+  useEffect(() => { const h = (e: MouseEvent) => { if (cardsRef.current && !cardsRef.current.contains(e.target as Node)) setCardsMenuOpen(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
   const [start, setStart] = useState<Date>(() => {
     const t = new Date();
     return new Date(t.getFullYear(), t.getMonth(), 1); // vista mensile: parte dal 1° del mese
@@ -538,11 +538,21 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     setDragView({ id: s.id, dxDays, targetUnitId, x: s.startX, y: e.clientY, ...res });
   }
 
+  // Il browser può annullare il tocco (scroll del calendario partito da una barra, gesto di sistema): senza questo il trascinamento restava "appeso"
+  // e il tocco successivo, ovunque, apriva una prenotazione a caso.
+  function onPointerCancel() {
+    dragRef.current = null;
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("pointerup", onPointerUp);
+    window.removeEventListener("pointercancel", onPointerCancel);
+    setDragView(null);
+  }
   function onPointerUp() {
     const s = dragRef.current;
     dragRef.current = null;
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("pointerup", onPointerUp);
+    window.removeEventListener("pointercancel", onPointerCancel);
     const view = dragViewRef.current;
     setDragView(null);
     if (!s) return;
@@ -574,6 +584,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
     dragRef.current = { id: bId, startX: e.clientX, startY: e.clientY, moved: false };
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerCancel);
   }
 
 
@@ -910,7 +921,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                 onPointerDown={(e) => onBarPointerDown(e, b.id)}
                 title={`${blocked ? `Fuori servizio${b.note ? ` · ${b.note}` : ""}` : `${guestName(b.guestId)} · ${pax} ospiti${gtot ? ` · €${Math.round(gtot)}` : ""}`} · ${b.checkIn} → ${b.checkOut}${tentative ? " · opzione" : ""}${underprice?.flagged ? ` · ⚠ ${underpriceReason(b, underprice)}` : ""}`}
                 className={`absolute overflow-hidden ${sotto ? "flex cursor-grab flex-col justify-end active:cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
-                style={{ left: g.left + (sotto ? 1 : 2), width: g.width - (sotto ? 2 : 4), top: lane * rowH + (sotto ? 1 : 3), height: rowH - (sotto ? 2 : 6), opacity: dragging ? 0.35 : past ? 0.5 : tentative ? 0.72 : 1, ...(past && !dragging ? { filter: "saturate(.65)" } : {}), pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
+                style={{ left: g.left + (sotto ? 1 : 2), width: g.width - (sotto ? 2 : 4), top: lane * rowH + (sotto ? 1 : 3), height: rowH - (sotto ? 2 : 6), opacity: dragging ? 0.35 : past ? 0.5 : tentative ? 0.72 : 1, ...(past && !dragging ? { filter: "saturate(.65)" } : {}), pointerEvents: dragView ? "none" : "auto", touchAction: "pan-x pan-y" }}
               >
                 {sotto ? (
                   <>
@@ -1575,7 +1586,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
                         onPointerDown={(e) => onBarPointerDown(e, b.id)}
                         title={`${guestName(b.guestId)} · da assegnare${visibleStructures.length > 1 ? " · " + st.name : ""}`}
                         className="absolute flex cursor-grab items-center overflow-hidden border-2 border-dashed px-2 text-xs font-semibold active:cursor-grabbing"
-                        style={{ left: g.left, width: g.width, top: (uLane.get(b.id) ?? 0) * rowH, height: rowH, borderColor: `var(${meta.cssVar})`, color: `var(${meta.cssVar})`, background: "color-mix(in srgb, var(--surface) 85%, transparent)", opacity: dragging ? 0.35 : 1, pointerEvents: dragView ? "none" : "auto", touchAction: "none" }}
+                        style={{ left: g.left, width: g.width, top: (uLane.get(b.id) ?? 0) * rowH, height: rowH, borderColor: `var(${meta.cssVar})`, color: `var(${meta.cssVar})`, background: "color-mix(in srgb, var(--surface) 85%, transparent)", opacity: dragging ? 0.35 : 1, pointerEvents: dragView ? "none" : "auto", touchAction: "pan-x pan-y" }}
                       >
                         <span className="truncate">{guestName(b.guestId)}</span>
                       </div>
@@ -1603,7 +1614,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         const pretty = `${parseISO(pick.from).toLocaleDateString("it-IT", { day: "numeric", month: "short" })} → ${parseISO(pick.to).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}`;
         const noRate = rangeIsos(pick.from, pick.to).some((iso) => rateFor(pick.roomTypeId, iso) <= 0); // tariffa mancante → vendita bloccata
         return (
-          <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[12dvh]">
             <button aria-label="Chiudi" onClick={() => setPick(null)} className="absolute inset-0 bg-black/40" />
             <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="font-display text-lg font-bold text-txt">Cosa vuoi inserire?</div>
@@ -1650,7 +1661,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
 
       {/* Avviso selezione in corso (evento / tariffa / prenotazione) */}
       {sel && (
-        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5 shadow-lg">
+        <div className="fixed bottom-6 max-md:bottom-20 left-1/2 z-50 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5 shadow-lg">
           <span className="inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-focus px-2 text-xs font-bold text-white">{selDays}</span>
           <span className="text-sm text-txt">{sel.kind === "event" ? "Evento" : sel.kind === "rate" ? "Tariffa" : sel.kind === "avail" ? "Disponibilità" : "Prenotazione"} · {selDays === 1 ? "1 giorno" : `${selDays} giorni`} — clicca sull'ultimo giorno per <b>confermare</b></span>
           <button onClick={cancelSel} className="rounded-md border border-line px-2.5 py-1 text-xs font-semibold text-dim hover:bg-wash">Annulla</button>
@@ -1659,7 +1670,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
 
       {/* Editor evento (crea / modifica) */}
       {evDraft && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[10dvh]">
           <button aria-label="Chiudi" onClick={() => setEvDraft(null)} className="absolute inset-0 bg-black/40" />
           <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
@@ -1694,7 +1705,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         const sample = isos[0];
         const preview = rateEdit.mode === "fixed" ? Math.max(0, Math.round(rateEdit.value)) : Math.max(0, Math.round(rateFor(rateEdit.typeId, sample) * (1 + rateEdit.value / 100)));
         return (
-          <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh]">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[10dvh]">
             <button aria-label="Chiudi" onClick={() => setRateEdit(null)} className="absolute inset-0 bg-black/40" />
             <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="mb-3 flex items-center justify-between">
@@ -1753,7 +1764,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         const rt = roomTypes.find((x) => x.id === availEdit.typeId);
         const totalRooms = units.filter((u) => u.roomTypeId === availEdit.typeId && !u.outOfService).length;
         return (
-          <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh]">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[10dvh]">
             <button aria-label="Chiudi" onClick={() => setAvailEdit(null)} className="absolute inset-0 bg-black/40" />
             <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="mb-1 flex items-center justify-between">
@@ -1837,7 +1848,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
       {priceConfirm && priceConfirm.kind === "single" && (() => {
         const pc = priceConfirm; const up = pc.to >= pc.from; const col = up ? "var(--ok)" : "var(--err)";
         return (
-          <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[12vh]">
+          <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[12dvh]">
             <button aria-label="Chiudi" onClick={() => setPriceConfirm(null)} className="absolute inset-0 bg-black/40" />
             <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="mb-2 flex items-center gap-2">
@@ -1869,7 +1880,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         const moFrom = toISO(new Date(start.getFullYear(), start.getMonth(), 1)), moTo = toISO(new Date(start.getFullYear(), start.getMonth() + 1, 0));
         const presetBtn = (lab: string, f: string, tt: string) => { const on = pc.from === f && pc.to === tt; return (<button onClick={() => setPriceConfirm({ ...pc, from: f, to: tt })} className={`rounded-md py-1.5 text-[11px] font-semibold transition ${on ? "bg-focus text-white" : "bg-wash text-dim hover:text-txt"}`}>{lab}</button>); };
         return (
-          <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[12vh]">
+          <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[12dvh]">
             <button aria-label="Chiudi" onClick={() => setPriceConfirm(null)} className="absolute inset-0 bg-black/40" />
             <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="mb-1 flex items-center gap-2">
@@ -1905,7 +1916,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
         const toS = toU ? structures.find((s) => s.id === toU.structureId) : null;
         const nightsN = nights(moveConfirm.checkIn, moveConfirm.checkOut);
         return (
-          <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[12vh]">
+          <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[12dvh]">
             <button aria-label="Chiudi" onClick={() => setMoveConfirm(null)} className="absolute inset-0 bg-black/40" />
             <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="mb-2 flex items-center gap-2">
@@ -1933,7 +1944,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
 
       {/* Modale Fuori servizio (periodo + motivo) */}
       {oos && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[10dvh]">
           <button aria-label="Chiudi" onClick={() => setOos(null)} className="absolute inset-0 bg-black/40" />
           <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
@@ -2019,9 +2030,9 @@ function RoomSettingsModal({ unit, typeName, lastCleanIso, cleanedToday, onSaveC
   };
   const del = () => { if (typeof window !== "undefined" && window.confirm(`Eliminare la camera "${unit.name}"?`)) { deleteUnit(unit.id); onClose(); } };
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[6vh]">
+    <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[6dvh]">
       <button aria-label="Chiudi" onClick={onClose} className="absolute inset-0 bg-black/40" />
-      <div className="relative max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+      <div className="relative max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
         <div className="mb-3 flex items-center justify-between">
           <span className="font-display text-lg font-bold text-txt">Scheda camera</span>
           <button onClick={onClose} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>

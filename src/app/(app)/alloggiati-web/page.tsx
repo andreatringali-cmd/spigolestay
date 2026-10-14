@@ -178,7 +178,7 @@ export default function AlloggiatiWebPage() {
           <SectionTitle>Schedine</SectionTitle>
           {statusPills}
         </div>
-        <div className="max-h-[60vh] overflow-y-auto">
+        <div className="max-h-[60dvh] overflow-y-auto">
           {autoBusy && sched.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-sm text-faint">
               {/* eslint-disable-next-line @next/next/no-img-element */}

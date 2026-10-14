@@ -190,8 +190,8 @@ export default function LoginPage() {
   return (
     <div className="login-bg relative flex flex-col overflow-hidden px-6 py-6 text-[#1f1b16]">
       <LoginWaves />
-      <main className="relative flex w-full min-h-0 flex-1 flex-col items-center justify-center overflow-x-hidden overflow-y-auto">
-        <div className="w-full max-w-md rounded-3xl border border-[#e6ebf5] bg-white px-6 py-6 shadow-[0_20px_50px_-28px_rgba(31,27,22,0.35)] sm:px-8 sm:py-8">
+      <main className="relative flex w-full min-h-0 flex-1 flex-col items-center overflow-x-hidden overflow-y-auto">
+        <div className="my-auto w-full max-w-md rounded-3xl border border-[#e6ebf5] bg-white px-6 py-6 shadow-[0_20px_50px_-28px_rgba(31,27,22,0.35)] sm:px-8 sm:py-8">
           {/* Logo dentro il box, centrato */}
           <div className="mb-4 flex flex-col items-center">
             <Image src="/xenora-logo.png" alt="Xenora" width={220} height={62} priority className="object-contain" style={{ width: 220, height: "auto" }} />

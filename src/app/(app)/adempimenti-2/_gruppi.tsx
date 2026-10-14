@@ -64,8 +64,8 @@ function RowMenu({ items, onPick }: { items: TaskAction[]; onPick: (a: TaskActio
     if (!open) return;
     const down = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     const key = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", down); document.addEventListener("keydown", key);
-    return () => { document.removeEventListener("mousedown", down); document.removeEventListener("keydown", key); };
+    document.addEventListener("pointerdown", down); document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("pointerdown", down); document.removeEventListener("keydown", key); };
   }, [open]);
   if (!items.length) return <span className="w-1 shrink-0" aria-hidden />;
   return (

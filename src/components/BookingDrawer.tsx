@@ -876,7 +876,7 @@ export default function BookingDrawer() {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <button aria-label={t("Chiudi")} onClick={closeBooking} className="fixed inset-0 bg-black/40" />
 
-      <div className={`anim-in relative z-10 flex max-h-[85vh] w-full flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl transition-[max-width] ${expanded || mode === "edit" ? "max-w-2xl" : "max-w-lg"}`}>
+      <div className={`anim-in relative z-10 flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl transition-[max-width] ${expanded || mode === "edit" ? "max-w-2xl" : "max-w-lg"}`}>
         {/* Accento canale */}
         <div className="h-1 w-full shrink-0" style={{ background: `var(${ch.cssVar})` }} />
         {/* Intestazione */}

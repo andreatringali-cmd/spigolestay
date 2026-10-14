@@ -710,7 +710,7 @@ export default function RecensioniPage() {
       {/* Finestra di configurazione Google: ricerca struttura + Place ID */}
       {cfgOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setCfgOpen(false)}>
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="font-display text-lg font-bold text-txt">Collega Google</div>

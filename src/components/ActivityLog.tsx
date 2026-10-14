@@ -45,8 +45,8 @@ export default function ActivityLog() {
   const toggle = () => setOpen((o) => { if (!o) markSeen(); return !o; });
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
+    document.addEventListener("pointerdown", h);
+    return () => document.removeEventListener("pointerdown", h);
   }, []);
 
   return (
@@ -60,7 +60,7 @@ export default function ActivityLog() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-40 mt-1 max-h-[70vh] w-80 overflow-y-auto rounded-xl border border-line bg-surface p-2 shadow-xl">
+        <div className="absolute right-0 top-full z-40 mt-1 max-h-[70dvh] w-80 overflow-y-auto rounded-xl border border-line bg-surface p-2 shadow-xl">
           <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-faint">{t("Registro attività")}</div>
           {activities.length === 0 ? (
             <div className="px-2 py-6 text-center text-sm text-faint">{t("Nessuna attività registrata.")}<br />{t("Crea o modifica qualcosa per vederla qui.")}</div>

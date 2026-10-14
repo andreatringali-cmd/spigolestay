@@ -280,7 +280,7 @@ export default function StepActions(p: StepActionsProps) {
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center p-3 sm:items-center">
       <button aria-label="Chiudi" onClick={p.onClose} className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
-      <div role="dialog" aria-label={step.label} className="relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
+      <div role="dialog" aria-label={step.label} className="relative flex max-h-[88dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
         <div className="border-b border-line px-5 py-3.5">
           <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-faint">{step.label}</div>
           <div className="text-base font-bold text-txt">{guestLabel}</div>

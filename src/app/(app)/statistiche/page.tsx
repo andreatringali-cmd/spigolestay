@@ -392,7 +392,7 @@ export default function StatistichePage() {
     <div className="mb-2 flex justify-end">
       <button onClick={() => exportRegistro(fileLabel, periodLabel, rows, totAll)} className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-txt hover:bg-wash" title={t("Scarica la tabella in CSV (si apre in Excel)")}>{t("Esporta CSV")}</button>
     </div>
-    <div className="max-h-[60vh] overflow-auto rounded-xl border border-line bg-surface shadow-sm">
+    <div className="max-h-[60dvh] overflow-auto rounded-xl border border-line bg-surface shadow-sm">
       <table className="w-full min-w-[1000px] table-fixed text-sm">
         <RepCols />
         <thead className="sticky top-0 z-20">

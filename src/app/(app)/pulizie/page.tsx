@@ -203,7 +203,7 @@ export default function PuliziePage() {
   const emailShop = () => { window.location.href = `mailto:?subject=${encodeURIComponent(t("Lista della spesa"))}&body=${encodeURIComponent(buildShopText())}`; }; // window.open("mailto:...") non apriva nulla in Chrome
   const [shareOpen, setShareOpen] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { const h = (e: MouseEvent) => { if (shareRef.current && !shareRef.current.contains(e.target as Node)) setShareOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
+  useEffect(() => { const h = (e: MouseEvent) => { if (shareRef.current && !shareRef.current.contains(e.target as Node)) setShareOpen(false); }; document.addEventListener("pointerdown", h); return () => document.removeEventListener("pointerdown", h); }, []);
   const toggleDone = (k: string) => {
     const next = { ...done };
     const wasDone = !!next[k];
@@ -708,7 +708,7 @@ export default function PuliziePage() {
 
       {/* Aggiungi / modifica prodotto */}
       {prodDraft && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[12dvh]">
           <button aria-label="Chiudi" onClick={() => setProdDraft(null)} className="absolute inset-0 bg-black/40" />
           <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
@@ -744,7 +744,7 @@ export default function PuliziePage() {
 
       {/* Conferma eliminazione prodotto */}
       {confirmDelProd && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[12dvh]">
           <button aria-label="Chiudi" onClick={() => setConfirmDelProd(null)} className="absolute inset-0 bg-black/40" />
           <div className="relative w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-2 font-display text-lg font-bold text-txt">{t("Eliminare il prodotto?")}</div>
@@ -759,7 +759,7 @@ export default function PuliziePage() {
 
       {/* Modale: segnala un problema */}
       {issueDraft && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[10dvh]">
           <button aria-label="Chiudi" onClick={() => setIssueDraft(null)} className="absolute inset-0 bg-black/40" />
           <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-1 flex items-center justify-between">

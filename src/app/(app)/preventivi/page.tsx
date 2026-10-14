@@ -984,7 +984,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
         const mail = `mailto:${q.email ?? ""}?subject=${encodeURIComponent("Conferma prenotazione — " + q.structure)}&body=${encodeURIComponent(confMsg)}`;
         const confirmed = q.status === "confermato";
         return (
-          <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[6vh]">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[6dvh]">
             <button aria-label={t("Chiudi")} onClick={() => setConfirming(null)} className="absolute inset-0 bg-black/40" />
             <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
               <div className="mb-2 flex items-center justify-between">

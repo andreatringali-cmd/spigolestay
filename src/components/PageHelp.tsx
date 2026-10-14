@@ -387,9 +387,9 @@ export default function PageHelp() {
     <>
       <button onClick={() => setOpen(true)} title="Guida della pagina" aria-label="Guida della pagina" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-sm font-bold text-dim transition hover:bg-wash hover:text-txt">?</button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[8dvh]">
           <button aria-label="Chiudi" onClick={() => setOpen(false)} className="absolute inset-0 bg-black/40" />
-          <div className="relative max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-6 shadow-2xl">
+          <div className="relative max-h-[80dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-6 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="grid h-7 w-7 place-items-center rounded-full bg-focus text-sm font-bold text-white">?</span>

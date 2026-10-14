@@ -82,7 +82,7 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
-      <div className="relative z-10 max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-line bg-surface shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="relative z-10 max-h-[92dvh] w-full max-w-3xl overflow-hidden rounded-2xl border border-line bg-surface shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 border-b border-line p-4">
           <div className="min-w-0">
             <h2 className="truncate text-base font-semibold text-txt">{g?.fullName || "Ospite"} <span className="font-normal text-faint">· {roleLabel(roleFor(0))}</span></h2>
@@ -91,7 +91,7 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
           <button onClick={onClose} aria-label="Chiudi" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-dim hover:bg-wash hover:text-txt">✕</button>
         </div>
 
-        <div className="max-h-[72vh] overflow-y-auto p-4">
+        <div className="max-h-[72dvh] overflow-y-auto p-4">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             {declared > 1 && <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={group} onChange={(e) => setGroup(e.target.checked)} className="h-3.5 w-3.5 accent-[color:var(--focus)]" /> Gruppo (non famiglia)</label>}
             <div className="ml-auto"><DocBtn id={b.id} withDoc apply={setPrimaryOf} /></div>

@@ -460,7 +460,7 @@ export default function CassaPage() {
       )}
 
       {/* Riepilogo */}
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <StatCard label={t("Saldo attuale")} value={hasOpening ? eur(saldoTot) : "—"} color={hasOpening && saldoTot < 0 ? "var(--err)" : undefined} onClick={() => openOpening()} hint={hasOpening ? <>{Object.keys(saldoConti).length} {t("conti")}</> : t("Imposta il saldo di partenza →")} />
         <StatCard label={`${t("Entrate")} ${periodWord}`} value={eur(entrateCard)} color="var(--ok)" hint={`${cardRows.filter((m) => m.kind === "in").length} ${t("movimenti")}`} />
         <StatCard label={`${t("Uscite")} ${periodWord}`} value={eur(usciteCard)} color="var(--err)" hint={`${cardRows.filter((m) => m.kind === "out").length} ${t("movimenti")}`} />
@@ -550,7 +550,7 @@ export default function CassaPage() {
           <option value="">{t("Tutte le categorie")}</option>
           {cats.filter((c) => c.key !== OPENING_CAT && (c.key === catF || catsInRegister.has(c.key))).map((c) => <option key={c.key} value={c.key}>{c.label ? t(c.label) : c.key}</option>)}
         </select>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
           <button onClick={() => setPayoutModal(true)} title={t("Impostazioni incassi")} aria-label={t("Impostazioni incassi")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></button>
           <button onClick={openNewMov} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Nuovo movimento")}</button>
@@ -562,10 +562,10 @@ export default function CassaPage() {
           <Card>
             <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Movimenti")}</SectionTitle><span className="text-xs text-faint">{listRows.length} {t("nel periodo")}</span></div>
             {rows.length === 0 ? <EmptyState title={t("Nessun movimento.")} /> : (
-              <div className="-mx-1 max-h-[640px] overflow-auto px-1">
-              <div className="min-w-[920px]">
-              <div className="grid grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
-                <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right">{t("Lordo")}</span><span className="text-right">{t("Commissioni")}</span><span className="text-right">{t("Netto")}</span><span className="-mb-1.5 self-stretch border-l border-line pb-1.5 pl-2 text-right" title={t("Saldo dei conti dopo ogni movimento, per la struttura selezionata")}>{t("Saldo conti")}</span>
+              <div className="-mx-1 max-h-[70dvh] overflow-auto px-1 md:max-h-[640px]">
+              <div className="md:min-w-[920px]">
+              <div className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
+                <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right max-md:hidden">{t("Lordo")}</span><span className="text-right max-md:hidden">{t("Commissioni")}</span><span className="text-right">{t("Netto")}</span><span className="-mb-1.5 self-stretch border-l border-line pb-1.5 pl-2 text-right" title={t("Saldo dei conti dopo ogni movimento, per la struttura selezionata")}>{t("Saldo conti")}</span>
               </div>
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
                 {listRows.map((r) => {
@@ -575,7 +575,7 @@ export default function CassaPage() {
                     const ch = r.channel as Channel;
                     return (
                       <div key={r.id}>
-                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} title={open ? t("Chiudi il dettaglio") : t("Mostra le prenotazioni di questo pagamento")} className="grid grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap rounded py-1.5 hover:bg-wash">
+                        <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} title={open ? t("Chiudi il dettaglio") : t("Mostra le prenotazioni di questo pagamento")} className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] cursor-pointer items-center gap-x-3 whitespace-nowrap rounded py-1.5 hover:bg-wash">
                           <span className="font-mono text-xs text-dim">{fmtDMY(r.date)}</span>
                           <div className="flex min-w-0 items-center gap-2">
                             <ChannelLogo channel={ch} size={24} title={CHANNELS[ch]?.label} />
@@ -583,8 +583,8 @@ export default function CassaPage() {
                             {r.forecast && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span>}
                             <span className="shrink-0 text-faint">{open ? "▾" : "▸"}</span>
                           </div>
-                          <span className="text-right font-mono text-xs" style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span>
-                          <span className="text-right font-mono text-xs" style={{ color: "var(--err)" }}>− {eur(r.comm)}</span>
+                          <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span>
+                          <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--err)" }}>− {eur(r.comm)}</span>
                           <span className="text-right font-mono text-sm font-bold text-txt">{eur(r.net)}</span>
                           {balCell(ledger.balanceAfter.get(lastId) ?? null, ledger.included.has(lastId))}
                         </div>
@@ -596,11 +596,11 @@ export default function CassaPage() {
                           const g2 = it.type === "booking" ? it.gross : im.kind === "in" ? im.amount : 0;
                           const c2 = it.type === "booking" ? it.comm : im.kind === "out" ? im.amount : 0;
                           return (
-                            <div key={"i-" + im.id} className="grid grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs text-dim">
+                            <div key={"i-" + im.id} className="grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap bg-wash/40 py-1 text-xs text-dim">
                               <span />
                               <span className="truncate pl-9">{gn}{ib ? <span className="text-faint"> · {t("check-out")} {fmtDMY(ib.checkOut)}</span> : null}</span>
-                              <span className="text-right font-mono">{g2 ? `+ ${eur(g2)}` : ""}</span>
-                              <span className="text-right font-mono">{c2 ? `− ${eur(c2)}` : ""}</span>
+                              <span className="text-right font-mono max-md:hidden">{g2 ? `+ ${eur(g2)}` : ""}</span>
+                              <span className="text-right font-mono max-md:hidden">{c2 ? `− ${eur(c2)}` : ""}</span>
                               <span className="text-right font-mono">{eur(roundCents(g2 - c2))}</span>
                               <div className="-my-1 self-stretch border-l border-line" />
                             </div>
@@ -622,7 +622,7 @@ export default function CassaPage() {
                   const rowClick = isBooking ? undefined : m.sched && m.ref ? () => openOcc(m) : m.auto || m.forecast ? undefined : m.cat === OPENING_CAT ? () => openOpening() : () => startEditMov(m);
                   const included = ledger.included.has(lastId); // del giorno del saldo di partenza: già nell'importo scritto
                   return (
-                    <div key={isBooking ? "b-" + r.id : m.id} onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap py-1.5" + (m.variable ? " rounded bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)]" : "") + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
+                    <div key={isBooking ? "b-" + r.id : m.id} onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid max-md:grid-cols-[58px_minmax(0,1fr)_84px_92px] md:grid-cols-[84px_minmax(0,1fr)_108px_108px_116px_128px] items-center gap-x-3 whitespace-nowrap py-1.5" + (m.variable ? " rounded bg-[color:color-mix(in_srgb,var(--warn)_12%,transparent)]" : "") + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
                       <span className="font-mono text-xs text-dim">{fmtDMY(m.date)}</span>
                       <div className="flex min-w-0 items-center gap-2">
                         {bk ? <ChannelLogo channel={bk.channel} size={24} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 24)}
@@ -635,14 +635,14 @@ export default function CassaPage() {
                       </div>
                       {isBooking ? (
                         <>
-                          <span className="text-right font-mono text-xs" style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span>
-                          <span className="text-right font-mono text-xs" style={{ color: "var(--err)" }}>− {eur(r.comm)}</span>
+                          <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span>
+                          <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--err)" }}>− {eur(r.comm)}</span>
                           <span className="text-right font-mono text-sm font-bold text-txt">{eur(r.net)}</span>
                         </>
                       ) : (
                         <>
-                          <span />
-                          <span />
+                          <span className="max-md:hidden" />
+                          <span className="max-md:hidden" />
                           <span className="text-right font-mono text-sm font-semibold" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.variable ? "~ " : ""}{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
                         </>
                       )}
@@ -707,9 +707,9 @@ export default function CassaPage() {
 
       {/* --- Modale saldo di partenza --- */}
       {opening && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[8dvh]">
           <button aria-label={t("Chiudi")} onClick={() => setOpening(null)} className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
-          <div role="dialog" aria-label={t("Saldo di partenza")} className="relative max-h-[84vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+          <div role="dialog" aria-label={t("Saldo di partenza")} className="relative max-h-[84dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="text-base font-bold text-txt">{t("Saldo di partenza")}</div>
             <p className="mt-1 text-xs text-dim">{t("Scrivi quanto hai oggi su ogni conto. Da qui ogni saldo parte dal suo importo e si aggiorna con le entrate e le uscite dei giorni successivi: lo storico passato non serve. I conti lasciati vuoti non vengono toccati.")}</p>
             <p className="mt-1 text-[11px] text-faint">{t("★ = conto principale: qui arrivano i soldi delle prenotazioni dai portali. ↑ ↓ cambiano l'ordine dei conti.")}</p>
@@ -755,9 +755,9 @@ export default function CassaPage() {
       {/* --- Modale selezione / gestione categorie --- */}
       {/* --- Modale impostazioni incassi --- */}
       {payoutModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[6vh]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[6dvh]">
           <button aria-label={t("Chiudi")} onClick={() => setPayoutModal(false)} className="absolute inset-0 bg-black/40" />
-          <div className="relative max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-2xl">
+          <div className="relative max-h-[88dvh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-2xl">
             <div className="mb-1 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Impostazioni incassi")}</h2><button onClick={() => setPayoutModal(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <p className="mb-2 text-xs text-dim">{t("Quando ogni portale ti paga: Cassa registra l'incasso nel giorno in cui arriva sul conto e, per i bonifici, riunisce le prenotazioni dello stesso pagamento. Valgono per tutte le strutture.")}</p>
             <div className="flex flex-col divide-y divide-[color:var(--line)] rounded-xl border border-line px-3">
@@ -791,9 +791,9 @@ export default function CassaPage() {
 
       {/* --- Modale modifica movimento --- */}
       {editingMov && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[6vh]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[6dvh]">
           <button aria-label={t("Chiudi")} onClick={resetForm} className="absolute inset-0 bg-black/40" />
-          <div className="relative max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+          <div className="relative max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{editingMov === NEW_MOV ? t("Nuovo movimento") : editingMov === OCC_MOV ? t("Modifica scadenza") : t("Modifica movimento")}</h2><button onClick={resetForm} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             {editingMov === NEW_MOV && (
               <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-wash p-1">
@@ -883,16 +883,16 @@ export default function CassaPage() {
         </div>
       )}
       {catPicker && (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[8vh]">
+        <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-[8dvh]">
           <button aria-label={t("Chiudi")} onClick={() => { setCatPicker(false); setNewCat(null); }} className="absolute inset-0 bg-black/40" />
-          <div className="relative max-h-[80vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+          <div className="relative max-h-[80dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Categorie")} {(catFor === "rule" ? rf.kind : form.kind) === "in" ? t("entrata") : t("uscita")}</h2><button onClick={() => { setCatPicker(false); setNewCat(null); }} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <div className="grid grid-cols-3 gap-2">
               {cats.filter((c) => c.kind === (catFor === "rule" ? rf.kind : form.kind) && !c.auto).map((c) => (
                 <button key={c.key} onClick={() => { if (catFor === "rule") setRf((f) => ({ ...f, cat: c.key })); else setForm((f) => ({ ...f, cat: c.key })); setCatPicker(false); }} className={`group relative flex flex-col items-center gap-1.5 rounded-xl border p-3 transition hover:bg-wash ${(catFor === "rule" ? rf.cat : form.cat) === c.key ? "border-focus ring-1 ring-[color:var(--focus)]" : "border-line"}`}>
                   {iconCircle(c, 40)}
                   <span className="text-center text-[11px] font-medium leading-tight text-txt">{t(c.label)}</span>
-                  {c.custom && <span onClick={(e) => { e.stopPropagation(); deleteCat(c.key); }} title={t("Elimina categoria")} className="absolute right-1 top-1 hidden h-5 w-5 place-items-center rounded-full bg-wash text-[10px] text-faint group-hover:grid hover:text-[color:var(--err)]">✕</span>}
+                  {c.custom && <span onClick={(e) => { e.stopPropagation(); deleteCat(c.key); }} title={t("Elimina categoria")} className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-wash text-[10px] text-faint [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:grid hover:text-[color:var(--err)]">✕</span>}
                 </button>
               ))}
               <button onClick={openNewCat} className="flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line p-3 text-dim transition hover:bg-wash hover:text-focus">
@@ -919,9 +919,9 @@ export default function CassaPage() {
 
       {/* --- Modale pagamento programmato --- */}
       {ruleModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[8vh]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain p-4 pt-[8dvh]">
           <button aria-label={t("Chiudi")} onClick={closeRuleModal} className="absolute inset-0 bg-black/40" />
-          <div className="relative max-h-[84vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+          <div className="relative max-h-[84dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{editingRule ? t("Modifica pagamento programmato") : t("Nuovo pagamento programmato")}</h2><button onClick={closeRuleModal} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <div className="mb-3 grid grid-cols-2 gap-2">
               <button onClick={() => setRf((f) => ({ ...f, kind: "out", cat: cats.find((c) => c.kind === "out" && !c.auto)!.key }))} className={`rounded-lg border py-2 text-sm font-semibold ${rf.kind === "out" ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim"}`}>− {t("Uscita")}</button>

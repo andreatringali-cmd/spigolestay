@@ -269,7 +269,7 @@ export default function OspitiPage() {
             </button>
             {clearBtn}{confirmClearNl && onClear && <button onClick={() => setConfirmClearNl(false)} className="text-[10px] font-normal normal-case text-faint hover:text-txt">{t("annulla")}</button>}
           </div>
-          {open && <div className="max-h-[62vh] overflow-auto">
+          {open && <div className="max-h-[62dvh] overflow-auto">
           <table className={`w-full ${lead ? "min-w-[560px]" : "min-w-[980px]"} text-sm`}>
             <thead className="sticky top-0 z-10 bg-wash">
               <tr className="border-b border-line text-[11px] uppercase tracking-wide text-faint">

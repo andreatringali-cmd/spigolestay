@@ -160,3 +160,10 @@ body {
   /* le classi con prefisso (sm:grid-cols-2) contengono ":" e non contano: valgono solo le colonne esplicite di base */
   .grid:not([class^="grid-cols-"]):not([class*=" grid-cols-"]):not([class^="grid-flow-"]):not([class*=" grid-flow-"]):not([class^="grid-rows-"]):not([class*=" grid-rows-"]) { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Telefono/tablet (puntatore "coarse"): i campi sotto i 16px fanno zoomare Safari al tocco; target e scroll più sicuri. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select, textarea { font-size: 16px; }
+  button, a, [role="button"], summary, label { touch-action: manipulation; } /* niente zoom a doppio tap, niente ritardo */
+}
+html, body { overflow-x: clip; } /* un popover che sporge non fa più "ballare" la pagina di lato */
