@@ -789,41 +789,34 @@ export default function CassaPage() {
       {payoutModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[6vh]">
           <button aria-label={t("Chiudi")} onClick={() => setPayoutModal(false)} className="absolute inset-0 bg-black/40" />
-          <div className="relative max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+          <div className="relative max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-2xl">
             <div className="mb-1 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Impostazioni incassi")}</h2><button onClick={() => setPayoutModal(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
-            <p className="mb-3 text-xs text-dim">{t("Indica quando ogni portale ti paga. Cassa registra l'incasso nella data in cui i soldi arrivano sul conto e, per i bonifici, riunisce in una voce le prenotazioni dello stesso pagamento. Le impostazioni valgono per tutte le strutture.")}</p>
-            <div className="flex flex-col gap-2">
+            <p className="mb-2 text-xs text-dim">{t("Quando ogni portale ti paga: Cassa registra l'incasso nel giorno in cui arriva sul conto e, per i bonifici, riunisce le prenotazioni dello stesso pagamento. Valgono per tutte le strutture.")}</p>
+            <div className="flex flex-col divide-y divide-[color:var(--line)] rounded-xl border border-line px-3">
               {PAYOUT_CHANNELS.map((ch) => {
                 const rule = payouts[ch] ?? { mode: "arrival" as PayoutMode };
-                const sel = "mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus";
                 const wd = rule.weekday ?? 4, md = rule.monthDay ?? 1, dd = rule.days ?? 0;
+                const tip = rule.mode === "arrival" ? t("I soldi risultano incassati il giorno dell'arrivo.")
+                  : rule.mode === "checkout" ? (dd ? `${t("Incasso")} ${dd} ${t("giorni dopo il check-out dell'ospite (es. carta virtuale).")}` : t("Incasso il giorno del check-out (es. carta virtuale)."))
+                  : rule.mode === "weekly" ? `${t("Un unico bonifico ogni")} ${t(WEEKDAY_LABELS[wd]).toLowerCase()}: ${t("copre i check-out dal")} ${t(WEEKDAY_LABELS[wd]).toLowerCase()} ${t("della settimana prima al giorno precedente.")}`
+                  : `${t("Un unico bonifico il")} ${md} ${t("del mese successivo: copre tutti i check-out del mese, dal 1 all'ultimo giorno.")}`;
                 return (
-                  <div key={ch} className="rounded-xl border border-line p-3">
-                    <div className="mb-2 flex items-center gap-2"><ChannelLogo channel={ch} size={22} title={CHANNELS[ch].label} /><span className="text-sm font-semibold text-txt">{CHANNELS[ch].label}</span></div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className="block"><span className="text-xs text-dim">{t("Quando arriva il pagamento")}</span>
-                        <select value={rule.mode} onChange={(e) => setPayoutRule(ch, { mode: e.target.value })} className={sel}>
-                          <option value="arrival">{t("Alla data di arrivo")}</option>
-                          <option value="checkout">{t("Dopo il check-out (carta virtuale)")}</option>
-                          <option value="weekly">{t("Bonifico settimanale")}</option>
-                          <option value="monthly">{t("Bonifico mensile")}</option>
-                        </select>
-                      </label>
-                      {rule.mode === "checkout" && <label className="block"><span className="text-xs text-dim">{t("Giorni dopo il check-out")}</span><input type="number" min={0} max={60} value={dd} onChange={(e) => setPayoutRule(ch, { days: Number(e.target.value) || 0 })} className={sel} /></label>}
-                      {rule.mode === "weekly" && <label className="block"><span className="text-xs text-dim">{t("Giorno del bonifico")}</span><select value={wd} onChange={(e) => setPayoutRule(ch, { weekday: Number(e.target.value) })} className={sel}>{WEEKDAY_LABELS.map((w, i) => <option key={w} value={i}>{t(w)}</option>)}</select></label>}
-                      {rule.mode === "monthly" && <label className="block"><span className="text-xs text-dim">{t("Giorno del mese successivo")}</span><input type="number" min={1} max={31} value={md} onChange={(e) => setPayoutRule(ch, { monthDay: Number(e.target.value) || 1 })} className={sel} /></label>}
-                    </div>
-                    <p className="mt-1.5 text-[11px] text-faint">
-                      {rule.mode === "arrival" && t("I soldi risultano incassati il giorno dell'arrivo.")}
-                      {rule.mode === "checkout" && (dd ? `${t("Incasso")} ${dd} ${t("giorni dopo il check-out dell'ospite (es. carta virtuale).")}` : t("Incasso il giorno del check-out (es. carta virtuale)."))}
-                      {rule.mode === "weekly" && `${t("Un unico bonifico ogni")} ${t(WEEKDAY_LABELS[wd]).toLowerCase()}: ${t("copre i check-out dal")} ${t(WEEKDAY_LABELS[wd]).toLowerCase()} ${t("della settimana prima al giorno precedente.")}`}
-                      {rule.mode === "monthly" && `${t("Un unico bonifico il")} ${md} ${t("del mese successivo: copre tutti i check-out del mese, dal 1 all'ultimo giorno.")}`}
-                    </p>
+                  <div key={ch} title={tip} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2">
+                    <div className="flex w-[128px] shrink-0 items-center gap-2"><ChannelLogo channel={ch} size={20} title={CHANNELS[ch].label} /><span className="truncate text-sm font-semibold text-txt">{CHANNELS[ch].label}</span></div>
+                    <select aria-label={t("Quando arriva il pagamento")} value={rule.mode} onChange={(e) => setPayoutRule(ch, { mode: e.target.value })} className="w-[210px] rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
+                      <option value="arrival">{t("Alla data di arrivo")}</option>
+                      <option value="checkout">{t("Dopo il check-out (carta virtuale)")}</option>
+                      <option value="weekly">{t("Bonifico settimanale")}</option>
+                      <option value="monthly">{t("Bonifico mensile")}</option>
+                    </select>
+                    {rule.mode === "checkout" && <span className="flex items-center gap-1.5 text-xs text-dim"><input type="number" min={0} max={60} aria-label={t("Giorni dopo il check-out")} value={dd} onChange={(e) => setPayoutRule(ch, { days: Number(e.target.value) || 0 })} className="w-14 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />{t("giorni dopo")}</span>}
+                    {rule.mode === "weekly" && <select aria-label={t("Giorno del bonifico")} value={wd} onChange={(e) => setPayoutRule(ch, { weekday: Number(e.target.value) })} className="rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">{WEEKDAY_LABELS.map((w, i) => <option key={w} value={i}>{t(w)}</option>)}</select>}
+                    {rule.mode === "monthly" && <span className="flex items-center gap-1.5 text-xs text-dim">{t("il")}<input type="number" min={1} max={31} aria-label={t("Giorno del mese successivo")} value={md} onChange={(e) => setPayoutRule(ch, { monthDay: Number(e.target.value) || 1 })} className="w-14 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />{t("del mese dopo")}</span>}
                   </div>
                 );
               })}
             </div>
-            <button onClick={() => setPayoutModal(false)} className="mt-3 w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{t("Fatto")}</button>
+            <button onClick={() => setPayoutModal(false)} className="mt-3 w-full rounded-lg bg-focus py-1.5 text-sm font-semibold text-white hover:opacity-90">{t("Fatto")}</button>
           </div>
         </div>
       )}
