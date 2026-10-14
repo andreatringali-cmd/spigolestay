@@ -27,3 +27,18 @@ test("prenotazioni diverse non si mescolano; l'ordine è quello dei movimenti", 
   const rows = groupBookingRows([inc("a", 100), com("a", 15), inc("b", 200), com("b", 30)]);
   assert.deepEqual(rows.map((r) => (r.type === "booking" ? r.id : "x")), ["a", "b"]);
 });
+
+test("prenotazione ancora da incassare (previsione) + commissione → una sola voce", () => {
+  const fc = { id: "fc-in-b9", date: "2026-10-14", kind: "in" as const, cat: "prenotazioni", desc: "Amir Oscar · da incassare", amount: 79.2, conto: "banca", forecast: true, ref: "b9" };
+  const rows = groupBookingRows([com("b9", 19.41), fc]);
+  assert.equal(rows.length, 1);
+  const b = rows[0];
+  assert.equal(b.type, "booking");
+  if (b.type === "booking") { assert.equal(b.gross, 79.2); assert.equal(b.comm, 19.41); assert.equal(b.net, 59.79); }
+});
+
+test("parzialmente incassata: la voce unica usa l'incasso, il 'da incassare' resta a parte", () => {
+  const fc = { id: "fc-in-b8", date: "2026-10-20", kind: "in" as const, cat: "prenotazioni", desc: "x · da incassare", amount: 200, conto: "banca", forecast: true, ref: "b8" };
+  const rows = groupBookingRows([inc("b8", 100), com("b8", 30), fc]);
+  assert.deepEqual(rows.map((r) => r.type), ["booking", "mov"]);
+});

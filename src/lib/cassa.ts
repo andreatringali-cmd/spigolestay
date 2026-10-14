@@ -167,13 +167,16 @@ export type CassaListRow =
 export function groupBookingRows(rows: Mov[]): CassaListRow[] {
   const commByRef = new Map<string, Mov>();
   for (const m of rows) if (m.id.startsWith("auto-comm-") && m.ref) commByRef.set(m.ref, m);
-  const incomeRefs = new Set(rows.filter((m) => m.id.startsWith("auto-in-") && m.ref).map((m) => m.ref as string));
+  // L'incasso della voce unica è quello già incassato (auto-in); se non c'è ancora nulla incassato, è il "da incassare" previsto (fc-in).
+  const autoRefs = new Set(rows.filter((m) => m.id.startsWith("auto-in-") && m.ref).map((m) => m.ref as string));
+  const isIncome = (m: Mov) => !!m.ref && (m.id.startsWith("auto-in-") || (m.id.startsWith("fc-in-") && !autoRefs.has(m.ref)));
+  const incomeRefs = new Set(rows.filter(isIncome).map((m) => m.ref as string));
   const out: CassaListRow[] = [];
   for (const m of rows) {
     if (m.id.startsWith("auto-comm-") && m.ref && incomeRefs.has(m.ref)) continue; // già dentro la voce della prenotazione
-    if (m.id.startsWith("auto-in-") && m.ref && commByRef.has(m.ref)) {
-      const c = commByRef.get(m.ref)!;
-      out.push({ type: "booking", id: m.ref, income: m, commission: c, gross: m.amount, comm: c.amount, net: roundCents(m.amount - c.amount) });
+    if (isIncome(m) && commByRef.has(m.ref as string)) {
+      const c = commByRef.get(m.ref as string)!;
+      out.push({ type: "booking", id: m.ref as string, income: m, commission: c, gross: m.amount, comm: c.amount, net: roundCents(m.amount - c.amount) });
     } else out.push({ type: "mov", mov: m });
   }
   return out;
