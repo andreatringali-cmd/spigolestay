@@ -271,7 +271,9 @@ export default function CassaPage() {
   // ---- Form nuovo movimento -------------------------------------------------
   const [form, setForm] = useState<{ kind: Kind; date: string; cat: string; desc: string; amount: string; conto: string; struttura: string; repeat: "once" | "monthly" | "weekly" | "yearly" }>(() => ({ kind: "out", date: todayISO(), cat: "pulizie", desc: "", amount: "", conto: "contanti", struttura: activeStructureId, repeat: "once" }));
   const setKind = (k: Kind) => setForm((f) => ({ ...f, kind: k, cat: cats.find((c) => c.kind === k && !c.auto)!.key }));
-  const [editingMov, setEditingMov] = useState<string | null>(null); // id del movimento in modifica (null = nuovo)
+  const NEW_MOV = "__nuovo__";
+  const [editingMov, setEditingMov] = useState<string | null>(null); // finestra movimento: id del movimento in modifica, NEW_MOV per uno nuovo, null = chiusa
+  const openNewMov = () => { setForm((f) => ({ ...f, kind: "out", cat: cats.find((c) => c.kind === "out" && !c.auto)!.key, desc: "", amount: "", repeat: "once", date: todayISO(), struttura: activeStructureId })); setEditingMov(NEW_MOV); };
   const resetForm = () => { setEditingMov(null); setForm((f) => ({ ...f, desc: "", amount: "", repeat: "once", date: todayISO() })); };
   const startEditMov = (m: Mov) => {
     setEditingMov(m.id);
@@ -288,7 +290,7 @@ export default function CassaPage() {
     if (!form.date) { toast(t("Inserisci la data."), "error"); return; }
     const desc = form.desc.trim() || catOf(form.cat)?.label || "";
     const summary = `${fmtDMY(form.date)} · ${form.kind === "in" ? "+" : "−"} ${eur(amt)}`;
-    if (editingMov) {
+    if (editingMov && editingMov !== NEW_MOV) {
       const prev = manual.find((m) => m.id === editingMov);
       if (!prev) { resetForm(); return; }
       const next: Mov = { ...prev, date: form.date, kind: form.kind, cat: form.cat, desc, amount: amt, conto: form.conto, structureId: form.struttura };
@@ -315,7 +317,7 @@ export default function CassaPage() {
       setRules((prev) => [...prev, rule]);
       if (user) checkWrite(insertRule(user.id, rule), "Il pagamento ricorrente", () => setRules((prev) => prev.filter((r) => r.id !== rule.id)));
     }
-    setForm((f) => ({ ...f, desc: "", amount: "", repeat: "once" }));
+    resetForm();
   };
   const del = async (id: string) => { if (!(await ask({ message: t("Eliminare questo movimento?"), danger: true, confirmLabel: t("Elimina") }))) return; const gone = manual.find((m) => m.id === id); setManual((prev) => prev.filter((m) => m.id !== id)); checkWrite(deleteMovement(id), "L'eliminazione", () => { if (gone) setManual((prev) => (prev.some((m) => m.id === gone.id) ? prev : [gone, ...prev])); }); };
 
@@ -476,43 +478,80 @@ export default function CassaPage() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
+          <button onClick={openNewMov} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Nuovo movimento")}</button>
           <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* Colonna sinistra */}
-        <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
           <Card>
-            <SectionTitle>{t("Nuovo movimento")}</SectionTitle>
-            <div className="mb-3 grid grid-cols-2 gap-2">
-              <button onClick={() => setKind("out")} className={`rounded-lg border py-2 text-sm font-semibold transition ${form.kind === "out" ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:bg-wash"}`}>− {t("Uscita")}</button>
-              <button onClick={() => setKind("in")} className={`rounded-lg border py-2 text-sm font-semibold transition ${form.kind === "in" ? "border-[color:var(--ok)] text-[color:var(--ok)]" : "border-line text-dim hover:bg-wash"}`}>+ {t("Entrata")}</button>
-            </div>
-            <label className="mb-2 block"><span className="text-xs text-dim">{t("Importo (€)")}</span><input inputMode="decimal" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} placeholder="0,00" className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 font-mono text-lg text-txt outline-none focus:border-focus" /></label>
-            <div className="mb-2 block">
-              <span className="text-xs text-dim">{t("Categoria")}</span>
-              <button onClick={() => setCatPicker(true)} className="mt-0.5 flex w-full items-center gap-2 rounded-lg border border-line bg-paper px-2 py-1.5 text-left text-sm text-txt hover:bg-wash">
-                {iconCircle(selCat, 28)}<span className="flex-1 font-medium">{selCat?.label ? t(selCat.label) : t("Scegli…")}</span><span className="text-faint">▾</span>
-              </button>
-            </div>
-            <div className="mb-2 grid grid-cols-2 gap-2">
-              <label className="block"><span className="text-xs text-dim">{t("Conto")}</span><select value={form.conto} onChange={(e) => setForm((f) => ({ ...f, conto: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{CONTI.map((c) => <option key={c.key} value={c.key}>{t(c.label)}</option>)}</select></label>
-              <label className="block"><span className="text-xs text-dim">{t("Data")}</span><input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
-            </div>
-            {activeStructureId === "all" && <label className="mb-2 block"><span className="text-xs text-dim">{t("Struttura")}</span><select value={form.struttura} onChange={(e) => setForm((f) => ({ ...f, struttura: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{activeStructureId === "all" && <option value="all">{t("Tutte le strutture")}</option>}{structures.filter((s) => activeStructureId === "all" || s.id === activeStructureId).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
-            <label className="mb-3 block"><span className="text-xs text-dim">{t("Descrizione (facoltativa)")}</span><input value={form.desc} onChange={(e) => setForm((f) => ({ ...f, desc: e.target.value }))} placeholder={t("es. Bolletta Enel agosto")} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
-            <div className="mb-3">
-              <span className="text-xs text-dim">{t("Si ripete?")}</span>
-              <div className="mt-1 grid grid-cols-4 gap-1.5">
-                {([["once", "Solo una volta"], ["monthly", "Ogni mese"], ["weekly", "Ogni settimana"], ["yearly", "Ogni anno"]] as [typeof form.repeat, string][]).map(([v, lab]) => (
-                  <button key={v} type="button" onClick={() => setForm((f) => ({ ...f, repeat: v }))} className={`rounded-lg border px-1 py-1.5 text-[11px] font-semibold transition ${form.repeat === v ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(lab)}</button>
-                ))}
+            <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Movimenti")}</SectionTitle><span className="text-xs text-faint">{listRows.length} {t("nel periodo")}</span></div>
+            {rows.length === 0 ? <EmptyState title={t("Nessun movimento.")} /> : (
+              <div className="-mx-1 max-h-[640px] overflow-y-auto px-1">
+              <div className="grid grid-cols-[84px_minmax(0,1fr)_auto_104px] items-center gap-x-3 sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
+                <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right">{t("Importo")}</span><span className="text-right" title={t("Saldo di tutti i conti e di tutte le strutture dopo ogni movimento")}>{t("Saldo conti")}</span>
               </div>
-              {form.repeat !== "once" && <p className="mt-1 text-[11px] text-faint">{t("Registro questo movimento oggi e creo un pagamento programmato che si ripete da solo.")}</p>}
-            </div>
-            <button onClick={add} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{form.repeat === "once" ? t("Registra movimento") : t("Registra e programma")}</button>
+              <div className="flex flex-col divide-y divide-[color:var(--line)]">
+                {listRows.map((r) => {
+                  const isBooking = r.type === "booking";
+                  const m = isBooking ? r.income : r.mov;
+                  const c = catOf(m.cat);
+                  const bk = bkOf(m);
+                  const gname = bk ? (guests.find((g) => g.id === bk.guestId)?.fullName || "Ospite") : "";
+                  const title = bk ? (m.id.startsWith("auto-comm-") ? t("Commissione") + " · " + gname : m.id.startsWith("fc-in-") ? gname + " · " + t("da incassare") : gname) : m.desc;
+                  // saldo in quella data = dopo l'ultimo movimento della riga (per la prenotazione: dopo incasso e commissione)
+                  const lastId = isBooking && r.commission && ledgerOrd(r.commission) > ledgerOrd(r.income) ? r.commission.id : m.id;
+                  const bal = ledger.balanceAfter.get(lastId) ?? null;
+                  // riga modificabile: movimento inserito a mano (si apre la finestra di modifica) o saldo di partenza (si apre la finestra del saldo)
+                  const rowClick = isBooking || m.auto || m.sched || m.forecast ? undefined : m.cat === OPENING_CAT ? () => openOpening() : () => startEditMov(m);
+                  const included = ledger.included.has(lastId); // del giorno del saldo di partenza: già nell'importo scritto
+                  return (
+                    <div key={isBooking ? "b-" + r.id : m.id} onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid grid-cols-[84px_minmax(0,1fr)_auto_104px] items-center gap-x-3 py-2.5" + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
+                      <span className="font-mono text-xs text-dim">{fmtDMY(m.date)}</span>
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        {bk ? <ChannelLogo channel={bk.channel} size={30} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 30)}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-sm font-medium text-txt">{title}</span>
+                            {m.forecast ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span> : (m.auto && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>)}
+                            {!isBooking && m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-faint">
+                            <span>{c?.label ? t(c.label) : ""}</span>
+                            <span>·</span><span className="capitalize">{(() => { const l = CONTI.find((x) => x.key === m.conto)?.label; return l ? t(l) : ""; })()}</span>
+                            {activeStructureId === "all" && m.structureId && m.structureId !== "all" && <><span>·</span><span>{structNameOf(m.structureId)}</span></>}
+                          </div>
+                        </div>
+                      </div>
+                      {isBooking ? (
+                        <div className="whitespace-nowrap font-mono text-[11px] leading-tight">
+                          <div className="flex justify-between gap-4"><span className="font-sans text-faint">{t("Lordo")}</span><span style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span></div>
+                          <div className="flex justify-between gap-4"><span className="font-sans text-faint">{t("Commissioni")}</span><span style={{ color: "var(--err)" }}>− {eur(r.comm)}</span></div>
+                          <div className="mt-0.5 flex justify-between gap-4 border-t border-line pt-0.5 text-sm font-bold"><span className="font-sans text-[11px] font-semibold text-dim">{t("Netto")}</span><span className="text-txt">{eur(r.net)}</span></div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="font-mono text-sm font-semibold" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
+                        </div>
+                      )}
+                      {included
+                        ? <span className="text-right text-[11px] font-medium text-faint" title={t("Questo movimento è del giorno in cui hai impostato il saldo: è già compreso nell'importo che hai scritto.")}>{t("già nel saldo")}</span>
+                        : <span className={"text-right font-mono text-sm font-bold " + (bal === null ? "text-faint" : m.forecast ? "text-dim" : bal >= 0 ? "text-txt" : "text-[color:var(--err)]")} title={bal === null ? t("Imposta il saldo di partenza per vedere il saldo") : m.forecast ? t("Saldo previsto") : t("Saldo dopo questo movimento")}>{bal === null ? "—" : eur(bal)}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              </div>
+            )}
+            {rows.length > 0 && (
+              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3 text-center">
+                <div><div className="text-[11px] text-faint">{t("Entrate")}</div><div className="font-mono text-sm font-semibold" style={{ color: "var(--ok)" }}>+ {eur(entrate)}</div></div>
+                <div><div className="text-[11px] text-faint">{t("Uscite")}</div><div className="font-mono text-sm font-semibold" style={{ color: "var(--err)" }}>− {eur(uscite)}</div></div>
+                <div><div className="text-[11px] text-faint">{t("Entrate − uscite")}</div><div className={`font-mono text-sm font-bold ${saldo >= 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{eur(saldo)}</div></div>
+              </div>
+            )}
           </Card>
+        <div className="grid items-start gap-4 lg:grid-cols-3">
 
           {/* Pagamenti programmati */}
           <Card>
@@ -596,78 +635,6 @@ export default function CassaPage() {
               </div>
             )}
           </Card>
-        </div>
-
-        {/* Colonna destra */}
-        <div className="flex flex-col gap-4 lg:col-span-2">
-          <Card>
-            <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Movimenti")}</SectionTitle><span className="text-xs text-faint">{listRows.length} {t("nel periodo")}</span></div>
-            {rows.length === 0 ? <EmptyState title={t("Nessun movimento.")} /> : (
-              <div className="-mx-1 max-h-[640px] overflow-y-auto px-1">
-              <div className="grid grid-cols-[84px_minmax(0,1fr)_auto_104px] items-center gap-x-3 sticky top-0 z-10 border-b border-line bg-surface pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
-                <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right">{t("Importo")}</span><span className="text-right" title={t("Saldo di tutti i conti e di tutte le strutture dopo ogni movimento")}>{t("Saldo conti")}</span>
-              </div>
-              <div className="flex flex-col divide-y divide-[color:var(--line)]">
-                {listRows.map((r) => {
-                  const isBooking = r.type === "booking";
-                  const m = isBooking ? r.income : r.mov;
-                  const c = catOf(m.cat);
-                  const bk = bkOf(m);
-                  const gname = bk ? (guests.find((g) => g.id === bk.guestId)?.fullName || "Ospite") : "";
-                  const title = bk ? (m.id.startsWith("auto-comm-") ? t("Commissione") + " · " + gname : m.id.startsWith("fc-in-") ? gname + " · " + t("da incassare") : gname) : m.desc;
-                  // saldo in quella data = dopo l'ultimo movimento della riga (per la prenotazione: dopo incasso e commissione)
-                  const lastId = isBooking && r.commission && ledgerOrd(r.commission) > ledgerOrd(r.income) ? r.commission.id : m.id;
-                  const bal = ledger.balanceAfter.get(lastId) ?? null;
-                  // riga modificabile: movimento inserito a mano (si apre la finestra di modifica) o saldo di partenza (si apre la finestra del saldo)
-                  const rowClick = isBooking || m.auto || m.sched || m.forecast ? undefined : m.cat === OPENING_CAT ? () => openOpening() : () => startEditMov(m);
-                  const included = ledger.included.has(lastId); // del giorno del saldo di partenza: già nell'importo scritto
-                  return (
-                    <div key={isBooking ? "b-" + r.id : m.id} onClick={rowClick} title={rowClick ? t("Clicca per modificare") : undefined} className={"grid grid-cols-[84px_minmax(0,1fr)_auto_104px] items-center gap-x-3 py-2.5" + (rowClick ? " cursor-pointer rounded hover:bg-wash" : "")}>
-                      <span className="font-mono text-xs text-dim">{fmtDMY(m.date)}</span>
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        {bk ? <ChannelLogo channel={bk.channel} size={30} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 30)}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="truncate text-sm font-medium text-txt">{title}</span>
-                            {m.forecast ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span> : (m.auto && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>)}
-                            {!isBooking && m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
-                          </div>
-                          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-faint">
-                            <span>{c?.label ? t(c.label) : ""}</span>
-                            <span>·</span><span className="capitalize">{(() => { const l = CONTI.find((x) => x.key === m.conto)?.label; return l ? t(l) : ""; })()}</span>
-                            {activeStructureId === "all" && m.structureId && m.structureId !== "all" && <><span>·</span><span>{structNameOf(m.structureId)}</span></>}
-                          </div>
-                        </div>
-                      </div>
-                      {isBooking ? (
-                        <div className="whitespace-nowrap font-mono text-[11px] leading-tight">
-                          <div className="flex justify-between gap-4"><span className="font-sans text-faint">{t("Lordo")}</span><span style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span></div>
-                          <div className="flex justify-between gap-4"><span className="font-sans text-faint">{t("Commissioni")}</span><span style={{ color: "var(--err)" }}>− {eur(r.comm)}</span></div>
-                          <div className="mt-0.5 flex justify-between gap-4 border-t border-line pt-0.5 text-sm font-bold"><span className="font-sans text-[11px] font-semibold text-dim">{t("Netto")}</span><span className="text-txt">{eur(r.net)}</span></div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-1.5">
-                          <span className="font-mono text-sm font-semibold" style={{ color: m.kind === "in" ? "var(--ok)" : "var(--err)" }}>{m.kind === "in" ? "+" : "−"} {eur(m.amount)}</span>
-                        </div>
-                      )}
-                      {included
-                        ? <span className="text-right text-[11px] font-medium text-faint" title={t("Questo movimento è del giorno in cui hai impostato il saldo: è già compreso nell'importo che hai scritto.")}>{t("già nel saldo")}</span>
-                        : <span className={"text-right font-mono text-sm font-bold " + (bal === null ? "text-faint" : m.forecast ? "text-dim" : bal >= 0 ? "text-txt" : "text-[color:var(--err)]")} title={bal === null ? t("Imposta il saldo di partenza per vedere il saldo") : m.forecast ? t("Saldo previsto") : t("Saldo dopo questo movimento")}>{bal === null ? "—" : eur(bal)}</span>}
-                    </div>
-                  );
-                })}
-              </div>
-              </div>
-            )}
-            {rows.length > 0 && (
-              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3 text-center">
-                <div><div className="text-[11px] text-faint">{t("Entrate")}</div><div className="font-mono text-sm font-semibold" style={{ color: "var(--ok)" }}>+ {eur(entrate)}</div></div>
-                <div><div className="text-[11px] text-faint">{t("Uscite")}</div><div className="font-mono text-sm font-semibold" style={{ color: "var(--err)" }}>− {eur(uscite)}</div></div>
-                <div><div className="text-[11px] text-faint">{t("Entrate − uscite")}</div><div className={`font-mono text-sm font-bold ${saldo >= 0 ? "text-txt" : "text-[color:var(--err)]"}`}>{eur(saldo)}</div></div>
-              </div>
-            )}
-          </Card>
-
           <Card>
             <SectionTitle>{t("Saldo per conto")}</SectionTitle>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -732,7 +699,7 @@ export default function CassaPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[6vh]">
           <button aria-label={t("Chiudi")} onClick={resetForm} className="absolute inset-0 bg-black/40" />
           <div className="relative max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Modifica movimento")}</h2><button onClick={resetForm} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{editingMov === NEW_MOV ? t("Nuovo movimento") : t("Modifica movimento")}</h2><button onClick={resetForm} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
             <div className="mb-3 grid grid-cols-2 gap-2">
               <button onClick={() => setKind("out")} className={`rounded-lg border py-2 text-sm font-semibold transition ${form.kind === "out" ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:bg-wash"}`}>− {t("Uscita")}</button>
               <button onClick={() => setKind("in")} className={`rounded-lg border py-2 text-sm font-semibold transition ${form.kind === "in" ? "border-[color:var(--ok)] text-[color:var(--ok)]" : "border-line text-dim hover:bg-wash"}`}>+ {t("Entrata")}</button>
@@ -750,8 +717,19 @@ export default function CassaPage() {
             </div>
             {activeStructureId === "all" && <label className="mb-2 block"><span className="text-xs text-dim">{t("Struttura")}</span><select value={form.struttura} onChange={(e) => setForm((f) => ({ ...f, struttura: e.target.value }))} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-2 text-sm text-txt outline-none focus:border-focus">{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
             <label className="mb-3 block"><span className="text-xs text-dim">{t("Descrizione (facoltativa)")}</span><input value={form.desc} onChange={(e) => setForm((f) => ({ ...f, desc: e.target.value }))} placeholder={t("es. Bolletta Enel agosto")} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus" /></label>
-            <button onClick={add} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{t("Salva modifiche")}</button>
-            <button onClick={() => { const id = editingMov; resetForm(); void del(id); }} className="mt-1.5 w-full rounded-lg border border-line py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina movimento")}</button>
+            {editingMov === NEW_MOV && (
+            <div className="mb-3">
+              <span className="text-xs text-dim">{t("Si ripete?")}</span>
+              <div className="mt-1 grid grid-cols-4 gap-1.5">
+                {([["once", "Solo una volta"], ["monthly", "Ogni mese"], ["weekly", "Ogni settimana"], ["yearly", "Ogni anno"]] as [typeof form.repeat, string][]).map(([v, lab]) => (
+                  <button key={v} type="button" onClick={() => setForm((f) => ({ ...f, repeat: v }))} className={`rounded-lg border px-1 py-1.5 text-[11px] font-semibold transition ${form.repeat === v ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash"}`}>{t(lab)}</button>
+                ))}
+              </div>
+              {form.repeat !== "once" && <p className="mt-1 text-[11px] text-faint">{t("Registro questo movimento oggi e creo un pagamento programmato che si ripete da solo.")}</p>}
+            </div>
+            )}
+            <button onClick={add} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{editingMov === NEW_MOV ? (form.repeat === "once" ? t("Registra movimento") : t("Registra e programma")) : t("Salva modifiche")}</button>
+            {editingMov !== NEW_MOV && <button onClick={() => { const id = editingMov; resetForm(); void del(id); }} className="mt-1.5 w-full rounded-lg border border-line py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina movimento")}</button>}
           </div>
         </div>
       )}
