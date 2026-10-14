@@ -41,7 +41,7 @@ export async function POST(req: Request) {
   const email = normEmail(body?.email);
   if (!isEmail(email)) return NextResponse.json({ error: "email_non_valida" }, { status: 400 });
   const note = String(body?.note ?? "").slice(0, 200) || null;
-  const { error } = await a.admin.from("access_allowlist").upsert({ email, note, added_by: a.email, kind: body?.kind === "collaboratore" ? "collaboratore" : "titolare" }, { onConflict: "email" });
+  const { error } = await a.admin.from("access_allowlist").upsert({ email, note, added_by: a.email, kind: body?.kind === "collaboratore" || (note ?? "").startsWith("Utente:") ? "collaboratore" : "titolare" }, { onConflict: "email" });
   if (error) return NextResponse.json({ error: error.message }, { status: 200 });
   const notified = await notifyAccessApproved(email);
   return NextResponse.json({ ok: true, notified });

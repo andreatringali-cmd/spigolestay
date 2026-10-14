@@ -153,7 +153,7 @@ export default function UserSchedaPage() {
     try {
       const token = (await supabase?.auth.getSession())?.data.session?.access_token;
       if (!token) return;
-      const r = await fetch("/api/admin/allowlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ email: usr.email.trim(), note: `Utente: ${usr.firstName} ${usr.lastName}`.trim() }) });
+      const r = await fetch("/api/admin/allowlist", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ email: usr.email.trim(), note: `Utente: ${usr.firstName} ${usr.lastName}`.trim(), kind: "collaboratore" }) });
       const j = await r.json().catch(() => ({}));
       if (r.status === 403) toast(t("Utente creato. L'invito può partire solo dal titolare dell'account."), "error");
       else if (j?.ok && j.notified) toast(`${t("Invito inviato a")} ${usr.email}`, "success");
