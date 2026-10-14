@@ -302,9 +302,10 @@ export default function CassaPage() {
   const [form, setForm] = useState<{ kind: Kind; date: string; cat: string; desc: string; amount: string; conto: string; struttura: string; repeat: "once" | "monthly" | "weekly" | "yearly" }>(() => ({ kind: "out", date: todayISO(), cat: "pulizie", desc: "", amount: "", conto: "contanti", struttura: activeStructureId, repeat: "once" }));
   const setKind = (k: Kind) => setForm((f) => ({ ...f, kind: k, cat: cats.find((c) => c.kind === k && !c.auto)!.key }));
   const NEW_MOV = "__nuovo__";
+  const [movTab, setMovTab] = useState<"mov" | "prog">("mov"); // scheda della finestra Nuovo movimento
   const OCC_MOV = "__scadenza__"; // la finestra movimento modifica UNA scadenza di un pagamento programmato
   const [editingMov, setEditingMov] = useState<string | null>(null); // finestra movimento: id del movimento in modifica, NEW_MOV per uno nuovo, null = chiusa
-  const openNewMov = () => { setForm((f) => ({ ...f, kind: "out", cat: cats.find((c) => c.kind === "out" && !c.auto)!.key, desc: "", amount: "", repeat: "once", date: todayISO(), struttura: activeStructureId })); setEditingMov(NEW_MOV); };
+  const openNewMov = () => { setForm((f) => ({ ...f, kind: "out", cat: cats.find((c) => c.kind === "out" && !c.auto)!.key, desc: "", amount: "", repeat: "once", date: todayISO(), struttura: activeStructureId })); setMovTab("mov"); setEditingMov(NEW_MOV); };
   const resetForm = () => { setEditingMov(null); setOccCtx(null); setForm((f) => ({ ...f, desc: "", amount: "", repeat: "once", date: todayISO() })); };
   const openOcc = (m: Mov) => {
     const r = rules.find((x) => x.id === m.ref);
@@ -655,43 +656,7 @@ export default function CassaPage() {
               </div>
             )}
           </Card>
-        <div className="grid items-start gap-4 lg:grid-cols-3">
-
-          {/* Pagamenti programmati */}
-          <Card>
-            <div className="mb-3 flex items-center justify-between">
-              <SectionTitle>{t("Pagamenti programmati")}</SectionTitle>
-              <button onClick={openNewRule} className="rounded-md border border-line px-2 py-1 text-xs font-medium text-focus hover:bg-wash">＋ {t("Aggiungi")}</button>
-            </div>
-            {rules.filter((r) => ruleVisible(r.structureId)).length === 0 ? (
-              <p className="text-sm text-faint">{t("Nessun pagamento ricorrente. Aggiungi mutuo, bollette, abbonamenti… si registrano da soli ogni mese.")}</p>
-            ) : (
-              <>
-                <div className="flex flex-col divide-y divide-[color:var(--line)]">
-                  {rules.filter((r) => ruleVisible(r.structureId)).map((r) => {
-                    const c = catOf(r.cat);
-                    const next = upcoming.find((u) => u.rule.id === r.id)?.date;
-                    return (
-                      <div key={r.id} className="flex items-center gap-3 py-2.5">
-                        <button type="button" onClick={() => openEditRule(r)} title={t("Modifica")} className="flex min-w-0 flex-1 items-center gap-3 rounded text-left hover:bg-wash">
-                        {iconCircle(c, 32)}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="truncate text-sm font-medium text-txt">{r.desc}</span>
-                            <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={r.auto ? { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{r.variable ? t("variabile") : r.auto ? t("auto") : t("manuale")}</span>
-                          </div>
-                          <div className="mt-0.5 text-[11px] text-faint">{t(FREQ[r.freq])}{r.freq === "monthly" ? ` · ${t("il")} ${r.day}` : ""}{r.end ? ` · ${t("fino al")} ${new Date(r.end).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" })}` : ""}{next ? ` · ${t("prossima")} ${new Date(next).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}` : ""}</div>
-                        </div>
-                        <span className="shrink-0 font-mono text-sm font-semibold" style={{ color: r.kind === "in" ? "var(--ok)" : "var(--err)" }}>{r.variable ? "~ " : ""}{r.kind === "in" ? "+" : "−"} {eur(r.amount)}</span>
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-                {monthlyRecurring !== 0 && <div className="mt-3 flex justify-between border-t border-line pt-2 text-xs"><span className="text-dim">{t("Impegno mensile ricorrente")}</span><span className="font-mono font-semibold text-[color:var(--err)]">− {eur(monthlyRecurring)}</span></div>}
-              </>
-            )}
-          </Card>
+        <div className="flex flex-col gap-4">
 
           {/* Scadenze da registrare (SCADUTA) */}
           {pending.length > 0 && (
@@ -827,6 +792,51 @@ export default function CassaPage() {
           <button aria-label={t("Chiudi")} onClick={resetForm} className="absolute inset-0 bg-black/40" />
           <div className="relative max-h-[88vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-5 shadow-2xl">
             <div className="mb-3 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{editingMov === NEW_MOV ? t("Nuovo movimento") : editingMov === OCC_MOV ? t("Modifica scadenza") : t("Modifica movimento")}</h2><button onClick={resetForm} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
+            {editingMov === NEW_MOV && (
+              <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-wash p-1">
+                {([["mov", t("Movimento")], ["prog", `${t("Pagamenti programmati")} (${rules.filter((r) => ruleVisible(r.structureId)).length})`]] as ["mov" | "prog", string][]).map(([k, lab]) => (
+                  <button key={k} onClick={() => setMovTab(k)} className={`rounded-md py-1.5 text-sm font-semibold transition ${movTab === k ? "bg-surface text-txt shadow-sm" : "text-dim hover:text-txt"}`}>{lab}</button>
+                ))}
+              </div>
+            )}
+            {editingMov === NEW_MOV && movTab === "prog" ? (
+              <div>
+              <div className="mb-3 flex items-center justify-between">
+                <div className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Pagamenti programmati")}</div>
+                <button onClick={() => { resetForm(); openNewRule(); }} className="rounded-md border border-line px-2 py-1 text-xs font-medium text-focus hover:bg-wash">＋ {t("Aggiungi")}</button>
+              </div>
+              {rules.filter((r) => ruleVisible(r.structureId)).length === 0 ? (
+                <p className="text-sm text-faint">{t("Nessun pagamento ricorrente. Aggiungi mutuo, bollette, abbonamenti… si registrano da soli ogni mese.")}</p>
+              ) : (
+                <>
+                  <div className="flex flex-col divide-y divide-[color:var(--line)]">
+                    {rules.filter((r) => ruleVisible(r.structureId)).map((r) => {
+                      const c = catOf(r.cat);
+                      const next = upcoming.find((u) => u.rule.id === r.id)?.date;
+                      return (
+                        <div key={r.id} className="flex items-center gap-3 py-2.5">
+                          <button type="button" onClick={() => { resetForm(); openEditRule(r); }} title={t("Modifica")} className="flex min-w-0 flex-1 items-center gap-3 rounded text-left hover:bg-wash">
+                          {iconCircle(c, 32)}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate text-sm font-medium text-txt">{r.desc}</span>
+                              <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={r.auto ? { backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" } : { backgroundColor: "var(--wash)", color: "var(--dim)" }}>{r.variable ? t("variabile") : r.auto ? t("auto") : t("manuale")}</span>
+                            </div>
+                            <div className="mt-0.5 text-[11px] text-faint">{t(FREQ[r.freq])}{r.freq === "monthly" ? ` · ${t("il")} ${r.day}` : ""}{r.end ? ` · ${t("fino al")} ${new Date(r.end).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "2-digit" })}` : ""}{next ? ` · ${t("prossima")} ${new Date(next).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}` : ""}</div>
+                          </div>
+                          <span className="shrink-0 font-mono text-sm font-semibold" style={{ color: r.kind === "in" ? "var(--ok)" : "var(--err)" }}>{r.variable ? "~ " : ""}{r.kind === "in" ? "+" : "−"} {eur(r.amount)}</span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {monthlyRecurring !== 0 && <div className="mt-3 flex justify-between border-t border-line pt-2 text-xs"><span className="text-dim">{t("Impegno mensile ricorrente")}</span><span className="font-mono font-semibold text-[color:var(--err)]">− {eur(monthlyRecurring)}</span></div>}
+                </>
+              )}
+  
+              </div>
+            ) : (
+            <>
             {editingMov === OCC_MOV && <p className="mb-3 -mt-1 text-xs text-dim">{t("La modifica vale solo per questa scadenza: il pagamento programmato resta uguale per le altre.")}</p>}
             <div className="mb-3 grid grid-cols-2 gap-2">
               <button onClick={() => setKind("out")} disabled={editingMov === OCC_MOV} className={`rounded-lg border py-2 text-sm font-semibold transition disabled:opacity-60 ${form.kind === "out" ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:bg-wash"}`}>− {t("Uscita")}</button>
@@ -864,6 +874,8 @@ export default function CassaPage() {
               </div>
             )}
             {editingMov !== NEW_MOV && editingMov !== OCC_MOV && <button onClick={() => { const id = editingMov; resetForm(); void del(id); }} className="mt-1.5 w-full rounded-lg border border-line py-2 text-sm font-medium text-[color:var(--err)] hover:bg-wash">{t("Elimina movimento")}</button>}
+            </>
+            )}
           </div>
         </div>
       )}
