@@ -309,7 +309,10 @@ export default function CassaPage() {
           )}
         </Card>
         <Card className="lg:col-span-3">
-          <SectionTitle>{t("Andamento ultimi 12 mesi")}</SectionTitle>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <SectionTitle>{t("Andamento ultimi 12 mesi")}</SectionTitle>
+            <div className="flex items-center gap-4 text-xs text-dim"><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--ok)" }} />{t("Entrate")}</span><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--err)" }} />{t("Uscite")}</span></div>
+          </div>
           <div className="flex items-end justify-between gap-2 pt-2" style={{ height: 160 }}>
             {trend.map((tr) => (
               <div key={tr.ym} className="flex flex-1 flex-col items-center gap-1">
@@ -321,7 +324,6 @@ export default function CassaPage() {
               </div>
             ))}
           </div>
-          <div className="mt-2 flex items-center gap-4 text-xs text-dim"><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--ok)" }} />{t("Entrate")}</span><span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "var(--err)" }} />{t("Uscite")}</span></div>
         </Card>
       </div>
       )}
