@@ -171,7 +171,9 @@ export default function UserSchedaPage() {
     if (isNew) void autoInvite(clean);
     router.push("/utenti");
   };
-  const isAdmin = u.templateKey === "owner" || u.id === "u-owner"; // l'amministratore non è eliminabile
+  // Non eliminabile: l'utente principale e l'ultimo "Titolare" rimasto. Un altro utente con il modello Titolare (es. un collaboratore) si può eliminare.
+  const titolari = loadUsers().filter((x) => x.templateKey === "owner" || x.id === "u-owner");
+  const isAdmin = u.id === "u-owner" || (u.templateKey === "owner" && titolari.length <= 1);
   const userCount = loadUsers().length;
   const canDelete = !isNew && !isAdmin && userCount > 1;
   const remove = async () => {
