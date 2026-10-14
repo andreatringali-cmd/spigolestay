@@ -14,7 +14,10 @@ export function mergeAdoptedProfile(existing: User[] | null, profile: Record<str
   const list = Array.isArray(existing) ? existing.slice() : [];
   const i = list.findIndex((u) => (u.email || "").trim().toLowerCase() === em);
   if (i >= 0) {
-    list[i] = { ...list[i], ...pick(profile, ACCESS) } as User;
+    // permessi e strutture decide il titolare; i dati personali si riempiono solo se ancora vuoti (poi sono suoi)
+    const cur = list[i] as unknown as Record<string, unknown>;
+    const fillEmpty = Object.fromEntries(PERSONAL.filter((k) => profile[k] !== undefined && (cur[k] === undefined || cur[k] === "" || cur[k] === null)).map((k) => [k, profile[k]]));
+    list[i] = { ...list[i], ...fillEmpty, ...pick(profile, ACCESS) } as User;
     return { list, id: list[i].id };
   }
   const base = blankUser();

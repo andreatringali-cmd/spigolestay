@@ -62,10 +62,11 @@ export default function OnboardingWizard() {
       setHasData(sts.length > 0);
       sharedStructure = sts.some((x) => !!x?.orgId);
     } catch {}
-    if (wants && sharedStructure) { markCollaborator(); setActive(false); return; } // ha già le strutture condivise
+    if (wants && sharedStructure) { markCollaborator(); setActive(false); } // ha già le strutture condivise: niente guida (ma sotto si scarica comunque il profilo)
     let cancelled = false;
     (async () => {
       let collaborator = false;
+      for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const token = supabase ? (await supabase.auth.getSession())?.data.session?.access_token : undefined;
         if (token) {
@@ -73,11 +74,16 @@ export default function OnboardingWizard() {
           const r = await fetch("/api/org/role", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
           const j = (await r.json().catch(() => ({}))) as { collaborator?: boolean; accepted?: number; profile?: Record<string, unknown> | null; email?: string | null };
           collaborator = !!j.collaborator;
+          // ricordato nel browser (non sincronizzato) per il cancello dei permessi e per non inviare prezzi/disponibilità da qui
+          try { if (collaborator) localStorage.setItem("xn-collab", "1"); else localStorage.removeItem("xn-collab"); window.dispatchEvent(new Event("xn-collab")); } catch { /* niente */ }
           // la scheda utente compilata dal titolare diventa la sua (dati, permessi, strutture)
           if (collaborator && j.profile && j.email) adoptProfile(j.profile, j.email);
           if (j.accepted && j.accepted > 0) { markCollaborator(); window.location.reload(); return; } // appena entrata in una struttura: ricarica per scaricarla
-        }
-      } catch { /* senza rete si comporta come prima */ }
+          break; // risposta ricevuta
+        } else break;
+      } catch { /* rete o server: un secondo tentativo dopo qualche secondo */ }
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 4000));
+      }
       if (cancelled) return;
       if (!wants) { setActive(false); return; }
       if (collaborator) { markCollaborator(); setActive(false); return; }

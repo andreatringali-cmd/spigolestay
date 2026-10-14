@@ -48,6 +48,13 @@ export interface ChannexMapRow { channex_property_id: string; tenant_id: string;
 // Se la struttura è condivisa (socio), passa orgId: le prenotazioni in entrata verranno
 // scritte in org_state(orgId) e non nel blob personale del tenant. Vedi struttura-condivisa.
 export async function saveChannexMap(admin: SupabaseClient, tenantId: string, structureId: string, propertyId: string, rooms: Record<string, string>, orgId?: string | null) {
+  // Riga già esistente: si aggiornano camere e organizzazione, MA non il proprietario (tenant_id). Prima chi riallineava per ultimo (anche un
+  // collaboratore) diventava il "proprietario" della property, e prenotazioni in arrivo e messaggi OTA finivano sul suo account.
+  const { data: cur } = await admin.from("channex_map").select("tenant_id, org_id").eq("channex_property_id", propertyId).maybeSingle();
+  if (cur) {
+    const { error: upErr } = await admin.from("channex_map").update({ structure_id: structureId, rooms, org_id: orgId ?? (cur as { org_id?: string | null }).org_id ?? null, updated_at: new Date().toISOString() }).eq("channex_property_id", propertyId);
+    return { ok: !upErr, error: upErr?.message };
+  }
   const { error } = await admin.from("channex_map").upsert({
     channex_property_id: propertyId, tenant_id: tenantId, structure_id: structureId, rooms, org_id: orgId ?? null, updated_at: new Date().toISOString(),
   }, { onConflict: "channex_property_id" });

@@ -66,3 +66,15 @@ export async function ratePlanBelongsTo(ratePlanId: string, props: { propertyId:
   for (const p of props) for (const rt of await api.listRoomTypeIds(p.propertyId)) if (await has(rt)) return true;
   return false;
 }
+
+/** Può inviare prezzi/disponibilità a queste property? Solo chi le possiede: il tenant della riga personale o il PROPRIETARIO dell'organizzazione.
+ *  Un collaboratore (membership "member") no: le sue impostazioni (chiusure, pool, modello tariffe) vivono ancora nel suo browser e invierebbe valori sbagliati. */
+export async function canWriteChannexProperties(admin: SupabaseClient, userId: string, propertyIds: string[]): Promise<boolean> {
+  const ids = Array.from(new Set(propertyIds.filter(Boolean)));
+  if (!ids.length) return false;
+  const { data: rows } = await admin.from("channex_map").select("channex_property_id, tenant_id, org_id").in("channex_property_id", ids);
+  const { data: mem } = await admin.from("memberships").select("org_id, role").eq("user_id", userId);
+  const ownerOrgs = new Set(((mem ?? []) as { org_id?: string; role?: string }[]).filter((m) => m.role === "owner").map((m) => m.org_id as string));
+  const byId = new Map(((rows ?? []) as { channex_property_id: string; tenant_id?: string; org_id?: string | null }[]).map((r) => [r.channex_property_id, r]));
+  return ids.every((id) => { const r = byId.get(id); return !!r && (r.org_id ? ownerOrgs.has(r.org_id) : r.tenant_id === userId); });
+}

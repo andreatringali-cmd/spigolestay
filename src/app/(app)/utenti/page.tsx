@@ -20,7 +20,7 @@ export default function UtentiPage() {
   useEffect(() => {
     const list = loadUsers();
     setUsers(list);
-    const emails = list.map((u) => u.email.trim().toLowerCase()).filter((e) => /S+@S+/.test(e));
+    const emails = list.map((u) => u.email.trim().toLowerCase()).filter((e) => /\S+@\S+/.test(e));
     if (!supabase || !emails.length) return;
     let cancelled = false;
     (async () => {

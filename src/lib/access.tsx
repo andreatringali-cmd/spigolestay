@@ -4,10 +4,10 @@
 // Permette a menu e pagine di adattarsi a permessi e moduli. In produzione l'utente
 // arriverà dall'autenticazione; qui è simulato con uno switch per provare i ruoli.
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { kvGet } from "./bigstore";
 import { usePathname } from "next/navigation";
-import { loadUsers, saveUsers, allowedStructureIds, type User, type PermLevel } from "./users";
+import { loadUsers, saveUsers, allowedStructureIds, blankUser, PERM_TEMPLATES, type User, type PermLevel } from "./users";
 import { useData } from "./store";
 import { TIERS } from "./plans";
 import { supabase } from "./supabase";
@@ -126,7 +126,16 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   const setUserId = (id: string) => { setUid(id); try { localStorage.setItem(CUR_KEY, id); } catch {} };
-  const user = users.find((u) => u.id === userId) ?? users[0] ?? null;
+  // Collaboratore (riconosciuto dal server al primo accesso) senza ancora la sua scheda: permessi nulli, MAI il segnaposto "titolare".
+  const [collab, setCollab] = useState(false);
+  useEffect(() => {
+    const read = () => { try { setCollab(localStorage.getItem("xn-collab") === "1"); } catch { /* niente */ } };
+    read();
+    window.addEventListener("xn-collab", read);
+    return () => window.removeEventListener("xn-collab", read);
+  }, []);
+  const pending = useMemo<User>(() => ({ ...blankUser(), id: "u-pending", templateKey: "none", perms: PERM_TEMPLATES.find((t) => t.key === "none")!.perms(), allStructures: true, structureIds: [] }), []);
+  const user = users.find((u) => u.id === userId) ?? (collab ? pending : users[0]) ?? null;
 
   // Limite del co-gestore: attivo SOLO se la struttura attiva è di un'org di cui sono "member"
   // (mai per il proprietario né per le strutture personali).

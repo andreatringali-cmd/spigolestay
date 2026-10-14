@@ -94,6 +94,8 @@ export default function ChannexAutoSync() {
   dataRef.current = { roomTypes, units, bookings, rateOverrides };
 
   useEffect(() => {
+    // Un collaboratore non invia prezzi/disponibilità: le chiusure, il pool e il modello tariffe non sono ancora condivisi e partirebbero valori sbagliati.
+    try { if (localStorage.getItem("xn-collab") === "1") return; } catch { /* niente */ }
     const schedulePush = () => {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(async () => {

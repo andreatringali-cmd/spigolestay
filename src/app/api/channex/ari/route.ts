@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { allowedChannexProperties } from "@/lib/channex-guard";
+import { allowedChannexProperties, canWriteChannexProperties } from "@/lib/channex-guard";
 import { requireUser, isErr } from "@/lib/server-auth";
 import { channexEnabled, pushAvailability, pushRestrictions, type AvailValue, type RestrictionRow } from "@/lib/channex";
 
@@ -19,6 +19,9 @@ export async function POST(req: Request) {
   const mine = await allowedChannexProperties(who.admin, who.userId);
   const foreign = [...availability, ...restrictions].some((r) => !mine.has(String((r as { property_id?: string }).property_id || "")));
   if (foreign) return NextResponse.json({ ok: false, error: "property_non_tua" }, { status: 403 });
+  // Un collaboratore non invia prezzi/disponibilità: le chiusure, il pool e il modello tariffe non sono ancora condivisi e partirebbero valori sbagliati (overbooking).
+  const pids = [...availability, ...restrictions].map((r) => String((r as { property_id?: string }).property_id || ""));
+  if (!(await canWriteChannexProperties(who.admin, who.userId, pids))) return NextResponse.json({ ok: false, error: "solo_titolare" }, { status: 403 });
 
   // Due chiamate Channex distinte (endpoint diversi): la disponibilità su /availability,
   // prezzi+restrizioni su /restrictions. Ognuna riporta il proprio esito così il client
