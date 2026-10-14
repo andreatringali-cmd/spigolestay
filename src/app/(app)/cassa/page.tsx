@@ -13,7 +13,7 @@ import Icon from "@/components/Icon";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
-import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, deleteMovement, insertRule, deleteRule, addPaid, migrateLocalCash } from "@/lib/cassa";
+import { type Kind, type Mov, type Rule, computeAuto, computeScheduled, occurrences, scopeVisible, loadCash, insertMovement, deleteMovement, insertRule, deleteRule, addPaid, migrateLocalCash, groupBookingRows } from "@/lib/cassa";
 
 // ---- Conti cassa ------------------------------------------------------------
 const CONTI = [
@@ -143,12 +143,17 @@ export default function CassaPage() {
   const all = useMemo(() => [...auto, ...scheduled, ...visibleManual].sort((a, b) => (a.date < b.date ? 1 : -1)), [auto, scheduled, visibleManual]);
 
   // Selettore mese.
-  const months = useMemo(() => { const s = new Set(all.map((m) => monthKey(m.date))); s.add(monthKey(today)); return Array.from(s).sort().reverse(); }, [all, today]);
-  const [month, setMonth] = useState<string>("all");
+  const years = useMemo(() => { const s = new Set(all.map((m) => m.date.slice(0, 4))); s.add(today.slice(0, 4)); return Array.from(s).sort().reverse(); }, [all, today]);
+  const [year, setYear] = useState<string>("all");   // "all" | "2026"
+  const [mon, setMon] = useState<string>("all");     // "all" | "01".."12"
+  const month = year !== "all" && mon !== "all" ? `${year}-${mon}` : "all"; // mese singolo (andamento, nomi file)
+  const inPeriod = (iso: string) => (year === "all" || iso.slice(0, 4) === year) && (mon === "all" || iso.slice(5, 7) === mon);
+  const periodWord = month !== "all" ? t("del mese") : year !== "all" ? t("dell'anno") : mon !== "all" ? t("del mese (tutti gli anni)") : t("totali");
   const [chartsOn, setChartsOn] = useState(true);
   const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
 
-  const rows = all.filter((m) => month === "all" || monthKey(m.date) === month);
+  const rows = all.filter((m) => inPeriod(m.date));
+  const listRows = groupBookingRows(rows);
   const entrate = sumCents(rows.filter((m) => m.kind === "in").map((m) => m.amount));
   const uscite = sumCents(rows.filter((m) => m.kind === "out").map((m) => m.amount));
   const saldo = roundCents(entrate - uscite);
@@ -160,12 +165,12 @@ export default function CassaPage() {
   const maxCat = Math.max(1, ...perCat.map((x) => x.v));
 
   const trend = useMemo(() => {
-    const base = month === "all" ? monthKey(today) : month;
+    const base = month !== "all" ? month : year !== "all" ? (year === today.slice(0, 4) ? monthKey(today) : `${year}-12`) : monthKey(today);
     const [by, bm] = base.split("-").map(Number);
     const list: { ym: string; in: number; out: number }[] = [];
     for (let i = 11; i >= 0; i--) { const d = new Date(by, bm - 1 - i, 1); const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; const mm = all.filter((m) => monthKey(m.date) === ym); list.push({ ym, in: sumCents(mm.filter((m) => m.kind === "in").map((m) => m.amount)), out: sumCents(mm.filter((m) => m.kind === "out").map((m) => m.amount)) }); }
     return list;
-  }, [all, month, today]);
+  }, [all, month, year, today]);
   const maxTrend = Math.max(1, ...trend.flatMap((t) => [t.in, t.out]));
 
   // ---- Form nuovo movimento -------------------------------------------------
@@ -229,7 +234,7 @@ export default function CassaPage() {
   const structNameOf = (id?: string) => (!id || id === "all" ? t("Tutte") : getStructure(id)?.name ?? "—");
 
   // ---- Export ---------------------------------------------------------------
-  const periodLabel = month === "all" ? "storico" : month;
+  const periodLabel = month !== "all" ? month : year !== "all" ? year : mon !== "all" ? `mese-${mon}` : "storico";
   const doExcel = () => {
     const headers = [t("Data"), t("Tipo"), t("Categoria"), t("Descrizione"), t("Conto"), t("Struttura"), `${t("Entrata")} €`, `${t("Uscita")} €`];
     const body = rows.map((m) => [m.date, m.kind === "in" ? t("Entrata") : t("Uscita"), catOf(m.cat)?.label ? t(catOf(m.cat)!.label) : m.cat, m.desc + (m.sched ? ` (${t("programmato")})` : m.auto ? ` (${t("auto")})` : ""), CONTI.find((x) => x.key === m.conto)?.label ? t(CONTI.find((x) => x.key === m.conto)!.label) : m.conto, structNameOf(m.structureId), m.kind === "in" ? m.amount : "", m.kind === "out" ? m.amount : ""]);
@@ -258,9 +263,9 @@ export default function CassaPage() {
       {/* Riepilogo */}
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label={t("Saldo cassa")} value={eur(saldoTot)} color={saldoTot >= 0 ? undefined : "var(--err)"} hint={t("tutti i conti · storico")} />
-        <StatCard label={`${t("Entrate")} ${month === "all" ? t("totali") : t("del mese")}`} value={eur(entrate)} color="var(--ok)" hint={`${rows.filter((m) => m.kind === "in").length} ${t("movimenti")}`} />
-        <StatCard label={`${t("Uscite")} ${month === "all" ? t("totali") : t("del mese")}`} value={eur(uscite)} color="var(--err)" hint={`${rows.filter((m) => m.kind === "out").length} ${t("movimenti")}`} />
-        <StatCard label={`${t("Saldo")} ${month === "all" ? t("totale") : t("del mese")}`} value={eur(saldo)} color={saldo >= 0 ? undefined : "var(--err)"} hint={t("entrate − uscite")} />
+        <StatCard label={`${t("Entrate")} ${periodWord}`} value={eur(entrate)} color="var(--ok)" hint={`${rows.filter((m) => m.kind === "in").length} ${t("movimenti")}`} />
+        <StatCard label={`${t("Uscite")} ${periodWord}`} value={eur(uscite)} color="var(--err)" hint={`${rows.filter((m) => m.kind === "out").length} ${t("movimenti")}`} />
+        <StatCard label={`${t("Saldo")} ${month !== "all" ? t("del mese") : year !== "all" ? t("dell'anno") : mon !== "all" ? t("del mese (tutti gli anni)") : t("totale")}`} value={eur(saldo)} color={saldo >= 0 ? undefined : "var(--err)"} hint={t("entrate − uscite")} />
       </div>
 
       {chartsOn && (
@@ -299,8 +304,15 @@ export default function CassaPage() {
 
       {/* Riga filtri + toggle grafici + Esporta */}
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
-        <button onClick={() => setMonth("all")} className={`rounded-full px-3 py-1 text-xs font-medium transition ${month === "all" ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{t("Tutto lo storico")}</button>
-        {months.map((ym) => <button key={ym} onClick={() => setMonth(ym)} className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition ${month === ym ? "bg-focus text-white" : "border border-line text-dim hover:bg-wash"}`}>{monthLabel(ym)}</button>)}
+        <select aria-label={t("Anno")} value={year} onChange={(e) => setYear(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
+          <option value="all">{t("Tutti gli anni")}</option>
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <select aria-label={t("Mese")} value={mon} onChange={(e) => setMon(e.target.value)} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus">
+          <option value="all">{t("Tutti i mesi")}</option>
+          {["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"].map((n, i) => <option key={n} value={pad(i + 1)}>{t(n)}</option>)}
+        </select>
+        {(year !== "all" || mon !== "all") && <button onClick={() => { setYear("all"); setMon("all"); }} className="text-xs font-semibold text-focus hover:underline">{t("Azzera")}</button>}
         <div className="ml-auto flex items-center gap-2">
           <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
           <span className="rounded-full bg-wash px-3 py-1 text-xs text-dim">{structLabel}</span>
@@ -428,11 +440,38 @@ export default function CassaPage() {
         {/* Colonna destra */}
         <div className="flex flex-col gap-4 lg:col-span-2">
           <Card>
-            <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Movimenti")}</SectionTitle><span className="text-xs text-faint">{rows.length} {t("nel periodo")}</span></div>
+            <div className="mb-3 flex items-center justify-between"><SectionTitle>{t("Movimenti")}</SectionTitle><span className="text-xs text-faint">{listRows.length} {t("nel periodo")}</span></div>
             {rows.length === 0 ? <EmptyState title={t("Nessun movimento.")} /> : (
               <div className="-mx-1 max-h-[640px] overflow-y-auto px-1">
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
-                {rows.map((m) => {
+                {listRows.map((r) => {
+                  if (r.type === "booking") {
+                    // UNA voce per prenotazione: lordo, commissioni e netto (i totali restano calcolati dai movimenti separati)
+                    const m = r.income, c = catOf(m.cat);
+                    return (
+                      <div key={"b-" + r.id} className="flex items-center gap-3 py-2.5">
+                        {iconCircle(c, 34)}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-sm font-medium text-txt">{m.desc}</span>
+                            <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-faint">
+                            <span>{new Date(m.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}</span>
+                            <span>·</span><span>{c?.label ? t(c.label) : ""}</span>
+                            <span>·</span><span className="capitalize">{(() => { const l = CONTI.find((x) => x.key === m.conto)?.label; return l ? t(l) : ""; })()}</span>
+                            {m.structureId && m.structureId !== "all" && <><span>·</span><span>{structNameOf(m.structureId)}</span></>}
+                          </div>
+                        </div>
+                        <div className="shrink-0 whitespace-nowrap font-mono text-[11px] leading-tight">
+                          <div className="flex justify-between gap-4"><span className="font-sans text-faint">{t("Lordo")}</span><span style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span></div>
+                          <div className="flex justify-between gap-4"><span className="font-sans text-faint">{t("Commissioni")}</span><span style={{ color: "var(--err)" }}>− {eur(r.comm)}</span></div>
+                          <div className="mt-0.5 flex justify-between gap-4 border-t border-line pt-0.5 text-sm font-bold"><span className="font-sans text-[11px] font-semibold text-dim">{t("Netto")}</span><span className="text-txt">{eur(r.net)}</span></div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  const m = r.mov;
                   const c = catOf(m.cat);
                   return (
                     <div key={m.id} className="flex items-center gap-3 py-2.5">

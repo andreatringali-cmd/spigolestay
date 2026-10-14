@@ -146,3 +146,24 @@ export async function migrateLocalCash(tenantId: string): Promise<boolean> {
     return movs.length > 0 || rules.length > 0 || paid.length > 0;
   } catch { return false; }
 }
+
+// Riga dell'elenco movimenti: una voce normale, oppure UNA voce per prenotazione con lordo, commissioni e netto
+// (l'incasso automatico e la commissione OTA della stessa prenotazione). I totali restano calcolati dai movimenti separati: cambia solo come si leggono.
+export type CassaListRow =
+  | { type: "mov"; mov: Mov }
+  | { type: "booking"; id: string; income: Mov; commission?: Mov; gross: number; comm: number; net: number };
+
+export function groupBookingRows(rows: Mov[]): CassaListRow[] {
+  const commByRef = new Map<string, Mov>();
+  for (const m of rows) if (m.id.startsWith("auto-comm-") && m.ref) commByRef.set(m.ref, m);
+  const incomeRefs = new Set(rows.filter((m) => m.id.startsWith("auto-in-") && m.ref).map((m) => m.ref as string));
+  const out: CassaListRow[] = [];
+  for (const m of rows) {
+    if (m.id.startsWith("auto-comm-") && m.ref && incomeRefs.has(m.ref)) continue; // già dentro la voce della prenotazione
+    if (m.id.startsWith("auto-in-") && m.ref && commByRef.has(m.ref)) {
+      const c = commByRef.get(m.ref)!;
+      out.push({ type: "booking", id: m.ref, income: m, commission: c, gross: m.amount, comm: c.amount, net: roundCents(m.amount - c.amount) });
+    } else out.push({ type: "mov", mov: m });
+  }
+  return out;
+}
