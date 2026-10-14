@@ -189,11 +189,11 @@ export default function CassaPage() {
   const rowsOrdered = [...rows].sort((a, b) => { const d = a.date < b.date ? -1 : a.date > b.date ? 1 : ledgerOrd(a) - ledgerOrd(b); return futureView ? d : -d; });
   const listRows = groupBookingRows(rowsOrdered, groupChannels);
   // cella "saldo conti" (riusata dalle voci bonifico)
-  const balCell = (bal: number | null, inc: boolean, forecast?: boolean) => (
+  const balCell = (bal: number | null, inc: boolean) => (
     <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2">
       {inc
         ? <span className="justify-self-end px-2 text-right text-[11px] italic text-faint" title={t("Questo movimento è del giorno in cui hai impostato il saldo: è già compreso nell'importo che hai scritto.")}>{t("già nel saldo")}</span>
-        : <span className={"justify-self-end rounded-md px-2 py-0.5 text-right font-mono text-sm font-semibold tabular-nums " + (bal === null ? "text-faint" : bal < 0 ? "text-[color:var(--err)]" : "text-txt") + (forecast && bal !== null ? " opacity-70" : "")} style={bal !== null && bal < 0 ? { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" } : undefined}>{bal === null ? "—" : eur(bal)}</span>}
+        : <span className={"justify-self-end rounded-md px-2 py-0.5 text-right font-mono text-sm font-semibold tabular-nums " + (bal === null ? "text-faint" : bal < 0 ? "text-[color:var(--err)]" : "text-txt")} style={bal !== null && bal < 0 ? { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" } : undefined}>{bal === null ? "—" : eur(bal)}</span>}
     </div>
   );
 
@@ -538,7 +538,7 @@ export default function CassaPage() {
                           <span className="text-right font-mono text-xs" style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span>
                           <span className="text-right font-mono text-xs" style={{ color: "var(--err)" }}>− {eur(r.comm)}</span>
                           <span className="text-right font-mono text-sm font-bold text-txt">{eur(r.net)}</span>
-                          {balCell(ledger.balanceAfter.get(lastId) ?? null, ledger.included.has(lastId), r.forecast)}
+                          {balCell(ledger.balanceAfter.get(lastId) ?? null, ledger.included.has(lastId))}
                         </div>
                         {open && r.items.map((it) => {
                           if (it.type === "payout") return null;
@@ -599,7 +599,7 @@ export default function CassaPage() {
                       <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2">
                       {included
                         ? <span className="justify-self-end px-2 text-right text-[11px] italic text-faint" title={t("Questo movimento è del giorno in cui hai impostato il saldo: è già compreso nell'importo che hai scritto.")}>{t("già nel saldo")}</span>
-                        : <span className={"justify-self-end rounded-md px-2 py-0.5 text-right font-mono text-sm font-semibold tabular-nums " + (bal === null ? "text-faint" : bal < 0 ? "text-[color:var(--err)]" : "text-txt") + (m.forecast && bal !== null ? " opacity-70" : "")} style={bal !== null && bal < 0 ? { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" } : undefined} title={bal === null ? t("Imposta il saldo di partenza per vedere il saldo") : m.forecast ? t("Saldo previsto") : t("Saldo dopo questo movimento")}>{bal === null ? "—" : eur(bal)}</span>}
+                        : <span className={"justify-self-end rounded-md px-2 py-0.5 text-right font-mono text-sm font-semibold tabular-nums " + (bal === null ? "text-faint" : bal < 0 ? "text-[color:var(--err)]" : "text-txt")} style={bal !== null && bal < 0 ? { backgroundColor: "color-mix(in srgb, var(--err) 10%, transparent)" } : undefined} title={bal === null ? t("Imposta il saldo di partenza per vedere il saldo") : m.forecast ? t("Saldo previsto") : t("Saldo dopo questo movimento")}>{bal === null ? "—" : eur(bal)}</span>}
                       </div>
                     </div>
                   );
