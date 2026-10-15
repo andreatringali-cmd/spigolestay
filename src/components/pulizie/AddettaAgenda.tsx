@@ -11,11 +11,33 @@ import { Card, Seg } from "./addetta-ui";
 
 const dm = (iso: string) => fmtDMY(iso).slice(0, 5); // gg.mm
 
-export default function AddettaAgenda({ structures, units, roomTypes, bookings, guests }: { structures: Structure[]; units: Unit[]; roomTypes: RoomType[]; bookings: Booking[]; guests: Guest[] }) {
+type Flt = "tutte" | "dafare" | "riassetto" | "partenze" | "arrivi";
+const FLT_MATCH: Record<Flt, (r: PlanRoom) => boolean> = {
+  tutte: () => true,
+  dafare: () => true, // l'elenco mostra già solo le camere con qualcosa da fare
+  riassetto: (r) => r.action === "riassetto",
+  partenze: (r) => r.action === "partenza" || r.action === "turnover",
+  arrivi: (r) => r.action === "arrivo" || r.action === "turnover",
+};
+
+export default function AddettaAgenda({ structures, units, roomTypes, bookings, guests, cards = false }: { structures: Structure[]; units: Unit[]; roomTypes: RoomType[]; bookings: Booking[]; guests: Guest[]; cards?: boolean }) {
   const today = toISO(new Date());
   const [span, setSpan] = useState<"3" | "7" | "14">("7");
   const [open, setOpen] = useState<Record<string, boolean>>({ [today]: true });
-  const days = useMemo(() => buildAgenda({ from: today, days: Number(span), structures, units, roomTypes, bookings }), [today, span, structures, units, roomTypes, bookings]);
+  const [flt, setFlt] = useState<Flt>("tutte");
+  const allDays = useMemo(() => buildAgenda({ from: today, days: Number(span), structures, units, roomTypes, bookings }), [today, span, structures, units, roomTypes, bookings]);
+  // con le card in alto, toccarne una filtra l'elenco (di nuovo per toglierla)
+  const days = useMemo(() => {
+    if (flt === "tutte" || flt === "dafare") return allDays;
+    return allDays.map((d) => {
+      const rooms = d.rooms.filter(FLT_MATCH[flt]);
+      return { ...d, rooms, arrivi: rooms.filter((r) => !!r.arr).length, partenze: rooms.filter((r) => !!r.dep).length, fermi: rooms.filter((r) => r.action === "riassetto").length };
+    });
+  }, [allDays, flt]);
+  const tot = useMemo(() => {
+    const all = allDays.flatMap((d) => d.rooms);
+    return { dafare: all.length, riassetto: all.filter(FLT_MATCH.riassetto).length, partenze: all.filter(FLT_MATCH.partenze).length, arrivi: all.filter(FLT_MATCH.arrivi).length };
+  }, [allDays]);
   const guestName = (id: string) => guests.find((g) => g.id === id)?.fullName || "Ospite";
   const isOpen = (d: string) => open[d] ?? false;
   const allOpen = days.every((d) => isOpen(d.date));
@@ -32,6 +54,25 @@ export default function AddettaAgenda({ structures, units, roomTypes, bookings, 
 
   return (
     <div className="flex flex-col gap-3">
+      {cards && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {([
+            { key: "dafare", label: "Da fare", count: tot.dafare, color: "var(--txt)" },
+            { key: "riassetto", label: "Riassetti", count: tot.riassetto, color: "#0891B2" },
+            { key: "partenze", label: "Partenze", count: tot.partenze, color: "var(--err)" },
+            { key: "arrivi", label: "Arrivi", count: tot.arrivi, color: "var(--ok)" },
+          ] as const).map((c) => {
+            const on = flt === c.key;
+            return (
+              <button key={c.key} onClick={() => setFlt((f) => (f === c.key ? "tutte" : c.key))} aria-pressed={on}
+                className={`w-full rounded-xl border bg-surface p-4 text-left shadow-sm transition-transform ${on ? "border-focus ring-2 ring-[color:var(--focus)]" : "border-line"}`}>
+                <span className="block text-xs font-medium uppercase tracking-wide text-dim">{c.label}</span>
+                <span className="mt-1 block font-mono text-2xl font-bold tabular-nums" style={{ color: c.color }}>{c.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <Seg value={span} onChange={setSpan} options={[{ key: "3", label: "3 giorni" }, { key: "7", label: "7 giorni" }, { key: "14", label: "14 giorni" }]} className="w-full sm:w-auto sm:min-w-[16rem]" />
         <button onClick={() => setOpen(Object.fromEntries(days.map((d) => [d.date, !allOpen])))} className="ml-auto min-h-[40px] rounded-lg border border-line px-3 text-xs font-medium text-dim hover:bg-wash">{allOpen ? "Chiudi tutti" : "Apri tutti"}</button>

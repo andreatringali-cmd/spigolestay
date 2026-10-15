@@ -515,7 +515,7 @@ export default function PuliziePage() {
       ) : planMode === "elenco" ? (
         <div className="flex flex-col gap-3">
           {planModeToggle}
-          <AddettaAgenda structures={scopeStructures} units={units.filter((u) => scopeStructures.some((x) => x.id === u.structureId))} roomTypes={roomTypes} bookings={bookings.filter((b) => scopeStructures.some((x) => x.id === b.structureId))} guests={guests} />
+          <AddettaAgenda structures={scopeStructures} units={units.filter((u) => scopeStructures.some((x) => x.id === u.structureId))} roomTypes={roomTypes} bookings={bookings.filter((b) => scopeStructures.some((x) => x.id === b.structureId))} guests={guests} cards />
         </div>
       ) : (<>
       <div className="mb-3">{planModeToggle}</div>
