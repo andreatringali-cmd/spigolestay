@@ -18,7 +18,6 @@ import { computePuliziePlan, buildPuliziePlanText, ACT_LABEL, fmtLongIT, type Pl
 import AutoShareSettings from "@/components/pulizie/AutoShareSettings";
 import AddettaView from "@/components/pulizie/AddettaView";
 import AddettaAgenda from "@/components/pulizie/AddettaAgenda";
-import { Seg as ModeSeg } from "@/components/pulizie/addetta-ui";
 import { useAccess } from "@/lib/access";
 import { isPulizieOnly } from "@/lib/pulizie-addetta";
 import { cleanBar, cleanTint, cleanText, cleanSolid } from "@/lib/pulizie-colors";
@@ -106,7 +105,6 @@ export default function PuliziePage() {
 
   // Scorte / lista della spesa (prodotti ricorrenti).
   const [tab, setTab] = useState<"planning" | "scorte" | "addetta">("planning");
-  const [planMode, setPlanMode] = useState<"elenco" | "giorno">("elenco"); // elenco = 3/7/14 giorni; giorno = planning del singolo giorno con spunte, note e invio
   // Vista "Addetta": si apre da sola per chi ha accesso SOLO a Pulizie (la signora) o con /pulizie?tab=addetta.
   const { user: accessUser } = useAccess();
   const pulOnly = isPulizieOnly(accessUser?.perms);
@@ -405,8 +403,6 @@ export default function PuliziePage() {
     </div>
   ); };
 
-  const planModeToggle = <ModeSeg value={planMode} onChange={setPlanMode} options={[{ key: "elenco", label: t("Elenco") }, { key: "giorno", label: t("Giorno") }]} className="w-full sm:w-auto sm:min-w-[12rem]" />;
-
   return (
     <div>
       <PageHeader title={t("Planning pulizie")} subtitle={t("Cosa fare in ogni camera oggi, da condividere con chi pulisce")} hideHelp />
@@ -512,13 +508,17 @@ export default function PuliziePage() {
           </div>
           </div>
         </div>
-      ) : planMode === "elenco" ? (
+      ) : view === "rows" ? (
         <div className="flex flex-col gap-3">
-          {planModeToggle}
+          <div className="flex items-center justify-end">
+            <div className="flex items-center rounded-lg border border-line p-0.5">
+              <Seg v="cards" icon="grid" title={t("Vista card")} />
+              <Seg v="rows" icon="menu" title={t("Vista lista")} />
+            </div>
+          </div>
           <AddettaAgenda structures={scopeStructures} units={units.filter((u) => scopeStructures.some((x) => x.id === u.structureId))} roomTypes={roomTypes} bookings={bookings.filter((b) => scopeStructures.some((x) => x.id === b.structureId))} guests={guests} cards />
         </div>
       ) : (<>
-      <div className="mb-3">{planModeToggle}</div>
 
       {/* Card riepilogo — cliccabili per filtrare (stessa grafica delle altre pagine) */}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -689,7 +689,6 @@ export default function PuliziePage() {
                 <span className="text-xs text-faint">· {sToClean} {t("da fare")}</span>
               </div>
               <div className="p-3">
-              {view === "cards" ? (
                 <div className="grid w-full gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   {list.flatMap((r, idx) => {
                     const showHeader = idx === 0 || (list[idx - 1].typeName || "") !== (r.typeName || "");
@@ -699,30 +698,6 @@ export default function PuliziePage() {
                       : [card];
                   })}
                 </div>
-              ) : (
-                <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
-                  {/* Intestazione delle colonne: le righe sotto sono allineate */}
-                  <div className="hidden gap-x-4 border-b border-line bg-wash px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint md:grid md:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)_15rem]">
-                    <span>{t("Camera")}</span><span>{t("Esce")}</span><span>{t("Entra")}</span><span>{t("Da fare")}</span>
-                  </div>
-                  {(() => {
-                    const rows = list.filter((r) => !r.oos);
-                    let lastType: string | null = null;
-                    return rows.map((r) => {
-                      const k = keyOf(r.unit.id);
-                      const showHeader = (r.typeName || "") !== (lastType || "");
-                      lastType = r.typeName || "";
-                      return (
-                        <div key={r.unit.id}>
-                          {showHeader && <TypeHeader flat className="border-t border-line first:border-t-0" name={r.typeName || t("Senza tipologia")} color={r.typeColor} {...typeCounts(list, r.typeName, done, keyOf)} />}
-                          <RoomRow r={r} done={!!done[k]} doneAt={doneTime(k)} hasIssue={roomHasIssue(r.unit.id)} guestName={guestName} hasDog={hasDog} note={noteInput(k)} onToggle={() => toggleDone(k)}
-                            onIssue={() => setIssueDraft({ unitId: r.unit.id, unitName: r.unit.name, structureName: r.structure.name, type: "guasto", note: "", photo: undefined })} />
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              )}
               </div>
             </div>
           );
@@ -871,42 +846,6 @@ function RowGuest({ label, color, b, name, dog, empty }: { label: string; color:
 }
 
 // Riga della vista lista: camera e tipo di intervento, chi esce, chi entra, nota e azioni. Colonne allineate tra le righe, barra colorata a sinistra col significato dell'intervento.
-function RoomRow({ r, done, doneAt, hasIssue, guestName, hasDog, note, onToggle, onIssue }: { r: any; done: boolean; doneAt?: string; hasIssue?: boolean; guestName: (id: string) => string; hasDog: (id: string) => boolean; note: React.ReactNode; onToggle: () => void; onIssue: () => void }) {
-  const { t } = useLang();
-  const a = ACT[r.action as ActionKey];
-  const clickable = r.action !== "niente";
-  const stayOnly = !r.dep && !r.arr && !!r.stay;
-  return (
-    <div className={`relative grid gap-x-4 gap-y-2.5 border-t border-line px-4 py-3 md:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)_15rem] md:items-center ${done ? "opacity-60" : ""}`}>
-      <span aria-hidden className="absolute inset-y-0 left-0 w-[3px]" style={{ background: cleanBar(r.action) }} />
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className={`font-display text-base font-bold ${done ? "text-dim line-through" : "text-txt"}`}>{r.unit.name}</span>
-          {hasIssue && <span title={t("Segnalazione aperta")} style={{ color: "var(--err)" }}><Icon name="alertTriangle" size={13} /></span>}
-        </div>
-        <span className="mt-1 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={{ color: cleanText(r.action), background: cleanTint(r.action) }}>{t(a.label)}</span>
-        {r.oosFrom && <div className="mt-1 text-[11px] text-faint">{t("Poi fuori servizio")}{r.oosNote ? `: ${r.oosNote}` : ""}</div>}
-      </div>
-      {stayOnly
-        ? <RowGuest label={t("In casa")} color="var(--focus)" b={r.stay} name={guestName(r.stay.guestId)} dog={hasDog(r.stay.guestId)} empty="" />
-        : <RowGuest label={t("Esce")} color="var(--err)" b={r.dep} name={r.dep ? guestName(r.dep.guestId) : undefined} dog={r.dep ? hasDog(r.dep.guestId) : false} empty={t("nessuna partenza")} />}
-      {stayOnly
-        ? <div className="hidden md:block" />
-        : <RowGuest label={t("Entra")} color="var(--ok)" b={r.arr} name={r.arr ? guestName(r.arr.guestId) : undefined} dog={r.arr ? hasDog(r.arr.guestId) : false} empty={t("nessun arrivo")} />}
-      <div className="flex flex-col gap-1.5">
-        {note}
-        <div className="flex items-center gap-1.5">
-          {clickable && (
-            <button onClick={onToggle} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-[12px] font-semibold transition ${done ? "bg-[color:color-mix(in_srgb,var(--ok)_14%,transparent)] text-[color:var(--ok)]" : "border border-line text-dim hover:border-[color:var(--ok)] hover:text-[color:var(--ok)]"}`}>{done ? <><span>✓</span> {t("Fatta")}{doneAt ? ` · ${doneAt}` : ""}</> : t("Segna come fatta")}</button>
-          )}
-          <button onClick={onIssue} title={t("Segnala un problema")} className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border transition ${hasIssue ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:border-[color:var(--err)] hover:text-[color:var(--err)]"}`}><Icon name="alertTriangle" size={15} /></button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Intestazione della tipologia: barra colorata a sinistra, nome ben leggibile e quante camere ci sono (e quante restano da fare).
 function TypeHeader({ name, color, total, todo, className = "", flat = false }: { name: string; color: string; total: number; todo: number; className?: string; flat?: boolean }) {
   const { t } = useLang();
   return (
