@@ -1562,7 +1562,8 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
 
           {/* Prenotazioni da assegnare (senza unità): una riga PER OGNI struttura visibile (con più strutture selezionate ognuna ha la sua riga, col nome) */}
           {visibleStructures.map((st) => {
-            const unassigned = bookings.filter((b) => !b.unitId && b.structureId === st.id && b.status !== "cancelled");
+            // Solo quelle che cadono nel periodo mostrato: se non ce n'è, la riga sparisce (resta durante il trascinamento).
+            const unassigned = bookings.filter((b) => !b.unitId && b.structureId === st.id && b.status !== "cancelled" && geom(b.checkIn, b.checkOut));
             // Durante il trascinamento la riga c'è sempre (anche vuota), così ci si può lasciare una prenotazione sopra.
             const dragBk = dragView ? bookings.find((b) => b.id === dragView.id) : undefined;
             if (!unassigned.length && !(dragBk && dragBk.structureId === st.id)) return null;
