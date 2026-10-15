@@ -17,5 +17,5 @@ export default function AddettaView() {
   const scopedUnits = useMemo(() => units.filter((u) => ids.has(u.structureId)), [units, ids]);
 
   if (!scoped.length) return <p className="rounded-xl border border-line bg-surface p-4 text-sm text-dim">Nessuna struttura disponibile.</p>;
-  return <div className="mx-auto flex w-full max-w-3xl flex-col gap-3"><AddettaChecklist structures={scoped} units={scopedUnits} canEdit={canEdit} isManager={isManager} /></div>;
+  return <div className="flex w-full flex-col gap-3"><AddettaChecklist structures={scoped} units={scopedUnits} canEdit={canEdit} isManager={isManager} /></div>;
 }
