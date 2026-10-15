@@ -88,9 +88,9 @@ export default function PuliziePage() {
   const [issues, setIssues] = useState<Issue[]>([]);
   useEffect(() => { try { const d = localStorage.getItem("spigolestay:pulizie:done"); if (d) setDone(JSON.parse(d)); const n = localStorage.getItem("spigolestay:pulizie:notes"); if (n) setNotes(JSON.parse(n)); const s = localStorage.getItem("spigolestay:pulizie:issues"); if (s) setIssues(JSON.parse(s)); } catch {} }, []);
   const persistIssues = (next: Issue[]) => { setIssues(next); try { localStorage.setItem("spigolestay:pulizie:issues", JSON.stringify(next)); } catch {} };
-  const [issueDraft, setIssueDraft] = useState<null | { unitId: string; unitName: string; structureName: string; type: string; note: string; photo?: string }>(null);
+  const [issueDraft, setIssueDraft] = useState<null | { unitId: string; unitName: string; structureName: string; type: string; note: string; photo?: string; date?: string }>(null);
   const [showResolved, setShowResolved] = useState(false);
-  const saveIssue = () => { if (!issueDraft || !issueDraft.note.trim()) return; const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()); persistIssues([{ id, unitId: issueDraft.unitId, unitName: issueDraft.unitName, structureName: issueDraft.structureName, structureId: units.find((u) => u.id === issueDraft.unitId)?.structureId, date, type: issueDraft.type, note: issueDraft.note.trim(), photo: issueDraft.photo, createdAt: new Date().toISOString(), resolved: false, updatedAt: Date.now() }, ...issues]); playSound("done"); notify(`⚠ Segnalazione · ${issueDraft.unitName}`, `${issueMeta(issueDraft.type).label}: ${issueDraft.note.trim()}`); setIssueDraft(null); };
+  const saveIssue = () => { if (!issueDraft || !issueDraft.note.trim()) return; const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()); persistIssues([{ id, unitId: issueDraft.unitId, unitName: issueDraft.unitName, structureName: issueDraft.structureName, structureId: units.find((u) => u.id === issueDraft.unitId)?.structureId, date: issueDraft.date ?? date, type: issueDraft.type, note: issueDraft.note.trim(), photo: issueDraft.photo, createdAt: new Date().toISOString(), resolved: false, updatedAt: Date.now() }, ...issues]); playSound("done"); notify(`⚠ Segnalazione · ${issueDraft.unitName}`, `${issueMeta(issueDraft.type).label}: ${issueDraft.note.trim()}`); setIssueDraft(null); };
   const resolveIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, resolved: true, resolvedAt: new Date().toISOString(), updatedAt: Date.now() } : i)));
   const reopenIssue = (id: string) => persistIssues(issues.map((i) => (i.id === id ? { ...i, resolved: false, resolvedAt: undefined, updatedAt: Date.now() } : i)));
   // Cancellazione = soft-delete (tombstone _deleted + updatedAt): la fusione LWW per id fa
@@ -678,7 +678,13 @@ export default function PuliziePage() {
 
       {/* Planning */}
       {view === "rows" ? (
-        <AddettaAgenda structures={scopeStructures} units={units.filter((u) => scopeStructures.some((x) => x.id === u.structureId))} roomTypes={roomTypes} bookings={bookings.filter((b) => scopeStructures.some((x) => x.id === b.structureId))} guests={guests} from={date} filter={actionFilter} span={agSpan} openAll={agOpen} />
+        <AddettaAgenda structures={scopeStructures} units={units.filter((u) => scopeStructures.some((x) => x.id === u.structureId))} roomTypes={roomTypes} bookings={bookings.filter((b) => scopeStructures.some((x) => x.id === b.structureId))} guests={guests} from={date} filter={actionFilter} span={agSpan} openAll={agOpen}
+          actions={{
+            isDone: (d, unitId) => !!done[`${unitId}:${d}`],
+            toggle: (d, unitId) => toggleDone(`${unitId}:${d}`),
+            hasIssue: (d, unitId) => openIssues.some((i) => i.unitId === unitId && i.date === d),
+            issue: (r, d) => setIssueDraft({ unitId: r.unit.id, unitName: r.unit.name, structureName: r.structure.name, type: "guasto", note: "", photo: undefined, date: d }),
+          }} />
       ) : (
       <div className="flex flex-col gap-5">
         {scopedStructures.map((s) => {
@@ -769,7 +775,7 @@ export default function PuliziePage() {
               <span className="font-display text-lg font-bold text-txt">{t("Segnala un problema")}</span>
               <button onClick={() => setIssueDraft(null)} className="rounded px-2 py-1 text-dim hover:bg-wash hover:text-txt">✕</button>
             </div>
-            <div className="mb-3 text-xs text-dim">{issueDraft.unitName} · {issueDraft.structureName} · {fmtShort(date)}</div>
+            <div className="mb-3 text-xs text-dim">{issueDraft.unitName} · {issueDraft.structureName} · {fmtShort(issueDraft.date ?? date)}</div>
             <div className="mb-3 grid grid-cols-2 gap-1.5">
               {ISSUE_TYPES.map((it) => (
                 <button key={it.key} onClick={() => setIssueDraft({ ...issueDraft, type: it.key })} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${issueDraft.type === it.key ? "text-white" : "border-line text-dim hover:bg-wash"}`} style={issueDraft.type === it.key ? { backgroundColor: it.color, borderColor: it.color } : undefined}><Icon name={it.icon} size={14} /> {t(it.label)}</button>

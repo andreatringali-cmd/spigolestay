@@ -11,6 +11,14 @@ import { Card, Seg } from "./addetta-ui";
 
 const dm = (iso: string) => fmtDMY(iso).slice(0, 5); // gg.mm
 
+/** Azioni di riga (solo nella pagina Pulizie): segna come fatta e segnala un problema. */
+export interface AgendaActions {
+  isDone: (date: string, unitId: string) => boolean;
+  toggle: (date: string, unitId: string) => void;
+  issue: (r: PlanRoom, date: string) => void;
+  hasIssue?: (date: string, unitId: string) => boolean;
+}
+
 type Flt = "tutte" | "dafare" | "riassetto" | "partenze" | "arrivi";
 const FLT_MATCH: Record<Flt, (r: PlanRoom) => boolean> = {
   tutte: () => true,
@@ -20,7 +28,7 @@ const FLT_MATCH: Record<Flt, (r: PlanRoom) => boolean> = {
   arrivi: (r) => r.action === "arrivo" || r.action === "turnover",
 };
 
-export default function AddettaAgenda({ structures, units, roomTypes, bookings, guests, cards = false, from, filter, span: spanProp, openAll }: { structures: Structure[]; units: Unit[]; roomTypes: RoomType[]; bookings: Booking[]; guests: Guest[]; cards?: boolean; from?: string; filter?: Flt; span?: "3" | "7" | "14"; openAll?: { open: boolean; n: number } }) {
+export default function AddettaAgenda({ structures, units, roomTypes, bookings, guests, cards = false, from, filter, span: spanProp, openAll, actions }: { structures: Structure[]; units: Unit[]; roomTypes: RoomType[]; bookings: Booking[]; guests: Guest[]; cards?: boolean; from?: string; filter?: Flt; span?: "3" | "7" | "14"; openAll?: { open: boolean; n: number }; actions?: AgendaActions }) {
   const today = toISO(new Date());
   const start = from ?? today; // la lista parte dal giorno scelto nella barra della pagina (se c'è)
   const [spanOwn, setSpan] = useState<"3" | "7" | "14">("7");
@@ -114,6 +122,16 @@ export default function AddettaAgenda({ structures, units, roomTypes, bookings, 
                           <span className="w-20 shrink-0 truncate pl-1 font-display text-sm font-bold text-txt">{r.unit.name}</span>
                           <span className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: cleanTint(r.action), color: cleanText(r.action) }}>{ACT_LABEL[r.action]}</span>
                           <span className="min-w-0 basis-full pl-1 text-xs text-dim sm:basis-0 sm:flex-1 sm:truncate sm:pl-0">{rowText(r)}</span>
+                          {actions && (() => {
+                            const fatta = actions.isDone(d.date, r.unit.id);
+                            const prob = actions.hasIssue?.(d.date, r.unit.id);
+                            return (
+                              <span className="ml-auto flex shrink-0 items-center gap-1.5 pl-1">
+                                <button onClick={() => actions.issue(r, d.date)} className={`whitespace-nowrap rounded-md border px-2 py-1 text-[11px] font-semibold transition ${prob ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:bg-wash"}`}>⚠ Segnala problema</button>
+                                <button onClick={() => actions.toggle(d.date, r.unit.id)} aria-pressed={fatta} className={`whitespace-nowrap rounded-md border px-2 py-1 text-[11px] font-semibold transition ${fatta ? "border-transparent bg-[color:var(--ok)] text-white" : "border-line text-dim hover:bg-wash"}`}>{fatta ? "✓ Fatta" : "Segna come fatta"}</button>
+                              </span>
+                            );
+                          })()}
                         </div>
                       ))}
                     </div>
