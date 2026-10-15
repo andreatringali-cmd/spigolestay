@@ -508,16 +508,6 @@ export default function PuliziePage() {
           </div>
           </div>
         </div>
-      ) : view === "rows" ? (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-end">
-            <div className="flex items-center rounded-lg border border-line p-0.5">
-              <Seg v="cards" icon="grid" title={t("Vista card")} />
-              <Seg v="rows" icon="menu" title={t("Vista lista")} />
-            </div>
-          </div>
-          <AddettaAgenda structures={scopeStructures} units={units.filter((u) => scopeStructures.some((x) => x.id === u.structureId))} roomTypes={roomTypes} bookings={bookings.filter((b) => scopeStructures.some((x) => x.id === b.structureId))} guests={guests} cards />
-        </div>
       ) : (<>
 
       {/* Card riepilogo — cliccabili per filtrare (stessa grafica delle altre pagine) */}
@@ -677,6 +667,9 @@ export default function PuliziePage() {
       </div>
 
       {/* Planning */}
+      {view === "rows" ? (
+        <AddettaAgenda structures={scopeStructures} units={units.filter((u) => scopeStructures.some((x) => x.id === u.structureId))} roomTypes={roomTypes} bookings={bookings.filter((b) => scopeStructures.some((x) => x.id === b.structureId))} guests={guests} from={date} filter={actionFilter} />
+      ) : (
       <div className="flex flex-col gap-5">
         {scopedStructures.map((s) => {
           const list = rooms.filter((r) => r.structure.id === s.id && (r.oos ? actionFilter === "tutte" : matchAction(r.action)));
@@ -703,6 +696,7 @@ export default function PuliziePage() {
           );
         })}
       </div>
+      )}
       </>)}
 
       {/* Aggiungi / modifica prodotto */}

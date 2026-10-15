@@ -20,12 +20,14 @@ const FLT_MATCH: Record<Flt, (r: PlanRoom) => boolean> = {
   arrivi: (r) => r.action === "arrivo" || r.action === "turnover",
 };
 
-export default function AddettaAgenda({ structures, units, roomTypes, bookings, guests, cards = false }: { structures: Structure[]; units: Unit[]; roomTypes: RoomType[]; bookings: Booking[]; guests: Guest[]; cards?: boolean }) {
+export default function AddettaAgenda({ structures, units, roomTypes, bookings, guests, cards = false, from, filter }: { structures: Structure[]; units: Unit[]; roomTypes: RoomType[]; bookings: Booking[]; guests: Guest[]; cards?: boolean; from?: string; filter?: Flt }) {
   const today = toISO(new Date());
+  const start = from ?? today; // la lista parte dal giorno scelto nella barra della pagina (se c'è)
   const [span, setSpan] = useState<"3" | "7" | "14">("7");
-  const [open, setOpen] = useState<Record<string, boolean>>({ [today]: true });
-  const [flt, setFlt] = useState<Flt>("tutte");
-  const allDays = useMemo(() => buildAgenda({ from: today, days: Number(span), structures, units, roomTypes, bookings }), [today, span, structures, units, roomTypes, bookings]);
+  const [open, setOpen] = useState<Record<string, boolean>>({ [start]: true });
+  const [fltOwn, setFlt] = useState<Flt>("tutte");
+  const flt = filter ?? fltOwn;
+  const allDays = useMemo(() => buildAgenda({ from: start, days: Number(span), structures, units, roomTypes, bookings }), [start, span, structures, units, roomTypes, bookings]);
   // con le card in alto, toccarne una filtra l'elenco (di nuovo per toglierla)
   const days = useMemo(() => {
     if (flt === "tutte" || flt === "dafare") return allDays;
