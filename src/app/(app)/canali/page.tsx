@@ -394,7 +394,7 @@ export default function CanaliPage() {
                       <tbody>
                         {list.map((c, i) => {
                           const chKey = c.channel as Channel;
-                          const label = CHANNELS[chKey]?.label ?? c.title;
+                          const label = chKey === "other" && c.title ? c.title : (CHANNELS[chKey]?.label ?? c.title);
                           const corr = c.id ? corrText(c.id) : "—";
                           const commInfo = defaultCommissionInfo(chKey, g.sid);
                           const commPct = Math.round(commInfo.pct * 10) / 10;
@@ -406,7 +406,7 @@ export default function CanaliPage() {
                             <tr key={c.id || c.channel + i} className="border-b border-line last:border-0 hover:bg-wash">
                               <td className={td}>
                                 <span className="flex min-w-0 items-center gap-2">
-                                  <ChannelLogo channel={chKey} size={20} title={label} />
+                                  <ChannelLogo channel={chKey} size={20} title={label} name={c.title} />
                                   <span className="truncate font-semibold text-txt">{label}</span>
                                 </span>
                               </td>
@@ -494,7 +494,7 @@ export default function CanaliPage() {
       {channelDetail && (() => {
         const { c } = channelDetail;
         const chKey = c.channel as Channel;
-        const label = CHANNELS[chKey]?.label ?? c.title;
+        const label = chKey === "other" && c.title ? c.title : (CHANNELS[chKey]?.label ?? c.title);
         const savedColor = loadChannelColor(chKey);
         const computedColor = typeof window !== "undefined" ? getComputedStyle(document.documentElement).getPropertyValue(CHANNELS[chKey]?.cssVar ?? "").trim() : "";
         const pickerColor = savedColor || (/^#/.test(computedColor) ? computedColor : "#888888");
@@ -502,7 +502,7 @@ export default function CanaliPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setChannelDetail(null); }}>
             <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-xl">
               <div className="mb-3 flex items-center gap-3">
-                <ChannelLogo channel={chKey} size={28} title={label} />
+                <ChannelLogo channel={chKey} size={28} title={label} name={c.title} />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-bold text-txt">{label}</div>
                   <div className="text-[11px] text-dim">{t("Colore su calendario")}</div>
