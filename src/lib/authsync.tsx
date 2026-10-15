@@ -643,21 +643,22 @@ async function syncOnce(
   const orgIds = await fetchOrgIds(client, uid);
   const { personal, orgs } = splitByOrg(fullData);
 
-  // 1) salva il personale (le chiavi non-dati, es. impostazioni, viaggiano col personale)
+  // 1) + 2) salva il personale (le chiavi non-dati, es. impostazioni, viaggiano col personale) e ogni org di cui sono membro: IN PARALLELO
+  // (righe diverse del database, nessuna dipendenza tra loro: prima erano una dopo l'altra e all'avvio sommavano i tempi di 3-4 trasferimenti da qualche MB).
   const personalSnap = { ...snap, "spigolestay:data:v1": JSON.stringify(personal) };
   const personalRef: SyncRef = { rev: revRef.current, last: lastSynced.current };
-  const pRes = await saveOne(client, "app_state", "user_id", uid, personalSnap, personalRef);
+  for (const orgId of orgIds) if (!orgRefs.current[orgId]) orgRefs.current[orgId] = { rev: -1, last: {} };
+  const [pRes, ...orgResults] = await Promise.all([
+    saveOne(client, "app_state", "user_id", uid, personalSnap, personalRef),
+    ...orgIds.map((orgId) => {
+      const localOrg = orgs.get(orgId) ?? EMPTY_ORG_DATA();
+      const orgSnap = { "spigolestay:data:v1": JSON.stringify(localOrg) };
+      return saveOne(client, "org_state", "org_id", orgId, orgSnap, orgRefs.current[orgId]);
+    }),
+  ]);
   revRef.current = personalRef.rev; lastSynced.current = personalRef.last;
-
-  // 2) salva ogni org di cui sono membro
   const orgMergedDatas: DataObj[] = [];
-  for (const orgId of orgIds) {
-    if (!orgRefs.current[orgId]) orgRefs.current[orgId] = { rev: -1, last: {} };
-    const localOrg = orgs.get(orgId) ?? EMPTY_ORG_DATA();
-    const orgSnap = { "spigolestay:data:v1": JSON.stringify(localOrg) };
-    const r = await saveOne(client, "org_state", "org_id", orgId, orgSnap, orgRefs.current[orgId]);
-    try { orgMergedDatas.push(JSON.parse(r.merged["spigolestay:data:v1"] || "{}") as DataObj); } catch { /* salta */ }
-  }
+  for (const r of orgResults) { try { orgMergedDatas.push(JSON.parse(r.merged["spigolestay:data:v1"] || "{}") as DataObj); } catch { /* salta */ } }
   for (const k of Object.keys(orgRefs.current)) if (!orgIds.includes(k)) delete orgRefs.current[k]; // pulizia org non più membro
 
   // 3) ricombina il locale con i risultati (personale + org) e segnala se il locale va aggiornato
