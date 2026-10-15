@@ -11,7 +11,9 @@ import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
-import PersonPlanCard from "@/components/PersonPlanCard";
+import { useToast } from "@/components/ToastProvider";
+import { personPlanMother, publishSingleOccupancy } from "@/lib/person-plan-client";
+import { hasPersonPlan } from "@/lib/person-plan";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
@@ -247,8 +249,6 @@ export default function TariffeDerivatePage() {
         })}
       </div>
 
-      <PersonPlanCard structures={scoped} roomTypes={roomTypes} />
-
       {derivModal && <DerivataModal structureIds={derivModal.structureIds} parentId={derivModal.parentId} editId={derivModal.editId} onClose={() => setDerivModal(null)} />}
     </div>
   );
@@ -265,6 +265,19 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
 }) {
   const { roomTypes } = useData();
   const { t } = useLang();
+  const toast = useToast();
+  const [busyId, setBusyId] = useState("");
+  const [, setDoneTick] = useState(0);
+  // "Uso singola" → prezzo per 1 ospite sui portali (piano «Per persona» su Channex): lo sconto è quello di questa tariffa derivata.
+  const publish = async (child: RoomType) => {
+    const mother = personPlanMother(child, roomTypes);
+    if (!mother || busyId) return;
+    setBusyId(child.id);
+    toast(t("Creo il piano per persona su Channex…"), "info");
+    const r = await publishSingleOccupancy(mother, child, roomTypes);
+    toast(r.text, r.ok ? "success" : "error");
+    setBusyId(""); setDoneTick((n) => n + 1);
+  };
   const kidsOf = (id: string) => types.filter((x) => x.deriveFrom === id);
   const masters = types.filter((rt) => !rt.deriveFrom || !types.some((x) => x.id === rt.deriveFrom));
 
@@ -296,6 +309,12 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
           </div>
           <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-1.5 text-xs">
             <button onClick={() => onAdd(rt.id)} className="font-semibold text-focus hover:underline">＋ {t("Derivata")}</button>
+            {derived && (() => {
+              const mom = personPlanMother(rt, roomTypes);
+              if (!mom) return null;
+              const done = hasPersonPlan(mom.structureId, mom.id);
+              return <button onClick={() => void publish(rt)} disabled={!!busyId} title={t("Invia ai portali come prezzo per 1 ospite (piano «Per persona» su Channex). Riguarda solo i canali che colleghi a quel piano.")} className="font-semibold text-focus hover:underline disabled:opacity-50">{busyId === rt.id ? t("Attendi…") : done ? `✓ ${t("Portali")}` : t("Portali 👤1")}</button>;
+            })()}
             {derived ? (
               <button onClick={() => onEdit(rt.id)} className="font-medium text-dim hover:underline">{t("Modifica")}</button>
             ) : (
