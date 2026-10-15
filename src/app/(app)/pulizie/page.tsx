@@ -17,6 +17,8 @@ import { useLang } from "@/lib/i18n";
 import { computePuliziePlan, buildPuliziePlanText, ACT_LABEL, fmtLongIT, type PlanRoom } from "@/lib/puliziePlan";
 import AutoShareSettings from "@/components/pulizie/AutoShareSettings";
 import AddettaView from "@/components/pulizie/AddettaView";
+import AddettaAgenda from "@/components/pulizie/AddettaAgenda";
+import { Seg as ModeSeg } from "@/components/pulizie/addetta-ui";
 import { useAccess } from "@/lib/access";
 import { isPulizieOnly } from "@/lib/pulizie-addetta";
 import { cleanBar, cleanTint, cleanText, cleanSolid } from "@/lib/pulizie-colors";
@@ -104,6 +106,7 @@ export default function PuliziePage() {
 
   // Scorte / lista della spesa (prodotti ricorrenti).
   const [tab, setTab] = useState<"planning" | "scorte" | "addetta">("planning");
+  const [planMode, setPlanMode] = useState<"elenco" | "giorno">("elenco"); // elenco = 3/7/14 giorni; giorno = planning del singolo giorno con spunte, note e invio
   // Vista "Addetta": si apre da sola per chi ha accesso SOLO a Pulizie (la signora) o con /pulizie?tab=addetta.
   const { user: accessUser } = useAccess();
   const pulOnly = isPulizieOnly(accessUser?.perms);
@@ -402,6 +405,8 @@ export default function PuliziePage() {
     </div>
   ); };
 
+  const planModeToggle = <ModeSeg value={planMode} onChange={setPlanMode} options={[{ key: "elenco", label: t("Elenco") }, { key: "giorno", label: t("Giorno") }]} className="w-full sm:w-auto sm:min-w-[12rem]" />;
+
   return (
     <div>
       <PageHeader title={t("Planning pulizie")} subtitle={t("Cosa fare in ogni camera oggi, da condividere con chi pulisce")} hideHelp />
@@ -507,7 +512,13 @@ export default function PuliziePage() {
           </div>
           </div>
         </div>
+      ) : planMode === "elenco" ? (
+        <div className="flex flex-col gap-3">
+          {planModeToggle}
+          <AddettaAgenda structures={scopeStructures} units={units.filter((u) => scopeStructures.some((x) => x.id === u.structureId))} roomTypes={roomTypes} bookings={bookings.filter((b) => scopeStructures.some((x) => x.id === b.structureId))} guests={guests} />
+        </div>
       ) : (<>
+      <div className="mb-3">{planModeToggle}</div>
 
       {/* Card riepilogo — cliccabili per filtrare (stessa grafica delle altre pagine) */}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
