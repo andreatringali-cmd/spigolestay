@@ -4,6 +4,8 @@ import { POOL_KEY, parsePool } from "@/lib/inventory-pool";
 import { RATEMODEL_KEY, parseRateModel } from "@/lib/rate-model";
 import { useEffect, useRef } from "react";
 import { useData } from "@/lib/store";
+import { liveSingleDiscounts, hasPersonPlan } from "@/lib/person-plan";
+import { ensurePersonPlan, personPlanMother } from "@/lib/person-plan-client";
 import { buildAriPayload, type ChxStructMap } from "@/lib/channex-ari";
 import { apiPost } from "@/lib/invoicing/client";
 import { refreshChannexMap, readChannexMap, hasLinkedStructures } from "@/lib/channex-map-sync";
@@ -118,21 +120,32 @@ export default function ChannexAutoSync() {
         // Strutture che si dividono le camere reali (Impostazioni → Disponibilità condivisa): la disponibilità di una non supera le camere libere del gruppo.
         const pool = parsePool(localStorage.getItem(POOL_KEY));
         // Più piani tariffari / prezzo per 1 ospite: default SPENTO (Impostazioni), vedi src/lib/rate-model.ts.
-        const rateModel = parseRateModel(localStorage.getItem(RATEMODEL_KEY));
+        let rateModel = parseRateModel(localStorage.getItem(RATEMODEL_KEY));
         const { roomTypes: rt, units: un, bookings: bk, rateOverrides: ro } = dataRef.current;
 
         const snapshots = loadSnapshots();
         const lastFull = loadJSON<Record<string, number>>(LASTFULL_KEY, {});
         const now = Date.now();
 
-        for (const [sid, map] of linked) {
+        for (const [sid, map0] of linked) {
+          let map = map0;
+          let planCreated = false;
+          // tariffe "uso singola" con la spunta ma senza piano registrato: si crea (al massimo un tentativo ogni 30 minuti)
+          for (const kid of rt.filter((x) => x.personPlan && x.structureId === sid)) {
+            const mom = personPlanMother(kid, rt);
+            if (!mom || hasPersonPlan(sid, mom.id)) continue;
+            const tryKey = `xn-pp-try:${kid.id}`;
+            try { const last = Number(sessionStorage.getItem(tryKey) || 0); if (Date.now() - last < 30 * 60 * 1000) continue; sessionStorage.setItem(tryKey, String(Date.now())); } catch { /* niente */ }
+            const r = await ensurePersonPlan(mom, kid, rt);
+            if (r.ok) { planCreated = true; map = readChannexMap()[sid] ?? map; rateModel = parseRateModel(localStorage.getItem(RATEMODEL_KEY)); }
+          }
           // Finestra COMPLETA 500 giorni (una sola build: da qui si ricava full o delta).
           const { availability, restrictions } = buildAriPayload(map, sid, rt, un, bk, ro, { days: FULL_DAYS, weekendPct, closes, cta, ctd, pool, rateModel: undefined });
           if (availability.length === 0 && restrictions.length === 0) continue;
 
           const snap = snapshots[sid];
           // Full-sync quando: manca lo snapshot (primo caricamento) oppure sono passate 24h.
-          const needFull = !snap || (now - (lastFull[sid] ?? 0) >= FULLSYNC_INTERVAL_MS);
+          const needFull = !snap || planCreated || (now - (lastFull[sid] ?? 0) >= FULLSYNC_INTERVAL_MS);
 
           // Mappe chiave→valore correnti (servono sia per il diff che per aggiornare lo snapshot).
           const curAvail: Record<string, string> = {};
@@ -199,9 +212,15 @@ export default function ChannexAutoSync() {
           try {
             const extraIds = new Set(Object.values(map.rooms ?? {}).flatMap((m) => (m.ratePlans ?? []).map((p) => p.ratePlanId)).filter(Boolean) as string[]);
             if (rateModel.enabled && extraIds.size > 0) {
-              const extraAll = buildAriPayload(map, sid, rt, un, bk, ro, { days: FULL_DAYS, weekendPct, closes, cta, ctd, pool, rateModel }).restrictions.filter((r) => extraIds.has(r.rate_plan_id));
+              // sconto per 1 ospite = quello attuale della tariffa derivata "uso singola"
+              const live = liveSingleDiscounts(rt, Object.keys(map.rooms ?? {}));
+              const rmLive = { ...rateModel, single: { ...rateModel.single, ...live } };
+              const extraAll = buildAriPayload(map, sid, rt, un, bk, ro, { days: FULL_DAYS, weekendPct, closes, cta, ctd, pool, rateModel: rmLive }).restrictions.filter((r) => extraIds.has(r.rate_plan_id));
               const changedDates = new Set(sendRestr.map((r) => `${r.property_id}|${r.date}`));
-              const extraRows = needFull ? extraAll : extraAll.filter((r) => changedDates.has(`${r.property_id}|${r.date}`));
+              // se è cambiato lo sconto della tariffa "uso singola" si reinviano tutti i giorni (altrimenti solo quelli cambiati)
+              const sigKey = `xn-pp-sig:${sid}`; const sig = JSON.stringify(live); let sigChanged = false;
+              try { sigChanged = sessionStorage.getItem(sigKey) !== sig; sessionStorage.setItem(sigKey, sig); } catch { /* niente */ }
+              const extraRows = needFull || sigChanged ? extraAll : extraAll.filter((r) => changedDates.has(`${r.property_id}|${r.date}`));
               if (extraRows.length > 0) await fetch("/api/channex/person-ari", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ restrictions: extraRows }) });
             }
           } catch { /* i piani per persona non fermano mai l'invio normale */ }

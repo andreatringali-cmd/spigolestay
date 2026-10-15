@@ -13,7 +13,8 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
 import { useToast } from "@/components/ToastProvider";
 import { personPlanMother, publishSingleOccupancy } from "@/lib/person-plan-client";
-import { hasPersonPlan } from "@/lib/person-plan";
+import { forceFullSync } from "@/components/ChannexAutoSync";
+import { unregisterPersonPlan } from "@/lib/person-plan";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
@@ -265,19 +266,6 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
 }) {
   const { roomTypes } = useData();
   const { t } = useLang();
-  const toast = useToast();
-  const [busyId, setBusyId] = useState("");
-  const [, setDoneTick] = useState(0);
-  // "Uso singola" → prezzo per 1 ospite sui portali (piano «Per persona» su Channex): lo sconto è quello di questa tariffa derivata.
-  const publish = async (child: RoomType) => {
-    const mother = personPlanMother(child, roomTypes);
-    if (!mother || busyId) return;
-    setBusyId(child.id);
-    toast(t("Creo il piano per persona su Channex…"), "info");
-    const r = await publishSingleOccupancy(mother, child, roomTypes);
-    toast(r.text, r.ok ? "success" : "error");
-    setBusyId(""); setDoneTick((n) => n + 1);
-  };
   const kidsOf = (id: string) => types.filter((x) => x.deriveFrom === id);
   const masters = types.filter((rt) => !rt.deriveFrom || !types.some((x) => x.id === rt.deriveFrom));
 
@@ -309,12 +297,7 @@ function DerivMap({ types, sUnits, onAdd, onEdit, onOpenType, onDelete }: {
           </div>
           <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-1.5 text-xs">
             <button onClick={() => onAdd(rt.id)} className="font-semibold text-focus hover:underline">＋ {t("Derivata")}</button>
-            {derived && (() => {
-              const mom = personPlanMother(rt, roomTypes);
-              if (!mom) return null;
-              const done = hasPersonPlan(mom.structureId, mom.id);
-              return <button onClick={() => void publish(rt)} disabled={!!busyId} title={t("Invia ai portali come prezzo per 1 ospite (piano «Per persona» su Channex). Riguarda solo i canali che colleghi a quel piano.")} className="font-semibold text-focus hover:underline disabled:opacity-50">{busyId === rt.id ? t("Attendi…") : done ? `✓ ${t("Portali")}` : t("Portali 👤1")}</button>;
-            })()}
+            {derived && rt.personPlan && <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--ok) 14%, transparent)", color: "var(--ok)" }} title={t("Inviata ai portali come prezzo per 1 ospite")}>✓ 👤1 {t("portali")}</span>}
             {derived ? (
               <button onClick={() => onEdit(rt.id)} className="font-medium text-dim hover:underline">{t("Modifica")}</button>
             ) : (
@@ -393,12 +376,16 @@ function DerivataModal({ structureIds, parentId, editId, onClose }: { structureI
   const [inheritAvail, setInheritAvail] = useState<boolean>(editing?.deriveInherit ?? true);
   const [inheritLos, setInheritLos] = useState<boolean>(editing?.restrictionsInherit ?? true);
   const [salesClosed, setSalesClosed] = useState<boolean>(editing?.salesClosed ?? false);
+  const [personPlan, setPersonPlan] = useState<boolean>(editing?.personPlan ?? false);
+  const toast = useToast();
 
   const parent = parentOf(basedOn);
   const parentBase = parent ? effectiveBase(parent, roomTypes) : 0;
   const preview = Math.max(0, Math.round(mode === "percent" ? parentBase * (1 + value / 100) : parentBase + value));
   const suggestedName = parent ? `${parent.name} · ${ratePlan || t("derivata")}` : t("Tariffa derivata");
 
+  // La spunta compare per una tariffa "uso singola" (1 adulto) con sconto, la cui madre è collegata a Channex.
+  const personAllowed = !!parent && adults === 1 && value < 0 && !!personPlanMother({ ...(editing ?? ({} as RoomType)), id: editing?.id ?? "new", name: name || suggestedName, deriveFrom: basedOn, deriveMode: mode, deriveValue: value, maxOccupancy: 1, maxAdults: 1 } as RoomType, roomTypes);
   const num = (v: string, min = 0) => (v === "" ? min : Math.max(min, Math.floor(Number(v)) || 0));
   const canSave = !!basedOn && !!(name.trim() || suggestedName);
 
@@ -414,6 +401,7 @@ function DerivataModal({ structureIds, parentId, editId, onClose }: { structureI
       deriveInherit: inheritAvail,
       restrictionsInherit: inheritLos,
       salesClosed,
+      personPlan: personAllowed ? personPlan : false,
       ratePlan: ratePlan || undefined,
       maxAdults: adults,
       maxChildren: children,
@@ -421,11 +409,21 @@ function DerivataModal({ structureIds, parentId, editId, onClose }: { structureI
       maxOccupancy: Math.max(1, adults + children),
       color: parent.color,
     };
+    let childId = editing?.id ?? "";
     if (editing) { updateRoomType(editing.id, patch); addActivity("config", `Tariffa derivata modificata — ${finalName}`); }
     else {
-      const id = addRoomType({ structureId: parent.structureId, name: finalName, beds: parent.beds, basePrice: parent.basePrice });
-      updateRoomType(id, patch);
+      childId = addRoomType({ structureId: parent.structureId, name: finalName, beds: parent.beds, basePrice: parent.basePrice });
+      updateRoomType(childId, patch);
       addActivity("config", `Tariffa derivata creata — ${finalName}`);
+    }
+    // Spunta "Invia ai portali come prezzo per 1 ospite": salvando, crea il piano su Channex e manda i prezzi (se tolta, smette di inviarli).
+    if (personAllowed && personPlan) {
+      const child = { ...(editing ?? ({} as RoomType)), ...patch, id: childId } as RoomType;
+      toast(t("Creo il piano per persona su Channex e invio i prezzi…"), "info");
+      void publishSingleOccupancy(parent, child, roomTypes, forceFullSync).then((r) => toast(r.text, r.ok ? "success" : "error"));
+    } else if (editing?.personPlan && !(personAllowed && personPlan)) {
+      unregisterPersonPlan(parent.structureId, parent.id);
+      toast(t("Prezzo per 1 ospite sui portali spento: non verrà più inviato."), "info");
     }
     onClose();
   };
@@ -472,6 +470,16 @@ function DerivataModal({ structureIds, parentId, editId, onClose }: { structureI
             </div>
             <p className="mt-1.5 text-[11px] text-faint">{t("Usa un valore negativo per una tariffa più bassa (es. −10% per uso singola o non rimborsabile).")}</p>
           </div>
+
+          {personAllowed && (
+            <label className="mt-3 flex items-start justify-between gap-3 rounded-lg border border-line p-3">
+              <span>
+                <span className="block text-sm font-medium text-txt">{t("Invia ai portali come prezzo per 1 ospite")}</span>
+                <span className="mt-0.5 block text-[11px] text-faint">{t("Salvando crea su Channex il piano «Per persona» della camera madre e invia due prezzi: uno per 1 ospite (questa tariffa) e uno per 2. Vale solo per i canali che colleghi tu a quel piano: gli altri portali non cambiano.")}</span>
+              </span>
+              <Toggle on={personPlan} onClick={() => setPersonPlan((v) => !v)} />
+            </label>
+          )}
 
           {/* Regole ereditate dalla madre */}
           <div className="mt-3">

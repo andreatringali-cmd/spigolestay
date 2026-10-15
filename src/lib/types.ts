@@ -189,6 +189,7 @@ export interface RoomType {
   basePrice: number; // tariffa base feriale (€)
   // Tariffa derivata: se impostata, il prezzo si calcola da un'altra tipologia.
   deriveFrom?: string; // id tipologia sorgente ("" o assente = tariffa indipendente)
+  personPlan?: boolean; // tariffa "uso singola": invia ai portali come prezzo per 1 ospite (piano «Per persona» su Channex), vedi person-plan.ts
   deriveMode?: "amount" | "percent"; // ±€ oppure ±%
   deriveValue?: number; // valore con segno (es. -10 = −10€ / −10%)
   deriveRound?: boolean; // arrotonda il prezzo derivato (assente/true = sì)

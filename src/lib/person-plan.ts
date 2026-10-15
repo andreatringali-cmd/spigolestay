@@ -37,3 +37,27 @@ export function registerPersonPlan(structureId: string, roomTypeId: string, rate
     return true;
   } catch { return false; }
 }
+
+/** Lo sconto per 1 ospite segue SEMPRE la tariffa derivata "uso singola" di oggi (non una copia salvata): se cambi la Dus, il prossimo invio aggiorna il portale. */
+export function liveSingleDiscounts(roomTypes: RoomType[], roomIds: string[]): Record<string, SingleDiscount> {
+  const out: Record<string, SingleDiscount> = {};
+  for (const id of roomIds) {
+    const kid = roomTypes.find((x) => x.deriveFrom === id && (x.maxOccupancy === 1 || x.beds === 1 || /dus|singol/i.test(x.name)));
+    const d = kid ? singleDiscountFromDerived(kid) : null;
+    if (d) out[id] = d;
+  }
+  return out;
+}
+
+/** Spegne l'invio per persona: la tipologia non ha più il piano nella mappa locale (il piano su Channex resta, ma nessun prezzo viene più inviato). */
+export function unregisterPersonPlan(structureId: string, roomTypeId: string): void {
+  try {
+    const map = readChannexMap();
+    const room = map[structureId]?.rooms?.[roomTypeId];
+    if (room?.ratePlans) { room.ratePlans = room.ratePlans.filter((p) => p.id !== PERSON_PLAN_ID); localStorage.setItem(CHX_MAP_KEY, JSON.stringify(map)); }
+    const cfg = parseRateModel(localStorage.getItem(RATEMODEL_KEY));
+    cfg.plans[roomTypeId] = (cfg.plans[roomTypeId] ?? []).filter((p) => p.id !== PERSON_PLAN_ID);
+    delete cfg.single[roomTypeId];
+    localStorage.setItem(RATEMODEL_KEY, JSON.stringify(cfg));
+  } catch { /* niente */ }
+}
