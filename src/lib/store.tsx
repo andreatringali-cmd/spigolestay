@@ -4,7 +4,7 @@
 // In produzione questi dati arriveranno da Supabase.
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { modificaMeritaEmail, spostamentoMeritaEmail } from "@/lib/notify-rules";
+import { campoCambiato, modificaMeritaEmail, spostamentoMeritaEmail } from "@/lib/notify-rules";
 import { kvGet, kvSet, kvRemove, kvKeys, kvFlush } from "./bigstore";
 import type { Structure, RoomType, Unit, Guest, Booking, Channel, CalEvent, DirectReview } from "./types";
 import { CHANNELS } from "./types";
@@ -591,7 +591,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (updated) syncGcal(updated, updated.status === "cancelled" ? "delete" : "upsert");
         if (before) {
           const FIELDS: (keyof Booking)[] = ["checkIn", "checkOut", "unitId", "roomTypeId", "adults", "children", "total", "channel", "status", "guestId"];
-          const changed = FIELDS.filter((f) => f in patch && patch[f] !== before[f]);
+          const changed = FIELDS.filter((f) => f in patch && campoCambiato(patch[f], before[f]));
           if (changed.length) {
             const labels: string[] = [];
             if (changed.includes("checkIn") || changed.includes("checkOut")) labels.push("date");
