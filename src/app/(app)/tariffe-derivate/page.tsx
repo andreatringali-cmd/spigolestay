@@ -11,6 +11,7 @@ import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { useLang } from "@/lib/i18n";
+import PersonPlanCard from "@/components/PersonPlanCard";
 
 const inp = "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-txt outline-none focus:border-focus";
 const lbl = "block text-xs font-medium text-dim";
@@ -245,6 +246,8 @@ export default function TariffeDerivatePage() {
           );
         })}
       </div>
+
+      <PersonPlanCard structures={scoped} roomTypes={roomTypes} />
 
       {derivModal && <DerivataModal structureIds={derivModal.structureIds} parentId={derivModal.parentId} editId={derivModal.editId} onClose={() => setDerivModal(null)} />}
     </div>

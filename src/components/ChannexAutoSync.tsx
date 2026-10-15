@@ -127,7 +127,7 @@ export default function ChannexAutoSync() {
 
         for (const [sid, map] of linked) {
           // Finestra COMPLETA 500 giorni (una sola build: da qui si ricava full o delta).
-          const { availability, restrictions } = buildAriPayload(map, sid, rt, un, bk, ro, { days: FULL_DAYS, weekendPct, closes, cta, ctd, pool, rateModel });
+          const { availability, restrictions } = buildAriPayload(map, sid, rt, un, bk, ro, { days: FULL_DAYS, weekendPct, closes, cta, ctd, pool, rateModel: undefined });
           if (availability.length === 0 && restrictions.length === 0) continue;
 
           const snap = snapshots[sid];
@@ -193,6 +193,18 @@ export default function ChannexAutoSync() {
           }
           snapshots[sid] = nextSnap;
           saveSnapshots(snapshots);
+
+          // Piani "Per persona" (prezzo per 1 ospite, solo per i portali collegati a quel piano): chiamata SEPARATA da quella dei prezzi normali,
+          // così un errore qui non impedisce mai l'invio agli altri portali. Con il full-sync si inviano tutti i giorni, altrimenti solo i giorni cambiati.
+          try {
+            const extraIds = new Set(Object.values(map.rooms ?? {}).flatMap((m) => (m.ratePlans ?? []).map((p) => p.ratePlanId)).filter(Boolean) as string[]);
+            if (rateModel.enabled && extraIds.size > 0) {
+              const extraAll = buildAriPayload(map, sid, rt, un, bk, ro, { days: FULL_DAYS, weekendPct, closes, cta, ctd, pool, rateModel }).restrictions.filter((r) => extraIds.has(r.rate_plan_id));
+              const changedDates = new Set(sendRestr.map((r) => `${r.property_id}|${r.date}`));
+              const extraRows = needFull ? extraAll : extraAll.filter((r) => changedDates.has(`${r.property_id}|${r.date}`));
+              if (extraRows.length > 0) await fetch("/api/channex/person-ari", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ restrictions: extraRows }) });
+            }
+          } catch { /* i piani per persona non fermano mai l'invio normale */ }
         }
       }, DEBOUNCE_MS);
     };
