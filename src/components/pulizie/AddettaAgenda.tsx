@@ -128,10 +128,10 @@ export default function AddettaAgenda({ structures, units, roomTypes, bookings, 
                             const prob = actions.hasIssue?.(d.date, r.unit.id);
                             return (
                               <span className="ml-auto flex shrink-0 items-center gap-1.5 pl-1">
-                                <button onClick={() => actions.issue(r, d.date)} title="Segnala problema" aria-label="Segnala problema" className={`grid h-8 w-8 place-items-center rounded-md border transition ${prob ? "border-[color:var(--err)] bg-[color:var(--err)] text-white" : "border-[color:var(--warn)] text-[color:var(--warn)] hover:bg-wash"}`}><Icon name="alertTriangle" size={15} /></button>
-                                <button onClick={() => actions.toggle(d.date, r.unit.id)} title={fatta ? "Fatta (tocca per annullare)" : "Segna come fatta"} aria-label={fatta ? "Fatta (tocca per annullare)" : "Segna come fatta"} aria-pressed={fatta} className={`grid h-8 w-8 place-items-center rounded-md border transition ${fatta ? "border-[color:var(--ok)] bg-[color:var(--ok)] text-white" : "border-[color:var(--ok)] text-[color:var(--ok)] hover:bg-wash"}`}>
-                                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="20 6 9 17 4 12" /></svg>
+                                <button onClick={() => actions.toggle(d.date, r.unit.id)} title={fatta ? "Fatta (tocca per annullare)" : "Segna come fatta"} aria-label={fatta ? "Fatta (tocca per annullare)" : "Segna come fatta"} aria-pressed={fatta} className={`grid h-6 w-6 place-items-center rounded-md border transition ${fatta ? "border-[color:var(--ok)] bg-[color:var(--ok)] text-white" : "border-[color:var(--ok)] text-[color:var(--ok)] hover:bg-wash"}`}>
+                                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="20 6 9 17 4 12" /></svg>
                                 </button>
+                                <button onClick={() => actions.issue(r, d.date)} title="Segnala problema" aria-label="Segnala problema" className={`grid h-6 w-6 place-items-center rounded-md border transition ${prob ? "border-[color:var(--err)] bg-[color:var(--err)] text-white" : "border-[color:var(--warn)] text-[color:var(--warn)] hover:bg-wash"}`}><Icon name="alertTriangle" size={12} /></button>
                               </span>
                             );
                           })()}
