@@ -23,7 +23,10 @@ export default function StrutturePage() {
   const visible = activeStructureId !== "all" ? structures.filter((x) => x.id === activeStructureId) : structures;
   // Ogni struttura ha UN proprietario. "Di mia proprietà": sono io il proprietario. "Condivise": un altro proprietario l'ha condivisa con me (socio).
   // "Assegnate a te": sono staff di chi ne è proprietario (collaboratore invitato da "Utenti"): lavoro sulle sue strutture con i permessi che mi ha dato.
-  const [orgInfo, setOrgInfo] = useState<Record<string, { role: string; ownerEmail: string }>>({});
+  // Ultimo stato noto ricordato nel browser (solo per non far lampeggiare il raggruppamento): si aggiorna comunque dal server ad ogni apertura.
+  const ORG_CACHE = "xn-org-info";
+  const [orgInfo, setOrgInfo] = useState<Record<string, { role: string; ownerEmail: string }>>(() => { try { return typeof window === "undefined" ? {} : JSON.parse(localStorage.getItem(ORG_CACHE) || "{}"); } catch { return {}; } });
+  const [orgLoaded, setOrgLoaded] = useState(false);
   useEffect(() => {
     if (!supabase) return;
     let off = false;
@@ -35,13 +38,14 @@ export default function StrutturePage() {
         const j = (await r.json().catch(() => ({}))) as { orgs?: { orgId?: string; role?: string; ownerEmail?: string }[] };
         const map: Record<string, { role: string; ownerEmail: string }> = {};
         for (const o of j.orgs ?? []) if (o.orgId) map[o.orgId] = { role: o.role || "member", ownerEmail: o.ownerEmail || "" }; // per organizzazione, come fa il resto dell app
-        if (!off) setOrgInfo(map);
+        if (!off) { setOrgInfo(map); setOrgLoaded(true); try { localStorage.setItem(ORG_CACHE, JSON.stringify(map)); } catch { /* niente */ } }
       } catch { /* resta il raggruppamento provvisorio */ }
     })();
     return () => { off = true; };
   }, []);
   const isStaff = (() => { try { return typeof window !== "undefined" && localStorage.getItem("xn-collab") === "1"; } catch { return false; } })();
-  const mine = (x: typeof structures[number]) => !x.orgId || orgInfo[x.orgId]?.role === "owner";
+  const unknownOwner = (x: typeof structures[number]) => !!x.orgId && !orgInfo[x.orgId] && !orgLoaded; // proprietario non ancora noto
+  const mine = (x: typeof structures[number]) => !x.orgId || orgInfo[x.orgId]?.role === "owner" || unknownOwner(x); // nel dubbio resta tra le tue, senza spostarsi dopo
   const owned = visible.filter(mine);
   const others = visible.filter((x) => !mine(x));
   const shared = isStaff ? [] : others;
