@@ -76,7 +76,7 @@ export default function Hero(p: HeroProps) {
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-0.5">
             <p className="text-[11px] font-semibold uppercase tracking-wide sm:text-xs" style={{ color: HERO.inkDim }}>{p.dateLabel}{p.scopeLabel && <span style={{ color: "rgba(235,241,255,.62)" }}> · {p.scopeLabel}</span>}</p>
           </div>
-          <h1 className="mt-1.5 font-display text-[1.75rem] font-bold leading-[1.05] tracking-tight sm:text-4xl" style={{ color: "#fff" }}>{p.greeting}<span style={{ color: HERO.cyan }}>.</span></h1>
+          <h1 className="mt-1.5 font-display text-[1.75rem] font-bold leading-[1.05] tracking-tight sm:text-4xl" style={{ color: "#fff" }}>{p.greeting}<span style={{ color: HERO.cyan }}>,</span></h1>
           
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
             <a

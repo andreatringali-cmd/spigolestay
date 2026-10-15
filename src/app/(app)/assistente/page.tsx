@@ -454,7 +454,7 @@ export default function AssistentePage() {
       <div className="mb-7 flex items-start gap-4">
         {orb(56, true)}
         <div className="min-w-0 flex-1 pt-1">
-          <h1 className="font-display text-2xl font-bold leading-tight tracking-tight text-txt sm:text-[28px]">{greet}{firstName ? ` ${firstName}` : ""}<span style={{ color: "var(--focus)" }}>.</span></h1>
+          <h1 className="font-display text-2xl font-bold leading-tight tracking-tight text-txt sm:text-[28px]">{greet}{firstName ? ` ${firstName}` : ""}<span style={{ color: "var(--focus)" }}>,</span></h1>
           <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-dim">{briefing}</p>
         </div>
       </div>
