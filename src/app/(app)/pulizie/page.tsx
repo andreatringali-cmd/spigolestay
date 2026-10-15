@@ -105,6 +105,8 @@ export default function PuliziePage() {
 
   // Scorte / lista della spesa (prodotti ricorrenti).
   const [tab, setTab] = useState<"planning" | "scorte" | "addetta">("planning");
+  const [agSpan, setAgSpan] = useState<"3" | "7" | "14">("7"); // vista elenco: quanti giorni mostrare
+  const [agOpen, setAgOpen] = useState({ open: false, n: 0 }); // vista elenco: apri/chiudi tutti i giorni
   // Vista "Addetta": si apre da sola per chi ha accesso SOLO a Pulizie (la signora) o con /pulizie?tab=addetta.
   const { user: accessUser } = useAccess();
   const pulOnly = isPulizieOnly(accessUser?.perms);
@@ -578,6 +580,14 @@ export default function PuliziePage() {
           <Seg v="cards" icon="grid" title={t("Vista card")} />
           <Seg v="rows" icon="menu" title={t("Vista lista")} />
         </div>
+        {view === "rows" && (<>
+          <div className="flex items-center rounded-lg border border-line p-0.5">
+            {(["3", "7", "14"] as const).map((n) => (
+              <button key={n} onClick={() => setAgSpan(n)} aria-pressed={agSpan === n} className={`whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${agSpan === n ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{n} {t("giorni")}</button>
+            ))}
+          </div>
+          <button onClick={() => setAgOpen((a) => ({ open: !a.open, n: a.n + 1 }))} className="whitespace-nowrap rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-dim hover:bg-wash">{agOpen.open ? t("Chiudi tutti") : t("Apri tutti")}</button>
+        </>)}
         <div className="relative ml-auto">
           {copied && <span className="mr-2 text-xs font-medium text-[color:var(--ok)]">{t("Copiato ✓")}</span>}
           <button onClick={() => setPlanShare((v) => !v)} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 max-sm:h-9 max-sm:py-0" style={{ backgroundColor: "var(--focus)" }}>{t("Condividi")}</button>
@@ -668,7 +678,7 @@ export default function PuliziePage() {
 
       {/* Planning */}
       {view === "rows" ? (
-        <AddettaAgenda structures={scopeStructures} units={units.filter((u) => scopeStructures.some((x) => x.id === u.structureId))} roomTypes={roomTypes} bookings={bookings.filter((b) => scopeStructures.some((x) => x.id === b.structureId))} guests={guests} from={date} filter={actionFilter} />
+        <AddettaAgenda structures={scopeStructures} units={units.filter((u) => scopeStructures.some((x) => x.id === u.structureId))} roomTypes={roomTypes} bookings={bookings.filter((b) => scopeStructures.some((x) => x.id === b.structureId))} guests={guests} from={date} filter={actionFilter} span={agSpan} openAll={agOpen} />
       ) : (
       <div className="flex flex-col gap-5">
         {scopedStructures.map((s) => {

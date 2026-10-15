@@ -1,7 +1,7 @@
 "use client";
 
 // Arrivi, partenze e fermi (ospiti in casa) per i giorni a venire, camera per camera.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Booking, Guest, RoomType, Structure, Unit } from "@/lib/types";
 import { buildAgenda, WEEKDAY_LONG, isoWeekday } from "@/lib/pulizie-addetta";
 import { fmtDMY, parseISO, toISO } from "@/lib/dates";
@@ -20,10 +20,11 @@ const FLT_MATCH: Record<Flt, (r: PlanRoom) => boolean> = {
   arrivi: (r) => r.action === "arrivo" || r.action === "turnover",
 };
 
-export default function AddettaAgenda({ structures, units, roomTypes, bookings, guests, cards = false, from, filter }: { structures: Structure[]; units: Unit[]; roomTypes: RoomType[]; bookings: Booking[]; guests: Guest[]; cards?: boolean; from?: string; filter?: Flt }) {
+export default function AddettaAgenda({ structures, units, roomTypes, bookings, guests, cards = false, from, filter, span: spanProp, openAll }: { structures: Structure[]; units: Unit[]; roomTypes: RoomType[]; bookings: Booking[]; guests: Guest[]; cards?: boolean; from?: string; filter?: Flt; span?: "3" | "7" | "14"; openAll?: { open: boolean; n: number } }) {
   const today = toISO(new Date());
   const start = from ?? today; // la lista parte dal giorno scelto nella barra della pagina (se c'è)
-  const [span, setSpan] = useState<"3" | "7" | "14">("7");
+  const [spanOwn, setSpan] = useState<"3" | "7" | "14">("7");
+  const span = spanProp ?? spanOwn; // se la pagina lo passa, 3/7/14 giorni sta nella sua barra dei filtri
   const [open, setOpen] = useState<Record<string, boolean>>({ [start]: true });
   const [fltOwn, setFlt] = useState<Flt>("tutte");
   const flt = filter ?? fltOwn;
@@ -43,6 +44,7 @@ export default function AddettaAgenda({ structures, units, roomTypes, bookings, 
   const guestName = (id: string) => guests.find((g) => g.id === id)?.fullName || "Ospite";
   const isOpen = (d: string) => open[d] ?? false;
   const allOpen = days.every((d) => isOpen(d.date));
+  useEffect(() => { if (openAll && openAll.n > 0) setOpen(Object.fromEntries(days.map((d) => [d.date, openAll.open]))); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [openAll?.n]);
   const label = (iso: string) => (iso === today ? "Oggi" : iso === toISO(new Date(parseISO(today).getTime() + 86_400_000)) ? "Domani" : WEEKDAY_LONG[isoWeekday(iso) - 1]);
 
   const rowText = (r: PlanRoom): string => {
@@ -75,10 +77,10 @@ export default function AddettaAgenda({ structures, units, roomTypes, bookings, 
           })}
         </div>
       )}
-      <div className="flex flex-wrap items-center gap-2">
+      {spanProp === undefined && <div className="flex flex-wrap items-center gap-2">
         <Seg value={span} onChange={setSpan} options={[{ key: "3", label: "3 giorni" }, { key: "7", label: "7 giorni" }, { key: "14", label: "14 giorni" }]} className="w-full sm:w-auto sm:min-w-[16rem]" />
         <button onClick={() => setOpen(Object.fromEntries(days.map((d) => [d.date, !allOpen])))} className="ml-auto min-h-[40px] rounded-lg border border-line px-3 text-xs font-medium text-dim hover:bg-wash">{allOpen ? "Chiudi tutti" : "Apri tutti"}</button>
-      </div>
+      </div>}
 
       {days.map((d) => {
         const empty = d.rooms.length === 0;
