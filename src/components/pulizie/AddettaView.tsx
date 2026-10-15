@@ -1,15 +1,12 @@
 "use client";
 
-// Vista pensata per la signora delle pulizie (e per il titolare che vuole vedere cosa vede lei):
-// ore lavorate (checklist e acquisti stanno nelle schede Checklist e Scorte & spesa).
+// Checklist della signora delle pulizie (e per il titolare che vuole vedere cosa vede lei): voci per camera o zona comune, con frequenza settimanale.
 import { useMemo } from "react";
 import { useData } from "@/lib/store";
 import { useAccess } from "@/lib/access";
 import AddettaChecklist from "./AddettaChecklist";
-import AddettaHours from "./AddettaHours";
 
-/** section "checklist" = solo la checklist (scheda a sé); "addetta" = ore lavorate. */
-export default function AddettaView({ section = "addetta" }: { section?: "checklist" | "addetta" }) {
+export default function AddettaView() {
   const { units, structures, activeStructureId } = useData();
   const { level } = useAccess();
   const canEdit = level("pulizie") === "edit";
@@ -20,8 +17,5 @@ export default function AddettaView({ section = "addetta" }: { section?: "checkl
   const scopedUnits = useMemo(() => units.filter((u) => ids.has(u.structureId)), [units, ids]);
 
   if (!scoped.length) return <p className="rounded-xl border border-line bg-surface p-4 text-sm text-dim">Nessuna struttura disponibile.</p>;
-
-  if (section === "checklist") return <div className="mx-auto flex w-full max-w-3xl flex-col gap-3"><AddettaChecklist structures={scoped} units={scopedUnits} canEdit={canEdit} isManager={isManager} /></div>;
-
-  return <div className="mx-auto flex w-full max-w-3xl flex-col gap-3"><AddettaHours structures={scoped} units={scopedUnits} canEdit={canEdit} activeStructureId={activeStructureId} /></div>;
+  return <div className="mx-auto flex w-full max-w-3xl flex-col gap-3"><AddettaChecklist structures={scoped} units={scopedUnits} canEdit={canEdit} isManager={isManager} /></div>;
 }

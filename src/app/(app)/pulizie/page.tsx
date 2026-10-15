@@ -105,18 +105,18 @@ export default function PuliziePage() {
   const roomHasIssue = (unitId: string) => openIssues.some((i) => i.unitId === unitId && i.date === date);
 
   // Scorte / lista della spesa (prodotti ricorrenti).
-  const [tab, setTab] = useState<"planning" | "scorte" | "addetta" | "checklist">("planning");
+  const [tab, setTab] = useState<"planning" | "scorte" | "checklist">("planning");
   const [agSpan, setAgSpan] = useState<"3" | "7" | "14">("7"); // vista elenco: quanti giorni mostrare
   const [agOpen, setAgOpen] = useState({ open: false, n: 0 }); // vista elenco: apri/chiudi tutti i giorni
-  // Vista "Addetta": si apre da sola per chi ha accesso SOLO a Pulizie (la signora) o con /pulizie?tab=checklist | addetta.
+  // Vista "Addetta": si apre da sola per chi ha accesso SOLO a Pulizie (la signora) o con /pulizie?tab=checklist.
   const { user: accessUser, level } = useAccess();
   const pulOnly = isPulizieOnly(accessUser?.perms);
   const tabInit = useRef(false);
   useEffect(() => {
     if (tabInit.current) return;
-    let want: "addetta" | "checklist" | null = null;
-    try { const q = new URLSearchParams(window.location.search).get("tab"); if (q === "addetta" || q === "checklist") want = q; } catch {}
-    if (want || pulOnly) { tabInit.current = true; setTab(want ?? "checklist"); }
+    let want = false;
+    try { const q = new URLSearchParams(window.location.search).get("tab"); want = q === "addetta" || q === "checklist"; } catch {}
+    if (want || pulOnly) { tabInit.current = true; setTab("checklist"); }
   }, [pulOnly]);
   const [stock, setStock] = useState<Prod[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -413,9 +413,9 @@ export default function PuliziePage() {
       {/* Selettore: Pulizie / Scorte · meteo e "?" in linea, a destra */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="inline-flex rounded-xl border border-line bg-surface p-0.5 shadow-sm max-sm:w-full">
-          {([["planning", "Pulizie"], ["scorte", "Scorte & spesa"], ["addetta", "Addetta"], ["checklist", "Checklist"]] as ["planning" | "scorte" | "addetta" | "checklist", string][]).map(([v, lab]) => (
+          {([["planning", "Pulizie"], ["scorte", "Scorte & spesa"], ["checklist", "Checklist"]] as ["planning" | "scorte" | "checklist", string][]).map(([v, lab]) => (
             <button key={v} onClick={() => setTab(v)} className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition max-sm:flex-1 max-sm:justify-center max-sm:px-2 ${tab === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>
-              <Icon name={v === "planning" ? "sparkles" : v === "addetta" ? "users" : v === "checklist" ? "menu" : "clipboard"} size={15} /> {t(lab)}
+              <Icon name={v === "planning" ? "sparkles" : v === "checklist" ? "menu" : "clipboard"} size={15} /> {t(lab)}
               {v === "scorte" && shopList.length > 0 && <span className="rounded-full bg-[color:var(--err)] px-1.5 text-[10px] font-bold text-white">{shopList.length}</span>}
             </button>
           ))}
@@ -423,7 +423,7 @@ export default function PuliziePage() {
         <div className="ml-auto flex items-center gap-3 max-sm:w-full max-sm:justify-end"><WeatherWidget compact /><PageHelp /></div>
       </div>
 
-      {tab === "addetta" || tab === "checklist" ? <AddettaView section={tab} /> : tab === "scorte" ? (
+      {tab === "checklist" ? <AddettaView /> : tab === "scorte" ? (
         <div className="flex flex-col gap-4">
           {/* Split: Prodotti (sinistra) · Lista della spesa (destra). Impilato su mobile. */}
           <div className="grid gap-4 lg:grid-cols-2">
