@@ -85,11 +85,11 @@ function Engine() {
   const accent = info?.structure.color || "#285f92";
   const header = (
     <div className="border-b border-line bg-surface">
-      <div className="mx-auto flex max-w-2xl items-center gap-2 px-4 pt-3 pb-2">
+      <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
         <div className="grid h-9 w-9 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: accent }}>{(info?.structure.name ?? "XN").slice(0, 2).toUpperCase()}</div>
         <div className="leading-tight"><div className="text-sm font-bold text-txt">{info?.structure.name ?? "Xenora"}</div><div className="text-[11px] text-faint">{t("Gestione prenotazione")}</div></div>
+        <div className="ml-auto"><GuestLangPicker lang={lang} setLang={setLang} label={t("Lingua")} /></div>
       </div>
-      <div className="mx-auto max-w-2xl px-4 pb-3"><GuestLangPicker lang={lang} setLang={setLang} label={t("Lingua")} /></div>
     </div>
   );
 

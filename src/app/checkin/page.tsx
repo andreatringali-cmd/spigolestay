@@ -422,13 +422,13 @@ function Engine() {
   const header = (
     <div className="border-b border-line bg-surface">
       <div className="mx-auto max-w-5xl px-4 py-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {st?.logo
             ? <img src={st.logo} alt={st?.name ?? "Logo"} className="h-9 w-auto max-w-[150px] object-contain" />
             : <div className="grid h-9 w-9 place-items-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: accent }}>{(st?.name ?? "SS").slice(0, 2).toUpperCase()}</div>}
           <div className="leading-tight"><div className="text-sm font-bold text-txt">{st?.name ?? "Xenora"}</div><div className="text-[11px] text-faint">{t("Gestisci la tua prenotazione")}</div></div>
+          <div className="ml-auto"><GuestLangPicker lang={lang} setLang={setLang} label={t("Lingua")} /></div>
         </div>
-        <div className="mt-2"><GuestLangPicker lang={lang} setLang={setLang} label={t("Lingua")} /></div>
       </div>
     </div>
   );
