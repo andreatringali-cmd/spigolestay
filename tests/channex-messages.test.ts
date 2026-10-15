@@ -68,7 +68,8 @@ test("appendOtaMessage: prenotazione di una struttura condivisa (solo in org_sta
   const org = { bookings: [{ id: "bk9", extId: "channex:B1", guestId: "G9", channel: "airbnb" }] };
   const msg = { id: "m1", text: "📎 Allegato", bookingId: "B1", propertyId: "P1", sender: "guest" as const, attachments: [{ url: "https://a.it/x.pdf", name: "x.pdf" }] };
   assert.equal(appendOtaMessage(blob, msg, 5).status, "no_booking"); // senza i dati dell'org non si trova
-  assert.deepEqual(appendOtaMessage(blob, msg, 5, [org]), { status: "added", guestId: "G9", bookingId: "bk9", channel: "Airbnb" });
+  const { details: _d9, ...res9 } = appendOtaMessage(blob, msg, 5, [org]) as { details?: unknown } & Record<string, unknown>; // details: dati per l'email, provati in ota-message-email.test.ts
+  assert.deepEqual(res9, { status: "added", guestId: "G9", bookingId: "bk9", channel: "Airbnb" });
   const t = JSON.parse(blob["spigolestay:threads:v1"]);
   assert.deepEqual(t.G9[0], { id: "chx:m1", dir: "in", text: "📎 Allegato", ts: 5, via: "Airbnb", att: msg.attachments });
   assert.equal(appendOtaMessage(blob, msg, 6, [org]).status, "duplicate");
@@ -104,7 +105,8 @@ test("appendOtaMessage: aggiunge al thread dell'ospite e non duplica", () => {
     "spigolestay:threads:v1": JSON.stringify({ G1: [{ id: "x", dir: "out", text: "hi", ts: 1 }] }),
   };
   const msg = { id: "m1", text: "Ciao", bookingId: "B1", propertyId: "P1", sender: "guest" as const };
-  assert.deepEqual(appendOtaMessage(blob, msg, 1000), { status: "added", guestId: "G1", bookingId: "bk1", channel: "Booking.com" });
+  const { details: _d1, ...res1 } = appendOtaMessage(blob, msg, 1000) as { details?: unknown } & Record<string, unknown>;
+  assert.deepEqual(res1, { status: "added", guestId: "G1", bookingId: "bk1", channel: "Booking.com" });
   const t = JSON.parse(blob["spigolestay:threads:v1"]);
   assert.equal(t.G1.length, 2);
   assert.deepEqual(t.G1[1], { id: "chx:m1", dir: "in", text: "Ciao", ts: 1000, via: "Booking.com" });

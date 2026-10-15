@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { internalFetch } from "@/lib/server-auth";
 import { logInvio } from "@/lib/invii-log";
-import { parseChannexMessage, appendOtaMessage, pickMessageStore, verifyMessageHook, HOOK_SECRET_HEADER, type InboundOtaMessage } from "@/lib/channex-messages";
+import { parseChannexMessage, appendOtaMessage, otaMessageEmailText, pickMessageStore, verifyMessageHook, HOOK_SECRET_HEADER, type InboundOtaMessage } from "@/lib/channex-messages";
 import { AI_CONCIERGE_KEY, parseAiConciergePrefs, otaAutoActive } from "@/lib/aiConcierge";
 import { conciergeAnswer, resolveStructureId, type BookingLite } from "@/lib/concierge-engine";
 import { loadOrgDatas, loadOrgData, mergeOrgData } from "@/lib/concierge-orgdata";
@@ -107,7 +107,7 @@ export async function POST(req: Request) {
     if (store.orgId) { const d = await loadOrgData(admin, store.orgId); if (d) orgDatas = [d]; }
     let triedAllOrgs = false;
 
-    let added: { guestId: string; bookingId: string; channel: string } | null = null;
+    let added: { guestId: string; bookingId: string; channel: string; details: import("@/lib/channex-messages").BookingMailDetails } | null = null;
     let savedBlob: Record<string, string> = {};
     for (let attempt = 0; attempt < 3 && !added; attempt++) {
       const { data: row } = await admin.from("app_state").select("data, rev").eq("user_id", tenantId).maybeSingle();
@@ -120,7 +120,7 @@ export async function POST(req: Request) {
       let write = admin.from("app_state").update({ data: blob, updated_at: new Date().toISOString() }).eq("user_id", tenantId);
       if (rev !== null) write = write.eq("rev", rev);
       const { data: updated } = await write.select("rev");
-      if (updated && updated.length > 0) { added = { guestId: res.guestId, bookingId: res.bookingId, channel: res.channel }; savedBlob = blob; }
+      if (updated && updated.length > 0) { added = { guestId: res.guestId, bookingId: res.bookingId, channel: res.channel, details: res.details }; savedBlob = blob; }
     }
     if (!added) { console.log("[channex webhook-messages] conflitto di rev, messaggio non salvato", msg.id); return NextResponse.json({ received: true }); }
 
@@ -141,7 +141,7 @@ export async function POST(req: Request) {
         const preview = msg.text.length > 280 ? msg.text.slice(0, 280) + "…" : msg.text;
         const r = await internalFetch(`${new URL(req.url).origin}/api/email`, {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ kind: "guest_message", to, subject: `Nuovo messaggio su ${added.channel}`, text: `Un ospite ti ha scritto su ${added.channel}:\n\n«${preview}»\n\nRispondi da ${origin}/messaggi`, booking: { structureName: "Xenora" } }),
+          body: JSON.stringify({ kind: "guest_message", to, subject: `Nuovo messaggio su ${added.channel}${added.details.guestName ? ` · ${added.details.guestName}` : ""}`, text: otaMessageEmailText(added.channel, preview, added.details, `${origin}/messaggi`), booking: { structureName: "Xenora" } }),
         });
         const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: unknown };
         await logInvio(admin, tenantId, { job: "ota_msg", ref: msg.bookingId, channel: "email", ok: !!(r.ok && j?.ok), detail: r.ok && j?.ok ? `${added.channel} → ${to}` : `errore ${r.status}: ${typeof j?.error === "string" ? j.error : JSON.stringify(j?.error ?? "")}` });

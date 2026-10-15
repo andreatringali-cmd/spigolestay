@@ -89,11 +89,48 @@ export function otaLabel(channel?: string): string {
 }
 
 export type AppendResult =
-  | { status: "added"; guestId: string; bookingId: string; channel: string }
+  | { status: "added"; guestId: string; bookingId: string; channel: string; details: BookingMailDetails }
   | { status: "duplicate" }
   | { status: "no_booking" };
 
-type BookingRef = { id?: string; extId?: string; guestId?: string; channel?: string };
+type BookingRef = { id?: string; extId?: string; guestId?: string; channel?: string; code?: string; checkIn?: string; checkOut?: string; adults?: number; children?: number; structureId?: string; roomTypeId?: string };
+
+/** Dati della prenotazione da mostrare nell'email di avviso: chi ha scritto, dove, quando. Vuoti se non si trovano. */
+export interface BookingMailDetails { guestName: string; structureName: string; roomTypeName: string; checkIn: string; checkOut: string; nights: number; adults: number; children: number; code: string }
+
+const strOf = (x: unknown) => (typeof x === "string" ? x : "");
+const nameIn = (d: DataObj, list: string, id: string | undefined, field: string) => {
+  const arr = Array.isArray(d[list]) ? (d[list] as Record<string, unknown>[]) : [];
+  return strOf(arr.find((x) => x?.id === id)?.[field]);
+};
+/** Ricava i dettagli leggibili della prenotazione dai dati (guests/structures/roomTypes) in cui è stata trovata. */
+export function bookingMailDetails(d: DataObj, b: BookingRef): BookingMailDetails {
+  const ms = (iso?: string) => { const t = Date.parse(strOf(iso)); return Number.isFinite(t) ? t : NaN; };
+  const nights = Math.max(0, Math.round((ms(b.checkOut) - ms(b.checkIn)) / 86400000)) || 0;
+  return {
+    guestName: nameIn(d, "guests", b.guestId, "fullName").replace(/ +/g, " ").trim(),
+    structureName: nameIn(d, "structures", b.structureId, "name"),
+    roomTypeName: nameIn(d, "roomTypes", b.roomTypeId, "name"),
+    checkIn: strOf(b.checkIn), checkOut: strOf(b.checkOut), nights,
+    adults: Number(b.adults) || 0, children: Number(b.children) || 0, code: strOf(b.code),
+  };
+}
+
+const dmy = (iso: string) => (/^[0-9]{4}-[0-9]{2}-[0-9]{2}/.test(iso) ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : iso);
+/** Testo dell'email "Nuovo messaggio": chi, da dove, la prenotazione e il messaggio. */
+export function otaMessageEmailText(channel: string, preview: string, d: BookingMailDetails, replyUrl: string): string {
+  const who = d.guestName || "Un ospite";
+  const lines = [`${who} ti ha scritto su ${channel}:`, "", `«${preview}»`, ""];
+  const where = [d.structureName, d.roomTypeName].filter(Boolean).join(" · ");
+  if (where) lines.push(`Struttura: ${where}`);
+  if (d.checkIn && d.checkOut) {
+    const pers = d.adults ? ` · ${d.adults} ${d.adults === 1 ? "adulto" : "adulti"}${d.children ? ` + ${d.children} ${d.children === 1 ? "bambino" : "bambini"}` : ""}` : "";
+    lines.push(`Soggiorno: ${dmy(d.checkIn)} → ${dmy(d.checkOut)}${d.nights ? ` (${d.nights} ${d.nights === 1 ? "notte" : "notti"})` : ""}${pers}`);
+  }
+  if (d.code) lines.push(`Prenotazione: ${d.code}`);
+  lines.push("", `Rispondi da ${replyUrl}`);
+  return lines.join("\n");
+}
 
 /** Riga di channex_map che interessa ai messaggi: chi ha collegato la property e l'eventuale organizzazione (struttura condivisa). */
 export interface MessageMapRow { tenant_id?: string | null; org_id?: string | null }
@@ -126,7 +163,8 @@ export function appendOtaMessage(blob: Record<string, string>, msg: InboundOtaMe
   try { data = JSON.parse(blob[DATA_KEY] || "{}"); } catch { data = {}; }
   const extId = `channex:${msg.bookingId}`;
   const find = (d: DataObj) => (Array.isArray(d.bookings) ? (d.bookings as BookingRef[]) : []).find((x) => x?.extId === extId && x.guestId);
-  const booking = orgDatas.map(find).find(Boolean) ?? find(data);
+  const srcData = orgDatas.find((d) => find(d)) ?? data; // i dati in cui la prenotazione vive (org condivisa o personale)
+  const booking = find(srcData);
   if (!booking?.guestId) return { status: "no_booking" };
   let threads: Record<string, Thread> = {};
   try { threads = JSON.parse(blob[THREADS_KEY] || "{}"); } catch { threads = {}; }
@@ -138,7 +176,7 @@ export function appendOtaMessage(blob: Record<string, string>, msg: InboundOtaMe
   if (dir === "out" && hasSameOut(list, msg.text, ts)) return { status: "duplicate" };
   threads[booking.guestId] = [...list, { id: mid, dir, text: msg.text, ts, via: otaLabel(booking.channel), ...(msg.attachments?.length ? { att: msg.attachments } : {}) }];
   blob[THREADS_KEY] = JSON.stringify(threads);
-  return { status: "added", guestId: booking.guestId, bookingId: booking.id ?? "", channel: otaLabel(booking.channel) };
+  return { status: "added", guestId: booking.guestId, bookingId: booking.id ?? "", channel: otaLabel(booking.channel), details: bookingMailDetails(srcData, booking) };
 }
 
 type Env = Record<string, string | undefined>;
