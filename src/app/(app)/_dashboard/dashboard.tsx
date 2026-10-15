@@ -33,6 +33,7 @@ import Provenienza from "./_provenienza";
 import Prenotazioni from "./_prenotazioni";
 import { D2Styles } from "./_kit";
 import { useDashboard2Dati } from "./_dati";
+import { loadChannelColor } from "@/lib/channelOverrides";
 
 const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
 const MESI_BREVI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
@@ -129,7 +130,7 @@ export default function Dashboard2() {
   const cur = useMemo(() => monthStats(live, monthStart, nextMonthStart, today, nightlyRevenue), [live, monthStart, nextMonthStart, today]);
   const prev = useMemo(() => monthStats(live, prevStart, monthStart, today, nightlyRevenue), [live, prevStart, monthStart, today]);
   const channelRows: ChannelRow[] = useMemo(() => cur.byChannel.filter((r) => r.revenue > 0 && r.channel in CHANNELS).slice(0, 5).map((r) => ({
-    channel: r.channel as Channel, label: CHANNELS[r.channel as Channel].label, color: `var(${CHANNELS[r.channel as Channel].cssVar})`,
+    channel: r.channel as Channel, label: CHANNELS[r.channel as Channel].label, color: loadChannelColor(r.channel as Channel) || `var(${CHANNELS[r.channel as Channel].cssVar})`, // il colore scelto in Canali, altrimenti quello del portale
     revenue: Math.round(r.revenue), count: r.count, share: cur.total ? Math.round((r.revenue / cur.total) * 100) : 0,
   })), [cur]);
 

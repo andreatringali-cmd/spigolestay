@@ -28,7 +28,7 @@ export default function Canali({ rows, total, monthName, delay = 0 }: { rows: Ch
             <circle cx="50" cy="50" r="38" fill="none" stroke="var(--wash)" strokeWidth="12" />
             {segs.map((s) => (
               <circle
-                key={s.i} cx="50" cy="50" r="38" fill="none" stroke={SERIES[s.i % SERIES.length]} strokeWidth={hi === s.i ? 15 : 12} strokeLinecap="butt" pathLength={100}
+                key={s.i} cx="50" cy="50" r="38" fill="none" stroke={rows[s.i].color || SERIES[s.i % SERIES.length]} strokeWidth={hi === s.i ? 15 : 12} strokeLinecap="butt" pathLength={100}
                 strokeDasharray={`${on ? s.len : 0} 100`} strokeDashoffset={-s.start} opacity={hi !== null && hi !== s.i ? 0.35 : 1}
                 style={{ transition: reduced ? "none" : `stroke-dasharray 1s cubic-bezier(.22,1,.36,1) ${200 + s.i * 120}ms, stroke-width .2s, opacity .2s`, cursor: "pointer" }}
                 onPointerEnter={() => setHi(s.i)} onPointerLeave={() => setHi(null)}
@@ -50,7 +50,7 @@ export default function Canali({ rows, total, monthName, delay = 0 }: { rows: Ch
               className="flex items-center gap-2 rounded-lg px-1.5 py-1 transition" style={{ backgroundColor: hi === i ? "var(--wash)" : undefined, opacity: hi !== null && hi !== i ? 0.55 : 1 }}
               title={`${r.label}: € ${num(r.revenue)} · ${r.count} ${r.count === 1 ? "prenotazione" : "prenotazioni"}`}
             >
-              <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: SERIES[i % SERIES.length] }} />
+              <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: r.color || SERIES[i % SERIES.length] }} />
               <ChannelLogo channel={r.channel} size={18} title={r.label} />
               <span className="min-w-0 flex-1 truncate text-xs font-semibold text-txt">{r.label}</span>
               <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-txt">{r.share}%</span>
