@@ -17,6 +17,7 @@ import { useLang } from "@/lib/i18n";
 import { computePuliziePlan, buildPuliziePlanText, ACT_LABEL, fmtLongIT, type PlanRoom } from "@/lib/puliziePlan";
 import AutoShareSettings from "@/components/pulizie/AutoShareSettings";
 import AddettaView from "@/components/pulizie/AddettaView";
+import AddettaPurchases from "@/components/pulizie/AddettaPurchases";
 import AddettaAgenda from "@/components/pulizie/AddettaAgenda";
 import { useAccess } from "@/lib/access";
 import { isPulizieOnly } from "@/lib/pulizie-addetta";
@@ -104,18 +105,18 @@ export default function PuliziePage() {
   const roomHasIssue = (unitId: string) => openIssues.some((i) => i.unitId === unitId && i.date === date);
 
   // Scorte / lista della spesa (prodotti ricorrenti).
-  const [tab, setTab] = useState<"planning" | "scorte" | "addetta">("planning");
+  const [tab, setTab] = useState<"planning" | "scorte" | "addetta" | "checklist">("planning");
   const [agSpan, setAgSpan] = useState<"3" | "7" | "14">("7"); // vista elenco: quanti giorni mostrare
   const [agOpen, setAgOpen] = useState({ open: false, n: 0 }); // vista elenco: apri/chiudi tutti i giorni
-  // Vista "Addetta": si apre da sola per chi ha accesso SOLO a Pulizie (la signora) o con /pulizie?tab=addetta.
-  const { user: accessUser } = useAccess();
+  // Vista "Addetta": si apre da sola per chi ha accesso SOLO a Pulizie (la signora) o con /pulizie?tab=checklist | addetta.
+  const { user: accessUser, level } = useAccess();
   const pulOnly = isPulizieOnly(accessUser?.perms);
   const tabInit = useRef(false);
   useEffect(() => {
     if (tabInit.current) return;
-    let want = false;
-    try { want = new URLSearchParams(window.location.search).get("tab") === "addetta"; } catch {}
-    if (want || pulOnly) { tabInit.current = true; setTab("addetta"); }
+    let want: "addetta" | "checklist" | null = null;
+    try { const q = new URLSearchParams(window.location.search).get("tab"); if (q === "addetta" || q === "checklist") want = q; } catch {}
+    if (want || pulOnly) { tabInit.current = true; setTab(want ?? "checklist"); }
   }, [pulOnly]);
   const [stock, setStock] = useState<Prod[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -412,9 +413,9 @@ export default function PuliziePage() {
       {/* Selettore: Pulizie / Scorte · meteo e "?" in linea, a destra */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="inline-flex rounded-xl border border-line bg-surface p-0.5 shadow-sm max-sm:w-full">
-          {([["planning", "Pulizie"], ["scorte", "Scorte & spesa"], ["addetta", "Addetta"]] as ["planning" | "scorte" | "addetta", string][]).map(([v, lab]) => (
+          {([["planning", "Pulizie"], ["scorte", "Scorte & spesa"], ["addetta", "Addetta"], ["checklist", "Checklist"]] as ["planning" | "scorte" | "addetta" | "checklist", string][]).map(([v, lab]) => (
             <button key={v} onClick={() => setTab(v)} className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition max-sm:flex-1 max-sm:justify-center max-sm:px-2 ${tab === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>
-              <Icon name={v === "planning" ? "sparkles" : v === "addetta" ? "users" : "clipboard"} size={15} /> {t(lab)}
+              <Icon name={v === "planning" ? "sparkles" : v === "addetta" ? "users" : v === "checklist" ? "menu" : "clipboard"} size={15} /> {t(lab)}
               {v === "scorte" && shopList.length > 0 && <span className="rounded-full bg-[color:var(--err)] px-1.5 text-[10px] font-bold text-white">{shopList.length}</span>}
             </button>
           ))}
@@ -422,7 +423,7 @@ export default function PuliziePage() {
         <div className="ml-auto flex items-center gap-3 max-sm:w-full max-sm:justify-end"><WeatherWidget compact /><PageHelp /></div>
       </div>
 
-      {tab === "addetta" ? <AddettaView /> : tab === "scorte" ? (
+      {tab === "addetta" || tab === "checklist" ? <AddettaView section={tab} /> : tab === "scorte" ? (
         <div className="flex flex-col gap-4">
           {/* Split: Prodotti (sinistra) · Lista della spesa (destra). Impilato su mobile. */}
           <div className="grid gap-4 lg:grid-cols-2">
@@ -509,6 +510,8 @@ export default function PuliziePage() {
             <p className="mt-2 text-[11px] text-faint">{t("Segna lo stato del prodotto: gli esauriti e in esaurimento entrano da soli nella lista della spesa. Menu ⋯ per riassortire, modificare o eliminare.")}</p>
           </div>
           </div>
+          {/* Acquisti: il materiale comprato (carta igienica, prodotti…), con riepilogo per periodo */}
+          <AddettaPurchases structures={scopeStructures} canEdit={level("pulizie") === "edit"} activeStructureId={activeStructureId} />
         </div>
       ) : (<>
 
