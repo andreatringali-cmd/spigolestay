@@ -330,6 +330,12 @@ export default function CassaPage() {
     setPreset("custom"); setFrom(f); setTo(l); setTipo(k);
     setTimeout(() => { try { document.getElementById("cassa-filtri")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* niente */ } }, 50);
   };
+  // Clic su una categoria del grafico: il registro mostra solo le uscite di quella categoria (di nuovo = toglie il filtro).
+  const pickCat = (key: string) => {
+    if (catF === key) { setCatF(""); setTipo("all"); return; }
+    setCatF(key); setTipo("out");
+    setTimeout(() => { try { document.getElementById("cassa-filtri")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* niente */ } }, 50);
+  };
   const monthOn = (ym: string) => { const [y, m] = ym.split("-").map(Number); return from === ym + "-01" && to === ym + "-" + pad(new Date(y, m, 0).getDate()); };
   const maxTrend = Math.max(1, ...trend.flatMap((t) => [t.in, t.out]));
   const axis = niceAxis(maxTrend); // asse Y a 4 intervalli con massimo "tondo"
@@ -509,13 +515,13 @@ export default function CassaPage() {
           {perCat.length === 0 ? <p className="text-sm text-faint">{t("Nessuna uscita nel periodo.")}</p> : (
             <div className="flex max-h-[172px] flex-col gap-2.5 overflow-y-auto pr-2">
               {perCat.map(({ cat, v }) => (
-                <div key={cat!.key}>
+                <button key={cat!.key} type="button" onClick={() => pickCat(cat!.key)} aria-pressed={catF === cat!.key} title={t("clicca per filtrare")} className={`block w-full rounded-md px-1 py-0.5 text-left transition hover:bg-wash ${catF === cat!.key ? "bg-wash ring-1 ring-[color:var(--focus)]" : ""}`}>
                   <div className="mb-1 flex items-center justify-between text-xs">
                     <span className="flex items-center gap-1.5 text-dim"><span style={{ color: cat!.color }}><CatIcon name={cat!.icon} size={15} /></span>{t(cat!.label)}</span>
                     <span className="font-mono text-txt">{eur(v)}</span>
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-wash"><div className="h-full rounded-full" style={{ width: `${(v / maxCat) * 100}%`, backgroundColor: cat!.color }} /></div>
-                </div>
+                </button>
               ))}
             </div>
           )}
