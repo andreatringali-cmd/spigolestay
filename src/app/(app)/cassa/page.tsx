@@ -21,7 +21,8 @@ import { shiftISO } from "@/lib/dates";
 import { fmtDMY } from "@/lib/dates";
 import ChannelLogo from "@/components/ChannelLogo";
 import { CHANNELS, type Channel } from "@/lib/types";
-import { type PayoutMode, type PayoutSettings, PAYOUT_CHANNELS, WEEKDAY_LABELS, cleanRule, loadPayoutSettings, savePayoutSettings } from "@/lib/payouts";
+import { type PayoutMode, type PayoutSettingsMap, PAYOUT_CHANNELS, WEEKDAY_LABELS, DEFAULT_PAYOUTS_ID, cleanRule, isGroupedPayout, loadPayoutSettings, payoutSettingsFor, savePayoutSettings } from "@/lib/payouts";
+import { formatDecimalIT, parseDecimalIT } from "@/lib/num-it";
 import { useTenantId } from "@/lib/tenant";
 import { useSyncedList } from "@/components/pulizie/useSyncedList";
 import { KEY_ORDERS, type PulizieOrder } from "@/lib/pulizie-addetta";
@@ -82,13 +83,29 @@ export default function CassaPage() {
   const [conti, setConti] = useState<ContoDef[]>(() => (typeof window === "undefined" ? [...DEFAULT_CONTI] : loadConti())); // conti di base + quelli aggiunti (più banche…)
   const CONTI = conti;
   // Impostazioni incassi per canale: quando i soldi arrivano davvero sul conto (arrivo, check-out, bonifico settimanale o mensile).
-  const [payouts, setPayouts] = useState<PayoutSettings>(() => (typeof window === "undefined" ? {} : loadPayoutSettings()));
+  const [payouts, setPayouts] = useState<PayoutSettingsMap>(() => (typeof window === "undefined" ? {} : loadPayoutSettings()));
   const [payoutModal, setPayoutModal] = useState(false);
   const [overrides, setOverrides] = useState<OccOverrides>(() => (typeof window === "undefined" ? {} : loadOverrides())); // righe modificate per singola scadenza
   const [occCtx, setOccCtx] = useState<{ key: string; ruleId: string; orig: { amount: number; date: string; desc: string; cat: string; conto: string } } | null>(null);
   const [openPayouts, setOpenPayouts] = useState<Set<string>>(() => new Set()); // bonifici aperti nell'elenco
-  const setPayoutRule = (ch: Channel, patch: Record<string, unknown>) => { const next = { ...payouts, [ch]: cleanRule({ ...(payouts[ch] ?? { mode: "arrival" }), ...patch }) }; setPayouts(next); savePayoutSettings(next); };
-  const groupChannels = useMemo(() => new Set<string>(PAYOUT_CHANNELS.filter((c) => payouts[c]?.mode === "weekly" || payouts[c]?.mode === "monthly")), [payouts]);
+  // Le impostazioni incassi sono PER STRUTTURA: nella finestra si sceglie la struttura (di partenza la attiva, se è una sola; altrimenti la prima).
+  const [payoutStruct, setPayoutStruct] = useState("");
+  const payoutSid = structures.some((x) => x.id === payoutStruct) ? payoutStruct : (structures.some((x) => x.id === activeStructureId) ? activeStructureId : (structures[0]?.id ?? ""));
+  const payoutKey = payoutSid || DEFAULT_PAYOUTS_ID;
+  const payoutsOfModal = payoutSettingsFor(payouts, payoutSid);
+  const openPayoutModal = () => { setPayoutStruct(""); setPayoutModal(true); };
+  const commitPayouts = (next: PayoutSettingsMap) => { setPayouts(next); savePayoutSettings(next); };
+  // Al primo cambio una struttura che eredita le predefinite ne crea la copia propria.
+  const setPayoutRule = (ch: Channel, patch: Record<string, unknown>) => { const base = payoutSettingsFor(payouts, payoutSid); commitPayouts({ ...payouts, [payoutKey]: { ...base, [ch]: cleanRule({ ...(base[ch] ?? { mode: "arrival" }), ...patch }) } }); };
+  const copyPayoutsToAll = async () => {
+    if (!(await ask({ title: t("Copia su tutte le strutture"), message: `${t("Le impostazioni di")} «${getStructure(payoutSid)?.name ?? ""}» ${t("sostituiranno quelle di tutte le altre strutture.")}`, confirmLabel: t("Copia") }))) return;
+    const cur = payoutSettingsFor(payouts, payoutSid);
+    const next: PayoutSettingsMap = { ...payouts, [DEFAULT_PAYOUTS_ID]: { ...cur } };
+    for (const x of structures) next[x.id] = { ...cur };
+    commitPayouts(next); toast(t("Impostazioni copiate su tutte le strutture"), "success");
+  };
+  // Il bonifico unico riunisce solo prenotazioni della stessa struttura: quali canali raggruppare dipende dalla struttura della riga.
+  const groupPayout = useMemo(() => (channel: string, structureId: string | undefined) => isGroupedPayout(payouts, channel, structureId), [payouts]);
   const [principal, setPrincipalState] = useState<string>(() => (typeof window === "undefined" ? "banca" : loadContiPrefs().principal)); // dove arrivano i soldi delle prenotazioni OTA
   useEffect(() => { try { const r = localStorage.getItem(CATS_KEY); if (r) { const saved = JSON.parse(r); const customs = saved.filter((c: Cat) => c.custom); setCats([...DEFAULT_CATS, ...customs]); } } catch {} }, []);
   const saveCats = (list: Cat[]) => { setCats(list); try { localStorage.setItem(CATS_KEY, JSON.stringify(list.filter((c) => c.custom))); } catch {} };
@@ -216,7 +233,7 @@ export default function CassaPage() {
   const ledgerOrd = (x: Mov) => ledger.order.get(x.id) ?? 0;
   const bkOf = (x: Mov) => (x.ref && /^(auto-in|auto-comm|fc-in)-/.test(x.id) ? bookings.find((b) => b.id === x.ref) : undefined); // prenotazione da cui nasce il movimento
   const rowsOrdered = [...rows].sort((a, b) => { const d = a.date < b.date ? -1 : a.date > b.date ? 1 : ledgerOrd(a) - ledgerOrd(b); return futureView ? d : -d; });
-  const listRows = groupBookingRows(rowsOrdered, groupChannels);
+  const listRows = groupBookingRows(rowsOrdered, groupPayout);
   // cella "saldo conti" (riusata dalle voci bonifico)
   const balCell = (bal: number | null, inc: boolean) => (
     <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2">
@@ -230,7 +247,7 @@ export default function CassaPage() {
   const [opening, setOpening] = useState<{ date: string; amounts: Record<string, string>; newName: string; startOfDay: boolean } | null>(null);
   const openOpening = () => {
     const amounts: Record<string, string> = {};
-    for (const c of CONTI) amounts[c.key] = balances[c.key]?.since ? String(balances[c.key].start ?? "").replace(".", ",") : "";
+    for (const c of CONTI) amounts[c.key] = balances[c.key]?.since ? formatDecimalIT(balances[c.key].start ?? null) : "";
     setOpening({ date: todayISO(), amounts, newName: "", startOfDay: false });
   };
   const addConto = () => {
@@ -277,8 +294,8 @@ export default function CassaPage() {
     for (const c of CONTI) {
       const txt = (opening.amounts[c.key] ?? "").trim();
       if (!txt) continue;
-      const raw = parseFloat(txt.replace(/\s/g, "").replace(",", "."));
-      if (!Number.isFinite(raw)) continue;
+      const raw = parseDecimalIT(txt);
+      if (raw === null) continue;
       newMovs.push({ id: uid(), date, kind: raw >= 0 ? "in" : "out", cat: OPENING_CAT, desc: `${t("Saldo di partenza")} · ${c.label}`, amount: roundCents(Math.abs(raw)), conto: c.key });
       olds.push(...manual.filter((x) => x.cat === OPENING_CAT && x.conto === c.key)); // il nuovo sostituisce quello di prima
     }
@@ -560,7 +577,7 @@ export default function CassaPage() {
         </select>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <button onClick={toggleCharts} title={chartsOn ? t("Nascondi i grafici") : t("Mostra i grafici")} className={`grid h-8 w-8 place-items-center rounded-lg border transition ${chartsOn ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_12%,transparent)] text-focus" : "border-line text-dim hover:bg-wash hover:text-txt"}`}><Icon name="chart" size={15} /></button>
-          <button onClick={() => setPayoutModal(true)} title={t("Impostazioni incassi")} aria-label={t("Impostazioni incassi")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></button>
+          <button onClick={openPayoutModal} title={t("Impostazioni incassi")} aria-label={t("Impostazioni incassi")} className="grid h-8 w-8 place-items-center rounded-lg border border-line text-dim transition hover:bg-wash hover:text-txt"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></button>
           <button onClick={openNewMov} className="rounded-lg bg-focus px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">＋ {t("Nuovo movimento")}</button>
           <ExportMenu onExcel={doExcel} onPdf={exportPdf} />
         </div>
@@ -729,7 +746,7 @@ export default function CassaPage() {
                   {renaming?.key === c.key
                     ? <input autoFocus value={renaming.label} maxLength={30} onChange={(e) => setRenaming({ key: c.key, label: e.target.value })} onBlur={renameConto} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); renameConto(); } if (e.key === "Escape") setRenaming(null); }} className="w-32 shrink-0 rounded-lg border border-focus bg-paper px-2 py-1.5 text-sm text-txt outline-none" />
                     : <span className="w-32 shrink-0 truncate text-sm text-txt" title={t(c.label)}>{t(c.label)}</span>}
-                  <input aria-label={`${t("Importo")} ${c.label}`} inputMode="decimal" value={opening.amounts[c.key] ?? ""} onChange={(e) => setOpening((o) => (o ? { ...o, amounts: { ...o.amounts, [c.key]: e.target.value } } : o))} placeholder="—" className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-right font-mono text-sm text-txt outline-none focus:border-focus" />
+                  <input aria-label={`${t("Importo")} ${c.label}`} inputMode="decimal" value={opening.amounts[c.key] ?? ""} onBlur={(e) => { const v = parseDecimalIT(e.target.value); if (v !== null) setOpening((o) => (o ? { ...o, amounts: { ...o.amounts, [c.key]: formatDecimalIT(v) } } : o)); }} onChange={(e) => setOpening((o) => (o ? { ...o, amounts: { ...o.amounts, [c.key]: e.target.value } } : o))} placeholder="—" className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-right font-mono text-sm text-txt outline-none focus:border-focus" />
                   <span className="text-xs text-faint">€</span>
                   <button type="button" onClick={() => moveConto(c.key, -1)} disabled={conti[0]?.key === c.key} title={t("Sposta su")} aria-label={`${t("Sposta su")} ${c.label}`} className="shrink-0 rounded p-0.5 text-faint hover:bg-wash hover:text-txt disabled:opacity-30">↑</button>
                   <button type="button" onClick={() => moveConto(c.key, 1)} disabled={conti[conti.length - 1]?.key === c.key} title={t("Sposta giù")} aria-label={`${t("Sposta giù")} ${c.label}`} className="shrink-0 rounded p-0.5 text-faint hover:bg-wash hover:text-txt disabled:opacity-30">↓</button>
@@ -768,10 +785,16 @@ export default function CassaPage() {
           <button aria-label={t("Chiudi")} onClick={() => setPayoutModal(false)} className="absolute inset-0 bg-black/40" />
           <div className="relative max-h-[88dvh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-surface p-4 shadow-2xl">
             <div className="mb-1 flex items-center justify-between"><h2 className="font-display text-lg font-bold text-txt">{t("Impostazioni incassi")}</h2><button onClick={() => setPayoutModal(false)} className="rounded px-2 py-1 text-dim hover:bg-wash">✕</button></div>
-            <p className="mb-2 text-xs text-dim">{t("Quando ogni portale ti paga: Cassa registra l'incasso nel giorno in cui arriva sul conto e, per i bonifici, riunisce le prenotazioni dello stesso pagamento. Valgono per tutte le strutture.")}</p>
+            <p className="mb-2 text-xs text-dim">{t("Quando ogni portale ti paga: Cassa registra l'incasso nel giorno in cui arriva sul conto e, per i bonifici, riunisce le prenotazioni dello stesso pagamento. Valgono per la struttura scelta.")}</p>
+            {structures.length > 0 && (
+              <div className="mb-2 flex items-end gap-2">
+                <label className="min-w-0 flex-1"><span className="text-xs text-dim">{t("Struttura")}</span><select value={payoutSid} onChange={(e) => setPayoutStruct(e.target.value)} className="mt-0.5 w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">{structures.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+                {structures.length > 1 && <button onClick={copyPayoutsToAll} className="shrink-0 rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-dim hover:bg-wash">{t("Copia su tutte le strutture")}</button>}
+              </div>
+            )}
             <div className="flex flex-col divide-y divide-[color:var(--line)] rounded-xl border border-line px-3">
               {PAYOUT_CHANNELS.map((ch) => {
-                const rule = payouts[ch] ?? { mode: "arrival" as PayoutMode };
+                const rule = payoutsOfModal[ch] ?? { mode: "arrival" as PayoutMode };
                 const wd = rule.weekday ?? 4, md = rule.monthDay ?? 1, dd = rule.days ?? 0;
                 const tip = rule.mode === "arrival" ? t("I soldi risultano incassati il giorno dell'arrivo.")
                   : rule.mode === "checkout" ? (dd ? `${t("Incasso")} ${dd} ${t("giorni dopo il check-out dell'ospite (es. carta virtuale).")}` : t("Incasso il giorno del check-out (es. carta virtuale)."))
