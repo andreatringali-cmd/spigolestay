@@ -563,6 +563,12 @@ export default function CassaPage() {
           <span className="text-xs text-faint">→</span>
           <DateField value={to} onChange={(v) => { setTo(v); setPreset("custom"); }} title={t("Al")} placeholder={t("Al")} className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs transition hover:border-focus" />
         </div>
+        {/* Entrate / Uscite: sempre a vista (le altre viste per tipo restano nel menu qui accanto) */}
+        <div role="group" aria-label={t("Entrate e uscite")} className="flex items-center rounded-lg border border-line p-0.5">
+          {([["all", "Tutti", "var(--txt)"], ["in", "Entrate", "var(--ok)"], ["out", "Uscite", "var(--err)"]] as const).map(([k, lab, col]) => (
+            <button key={k} type="button" onClick={() => setTipo(k)} aria-pressed={tipo === k} className={`rounded-md px-2.5 py-1 text-sm font-semibold transition ${tipo === k ? "bg-focus text-white" : "hover:bg-wash"}`} style={tipo === k ? undefined : { color: col }}>{t(lab)}</button>
+          ))}
+        </div>
         <select aria-label={t("Tipo di movimento")} value={tipo} onChange={(e) => setTipo(e.target.value as typeof tipo)} className={`rounded-lg border bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus ${tipo === "all" ? "border-line" : "border-focus"}`}>
           <option value="all">{t("Tutti i movimenti")}</option>
           <option value="in">{t("Solo entrate")}</option>
