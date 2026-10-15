@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import { AV_COLORS } from "@/lib/users";
@@ -8,6 +8,7 @@ import { useLang } from "@/lib/i18n";
 import { PageHeader } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import { planStructureLimit, planName } from "@/lib/plan";
+import { supabase } from "@/lib/supabase";
 
 export default function StrutturePage() {
   const router = useRouter();
@@ -20,12 +21,36 @@ export default function StrutturePage() {
   // Rispetta il filtro struttura in alto a destra: se è selezionata una singola struttura
   // mostra solo quella; con "Tutte" le mostra tutte.
   const visible = activeStructureId !== "all" ? structures.filter((x) => x.id === activeStructureId) : structures;
-  const owned = visible.filter((x) => !x.orgId);
-  const shared = visible.filter((x) => !!x.orgId);
+  // Ogni struttura ha UN proprietario. "Di mia proprietà": sono io il proprietario. "Condivise": un altro proprietario l'ha condivisa con me (socio).
+  // "Assegnate a te": sono staff di chi ne è proprietario (collaboratore invitato da "Utenti"): lavoro sulle sue strutture con i permessi che mi ha dato.
+  const [orgInfo, setOrgInfo] = useState<Record<string, { role: string; ownerEmail: string }>>({});
+  useEffect(() => {
+    if (!supabase) return;
+    let off = false;
+    (async () => {
+      try {
+        const token = (await supabase!.auth.getSession())?.data.session?.access_token;
+        if (!token) return;
+        const r = await fetch("/api/org/access", { headers: { Authorization: `Bearer ${token}` } });
+        const j = (await r.json().catch(() => ({}))) as { orgs?: { structureId?: string; role?: string; ownerEmail?: string }[] };
+        const map: Record<string, { role: string; ownerEmail: string }> = {};
+        for (const o of j.orgs ?? []) if (o.structureId) map[o.structureId] = { role: o.role || "member", ownerEmail: o.ownerEmail || "" };
+        if (!off) setOrgInfo(map);
+      } catch { /* resta il raggruppamento provvisorio */ }
+    })();
+    return () => { off = true; };
+  }, []);
+  const isStaff = (() => { try { return typeof window !== "undefined" && localStorage.getItem("xn-collab") === "1"; } catch { return false; } })();
+  const mine = (x: typeof structures[number]) => !x.orgId || orgInfo[x.id]?.role === "owner";
+  const owned = visible.filter(mine);
+  const others = visible.filter((x) => !mine(x));
+  const shared = isStaff ? [] : others;
+  const assigned = isStaff ? others : [];
   const groups = [
     { key: "own", title: t("Di mia proprietà"), desc: "", list: owned, empty: t("Nessuna struttura di tua proprietà.") },
-    { key: "shared", title: t("Condivise"), desc: "", list: shared, empty: t("Nessuna struttura condivisa. Per condividerne una, apri la scheda della struttura e invita il socio.") },
-  ];
+    { key: "shared", title: t("Condivise con me"), desc: "", list: shared, empty: t("Nessuna struttura condivisa con te da un altro proprietario.") },
+    { key: "assigned", title: t("Assegnate a te"), desc: "", list: assigned, empty: "" },
+  ].filter((g) => g.list.length > 0 || (g.key === "own" && !isStaff) || (g.key === "shared" && !isStaff));
 
   const renderRow = (s: typeof structures[number]) => {
     const sUnits = units.filter((u) => u.structureId === s.id);
@@ -38,7 +63,7 @@ export default function StrutturePage() {
         <td className="px-3 py-2.5">
           <div className="flex items-center gap-2.5">
             <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-xs font-bold text-white" style={{ backgroundColor: color }}>{s.logo ? <img src={s.logo} alt="" className="h-full w-full object-cover" /> : s.name.slice(0, 2).toUpperCase()}</div>
-            <div className="min-w-0"><div className="truncate font-medium text-txt">{s.name}</div></div>
+            <div className="min-w-0"><div className="truncate font-medium text-txt">{s.name}</div>{s.orgId && orgInfo[s.id] && orgInfo[s.id].role !== "owner" && orgInfo[s.id].ownerEmail && <div className="truncate text-[11px] text-faint">{t("Proprietario")}: {orgInfo[s.id].ownerEmail}</div>}</div>
           </div>
         </td>
         <td className="truncate px-3 py-2.5 text-dim">{s.city || <span className="text-faint">—</span>}</td>
