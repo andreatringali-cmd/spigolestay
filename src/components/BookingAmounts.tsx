@@ -2,6 +2,7 @@ import type { Booking, Structure } from "@/lib/types";
 import { bookingPaidTotal, cityTaxOf, cityTaxPayers, commissionBaseOf, commissionOf, commissionShareOf, nettoOf, paymentFeeOf } from "@/lib/booking";
 import { nights } from "@/lib/dates";
 import { eur } from "@/lib/format";
+import { effectivePayMethod, PAY_METHOD_LABEL } from "@/lib/pay-method";
 
 // Riepilogo importi compatto di una prenotazione (poche righe, una riga per concetto): come si arriva al totale (solo se oltre al soggiorno
 // c'è altro), incassato / da incassare, tassa di soggiorno (riscossa a parte) e commissione OTA con il netto. Il totale in grande sta nella riga.
@@ -18,11 +19,13 @@ export default function BookingAmounts({ b, structure }: { b: Booking; structure
   const tax = cityTaxOf(structure, cityTaxPayers(structure, b), n, acc, b.cityTaxExempt);
   const comm = commissionOf(b);
   const payFee = paymentFeeOf(b);
+  const pm = effectivePayMethod(b).method;
+  const pmTxt = pm ? ` · ${PAY_METHOD_LABEL[pm].toLowerCase()}` : "";
   const parts: string[] = [];
   if (clean > 0 || extras.length > 0 || (b.parking && !hasParkingExtra)) {
     parts.push(`Soggiorno ${eur(acc)}`);
     if (clean > 0) parts.push(`Pulizia ${eur(clean)}`);
-    for (const e of extras) parts.push(`${e.name || "Extra"}${e.qty && e.qty > 1 ? ` ×${e.qty}` : ""} ${eur(e.price || 0)}`);
+    for (const e of extras) parts.push(`${e.name || "Extra"}${e.qty && e.qty > 1 && !/×\s?\d+$/u.test(e.name || "") ? ` ×${e.qty}` : ""} ${eur(e.price || 0)}`);
     if (b.parking && !hasParkingExtra) parts.push("Parcheggio incluso");
   }
   const Row = ({ k, v, color, strong, title }: { k: string; v: string; color?: string; strong?: boolean; title?: string }) => (
@@ -35,10 +38,10 @@ export default function BookingAmounts({ b, structure }: { b: Booking; structure
     <div className="flex w-full flex-col gap-0.5 text-[11px] leading-tight">
       {parts.length > 0 && <div className="text-faint" title="Come si arriva al totale">{parts.join(" + ")}</div>}
       {resid <= 0.005
-        ? <Row k="Incassato" v={`${eur(paid)} · saldato ✓`} color="var(--ok)" strong />
+        ? <Row k={`Incassato${pmTxt}`} v={`${eur(paid)} · saldato ✓`} color="var(--ok)" strong />
         : paid > 0
-          ? <Row k="Incassato" v={`${eur(paid)} · mancano ${eur(resid)}`} color="var(--err)" strong />
-          : <Row k="Da incassare" v={eur(resid)} color="var(--err)" strong />}
+          ? <Row k={`Incassato${pmTxt}`} v={`${eur(paid)} · mancano ${eur(resid)}`} color="var(--err)" strong />
+          : <Row k={`Da incassare${pmTxt}`} v={eur(resid)} color="var(--err)" strong />}
       {b.depositPaid && resid > 0.005 && <Row k="Caparra" v="ricevuta ✓" color="var(--ok)" />}
       {tax > 0 && <Row k="Tassa (a parte)" v={`${eur(tax)} · ${b.cityTaxPaid ? "incassata ✓" : "da incassare"}`} color={b.cityTaxPaid ? "var(--ok)" : "var(--warn)"} title="Non rientra nel totale: si riscuote in struttura" />}
       {comm > 0 && <Row k={`Comm. ${commissionShareOf(b)}%`} v={`− ${eur(comm)} · netto ${eur(nettoOf(b))}`} color="var(--dim)" title={payFee > 0 ? `Commissione ${eur(commissionBaseOf(b))} + costo d'incasso ${eur(payFee)} (Payment charge), e quanto resta a te` : "Commissione dell'OTA e quanto resta a te"} />}

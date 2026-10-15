@@ -9,8 +9,14 @@ import { bookingCode } from "@/lib/bookingCode";
 import { sendVoucher, voucherPayload } from "@/lib/mailer";
 import { captureA4ToPdfBlob, blobToBase64 } from "@/lib/pdf-capture";
 import VoucherDoc from "@/components/pdf/VoucherDoc";
+import { guestLangOf } from "@/lib/guest-lang";
 import { buildGuestLink, buildGroupGuestLink, guideMessage, shortenGuideLink, shortenLink } from "@/lib/guestlink";
-import { CHANNELS, type Channel, type BookingStatus, type Structure } from "@/lib/types";
+import { CHANNELS, type Booking, type Channel, type BookingStatus, type Structure } from "@/lib/types";
+import NumInput from "@/components/NumInput";
+import BookingExtrasPicker from "@/components/booking/BookingExtrasPicker";
+import { entriesTotal } from "@/lib/booking-extras";
+import { effectivePayMethod, otaPayDetail, MANUAL_PAY_METHODS, PAY_METHOD_LABEL, isPayMethod, type PayMethod } from "@/lib/pay-method";
+import { roundCents } from "@/lib/money";
 import { nights, parseISO, shiftISO } from "@/lib/dates";
 import { cityTaxOf, commissionBaseOf, commissionPctOf, defaultCommissionInfo, nettoOf, paymentFeeOf } from "@/lib/booking";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
@@ -59,6 +65,7 @@ interface Form {
   cityTaxExempt: boolean; cityTaxPaid: boolean; depositPaid: boolean; parking: boolean;
   note: string; color: string;
   lastName: string; firstName: string; email: string; phone: string; country: string;
+  extras: NonNullable<Booking["extras"]>; paymentMethod: PayMethod | "";
 }
 
 const inputCls = "w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus";
@@ -93,9 +100,7 @@ export default function BookingDrawer() {
   const [checkinQr, setCheckinQr] = useState("");
   const [expanded, setExpanded] = useState(false); // false = anteprima, true = scheda intera
   const [qa, setQa] = useState<null | "incasso" | "extra">(null); // azione rapida aperta
-  const [incassoAmt, setIncassoAmt] = useState("");
-  const [extraName, setExtraName] = useState("");
-  const [extraPrice, setExtraPrice] = useState("");
+  const [incassoAmt, setIncassoAmt] = useState<number | null>(null);
   const checkinRef = useRef<HTMLDivElement>(null);
   const voucherPdfRef = useRef<HTMLDivElement>(null);
 
@@ -116,6 +121,7 @@ export default function BookingDrawer() {
       lastName: g?.lastName ?? (g?.fullName ? g.fullName.split(" ").slice(1).join(" ") : ""),
       firstName: g?.firstName ?? (g?.fullName ? g.fullName.split(" ")[0] : ""),
       email: g?.email ?? "", phone: g?.phone ?? "", country: g?.country ?? "",
+      extras: (booking.extras ?? []).map((x) => ({ ...x })), paymentMethod: isPayMethod(booking.paymentMethod) ? booking.paymentMethod : "",
     });
   };
 
@@ -196,6 +202,7 @@ export default function BookingDrawer() {
       [`Soggiorno · ${nView} ${nView === 1 ? "notte" : "notti"} (${fmtDate(booking.checkIn)} → ${fmtDate(booking.checkOut)})`, money(accV)],
       ["Pulizia finale", money(cleanV)],
     ];
+    for (const e of extrasList) if (e.price || e.name) rows.push([e.name || "Extra", money(e.price || 0)]);
     if (taxV > 0) rows.push(["Tassa di soggiorno", money(taxV)]);
     const paidV = Math.max(0, totalV - balanceV);
     const accent = structure?.photoColor || "#285f92";
@@ -286,10 +293,31 @@ export default function BookingDrawer() {
   };
 
   // ─────────────── VISTA (sola lettura) ───────────────
-  const registraIncasso = () => { const amt = Math.round(Number(incassoAmt) * 100) / 100; if (!amt) return; updateBooking(booking.id, { paid: paidV + amt }); setIncassoAmt(""); setQa(null); };
-  const aggiungiExtra = () => { const p = Math.round(Number(extraPrice) * 100) / 100; if (!extraName.trim() || !p) return; updateBooking(booking.id, { extras: [...extrasList, { name: extraName.trim(), price: p }] }); setExtraName(""); setExtraPrice(""); setQa(null); };
+  const registraIncasso = () => { const amt = roundCents(incassoAmt ?? 0); if (!amt) return; updateBooking(booking.id, { paid: roundCents(paidV + amt) }); setIncassoAmt(null); setQa(null); };
   const removeExtra = (i: number) => updateBooking(booking.id, { extras: extrasList.filter((_, j) => j !== i) });
   const gestisciCheckin = () => { setQa(null); setTimeout(() => checkinRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); };
+  // Extra della prenotazione: catalogo della struttura (+ animali, culla, letto suggeriti) con quantità; salva subito.
+  const extraPanel = qa === "extra" && (
+    <div className="rounded-lg border border-line bg-wash p-2">
+      <div className="mb-1.5 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wide text-faint">{t("Extra")}</span><button onClick={() => setQa(null)} className="text-xs text-dim hover:text-txt">{t("Chiudi")} ✕</button></div>
+      <BookingExtrasPicker entries={extrasList} onChange={(next) => updateBooking(booking.id, { extras: next })} catalog={structure?.extras} stay={booking} onConfigure={() => { closeBooking(); router.push("/upselling?tab=catalogo"); }} />
+    </div>
+  );
+  // Come è stato incassato: scelto dal gestore, oppure "Incasso OTA" in automatico quando l'OTA incassa dall'ospite.
+  const pmView = effectivePayMethod(booking);
+  const pmDetail = pmView.method === "ota" ? otaPayDetail(booking) : undefined;
+  const isOtaChannelV = booking.channel !== "direct" && booking.channel !== "blocked";
+  const payMethodRow = (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-sm text-dim">{t("Incassato con")}</span>
+      {pmView.auto
+        ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }} title={t("Impostato in automatico: l'OTA incassa dall'ospite e poi versa alla struttura")}>{t(PAY_METHOD_LABEL.ota)}{pmDetail ? ` · ${t(pmDetail)}` : ""} · {t("automatico")}</span>
+        : <select value={pmView.method ?? ""} onChange={(e) => updateBooking(booking.id, { paymentMethod: isPayMethod(e.target.value) ? e.target.value : undefined })} aria-label={t("Incassato con")} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs text-txt outline-none focus:border-focus">
+            <option value="">{t("Da indicare")}</option>
+            {[...MANUAL_PAY_METHODS, ...(isOtaChannelV ? (["ota"] as PayMethod[]) : [])].map((m) => <option key={m} value={m}>{t(PAY_METHOD_LABEL[m])}</option>)}
+          </select>}
+    </div>
+  );
   const qaBtn = "flex flex-col items-center gap-1 rounded-xl border border-line bg-paper px-2 py-2.5 text-[11px] font-semibold text-txt transition hover:border-focus hover:bg-wash";
 
   const contactIcons = (
@@ -342,6 +370,8 @@ export default function BookingDrawer() {
         </div>
         <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Incassato")}</span><span className="font-mono text-sm font-semibold tabular-nums" style={{ color: "var(--ok)" }}>{eur(Math.max(0, totalV - balanceV))}</span></div>
         <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("Saldo dovuto")}</span><span className="font-mono text-sm font-bold tabular-nums" style={{ color: balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span></div>
+        {extrasV > 0 && <div className="mt-1 flex items-baseline justify-between gap-4"><span className="text-sm text-dim">{t("di cui extra")}</span><span className="font-mono text-sm tabular-nums text-dim">{eur(extrasV)}</span></div>}
+        <div className="mt-1.5">{payMethodRow}</div>
         {booking.nightlyRates && (
           <details className="mt-2 border-t border-line pt-2">
             <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-faint">{t("Dettaglio notte per notte")} ({t("da")} {CHANNELS[booking.channel]?.label ?? booking.channel})</summary>
@@ -360,12 +390,15 @@ export default function BookingDrawer() {
         qa === "incasso"
           ? <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash p-2">
               <span className="text-xs text-dim">{t("Importo")} €</span>
-              <input type="number" min={0} value={incassoAmt} onChange={(e) => setIncassoAmt(e.target.value)} placeholder="0" className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
-              <button onClick={() => setIncassoAmt(String(balanceV))} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(balanceV)}</button>
+              <NumInput value={incassoAmt} allowNull onChange={setIncassoAmt} placeholder="0" aria-label={t("Importo")} className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-right text-sm text-txt outline-none focus:border-focus" />
+              <button onClick={() => setIncassoAmt(balanceV)} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(balanceV)}</button>
               <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Registra")}</button>
             </div>
           : <button onClick={() => setQa("incasso")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-focus hover:bg-wash">💶 {t("Registra incasso")}</button>
       )}
+      {qa === "extra"
+        ? extraPanel
+        : <button onClick={() => setQa("extra")} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold text-focus hover:bg-wash">＋ {t("Extra")} <span className="font-normal text-faint">· {t("animali, culla, letto aggiuntivo…")}</span></button>}
       {departed && (() => {
         const first = guest?.fullName?.split(" ")[0] ?? "";
         const rmsg = `Grazie ${first} per aver soggiornato da ${structure?.name ?? "noi"}! Se ti sei trovato bene, ci lasceresti una recensione su Google? Ci aiuta tantissimo. ${reviewUrl}`.trim();
@@ -416,18 +449,12 @@ export default function BookingDrawer() {
         {qa === "incasso" && (
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash p-2">
             <span className="text-xs text-dim">{t("Importo")} €</span>
-            <input type="number" min={0} value={incassoAmt} onChange={(e) => setIncassoAmt(e.target.value)} placeholder="0" className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
-            {balanceV > 0 && <button onClick={() => setIncassoAmt(String(balanceV))} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(balanceV)}</button>}
+            <NumInput value={incassoAmt} allowNull onChange={setIncassoAmt} placeholder="0" aria-label={t("Importo")} className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-right text-sm text-txt outline-none focus:border-focus" />
+            {balanceV > 0 && <button onClick={() => setIncassoAmt(balanceV)} className="rounded-md border border-line px-2 py-1 text-xs text-dim hover:bg-surface">{t("Saldo")} {eur(balanceV)}</button>}
             <button onClick={registraIncasso} className="ml-auto rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Registra")}</button>
           </div>
         )}
-        {qa === "extra" && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-wash p-2">
-            <input value={extraName} onChange={(e) => setExtraName(e.target.value)} placeholder={t("Descrizione (es. Transfer)")} className="min-w-[140px] flex-1 rounded-md border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
-            <input type="number" min={0} value={extraPrice} onChange={(e) => setExtraPrice(e.target.value)} placeholder="€" className="w-20 rounded-md border border-line bg-surface px-2 py-1 text-sm text-txt outline-none focus:border-focus" />
-            <button onClick={aggiungiExtra} className="rounded-md bg-focus px-3 py-1 text-xs font-semibold text-white hover:opacity-90">{t("Aggiungi")}</button>
-          </div>
-        )}
+        {extraPanel && <div className="mt-2">{extraPanel}</div>}
       </div>
 
       <Section title={t("Ospite")}>
@@ -481,6 +508,7 @@ export default function BookingDrawer() {
             <span className="font-mono text-sm font-bold tabular-nums" style={{ color: balanceV > 0 ? "var(--warn)" : "var(--ok)" }}>{balanceV > 0 ? eur(balanceV) : t("Saldato ✓")}</span>
           </div>
         </div>
+        {payMethodRow}
         <div className="my-1 border-t border-line" />
         {commV > 0 && <Row label={`${t("Commissione")} (${commPctV}%)`} value={eur(commV)} mono />}
         {payFeeV > 0 && <Row label={t("Costo incasso")} value={eur(payFeeV)} mono />}
@@ -600,8 +628,8 @@ export default function BookingDrawer() {
         {(() => {
           const groupBk = booking.groupId ? bookings.filter((x) => x.groupId === booking.groupId) : [booking];
           const gLink = groupBk.length > 1
-            ? buildGroupGuestLink({ structureId: booking.structureId, guestName: guest?.fullName || "", rooms: groupBk.map((bb) => ({ unitId: bb.unitId, unitCode: getUnit(bb.unitId)?.code || getUnit(bb.unitId)?.name || "", parking: !!bb.parking })) })
-            : buildGuestLink({ structureId: booking.structureId, unitId: booking.unitId, unitCode: unitV?.code || unitV?.name || "", guestName: guest?.fullName || "", parking: !!booking.parking });
+            ? buildGroupGuestLink({ structureId: booking.structureId, guestName: guest?.fullName || "", lang: guestLangOf(guest), rooms: groupBk.map((bb) => ({ unitId: bb.unitId, unitCode: getUnit(bb.unitId)?.code || getUnit(bb.unitId)?.name || "", parking: !!bb.parking })) })
+            : buildGuestLink({ structureId: booking.structureId, unitId: booking.unitId, unitCode: unitV?.code || unitV?.name || "", guestName: guest?.fullName || "", lang: guestLangOf(guest), parking: !!booking.parking });
           const guideSubject = `${t("La tua guida")} · ${structure?.name || "Xenora"}`;
           const gmailGuide = (msg: string) => guest?.email ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(guest.email)}&su=${encodeURIComponent(guideSubject)}&body=${encodeURIComponent(msg)}` : "";
           const guideMsgWith = (link: string) => guideMessage(booking.structureId, { name: guest?.fullName || "", link, structureName: structure?.name || "" });
@@ -729,7 +757,10 @@ export default function BookingDrawer() {
   const set = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f));
   const nEdit = form ? Math.max(0, nights(form.checkIn, form.checkOut)) : 0;
   const taxEdit = form ? cityTaxOf(structure, form.adults, nEdit, form.total, form.cityTaxExempt) : 0;
-  const totalEdit = form ? form.total + form.cleaningFee + taxEdit : 0;
+  // Totale ospite = soggiorno + pulizia + extra, come nella vista (la tassa di soggiorno si riscuote a parte e non rientra).
+  const totalEdit = form ? form.total + form.cleaningFee + entriesTotal(form.extras) : 0;
+  const pmEdit = effectivePayMethod(form ? { ...booking, channel: form.channel, paymentMethod: form.paymentMethod || undefined } : booking);
+  const isOtaChannelE = form ? form.channel !== "direct" && form.channel !== "blocked" : false;
   const structUnits = sortUnitsByName(units.filter((u) => u.structureId === booking.structureId));
 
   const save = () => {
@@ -740,6 +771,8 @@ export default function BookingDrawer() {
       total: form.total, cleaningFee: form.cleaningFee,
       commissionPct: form.commissionPct === (booking.commissionPct ?? defaultCommissionInfo(booking.channel, booking.structureId).pct) ? booking.commissionPct : form.commissionPct,
       commissionAmount: form.commissionAmount ?? undefined, paid: form.paid,
+      ...(JSON.stringify(form.extras) !== JSON.stringify(booking.extras ?? []) ? { extras: form.extras } : {}),
+      ...(pmEdit.auto ? {} : { paymentMethod: form.paymentMethod || undefined }),
       cityTaxExempt: form.cityTaxExempt, cityTaxPaid: form.cityTaxPaid, depositPaid: form.depositPaid, parking: form.parking,
       note: form.note.trim() || undefined, code: form.code.trim() || undefined, color: isHexColor(form.color) ? form.color : undefined,
     });
@@ -804,16 +837,16 @@ export default function BookingDrawer() {
 
       <Section title={t("Conto")}>
         <div className="grid grid-cols-2 gap-2">
-          <Field label={`${t("Soggiorno")} (€)`}><input type="number" min={0} className={inputCls} value={form.total} onChange={(e) => set({ total: Math.max(0, +e.target.value) })} /></Field>
-          <Field label={`${t("Pulizia")} (€)`}><input type="number" min={0} className={inputCls} value={form.cleaningFee} onChange={(e) => set({ cleaningFee: Math.max(0, +e.target.value) })} /></Field>
+          <Field label={`${t("Soggiorno")} (€)`}><NumInput className={inputCls} value={form.total} onChange={(v) => set({ total: v ?? 0 })} /></Field>
+          <Field label={`${t("Pulizia")} (€)`}><NumInput className={inputCls} value={form.cleaningFee} onChange={(v) => set({ cleaningFee: v ?? 0 })} /></Field>
         </div>
         <div className="grid grid-cols-3 gap-2">
           <Field label={`${t("Commissione")} (€)`}>
-            <input type="number" min={0} step={0.01} className={inputCls}
+            <NumInput allowNull className={inputCls}
               value={form.commissionAmount ?? Math.round(form.total * form.commissionPct / 100)}
-              onChange={(e) => { const raw = e.target.value; set({ commissionAmount: raw === "" ? null : Math.max(0, +raw) }); }} />
+              onChange={(v) => set({ commissionAmount: v })} />
           </Field>
-          <Field label={`${t("Commissione")} (%)`}><input type="number" min={0} max={100} step={0.1} className={inputCls} value={commissionPctOf(form)} onChange={(e) => set({ commissionPct: Math.max(0, Math.min(100, +e.target.value)), commissionAmount: null })} /></Field>
+          <Field label={`${t("Commissione")} (%)`}><NumInput decimals={1} max={100} className={inputCls} value={commissionPctOf(form)} onChange={(v) => set({ commissionPct: v ?? 0, commissionAmount: null })} /></Field>
           <div className="flex flex-col justify-end">
             <span className="mb-1 block text-xs font-medium text-dim">{t("Netto (soggiorno − commissione)")}</span>
             <div className="rounded-lg border border-line bg-wash px-2.5 py-1.5 text-sm font-mono font-semibold text-[color:var(--ok)]">{eur(form.total - (form.commissionAmount ?? Math.round(form.total * form.commissionPct / 100)))}</div>
@@ -826,6 +859,7 @@ export default function BookingDrawer() {
             <span className="text-sm font-medium text-txt">{t("Tassa di soggiorno")}</span>
             <span className="font-mono text-sm font-semibold text-txt">{eur(taxEdit)}</span>
           </div>
+          <div className="mt-1 text-[11px] text-faint">{t("Non rientra nel totale: si riscuote in struttura")}</div>
           <div className="mt-1 text-xs text-dim">{form.cityTaxExempt ? t("Esente") : (structure?.cityTaxMode === "percent" ? `${structure.cityTaxPercent ?? 0}% ${t("del totale soggiorno")}` : `${form.adults} ${t("adulti")} × ${Math.min(nEdit, structure?.cityTaxMaxNights ?? 3)} ${t("notti")} × € ${structure?.cityTaxAmount ?? 2}`)}</div>
           <div className="mt-2 flex flex-wrap gap-3">
             <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={form.cityTaxExempt} onChange={(e) => set({ cityTaxExempt: e.target.checked })} /> {t("Esente")}</label>
@@ -835,16 +869,28 @@ export default function BookingDrawer() {
         <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={form.depositPaid} onChange={(e) => set({ depositPaid: e.target.checked })} /> {t("Caparra ricevuta")}</label>
         <label className="flex items-center gap-1.5 text-xs text-dim"><input type="checkbox" checked={form.parking} onChange={(e) => set({ parking: e.target.checked })} /> {t("Parcheggio prenotato")}</label>
         <div className="grid grid-cols-2 gap-2">
-          <Field label={`${t("Acconto incassato")} (€)`}><input type="number" min={0} className={inputCls} value={form.paid} onChange={(e) => set({ paid: Math.max(0, +e.target.value) })} /></Field>
+          <Field label={`${t("Acconto incassato")} (€)`}><NumInput className={inputCls} value={form.paid} onChange={(v) => set({ paid: v ?? 0 })} /></Field>
           <div className="flex flex-col justify-end">
             <span className="mb-1 block text-xs font-medium text-dim">{t("Saldo dovuto")}</span>
             <div className="rounded-lg border border-line bg-wash px-2.5 py-1.5 font-mono text-sm font-semibold" style={{ color: Math.max(0, totalEdit - form.paid) > 0 ? "var(--warn)" : "var(--ok)" }}>{Math.max(0, totalEdit - form.paid) > 0 ? eur(totalEdit - form.paid) : t("Saldato ✓")}</div>
           </div>
         </div>
+        <Field label={t("Incassato con")}>
+          {pmEdit.auto
+            ? <div className="rounded-lg border border-line bg-wash px-2.5 py-1.5 text-sm text-txt" title={t("Impostato in automatico: l'OTA incassa dall'ospite e poi versa alla struttura")}>{t(PAY_METHOD_LABEL.ota)}{otaPayDetail(booking) ? ` · ${t(otaPayDetail(booking) as string)}` : ""} · {t("automatico")}</div>
+            : <select className={inputCls} value={form.paymentMethod} onChange={(e) => set({ paymentMethod: isPayMethod(e.target.value) ? e.target.value : "" })}>
+                <option value="">{t("Da indicare")}</option>
+                {[...MANUAL_PAY_METHODS, ...(isOtaChannelE ? (["ota"] as PayMethod[]) : [])].map((m) => <option key={m} value={m}>{t(PAY_METHOD_LABEL[m])}</option>)}
+              </select>}
+        </Field>
         <div className="mt-1 flex items-baseline justify-between border-t border-line pt-2">
           <span className="text-sm font-semibold text-txt">{t("Totale ospite")}</span>
           <span className="font-mono text-lg font-bold text-txt">{eur(totalEdit)}</span>
         </div>
+      </Section>
+
+      <Section title={t("Extra")}>
+        <BookingExtrasPicker entries={form.extras} onChange={(next) => set({ extras: next })} catalog={structure?.extras} stay={{ checkIn: form.checkIn, checkOut: form.checkOut, adults: form.adults }} onConfigure={() => { closeBooking(); router.push("/upselling?tab=catalogo"); }} />
       </Section>
 
       <Section title={t("Colore nel calendario")}>

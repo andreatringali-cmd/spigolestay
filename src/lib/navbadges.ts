@@ -69,7 +69,7 @@ export function useNavBadges(pathname: string): NavBadges {
   // Ricalcolo su sync, messaggi, ritorno sulla scheda e quando una conversazione viene letta.
   useEffect(() => {
     const h = () => setTick((t) => t + 1);
-    const ev = ["focus", "spigolestay:datasync", "spigolestay:threads", "spigolestay:navseen", "storage"];
+    const ev = ["focus", "spigolestay:datasync", "spigolestay:threads", "spigolestay:navseen", "spigolestay:pulizie-list", "storage"];
     ev.forEach((e) => window.addEventListener(e, h));
     return () => ev.forEach((e) => window.removeEventListener(e, h));
   }, []);

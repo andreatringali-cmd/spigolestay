@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manage-booking";
 import { cityTaxOf } from "@/lib/booking";
 import type { Structure } from "@/lib/types";
+import { guestLangOrNull } from "@/lib/guest-lang";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,7 +74,9 @@ export async function GET(req: Request) {
         docPhotoFront: s(b.docPhotoFront) || null, docPhotoBack: s(b.docPhotoBack) || null, signature: s(b.signature) || null,
         invoiceRequest: (b.invoiceRequest as Json) || null,
       },
-      guest: { firstName: s(g.firstName) || s(g.fullName).split(" ")[0] || "", lastName: s(g.lastName) || s(g.fullName).split(" ").slice(1).join(" ") || "", email: s(g.email), phone: s(g.phone), sex: s(g.sex), birthDate: s(g.birthDate), birthPlace: s(g.birthPlace), citizenship: s(g.citizenship) || s(g.country), docType: s(g.docType), docNumber: s(g.docNumber), docPlace: s(g.docPlace), docPhotoFront: s(g.docPhotoFront) || null, docPhotoBack: s(g.docPhotoBack) || null },
+      guest: { firstName: s(g.firstName) || s(g.fullName).split(" ")[0] || "", lastName: s(g.lastName) || s(g.fullName).split(" ").slice(1).join(" ") || "", email: s(g.email), phone: s(g.phone), sex: s(g.sex), birthDate: s(g.birthDate), birthPlace: s(g.birthPlace), citizenship: s(g.citizenship) || s(g.country), docType: s(g.docType), docNumber: s(g.docNumber), docPlace: s(g.docPlace), docPhotoFront: s(g.docPhotoFront) || null, docPhotoBack: s(g.docPhotoBack) || null,
+        // Lingua della pagina: scheda ospite → Paese → prefisso del telefono. null se non c'è nessun dato (allora decide il browser).
+        lang: guestLangOrNull({ language: s(g.language), lang: s(g.lang), country: s(g.country), phone: s(g.phone) }) },
       // Ospite "di ritorno": ha già dati documento da un soggiorno precedente → check-in veloce.
       returning: !!(s(g.docNumber) && s(g.firstName) && (s(g.docPhotoFront) || s(b.docPhotoFront))),
       roomType: { name: s(rt.name) },

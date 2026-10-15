@@ -4,7 +4,8 @@
 import { supabase } from "./supabase";
 import { CHANNELS } from "./types";
 import type { Booking, Guest, Structure } from "./types";
-import { commissionOf } from "./booking";
+import { commissionOf, bookingExtrasTotal } from "./booking";
+import { cassaContoFor } from "./pay-method";
 import { shiftISO } from "./dates";
 import { payoutDate, loadPayoutSettings, type PayoutSettings } from "./payouts";
 import { roundCents, sumCents } from "./money";
@@ -54,7 +55,7 @@ export const scopeVisible = (structureId: string | undefined | null, active: str
   active === "all" || structureId === active;
 
 // Movimenti automatici dalle prenotazioni (dirette → contanti, OTA → banca + commissione).
-export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, active: string, principal: string = loadContiPrefs().principal, payouts: PayoutSettings = loadPayoutSettings()): Mov[] {
+export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, active: string, principal: string = loadContiPrefs().principal, payouts: PayoutSettings = loadPayoutSettings(), validConti: string[] = loadConti().map((c) => c.key)): Mov[] {
   const out: Mov[] = [];
   for (const b of bookings) {
     if (b.status === "cancelled" || b.channel === "blocked") continue;
@@ -65,7 +66,7 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
     // Incasso automatico = quanto realmente incassato sulla prenotazione (fonte di
     // verità = prenotazione), non l'intero totale: così la cassa/chiusura riflette il reale.
     const incassato = roundCents(b.paid ?? 0);
-    if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: when, channel: b.channel, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: b.channel === "direct" ? "contanti" : principal, auto: true, ref: b.id });
+    if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: when, channel: b.channel, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: cassaContoFor(b, principal, validConti), auto: true, ref: b.id });
     const comm = roundCents(commissionOf(b));
     if (comm > 0) out.push({ id: `auto-comm-${b.id}`, date: when, channel: b.channel, kind: "out", cat: "commissioni", desc: `Commissione ${CHANNELS[b.channel].label} · ${g?.fullName ?? "Ospite"}`, amount: comm, conto: principal, auto: true, ref: b.id });
   }
@@ -335,18 +336,18 @@ export function contoKeyFromLabel(label: string, existing: ContoDef[]): string {
 // ── Flusso di cassa: oggi e futuro ──────────────────────────────────────────────────────────────────────────────────────
 // Movimenti PREVISTI da oggi in poi: il saldo ancora da incassare delle prenotazioni in arrivo (alla data di arrivo) e le occorrenze future dei pagamenti
 // programmati. Le commissioni OTA delle prenotazioni future e gli acconti già incassati sono già nei movimenti automatici (computeAuto).
-export function computeForecast(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, rules: Rule[], active: string, today: string, horizon: string, principal: string = loadContiPrefs().principal, payouts: PayoutSettings = loadPayoutSettings()): Mov[] {
+export function computeForecast(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, rules: Rule[], active: string, today: string, horizon: string, principal: string = loadContiPrefs().principal, payouts: PayoutSettings = loadPayoutSettings(), validConti: string[] = loadConti().map((c) => c.key)): Mov[] {
   const out: Mov[] = [];
   for (const b of bookings) {
     if (b.status === "cancelled" || b.channel === "blocked") continue;
     if (active !== "all" && b.structureId !== active) continue;
     const when = payoutDate(b, payouts);
     if (when < today || when > horizon) continue;
-    const remaining = roundCents(Math.max(0, (b.total ?? 0) + (b.cleaningFee ?? 0) - (b.paid ?? 0)));
+    const remaining = roundCents(Math.max(0, (b.total ?? 0) + (b.cleaningFee ?? 0) + bookingExtrasTotal(b) - (b.paid ?? 0)));
     if (remaining <= 0) continue;
     const g = guests.find((x) => x.id === b.guestId);
     const st = getStructure(b.structureId);
-    out.push({ id: `fc-in-${b.id}`, date: when, channel: b.channel, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label} · da incassare`, amount: remaining, conto: b.channel === "direct" ? "contanti" : principal, auto: true, forecast: true, ref: b.id });
+    out.push({ id: `fc-in-${b.id}`, date: when, channel: b.channel, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label} · da incassare`, amount: remaining, conto: cassaContoFor(b, principal, validConti), auto: true, forecast: true, ref: b.id });
   }
   const from = shiftISO(today, 1);
   if (from <= horizon) {

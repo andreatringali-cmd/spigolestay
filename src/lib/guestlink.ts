@@ -79,6 +79,7 @@ export function codesListForRoom(unitId: string | null | undefined, hasParking: 
 export function buildGroupGuestLink(opts: {
   structureId: string;
   guestName?: string;
+  lang?: string;       // lingua dell'ospite (it/en/fr/de/es): la guida si apre già in quella lingua
   rooms: { unitId?: string | null; unitCode?: string; parking?: boolean }[];
 }): string {
   const base = typeof window !== "undefined" ? window.location.origin : "";
@@ -92,12 +93,14 @@ export function buildGroupGuestLink(opts: {
   if (kr.some((x) => x.c.length)) p.set("kr", JSON.stringify(kr));
   p.set("pk", opts.rooms.some((r) => r.parking) ? "1" : "0");
   if (opts.guestName?.trim()) p.set("g", opts.guestName.trim());
+  if (opts.lang) p.set("lang", opts.lang);
   return `${base}/guida/index.html?${p.toString()}`;
 }
 
 export function buildGuestLink(opts: {
   structureId: string;
   unitId?: string | null;
+  lang?: string;       // lingua dell'ospite (it/en/fr/de/es): la guida si apre già in quella lingua
   unitCode?: string;   // numero/codice camera mostrato all'ospite (es. "4")
   guestName?: string;
   parking?: boolean;
@@ -113,5 +116,6 @@ export function buildGuestLink(opts: {
   p.set("pk", has ? "1" : "0");
   if (opts.docsUrl?.trim()) p.set("d", opts.docsUrl.trim());
   if (opts.guestName?.trim()) p.set("g", opts.guestName.trim());
+  if (opts.lang) p.set("lang", opts.lang);
   return `${base}/guida/index.html?${p.toString()}`;
 }

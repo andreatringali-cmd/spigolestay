@@ -186,7 +186,7 @@ async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: 
   fromDigits: string;
   text: string;
   guestName?: string;
-  guest?: { id: string; fullName?: string; language?: string };
+  guest?: { id: string; fullName?: string; language?: string; phone?: string; country?: string };
   structures?: unknown;
   bookings?: unknown;
   units?: unknown;
@@ -222,7 +222,7 @@ async function tryAutoReply(admin: SupabaseClient<any>, tenantId: string, info: 
       admin, tenantId,
       data: { structures: data.structures, bookings: data.bookings, units: data.units, roomTypes: data.roomTypes },
       roomAccessRaw: info.roomAccessRaw, conciergeFaqRaw: info.conciergeFaqRaw,
-      structureId, guest: info.guest, guestName: info.guestName, message: info.text, transcript, tone: prefs.tone,
+      structureId, guest: info.guest ?? { phone: `+${info.fromDigits}` }, guestName: info.guestName, message: info.text, transcript, tone: prefs.tone, // senza scheda ospite: il prefisso del numero WhatsApp suggerisce la lingua
     });
     console.log("[concierge]", JSON.stringify({ answered: result.answered, reason: result.reason, topic: result.topic, hasBooking: result.hasBooking, lang: result.lang, tone: prefs.tone, ms: result.ms, q: info.text.slice(0, 60) }));
     if (!result.answered || !result.reply) {

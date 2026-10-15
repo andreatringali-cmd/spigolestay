@@ -22,6 +22,8 @@ export async function POST(req: Request) {
     if (body?.metadata && typeof body.metadata === "object") {
       for (const [k, v] of Object.entries(body.metadata)) meta[k.slice(0, 40)] = String(v ?? "").slice(0, 480);
     }
+    // Lingua della pagina di pagamento Stripe: quella scelta dall'ospite (it/en/fr/de/es), altrimenti la decide Stripe dal browser.
+    const locale = typeof body?.locale === "string" && ["it", "en", "fr", "de", "es"].includes(body.locale) ? (body.locale as "it" | "en" | "fr" | "de" | "es") : undefined;
     const acct = typeof body?.acct === "string" && body.acct.trim() ? body.acct.trim() : "";
     const stripe = new Stripe(key);
     const origin = siteOrigin(req);
@@ -50,6 +52,7 @@ export async function POST(req: Request) {
       metadata: { kind: "quote", source, ...meta },
       payment_intent_data: { metadata: { kind: "quote", source, ...meta } },
       customer_email: email,
+      ...(locale ? { locale } : {}),
       success_url: success.includes("{CHECKOUT_SESSION_ID}") ? success : `${success}${success.includes("?") ? "&" : "?"}paid=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancel,
     };

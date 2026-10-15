@@ -11,6 +11,8 @@ import EmptyState from "@/components/EmptyState";
 import { eur } from "@/lib/format";
 import { centsEur, apiPost } from "@/lib/invoicing/client";
 import { shortenLink } from "@/lib/guestlink";
+import { checkinRequestMsg } from "@/lib/guest-messages";
+import { guestLangOf } from "@/lib/guest-lang";
 import { cityTaxTotalByStructure } from "@/lib/citytax";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Booking, Guest, Structure } from "@/lib/types";
@@ -94,7 +96,8 @@ function ArrivalRow({ b, g, st, origin, waOn, showStruct, rooms, expected: expec
   const [link, setLink] = useState(fullLink);
   useEffect(() => { let on = true; shortenLink(fullLink).then((s) => { if (on) setLink(s); }).catch(() => {}); return () => { on = false; }; }, [fullLink]);
   // Messaggio breve e chiaramente DA PARTE DELLA STRUTTURA (firma inclusa).
-  const msg = `Gentile ${g?.firstName || "ospite"}, le scriviamo da ${st?.name || "la struttura"}. Per velocizzare il suo arrivo la invitiamo a completare il check-in online (dati e documento, bastano 2 minuti): ${link} . Grazie e a presto!${st?.name ? `\n— ${st.name}` : ""}`;
+  // Nella lingua dell'ospite: scheda → Paese → prefisso del telefono.
+  const msg = checkinRequestMsg(guestLangOf(g), { name: g?.firstName, structure: st?.name, link });
   const wa = g?.phone ? `https://wa.me/${g.phone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}` : "";
   const sendMail = async () => {
     if (!g?.email) return;
@@ -102,7 +105,7 @@ function ArrivalRow({ b, g, st, origin, waOn, showStruct, rooms, expected: expec
     try {
       const r = await fetch("/api/email", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind: "checkin_reminder", checkinUrl: link, booking: { code: b.code, structureName: st?.name, structureEmail: st?.email, guestName: g?.fullName, guestEmail: g?.email, checkIn: b.checkIn, checkInFrom: st?.checkInFrom, color: st?.photoColor, address: [st?.address, st?.streetNumber, st?.city].filter(Boolean).join(" "), phone: st?.phone, logo: st?.logo, website: st?.website, cin: st?.cin, vat: st?.vat } }),
+        body: JSON.stringify({ kind: "checkin_reminder", checkinUrl: link, booking: { code: b.code, structureName: st?.name, structureEmail: st?.email, guestName: g?.fullName, guestEmail: g?.email, guestPhone: g?.phone, guestCountry: g?.country, guestLanguage: g?.language, checkIn: b.checkIn, checkInFrom: st?.checkInFrom, color: st?.photoColor, address: [st?.address, st?.streetNumber, st?.city].filter(Boolean).join(" "), phone: st?.phone, logo: st?.logo, website: st?.website, cin: st?.cin, vat: st?.vat } }),
       });
       const j = await r.json().catch(() => ({}));
       setMail(r.ok && j?.ok ? "sent" : "err");

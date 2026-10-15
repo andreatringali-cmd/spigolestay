@@ -65,6 +65,10 @@ function payload(b: Booking, d: Deps) {
     structureEmail: s?.email,
     guestName: g?.fullName,
     guestEmail: g?.email,
+    // Per scegliere la lingua dell'email (scheda ospite → Paese → prefisso del telefono), vedi lib/email-i18n.ts
+    guestPhone: g?.phone,
+    guestCountry: g?.country,
+    guestLanguage: g?.language,
     roomType: rt?.name,
     unitName: u?.name,
     checkIn: b.checkIn,
@@ -78,6 +82,7 @@ function payload(b: Booking, d: Deps) {
     bookingTotal,
     cityTaxAmount: cityTax,
     cityTaxRuleText: cityTaxRuleText(s, cityTax),
+    cityTaxRule: s?.cityTax && cityTax > 0 ? { mode: s.cityTaxMode, percent: s.cityTaxPercent, cap: s.cityTaxCap, amount: s.cityTaxAmount, childFreeUnder: s.cityTaxChildFreeUnder } : undefined, // stessi dati del testo, per ricomporlo nella lingua dell'ospite
     grandTotal,
     paid: b.paid ?? 0,
     due: Math.max(0, grandTotal - (b.paid ?? 0)),

@@ -51,7 +51,7 @@ export function cityTaxPayers(structure: Structure | undefined, b: { adults?: nu
   return adults + payingKids;
 }
 
-export function bookingExtrasTotal(b: BookingLike): number {
+export function bookingExtrasTotal(b: { extras?: { price?: number }[] }): number {
   return Array.isArray(b.extras) ? b.extras.reduce((a, e) => a + (e?.price || 0), 0) : 0;
 }
 

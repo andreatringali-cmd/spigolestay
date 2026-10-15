@@ -13,6 +13,8 @@ import { rateForDay } from "@/lib/pricing";
 import { shiftISO, toISO, nights } from "@/lib/dates";
 import { cityTaxOf } from "@/lib/booking";
 import { eur } from "@/lib/format";
+import NumInput from "@/components/NumInput";
+import { selectableExtras, extraUnitAmount, maxQtyOf } from "@/lib/booking-extras";
 import { Card } from "@/components/ui";
 import Icon from "@/components/Icon";
 import QRCode from "qrcode";
@@ -79,8 +81,8 @@ export default function NuovaPrenotazionePage() {
   const [phone, setPhone] = useState("");
   const [channel, setChannel] = useState<Channel>("direct");
   const [parking, setParking] = useState(false);
-  const [parkingPrice, setParkingPrice] = useState("");
-  const [deposit, setDeposit] = useState("");
+  const [parkingPrice, setParkingPrice] = useState(0);
+  const [deposit, setDeposit] = useState(0);
   const [note, setNote] = useState("");
   const [sendConfirm, setSendConfirm] = useState(true);
   const [err, setErr] = useState("");
@@ -121,11 +123,11 @@ export default function NuovaPrenotazionePage() {
 
   // Extra proponibili: quelli attivi delle strutture delle camere scelte.
   const selectedStructIds = [...new Set(selected.map((rt) => rt.structureId))];
-  const availExtras = structures.filter((s) => selectedStructIds.includes(s.id)).flatMap((s) => (s.extras ?? []).filter((e) => e.active !== false).map((e) => ({ id: e.id, name: e.name, desc: e.desc, price: e.price, per: e.per, structName: structures.length > 1 ? s.name : "" })));
+  const availExtras = structures.filter((s) => selectedStructIds.includes(s.id)).flatMap((s) => selectableExtras(s.extras).map((e) => ({ id: `${s.id}:${e.id}`, extraId: e.id, name: e.name, desc: e.desc, price: extraUnitAmount(e, { checkIn, checkOut, adults }), per: e.per, free: !!e.free || !(e.price > 0), maxQty: maxQtyOf(e), structName: structures.length > 1 ? s.name : "" })));
   const extrasTotal = availExtras.reduce((a, e) => a + (extraQty[e.id] ?? 0) * e.price, 0);
   const grandWithExtras = grandTotal + extrasTotal;
-  const chosenExtras = availExtras.filter((e) => (extraQty[e.id] ?? 0) > 0).map((e) => { const q = extraQty[e.id] ?? 0; return { name: q > 1 ? `${e.name} ×${q}` : e.name, price: e.price * q }; });
-  const setExtraQ = (id: string, n: number) => setExtraQty((m) => ({ ...m, [id]: Math.max(0, n) }));
+  const chosenExtras = availExtras.filter((e) => (extraQty[e.id] ?? 0) > 0).map((e) => { const q = extraQty[e.id] ?? 0; return { name: q > 1 ? `${e.name} ×${q}` : e.name, price: Math.round(e.price * q * 100) / 100, extraId: e.extraId, qty: q }; });
+  const setExtraQ = (id: string, n: number) => setExtraQty((m) => ({ ...m, [id]: Math.max(0, Math.min(availExtras.find((x) => x.id === id)?.maxQty ?? 99, n)) }));
   // Parcheggio: 0 = incluso, >0 = voce a pagamento che entra nel voucher.
   const parkingPriceN = parking ? Math.max(0, Number(parkingPrice) || 0) : 0;
   // Extra salvati sulla prenotazione: servizi scelti + parcheggio se a pagamento.
@@ -524,8 +526,8 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-line pt-3">
                   <label className="flex items-center gap-2 text-sm text-txt"><Toggle on={parking} onClick={() => setParking((v) => !v)} /> Parcheggio</label>
-                  {parking && <label className="flex items-center gap-2 text-sm text-txt">Prezzo parcheggio <span className="flex items-center gap-1">€ <input type="number" min={0} value={parkingPrice} onChange={(e) => setParkingPrice(e.target.value)} placeholder="0 = incluso" className="w-28 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></span></label>}
-                  <label className="flex items-center gap-2 text-sm text-txt">Acconto <span className="flex items-center gap-1">€ <input type="number" min={0} value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="0" className="w-24 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></span></label>
+                  {parking && <label className="flex items-center gap-2 text-sm text-txt">Prezzo parcheggio <span className="flex items-center gap-1">€ <NumInput value={parkingPrice} onChange={(v) => setParkingPrice(v ?? 0)} placeholder="0 = incluso" className="w-28 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></span></label>}
+                  <label className="flex items-center gap-2 text-sm text-txt">Acconto <span className="flex items-center gap-1">€ <NumInput value={deposit} onChange={(v) => setDeposit(v ?? 0)} placeholder="0" className="w-24 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-txt outline-none focus:border-focus" /></span></label>
                   <label className={`flex items-center gap-2 text-sm ${email.trim() ? "text-txt" : "text-faint"}`} title={email.trim() ? undefined : "Inserisci l'email dell'ospite per inviare il voucher"}><Toggle on={sendConfirm && !!email.trim()} onClick={() => setSendConfirm((v) => !v)} /> Invia il voucher di conferma via email</label>
                 </div>
               </Card>
@@ -543,7 +545,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                           <tr key={rt.id}>
                             <td className="px-4 py-2.5"><span className="font-semibold text-txt">{rt.name}</span> <span className="text-faint">· {st?.name}</span></td>
                             <td className="px-3 py-2.5 text-center font-bold text-txt">{qty[rt.id]}</td>
-                            <td className="px-3 py-2.5 text-right"><span className="inline-flex items-center gap-1">€ <input type="number" min={0} value={linePrice(rt)} onChange={(e) => setPriceOv((o) => ({ ...o, [rt.id]: Math.max(0, Number(e.target.value)) }))} className="w-20 rounded border border-line bg-paper px-1.5 py-1 text-right text-sm text-txt outline-none focus:border-focus" /></span></td>
+                            <td className="px-3 py-2.5 text-right"><span className="inline-flex items-center gap-1">€ <NumInput value={linePrice(rt)} onChange={(v) => setPriceOv((o) => ({ ...o, [rt.id]: v ?? 0 }))} className="w-20 rounded border border-line bg-paper px-1.5 py-1 text-right text-sm text-txt outline-none focus:border-focus" /></span></td>
                             <td className="px-4 py-2.5 text-right font-bold text-txt">{eur(linePrice(rt) * (qty[rt.id] ?? 0))}</td>
                             <td className="px-3 py-2.5 text-right"><button onClick={() => setQ(rt.id, 0)} title="Rimuovi" className="text-faint hover:text-[color:var(--err)]">✕</button></td>
                           </tr>
@@ -562,7 +564,7 @@ ${note.trim() ? `<p class="note">${esc(note.trim())}</p>` : ""}
                   <div className="grid gap-2 sm:grid-cols-2">
                     {availExtras.map((e) => { const q = extraQty[e.id] ?? 0; return (
                       <div key={e.id} className={`flex items-center gap-3 rounded-xl border p-2.5 transition ${q > 0 ? "border-focus bg-[color:color-mix(in_srgb,var(--focus)_6%,transparent)]" : "border-line"}`}>
-                        <div className="min-w-0 flex-1"><div className="text-sm font-semibold text-txt">{e.name}{e.structName ? <span className="font-normal text-faint"> · {e.structName}</span> : ""}</div>{e.desc && <div className="truncate text-[11px] text-faint">{e.desc}</div>}<div className="text-[11px] text-faint">{eur(e.price)}</div></div>
+                        <div className="min-w-0 flex-1"><div className="text-sm font-semibold text-txt">{e.name}{e.structName ? <span className="font-normal text-faint"> · {e.structName}</span> : ""}</div>{e.desc && <div className="truncate text-[11px] text-faint">{e.desc}</div>}<div className="text-[11px] text-faint">{e.free ? "gratis" : eur(e.price)}</div></div>
                         <div className="flex shrink-0 items-center gap-1.5">
                           <button disabled={q <= 0} onClick={() => setExtraQ(e.id, q - 1)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-base leading-none text-dim hover:bg-wash disabled:opacity-30">−</button>
                           <span className={`w-5 text-center text-sm font-bold ${q > 0 ? "text-[color:var(--focus)]" : "text-dim"}`}>{q}</span>

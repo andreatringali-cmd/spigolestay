@@ -124,7 +124,7 @@ export function proposalsFor(b: Booking, ctx: ProposalCtx): Proposal[] {
     const skip = (reason: string) => out.push({ ...base, status: "skip", reason });
     const ok = (reason: string, status: "ok" | "warn" = "ok") => out.push({ ...base, status, reason });
 
-    if (!(e.price > 0)) { skip("prezzo non impostato nel catalogo"); continue; }
+    if (!(e.price > 0)) { skip(e.free ? "servizio gratuito: nessun ricavo da proporre" : "prezzo non impostato nel catalogo"); continue; }
     if (isPriceUnverified(e)) { skip("prezzo di esempio: confermalo nel catalogo prima di proporlo"); continue; }
     if ((b.extras ?? []).some((x) => entryMatches(x, e))) { skip("già nella prenotazione"); continue; }
     if (!inSeason(e, b.checkIn, b.checkOut)) { skip(`fuori stagione (${seasonLabel(e)})`); continue; }

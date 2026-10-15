@@ -9,6 +9,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Structure, RoomType, Booking, Guest } from "@/lib/types";
 import { cityTaxOf } from "@/lib/booking";
+import { invoicePayMethodLabel } from "@/lib/pay-method";
 import { nights } from "@/lib/dates";
 import { todayRome } from "@/lib/dates-rome";
 import {
@@ -191,7 +192,7 @@ export async function createDocumentFromBooking(
     due_date: options.dueDate ?? null,
     payment_terms: options.paymentTerms ?? null,
     vat_exigibility: options.vatExigibility ?? "I",
-    payment_method: options.paymentMethod ?? null,
+    payment_method: options.paymentMethod ?? invoicePayMethodLabel(ctx.booking) ?? null, // metodo scelto sulla prenotazione (o Incasso OTA dedotto): la fattura lo traduce nel codice SdI
     notes: options.notes ?? null,
     taxable_cents: draft.totals.taxableCents,
     vat_cents: draft.totals.vatCents,

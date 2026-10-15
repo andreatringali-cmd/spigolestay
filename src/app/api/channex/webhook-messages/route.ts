@@ -39,7 +39,7 @@ async function tryOtaAutoReply(admin: SupabaseClient<any>, tenantId: string, msg
     const data = mergeOrgData({ structures: personal.structures, bookings: personal.bookings, units: personal.units, roomTypes: personal.roomTypes }, await loadOrgDatas(admin, tenantId));
     const structures = (Array.isArray(data.structures) ? data.structures : []) as { id: string }[];
     const bookings = (Array.isArray(data.bookings) ? data.bookings : []) as BookingLite[];
-    const guests = (Array.isArray(personal.guests) ? personal.guests : []) as { id: string; fullName?: string; language?: string }[];
+    const guests = (Array.isArray(personal.guests) ? personal.guests : []) as { id: string; fullName?: string; language?: string; phone?: string; country?: string }[];
     const guest = guests.find((g) => g.id === info.guestId);
     const structureId = resolveStructureId(structures, bookings, info.guestId, prefs.defaultStructureId);
     if (!structureId) { await logUnanswered(admin, tenantId, { q: msg.text, sid: "", reason: "struttura di riferimento non determinabile", hasBooking: true }); return; }

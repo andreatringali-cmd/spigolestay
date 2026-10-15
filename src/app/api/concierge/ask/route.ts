@@ -32,7 +32,7 @@ export async function POST(req: Request) {
 
     const bookings = (Array.isArray(data.bookings) ? data.bookings : []) as { id: string; guestId: string }[];
     const bk = bookingId ? bookings.find((x) => x.id === bookingId) : undefined;
-    const guests = (Array.isArray(data.guests) ? data.guests : []) as { id: string; fullName?: string; language?: string }[];
+    const guests = (Array.isArray(data.guests) ? data.guests : []) as { id: string; fullName?: string; language?: string; phone?: string; country?: string }[];
     const g = bk ? guests.find((x) => x.id === bk.guestId) : undefined;
 
     const faqRaw: Record<string, string> = {};
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
       admin: auth.admin, tenantId: auth.tenantId,
       data: { structures: data.structures, bookings: data.bookings, units: data.units, roomTypes: data.roomTypes },
       roomAccessRaw: blob["spigolestay:roomaccess"], conciergeFaqRaw: faqRaw,
-      structureId, bookingId, forceLang, guest: g ? { id: g.id, language: g.language } : undefined, guestName: g?.fullName, message,
+      structureId, bookingId, forceLang, guest: g ? { id: g.id, language: g.language, phone: g.phone, country: g.country } : undefined, guestName: g?.fullName, message,
       tone: parseAiConciergePrefs(blob[AI_CONCIERGE_KEY]).tone, // la prova usa lo stesso tono scelto in Impostazioni
 
       assumeVerified: b?.verified !== false, // la prova la fa il proprietario: Wi-Fi e accesso si vedono come per un ospite in casa

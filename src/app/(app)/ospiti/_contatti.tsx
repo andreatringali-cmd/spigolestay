@@ -9,6 +9,7 @@ import { useData } from "@/lib/store";
 import { toISO, parseISO } from "@/lib/dates";
 import { CHANNELS } from "@/lib/types";
 import { contactReportCached, isRelayEmail } from "@/lib/contacts-check";
+import { guestLangOf } from "@/lib/guest-lang";
 import { upcomingContactIssues, URGENT_DAYS, type UpcomingIssue } from "@/lib/contacts-upcoming";
 
 const OTA = new Set(["booking", "airbnb", "expedia", "agoda", "google", "hotelbeds"]);
@@ -54,7 +55,7 @@ export default function ContattiDaCorreggere() {
   const shown = open ? list : list.slice(0, LIMIT);
   const apply = (x: UpcomingIssue, field: "phone" | "email", value: string) => updateGuest(x.guest.id, { [field]: value });
   const copy = async (x: UpcomingIssue) => {
-    const lang = (x.guest as { language?: string }).language ?? "it";
+    const lang = guestLangOf(x.guest); // scheda, altrimenti Paese/prefisso
     const first = (x.guest.fullName || "").split(/[ ,]+/).filter(Boolean)[0] ?? "";
     const place = getStructure(x.booking.structureId)?.name ? ` a ${getStructure(x.booking.structureId)!.name}` : "";
     try { await navigator.clipboard.writeText((ASK[lang] ?? ASK.it)(first || "ospite", place)); setCopied(x.guest.id); setTimeout(() => setCopied((c) => (c === x.guest.id ? null : c)), 2500); } catch { /* clipboard non disponibile */ }

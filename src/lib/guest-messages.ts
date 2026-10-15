@@ -24,6 +24,19 @@ export const CHECKIN_MSG: Record<Lang, (u: string) => string> = {
   de: (u) => `Um Ihre Ankunft zu beschleunigen, füllen Sie bitte den Online-Check-in (Daten und Ausweis) hier aus: ${u}`,
   es: (u) => `Para agilizar tu llegada, completa el check-in online (datos y documento) aquí: ${u}`,
 };
+// Richiesta di check-in dalla riga "arrivi senza check-in" (Adempimenti): firmata dalla struttura, con il link già accorciato.
+export function checkinRequestMsg(lang: Lang, o: { name?: string; structure?: string; link: string }): string {
+  const n = (o.name ?? "").trim(), s = (o.structure ?? "").trim();
+  const T: Record<Lang, string> = {
+    it: `Gentile ${n || "ospite"}, le scriviamo da ${s || "la struttura"}. Per velocizzare il suo arrivo la invitiamo a completare il check-in online (dati e documento, bastano 2 minuti): ${o.link} . Grazie e a presto!`,
+    en: `Dear ${n || "guest"}, this is ${s || "your host"}. To speed up your arrival, please complete the online check-in (details and ID, it only takes 2 minutes): ${o.link} . Thank you and see you soon!`,
+    fr: `Bonjour ${n || "cher client"}, ici ${s || "votre hôte"}. Pour accélérer votre arrivée, merci de remplir le check-in en ligne (données et pièce d'identité, 2 minutes suffisent) : ${o.link} . Merci et à bientôt !`,
+    de: `Guten Tag ${n || "lieber Gast"}, hier ist ${s || "Ihre Unterkunft"}. Um Ihre Ankunft zu beschleunigen, füllen Sie bitte den Online-Check-in aus (Daten und Ausweis, es dauert nur 2 Minuten): ${o.link} . Vielen Dank und bis bald!`,
+    es: `Estimado/a ${n || "huésped"}, le escribimos desde ${s || "el alojamiento"}. Para agilizar su llegada, le invitamos a completar el check-in online (datos y documento, bastan 2 minutos): ${o.link} . ¡Gracias y hasta pronto!`,
+  };
+  return T[lang] + (s ? "\n— " + s : "");
+}
+
 // Check-in incompleto: manca qualche ospite (n = quanti).
 export const CHECKIN_MORE_MSG: Record<Lang, (n: number, u: string) => string> = {
   it: (n, u) => `Il check-in è quasi completo: ci mancano i dati di ${n} ${n === 1 ? "altro ospite" : "altri ospiti"}. Apri il link e compila di nuovo il modulo con i dati di tutti gli ospiti: ${u}`,

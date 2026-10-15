@@ -1,0 +1,85 @@
+"use client";
+
+// Arrivi, partenze e fermi (ospiti in casa) per i giorni a venire, camera per camera.
+import { useMemo, useState } from "react";
+import type { Booking, Guest, RoomType, Structure, Unit } from "@/lib/types";
+import { buildAgenda, WEEKDAY_LONG, isoWeekday } from "@/lib/pulizie-addetta";
+import { fmtDMY, parseISO, toISO } from "@/lib/dates";
+import { ACT_LABEL, type PlanRoom } from "@/lib/puliziePlan";
+import { cleanBar, cleanText, cleanTint } from "@/lib/pulizie-colors";
+import { Card, Seg } from "./addetta-ui";
+
+const dm = (iso: string) => fmtDMY(iso).slice(0, 5); // gg.mm
+
+export default function AddettaAgenda({ structures, units, roomTypes, bookings, guests }: { structures: Structure[]; units: Unit[]; roomTypes: RoomType[]; bookings: Booking[]; guests: Guest[] }) {
+  const today = toISO(new Date());
+  const [span, setSpan] = useState<"3" | "7" | "14">("7");
+  const [open, setOpen] = useState<Record<string, boolean>>({ [today]: true });
+  const days = useMemo(() => buildAgenda({ from: today, days: Number(span), structures, units, roomTypes, bookings }), [today, span, structures, units, roomTypes, bookings]);
+  const guestName = (id: string) => guests.find((g) => g.id === id)?.fullName || "Ospite";
+  const isOpen = (d: string) => open[d] ?? false;
+  const allOpen = days.every((d) => isOpen(d.date));
+  const label = (iso: string) => (iso === today ? "Oggi" : iso === toISO(new Date(parseISO(today).getTime() + 86_400_000)) ? "Domani" : WEEKDAY_LONG[isoWeekday(iso) - 1]);
+
+  const rowText = (r: PlanRoom): string => {
+    const pers = (b: Booking) => `${b.adults + b.children} pers.`;
+    if (r.dep && r.arr) return `Esce ${guestName(r.dep.guestId)} · entra ${guestName(r.arr.guestId)} (${pers(r.arr)}, fino al ${dm(r.arr.checkOut)})`;
+    if (r.arr) return `Entra ${guestName(r.arr.guestId)} (${pers(r.arr)}, fino al ${dm(r.arr.checkOut)})`;
+    if (r.dep) return `Esce ${guestName(r.dep.guestId)}`;
+    if (r.stay) return `${guestName(r.stay.guestId)} in casa (${pers(r.stay)}, fino al ${dm(r.stay.checkOut)})`;
+    return "";
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Seg value={span} onChange={setSpan} options={[{ key: "3", label: "3 giorni" }, { key: "7", label: "7 giorni" }, { key: "14", label: "14 giorni" }]} className="w-full sm:w-auto sm:min-w-[16rem]" />
+        <button onClick={() => setOpen(Object.fromEntries(days.map((d) => [d.date, !allOpen])))} className="ml-auto min-h-[40px] rounded-lg border border-line px-3 text-xs font-medium text-dim hover:bg-wash">{allOpen ? "Chiudi tutti" : "Apri tutti"}</button>
+      </div>
+
+      {days.map((d) => {
+        const empty = d.rooms.length === 0;
+        const o = isOpen(d.date);
+        return (
+          <Card key={d.date} className="overflow-hidden">
+            <button onClick={() => setOpen((s) => ({ ...s, [d.date]: !o }))} disabled={empty} className="flex w-full items-center gap-2 px-3 py-3 text-left disabled:cursor-default" aria-expanded={o}>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-bold text-txt">{label(d.date)} <span className="font-normal text-dim">· {fmtDMY(d.date)}</span></span>
+                <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
+                  {empty ? <span className="text-faint">Nessun movimento</span> : (<>
+                    <span style={{ color: "var(--ok)" }}>{d.arrivi} {d.arrivi === 1 ? "arrivo" : "arrivi"}</span>
+                    <span style={{ color: "var(--err)" }}>{d.partenze} {d.partenze === 1 ? "partenza" : "partenze"}</span>
+                    <span style={{ color: "#0891B2" }}>{d.fermi} {d.fermi === 1 ? "fermo" : "fermi"}</span>
+                  </>)}
+                </span>
+              </span>
+              {!empty && <span className="shrink-0 text-xs text-dim">{o ? "▲" : "▼"}</span>}
+            </button>
+            {o && !empty && (
+              <div className="border-t border-line">
+                {structures.map((s) => {
+                  const rs = d.rooms.filter((r) => r.structure.id === s.id);
+                  if (!rs.length) return null;
+                  return (
+                    <div key={s.id}>
+                      {structures.length > 1 && <div className="bg-wash px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-faint">{s.name}</div>}
+                      {rs.map((r) => (
+                        <div key={r.unit.id} className="relative flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-line px-3 py-2 first:border-t-0" title={rowText(r)}>
+                          <span aria-hidden className="absolute inset-y-0 left-0 w-[3px]" style={{ background: cleanBar(r.action) }} />
+                          <span className="w-20 shrink-0 truncate pl-1 font-display text-sm font-bold text-txt">{r.unit.name}</span>
+                          <span className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: cleanTint(r.action), color: cleanText(r.action) }}>{ACT_LABEL[r.action]}</span>
+                          <span className="min-w-0 basis-full pl-1 text-xs text-dim sm:basis-0 sm:flex-1 sm:truncate sm:pl-0">{rowText(r)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+      <p className="text-[11px] text-faint">Arrivo = entra un ospite · Partenza = esce un ospite · Fermo = l&apos;ospite è in casa (riassetto). Le camere senza movimenti non compaiono.</p>
+    </div>
+  );
+}

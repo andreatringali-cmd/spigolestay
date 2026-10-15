@@ -18,9 +18,10 @@ export function roomCodes(roomAccess: unknown, unitId: string | null | undefined
 }
 
 /** Link della guida per una prenotazione (1 camera) o di gruppo (2+ camere). `origin` senza barra finale. */
-export function buildGuideUrl(o: { origin: string; structureId: string; guestName?: string; rooms: GuideRoom[]; roomAccess?: unknown }): string {
+export function buildGuideUrl(o: { origin: string; structureId: string; guestName?: string; rooms: GuideRoom[]; roomAccess?: unknown; lang?: string }): string {
   const p = new URLSearchParams();
   p.set("p", o.structureId);
+  if (o.lang) p.set("lang", o.lang); // la guida si apre già nella lingua dell'ospite (può cambiarla dal selettore)
   const name = (o.guestName || "").trim();
   if (o.rooms.length > 1) {
     const withCode = o.rooms.filter((r) => (r.unitCode || "").trim());

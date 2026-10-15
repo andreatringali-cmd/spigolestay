@@ -227,6 +227,8 @@ export async function POST(req: Request) {
               code: (booking.code as string) || booking.id.slice(0, 8).toUpperCase(),
               structureName: g("name"), structureEmail: g("email"), color: g("photoColor"),
               guestName: `${gFirst} ${gLast}`.trim() || gEmail, guestEmail: gEmail,
+              guestPhone: gPhone || undefined, guestCountry: gCountry || undefined, // lingua dell'email: dal Paese o dal prefisso del telefono
+              refundable, cancelDays,
               roomType: (rtObj?.name as string) || undefined, checkIn: ci, checkOut: co, nights: nN,
               adults, children, total, currency: g("currency") || "€",
               checkInFrom: g("checkInFrom"), checkOutBy: g("checkOutBy"),

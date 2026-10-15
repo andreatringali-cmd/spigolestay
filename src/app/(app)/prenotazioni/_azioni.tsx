@@ -132,9 +132,9 @@ export default function StepActions(p: StepActionsProps) {
 
   const guideUrl = () => {
     const group = b.groupId ? bookings.filter((x) => x.groupId === b.groupId) : [b];
-    if (group.length > 1) return buildGroupGuestLink({ structureId: b.structureId, guestName: guest?.fullName || "", rooms: group.map((bb) => ({ unitId: bb.unitId, unitCode: getUnit(bb.unitId)?.code || getUnit(bb.unitId)?.name || "", parking: !!bb.parking })) });
+    if (group.length > 1) return buildGroupGuestLink({ structureId: b.structureId, guestName: guest?.fullName || "", lang, rooms: group.map((bb) => ({ unitId: bb.unitId, unitCode: getUnit(bb.unitId)?.code || getUnit(bb.unitId)?.name || "", parking: !!bb.parking })) });
     const u = getUnit(b.unitId);
-    return buildGuestLink({ structureId: b.structureId, unitId: b.unitId, unitCode: u?.code || u?.name || "", guestName: guest?.fullName || "", parking: !!b.parking });
+    return buildGuestLink({ structureId: b.structureId, unitId: b.unitId, unitCode: u?.code || u?.name || "", guestName: guest?.fullName || "", parking: !!b.parking, lang });
   };
 
   // ── Contenuti per passaggio ──

@@ -16,6 +16,9 @@ import DateField from "@/components/DateField";
 import { useLang } from "@/lib/i18n";
 import { computePuliziePlan, buildPuliziePlanText, ACT_LABEL, fmtLongIT, type PlanRoom } from "@/lib/puliziePlan";
 import AutoShareSettings from "@/components/pulizie/AutoShareSettings";
+import AddettaView from "@/components/pulizie/AddettaView";
+import { useAccess } from "@/lib/access";
+import { isPulizieOnly } from "@/lib/pulizie-addetta";
 import { cleanBar, cleanTint, cleanText, cleanSolid } from "@/lib/pulizie-colors";
 import PulizieDoc, { type PulizieRow } from "@/components/pdf/PulizieDoc";
 import { captureA4ToPdfBlob } from "@/lib/pdf-capture";
@@ -100,7 +103,17 @@ export default function PuliziePage() {
   const roomHasIssue = (unitId: string) => openIssues.some((i) => i.unitId === unitId && i.date === date);
 
   // Scorte / lista della spesa (prodotti ricorrenti).
-  const [tab, setTab] = useState<"planning" | "scorte">("planning");
+  const [tab, setTab] = useState<"planning" | "scorte" | "addetta">("planning");
+  // Vista "Addetta": si apre da sola per chi ha accesso SOLO a Pulizie (la signora) o con /pulizie?tab=addetta.
+  const { user: accessUser } = useAccess();
+  const pulOnly = isPulizieOnly(accessUser?.perms);
+  const tabInit = useRef(false);
+  useEffect(() => {
+    if (tabInit.current) return;
+    let want = false;
+    try { want = new URLSearchParams(window.location.search).get("tab") === "addetta"; } catch {}
+    if (want || pulOnly) { tabInit.current = true; setTab("addetta"); }
+  }, [pulOnly]);
   const [stock, setStock] = useState<Prod[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [prodDraft, setProdDraft] = useState<null | { id?: string; name: string; structureId: string; supplier: string; qty: number; min: number; applyAll?: boolean }>(null);
@@ -396,9 +409,9 @@ export default function PuliziePage() {
       {/* Selettore: Pulizie / Scorte · meteo e "?" in linea, a destra */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="inline-flex rounded-xl border border-line bg-surface p-0.5 shadow-sm max-sm:w-full">
-          {([["planning", "Pulizie"], ["scorte", "Scorte & spesa"]] as ["planning" | "scorte", string][]).map(([v, lab]) => (
+          {([["planning", "Pulizie"], ["scorte", "Scorte & spesa"], ["addetta", "Addetta"]] as ["planning" | "scorte" | "addetta", string][]).map(([v, lab]) => (
             <button key={v} onClick={() => setTab(v)} className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition max-sm:flex-1 max-sm:justify-center max-sm:px-2 ${tab === v ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>
-              <Icon name={v === "planning" ? "sparkles" : "clipboard"} size={15} /> {t(lab)}
+              <Icon name={v === "planning" ? "sparkles" : v === "addetta" ? "users" : "clipboard"} size={15} /> {t(lab)}
               {v === "scorte" && shopList.length > 0 && <span className="rounded-full bg-[color:var(--err)] px-1.5 text-[10px] font-bold text-white">{shopList.length}</span>}
             </button>
           ))}
@@ -406,7 +419,7 @@ export default function PuliziePage() {
         <div className="ml-auto flex items-center gap-3 max-sm:w-full max-sm:justify-end"><WeatherWidget compact /><PageHelp /></div>
       </div>
 
-      {tab === "scorte" ? (
+      {tab === "addetta" ? <AddettaView /> : tab === "scorte" ? (
         <div className="flex flex-col gap-4">
           {/* Split: Prodotti (sinistra) · Lista della spesa (destra). Impilato su mobile. */}
           <div className="grid gap-4 lg:grid-cols-2">

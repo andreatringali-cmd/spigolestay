@@ -15,6 +15,11 @@
   // ripulito, così i codici non restano nella barra degli indirizzi.
   (function () {
     var params = new URLSearchParams(location.search);
+    // Lingua dell'ospite dal link (?lang=it|en|fr|de|es, ricavata dalla prenotazione: scheda, Paese o prefisso del telefono):
+    // se l'ospite non ha ancora scelto una lingua la guida si apre già in quella, senza passare dalla schermata di scelta.
+    // Una scelta fatta in precedenza dall'ospite ha sempre la precedenza; la lingua si cambia dal selettore in alto.
+    var lp = (params.get("lang") || "").slice(0, 2).toLowerCase();
+    try { if (/^(it|en|fr|de|es)$/.test(lp) && !localStorage.getItem("spigole_lang")) localStorage.setItem("spigole_lang", lp); } catch (e) {}
     // Nomi brevi (c/pk) con i vecchi (camera/tipo/park) come ripiego:
     // i link già in mano agli ospiti devono continuare a funzionare.
     var hasGuest = ["c", "camera", "k", "kr", "pk", "park", "p", "d", "tax", "g"].some(function (x) { return params.has(x); });

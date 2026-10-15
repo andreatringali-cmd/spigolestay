@@ -10,7 +10,7 @@ const EXACT = [
   "aiconcierge", "concierge:unanswered:v1", "roomaccess", "revenueapplied", "autopilot", "channexmap", "google-content-result",
   "canali:conn", "canali:enabled", "canali:colors", "canali:log", "canali:corrlog",
   "cassa:conti", "cassa:conti-prefs", "cassa:payouts", "cassa:overrides", "cassa:v1", "cassa:migrated",
-  "reviewsettings", "pulizie:done", "pulizie:stock", "pulizie:issues", "pulizie:linen", "pulizie:notes", "pulizie:orders", "pulizie:autoshare",
+  "reviewsettings", "pulizie:done", "pulizie:stock", "pulizie:issues", "pulizie:linen", "pulizie:notes", "pulizie:orders", "pulizie:autoshare", "pulizie:tasks", "pulizie:checks", "pulizie:hours",
 ].map((k) => P + k);
 
 // chiavi con suffisso (per struttura): pulizie:autoshare:<id>, sito:<id>, reviews:placeid:<id>, ratecheck:*, style:*

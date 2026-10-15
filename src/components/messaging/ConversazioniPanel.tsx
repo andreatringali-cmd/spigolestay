@@ -8,6 +8,7 @@ import { playSound } from "@/lib/sound";
 import { otaLabel, isOtaVia } from "@/lib/ota-label";
 import { useLang } from "@/lib/i18n";
 import { CHANNELS, type Booking, type Guest } from "@/lib/types";
+import { bookingExtrasTotal } from "@/lib/booking";
 import ChannelLogo from "@/components/ChannelLogo";
 import LinkPreview from "@/components/messaging/LinkPreview";
 import VoiceNote from "@/components/messaging/VoiceNote";
@@ -524,10 +525,10 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
     const gu = guests.find((x) => x.id === b.guestId);
     const groupBk = b.groupId ? bookings.filter((x) => x.groupId === b.groupId) : [b];
     if (groupBk.length > 1) {
-      return buildGroupGuestLink({ structureId: b.structureId, guestName: gu?.fullName || "", rooms: groupBk.map((bb) => ({ unitId: bb.unitId, unitCode: getUnit(bb.unitId)?.code || getUnit(bb.unitId)?.name || "", parking: !!bb.parking })) });
+      return buildGroupGuestLink({ structureId: b.structureId, guestName: gu?.fullName || "", lang: langOf(gu), rooms: groupBk.map((bb) => ({ unitId: bb.unitId, unitCode: getUnit(bb.unitId)?.code || getUnit(bb.unitId)?.name || "", parking: !!bb.parking })) });
     }
     const unit = getUnit(b.unitId);
-    return buildGuestLink({ structureId: b.structureId, unitId: b.unitId, unitCode: unit?.code || unit?.name || "", guestName: gu?.fullName || "", parking: !!b.parking });
+    return buildGuestLink({ structureId: b.structureId, unitId: b.unitId, unitCode: unit?.code || unit?.name || "", guestName: gu?.fullName || "", parking: !!b.parking, lang: langOf(gu) });
   };
   const checkinUrlFor = (b: Booking) => `${typeof window !== "undefined" ? window.location.origin : ""}/checkin?b=${encodeURIComponent(b.id)}`;
   const nightsOf = (b: Booking) => Math.max(1, Math.round((new Date(b.checkOut).getTime() - new Date(b.checkIn).getTime()) / 86400000));
@@ -542,7 +543,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const fillFor = (raw: string, b: Booking, g: Guest) => {
     const st = getStructure(b.structureId); const unit = getUnit(b.unitId);
     const access = unit?.accessInfo || st?.accessInfo || "—";
-    const balance = (b.total ?? 0) + (b.cleaningFee ?? 0) - (b.paid ?? 0);
+    const balance = (b.total ?? 0) + (b.cleaningFee ?? 0) + bookingExtrasTotal(b) - (b.paid ?? 0);
     return raw
       .replace(/\{ospite\}/g, g.fullName.split(" ")[0])
       .replace(/\{struttura\}/g, st?.name ?? "")
@@ -847,7 +848,7 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
                 const primaryOk = !!(g && (g.lastName || g.fullName) && g.sex && g.birthDate && g.birthPlace && g.citizenship && g.docType && g.docNumber);
                 const schedinaOk = primaryOk && (b.extraGuests ?? []).every((c) => c.lastName && c.firstName && c.sex && c.birthDate && c.birthPlace && c.citizenship);
                 const guidaSent = (threads[b.guestId] ?? []).some((m) => m.dir === "out" && /guest-guide|\/guida|guida ospiti/i.test(m.text));
-                const totale = (b.total ?? 0) + (b.cleaningFee ?? 0);
+                const totale = (b.total ?? 0) + (b.cleaningFee ?? 0) + bookingExtrasTotal(b);
                 const paid = b.paid ?? 0;
                 const saldato = totale > 0 && paid >= totale - 0.01;
                 const residuo = Math.max(0, totale - paid);

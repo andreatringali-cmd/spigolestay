@@ -169,7 +169,7 @@ const ENTITY_COLLECTIONS = ["structures", "roomTypes", "units", "bookings", "gue
 // pulizie) sovrascriveva sul server le modifiche appena fatte altrove — è la causa per cui lo
 // stato "Disponibile" dei prodotti "tornava indietro". Le cancellazioni sono soft-delete
 // (_deleted:true con updatedAt più recente) così non risorgono.
-const FLAT_ENTITY_KEYS = ["spigolestay:pulizie:stock", "spigolestay:pulizie:orders", "spigolestay:pulizie:issues"];
+const FLAT_ENTITY_KEYS = ["spigolestay:pulizie:stock", "spigolestay:pulizie:orders", "spigolestay:pulizie:issues", "spigolestay:pulizie:tasks", "spigolestay:pulizie:checks", "spigolestay:pulizie:hours"];
 const THREADS_KEY = "spigolestay:threads:v1";
 // Preventivi (array piatto, id ma senza updatedAt): vedi mergePreventivi più sotto. Scritta anche dal
 // server (conferma dopo pagamento Stripe, src/app/api/stripe/quote/confirm/route.ts).

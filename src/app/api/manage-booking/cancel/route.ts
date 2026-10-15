@@ -88,6 +88,8 @@ export async function POST(req: Request) {
             booking: {
               code, structureName: s(st.name), structureEmail: s(st.email), color: s(st.photoColor),
               guestName: `${s(g.firstName)} ${s(g.lastName)}`.trim() || s(g.fullName) || gEmail, guestEmail: gEmail,
+              guestPhone: s(g.phone) || undefined, guestCountry: s(g.country) || undefined, guestLanguage: s(g.language) || undefined, // lingua dell'email
+              refundable: b.refundable === true, cancelDays: n(b.cancelDays),
               checkIn: s(b.checkIn), checkOut: s(b.checkOut), currency,
               refunded, cancelPolicy: refunded > 0 ? undefined : cancelPolicy,
             },

@@ -140,7 +140,8 @@ export async function GET(req: Request) {
       const rt = roomTypes.get(s(b.roomTypeId)) || {};
       const lang = guestLangOf({ language: s(g.lang) || s(g.language), country: s(g.country), phone: s(g.phone) }); // lingua della scheda, altrimenti Paese/prefisso
       const nn = nights(checkIn, checkOut);
-      const balance = Math.max(0, num(b.total) + num(b.cleaningFee) - num(b.paid));
+      const extrasSum = Array.isArray(b.extras) ? (b.extras as { price?: unknown }[]).reduce((a, e) => a + num(e?.price), 0) : 0; // extra venduti (culla, animali, letto…): fanno parte del dovuto
+      const balance = Math.max(0, num(b.total) + num(b.cleaningFee) + extrasSum - num(b.paid));
       const ctx: Record<string, string> = {
         ospite: s(g.firstName) || s(g.fullName).split(" ")[0] || "ospite",
         struttura: s(st.name),
@@ -152,7 +153,7 @@ export async function GET(req: Request) {
         link_checkin: `${origin}/checkin?b=${s(b.id)}`,
         // Link PERSONALE della guida (struttura + camera + codici + nome), come quello copiato a mano dalla chat; l'indirizzo scelto a mano nella struttura ha la precedenza.
         link_guida: s(st.guideUrl) || buildGuideUrl({
-          origin, structureId: s(b.structureId), guestName: s(g.fullName) || [s(g.firstName), s(g.lastName)].filter(Boolean).join(" "), roomAccess: blob[ROOMACCESS_KEY],
+          origin, structureId: s(b.structureId), guestName: s(g.fullName) || [s(g.firstName), s(g.lastName)].filter(Boolean).join(" "), roomAccess: blob[ROOMACCESS_KEY], lang,
           rooms: (b.groupId ? bookings.filter((x) => s((x as Json).groupId) === s(b.groupId) && s((x as Json).status) !== "cancelled") : [bk]).map((x) => {
             const xu = units.get(s((x as Json).unitId)) || {};
             return { unitId: s((x as Json).unitId) || null, unitCode: s(xu.code) || s(xu.name), parking: !!(x as Json).parking };

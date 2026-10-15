@@ -1,17 +1,24 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { NAV } from "./nav";
 import { useAccess } from "@/lib/access";
+import { isPulizieOnly } from "@/lib/pulizie-addetta";
 
 // Protegge le pagine: se l'utente non ha il permesso o il modulo è spento, mostra un avviso.
 export default function AccessGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { can, moduleOn, user } = useAccess();
+  const router = useRouter();
+  // Profilo "solo Pulizie" (la signora delle pulizie): ovunque atterri, va alla sua pagina.
+  const pulOnlyOff = !!user && isPulizieOnly(user.perms) && !pathname.startsWith("/pulizie");
+  useEffect(() => { if (pulOnlyOff) router.replace("/pulizie?tab=addetta"); }, [pulOnlyOff, router]);
   const item = NAV.filter((n) => n.href !== "/" && pathname.startsWith(n.href)).sort((a, b) => b.href.length - a.href.length)[0];
 
+  if (pulOnlyOff) return null;
   if (item && user) {
     const moduleOff = !moduleOn(item.module);
     const noPerm = !can(item.perm);

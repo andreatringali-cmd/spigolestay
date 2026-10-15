@@ -3,6 +3,7 @@
 
 import type { Booking, Guest, Structure, Unit, RoomType } from "./types";
 import { eur } from "./format";
+import { bookingExtrasTotal } from "./booking";
 
 export interface SavedQuote { id: string; number: number; name: string; total: number; status: string; createdAt: string; structureId: string; checkIn: string; checkOut: string }
 
@@ -99,7 +100,7 @@ export function answer(raw: string, ctx: AssistantCtx): Answer {
 
   // ── Da incassare (saldi aperti) ──
   if (/(da\s+incass|devo\s+incass|ancora\s+incass|saldo|saldi|resid|manca.*(pagare|incass)|crediti)/.test(q)) {
-    const open = active.filter((b) => b.checkOut >= todayISO).map((b) => ({ b, due: (b.total ?? 0) + (b.cleaningFee ?? 0) - (b.paid ?? 0) })).filter((x) => x.due > 0).sort((a, z) => z.due - a.due);
+    const open = active.filter((b) => b.checkOut >= todayISO).map((b) => ({ b, due: (b.total ?? 0) + (b.cleaningFee ?? 0) + bookingExtrasTotal(b) - (b.paid ?? 0) })).filter((x) => x.due > 0).sort((a, z) => z.due - a.due);
     const tot = open.reduce((a, x) => a + x.due, 0);
     return { kind: "answer", icon: "card", title: "Ancora da incassare", metric: eur(tot), detail: `${open.length} prenotazioni con saldo aperto`, items: open.slice(0, 8).map(({ b, due }) => bItem(b, `${fmtD(b.checkIn)} → ${fmtD(b.checkOut)}`)).map((it, i) => ({ ...it, badge: eur(open[i].due) })), href: "/pagamenti", hrefLabel: "Apri pagamenti" };
   }

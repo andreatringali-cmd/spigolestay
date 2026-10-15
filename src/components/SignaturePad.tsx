@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 // Riquadro di firma (canvas) — l'ospite firma col dito/mouse; esporta una dataURL PNG.
-export default function SignaturePad({ value, onChange, height = 150 }: { value?: string; onChange: (dataUrl: string | undefined) => void; height?: number }) {
+export default function SignaturePad({ value, onChange, height = 150, placeholder = "Firma qui col dito o col mouse", clearLabel = "Cancella firma" }: { value?: string; onChange: (dataUrl: string | undefined) => void; height?: number; placeholder?: string; clearLabel?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
@@ -37,9 +37,9 @@ export default function SignaturePad({ value, onChange, height = 150 }: { value?
     <div>
       <div className="relative overflow-hidden rounded-lg border border-line bg-paper">
         <canvas ref={ref} style={{ width: "100%", height, touchAction: "none", cursor: "crosshair" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} />
-        {empty && <span className="pointer-events-none absolute inset-0 grid place-items-center text-xs text-faint">Firma qui col dito o col mouse</span>}
+        {empty && <span className="pointer-events-none absolute inset-0 grid place-items-center text-xs text-faint">{placeholder}</span>}
       </div>
-      <div className="mt-1 flex justify-end"><button type="button" onClick={clear} className="text-[11px] font-medium text-dim hover:text-[color:var(--err)]">Cancella firma</button></div>
+      <div className="mt-1 flex justify-end"><button type="button" onClick={clear} className="text-[11px] font-medium text-dim hover:text-[color:var(--err)]">{clearLabel}</button></div>
     </div>
   );
 }

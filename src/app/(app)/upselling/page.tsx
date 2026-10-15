@@ -33,6 +33,8 @@ export default function UpsellingPage() {
   const [showEmpty, setShowEmpty] = useState(false);
   const [period, setPeriod] = useState("365");
   const [localCat, setLocalCat] = useState<string>(structures[0]?.id ?? "");
+  // Link diretto alla scheda catalogo (es. dalla scheda prenotazione: "Imposta prezzi e extra").
+  useEffect(() => { try { if (new URLSearchParams(window.location.search).get("tab") === "catalogo") setTab("catalogo"); } catch { /* niente query */ } }, []);
 
   // ── Catalogo extra della struttura selezionata (fonte unica, condivisa col motore prenotazioni) ──
   const catId = activeStructureId !== "all" ? activeStructureId : (structures.some((s) => s.id === localCat) ? localCat : structures[0]?.id ?? "");

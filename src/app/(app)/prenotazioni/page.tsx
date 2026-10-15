@@ -8,7 +8,7 @@ import { bookingCode } from "@/lib/bookingCode";
 import { CHANNELS, type BookingStatus, type Channel } from "@/lib/types";
 import { nights, parseISO, toISO } from "@/lib/dates";
 import { eur } from "@/lib/format";
-import { bookingPaidTotal, cityTaxOfBooking, commissionOf, commissionPctOf, commissionShareOf, nettoOf } from "@/lib/booking";
+import { bookingExtrasTotal, bookingPaidTotal, cityTaxOfBooking, commissionOf, commissionPctOf, commissionShareOf, nettoOf } from "@/lib/booking";
 import { loadWeekendPct } from "@/lib/pricing";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { exportExcel, exportPdf } from "@/lib/export";
@@ -64,8 +64,8 @@ export default function PrenotazioniPage() {
     const g = guests.find((x) => x.id === b.guestId);
     return !!(g && (g.lastName || g.fullName) && g.sex && g.birthDate && g.birthPlace && g.citizenship && g.docType && g.docNumber);
   };
-  const payStatus = (b: { total?: number; cleaningFee?: number; paid?: number }): "paid" | "partial" | "unpaid" => {
-    const due = (b.total ?? 0) + (b.cleaningFee ?? 0);
+  const payStatus = (b: { total?: number; cleaningFee?: number; extras?: { price?: number }[]; paid?: number }): "paid" | "partial" | "unpaid" => {
+    const due = (b.total ?? 0) + (b.cleaningFee ?? 0) + bookingExtrasTotal(b);
     const paid = b.paid ?? 0;
     if (due > 0 && paid >= due) return "paid";
     if (paid > 0) return "partial";

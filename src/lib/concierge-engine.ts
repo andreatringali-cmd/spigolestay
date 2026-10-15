@@ -4,6 +4,7 @@ import { getConciergeReply } from "@/lib/ai/guest-concierge";
 import type { ConciergeTone } from "@/lib/aiConcierge";
 import { isTranslateLang, toTranslationMap, type GuestLang } from "@/lib/concierge-i18n";
 import { loadTranslations } from "@/lib/concierge-translations";
+import { guestLangHint } from "@/lib/guest-lang";
 import { accessCodeOf, kbLang, renderEntry, resolveEntries, toFaqItems, selectRelevant, SENSITIVE_CATEGORIES, type ConciergeEntry } from "@/lib/concierge-kb";
 
 // Motore unico del Concierge (solo server): lo usano sia il webhook WhatsApp sia la casella "Prova" di Xenora,
@@ -48,7 +49,7 @@ export interface EngineInput {
   structureId: string;
   bookingId?: string;                       // prova dalla UI: prenotazione scelta a mano
   assumeVerified?: boolean;                 // prova dalla UI: tratta l'interlocutore come ospite con prenotazione in corso
-  guest?: { id?: string; language?: string };
+  guest?: { id?: string; language?: string; phone?: string; country?: string }; // phone/country: se manca la lingua, la ricava il prefisso (guestLangHint)
   forceLang?: GuestLang;                    // prova dalla UI: lingua dell'ospite scelta a mano (ignora anagrafica e testo)
   guestName?: string;
   message: string;
@@ -74,7 +75,7 @@ async function runConcierge(inp: EngineInput, ms: { total: number; kb: number; a
   const units = arr<UnitLite>(inp.data.units);
   const roomTypes = arr<RoomTypeLite>(inp.data.roomTypes);
   const st = structures.find((s) => s.id === inp.structureId);
-  const lang: GuestLang = inp.forceLang ?? kbLang(inp.guest?.language, inp.message);
+  const lang: GuestLang = inp.forceLang ?? kbLang(guestLangHint(inp.guest), inp.message);
   if (!st) return { answered: false, reason: "nessuna struttura di riferimento", hasBooking: false, lang };
 
   const oggi = todayISO();

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { findBookingStore, refundEligible } from "@/lib/manage-booking";
+import { guestLangOrNull } from "@/lib/guest-lang";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,6 +56,7 @@ export async function GET(req: Request) {
         cancelledAt: s(b.cancelledAt) || null,
         refundedAmount: n(b.refundedAmount),
         guestFirst: s(g.firstName) || s(g.fullName).split(" ")[0] || "",
+        guestLang: guestLangOrNull({ language: s(g.language), lang: s(g.lang), country: s(g.country), phone: s(g.phone) }), // lingua della pagina (scheda → Paese → prefisso telefono)
       },
       structure: {
         name: s(st.name), color: s(st.photoColor),

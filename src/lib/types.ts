@@ -1,6 +1,7 @@
 // Modello dati di Xenora (front-end), sincronizzato con lo schema DB reale su Supabase.
 // Strutture → tipologie → unità; prenotazioni; folio.
 import type { OtaInfo } from "./channex-guestdata";
+import type { PayMethod } from "./pay-method";
 
 export type Channel = "booking" | "airbnb" | "expedia" | "agoda" | "google" | "hotelbeds" | "other" | "direct" | "blocked";
 
@@ -137,6 +138,7 @@ export interface ExtraService {
   minNights?: number;      // soggiorno minimo (notti) perché l'extra venga proposto
   maxQty?: number;         // quantità massima per prenotazione
   confirmed?: boolean;     // il gestore ha verificato il prezzo (false = esempio precaricato: NON viene proposto agli ospiti)
+  free?: boolean;          // servizio gratuito per scelta (es. culla da campo): prezzo 0 voluto, non "da impostare"
 }
 
 export type ExtraKind = "late-checkout" | "early-checkin" | "breakfast" | "parking" | "transfer" | "excursion" | "other";
@@ -347,6 +349,7 @@ export interface Booking {
   depositPaid?: boolean; // caparra ricevuta
   parking?: boolean; // l'ospite ha prenotato il parcheggio (seleziona i codici "con parcheggio" nella guida)
   paid?: number; // € già incassati (acconto/saldo)
+  paymentMethod?: PayMethod; // come è stato/sarà incassato (scelto a mano). Se l'OTA incassa, il metodo "Incasso OTA" è dedotto in automatico: vedi effectivePayMethod in pay-method.ts
   commissionPct?: number; // % di commissione OTA specifica di questa prenotazione
   paymentFee?: number; // € costo d'incasso trattenuto dall'OTA (es. "Payment charge" di Booking.com): si toglie dal netto, separato dalla commissione
   commissionAmount?: number; // € commissione esatta (con centesimi), es. da un'OTA — se presente ha priorità sul calcolo via %

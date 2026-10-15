@@ -79,6 +79,10 @@ export const PERM_TEMPLATES: PermTemplate[] = [
     perms: () => build({ pulizie: "edit", calendario: "view" }),
   },
   {
+    key: "cleaner", label: "Addetta pulizie", desc: "Vede solo la pagina Pulizie: programma, checklist, problemi, ore e acquisti.",
+    perms: () => build({ pulizie: "edit" }),
+  },
+  {
     key: "revenue", label: "Revenue manager", desc: "Tariffe, prezzi dinamici e analisi.",
     perms: () => build({ calendario: "view", tariffe: "edit", revenue: "edit", ratechecker: "edit", canali: "edit", sito: "edit", statistiche: "edit" }),
   },

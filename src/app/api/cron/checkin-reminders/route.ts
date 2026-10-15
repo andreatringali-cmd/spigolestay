@@ -124,6 +124,7 @@ export async function GET(req: Request) {
             structureEmail: st?.email,
             guestName: guest?.fullName,
             guestEmail,
+            guestPhone: guest?.phone ? String(guest.phone) : undefined, guestCountry: guest?.country ? String(guest.country) : undefined, guestLanguage: guest?.language ? String(guest.language) : undefined, // lingua dell'email
             checkIn: b.checkIn,
             checkInFrom: st?.checkInFrom,
             color: st?.photoColor,

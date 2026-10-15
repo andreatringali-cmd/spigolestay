@@ -10,6 +10,7 @@ import { USER_LANGS, AV_COLORS, initials } from "@/lib/users";
 import { eur } from "@/lib/format";
 import { useLang } from "@/lib/i18n";
 import { contactReportCached } from "@/lib/contacts-check";
+import { guestLangOf } from "@/lib/guest-lang";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { type Promo, loadPromos, promosForStructure, promoMailto } from "@/lib/promos";
@@ -66,7 +67,7 @@ export default function OspiteSchedaPage() {
   const ask = useConfirm();
 
   const existing = guests.find((g) => g.id === params.id);
-  const [g, setG] = useState<Guest>(() => (existing ? withSplitNames(existing) : { id: "", fullName: "", firstName: "", lastName: "", language: "it", tags: [] }));
+  const [g, setG] = useState<Guest>(() => (existing ? withSplitNames(existing) : { id: "", fullName: "", firstName: "", lastName: "", tags: [] }));
   const set = <K extends keyof Guest>(k: K, v: Guest[K]) => setG((p) => ({ ...p, [k]: v }));
   const cr = contactReportCached({ phone: g.phone, email: g.email, country: g.country }); // controllo di telefono ed email mentre si scrive
   // Telefono scomposto in prefisso + numero; salvo sempre il formato internazionale in g.phone.
@@ -238,7 +239,7 @@ export default function OspiteSchedaPage() {
                 )}
               </label>
               <label className={`${lbl} col-span-2`}>{t("Paese")}<input value={g.country ?? ""} onChange={(e) => set("country", e.target.value)} className={`${inp} mt-1`} /></label>
-              <label className={`${lbl} col-span-2`}>{t("Lingua")}<select value={g.language ?? "it"} onChange={(e) => set("language", e.target.value)} className={`${inp} mt-1`}>{USER_LANGS.map((l) => <option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}</select></label>
+              <label className={`${lbl} col-span-2`}>{t("Lingua")}<select value={g.language ?? ""} onChange={(e) => set("language", e.target.value)} className={`${inp} mt-1`}><option value="">{t("Automatica")} ({USER_LANGS.find((l) => l.code === guestLangOf({ country: g.country, phone: g.phone }))?.label}, {t("dal Paese o dal prefisso del telefono")})</option>{USER_LANGS.map((l) => <option key={l.code} value={l.code}>{l.flag} {l.label}</option>)}</select></label>
             </div>
           </Card>
 
