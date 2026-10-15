@@ -9,6 +9,7 @@ import { cassaContoFor } from "./pay-method";
 import { shiftISO } from "./dates";
 import { payoutDate, loadPayoutSettings, type PayoutSettingsMap } from "./payouts";
 import { roundCents, sumCents } from "./money";
+import { onlineIncasso } from "./online-pay";
 
 export type Kind = "in" | "out";
 export interface Mov { id: string; date: string; kind: Kind; cat: string; desc: string; amount: number; conto: string; structureId?: string; auto?: boolean; sched?: boolean; ref?: string; forecast?: boolean; channel?: string /* canale della prenotazione da cui nasce */; bookingStructureId?: string /* struttura della prenotazione da cui nasce (movimenti automatici): serve a non mescolare strutture nei bonifici unici */; edited?: boolean /* riga di una scadenza modificata a mano */; occKey?: string /* chiave originale della scadenza (regola|data) */; variable?: boolean /* scadenza a importo variabile: l'importo è una stima */ }
@@ -54,7 +55,13 @@ export function occurrences(r: Rule, fromISO: string, toISO: string): string[] {
 export const scopeVisible = (structureId: string | undefined | null, active: string) =>
   active === "all" || structureId === active;
 
+/** Id del secondo movimento di incasso di una prenotazione diretta pagata online: la parte NON pagata online (es. saldo in contanti all'arrivo). Comincia per `auto-in-`, così i filtri e i raggruppamenti per prenotazione lo riconoscono. */
+export const REST_IN_PREFIX = "auto-in-resto-";
+/** Conto della parte NON pagata online: segue la scelta del gestore; senza scelta è quello storico (diretta → contanti), non la carta dedotta dal pagamento online. */
+const restContoFor = (b: Booking, principal: string, validConti: string[]) => cassaContoFor({ ...b, stripePaymentIntent: undefined }, principal, validConti);
+
 // Movimenti automatici dalle prenotazioni (dirette → contanti, OTA → banca + commissione).
+// Diretta pagata online (Stripe): la parte pagata online è datata al giorno del pagamento (booking.paidAt), non all'arrivo.
 export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: (id: string) => Structure | undefined, active: string, principal: string = loadContiPrefs().principal, payouts: PayoutSettingsMap = loadPayoutSettings(), validConti: string[] = loadConti().map((c) => c.key)): Mov[] {
   const out: Mov[] = [];
   for (const b of bookings) {
@@ -66,7 +73,13 @@ export function computeAuto(bookings: Booking[], guests: Guest[], getStructure: 
     // Incasso automatico = quanto realmente incassato sulla prenotazione (fonte di
     // verità = prenotazione), non l'intero totale: così la cassa/chiusura riflette il reale.
     const incassato = roundCents(b.paid ?? 0);
-    if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: cassaContoFor(b, principal, validConti), auto: true, ref: b.id });
+    // Diretta pagata online (Stripe): la parte online è incassata il giorno del pagamento, non all'arrivo; il resto (es. saldo in contanti all'arrivo) alla data del canale.
+    const online = onlineIncasso(b);
+    if (online) {
+      const label = `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`;
+      if (online.amount > 0) out.push({ id: `auto-in-${b.id}`, date: online.date, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: label, amount: online.amount, conto: cassaContoFor(b, principal, validConti), auto: true, ref: b.id });
+      if (online.rest > 0) out.push({ id: `${REST_IN_PREFIX}${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: label, amount: online.rest, conto: restContoFor(b, principal, validConti), auto: true, ref: b.id });
+    } else if (incassato > 0) out.push({ id: `auto-in-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label}`, amount: incassato, conto: cassaContoFor(b, principal, validConti), auto: true, ref: b.id });
     const comm = roundCents(commissionOf(b));
     if (comm > 0) out.push({ id: `auto-comm-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "out", cat: "commissioni", desc: `Commissione ${CHANNELS[b.channel].label} · ${g?.fullName ?? "Ospite"}`, amount: comm, conto: principal, auto: true, ref: b.id });
   }
@@ -177,7 +190,7 @@ export function groupBookingRows(rows: Mov[], groupPayout?: (channel: string, st
   for (const m of rows) if (m.id.startsWith("auto-comm-") && m.ref) commByRef.set(m.ref, m);
   // L'incasso della voce unica è quello già incassato (auto-in); se non c'è ancora nulla incassato, è il "da incassare" previsto (fc-in).
   const autoRefs = new Set(rows.filter((m) => m.id.startsWith("auto-in-") && m.ref).map((m) => m.ref as string));
-  const isIncome = (m: Mov) => !!m.ref && (m.id.startsWith("auto-in-") || (m.id.startsWith("fc-in-") && !autoRefs.has(m.ref)));
+  const isIncome = (m: Mov) => !!m.ref && !m.id.startsWith(REST_IN_PREFIX) && (m.id.startsWith("auto-in-") || (m.id.startsWith("fc-in-") && !autoRefs.has(m.ref)));
   const incomeRefs = new Set(rows.filter(isIncome).map((m) => m.ref as string));
   const out: CassaListRow[] = [];
   for (const m of rows) {
@@ -348,7 +361,7 @@ export function computeForecast(bookings: Booking[], guests: Guest[], getStructu
     if (remaining <= 0) continue;
     const g = guests.find((x) => x.id === b.guestId);
     const st = getStructure(b.structureId);
-    out.push({ id: `fc-in-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label} · da incassare`, amount: remaining, conto: cassaContoFor(b, principal, validConti), auto: true, forecast: true, ref: b.id });
+    out.push({ id: `fc-in-${b.id}`, date: when, channel: b.channel, bookingStructureId: b.structureId, kind: "in", cat: "prenotazioni", desc: `${g?.fullName ?? "Ospite"} · ${st?.name ?? ""} · ${CHANNELS[b.channel].label} · da incassare`, amount: remaining, conto: restContoFor(b, principal, validConti), auto: true, forecast: true, ref: b.id });
   }
   const from = shiftISO(today, 1);
   if (from <= horizon) {

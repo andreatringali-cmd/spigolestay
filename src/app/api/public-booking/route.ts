@@ -6,6 +6,7 @@ import { isInternalRequest, rateLimited } from "@/lib/server-auth";
 import { siteOrigin } from "@/lib/server-auth";
 import { internalFetch } from "@/lib/server-auth";
 import { createClient } from "@supabase/supabase-js";
+import { ymdRome } from "@/lib/dates-rome";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -153,6 +154,8 @@ export async function POST(req: Request) {
       total,
       cleaningFee: 0,
       paid: deposit,
+      // Pagato online al momento della prenotazione (Stripe): l'incasso in Cassa è di questo giorno (fuso Roma), non dell'arrivo.
+      ...(stripePaymentIntent && deposit > 0 ? { paidOnline: deposit, paidAt: ymdRome(Date.now()) } : {}),
       cityTaxPaid: false,
       updatedAt: Date.now(),
       extId,

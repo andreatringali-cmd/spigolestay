@@ -32,6 +32,8 @@ type PayBookingLike = {
   paymentFee?: number | null;
   otaCard?: { present?: boolean } | null;
   otaInfo?: { paymentCollect?: "property" | "ota"; paymentType?: "credit_card" | "bank_transfer" } | null;
+  /** Riferimento del pagamento online Stripe: se c'è, l'ospite ha pagato con carta sul sito/link. */
+  stripePaymentIntent?: string | null;
 };
 
 /** Canali che non sono OTA: la prenotazione è diretta o è un blocco. */
@@ -58,15 +60,22 @@ export interface EffectivePayMethod {
   method?: PayMethod;
   /** true = dedotto dai dati dell'OTA, non modificabile dall'utente. */
   auto: boolean;
+  /** true = «Carta» dedotta dal pagamento online (Stripe) perché il gestore non ha scelto nulla. Resta modificabile (auto = false): se il gestore sceglie un metodo, quello vince. */
+  online?: boolean;
 }
+
+/** Etichetta del metodo dedotto dal pagamento online (quando `EffectivePayMethod.online` è true). */
+export const ONLINE_PAY_LABEL = "Carta · pagamento online (automatico)";
 
 /** Metodo di incasso in vigore: "Incasso OTA" automatico se l'OTA incassa, altrimenti quello scelto dal gestore (se c'è). */
 export function effectivePayMethod(b: PayBookingLike): EffectivePayMethod {
   if (otaCollectsPayment(b)) return { method: "ota", auto: true };
   const m = isPayMethod(b.paymentMethod) ? b.paymentMethod : undefined;
   // "ota" scelto a mano su un canale non-OTA non ha senso: si ignora.
-  if (m === "ota" && !isOtaChannel(b.channel)) return { method: undefined, auto: false };
-  return { method: m, auto: false };
+  const chosen = m === "ota" && !isOtaChannel(b.channel) ? undefined : m;
+  // Prenotazione diretta pagata online con Stripe e nessun metodo scelto dal gestore: è una carta (il metodo scelto a mano, se c'è, vince).
+  if (!chosen && b.channel === "direct" && b.stripePaymentIntent) return { method: "carta", auto: false, online: true };
+  return { method: chosen, auto: false };
 }
 
 /** Dettaglio leggibile dell'incasso OTA ("carta virtuale", "bonifico dell'OTA"), per le etichette. */

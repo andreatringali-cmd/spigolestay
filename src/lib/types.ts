@@ -393,6 +393,8 @@ export interface Booking {
   stripeSessionId?: string;
   stripeAccountId?: string; // conto connesso su cui è avvenuto il pagamento
   paidSessions?: string[];  // id sessioni Stripe già registrate come incasso (idempotenza saldo)
+  paidOnline?: number;      // € incassati ONLINE (Stripe) in totale: acconto/saldo pagato dal sito o dal link. Il resto di `paid` è incassato altrimenti (es. contanti all'arrivo). Vedi lib/online-pay.ts
+  paidAt?: string;          // data (yyyy-mm-dd, Europe/Rome) dell'ULTIMO pagamento online: è il giorno in cui la Cassa registra l'incasso online di una prenotazione diretta
   // Ciclo di vita dell'annullamento self-service.
   cancelledAt?: string;    // ISO datetime dell'annullamento
   cancelledBy?: "guest" | "host";

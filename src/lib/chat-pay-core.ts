@@ -25,6 +25,13 @@ export function fmtEur(cents: number): string {
   return `€ ${v.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** Giorno di calendario italiano (yyyy-mm-dd, Europe/Rome) di un istante. */
+function romeYmd(ms: number): string {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(ms));
+  const v = (t: string) => parts.find((x) => x.type === t)?.value ?? "";
+  return `${v("year")}-${v("month")}-${v("day")}`;
+}
+
 /** Interpreta un importo scritto a mano ("120", "120,50", "1.200,50", "120.5"). null se non valido. */
 export function parseEurInput(raw: string): number | null {
   let s = String(raw ?? "").trim().replace(/[€\s]/g, "");
@@ -146,7 +153,11 @@ export function applyChatPayment(booking: Json, p: ApplyPaymentInput): ApplyPaym
   }
   const paidNow = typeof booking.paid === "number" && Number.isFinite(booking.paid) ? booking.paid : 0;
   const newPaid = Math.round((paidNow * 100 + p.cents)) / 100; // niente deriva dei float
-  const patch: Json = { paid: newPaid, paidSessions: [...sessions, p.sessionId], updatedAt: p.now };
+  // Pagato online: la parte versata va datata al giorno di questo pagamento (Cassa), non all'arrivo.
+  // (stessa regola di onlinePaymentPatch in online-pay.ts, riscritta qui perche' questo modulo non ha import: lo carica anche il test senza alias.)
+  const hasOnline = typeof booking.paidOnline === "number" && Number.isFinite(booking.paidOnline);
+  const onlineBefore = hasOnline ? (booking.paidOnline as number) : booking.stripePaymentIntent ? paidNow : 0;
+  const patch: Json = { paid: newPaid, paidSessions: [...sessions, p.sessionId], updatedAt: p.now, paidOnline: Math.round(onlineBefore * 100 + p.cents) / 100, paidAt: romeYmd(p.now) };
   // La tassa risulta incassata se pagata col link "tassa", oppure se il saldo (tassa inclusa) azzera il residuo.
   const taxApplies = (p.cityTaxCents || 0) > 0 && !p.cityTaxExempt;
   if (taxApplies && (p.kind === "tassa" || p.cents >= before)) patch.cityTaxPaid = true;

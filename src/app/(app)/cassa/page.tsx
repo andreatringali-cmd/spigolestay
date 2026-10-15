@@ -23,6 +23,7 @@ import ChannelLogo from "@/components/ChannelLogo";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { type PayoutMode, type PayoutSettingsMap, PAYOUT_CHANNELS, WEEKDAY_LABELS, DEFAULT_PAYOUTS_ID, cleanRule, isGroupedPayout, loadPayoutSettings, payoutSettingsFor, savePayoutSettings } from "@/lib/payouts";
 import { formatDecimalIT, parseDecimalIT } from "@/lib/num-it";
+import { commissionShareOf } from "@/lib/booking";
 import { useTenantId } from "@/lib/tenant";
 import { useSyncedList } from "@/components/pulizie/useSyncedList";
 import { KEY_ORDERS, type PulizieOrder } from "@/lib/pulizie-addetta";
@@ -615,7 +616,7 @@ export default function CassaPage() {
                             <span className="shrink-0 text-faint">{open ? "▾" : "▸"}</span>
                           </div>
                           <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span>
-                          <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--err)" }}>− {eur(r.comm)}</span>
+                          <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--err)" }}>− {eur(r.comm)}{r.gross > 0 && r.comm > 0 && <span className="ml-1 text-[10px] text-faint" title={t("Commissioni ÷ lordo")}>{String(Math.round((r.comm / r.gross) * 1000) / 10).replace(".", ",")}%</span>}</span>
                           <span className="text-right font-mono text-sm font-bold text-txt">{eur(r.net)}</span>
                           {balCell(ledger.balanceAfter.get(lastId) ?? null, ledger.included.has(lastId))}
                         </div>
@@ -645,7 +646,7 @@ export default function CassaPage() {
                   const c = catOf(m.cat);
                   const bk = bkOf(m);
                   const gname = bk ? (guests.find((g) => g.id === bk.guestId)?.fullName || "Ospite") : "";
-                  const title = bk ? (m.id.startsWith("auto-comm-") ? t("Commissione") + " · " + gname : m.id.startsWith("fc-in-") ? gname + " · " + t("da incassare") : gname) : m.desc;
+                  const title = bk ? (m.id.startsWith("auto-comm-") ? t("Commissione") + " · " + gname + (bk ? " · " + String(commissionShareOf(bk)).replace(".", ",") + "%" : "") : m.id.startsWith("fc-in-") ? gname + " · " + t("da incassare") : gname) : m.desc;
                   // saldo in quella data = dopo l'ultimo movimento della riga (per la prenotazione: dopo incasso e commissione)
                   const lastId = isBooking && r.commission && ledgerOrd(r.commission) > ledgerOrd(r.income) ? r.commission.id : m.id;
                   const bal = ledger.balanceAfter.get(lastId) ?? null;
@@ -668,7 +669,7 @@ export default function CassaPage() {
                       {isBooking ? (
                         <>
                           <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--ok)" }}>+ {eur(r.gross)}</span>
-                          <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--err)" }}>− {eur(r.comm)}</span>
+                          <span className="text-right font-mono text-xs max-md:hidden" style={{ color: "var(--err)" }}>− {eur(r.comm)}{r.gross > 0 && r.comm > 0 && <span className="ml-1 text-[10px] text-faint" title={t("Commissioni ÷ lordo")}>{String(Math.round((r.comm / r.gross) * 1000) / 10).replace(".", ",")}%</span>}</span>
                           <span className="text-right font-mono text-sm font-bold text-txt">{eur(r.net)}</span>
                         </>
                       ) : (

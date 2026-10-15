@@ -4,6 +4,7 @@ import { internalFetch } from "@/lib/server-auth";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manage-booking";
+import { onlinePaymentPatch } from "@/lib/online-pay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
       const bk = bookings[idx] as Json;
       const sessions = arr(bk.paidSessions).map(String);
       if (sessions.includes(session.id)) return false; // già registrata
-      bookings[idx] = { ...bk, paid: n(bk.paid) + amount, paidSessions: [...sessions, session.id], updatedAt: Date.now() };
+      bookings[idx] = { ...bk, paid: n(bk.paid) + amount, paidSessions: [...sessions, session.id], updatedAt: Date.now(), ...onlinePaymentPatch(bk as never, amount, Date.now()) };
       data.bookings = bookings;
       return true;
     });

@@ -18,7 +18,7 @@ import { entriesTotal } from "@/lib/booking-extras";
 import { effectivePayMethod, otaPayDetail, MANUAL_PAY_METHODS, PAY_METHOD_LABEL, isPayMethod, type PayMethod } from "@/lib/pay-method";
 import { roundCents } from "@/lib/money";
 import { nights, parseISO, shiftISO } from "@/lib/dates";
-import { cityTaxOf, commissionBaseOf, commissionPctOf, defaultCommissionInfo, nettoOf, paymentFeeOf } from "@/lib/booking";
+import { cityTaxOf, commissionBaseOf, commissionOf, commissionPctOf, commissionShareOf, defaultCommissionInfo, nettoOf, paymentFeeOf } from "@/lib/booking";
 import { checkUnderpriced, underpriceReason } from "@/lib/priceAlert";
 import { loadWeekendPct } from "@/lib/pricing";
 import { eur } from "@/lib/format";
@@ -185,7 +185,8 @@ export default function BookingDrawer() {
   // "Totale ospite" = quanto pagato per il soggiorno (senza tassa di soggiorno, riscossa
   // localmente e mai transitata dall'OTA): torna con l'importo che mostra Booking.com ecc.
   const totalV = accV + cleanV + extrasV;
-  const commPctV = totalV > 0 ? Math.round((commissionBaseOf(booking) / totalV) * 1000) / 10 : 0; // dalla formula: commissione ÷ lordo
+  const commPctV = commissionShareOf(booking); // % REALE di questa prenotazione: (lordo − netto) ÷ lordo, cioè commissione + costo incasso ÷ lordo (cambia con promo e livello Genius)
+  const commTotV = commissionOf(booking);
   const commV = commissionBaseOf(booking);
   const payFeeV = paymentFeeOf(booking);
   const nettoV = nettoOf(booking);
@@ -510,8 +511,9 @@ export default function BookingDrawer() {
         </div>
         {payMethodRow}
         <div className="my-1 border-t border-line" />
-        {commV > 0 && <Row label={`${t("Commissione")} (${commPctV}%)`} value={eur(commV)} mono />}
-        {payFeeV > 0 && <Row label={t("Costo incasso")} value={eur(payFeeV)} mono />}
+        {commTotV > 0 && <Row label={`${t("Commissioni")} (${String(commPctV).replace(".", ",")}%)`} value={eur(commTotV)} mono />}
+        {commV > 0 && payFeeV > 0 && <Row label={`↳ ${t("Commissione")}`} value={eur(commV)} mono />}
+        {payFeeV > 0 && <Row label={`↳ ${t("Costo incasso")}`} value={eur(payFeeV)} mono />}
         <Row label={t("Netto struttura")} value={eur(nettoV)} mono strong />
       </Section>
 
