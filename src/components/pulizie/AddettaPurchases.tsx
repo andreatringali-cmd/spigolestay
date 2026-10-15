@@ -1,11 +1,11 @@
 "use client";
 
 // Materiale acquistato (carta igienica, prodotti per la pulizia…). Usa gli stessi "ordini" di Scorte & spesa:
-// se la voce è un prodotto in scorta, la giacenza sale da sola. Riepilogo per mese o per anno.
+// se la voce è un prodotto in scorta, la giacenza sale da sola. Elenco degli ultimi acquisti.
 import { useMemo, useState } from "react";
 import type { Structure } from "@/lib/types";
 import {
-  KEY_ORDERS, KEY_STOCK, matchStock, monthBounds, monthName, monthOf, parseMoney, removeEntity, shiftMonth, summarizePurchases,
+  KEY_ORDERS, KEY_STOCK, matchStock, parseMoney, removeEntity,
   type PulizieOrder, type StockLite,
 } from "@/lib/pulizie-addetta";
 import { fmtDMY } from "@/lib/dates";
@@ -14,7 +14,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import DateField from "@/components/DateField";
 import Icon from "@/components/Icon";
 import { useSyncedList } from "./useSyncedList";
-import { Card, Seg, btnPrimary, inputCls, newId, stamp } from "./addetta-ui";
+import { Card, btnPrimary, inputCls, newId, stamp } from "./addetta-ui";
 
 export default function AddettaPurchases({ structures, canEdit, activeStructureId }: { structures: Structure[]; canEdit: boolean; activeStructureId: string }) {
   const confirm = useConfirm();
@@ -28,17 +28,13 @@ export default function AddettaPurchases({ structures, canEdit, activeStructureI
   const [sid, setSid] = useState(activeStructureId !== "all" ? activeStructureId : (structures[0]?.id ?? ""));
   const [addStock, setAddStock] = useState(true);
   const [err, setErr] = useState("");
-  const [period, setPeriod] = useState<"month" | "year">("month");
-  const [ym, setYm] = useState(monthOf(today));
 
   const structId = sid || structures[0]?.id || "";
   const match = matchStock(stock, name, structId);
   const suggestions = useMemo(() => [...new Set(stock.filter((p) => !p._deleted && p.structureId === structId).map((p) => p.name))].sort((a, b) => a.localeCompare(b, "it")), [stock, structId]);
 
-  const range = period === "month" ? monthBounds(ym) : { from: `${ym.slice(0, 4)}-01-01`, to: `${ym.slice(0, 4)}-12-31` };
   const scoped = orders.filter((o) => activeStructureId === "all" || !o.structureId || o.structureId === activeStructureId);
-  const sum = summarizePurchases(scoped, range.from, range.to);
-  const list = scoped.filter((o) => !o._deleted && o.date.slice(0, 10) >= range.from && o.date.slice(0, 10) <= range.to).sort((a, b) => b.date.localeCompare(a.date));
+  const list = scoped.filter((o) => !o._deleted).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30);
 
   const add = () => {
     const q = Number(qty.replace(",", "."));
@@ -52,7 +48,6 @@ export default function AddettaPurchases({ structures, canEdit, activeStructureI
     setOrders((prev) => [{ id: newId(), productId: match?.id ?? "", productName: match?.name ?? name.trim(), structureId: structId, date: when, qty: q, cost: parseMoney(cost), source: "addetta", updatedAt: n.ms }, ...prev]);
     if (match && addStock) setStock((prev) => prev.map((p) => (p.id === match.id ? { ...p, qty: (p.qty || 0) + q, updatedAt: n.ms } : p)));
     setName(""); setQty("1"); setCost("");
-    if (date) setYm(monthOf(date));
   };
   const del = async (o: PulizieOrder) => {
     if (!(await confirm({ title: "Eliminare l'acquisto?", message: `${o.productName} · ${fmtDMY(o.date)}. Le scorte non vengono toccate.`, danger: true, confirmLabel: "Elimina" }))) return;
@@ -84,36 +79,9 @@ export default function AddettaPurchases({ structures, canEdit, activeStructureI
         </Card>
       )}
 
-      <Seg value={period} onChange={setPeriod} options={[{ key: "month", label: "Mese" }, { key: "year", label: "Anno" }]} />
-      <div className="flex items-center justify-between gap-2">
-        <button onClick={() => setYm((m) => shiftMonth(m, period === "month" ? -1 : -12))} aria-label="Periodo precedente" className="grid h-11 w-11 place-items-center rounded-lg border border-line text-lg text-dim hover:bg-wash">‹</button>
-        <span className="text-sm font-bold capitalize text-txt">{period === "month" ? monthName(ym) : ym.slice(0, 4)}</span>
-        <button onClick={() => setYm((m) => shiftMonth(m, period === "month" ? 1 : 12))} aria-label="Periodo successivo" className="grid h-11 w-11 place-items-center rounded-lg border border-line text-lg text-dim hover:bg-wash">›</button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <Card className="p-3"><div className="text-[10px] font-semibold uppercase tracking-wide text-dim">Speso</div><div className="mt-0.5 font-mono text-xl font-bold tabular-nums text-txt">{eur(sum.total)}</div>{sum.withoutCost > 0 && <div className="text-[10px] text-faint">{sum.withoutCost} {sum.withoutCost === 1 ? "acquisto senza importo" : "acquisti senza importo"}</div>}</Card>
-        <Card className="p-3"><div className="text-[10px] font-semibold uppercase tracking-wide text-dim">Acquisti</div><div className="mt-0.5 font-mono text-xl font-bold tabular-nums text-txt">{sum.count}</div></Card>
-      </div>
-
-      {sum.rows.length > 0 && (
-        <Card className="overflow-hidden">
-          <div className="border-b border-line bg-wash px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-dim">Per voce</div>
-          <div className="divide-y divide-[color:var(--line)]">
-            {sum.rows.map((r) => (
-              <div key={r.name.toLowerCase()} className="flex items-center gap-2 px-3 py-2 text-xs">
-                <span className="min-w-0 flex-1 truncate font-medium text-txt">{r.name}</span>
-                <span className="shrink-0 whitespace-nowrap text-dim">× {r.qty.toLocaleString("it-IT")}</span>
-                <span className="w-20 shrink-0 whitespace-nowrap text-right font-semibold text-txt">{r.cost ? eur(r.cost) : "—"}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
       <Card className="overflow-hidden">
-        <div className="border-b border-line bg-wash px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-dim">Acquisti del periodo</div>
-        {list.length === 0 ? <div className="px-3 py-4 text-center text-xs text-faint">Nessun acquisto in questo periodo.</div> : (
+        <div className="border-b border-line bg-wash px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-dim">Ultimi acquisti</div>
+        {list.length === 0 ? <div className="px-3 py-4 text-center text-xs text-faint">Nessun acquisto registrato.</div> : (
           <div className="divide-y divide-[color:var(--line)]">
             {list.map((o) => (
               <div key={o.id} className="flex min-h-[48px] items-center gap-2 px-3 py-1.5">

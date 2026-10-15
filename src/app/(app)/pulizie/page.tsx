@@ -141,6 +141,16 @@ export default function PuliziePage() {
     if (structures.length) { setStock(structures.flatMap((s) => DEFAULT_PRODUCTS.map((name, i) => ({ id: `${s.id}-p${i}`, name, structureId: s.id, supplier: "", min: 1, qty: 3 })))); stockSeeded.current = true; }
   }, [structures]);
   const persistStock = (next: Prod[]) => { setStock(next); try { localStorage.setItem("spigolestay:pulizie:stock", JSON.stringify(next)); } catch {} };
+  // Ogni struttura deve trovare subito i prodotti predefiniti: anche quella aggiunta DOPO (es. un secondo alloggio), non solo la prima.
+  // Si parte solo a scorte già caricate (stock non vuoto) e solo per le strutture senza alcun prodotto (nemmeno cancellato: se li ha tolti lei, restano tolti).
+  // Gli id sono fissi (<struttura>-p<n>): da due dispositivi la fusione per id non crea doppioni.
+  useEffect(() => {
+    if (!stockSeeded.current || stock.length === 0 || structures.length === 0) return;
+    const missing = structures.filter((st) => !stock.some((p) => p.structureId === st.id));
+    if (!missing.length) return;
+    persistStock([...stock, ...missing.flatMap((st) => DEFAULT_PRODUCTS.map((name, i) => ({ id: `${st.id}-p${i}`, name, structureId: st.id, supplier: "", min: 1, qty: 3, updatedAt: Date.now() })))]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structures, stock]);
   const persistOrders = (next: Order[]) => { setOrders(next); try { localStorage.setItem("spigolestay:pulizie:orders", JSON.stringify(next)); } catch {} };
   // Ri-lettura IN-PLACE quando la sincronizzazione col server aggiorna il localStorage
   // (evento spigolestay:datasync) o al ritorno sulla scheda. Senza, lo stato React di questa
