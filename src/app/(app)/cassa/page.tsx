@@ -51,6 +51,7 @@ const DEFAULT_CATS: Cat[] = [
   { key: "marketing", label: "Marketing", kind: "out", color: "#0891B2", icon: "megaphone" },
   { key: "affitto", label: "Affitto", kind: "out", color: "#DB2777", icon: "home" },
   { key: "mutuo", label: "Mutuo", kind: "out", color: "#9D174D", icon: "bank" },
+  { key: "finanziamento", label: "Finanziamento", kind: "out", color: "#0F766E", icon: "bank" },
   { key: "altro_out", label: "Altra uscita", kind: "out", color: "#6B7280", icon: "box" },
 ];
 
