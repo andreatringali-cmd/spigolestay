@@ -79,10 +79,24 @@ export async function POST(req: Request) {
       console.log("[channex webhook-messages] chiamata rifiutata:", verdict.reason);
       return NextResponse.json({ received: true });
     }
-    const msg = parseChannexMessage(await req.json().catch(() => ({})));
+    const body = await req.json().catch(() => ({}));
+    const msg = parseChannexMessage(body);
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL, service = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!msg || !url || !service) return NextResponse.json({ received: true });
+    if (!url || !service) return NextResponse.json({ received: true });
     const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+    if (!msg) {
+      // Evento arrivato ma non trasformabile in messaggio (formato diverso, senza testo, mittente sconosciuto): si conserva la traccia per capirlo.
+      try {
+        const b = (body ?? {}) as { event?: string; property_id?: string; payload?: Record<string, unknown> };
+        const pid = String(b.payload?.property_id ?? b.property_id ?? "");
+        if (pid) {
+          const { data: m } = await admin.from("channex_map").select("tenant_id").eq("channex_property_id", pid).limit(1);
+          const tenant = (m?.[0] as { tenant_id?: string } | undefined)?.tenant_id;
+          if (tenant) await logInvio(admin, tenant, { job: "ota_msg_skip", ref: String(b.payload?.booking_id ?? ""), channel: "channex", ok: false, detail: JSON.stringify(body).slice(0, 1500) });
+        }
+      } catch { /* la traccia non deve mai far fallire il webhook */ }
+      return NextResponse.json({ received: true });
+    }
 
     const { data: maps } = await admin.from("channex_map").select("tenant_id, org_id").eq("channex_property_id", msg.propertyId).limit(10);
     const store = pickMessageStore(maps as { tenant_id?: string | null; org_id?: string | null }[] | null);

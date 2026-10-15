@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { importBookings } from "@/lib/channex-inbound";
+import { channexEnabled } from "@/lib/channex";
+import { ensureChannexHooks } from "@/lib/channex-hooks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +25,16 @@ async function run(req: Request) {
   if (!url || !service) return NextResponse.json({ error: "supabase_not_configured" }, { status: 503 });
   const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
   const res = await importBookings(admin);
-  return NextResponse.json(res);
+  // Rete di sicurezza anche per i MESSAGGI delle OTA: se una property ha perso (o non ha mai avuto) l'avviso, lo si registra qui.
+  let hooks: unknown = undefined;
+  if (channexEnabled()) {
+    try {
+      const { data: rows } = await admin.from("channex_map").select("channex_property_id");
+      const out = await ensureChannexHooks(((rows ?? []) as { channex_property_id?: string }[]).map((r) => r.channex_property_id as string));
+      hooks = out.result.map((r) => ({ p: r.propertyId, nuovoPrenotazioni: r.created, nuovoMessaggi: !!r.messagesCreated, errore: r.error }));
+    } catch (e) { hooks = { errore: (e as Error)?.message ?? "errore" }; }
+  }
+  return NextResponse.json({ ...(res as object), hooks });
 }
 
 export async function GET(req: Request) { return run(req); }
