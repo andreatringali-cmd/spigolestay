@@ -51,7 +51,6 @@ const DEFAULT_CATS: Cat[] = [
   { key: "marketing", label: "Marketing", kind: "out", color: "#0891B2", icon: "megaphone" },
   { key: "affitto", label: "Affitto", kind: "out", color: "#DB2777", icon: "home" },
   { key: "mutuo", label: "Mutuo", kind: "out", color: "#9D174D", icon: "bank" },
-  { key: "finanziamento", label: "Finanziamento", kind: "out", color: "#0F766E", icon: "bank" },
   { key: "altro_out", label: "Altra uscita", kind: "out", color: "#6B7280", icon: "box" },
 ];
 
@@ -323,6 +322,15 @@ export default function CassaPage() {
     for (let i = n - 1; i >= 0; i--) { const d = new Date(by, bm - 1 - i, 1); const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; const mm = chartSrc.filter((m) => monthKey(m.date) === ym && m.cat !== OPENING_CAT); list.push({ ym, in: sumCents(mm.filter((m) => m.kind === "in").map((m) => m.amount)), out: sumCents(mm.filter((m) => m.kind === "out").map((m) => m.amount)) }); }
     return list;
   }, [chartSrc, futureView, to, today, fcEnd]);
+  // Clic sul grafico: il registro si filtra su quel mese; barra verde = solo entrate, rossa = solo uscite, nome del mese = tutto. Di nuovo sullo stesso = toglie il filtro.
+  const pickMonth = (ym: string, k: "all" | "in" | "out") => {
+    const [y, m] = ym.split("-").map(Number);
+    const f = ym + "-01", l = ym + "-" + pad(new Date(y, m, 0).getDate());
+    if (from === f && to === l && tipo === k) { applyPreset("future"); setTipo("all"); return; }
+    setPreset("custom"); setFrom(f); setTo(l); setTipo(k);
+    setTimeout(() => { try { document.getElementById("cassa-filtri")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* niente */ } }, 50);
+  };
+  const monthOn = (ym: string) => { const [y, m] = ym.split("-").map(Number); return from === ym + "-01" && to === ym + "-" + pad(new Date(y, m, 0).getDate()); };
   const maxTrend = Math.max(1, ...trend.flatMap((t) => [t.in, t.out]));
   const axis = niceAxis(maxTrend); // asse Y a 4 intervalli con massimo "tondo"
   const axisTicks = [0, 1, 2, 3, 4].map((i) => i * axis.step);
@@ -529,16 +537,16 @@ export default function CassaPage() {
               </div>
               <div className="relative flex items-end justify-between gap-2 pt-[18px]" style={{ height: 160 }}>
                 {trend.map((tr) => (
-                  <div key={tr.ym} className="flex flex-1 flex-col items-center gap-1">
+                  <div key={tr.ym} className={`flex flex-1 flex-col items-center gap-1 rounded-md ${monthOn(tr.ym) ? "bg-wash" : ""}`}>
                     <div className="flex w-full items-end justify-center gap-1.5" style={{ height: 120 }}>
-                      <div className="relative w-1/3 max-w-[26px] rounded-t" title={`${t("Entrate")} ${eur(tr.in)}`} style={{ height: `${(tr.in / axis.max) * 100}%`, backgroundColor: "var(--ok)", minHeight: tr.in > 0 ? 3 : 0 }}>
+                      <div role="button" tabIndex={0} aria-label={`${t("Solo entrate")} · ${monthLabel(tr.ym)} · ${eur(tr.in)}`} onClick={() => pickMonth(tr.ym, "in")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickMonth(tr.ym, "in"); } }} className="relative w-1/3 max-w-[26px] cursor-pointer rounded-t hover:opacity-80" title={`${t("Entrate")} ${eur(tr.in)} · ${t("clicca per filtrare")}`} style={{ height: `${(tr.in / axis.max) * 100}%`, backgroundColor: "var(--ok)", minHeight: tr.in > 0 ? 3 : 0 }}>
                         {tr.in > 0 && <span className="absolute bottom-full left-1/2 mb-0.5 hidden -translate-x-1/2 whitespace-nowrap font-mono text-[8px] leading-none text-dim sm:block">{compactEuro(tr.in)}</span>}
                       </div>
-                      <div className="relative w-1/3 max-w-[26px] rounded-t" title={`${t("Uscite")} ${eur(tr.out)}`} style={{ height: `${(tr.out / axis.max) * 100}%`, backgroundColor: "var(--err)", minHeight: tr.out > 0 ? 3 : 0 }}>
+                      <div role="button" tabIndex={0} aria-label={`${t("Solo uscite")} · ${monthLabel(tr.ym)} · ${eur(tr.out)}`} onClick={() => pickMonth(tr.ym, "out")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickMonth(tr.ym, "out"); } }} className="relative w-1/3 max-w-[26px] cursor-pointer rounded-t hover:opacity-80" title={`${t("Uscite")} ${eur(tr.out)} · ${t("clicca per filtrare")}`} style={{ height: `${(tr.out / axis.max) * 100}%`, backgroundColor: "var(--err)", minHeight: tr.out > 0 ? 3 : 0 }}>
                         {tr.out > 0 && <span className="absolute bottom-full left-1/2 mb-0.5 hidden -translate-x-1/2 whitespace-nowrap font-mono text-[8px] leading-none text-dim sm:block">{compactEuro(tr.out)}</span>}
                       </div>
                     </div>
-                    <span className="text-[10px] capitalize text-faint">{monthLabel(tr.ym).split(" ")[0].slice(0, 3)}</span>
+                    <button type="button" onClick={() => pickMonth(tr.ym, "all")} aria-label={`${t("Tutti i movimenti")} · ${monthLabel(tr.ym)}`} className="w-full rounded px-1 text-[10px] capitalize text-faint hover:text-txt">{monthLabel(tr.ym).split(" ")[0].slice(0, 3)}</button>
                   </div>
                 ))}
               </div>
@@ -549,7 +557,7 @@ export default function CassaPage() {
       )}
 
       {/* Riga filtri + toggle grafici + Esporta */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
+      <div id="cassa-filtri" className="mb-4 flex scroll-mt-16 flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
         <SearchInput value={q} onChange={setQ} placeholder={t("Cerca movimento…")} className="min-w-[220px] max-w-md flex-1" />
         <div className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-line bg-surface px-1 py-1">
           <select aria-label={t("Periodo")} value={preset} onChange={(e) => applyPreset(e.target.value as Preset)} className="rounded-md border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
