@@ -32,16 +32,16 @@ export default function StrutturePage() {
         const token = (await supabase!.auth.getSession())?.data.session?.access_token;
         if (!token) return;
         const r = await fetch("/api/org/access", { headers: { Authorization: `Bearer ${token}` } });
-        const j = (await r.json().catch(() => ({}))) as { orgs?: { structureId?: string; role?: string; ownerEmail?: string }[] };
+        const j = (await r.json().catch(() => ({}))) as { orgs?: { orgId?: string; role?: string; ownerEmail?: string }[] };
         const map: Record<string, { role: string; ownerEmail: string }> = {};
-        for (const o of j.orgs ?? []) if (o.structureId) map[o.structureId] = { role: o.role || "member", ownerEmail: o.ownerEmail || "" };
+        for (const o of j.orgs ?? []) if (o.orgId) map[o.orgId] = { role: o.role || "member", ownerEmail: o.ownerEmail || "" }; // per organizzazione, come fa il resto dell app
         if (!off) setOrgInfo(map);
       } catch { /* resta il raggruppamento provvisorio */ }
     })();
     return () => { off = true; };
   }, []);
   const isStaff = (() => { try { return typeof window !== "undefined" && localStorage.getItem("xn-collab") === "1"; } catch { return false; } })();
-  const mine = (x: typeof structures[number]) => !x.orgId || orgInfo[x.id]?.role === "owner";
+  const mine = (x: typeof structures[number]) => !x.orgId || orgInfo[x.orgId]?.role === "owner";
   const owned = visible.filter(mine);
   const others = visible.filter((x) => !mine(x));
   const shared = isStaff ? [] : others;
@@ -63,7 +63,7 @@ export default function StrutturePage() {
         <td className="px-3 py-2.5">
           <div className="flex items-center gap-2.5">
             <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg text-xs font-bold text-white" style={{ backgroundColor: color }}>{s.logo ? <img src={s.logo} alt="" className="h-full w-full object-cover" /> : s.name.slice(0, 2).toUpperCase()}</div>
-            <div className="min-w-0"><div className="truncate font-medium text-txt">{s.name}</div>{s.orgId && orgInfo[s.id] && orgInfo[s.id].role !== "owner" && orgInfo[s.id].ownerEmail && <div className="truncate text-[11px] text-faint">{t("Proprietario")}: {orgInfo[s.id].ownerEmail}</div>}</div>
+            <div className="min-w-0"><div className="truncate font-medium text-txt">{s.name}</div>{s.orgId && orgInfo[s.orgId] && orgInfo[s.orgId].role !== "owner" && orgInfo[s.orgId].ownerEmail && <div className="truncate text-[11px] text-faint">{t("Proprietario")}: {orgInfo[s.orgId].ownerEmail}</div>}</div>
           </div>
         </td>
         <td className="truncate px-3 py-2.5 text-dim">{s.city || <span className="text-faint">—</span>}</td>
