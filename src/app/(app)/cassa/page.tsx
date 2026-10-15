@@ -311,7 +311,10 @@ export default function CassaPage() {
   };
 
   const perCat = useMemo(() => { const map: Record<string, number> = {}; for (const m of rowsStat) if (m.kind === "out") map[m.cat] = roundCents((map[m.cat] ?? 0) + m.amount); return Object.entries(map).map(([k, v]) => ({ cat: catOf(k), v })).filter((x) => x.cat).sort((a, b) => b.v - a.v); }, [rowsStat]);
-  const maxCat = Math.max(1, ...perCat.map((x) => x.v));
+  const perCatIn = useMemo(() => { const map: Record<string, number> = {}; for (const m of rowsStat) if (m.kind === "in" && m.cat !== OPENING_CAT) map[m.cat] = roundCents((map[m.cat] ?? 0) + m.amount); return Object.entries(map).map(([k, v]) => ({ cat: catOf(k), v })).filter((x) => x.cat).sort((a, b) => b.v - a.v); }, [rowsStat]);
+  const [catView, setCatView] = useState<"out" | "in">("out"); // lato del riquadro: uscite o entrate per categoria
+  const catRows = catView === "out" ? perCat : perCatIn;
+  const maxCat = Math.max(1, ...catRows.map((x) => x.v));
 
   const chartSrc = useMemo(() => [...all, ...(futureView ? forecastChart : [])], [all, forecastChart, futureView]);
   const trend = useMemo(() => {
@@ -333,7 +336,7 @@ export default function CassaPage() {
   // Clic su una categoria del grafico: il registro mostra solo le uscite di quella categoria (di nuovo = toglie il filtro).
   const pickCat = (key: string) => {
     if (catF === key) { setCatF(""); setTipo("all"); return; }
-    setCatF(key); setTipo("out");
+    setCatF(key); setTipo(catView);
     setTimeout(() => { try { document.getElementById("cassa-filtri")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* niente */ } }, 50);
   };
   const monthOn = (ym: string) => { const [y, m] = ym.split("-").map(Number); return from === ym + "-01" && to === ym + "-" + pad(new Date(y, m, 0).getDate()); };
@@ -511,10 +514,15 @@ export default function CassaPage() {
       {chartsOn && (
       <div className="mb-4 grid gap-3 lg:grid-cols-2">
         <Card>
-          <SectionTitle>{t("Uscite per categoria")}</SectionTitle>
-          {perCat.length === 0 ? <p className="text-sm text-faint">{t("Nessuna uscita nel periodo.")}</p> : (
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <SectionTitle>{catView === "out" ? t("Uscite per categoria") : t("Entrate per categoria")}</SectionTitle>
+            <button type="button" onClick={() => { setCatView((v) => (v === "out" ? "in" : "out")); setCatF(""); }} title={catView === "out" ? t("Mostra le entrate per categoria") : t("Mostra le uscite per categoria")} aria-label={catView === "out" ? t("Mostra le entrate per categoria") : t("Mostra le uscite per categoria")} className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>
+            </button>
+          </div>
+          {catRows.length === 0 ? <p className="text-sm text-faint">{catView === "out" ? t("Nessuna uscita nel periodo.") : t("Nessuna entrata nel periodo.")}</p> : (
             <div className="flex max-h-[172px] flex-col gap-2.5 overflow-y-auto pr-2">
-              {perCat.map(({ cat, v }) => (
+              {catRows.map(({ cat, v }) => (
                 <button key={cat!.key} type="button" onClick={() => pickCat(cat!.key)} aria-pressed={catF === cat!.key} title={t("clicca per filtrare")} className={`block w-full rounded-md px-1 py-0.5 text-left transition hover:bg-wash ${catF === cat!.key ? "bg-wash ring-1 ring-[color:var(--focus)]" : ""}`}>
                   <div className="mb-1 flex items-center justify-between text-xs">
                     <span className="flex items-center gap-1.5 text-dim"><span style={{ color: cat!.color }}><CatIcon name={cat!.icon} size={15} /></span>{t(cat!.label)}</span>
@@ -615,7 +623,9 @@ export default function CassaPage() {
                 <span>{t("Data")}</span><span>{t("Movimento")}</span><span className="text-right max-md:hidden">{t("Lordo")}</span><span className="text-right max-md:hidden">{t("Commissioni")}</span><span className="text-right">{t("Netto")}</span><span className="-mb-1.5 self-stretch border-l border-line pb-1.5 pl-2 text-right" title={t("Saldo dei conti dopo ogni movimento, per la struttura selezionata")}>{t("Saldo conti")}</span>
               </div>
               <div className="flex flex-col divide-y divide-[color:var(--line)]">
-                {listRows.map((r) => {
+                {(() => {
+                const rowDate = (x: (typeof listRows)[number]) => (x.type === "payout" ? x.date : x.type === "booking" ? x.income.date : x.mov.date);
+                const els = listRows.map((r) => {
                   if (r.type === "payout") {
                     const open = openPayouts.has(r.id);
                     const lastId = r.movIds.reduce((best, id) => ((ledger.order.get(id) ?? 0) > (ledger.order.get(best) ?? 0) ? id : best), r.movIds[0]);
@@ -701,7 +711,14 @@ export default function CassaPage() {
                       </div>
                     </div>
                   );
-                })}
+                });
+                // Cambio d'anno: una riga più spessa con il titolo dell'anno che comincia (si vede subito dove finisce un anno e inizia l'altro)
+                return els.flatMap((el, i) => {
+                  const y = rowDate(listRows[i]).slice(0, 4);
+                  if (i === 0 || y === rowDate(listRows[i - 1]).slice(0, 4)) return [el];
+                  return [<div key={"anno-" + y + "-" + i} className="flex items-center gap-3 border-t-4 border-[color:var(--focus)] bg-wash px-3 py-1.5"><span className="font-display text-sm font-bold tracking-wide text-txt">{y}</span><span className="h-px flex-1 bg-[color:var(--line)]" /></div>, el];
+                });
+                })()}
               </div>
               </div>
               </div>
