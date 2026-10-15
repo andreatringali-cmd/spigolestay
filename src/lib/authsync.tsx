@@ -731,11 +731,22 @@ interface AuthCtx {
 const Ctx = createContext<AuthCtx | null>(null);
 
 function Splash({ label }: { label: string }) {
+  // Se resta qui più di 6 secondi scrive in che passaggio è (così, se si blocca, si sa dove) e offre di ricaricare.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setSlow(true), 6000); return () => clearTimeout(t); }, []);
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#ffffff" }}>
       {/* Solo la farfalla Xenora che pulsa durante il caricamento */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/xenora-mark.png" alt={label || "Xenora"} width={72} height={72} style={{ width: 72, height: 72, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+        <img src="/xenora-mark.png" alt={label || "Xenora"} width={72} height={72} style={{ width: 72, height: 72, objectFit: "contain", animation: "xpulse 1.4s ease-in-out infinite" }} />
+        {slow && (
+          <div style={{ textAlign: "center", fontFamily: "system-ui, sans-serif", fontSize: 13, color: "#6b7280" }}>
+            <div>{label}</div>
+            <button onClick={() => window.location.reload()} style={{ marginTop: 8, padding: "6px 14px", borderRadius: 8, border: "1px solid #d1d5db", background: "#fff", color: "#111", fontSize: 13, cursor: "pointer" }}>Ricarica</button>
+          </div>
+        )}
+      </div>
       <style>{`@keyframes xpulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1)}}`}</style>
     </div>
   );
@@ -771,7 +782,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
   const [bigReady, setBigReady] = useState(false); // archivio dei dati grandi (IndexedDB) caricato in memoria
   useEffect(() => { void initBigStore().finally(() => setBigReady(true)); }, []);
-  const [hydrateError, setHydrateError] = useState(false); // impossibile leggere i dati dal server (e nessuna copia locale)
+  const [hydrateError, setHydrateError] = useState(false);
+  const sessionUid = session?.user?.id;
+  useEffect(() => {
+    if (!sessionUid || hydrated) return;
+    const t = setTimeout(() => setHydrateError(true), 30000); // niente risposta dal server: schermata con «Riprova» invece della farfalla all'infinito
+    return () => clearTimeout(t);
+  }, [sessionUid, hydrated]); // impossibile leggere i dati dal server (e nessuna copia locale)
   useEffect(() => { const h = () => setStorageFull(true); window.addEventListener("xenora:storage-full", h); return () => window.removeEventListener("xenora:storage-full", h); }, []);
   const [mfaChecked, setMfaChecked] = useState(false); // AAL verificato per la sessione corrente
   const [mfaNeeded, setMfaNeeded] = useState(false);    // il 2FA è attivo ma la sessione è a un fattore
@@ -798,6 +815,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!supabaseEnabled || !supabase) { setLoading(false); setHydrated(true); return; }
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => { if (mounted) { setSession(data.session); setLoading(false); } });
+    const loadingGuard = setTimeout(() => { if (mounted) setLoading(false); }, 15000); // rete assente o lenta: si esce dall'attesa (poi login o dati locali)
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => { setSession(s); setLoading(false); });
     return () => { mounted = false; sub.subscription.unsubscribe(); stopPush(); };
   }, []);
@@ -838,7 +856,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/access/status", { headers: { Authorization: `Bearer ${session.access_token}` } });
+        const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 10000);
+        const res = await fetch("/api/access/status", { headers: { Authorization: `Bearer ${session.access_token}` }, signal: ctl.signal }).finally(() => clearTimeout(to));
         const j = await res.json().catch(() => null) as { allowed?: boolean } | null;
         if (cancelled) return;
         if (j && j.allowed === false) {
@@ -1132,7 +1151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   if (mfaNeeded) return <MfaChallenge onVerified={() => setMfaNeeded(false)} onSignOut={signOut} />;
   if (accessAllowed === null) return <Splash label="Verifica accesso…" />;
   if (accessAllowed === false) return <Splash label="Accesso su invito — reindirizzamento…" />;
-  if (hydrateError) return (
+  if (hydrateError && !hydrated) return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: 24, textAlign: "center", background: "#ffffff", color: "#1a1a1a", fontFamily: "system-ui, sans-serif" }}>
       <div style={{ fontSize: 18, fontWeight: 600 }}>Non riesco a collegarmi ai tuoi dati</div>
       <div style={{ maxWidth: 360, fontSize: 14, color: "#555" }}>I dati sono al sicuro sul server. Controlla la connessione e riprova: non serve rifare nulla.</div>
