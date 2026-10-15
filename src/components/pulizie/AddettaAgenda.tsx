@@ -7,6 +7,7 @@ import { buildAgenda, WEEKDAY_LONG, isoWeekday } from "@/lib/pulizie-addetta";
 import { fmtDMY, parseISO, toISO } from "@/lib/dates";
 import { ACT_LABEL, type PlanRoom } from "@/lib/puliziePlan";
 import { cleanBar, cleanText, cleanTint } from "@/lib/pulizie-colors";
+import Icon from "@/components/Icon";
 import { Card, Seg } from "./addetta-ui";
 
 const dm = (iso: string) => fmtDMY(iso).slice(0, 5); // gg.mm
@@ -127,8 +128,10 @@ export default function AddettaAgenda({ structures, units, roomTypes, bookings, 
                             const prob = actions.hasIssue?.(d.date, r.unit.id);
                             return (
                               <span className="ml-auto flex shrink-0 items-center gap-1.5 pl-1">
-                                <button onClick={() => actions.issue(r, d.date)} className={`whitespace-nowrap rounded-md border px-2 py-1 text-[11px] font-semibold transition ${prob ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:bg-wash"}`}>⚠ Segnala problema</button>
-                                <button onClick={() => actions.toggle(d.date, r.unit.id)} aria-pressed={fatta} className={`whitespace-nowrap rounded-md border px-2 py-1 text-[11px] font-semibold transition ${fatta ? "border-transparent bg-[color:var(--ok)] text-white" : "border-line text-dim hover:bg-wash"}`}>{fatta ? "✓ Fatta" : "Segna come fatta"}</button>
+                                <button onClick={() => actions.issue(r, d.date)} title="Segnala problema" aria-label="Segnala problema" className={`grid h-8 w-8 place-items-center rounded-md border transition ${prob ? "border-[color:var(--err)] text-[color:var(--err)]" : "border-line text-dim hover:bg-wash"}`}><Icon name="alertTriangle" size={15} /></button>
+                                <button onClick={() => actions.toggle(d.date, r.unit.id)} title={fatta ? "Fatta (tocca per annullare)" : "Segna come fatta"} aria-label={fatta ? "Fatta (tocca per annullare)" : "Segna come fatta"} aria-pressed={fatta} className={`grid h-8 w-8 place-items-center rounded-md border transition ${fatta ? "border-transparent bg-[color:var(--ok)] text-white" : "border-line text-dim hover:bg-wash"}`}>
+                                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="20 6 9 17 4 12" /></svg>
+                                </button>
                               </span>
                             );
                           })()}
