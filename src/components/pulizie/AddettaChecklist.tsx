@@ -93,6 +93,30 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Gestione voci: solo titolare */}
+      {isManager && (
+        <Card className="p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => setManage((v) => !v)} className="flex min-h-[40px] items-center gap-1.5 text-sm font-bold text-txt"><Icon name="settings" size={15} /> Voci della checklist <span className="font-normal text-faint">· {live.length}</span> <span className="text-xs text-dim">{manage ? "▲" : "▼"}</span></button>
+            <button onClick={() => setEditing({ scope: "common", freq: { kind: "weekly", times: 1 }, structureId: structures.length === 1 ? structures[0].id : undefined })} className="ml-auto flex min-h-[40px] items-center gap-1.5 rounded-lg bg-focus px-3 text-xs font-semibold text-white hover:opacity-90"><Icon name="plus" size={14} /> Nuova voce</button>
+          </div>
+          {manage && (
+            <div className="mt-2 divide-y divide-[color:var(--line)] rounded-lg border border-line">
+              {live.length === 0 && <div className="px-3 py-3 text-xs text-faint">Nessuna voce.</div>}
+              {live.map((t) => (
+                <button key={t.id} onClick={() => setEditing(t)} className="flex min-h-[48px] w-full items-center gap-2 px-3 py-2 text-left hover:bg-wash">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-txt">{t.name}</span>
+                    <span className="block truncate text-[11px] text-dim">{t.scope === "common" ? "Zona comune" : "Camere"} · {t.structureId ? (structures.find((s) => s.id === t.structureId)?.name ?? "—") : "tutte le strutture"} · {freqLabel(t.freq)}</span>
+                  </span>
+                  <span className="shrink-0 text-xs text-dim">Modifica</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
       {/* Avanzamento della settimana */}
       <Card className="p-3">
         <div className="flex items-baseline justify-between gap-2">
@@ -137,30 +161,6 @@ export default function AddettaChecklist({ structures, units, canEdit, isManager
           ))}
         </div>
       ))}
-
-      {/* Gestione voci: solo titolare */}
-      {isManager && (
-        <Card className="p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <button onClick={() => setManage((v) => !v)} className="flex min-h-[40px] items-center gap-1.5 text-sm font-bold text-txt"><Icon name="settings" size={15} /> Voci della checklist <span className="font-normal text-faint">· {live.length}</span> <span className="text-xs text-dim">{manage ? "▲" : "▼"}</span></button>
-            <button onClick={() => setEditing({ scope: "common", freq: { kind: "weekly", times: 1 }, structureId: structures.length === 1 ? structures[0].id : undefined })} className="ml-auto flex min-h-[40px] items-center gap-1.5 rounded-lg bg-focus px-3 text-xs font-semibold text-white hover:opacity-90"><Icon name="plus" size={14} /> Nuova voce</button>
-          </div>
-          {manage && (
-            <div className="mt-2 divide-y divide-[color:var(--line)] rounded-lg border border-line">
-              {live.length === 0 && <div className="px-3 py-3 text-xs text-faint">Nessuna voce.</div>}
-              {live.map((t) => (
-                <button key={t.id} onClick={() => setEditing(t)} className="flex min-h-[48px] w-full items-center gap-2 px-3 py-2 text-left hover:bg-wash">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-txt">{t.name}</span>
-                    <span className="block truncate text-[11px] text-dim">{t.scope === "common" ? "Zona comune" : "Camere"} · {t.structureId ? (structures.find((s) => s.id === t.structureId)?.name ?? "—") : "tutte le strutture"} · {freqLabel(t.freq)}</span>
-                  </span>
-                  <span className="shrink-0 text-xs text-dim">Modifica</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </Card>
-      )}
 
       {editing && (
         <TaskEditor
