@@ -261,7 +261,13 @@ export interface PulizieOrder extends Entity {
   cost?: number;            // importo TOTALE della voce, in euro
   note?: string;
   source?: "addetta";
+  payConto?: string;        // conto della Cassa da cui è stato pagato (contanti / carta / banca)
+  receipt?: ReceiptRef;     // scontrino allegato (file su Storage privato: qui solo il riferimento, mai il contenuto)
+  cash?: CashLink;          // collegamento alla Prima nota: pending = movimento da creare · done = creato · failed = rifiutato dal server · removed = tolto perché l'acquisto è stato eliminato
 }
+/** Riferimento a un file su Supabase Storage (bucket privato "receipts"): path = <tenantId>/<uuid>.<ext>. */
+export interface ReceiptRef { path: string; name: string; type: string }
+export type CashLink = "pending" | "done" | "failed" | "removed";
 export interface StockLite extends Entity { name: string; structureId: string; qty: number }
 
 /** Prodotto in scorta con lo stesso nome (senza maiuscole/spazi doppi) nella struttura: serve ad aggiornare la giacenza all'acquisto. */

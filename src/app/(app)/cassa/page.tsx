@@ -23,6 +23,10 @@ import ChannelLogo from "@/components/ChannelLogo";
 import { CHANNELS, type Channel } from "@/lib/types";
 import { type PayoutMode, type PayoutSettings, PAYOUT_CHANNELS, WEEKDAY_LABELS, cleanRule, loadPayoutSettings, savePayoutSettings } from "@/lib/payouts";
 import { useTenantId } from "@/lib/tenant";
+import { useSyncedList } from "@/components/pulizie/useSyncedList";
+import { KEY_ORDERS, type PulizieOrder } from "@/lib/pulizie-addetta";
+import { receiptsByMovement } from "@/lib/pulizie-purchase";
+import { openReceipt } from "@/lib/pulizie-purchase-client";
 
 // ---- Conti cassa ------------------------------------------------------------
 
@@ -68,6 +72,10 @@ export default function CassaPage() {
   const { t } = useLang();
   const { user } = useAuth();
   const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
+  // Acquisti di materiale (modulo Pulizie): il movimento ha lo stesso id dell'acquisto, quindi da qui si risale allo scontrino allegato.
+  const [pOrders] = useSyncedList<PulizieOrder>(KEY_ORDERS);
+  const receiptOf = useMemo(() => receiptsByMovement(pOrders), [pOrders]);
+  const openRcpt = async (path: string) => { const e = await openReceipt(path); if (e) toast(e, "error"); };
 
   // Categorie (default + personalizzate).
   const [cats, setCats] = useState<Cat[]>(DEFAULT_CATS);
@@ -627,6 +635,7 @@ export default function CassaPage() {
                       <div className="flex min-w-0 items-center gap-2">
                         {bk ? <ChannelLogo channel={bk.channel} size={24} title={CHANNELS[bk.channel]?.label} /> : iconCircle(c, 24)}
                         <span className="truncate text-sm font-medium text-txt">{title}</span>
+                        {!isBooking && receiptOf.get(m.id) && <button type="button" onClick={(e) => { e.stopPropagation(); void openRcpt(receiptOf.get(m.id)!.path); }} aria-label={t("Apri scontrino")} title={t("Apri scontrino")} className="grid h-6 w-6 shrink-0 place-items-center rounded-md border border-line text-dim hover:bg-wash hover:text-txt"><Icon name="receipt" size={13} /></button>}
                         {m.forecast ? <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 16%, transparent)", color: "var(--warn)" }}>{t("previsto")}</span> : (m.auto && <span className="shrink-0 rounded bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-faint">{t("auto")}</span>)}
                         {!isBooking && m.sched && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--focus) 14%, transparent)", color: "var(--focus)" }}>{t("programmato")}</span>}
                         {!isBooking && m.variable && <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "color-mix(in srgb, var(--warn) 22%, transparent)", color: "var(--warn)" }} title={t("Importo variabile: è una stima, alla scadenza registri quello reale")}>{t("variabile")}</span>}
@@ -869,6 +878,7 @@ export default function CassaPage() {
               {form.repeat !== "once" && <p className="mt-1 text-[11px] text-faint">{t("Registro questo movimento oggi e creo un pagamento programmato che si ripete da solo.")}</p>}
             </div>
             )}
+            {editingMov && editingMov !== NEW_MOV && editingMov !== OCC_MOV && receiptOf.get(editingMov) && <button type="button" onClick={() => void openRcpt(receiptOf.get(editingMov)!.path)} className="mb-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line py-2 text-sm font-medium text-txt hover:bg-wash"><Icon name="receipt" size={14} /> {t("Apri scontrino")}</button>}
             <button onClick={add} className="w-full rounded-lg bg-focus py-2 text-sm font-semibold text-white hover:opacity-90">{editingMov === NEW_MOV ? (form.repeat === "once" ? t("Registra movimento") : t("Registra e programma")) : t("Salva modifiche")}</button>
             {editingMov === OCC_MOV && occCtx && (
               <div className="mt-1.5 grid grid-cols-2 gap-1.5">
