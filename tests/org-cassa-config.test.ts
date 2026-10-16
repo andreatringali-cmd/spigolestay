@@ -45,3 +45,24 @@ test("un altro socio rinomina il conto e ne toglie uno: il locale lo adotta sul 
   const out = applyOrgCassaConfig(l, org, CP);
   assert.deepEqual(JSON.parse(out[C]), [conti[0], { key: "conto-revolut@cp", label: "Revolut Business", structureIds: ["cp"] }, conti[2]]);
 });
+
+const { extractOrgPoolConfig, applyOrgPoolConfig, POOL_CONFIG_KEY: PK } = await import("../src/lib/org-cassa-config.ts");
+const pool = (o: Record<string, unknown>) => JSON.stringify({ enabled: true, structureIds: ["sh", "sr", "cp"], rooms: { deluxe: 8 }, assign: {}, ...o });
+
+test("gruppo disponibilità: la configurazione parte verso le org che hanno una struttura del gruppo, solo se nuova rispetto all'ultima copia", () => {
+  const local = { [PK]: pool({}) };
+  assert.deepEqual(Object.keys(extractOrgPoolConfig(local, new Set(["cp"]))), [PK]); // prima sincronizzazione: nessuna base
+  assert.deepEqual(extractOrgPoolConfig(local, new Set(["altra"])), {}); // org senza strutture del gruppo
+  assert.deepEqual(extractOrgPoolConfig(local, new Set(["cp"]), pool({})), {}); // stessa data della copia nota: non si rimanda
+  assert.deepEqual(Object.keys(extractOrgPoolConfig({ [PK]: pool({ updatedAt: 200 }) }, new Set(["cp"]), pool({ updatedAt: 100 }))), [PK]); // modificata qui dopo
+  assert.deepEqual(extractOrgPoolConfig({ [PK]: pool({ updatedAt: 100 }) }, new Set(["cp"]), pool({ updatedAt: 300 })), {}); // una copia vecchia non scavalca quella nuova
+});
+
+test("gruppo disponibilità: un socio senza configurazione la riceve; la copia più recente vince", () => {
+  const org = { [PK]: pool({ updatedAt: 500 }) };
+  assert.deepEqual(applyOrgPoolConfig({}, org, new Set(["cp"])), { [PK]: org[PK] }); // Stefano non ne ha una
+  assert.deepEqual(applyOrgPoolConfig({ [PK]: pool({ updatedAt: 100 }) }, org, new Set(["cp"])), { [PK]: org[PK] });
+  assert.deepEqual(applyOrgPoolConfig({ [PK]: pool({ updatedAt: 900 }) }, org, new Set(["cp"])), {}); // la mia è più recente
+  assert.deepEqual(applyOrgPoolConfig({ [PK]: org[PK] }, org, new Set(["cp"])), {}); // niente da fare
+  assert.deepEqual(applyOrgPoolConfig({}, org, new Set(["altra"])), {});
+});

@@ -13,6 +13,7 @@ export interface PoolConfig {
   rooms?: Record<string, number>;      // famiglia (nome normalizzato) → camere reali
   assign?: Record<string, string>;     // id tipologia → famiglia scelta a mano ("" = non condivisa); assente = per nome
   realRooms?: number;                  // non più usato (versione precedente)
+  updatedAt?: number;                  // ultima modifica (ms): serve a far vincere la copia più recente quando la configurazione viaggia tra account diversi
 }
 
 export const POOL_DEF: PoolConfig = { enabled: false, structureIds: [] };
@@ -25,7 +26,8 @@ export function parsePool(raw: string | null | undefined): PoolConfig {
     if (p.rooms && typeof p.rooms === "object") for (const [k, v] of Object.entries(p.rooms as Record<string, unknown>)) if (typeof v === "number" && Number.isFinite(v) && v >= 0) rooms[k] = Math.floor(v);
     const assign: Record<string, string> = {};
     if (p.assign && typeof p.assign === "object") for (const [k, v] of Object.entries(p.assign as Record<string, unknown>)) if (typeof v === "string") assign[k] = v;
-    return { enabled: !!p.enabled && ids.length >= 2, structureIds: ids, rooms, assign };
+    const updatedAt = typeof p.updatedAt === "number" && Number.isFinite(p.updatedAt) ? p.updatedAt : undefined;
+    return { enabled: !!p.enabled && ids.length >= 2, structureIds: ids, rooms, assign, ...(updatedAt !== undefined ? { updatedAt } : {}) };
   } catch { return { ...POOL_DEF }; }
 }
 

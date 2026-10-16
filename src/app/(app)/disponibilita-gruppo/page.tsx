@@ -38,7 +38,7 @@ export default function GruppoPage() {
   useEffect(() => { setCfg(parsePool(typeof window === "undefined" ? null : localStorage.getItem(POOL_KEY))); setLoaded(true); }, []);
 
   const save = (patch: Partial<PoolConfig>) => setCfg((p) => {
-    const n = { ...p, ...patch };
+    const n = { ...p, ...patch, updatedAt: Date.now() }; // updatedAt: la copia più recente vince quando la configurazione si sincronizza tra account
     try { localStorage.setItem(POOL_KEY, JSON.stringify(n)); window.dispatchEvent(new Event(CHANNEX_DIRTY_EVENT)); } catch { /* storage non disponibile */ }
     return n;
   });

@@ -38,6 +38,30 @@ export function extractOrgCassaConfig(local: Snap, org: Set<string>): Snap {
   return out;
 }
 
+export const POOL_CONFIG_KEY = "spigolestay:inventorypool";
+const poolTs = (raw: string | undefined): number => { const v = parse(raw); const t = isObj(v) && typeof v.updatedAt === "number" ? v.updatedAt : 0; return Number.isFinite(t) ? t : 0; };
+const poolTouches = (raw: string | undefined, org: Set<string>): boolean => { const v = parse(raw); return isObj(v) && Array.isArray(v.structureIds) && v.structureIds.some((s) => typeof s === "string" && org.has(s)); };
+
+/**
+ * Gruppo "disponibilità condivisa" (strutture che si dividono le camere, anche di organizzazioni e account diversi): la configurazione deve essere la STESSA per tutti,
+ * altrimenti ogni account invia ai portali disponibilità calcolate con regole diverse e si sovrascrivono. Viaggia in ogni org che ha una struttura del gruppo.
+ * Qui si decide cosa mandare: solo se è cambiata da questo dispositivo dopo l'ultima copia nota dell'org (altrimenti una copia vecchia sovrascriverebbe quella nuova).
+ */
+export function extractOrgPoolConfig(local: Snap, org: Set<string>, baseRaw?: string): Snap {
+  const raw = local[POOL_CONFIG_KEY];
+  if (!raw || !poolTouches(raw, org)) return {};
+  if (baseRaw !== undefined && poolTs(raw) <= poolTs(baseRaw)) return {};
+  return { [POOL_CONFIG_KEY]: raw };
+}
+/** Dall'org fusa col server: se la configurazione del gruppo lì è più recente (o qui manca), si adotta. Ritorna solo ciò che cambia. */
+export function applyOrgPoolConfig(local: Snap, orgMerged: Snap, org: Set<string>): Snap {
+  const theirs = orgMerged[POOL_CONFIG_KEY];
+  if (!theirs || !poolTouches(theirs, org)) return {};
+  const mine = local[POOL_CONFIG_KEY];
+  if (mine !== undefined && poolTs(theirs) <= poolTs(mine)) return {};
+  return theirs === mine ? {} : { [POOL_CONFIG_KEY]: theirs };
+}
+
 /**
  * Riporta nel locale la parte dell'org fusa col server. Ritorna SOLO le chiavi che cambiano (vuoto = niente da fare). L'ordine delle voci locali si conserva
  * (le voci dell'org si sostituiscono sul posto, le nuove vanno in coda): così una sincronizzazione senza novità non cambia nulla e non innesca altri salvataggi.

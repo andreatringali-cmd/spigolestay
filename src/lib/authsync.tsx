@@ -26,7 +26,7 @@ import MfaChallenge from "@/components/MfaChallenge";
 import { adoptMigratedMedia, isMediaFlatKey } from "./media-migrate-plan";
 import { mergeKeyedList } from "./list-merge";
 import { combineData } from "./org-combine";
-import { orgStructureSets, extractOrgCassaConfig, applyOrgCassaConfig } from "./org-cassa-config";
+import { orgStructureSets, extractOrgCassaConfig, applyOrgCassaConfig, extractOrgPoolConfig, applyOrgPoolConfig } from "./org-cassa-config";
 import { adoptServerFlatKeys, mergeRecord3, applyRaceChanges, mergePreventivi3, mergeRecordJson, stripVolatileUsers } from "./sync-merge";
 
 // Prefissi delle chiavi che rappresentano lo stato dell'account (da sincronizzare).
@@ -658,7 +658,7 @@ async function syncOnce(
     saveOne(client, "app_state", "user_id", uid, personalSnap, personalRef),
     ...orgIds.map((orgId) => {
       const localOrg = orgs.get(orgId) ?? EMPTY_ORG_DATA();
-      const orgSnap = { "spigolestay:data:v1": JSON.stringify(localOrg), ...extractOrgCassaConfig(snap, orgSids.get(orgId) ?? new Set<string>()) };
+      const orgSnap = { "spigolestay:data:v1": JSON.stringify(localOrg), ...extractOrgCassaConfig(snap, orgSids.get(orgId) ?? new Set<string>()), ...extractOrgPoolConfig(snap, orgSids.get(orgId) ?? new Set<string>(), orgRefs.current[orgId]?.last?.["spigolestay:inventorypool"]) };
       return saveOne(client, "org_state", "org_id", orgId, orgSnap, orgRefs.current[orgId]);
     }),
   ]);
@@ -675,7 +675,7 @@ async function syncOnce(
   const combined = combineData(mergedPersonal, orgMergedDatas);
   const newBlob: Record<string, string> = { ...pRes.merged, "spigolestay:data:v1": JSON.stringify(combined) };
   // Conti, regole di incasso e conto principale delle strutture condivise: si adotta la versione fusa dell'org (tutti i soci vedono gli stessi).
-  for (const oc of orgCassa) { if (oc.sids.size) Object.assign(newBlob, applyOrgCassaConfig(newBlob, oc.merged, oc.sids)); }
+  for (const oc of orgCassa) { if (oc.sids.size) { Object.assign(newBlob, applyOrgCassaConfig(newBlob, oc.merged, oc.sids)); Object.assign(newBlob, applyOrgPoolConfig(newBlob, oc.merged, oc.sids)); } }
 
   // ANTI-RACE: la sincronizzazione fotografa il localStorage all'inizio, poi fa round-trip di
   // rete, poi restore() riscrive. Se l'utente SALVA durante il round-trip, restore lo cancellerebbe.
