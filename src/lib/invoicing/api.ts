@@ -4,7 +4,8 @@ import { NextResponse } from "next/server";
 import { isUserAllowed } from "@/lib/server-auth";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-export interface AuthOk { admin: SupabaseClient; tenantId: string }
+// userId = l'utente che ha fatto la chiamata (per un collaboratore è diverso da tenantId, che è il titolare dell'account).
+export interface AuthOk { admin: SupabaseClient; tenantId: string; userId: string }
 
 export async function authTenant(req: Request): Promise<AuthOk | NextResponse> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -20,7 +21,7 @@ export async function authTenant(req: Request): Promise<AuthOk | NextResponse> {
   // Un collaboratore (invitato da "Utenti") opera sull'account di chi lo ha invitato; tutti gli altri sul proprio.
   let tenantId = who.user.id;
   try { const { data: ws } = await admin.rpc("workspace_owner", { uid: who.user.id }); if (typeof ws === "string" && ws) tenantId = ws; } catch { /* resta il proprio */ }
-  return { admin, tenantId };
+  return { admin, tenantId, userId: who.user.id };
 }
 
 export const isResponse = (x: unknown): x is NextResponse => x instanceof NextResponse;

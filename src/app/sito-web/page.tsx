@@ -5,6 +5,9 @@ import { DataProvider, useData } from "@/lib/store";
 import type { RoomType } from "@/lib/types";
 import { effectiveBase } from "@/lib/pricing";
 import { getImages } from "@/lib/images";
+import MediaImg from "@/components/MediaImg";
+import { cssBgUrl } from "@/lib/media-client";
+import { toExternalUrl } from "@/lib/media";
 import { loadPromos } from "@/lib/promos";
 import { eur } from "@/lib/format";
 import { amenityIcon } from "@/lib/amenities";
@@ -300,7 +303,7 @@ export function Site() {
     ...(structure?.phone ? { telephone: structure.phone } : {}),
     ...(structure?.email ? { email: structure.email } : {}),
     ...(structure?.website ? { url: structure.website } : {}),
-    ...(gallery.length ? { image: gallery.map((g) => g.src).slice(0, 8) } : {}),
+    ...(gallery.length ? { image: gallery.map((g) => toExternalUrl(g.src)).filter((u): u is string => !!u && !u.startsWith("data:")).slice(0, 8) } : {}),
     ...(minPrice ? { priceRange: `€${minPrice}+` } : {}),
     address: {
       "@type": "PostalAddress",
@@ -334,7 +337,7 @@ export function Site() {
 
       {/* Hero + ricerca */}
       {cfg.hero && (
-        <div className="relative flex min-h-[360px] items-center overflow-hidden px-4 py-14 text-white" style={{ background: cfg.heroBg ? `linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), url(${cfg.heroBg}) center/cover no-repeat` : `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 45%, #000))` }}>
+        <div className="relative flex min-h-[360px] items-center overflow-hidden px-4 py-14 text-white" style={{ background: cfg.heroBg ? `linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), ${cssBgUrl(cfg.heroBg)} center/cover no-repeat` : `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 45%, #000))` }}>
           <div className="mx-auto w-full max-w-7xl">
             <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{name}</h1>
             {cfg.tagline && <p className="mt-2 max-w-xl text-white/90">{cfg.tagline}</p>}
@@ -379,8 +382,7 @@ export function Site() {
               {types.map((rt) => (
                 <button key={rt.id} onClick={() => go()} className="group overflow-hidden rounded-xl border border-line bg-surface text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                   {(() => { const cover = getImages(`rt:${rt.id}`)[0]; return cover ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={cover} alt={rt.name} className="h-32 w-full object-cover" />
+                    <MediaImg src={cover} alt={rt.name} className="h-32 w-full object-cover" />
                   ) : (
                     <div className="grid h-32 place-items-center" style={{ background: `linear-gradient(135deg, ${rt.color ?? accent}, color-mix(in srgb, ${rt.color ?? accent} 55%, #000))` }}>
                       <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.6" opacity="0.9"><path d="M3 8v11" /><path d="M3 13h18v6" /><path d="M21 19v-4a3 3 0 0 0-3-3h-7v4" /><circle cx="7" cy="11.5" r="1.4" /></svg>
@@ -463,8 +465,7 @@ export function Site() {
                 )}
               </div>
               <div className="group relative overflow-hidden rounded-2xl border border-line shadow-sm">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={cur.src} alt={cur.label} onClick={() => setLightbox(cur.src)} className="h-[300px] w-full cursor-zoom-in object-cover sm:h-[440px]" />
+                <MediaImg src={cur.src} alt={cur.label} onClick={() => setLightbox(cur.src)} className="h-[300px] w-full cursor-zoom-in object-cover sm:h-[440px]" />
                 {len > 1 && (
                   <>
                     <button onClick={() => setGi((g) => (g - 1 + len) % len)} className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/85 text-2xl text-txt shadow-md transition hover:bg-white">‹</button>
@@ -479,8 +480,7 @@ export function Site() {
               {len > 1 && (
                 <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
                   {galItems.map((g, i) => (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <button key={i} onClick={() => setGi(i)} className={`h-16 w-24 shrink-0 overflow-hidden rounded-lg border-2 transition ${i === idx ? "" : "opacity-55 hover:opacity-100"}`} style={{ borderColor: i === idx ? accent : "var(--line)" }}><img src={g.src} alt="" className="h-full w-full object-cover" /></button>
+                    <button key={i} onClick={() => setGi(i)} className={`h-16 w-24 shrink-0 overflow-hidden rounded-lg border-2 transition ${i === idx ? "" : "opacity-55 hover:opacity-100"}`} style={{ borderColor: i === idx ? accent : "var(--line)" }}><MediaImg src={g.src} alt="" className="h-full w-full object-cover" /></button>
                   ))}
                 </div>
               )}
@@ -710,8 +710,7 @@ export function Site() {
 
       {lightbox && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setLightbox(null)}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={lightbox} alt="" className="max-h-[90dvh] max-w-full rounded-lg object-contain" />
+          <MediaImg src={lightbox} alt="" className="max-h-[90dvh] max-w-full rounded-lg object-contain" />
           <button onClick={() => setLightbox(null)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/15 text-white">✕</button>
         </div>
       )}

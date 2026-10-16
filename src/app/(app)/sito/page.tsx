@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/store";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
-import { downscaleImage } from "@/lib/images";
+import { uploadImage, cssBgUrl } from "@/lib/media-client";
 import { useLang } from "@/lib/i18n";
 import { useAuth } from "@/lib/authsync";
 import { supabase } from "@/lib/supabase";
@@ -32,6 +32,7 @@ export default function SitoPage() {
   const { structures, roomTypes, units, activeStructureId } = useData();
   const [c, setC] = useState<Cfg>(DEF);
   const [sid, setSid] = useState("");
+  const [heroErr, setHeroErr] = useState("");
   // Se in alto è selezionata UNA struttura, il mini-sito segue quella (menu nascosto).
   // Se è selezionato "Tutte", resta il menu a tendina per scegliere quale configurare.
   useEffect(() => {
@@ -159,11 +160,12 @@ export default function SitoPage() {
             <div className="mb-1 mt-4 text-xs text-dim">{t("Sfondo copertina")}</div>
             <div className="flex items-center gap-2">
               {c.heroBg
-                ? <div className="h-12 w-20 shrink-0 overflow-hidden rounded-lg border border-line" style={{ backgroundImage: `url(${c.heroBg})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+                ? <div className="h-12 w-20 shrink-0 overflow-hidden rounded-lg border border-line" style={{ backgroundImage: cssBgUrl(c.heroBg), backgroundSize: "cover", backgroundPosition: "center" }} />
                 : <div className="grid h-12 w-20 shrink-0 place-items-center rounded-lg border border-line text-[10px] text-faint" style={{ background: `linear-gradient(135deg, ${c.accent}, color-mix(in srgb, ${c.accent} 55%, #000))` }}>{t("colore")}</div>}
-              <label className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-focus hover:bg-wash">{c.heroBg ? t("Cambia foto") : t("Carica foto")}<input type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (f) { try { set({ heroBg: await downscaleImage(f, 1600, 0.72) }); } catch {} } e.target.value = ""; }} /></label>
+              <label className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-focus hover:bg-wash">{c.heroBg ? t("Cambia foto") : t("Carica foto")}<input type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setHeroErr(""); try { set({ heroBg: await uploadImage(f, "public") }); } catch (err) { setHeroErr(err instanceof Error ? err.message : t("Caricamento foto non riuscito.")); } } e.target.value = ""; }} /></label>
               {c.heroBg && <button onClick={() => set({ heroBg: "" })} className="text-xs font-medium text-faint hover:text-[color:var(--err)]">{t("Rimuovi")}</button>}
             </div>
+            {heroErr && <p className="mt-1.5 text-[11px] text-[color:var(--err)]">{heroErr}</p>}
           </Card>
           <Card>
             <SectionTitle>{t("Sezioni")}</SectionTitle>
@@ -184,7 +186,7 @@ export default function SitoPage() {
           <div className="mb-3"><SectionTitle>{t("Anteprima")}</SectionTitle></div>
           <div className="overflow-hidden rounded-xl border border-line">
             {c.hero && (
-              <div className="relative p-6 text-white" style={{ background: c.heroBg ? `linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), url(${c.heroBg}) center/cover no-repeat` : `linear-gradient(135deg, ${c.accent}, color-mix(in srgb, ${c.accent} 55%, #000))` }}>
+              <div className="relative p-6 text-white" style={{ background: c.heroBg ? `linear-gradient(rgba(0,0,0,.45), rgba(0,0,0,.45)), ${cssBgUrl(c.heroBg)} center/cover no-repeat` : `linear-gradient(135deg, ${c.accent}, color-mix(in srgb, ${c.accent} 55%, #000))` }}>
                 <div className="text-lg font-bold">{siteName || c.nome}</div>
                 <div className="mt-1 text-sm opacity-90">{c.tagline}</div>
                 <div className="mt-4 inline-block rounded-lg bg-white/90 px-3 py-1.5 text-xs font-semibold" style={{ color: c.accent }}>{t("Verifica disponibilità")} →</div>

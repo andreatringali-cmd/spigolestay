@@ -4,6 +4,7 @@
 import type { Booking, RoomType, Structure, Unit } from "@/lib/types";
 import { parseISO } from "@/lib/dates";
 import type { FreeUnit } from "./_modello";
+import MediaImg from "@/components/MediaImg";
 
 const dayShort = (iso: string) => parseISO(iso).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
 
@@ -12,8 +13,7 @@ function Thumb({ unit, roomType, structure }: { unit: Unit; roomType?: RoomType;
   const tint = roomType?.color || structure?.photoColor || "var(--focus)";
   return (
     <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl" style={photo ? undefined : { background: `linear-gradient(145deg, color-mix(in srgb, ${tint} 85%, #fff), color-mix(in srgb, ${tint} 70%, #000))` }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      {photo && <img src={photo} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+      {photo && <MediaImg src={photo} alt="" className="absolute inset-0 h-full w-full object-cover" />}
     </div>
   );
 }

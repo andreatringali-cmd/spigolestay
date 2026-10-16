@@ -19,6 +19,7 @@
 import { supabase } from "./supabase";
 import { kvGet } from "./bigstore";
 import { cleanStructure, cleanUnit, cleanBookings } from "./publicsanitize";
+import { publicizeMediaRefsInJson } from "./media-walk";
 
 export const DATA_KEY = "spigolestay:data:v1";
 export const AUX_KEYS = [
@@ -196,6 +197,10 @@ export function buildPublishData(structureId: string): Record<string, string> | 
       if (v != null) out[k] = v;
     } catch {}
   }
+  // Immagini su Storage: nello snapshot pubblico i riferimenti "media:xenora-public:…" diventano URL pubblici ASSOLUTI,
+  // così anche i lettori che non conoscono il formato (feed Metasearch, XenoraBook, schema.org, AI, email) vedono un normale link.
+  // Le vecchie data URI restano com'erano finché non vengono migrate. I riferimenti privati non vengono toccati (non devono comparire qui).
+  for (const k of Object.keys(out)) out[k] = publicizeMediaRefsInJson(out[k]);
   return out;
 }
 

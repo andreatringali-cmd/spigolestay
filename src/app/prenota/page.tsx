@@ -5,6 +5,7 @@ import { DataProvider, useData } from "@/lib/store";
 import type { RoomType, ExtraService } from "@/lib/types";
 import { DEFAULT_EXTRAS } from "@/lib/types";
 import { getImages } from "@/lib/images";
+import MediaImg from "@/components/MediaImg";
 import { eur } from "@/lib/format";
 import { effectiveBase, effectiveClosed, structureWeekendPct } from "@/lib/pricing";
 import { cityTaxOf } from "@/lib/booking";
@@ -525,8 +526,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
                   <div key={rt.id} id={`rt-${rt.id}`} className={`${box} overflow-hidden`}>
                     <div className="flex flex-col gap-3 p-4 sm:flex-row">
                       {(() => { const cover = getImages(`rt:${rt.id}`)[0]; return cover ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={cover} alt={rt.name} className="h-28 w-full shrink-0 rounded-lg object-cover sm:w-40" />
+                        <MediaImg src={cover} alt={rt.name} className="h-28 w-full shrink-0 rounded-lg object-cover sm:w-40" />
                       ) : (
                         <div className="grid h-28 w-full shrink-0 place-items-center rounded-lg sm:w-40" style={{ background: `linear-gradient(135deg, ${rt.color ?? "#4F46E5"}, color-mix(in srgb, ${rt.color ?? "#4F46E5"} 55%, #000))` }}>
                           <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.6" opacity="0.9"><path d="M3 8v11" /><path d="M3 13h18v6" /><path d="M21 19v-4a3 3 0 0 0-3-3h-7v4" /><circle cx="7" cy="11.5" r="1.4" /></svg>

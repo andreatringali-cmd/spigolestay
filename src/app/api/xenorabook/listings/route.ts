@@ -18,6 +18,7 @@ import { createClient } from "@supabase/supabase-js";
 import { effectiveBase, effectiveClosed } from "@/lib/pricing";
 import { fetchGoogleReviews } from "@/lib/reviews/google";
 import { RESERVED_SLUGS } from "@/lib/publicdata";
+import { publicizeMediaRefs } from "@/lib/media-walk";
 import type { RoomType, Unit } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -142,7 +143,8 @@ export async function GET() {
       const units = Array.isArray(blob.units) ? blob.units : [];
       for (const u of units.filter((x) => x.structureId === sid)) for (const p of u.photos ?? []) images.push(p);
     } catch {}
-    const uniqueImages = Array.from(new Set(images)).slice(0, MAX_IMAGES);
+    // I riferimenti media (foto su Storage) diventano URL pubblici assoluti: questa API è letta da browser di terzi.
+    const uniqueImages = Array.from(new Set(publicizeMediaRefs(images))).slice(0, MAX_IMAGES);
 
     // Rating reale: recensioni dirette pubblicate (sempre nello snapshot) come base;
     // se c'è un Google Place ID configurato, il dato Google (più solido) ha priorità.

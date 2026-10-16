@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/store";
 import type { RoomType, Unit } from "@/lib/types";
 import { VIEW_OPTIONS, ROOM_AMENITIES, BED_CONFIGS } from "@/lib/types";
-import { downscaleImage } from "@/lib/images";
+import { uploadImage } from "@/lib/media-client";
+import MediaImg from "@/components/MediaImg";
 import { AV_COLORS } from "@/lib/users";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, SectionTitle, StatCard } from "@/components/ui";
@@ -409,7 +410,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
     if (!files?.length) return;
     for (const file of Array.from(files)) {
       if (!file.type.startsWith("image/")) continue;
-      try { const url = await downscaleImage(file, 900, 0.72); setF((p) => ({ ...p, photos: [...(p.photos ?? []), url] })); } catch (e) { console.error("Caricamento foto non riuscito", e); toast(t("Impossibile caricare una foto"), "error"); }
+      try { const url = await uploadImage(file, "public"); setF((p) => ({ ...p, photos: [...(p.photos ?? []), url] })); } catch (e) { console.error("Caricamento foto non riuscito", e); toast(t("Impossibile caricare una foto"), "error"); }
     }
   };
   const removePhoto = (i: number) => setF((p) => ({ ...p, photos: (p.photos ?? []).filter((_, j) => j !== i) }));
@@ -457,8 +458,7 @@ function RoomModal({ structureId, unit, onClose }: { structureId: string; unit?:
           <div className="flex flex-wrap gap-2">
             {(f.photos ?? []).map((src, i) => (
               <div key={i} className="group relative h-20 w-28 overflow-hidden rounded-lg border border-line">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt="" className="h-full w-full object-cover" />
+                <MediaImg src={src} alt="" className="h-full w-full object-cover" />
                 <button type="button" onClick={() => removePhoto(i)} className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/55 text-xs text-white opacity-0 transition group-hover:opacity-100" title={t("Rimuovi")}>✕</button>
               </div>
             ))}

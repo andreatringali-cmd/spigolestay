@@ -6,6 +6,7 @@
 import Link from "next/link";
 import type { Booking, Structure, Unit, RoomType } from "@/lib/types";
 import BookingAmounts from "@/components/BookingAmounts";
+import MediaImg from "@/components/MediaImg";
 import { CHANNELS } from "@/lib/types";
 import { parseISO, nights } from "@/lib/dates";
 import { bookingPaidTotal } from "@/lib/booking";
@@ -66,8 +67,7 @@ export default function SchedaGiorno({ groupSize, b, j: jIn, code, dim, typeLabe
     >
       {/* Anteprima camera */}
       <div className="relative h-28 w-full shrink-0 overflow-hidden rounded-xl md:h-auto md:w-40" style={photo ? undefined : { background: `linear-gradient(145deg, color-mix(in srgb, ${tint} 85%, #fff), color-mix(in srgb, ${tint} 70%, #000))` }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {photo && <img src={photo} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+        {photo && <MediaImg src={photo} alt="" className="absolute inset-0 h-full w-full object-cover" />}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 text-white">
           <div className="truncate text-sm font-bold leading-tight">{unitName ?? <span className="italic">Da assegnare</span>}</div>
           <div className="truncate text-[11px] opacity-90">{roomType?.name ?? typeLabel ?? ""}</div>

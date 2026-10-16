@@ -4,6 +4,7 @@
 //    dell'acquisto (UUID): così la scrittura è idempotente (stesso acquisto = stesso movimento) e dalla Cassa si risale all'acquisto
 //    (e quindi allo scontrino) senza colonne nuove sul database.
 import type { CashRow } from "./purchases";
+import { isUuid, newUuid, sniffMediaType } from "./media";
 import type { CashLink, PulizieOrder, ReceiptRef } from "./pulizie-addetta";
 
 // ---- scontrino ------------------------------------------------------------------------------------------------------------
@@ -28,27 +29,14 @@ export function validateReceiptFile(f: { type: string; size: number }): FileChec
   return { ok: true, ext, type };
 }
 
-/** Tipo reale del file dai primi byte (non ci si fida del tipo dichiarato dal browser). */
+/** Tipo reale del file dai primi byte (non ci si fida del tipo dichiarato dal browser). Usa il rilevatore comune di media.ts, ma gli scontrini non ammettono GIF. */
 export function sniffReceiptType(b: Uint8Array): string | null {
-  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
-  if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 && b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a) return "image/png";
-  if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return "image/webp";
-  if (b.length >= 5 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46 && b[4] === 0x2d) return "application/pdf";
-  return null;
+  const t = sniffMediaType(b);
+  return t === "image/gif" ? null : t;
 }
 
-export const isUuid = (s: unknown): s is string => typeof s === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
-
-/** UUID v4 (usa crypto.randomUUID quando c'è; altrimenti un ripiego, perché l'id deve SEMPRE essere un UUID valido). */
-export function newUuid(): string {
-  const c = typeof crypto !== "undefined" ? crypto : undefined;
-  if (c && typeof c.randomUUID === "function") return c.randomUUID();
-  const b = new Uint8Array(16);
-  if (c && typeof c.getRandomValues === "function") c.getRandomValues(b); else for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
-  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
-  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
-}
+// UUID: definiti in media.ts (stessa logica), qui riesportati per non rompere gli import esistenti.
+export { isUuid, newUuid };
 
 /** Percorso del file nel bucket privato: <tenantId>/<uuid>.<ext>. */
 export const receiptPathFor = (tenantId: string, fileId: string, ext: string): string => `${tenantId}/${fileId}.${ext}`;
