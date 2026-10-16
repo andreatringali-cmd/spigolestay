@@ -1083,8 +1083,8 @@ export default function CassaPage() {
                   : `${t("Un unico bonifico il")} ${md} ${t("del mese successivo: copre tutti i check-out del mese, dal 1 all'ultimo giorno.")}`;
                 const tipFull = rule.commission ? `${tip} ${t("Le commissioni sono trattenute tutte insieme il")} ${rule.commission.day} ${t("del mese dopo, per le prenotazioni con check-out del mese precedente.")}` : tip;
                 return (
-                  <div key={ch} title={tipFull} className="grid grid-cols-1 gap-x-3 gap-y-1.5 border-b border-line px-3 py-2.5 last:border-b-0 md:grid-cols-[132px_minmax(0,1fr)_minmax(0,1fr)] md:items-center">
-                    <div className="flex shrink-0 items-center gap-2"><ChannelLogo channel={ch} size={20} title={CHANNELS[ch].label} /><span className="truncate text-sm font-semibold text-txt">{CHANNELS[ch].label}</span></div>
+                  <div key={ch} title={tipFull} className="grid grid-cols-1 gap-x-3 gap-y-1.5 border-b border-line px-3 py-2.5 last:border-b-0 md:grid-cols-[132px_minmax(0,1fr)_minmax(0,1fr)] md:items-start">
+                    <div className="flex shrink-0 items-center gap-2 md:min-h-[34px]"><ChannelLogo channel={ch} size={20} title={CHANNELS[ch].label} /><span className="truncate text-sm font-semibold text-txt">{CHANNELS[ch].label}</span></div>
                     <div className="flex flex-wrap items-center gap-1.5">
                     <select aria-label={t("Quando arriva il pagamento")} value={rule.mode} onChange={(e) => setPayoutRule(ch, { mode: e.target.value })} className="w-full max-w-[210px] rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
                       <option value="arrival">{t("Alla data di arrivo")}</option>
@@ -1098,11 +1098,11 @@ export default function CassaPage() {
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 text-xs text-dim">
                       <span className="md:hidden">{t("Commissioni")}</span>
-                      <select aria-label={t("Quando il portale trattiene le commissioni")} value={rule.commission ? "monthly" : "together"} onChange={(e) => setPayoutRule(ch, { commission: e.target.value === "monthly" ? { mode: "monthly", day: rule.commission?.day ?? COMMISSION_DEFAULT_DAY } : undefined })} className="rounded-lg border border-line bg-paper px-2 py-1 text-xs text-txt outline-none focus:border-focus">
+                      <select aria-label={t("Quando il portale trattiene le commissioni")} value={rule.commission ? "monthly" : "together"} onChange={(e) => setPayoutRule(ch, { commission: e.target.value === "monthly" ? { mode: "monthly", day: rule.commission?.day ?? COMMISSION_DEFAULT_DAY } : undefined })} className="w-full max-w-[210px] rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus">
                         <option value="together">{t("Insieme all'incasso")}</option>
                         <option value="monthly">{t("Tutte insieme, il mese dopo")}</option>
                       </select>
-                      {rule.commission && <span className="flex items-center gap-1.5" title={t("Un'unica trattenuta per le prenotazioni con check-out nello stesso mese (es. il 15 febbraio per quelle di gennaio). L'incasso resta per intero.")}>{t("il")}<input type="number" min={1} max={COMMISSION_MAX_DAY} aria-label={t("Giorno del mese dopo")} value={rule.commission.day} onChange={(e) => setPayoutRule(ch, { commission: { mode: "monthly", day: Math.min(COMMISSION_MAX_DAY, Math.max(1, Math.round(Number(e.target.value)) || 1)) } })} className="w-14 rounded-lg border border-line bg-paper px-2 py-1 text-xs text-txt outline-none focus:border-focus" />{t("del mese dopo")}</span>}
+                      {rule.commission && <span className="flex items-center gap-1.5" title={t("Un'unica trattenuta per le prenotazioni con check-out nello stesso mese (es. il 15 febbraio per quelle di gennaio). L'incasso resta per intero.")}>{t("il")}<input type="number" min={1} max={COMMISSION_MAX_DAY} aria-label={t("Giorno del mese dopo")} value={rule.commission.day} onChange={(e) => setPayoutRule(ch, { commission: { mode: "monthly", day: Math.min(COMMISSION_MAX_DAY, Math.max(1, Math.round(Number(e.target.value)) || 1)) } })} className="w-14 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-txt outline-none focus:border-focus" />{t("del mese dopo")}</span>}
                     </div>
                   </div>
                 );
