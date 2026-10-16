@@ -65,6 +65,8 @@ export const GUEST_DICT: GuestDict = {
   "✓ Pagamento già ricevuto": ["✓ Payment already received", "✓ Paiement déjà reçu", "✓ Zahlung bereits erhalten", "✓ Pago ya recibido"],
   "Saldo da pagare: {amount}. Lo potrai pagare online dopo aver inviato il check-in (facoltativo, oppure all'arrivo).": ["Balance due: {amount}. You can pay it online after sending the check-in (optional, or on arrival).", "Solde à payer : {amount}. Vous pourrez le régler en ligne après l'envoi du check-in (facultatif, ou à l'arrivée).", "Offener Betrag: {amount}. Sie können ihn nach dem Absenden des Check-ins online bezahlen (freiwillig, oder bei der Ankunft).", "Saldo pendiente: {amount}. Podrás pagarlo online después de enviar el check-in (opcional, o a la llegada)."],
   "Prenotazione di gruppo": ["Group booking", "Réservation de groupe", "Gruppenbuchung", "Reserva de grupo"],
+  "quota di questa camera": ["this room's share", "part de cette chambre", "Anteil dieses Zimmers", "parte de esta habitación"],
+  "Tassa del gruppo (tutte le camere)": ["Group tax (all rooms)", "Taxe du groupe (toutes les chambres)", "Gruppen-Ortstaxe (alle Zimmer)", "Tasa del grupo (todas las habitaciones)"],
   "camere": ["rooms", "chambres", "Zimmer", "habitaciones"],
   "ospite": ["guest", "voyageur", "Gast", "huésped"],
   "ospiti": ["guests", "voyageurs", "Gäste", "huéspedes"],
