@@ -63,21 +63,35 @@ export async function POST(req: Request) {
     // Rimborso automatico se: entro finestra gratuita + pagamento online presente + Stripe ok.
     // Il pagamento è una DESTINATION CHARGE sulla piattaforma: il rimborso si crea sull'account
     // piattaforma (niente header stripeAccount) e reverse_transfer richiama i fondi dalla struttura.
+    // Pagamenti Stripe successivi al primo (saldo dal check-in): ciascuno ha il suo payment intent e si rimborsa per il SUO importo.
+    const extraPays = (Array.isArray(b.stripeExtraPayments) ? (b.stripeExtraPayments as Json[]) : [])
+      .map((x) => ({ pi: s(x.pi), amount: n(x.amount) })).filter((x) => x.pi && x.pi !== pi && x.amount > 0);
     let refunded = 0;
-    if (free && paid > 0 && pi) {
+    if (free && paid > 0 && (pi || extraPays.length)) {
       if (!key) return NextResponse.json({ ok: false, error: "stripe_not_configured", message: "Rimborso non disponibile al momento: riprova più tardi o contatta la struttura." }, { status: 503 });
       try {
         const stripe = new Stripe(key);
-        // idempotencyKey: se la richiesta si ripete (es. conflitto di scrittura) non si rimborsa due volte.
-        const r = await stripe.refunds.create({ payment_intent: pi, reverse_transfer: true }, { idempotencyKey: "guest-cancel-" + pi });
-        // amount è in centesimi; se non fornito rimborsa l'intero pagamento.
-        refunded = typeof r.amount === "number" ? Math.round(r.amount) / 100 : paid;
+        // idempotencyKey: se la richiesta si ripete (es. conflitto di scrittura, o un rimborso riuscito e uno no) non si rimborsa due volte.
+        if (pi) {
+          const r = await stripe.refunds.create({ payment_intent: pi, reverse_transfer: true }, { idempotencyKey: "guest-cancel-" + pi });
+          // amount è in centesimi; se non fornito rimborsa l'intero pagamento.
+          refunded += typeof r.amount === "number" ? Math.round(r.amount) / 100 : paid;
+        }
+        for (const ex of extraPays) {
+          const cents = Math.round(ex.amount * 100);
+          const r = await stripe.refunds.create({ payment_intent: ex.pi, amount: cents, reverse_transfer: true }, { idempotencyKey: "guest-cancel-" + ex.pi + "-" + cents });
+          refunded += typeof r.amount === "number" ? Math.round(r.amount) / 100 : ex.amount;
+        }
+        refunded = Math.round(refunded * 100) / 100;
       } catch (e) {
         // Rimborso fallito: NON si annulla (l'ospite resterebbe senza soggiorno e senza rimborso). Errore chiaro, nessuna modifica.
         console.error("[manage-booking/cancel] rimborso fallito", { booking: s(b.id), pi, error: e instanceof Error ? e.message : e });
         return NextResponse.json({ ok: false, error: "refund_failed", message: "Non siamo riusciti a rimborsare il pagamento, quindi la prenotazione NON è stata annullata. Riprova tra qualche minuto o contatta la struttura." }, { status: 502 });
       }
     }
+
+    // Quota dovuta ma NON rimborsata in automatico (es. incassi registrati a mano o prima del tracciamento dei pagamenti): va gestita dalla struttura.
+    const unrefunded = free && paid > 0 ? Math.max(0, Math.round((paid - refunded) * 100) / 100) : 0;
 
     // Marca annullata (rev-locked). Manteniamo lo storico: status=cancelled + metadati.
     const wrote = await writeBookingPatch(admin, store, {
@@ -86,7 +100,7 @@ export async function POST(req: Request) {
       cancelledBy: "guest",
       updatedAt: Date.now(),
       refundedAmount: refunded || undefined,
-      note: [s(b.note), `Annullata dall'ospite il ${now.slice(0, 10)}${refunded > 0 ? ` — rimborso €${refunded}` : ""}`].filter(Boolean).join(" · "),
+      note: [s(b.note), `Annullata dall'ospite il ${now.slice(0, 10)}${refunded > 0 ? ` — rimborso €${refunded}` : ""}${unrefunded > 0 ? ` — ATTENZIONE: rimborsati €${refunded} su €${paid}, il resto (€${unrefunded}) va gestito a mano` : ""}`].filter(Boolean).join(" · "),
     });
     if (!wrote) return NextResponse.json({ ok: false, error: "write_conflict" }, { status: 409 });
 
@@ -123,13 +137,13 @@ export async function POST(req: Request) {
           body: JSON.stringify({
             kind: "quote", to: hostEmail, subject: `Annullamento ${code} · ${s(st.name)}`,
             accent: "#b4472e",
-            text: `L'ospite ha annullato la prenotazione ${code}.\n\nStruttura: ${s(st.name)}\nPeriodo: ${fmtDMY(s(b.checkIn))} → ${fmtDMY(s(b.checkOut))}\nOspite: ${`${s(g.firstName)} ${s(g.lastName)}`.trim() || gEmail}\n\nRimborso emesso: ${refunded > 0 ? `${currency} ${refunded}` : "nessuno"}${free && paid > 0 && refunded === 0 ? "\n\n⚠ Era dovuto un rimborso ma non è stato emesso in automatico (nessun pagamento online registrato): da gestire a mano." : ""}`,
+            text: `L'ospite ha annullato la prenotazione ${code}.\n\nStruttura: ${s(st.name)}\nPeriodo: ${fmtDMY(s(b.checkIn))} → ${fmtDMY(s(b.checkOut))}\nOspite: ${`${s(g.firstName)} ${s(g.lastName)}`.trim() || gEmail}\n\nRimborso emesso: ${refunded > 0 ? `${currency} ${refunded}` : "nessuno"}${free && paid > 0 && refunded === 0 ? "\n\n⚠ Era dovuto un rimborso ma non è stato emesso in automatico (nessun pagamento online registrato): da gestire a mano." : unrefunded > 0 ? `\n\n⚠ Pagato in totale ${currency} ${paid}, rimborsati in automatico ${currency} ${refunded}: i restanti ${currency} ${unrefunded} (incassati in altro modo o non tracciati) vanno restituiti a mano.` : ""}`,
           }),
         });
       }
     } catch { /* email non critica */ }
 
-    return NextResponse.json({ ok: true, refunded, free, freeUntil });
+    return NextResponse.json({ ok: true, refunded, free, freeUntil, unrefunded });
   } catch (e) {
     return NextResponse.json({ ok: false, error: "server_error", message: (e as Error)?.message ?? "errore" }, { status: 500 });
   }

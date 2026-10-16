@@ -230,7 +230,7 @@ export default function PianiTariffariPage() {
 
       <p className="mt-4 text-xs text-faint">{t("Vedi l'effetto dei piani giorno per giorno nell'Anteprima prezzi della pagina")} <a href="/tariffe" className="font-semibold text-focus hover:underline">{t("Tariffe")}</a>.</p>
 
-      {editing && <PlanModal plan={editing} allTypes={editing.structureId ? roomTypes.filter((rt) => rt.structureId === editing.structureId) : types} structures={structures} roomName={roomName} onSave={(p) => { upsert(p); setEditId(null); }} onDelete={async () => { await delPlan(editing.id); setEditId(null); }} onClose={() => setEditId(null)} />}
+      {editing && <PlanModal plan={editing} allTypes={roomTypes} structures={structures} roomName={roomName} onSave={(p) => { upsert(p); setEditId(null); }} onDelete={async () => { await delPlan(editing.id); setEditId(null); }} onClose={() => setEditId(null)} />}
     </div>
   );
 }

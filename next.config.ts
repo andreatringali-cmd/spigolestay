@@ -9,7 +9,6 @@ import type { NextConfig } from "next";
 // - Permissions-Policy: disattiva microfono e geolocalizzazione (la fotocamera resta per il check-in)
 const SECURITY_HEADERS = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
-  { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "microphone=(), geolocation=(), browsing-topics=()" },
@@ -19,7 +18,12 @@ const SECURITY_HEADERS = [
 const nextConfig: NextConfig = {
   devIndicators: false, // nasconde l'indicatore "N" di sviluppo di Next.js
   async headers() {
-    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+    return [
+      { source: "/:path*", headers: SECURITY_HEADERS },
+      // X-Frame-Options SAMEORIGIN su tutto TRANNE /embed/*: il widget incorporabile deve poter stare in un iframe sul sito del gestore.
+      { source: "/((?!embed/).*)", headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }] },
+      { source: "/embed/:path*", headers: [{ key: "Content-Security-Policy", value: "frame-ancestors *" }] },
+    ];
   },
   // Le vecchie aree Concierge/Conversazioni sono confluite in un'unica pagina Messaggi (a tab):
   // reindirizzo i vecchi link così non danno 404.

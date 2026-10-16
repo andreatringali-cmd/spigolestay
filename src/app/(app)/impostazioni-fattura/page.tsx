@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/authsync";
 import { PageHeader, Card, SectionTitle } from "@/components/ui";
@@ -41,18 +41,22 @@ export default function ImpostazioniFatturaPage() {
 
   // Si legge la riga dell'account di LAVORO (filtro tenant_id): senza filtro un collaboratore che vede due righe (la propria e quella del titolare) otteneva un errore ignorato e un form vuoto, poi sovrascritto dal Salva.
   const [loadErr, setLoadErr] = useState("");
+  // Dipende da "c'è un utente" (booleano), non dall'oggetto user: a ogni ritorno sulla scheda Supabase emette una sessione nuova e l'effetto rileggeva la riga azzerando il form non salvato.
+  const hasUser = !!user;
+  const loadedFor = useRef("");
   useEffect(() => {
     if (!supabase) { setLoading(false); return; }
-    if (!tenantId) { if (!user) setLoading(false); return; } // un collaboratore aspetta di conoscere l'account di lavoro
+    if (!tenantId) { if (!hasUser) setLoading(false); return; } // un collaboratore aspetta di conoscere l'account di lavoro
+    if (loadedFor.current === tenantId) return; // già caricato per questo account: non sovrascrivere il form
     let off = false;
     void Promise.resolve(supabase.from("tenant_invoice_settings").select("*").eq("tenant_id", tenantId).maybeSingle()).then(({ data, error }) => {
       if (off) return;
       if (error) setLoadErr("Impossibile leggere le impostazioni: " + error.message + ". Il salvataggio è disattivato per non sovrascriverle.");
-      else if (data) setS({ ...DEF, ...Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null)) as Partial<Settings> });
+      else { loadedFor.current = tenantId; if (data) setS({ ...DEF, ...Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null)) as Partial<Settings> }); }
       setLoading(false);
     });
     return () => { off = true; };
-  }, [tenantId, user]);
+  }, [tenantId, hasUser]);
 
   const set = (patch: Partial<Settings>) => { setDirty(true); setS((p) => ({ ...p, ...patch })); };
   const [dirty, setDirty] = useState(false);

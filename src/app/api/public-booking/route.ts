@@ -1,7 +1,7 @@
 import { schedulePoolPush } from "@/lib/pool-push";
 import { POOL_KEY, parsePool, inPool, poolOccupancy } from "@/lib/inventory-pool";
 import { NextResponse } from "next/server";
-import { stayFloor, hasFreeUnit, clientIp, type OwnerStructureData } from "@/lib/server-booking-guard";
+import { stayFloor, hasFreeUnit, clientIp, loadOrgDataParts, mergeOwnerData, type OwnerStructureData } from "@/lib/server-booking-guard";
 import { isInternalRequest, rateLimited } from "@/lib/server-auth";
 import { siteOrigin } from "@/lib/server-auth";
 import { internalFetch } from "@/lib/server-auth";
@@ -95,10 +95,17 @@ export async function POST(req: Request) {
     try { data = JSON.parse(blob[DATA_KEY] || "{}") as Json; } catch { data = {}; }
     const bookings = (Array.isArray(data.bookings) ? data.bookings : []) as Booking[];
     const guests = (Array.isArray(data.guests) ? data.guests : []) as (Json & { id: string; email?: string; fullName?: string; phone?: string })[];
-    const units = (Array.isArray(data.units) ? data.units : []) as Unit[];
 
-    // Idempotenza
-    if (bookings.some((b) => b.extId === extId)) return NextResponse.json({ ok: true, already: true });
+    // Le strutture condivise (organizzazioni) stanno solo in org_state: camere e prenotazioni per i controlli vanno uniti a quelli personali
+    // (pool incluso, che attraversa più organizzazioni). La prenotazione si scrive comunque nello stato personale: il sync la smista nell'organizzazione.
+    const orgParts = await loadOrgDataParts(admin, ownerId);
+    const merged = mergeOwnerData([data, ...orgParts]);
+    const mRoomTypes = merged.roomTypes;
+    const mUnits = merged.units as unknown as Unit[];
+    const mBookings = merged.bookings as unknown as Booking[];
+
+    // Idempotenza (anche sulle prenotazioni già smistate nelle organizzazioni)
+    if (mBookings.some((b) => b.extId === extId)) return NextResponse.json({ ok: true, already: true });
 
     // Ospite: riusa per email, altrimenti crea
     let guestId = "";
@@ -113,23 +120,23 @@ export async function POST(req: Request) {
     // Camera: prima unità libera della tipologia. Se non ce ne sono: dal sito anonimo si rifiuta (409); se invece il pagamento
     // è già avvenuto (chiamata interna) si registra comunque, senza camera e con un avviso, invece di sovrapporla a un'altra prenotazione.
     // La tipologia deve esistere ed essere di QUESTA struttura (dal sito anonimo): una inventata non deve passare.
-    if (!internal && !(Array.isArray(data.roomTypes) ? data.roomTypes : []).some((x) => (x as { id?: string; structureId?: string }).id === rt && (x as { structureId?: string }).structureId === sid)) {
+    if (!internal && !mRoomTypes.some((x) => (x as { id?: string; structureId?: string }).id === rt && (x as { structureId?: string }).structureId === sid)) {
       return NextResponse.json({ error: "room_type_not_found" }, { status: 400 });
     }
-    const ofType = units.filter((u) => u.roomTypeId === rt && !u.outOfService);
+    const ofType = mUnits.filter((u) => u.roomTypeId === rt && !u.outOfService);
     // Strutture che mostrano le stesse camere fisiche: la tipologia deve avere camere libere anche nel gruppo (le camere uguali si dividono le stesse camere fisiche).
     const pool = parsePool(blob[POOL_KEY]);
-    const poolOcc = inPool(pool, sid) ? poolOccupancy(pool, (Array.isArray(data.roomTypes) ? data.roomTypes : []) as never, units, bookings) : null;
+    const poolOcc = inPool(pool, sid) ? poolOccupancy(pool, mRoomTypes as never, mUnits, mBookings) : null;
     const poolBlocks = poolOcc ? !poolOcc.canSell(rt, ci, co) : false;
-    const free = poolBlocks ? undefined : ofType.find((u) => !bookings.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)));
+    const free = poolBlocks ? undefined : ofType.find((u) => !mBookings.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)));
     let overbooked = false;
     let unitId: string | null = free?.id ?? null;
     if (!free && !internal) return NextResponse.json({ error: "no_availability" }, { status: 409 }); // anche se tutte le camere della tipologia sono fuori servizio
-    if (!free && ofType.length) { overbooked = true; unitId = null; }
+    if (!free) { overbooked = true; unitId = null; } // avviso anche quando i dati non mostrano camere: il gestore deve assegnarla a mano
     // Prezzo minimo (metà del listino): impedisce soggiorni "regalati" scrivendo un totale basso nella richiesta.
     if (!internal && total !== undefined) {
-      const od: OwnerStructureData | null = (Array.isArray(data.structures) ? data.structures : []).some((x) => (x as { id?: string }).id === sid)
-        ? { roomTypes: (Array.isArray(data.roomTypes) ? data.roomTypes : []) as never, units: units as never, bookings: bookings as never, rateOverrides: ((data.rateOverrides ?? {}) as Record<string, number>) }
+      const od: OwnerStructureData | null = merged.structures.some((x) => (x as { id?: string }).id === sid)
+        ? { roomTypes: mRoomTypes as never, units: mUnits as never, bookings: mBookings as never, rateOverrides: merged.rateOverrides }
         : null;
       const floor = od ? stayFloor(od, rt, ci, co) : null;
       if (floor !== null && total < floor) return NextResponse.json({ error: "price_mismatch" }, { status: 400 });
@@ -189,17 +196,19 @@ export async function POST(req: Request) {
       const gs2 = (Array.isArray(d2.guests) ? d2.guests : []) as (Json & { id: string })[];
       if (!gs2.some((x) => x.id === guestId)) { gs2.push({ id: guestId, fullName: `${gFirst} ${gLast}`.trim() || gEmail || "Ospite", email: gEmail || undefined } as Json & { id: string }); d2.guests = gs2; }
       // Il proprietario ha salvato nel frattempo: la camera scelta prima potrebbe non essere più libera. Si rifà il controllo sui dati freschi.
-      const units2 = (Array.isArray(d2.units) ? d2.units : []) as Unit[];
+      const merged2 = mergeOwnerData([d2, ...orgParts]);
+      const units2 = merged2.units as unknown as Unit[];
+      const bkAll2 = merged2.bookings as unknown as Booking[];
       const pool2 = parsePool(blob2[POOL_KEY]);
-      const poolOcc2 = inPool(pool2, sid) ? poolOccupancy(pool2, (Array.isArray(d2.roomTypes) ? d2.roomTypes : []) as never, units2, bk2) : null;
+      const poolOcc2 = inPool(pool2, sid) ? poolOccupancy(pool2, merged2.roomTypes as never, units2, bkAll2) : null;
       const ofType2 = units2.filter((u) => u.roomTypeId === rt && !u.outOfService);
-      const free2 = poolOcc2 && !poolOcc2.canSell(rt, ci, co) ? undefined : ofType2.find((u) => !bk2.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)));
+      const free2 = poolOcc2 && !poolOcc2.canSell(rt, ci, co) ? undefined : ofType2.find((u) => !bkAll2.some((b) => b.unitId === u.id && b.status !== "cancelled" && overlaps(b, ci, co)));
       if (free2) { booking.unitId = free2.id; }
       else {
         if (!internal) return NextResponse.json({ error: "no_availability" }, { status: 409 });
         // Già pagato: si registra comunque, senza camera e con avviso, invece di sovrapporla a un'altra prenotazione.
         booking.unitId = null;
-        if (ofType2.length && !String(booking.note || "").includes("nessuna camera libera")) booking.note = (String(booking.note || "") + " · ⚠ nessuna camera libera in quelle date: da assegnare a mano").trim();
+        if (!String(booking.note || "").includes("nessuna camera libera")) booking.note = (String(booking.note || "") + " · ⚠ nessuna camera libera in quelle date: da assegnare a mano").trim();
       }
       bk2.push(booking); d2.bookings = bk2; blob2[DATA_KEY] = JSON.stringify(d2);
       // Scrittura con lock sul rev appena riletto: se cambia ancora, si risponde 409 (il webhook Stripe ritenta, la scrittura è idempotente).
@@ -265,7 +274,7 @@ export async function POST(req: Request) {
     } catch { /* email non critica */ }
 
     // Disponibilità verso i portali (Channex) senza aspettare un browser aperto: la struttura/tipologia prenotata e, con camere condivise, tutto il gruppo.
-    try { const { data: rowP } = await admin.from("app_state").select("data").eq("user_id", ownerId).maybeSingle(); await schedulePoolPush(((rowP?.data ?? {}) as Record<string, string>) || {}, [{ structureId: booking.structureId, roomTypeId: booking.roomTypeId }]); } catch { /* non critico */ }
+    try { const { data: rowP } = await admin.from("app_state").select("data").eq("user_id", ownerId).maybeSingle(); const pushBlob = { ...(((rowP?.data ?? {}) as Record<string, string>) || {}) }; const pushBk = mBookings.some((b) => b.id === booking.id) ? mBookings : [...mBookings, booking]; pushBlob[DATA_KEY] = JSON.stringify({ ...data, roomTypes: mRoomTypes, units: mUnits, bookings: pushBk, rateOverrides: merged.rateOverrides }); await schedulePoolPush(pushBlob, [{ structureId: booking.structureId, roomTypeId: booking.roomTypeId }]); } catch { /* non critico */ }
 
     return NextResponse.json({ ok: true });
   } catch (e) {

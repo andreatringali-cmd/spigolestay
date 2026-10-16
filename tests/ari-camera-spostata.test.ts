@@ -20,8 +20,9 @@ const units = [
 const map = { propertyId: "P", rooms: { std: { roomTypeId: "CSTD" }, dlx: { roomTypeId: "CDLX" } } };
 const b = (id: string, roomTypeId: string, unitId: string | null, checkIn: string, checkOut: string, status = "confirmed") => ({ id, structureId: S, roomTypeId, unitId, checkIn, checkOut, status });
 
-const today = new Date().toISOString().slice(0, 10);
-const plus = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+const { toISO } = await import("../src/lib/dates.ts");
+const today = toISO(new Date()); // data locale, la stessa che usa buildAriPayload (non quella UTC: dopo mezzanotte le due differiscono)
+const plus = (n: number) => toISO(new Date(Date.now() + n * 86400000));
 const avail = (bookings: unknown[], room: string, iso: string) =>
   buildAriPayload(map as never, S, roomTypes, units, bookings as never[], {}, { days: 5 }).availability.find((a) => a.room_type_id === room && a.date === iso)?.availability;
 

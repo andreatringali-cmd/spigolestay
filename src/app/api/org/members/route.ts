@@ -73,7 +73,18 @@ export async function POST(req: Request) {
   if (target.role === "owner") return NextResponse.json({ error: "cannot_modify_owner" }, { status: 400 });
 
   if (body?.remove === true) {
-    await admin.from("memberships").delete().eq("org_id", orgId).eq("user_id", userId);
+    // Prima si annullano gli inviti già accettati da questo utente: altrimenti il vecchio link /accetta-invito
+    // (l'invito resta "accepted") lo rimetterebbe dentro. accepted_by può mancare sui vecchi inviti → si cerca anche per email.
+    const { error: i1 } = await admin.from("org_invites").delete().eq("org_id", orgId).eq("accepted_by", userId);
+    if (i1) return NextResponse.json({ error: "invite_cleanup_failed", message: i1.message }, { status: 500 });
+    const { data: prof } = await admin.from("profiles").select("email").eq("user_id", userId).maybeSingle();
+    const memberEmail = String((prof as { email?: string } | null)?.email || "").trim();
+    if (memberEmail) {
+      const { error: i2 } = await admin.from("org_invites").delete().eq("org_id", orgId).ilike("email", memberEmail.replace(/[\\%_]/g, (c) => "\\" + c));
+      if (i2) return NextResponse.json({ error: "invite_cleanup_failed", message: i2.message }, { status: 500 });
+    }
+    const { error: dErr } = await admin.from("memberships").delete().eq("org_id", orgId).eq("user_id", userId);
+    if (dErr) return NextResponse.json({ error: "remove_failed", message: dErr.message }, { status: 500 });
     return NextResponse.json({ ok: true, removed: true });
   }
   const patch: J = {};

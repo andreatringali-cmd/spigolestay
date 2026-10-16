@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useData } from "@/lib/store";
 import { toISO, fmtDate } from "@/lib/dates";
-import { bookingGrandTotal } from "@/lib/booking";
-import { amountPaid, paymentStatus } from "@/lib/incassi";
+import { amountPaid, paymentStatus, totalDue } from "@/lib/incassi";
 import { eur } from "@/lib/format";
+import { NUM_TYPING_RE, formatDecimalIT, parseDecimalIT, roundDecimals } from "@/lib/num-it";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, Card } from "@/components/ui";
 import SearchInput from "@/components/SearchInput";
@@ -35,7 +35,7 @@ export default function PagamentiPage() {
   const scoped = bookings.filter((b) => b.status !== "cancelled" && b.channel !== "blocked" && (activeStructureId === "all" || b.structureId === activeStructureId));
   const enrich = scoped.map((b) => {
     const structure = getStructure(b.structureId);
-    const due = bookingGrandTotal(b, structure);
+    const due = totalDue(b, structure);
     const paid = Math.min(amountPaid(b), due);
     const balance = Math.max(0, due - paid);
     const overdue = balance > 0 && b.checkOut < todayISO;
@@ -113,7 +113,7 @@ export default function PagamentiPage() {
                 <td className={`px-3 py-2 font-mono text-xs ${b.checkIn < todayISO ? "text-faint" : "text-dim"}`}>{fmt(b.checkIn)}</td>
                 <td className="px-3 py-2 text-right font-mono text-dim">{eur(due)}</td>
                 <td className="px-3 py-2 text-right">
-                  <input type="number" min={0} max={due} value={Math.round(paid)} onChange={(e) => updateBooking(b.id, { paid: Math.max(0, Math.min(due, Number(e.target.value))) })} className="w-24 rounded-md border border-line bg-paper px-2 py-1 text-right font-mono text-sm text-txt outline-none focus:border-focus" />
+                  <PaidCell key={`${b.id}-${paid}`} paid={paid} due={due} onCommit={(v) => updateBooking(b.id, { paid: v })} />
                 </td>
                 <td className={`px-3 py-2 text-right font-mono font-semibold ${balance > 0 ? "text-[color:var(--err)]" : "text-[color:var(--ok)]"}`}>{eur(balance)}</td>
                 <td className="px-3 py-2">
@@ -134,6 +134,32 @@ export default function PagamentiPage() {
       </div>
       <p className="mt-3 text-xs text-faint">{t("Modifica l'importo incassato direttamente in tabella o usa «Salda» per registrare il pagamento completo. Gli incassi si riflettono nella scheda prenotazione e nella Cassa.")}</p>
     </div>
+  );
+}
+
+// Importo incassato: tiene il testo digitato (virgola, centesimi) e salva UNA volta sola, all'uscita dal campo o con Invio.
+// Salvare a ogni tasto scriveva valori parziali (4, 45, 450), rifaceva il sync e mandava email «Pagamento ricevuto» intermedie.
+function PaidCell({ paid, due, onCommit }: { paid: number; due: number; onCommit: (v: number) => void }) {
+  const [draft, setDraft] = useState(() => formatDecimalIT(paid, 2));
+  const commit = () => {
+    const n = parseDecimalIT(draft);
+    if (n === null) { setDraft(formatDecimalIT(paid, 2)); return; }
+    const v = Math.max(0, Math.min(due, roundDecimals(n, 2)));
+    setDraft(formatDecimalIT(v, 2));
+    if (v !== roundDecimals(paid, 2)) onCommit(v);
+  };
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      autoComplete="off"
+      value={draft}
+      onFocus={(e) => e.target.select()}
+      onChange={(e) => { if (NUM_TYPING_RE.test(e.target.value)) setDraft(e.target.value); }}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+      className="w-24 rounded-md border border-line bg-paper px-2 py-1 text-right font-mono text-sm text-txt outline-none focus:border-focus"
+    />
   );
 }
 

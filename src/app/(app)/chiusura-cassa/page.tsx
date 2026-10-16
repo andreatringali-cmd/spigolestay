@@ -25,7 +25,7 @@ interface Closure { id: string; day: string; conto: string | null; structure_id:
 export default function ChiusuraCassaPage() {
   const { user } = useAuth();
   const tenantId = useTenantId(); // account di lavoro: per un collaboratore è quello di chi lo ha invitato
-  const { bookings, guests, getStructure, allStructures, selectedStructureIds } = useData();
+  const { guests, getStructure, allStructures, selectedStructureIds, raw } = useData();
 
   // Dati Cassa dal server (movimenti manuali + regole + occorrenze saldate).
   const [manual, setManual] = useState<Mov[]>([]);
@@ -75,11 +75,11 @@ export default function ChiusuraCassaPage() {
 
   // Composizione movimenti (come Prima Nota) nello scope struttura scelto.
   const all = useMemo<Mov[]>(() => {
-    const a = computeAuto(bookings, guests, getStructure, scope);
+    const a = computeAuto(raw.bookings, guests, getStructure, scope);
     const s = computeScheduled(rules, paidSet, scope, day);
     const m = manual.filter((mv) => scopeVisible(mv.structureId, scope));
     return [...a, ...s, ...m];
-  }, [bookings, guests, getStructure, scopeKey, rules, paidSet, day, manual, allConti]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [raw.bookings, guests, getStructure, scopeKey, rules, paidSet, day, manual, allConti]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Conti dell'ambito scelto (ognuna struttura ha i suoi), più quelli su cui ci sono movimenti (anche non assegnati).
   const conti = useMemo(() => { const s = new Set<string>(contiKeysInScope(allConti, all, scope)); all.forEach((m) => { if (m.conto) s.add(m.conto); }); return Array.from(s); }, [all, allConti, scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps

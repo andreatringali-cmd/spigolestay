@@ -27,7 +27,7 @@ import { adoptMigratedMedia, isMediaFlatKey } from "./media-migrate-plan";
 import { mergeKeyedList } from "./list-merge";
 import { combineData } from "./org-combine";
 import { orgStructureSets, extractOrgCassaConfig, applyOrgCassaConfig } from "./org-cassa-config";
-import { adoptServerFlatKeys, mergeRecord3, applyRaceChanges } from "./sync-merge";
+import { adoptServerFlatKeys, mergeRecord3, applyRaceChanges, mergePreventivi3, mergeRecordJson, stripVolatileUsers } from "./sync-merge";
 
 // Prefissi delle chiavi che rappresentano lo stato dell'account (da sincronizzare).
 const SYNC_PREFIXES = ["spigolestay:", "xenora:"];
@@ -140,7 +140,7 @@ function stableStringify(v: unknown): string {
 // Preferenze SOLO di vista/dispositivo: non guidano scritture/reload né si sincronizzano tra
 // dispositivi (ognuno tiene la propria vista). TUTTO il resto è dato d'account e va salvato.
 const SIG_SKIP = new Set<string>([
-  "spigolestay:activestruct", "spigolestay:calview:v2", "spigolestay:piani:view",
+  "spigolestay:activestruct", "spigolestay:activestructs", "spigolestay:calview:v2", "spigolestay:piani:view",
   "spigolestay:camere:collapsed:v1", "spigolestay:activityseen",
   // Preferenze "quali grafici/viste mostrare": per-dispositivo, non devono sincronizzarsi.
   "spigolestay:prenchart:v2", "spigolestay:prenchartorder", "spigolestay:camere:aperte:v2",
@@ -174,6 +174,7 @@ const ENTITY_COLLECTIONS = ["structures", "roomTypes", "units", "bookings", "gue
 // pulizie) sovrascriveva sul server le modifiche appena fatte altrove — è la causa per cui lo
 // stato "Disponibile" dei prodotti "tornava indietro". Le cancellazioni sono soft-delete
 // (_deleted:true con updatedAt più recente) così non risorgono.
+const PULIZIE_MAP_KEYS = ["spigolestay:pulizie:done", "spigolestay:pulizie:linen", "spigolestay:pulizie:notes"];
 const FLAT_ENTITY_KEYS = ["spigolestay:pulizie:stock", "spigolestay:pulizie:orders", "spigolestay:pulizie:issues", "spigolestay:pulizie:tasks", "spigolestay:pulizie:checks", "spigolestay:pulizie:hours"];
 const THREADS_KEY = "spigolestay:threads:v1";
 // Preventivi (array piatto, id ma senza updatedAt): vedi mergePreventivi più sotto. Scritta anche dal
@@ -279,23 +280,7 @@ function mergeActivities(localVal: unknown, serverVal: unknown): unknown[] {
 // conferma (stesso bug di mergeThreads/mergeFlatEntityArray). Non essendoci un updatedAt per il LWW
 // generico, la regola è sullo STATO (che può solo avanzare da "inviato" a "confermato", mai tornare
 // indietro), non sul tempo.
-function mergePreventivi(localRaw: string | undefined, serverRaw: string | undefined): string | null {
-  let local: unknown[];
-  let server: unknown[];
-  try { const p = JSON.parse(localRaw ?? "[]"); if (!Array.isArray(p)) return null; local = p; } catch { return null; }
-  try { const p = JSON.parse(serverRaw ?? "[]"); server = Array.isArray(p) ? p : []; } catch { server = []; }
-  const serverById = new Map<string, { status?: unknown; bookingId?: unknown }>();
-  for (const it of server) { const id = idOf(it); if (id) serverById.set(id, it as { status?: unknown; bookingId?: unknown }); }
-  const out = local.map((it) => {
-    const id = idOf(it);
-    const s = id ? serverById.get(id) : undefined;
-    if (s && s.status === "confermato" && (it as { status?: unknown })?.status !== "confermato") {
-      return { ...(it as Record<string, unknown>), status: s.status, bookingId: s.bookingId };
-    }
-    return it;
-  });
-  return JSON.stringify(out);
-}
+// L'implementazione (con la base per non perdere i preventivi creati altrove) è mergePreventivi3 in sync-merge.ts.
 
 // Chiavi di CONTATTO (email/telefono normalizzati) per riconoscere un iscritto newsletter / lead.
 function leadContactKeys(g: unknown): string[] {
@@ -362,7 +347,8 @@ function settingsSig(obj: Record<string, string> | null | undefined): string {
   let sig = "";
   for (const k of ["spigolestay:users", "spigolestay:plan", "spigolestay:modules"]) {
     const raw = obj[k];
-    if (raw) { try { sig += `${k}=${stableStringify(JSON.parse(raw))}`; } catch { sig += `${k}=${raw}`; } }
+    // lastLogin/sessions degli utenti cambiano a ogni accesso e sono solo informativi: non devono far ricaricare gli altri dispositivi.
+    if (raw) { try { const v = JSON.parse(raw); sig += `${k}=${stableStringify(k === "spigolestay:users" ? stripVolatileUsers(v) : v)}`; } catch { sig += `${k}=${raw}`; } }
   }
   return sig;
 }
@@ -380,7 +366,7 @@ function reloadSig(obj: Record<string, string> | null | undefined): string {
     for (const k of ENTITY_COLLECTIONS) { const t = (arr(del[k]) as string[]).slice().sort(); if (t.length) sig += `x${k}:${t.join(",")};`; }
   } catch { /* blob non valido */ }
   for (const k of ["spigolestay:users", "spigolestay:plan", "spigolestay:modules"]) {
-    const raw = obj[k]; if (raw) { try { sig += `${k}=${stableStringify(JSON.parse(raw))}`; } catch { sig += `${k}=${raw}`; } }
+    const raw = obj[k]; if (raw) { try { const v = JSON.parse(raw); sig += `${k}=${stableStringify(k === "spigolestay:users" ? stripVolatileUsers(v) : v)}`; } catch { sig += `${k}=${raw}`; } }
   }
   return sig;
 }
@@ -475,11 +461,11 @@ function mergeSnapshots(
     if (m !== null) merged[THREADS_KEY] = m;
   }
 
-  // Preventivi: vedi mergePreventivi — protegge solo lo stato "confermato" scritto dal server.
+  // Preventivi: vedi mergePreventivi3 — stato "confermato" scritto dal server + preventivi creati altrove (non nella base).
   const lPrev = local[PREVENTIVI_KEY];
   const sPrev = server?.[PREVENTIVI_KEY];
   if (lPrev !== undefined || sPrev !== undefined) {
-    const m = mergePreventivi(lPrev, sPrev);
+    const m = mergePreventivi3(base?.[PREVENTIVI_KEY], lPrev, sPrev);
     if (m !== null) merged[PREVENTIVI_KEY] = m;
   }
 
@@ -497,11 +483,17 @@ function mergeSnapshots(
     const m = mergeKeyedList(local[key], server[key], base?.[key]);
     if (m !== null) merged[key] = m;
   }
+  // Mappe dei segni di Pulizie (fatto/biancheria/note): fusione per chiave a 3 vie, così i segni fatti da due dispositivi non si cancellano a vicenda.
+  for (const key of PULIZIE_MAP_KEYS) {
+    const m = mergeRecordJson(base?.[key], local[key], server?.[key]);
+    if (m !== null) merged[key] = m;
+  }
   // Tutte le altre chiavi piatte (impostazioni, utenti e permessi, piano, modelli messaggi…): regola a 3 vie. Se questo dispositivo non le ha toccate
   // (uguali alla base) e il server le ha cambiate, si adotta il server; prima il locale vinceva sempre e un dispositivo con dati vecchi li rimetteva sul server.
-  // Escluse le chiavi che hanno già una regola propria qui sopra e quelle per-dispositivo.
+  // Escluse le chiavi che hanno già una regola propria qui sopra e quelle per-dispositivo. Le chiavi del sito/foto NON sono escluse: adoptMigratedMedia sopra
+  // copre la migrazione delle foto, ma i testi cambiati altrove vanno adottati anche qui (locale uguale alla base).
   return adoptServerFlatKeys(merged, local, server, base, (k) =>
-    k === "spigolestay:data:v1" || FLAT_ENTITY_KEYS.includes(k) || k === THREADS_KEY || k === PREVENTIVI_KEY || isMediaFlatKey(k)
+    k === "spigolestay:data:v1" || FLAT_ENTITY_KEYS.includes(k) || k === THREADS_KEY || k === PREVENTIVI_KEY || PULIZIE_MAP_KEYS.includes(k)
     || k === "spigolestay:cassa:cats" || k === "spigolestay:cassa:conti" || SIG_SKIP.has(k) || k === LOCAL_OWNER_KEY);
 }
 

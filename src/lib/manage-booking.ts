@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { rateLimited } from "@/lib/server-auth";
 
 // Helper server-side per la GESTIONE prenotazione da parte dell'OSPITE (pagina /gestisci).
 // Una prenotazione può vivere in app_state (struttura personale) oppure in org_state
@@ -105,21 +104,44 @@ export async function mutateStore(admin: SupabaseClient, store: BookingStore, mu
 // condivise (poche righe), poi negli stati personali. Serve ai link di check-in che
 // non portano lo slug (link interni / email vecchie). L'id prenotazione è un UUID.
 // Nota: a grande scala converrà una tabella-indice booking→store; per ora scan diretto.
+const FBS_WINDOW_MS = 60_000;
+const FBS_MAX_MISSES = 60;
+const FBS_CACHE_MS = 10 * 60_000;
+const idCache = new Map<string, { table: "app_state" | "org_state"; keyCol: "user_id" | "org_id"; keyVal: string; exp: number }>();
+const missHits: number[] = [];
+/** Solo per i test: azzera cache e contatore delle ricerche fallite. */
+export function _resetFindByIdState() { idCache.clear(); missHits.length = 0; }
+
 export async function findBookingStoreById(admin: SupabaseClient, bookingId: string): Promise<BookingStore | null> {
-  if (!bookingId) return null;
+  if (!bookingId || bookingId.length > 100) return null;
+  const now = Date.now();
+  // Id già trovato di recente: si rilegge SOLO quella riga (niente scansione di tutti i tenant, niente tetto). Gli ospiti veri restano serviti.
+  const cached = idCache.get(bookingId);
+  if (cached && cached.exp > now) {
+    const hit = await scan(admin, cached.table, cached.keyCol, cached.keyVal, bookingId);
+    if (hit) return hit;
+    idCache.delete(bookingId);
+  }
   // La ricerca senza slug scorre TUTTI i tenant (blob interi): con id inesistenti sarebbe un modo per saturare il database.
-  // Tetto globale (per istanza) alle ricerche di questo tipo; oltre, si risponde "non trovata" come per un id sconosciuto.
-  if (rateLimited("fbs:all", 60, 60_000)) return null;
+  // Tetto (per istanza) alle sole ricerche FALLITE, le uniche costose e senza esito; oltre, si risponde "non trovata".
+  while (missHits.length && now - missHits[0] > FBS_WINDOW_MS) missHits.shift();
+  if (missHits.length >= FBS_MAX_MISSES) return null;
+  const found = (hit: BookingStore) => {
+    if (idCache.size >= 2000) idCache.clear();
+    idCache.set(bookingId, { table: hit.table, keyCol: hit.keyCol, keyVal: hit.keyVal, exp: now + FBS_CACHE_MS });
+    return hit;
+  };
   const { data: orgs } = await admin.from("org_state").select("org_id").limit(5000);
   for (const o of arr(orgs)) {
     const hit = await scan(admin, "org_state", "org_id", String((o as { org_id?: string }).org_id || ""), bookingId);
-    if (hit) return hit;
+    if (hit) return found(hit);
   }
   const { data: users } = await admin.from("app_state").select("user_id").limit(10000);
   for (const u of arr(users)) {
     const hit = await scan(admin, "app_state", "user_id", String((u as { user_id?: string }).user_id || ""), bookingId);
-    if (hit) return hit;
+    if (hit) return found(hit);
   }
+  missHits.push(now);
   return null;
 }
 

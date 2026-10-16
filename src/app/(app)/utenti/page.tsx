@@ -13,7 +13,7 @@ import { fmtDate } from "@/lib/dates";
 export default function UtentiPage() {
   const router = useRouter();
   const { t } = useLang();
-  const { structures, activeStructureId } = useData();
+  const { allStructures: structures, activeStructureId } = useData(); // tutte le strutture, non solo quelle selezionate in alto
   const { moduleOn } = useAccess();
   const canMulti = moduleOn("team"); // il multiutente è nei piani superiori
   const [users, setUsers] = useState<User[]>([]);

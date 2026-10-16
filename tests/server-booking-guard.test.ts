@@ -6,7 +6,7 @@ import { makeFakeDb } from "./helpers/fake-supabase.ts";
 // server-booking-guard.ts importa "@/lib/pricing": lo risolve l'hook di tests/helpers. Lato server non c'e' localStorage:
 // il motore prezzi deve funzionare lo stesso (nessuna regola weekend propria = nessuna maggiorazione nel calcolo del minimo).
 register("./helpers/alias-loader.mjs", import.meta.url);
-const { stayFloor, hasFreeUnit, clientIp, loadOwnerStructureData } = await import("../src/lib/server-booking-guard.ts");
+const { stayFloor, hasFreeUnit, clientIp, loadOwnerStructureData, mergeOwnerData } = await import("../src/lib/server-booking-guard.ts");
 
 const DATA_KEY = "spigolestay:data:v1";
 const rt = (id: string, basePrice: number, extra: Record<string, unknown> = {}) => ({ id, structureId: "S1", name: id, beds: 2, basePrice, ...extra });
@@ -142,4 +142,24 @@ test("loadOwnerStructureData: rateOverrides assente o non oggetto = {}", async (
   const { client } = makeFakeDb({ memberships: [], app_state: [{ user_id: "own", data: blob(state(["S1"], { rateOverrides: "boh" })) }] });
   const r = await loadOwnerStructureData(client as never, "own", "S1");
   assert.deepEqual(r!.rateOverrides, {});
+});
+
+// ───────────────────────── mergeOwnerData (personale + organizzazioni) ─────────────────────────
+test("mergeOwnerData: unisce strutture, tipologie, camere e prenotazioni di piu' blob senza doppioni", () => {
+  const personal = { structures: [], roomTypes: [], units: [], bookings: [{ id: "b1", unitId: null }] };
+  const org = { structures: [{ id: "S1" }], roomTypes: [rt("A", 100)], units: [{ id: "u1", roomTypeId: "A" }], bookings: [{ id: "b1", unitId: "u1" }, { id: "b2", unitId: "u1" }], rateOverrides: { x: 1 } };
+  const m = mergeOwnerData([personal, org]);
+  assert.equal(m.structures.length, 1);
+  assert.equal(m.roomTypes.length, 1);
+  assert.equal(m.units.length, 1);
+  assert.deepEqual(m.bookings.map((b) => b.id), ["b1", "b2"]); // b1: vale la prima occorrenza (personale)
+  assert.deepEqual(m.rateOverrides, { x: 1 });
+});
+
+test("mergeOwnerData: con camere solo nell'organizzazione hasFreeUnit funziona sui dati uniti", () => {
+  const org = { structures: [{ id: "S1" }], roomTypes: [rt("A", 100)], units: [{ id: "u1", roomTypeId: "A" }], bookings: [{ id: "b1", unitId: "u1", status: "confirmed", checkIn: "2026-06-15", checkOut: "2026-06-18" }] };
+  const m = mergeOwnerData([{}, org]);
+  const d = { roomTypes: m.roomTypes, units: m.units, bookings: m.bookings, rateOverrides: m.rateOverrides } as never;
+  assert.equal(hasFreeUnit(d, "A", "2026-06-16", "2026-06-17"), false);
+  assert.equal(hasFreeUnit(d, "A", "2026-06-18", "2026-06-19"), true);
 });

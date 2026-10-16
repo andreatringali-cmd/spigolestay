@@ -68,7 +68,7 @@ export async function POST(req: Request) {
 
     const st = await findStructure(admin, ownerId, sid);
     const acct = st && typeof st.stripeAccount === "string" ? st.stripeAccount : "";
-    const amount = total > 0 ? Math.min(deposit > 0 ? deposit : total, total) : (deposit > 0 ? deposit : total); // caparra se prevista, altrimenti totale; mai oltre il totale
+    const amount = deposit > 0 ? (total > 0 ? Math.min(deposit, total) : deposit) : 0; // solo se c'è una caparra/prepagato (deposit>0); nessun anticipo = nessun pagamento online; mai oltre il totale
     if (!key || !acct || amount <= 0) return NextResponse.json({ ok: true, payment: false, token });
 
     // Controlli sul server prima di far pagare: i numeri arrivano dal browser dell'ospite e non sono affidabili.

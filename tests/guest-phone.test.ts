@@ -26,3 +26,13 @@ test("vuoto: nessun numero salvato", () => {
   assert.equal(combinePhone("+39", ""), "");
   assert.equal(combinePhone("", "  "), "");
 });
+
+test("formato OTA prefisso-zona-numero-: non viene riscritto come +39", () => {
+  for (const raw of ["39--3934335777-", "44-3-308225121-", "0-0-18574458226-"]) {
+    for (const country of [undefined, "", "IT"]) {
+      const p = parsePhone(raw, country);
+      assert.deepEqual(p, { dial: "", local: raw }, `${raw} ${country}`);
+      assert.equal(combinePhone(p.dial, p.local), raw, raw);
+    }
+  }
+});

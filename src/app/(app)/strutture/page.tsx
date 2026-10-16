@@ -12,11 +12,11 @@ import { supabase } from "@/lib/supabase";
 
 export default function StrutturePage() {
   const router = useRouter();
-  const { structures, roomTypes, units, activeStructureId, moveStructure } = useData();
+  const { structures, allStructures, roomTypes, units, activeStructureId, moveStructure } = useData();
   const { t } = useLang();
 
   const limit = planStructureLimit();
-  const overLimit = structures.length >= limit; // piano al completo di strutture
+  const overLimit = allStructures.length >= limit; // conta TUTTE le strutture, non solo quelle selezionate in alto; piano al completo di strutture
 
   // Rispetta il filtro struttura in alto a destra: se è selezionata una singola struttura
   // mostra solo quella; con "Tutte" le mostra tutte.

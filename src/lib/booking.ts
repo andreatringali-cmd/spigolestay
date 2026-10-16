@@ -107,11 +107,12 @@ export function cityTaxShareOf(structure: Structure | undefined, rows: GroupTaxR
   return (idx < 0 ? 0 : base[idx]) / 100;
 }
 
-/** Residuo di ogni camera di un gruppo (soggiorno + pulizia + extra + QUOTA di tassa del gruppo − incassato), ai centesimi. */
-export function groupRowBalances(structure: Structure | undefined, rows: (GroupTaxRow & { cleaningFee?: number; extras?: { price?: number }[]; paid?: number })[]): { id: string; balance: number; tax: number }[] {
+/** Residuo di ogni camera di un gruppo (soggiorno + pulizia + extra + QUOTA di tassa del gruppo − incassato), ai centesimi. Se la tassa è già stata incassata a parte (cityTaxPaid senza cityTaxInPaid, come in totalDue) la quota non entra nel dovuto. */
+export function groupRowBalances(structure: Structure | undefined, rows: (GroupTaxRow & { cleaningFee?: number; extras?: { price?: number }[]; paid?: number; cityTaxPaid?: boolean; cityTaxInPaid?: boolean })[]): { id: string; balance: number; tax: number }[] {
   return rows.map((r, i) => {
     const tax = cityTaxShareOf(structure, rows, r.id ?? String(i));
-    const grand = cents(r.total ?? 0) + cents(r.cleaningFee ?? 0) + cents(bookingExtrasTotal(r)) + cents(tax);
+    const taxDue = r.cityTaxPaid && !r.cityTaxInPaid ? 0 : tax;
+    const grand = cents(r.total ?? 0) + cents(r.cleaningFee ?? 0) + cents(bookingExtrasTotal(r)) + cents(taxDue);
     return { id: r.id ?? String(i), tax, balance: Math.max(0, grand - cents(r.paid ?? 0)) / 100 };
   });
 }

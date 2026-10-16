@@ -29,7 +29,7 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
 
   const primaryOf = (): PG & { fullName?: string } => {
     const g = guest(b.guestId);
-    if (g) return { firstName: g.firstName, lastName: g.lastName, sex: g.sex, birthDate: g.birthDate, birthPlace: g.birthPlace, citizenship: g.citizenship, docType: g.docType, docNumber: g.docNumber, fullName: g.fullName };
+    if (g) return { firstName: g.firstName, lastName: g.lastName, sex: g.sex, birthDate: g.birthDate, birthPlace: g.birthPlace, citizenship: g.citizenship, docType: g.docType, docNumber: g.docNumber, docPlace: g.docPlace, fullName: g.fullName };
     const pg = b.primaryGuest ?? {}; return { ...pg, fullName: `${pg.firstName ?? ""} ${pg.lastName ?? ""}`.trim() };
   };
   const setPrimary = (id: string, patch: Record<string, unknown>) => {
@@ -37,7 +37,8 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
     if ("lastName" in patch || "firstName" in patch) next.fullName = `${next.firstName ?? ""} ${next.lastName ?? ""}`.toString().trim() || g?.fullName || "";
     updateGuest(id, next);
   };
-  const setPrimaryOf = (patch: Record<string, unknown>) => { if (guest(b.guestId)) setPrimary(b.guestId, patch); else updateBooking(b.id, { primaryGuest: { ...(b.primaryGuest ?? {}), ...patch } }); };
+  // Se la prenotazione ha già primaryGuest (es. dal check-in online) la sync Alloggiati lo preferisce alla scheda ospite: la correzione va applicata a entrambi.
+  const setPrimaryOf = (patch: Record<string, unknown>) => { if (guest(b.guestId)) { setPrimary(b.guestId, patch); if (b.primaryGuest) updateBooking(b.id, { primaryGuest: { ...b.primaryGuest, ...patch } }); } else updateBooking(b.id, { primaryGuest: { ...(b.primaryGuest ?? {}), ...patch } }); };
   const setCo = (i: number, patch: Partial<Co>) => updateBooking(b.id, { extraGuests: cosOf().map((c, j) => (j === i ? { ...c, ...patch } : c)) });
   const addCo = () => updateBooking(b.id, { extraGuests: [...cosOf(), { firstName: "", lastName: "" } as Co] });
   const delCo = (i: number) => updateBooking(b.id, { extraGuests: cosOf().filter((_, j) => j !== i) });
@@ -49,7 +50,7 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
     if (f.sex === "M" || f.sex === "F") p.sex = f.sex;
     if (/^\d{4}-\d{2}-\d{2}$/.test(f.birthDate || "")) p.birthDate = f.birthDate;
     if (f.birthPlace) p.birthPlace = f.birthPlace; if (f.citizenship) p.citizenship = f.citizenship;
-    if (withDoc) { const dt = normDoc(f.docType); if (dt) p.docType = dt; if (f.docNumber) p.docNumber = f.docNumber; }
+    if (withDoc) { const dt = normDoc(f.docType); if (dt) p.docType = dt; if (f.docNumber) p.docNumber = f.docNumber; if (f.docPlace) p.docPlace = f.docPlace; }
     return p;
   };
   const fillFromDoc = (id: string, withDoc: boolean, apply: (patch: Record<string, unknown>) => void) => {
@@ -108,6 +109,7 @@ export default function EditBookingModal({ bookingId, onClose }: { bookingId: st
             <F label="Cittadinanza"><input className={inp} value={g?.citizenship ?? ""} onChange={(e) => setPrimaryOf({ citizenship: e.target.value })} placeholder="Es. ITALIA" /></F>
             <F label="Tipo documento"><select className={inp} value={g?.docType ?? ""} onChange={(e) => setPrimaryOf({ docType: e.target.value || undefined })}><option value="">—</option>{DOC_TYPES.map((d) => <option key={d} value={d}>{d}</option>)}</select></F>
             <F label="Numero documento"><input className={inp} value={g?.docNumber ?? ""} onChange={(e) => setPrimaryOf({ docNumber: e.target.value })} /></F>
+            <F label="Luogo di rilascio"><input className={inp} value={g?.docPlace ?? ""} onChange={(e) => setPrimaryOf({ docPlace: e.target.value })} placeholder="Es. Comune di Siracusa" /></F>
           </div>
 
           {cosOf().map((c, i) => (

@@ -1,0 +1,533 @@
+{
+ "riviste": [
+  {
+   "area": "prenotazioni",
+   "segnalazioni": 6,
+   "nota": "Ho letto git diff 52e3fbd..HEAD su tutto il perimetro (booking.ts, incassi.ts, chat-pay*.ts, booking-journey.ts, BookingAmounts, BookingDrawer, NewBookingModal, prenotazioni/page.tsx, nuova/page.tsx) e per intero BookingDrawer, NewBookingModal, nuova/page.tsx confirm(), online-pay.ts, pay-method.ts e direct-origin.ts. Ho controllato anche i chiamanti di incassi.ts (pagamenti/page.tsx), chat-pay.ts (route e pannello Messaggi) e le liste CARRY/TWIN_FILL. Non ho eseguito script: tsx/esbuild non sono nel repo, quindi i valori sono calcolati a mano dal codice. Controllati e senza problemi: sanitizeChosenExtras, il nuovo ramo di revenueInRange, la logica `counted`/gSum dei KPI, la catena sort/displayList, printAll, setGroupTaxContext/cityTaxShareOf e il flusso emitDocument/closeBooking. Ho scartato per incertezza: la divergenza della tassa di gruppo sul server (groupTaxShares è vuoto fuori dal browser), la riga 'Tassa di soggiorno' della ricevuta stampata (somma delle righe 314 contro Totale 300), il salvataggio che riscrive `paid` dal form (possibile perdita di un pagamento arrivato durante la modifica) e l'ADR che ora include pulizia ed extra."
+  },
+  {
+   "area": "calendario",
+   "segnalazioni": 5,
+   "nota": "Report letti: r0-r7 e fix0-fix5. Ho esaminato il diff 52e3fbd..HEAD sul mio perimetro: CalendarGrid, ChannexAutoSync, overlaps, pricing, store, tariffe, tariffe-derivate, piani-tariffari e camere/tipologia. `npx tsc --noEmit` è pulito. Ho letto per intero o quasi CalendarGrid, store.tsx, ChannexAutoSync, channex-ari, booking-heal, BookingHealer, inventory-pool, overlaps, rate-plans, pricing e i file calendario/camere/disponibilita-gruppo. Le correzioni del primo giro sono coerenti. Ho riprovato a mano i casi della modale Tariffa (importo fisso, percentuale, weekend, singolo giorno, solo weekend), le guardie di cascata, la capienza in planOverlapFix e l'occupazione come in buildAriPayload. Non ho trovato errori introdotti dalle correzioni. Anche i 5 problemi riportati sono nuovi, non regressioni. Non ho ripetuto i problemi già noti e ancora aperti: r6 #7 (codici duplicati), #10 (vista Compatta), #11 (blocchi spostabili) e le etichette ven/sab/dom. Non ho provato l'app dal vivo, perché serve il login: il punto della scheda tipologia con ricarica pagina e quello delle chiusure vendita sono verificati solo leggendo il codice. L'esito di un rate 0.00 su Channex e sulle OTA non l'ho potuto verificare. Query al database: solo conteggi in SELECT, nessuna scrittura.\""
+  },
+  {
+   "area": "cassa",
+   "segnalazioni": 6,
+   "nota": "Lettura e prove su funzioni pure (script fuori dal repo), nessun file modificato. `npx tsc --noEmit` è pulito.\n\nHo controllato:\n- `cassa.ts` per intero (`closingBalance`, `nextRecurrenceStart`, saldi, ledger, previsione), `num-it`, `money`, `payouts`, `commission-estimate`, `org-cassa-config` e `online-pay`.\n- Le pagine cassa, chiusura-cassa, scadenzario-incassi e pagamenti, con il diff 52e3fbd..HEAD.\n- Le tabelle `cash_*` sul DB in SELECT: colonne, indici, policy `is_ws_tenant`/`is_cash_org_member`, trigger `cash_fill_org` e dati reali.\n\nEsito sulle correzioni del primo giro:\n- `closingBalance`: corretto sui casi provati. I giorni prima del saldo di partenza ricadono sulla somma storica, come già nella Cassa.\n- `nextRecurrenceStart`: corretto (31/01, 29/02, 31/12, settimanale).\n- `parseDecimalIT` e `readAmount`: coerenti con i testi precompilati.\n- `needTenant`: correzione incompleta per il motivo del primo punto.\n\nRLS e org_id: nessun problema (anon escluso, le policy valgono per tenant e per soci di org con cassa condivisa). Resta una nota: `cash_closures` non ha `org_id`, quindi le chiusure dei soci restano personali.\n\nNon ho segnalato per gravità bassa:\n- le esportazioni Excel di Pagamenti con le date in formato ISO;\n- l'`eur()` che può mostrare «-€ 0,00»;\n- la perdita di un saldo di partenza se la cancellazione riesce e l'inserimento fallisce;\n- la Chiusura per giorni precedenti al saldo di partenza, che mostra la somma storica senza avviso."
+  },
+  {
+   "area": "fatture-struttura",
+   "segnalazioni": 6,
+   "nota": "Ho letto i report r0..r7 e fix0..fix5 e il diff 52e3fbd..HEAD di tutta l'area: documenti, fatture passive, fascicolo, registro bollo, abbonamento (pagina, pagamento, fatture), impostazioni e impostazioni-fattura, strutture, utenti, admin, invoicing/service.ts. Ho letto anche folio, validate, fatturapa, provider, fic-oauth, subscription-billing, users.ts, access.tsx. `npx tsc --noEmit` è pulito. In DB (solo SELECT) ho verificato fn_issue_document, workspace_owner, is_ws_tenant, le policy RLS, il contenuto di document_numbering/documents e la colonna profiles.structure_names. Ho controllato anche NumInput/parseDecimalIT e CoordInput, il diff-autosave di strutture/[id], l'ambito `selectedStructureIds` in fascicolo/registro bollo/documenti/fatture passive, e il testo della pagina abbonamento. Questi tre punti, riletti, risultano corretti: l'ambito per sottoinsieme, il diff-autosave e i nuovi campi decimali. Non ho segnalato per non duplicare i report: bollo non stornato dalla NC, numero autofattura, cambio piano Stripe, permessi co-gestore con 'Tutte'. Restano fuori anche cose minori: payAmount in utenti/[id] riga 371 (Number() dà NaN con la virgola), tassa di gruppo calcolata senza le quote lato server (1 centesimo), traduzioni EN mancanti delle nuove frasi, ImportoPagamento. Non ho potuto provare i flussi autenticati in browser: le conclusioni su B, C e D vengono dal codice, dal sorgente di auth-js 2.115 e dal DB."
+  },
+  {
+   "area": "ospite-adempimenti",
+   "segnalazioni": 4,
+   "nota": "Ho letto i report r5 e fix5 e il diff 52e3fbd..HEAD dell'intera area: api/checkin (GET, POST, pay-confirm, upload, extract), api/manage-booking (cancel, modify, GET), alloggiati/service, istat/service, checkin-flow, checkin/page, gestisci/page, pulizie/page e puliziePlan, adempimenti e adempimenti-2, EditBookingModal, i cron alloggiati-auto e checkin-reminders, pulizie/purchase/receipt/send-now. Ho usato SELECT sul DB per le policy di public_guides, che risultano corrette. Non ho eseguito tsc né i test.\\n\\nNon ho trovato errori introdotti dalle correzioni nei seguenti punti:\\n- sanitizeChosenExtras: nome, prezzo e quantità del client sono ricalcolati dal catalogo.\\n- Campi obbligatori del check-in: gli id dei campi esistono per ospite principale e co-ospiti.\\n- Azzeramento dei dati personali nel GET anonimo: il resto della pagina non ne dipende.\\n- Filtro sentRefs in syncSchedine.\\n- Chiave di idempotenza del rimborso.\\n- Scritture di scorte e acquisti in pulizie/page.tsx.\\n\\nProblemi minori che ho visto e scartato perché non gravi:\\n- DateTextField con `max`: incollare una data futura sopra una già valida svuota il campo.\\n- refundEligible confronta con la data UTC invece di quella di Roma.\\n- Il limite globale 'fbs:all' è per istanza e blocca i link senza slug se superato.\\n- L'orario 23:00 mostrato nella UI diventa 22:00 in ora solare.\\n\\nHo scartato come duplicato il fatto che i link /checkin?b=ID senza slug non generano la schedina (già in r5, BASSA). Va però rialzata: è il link usato dal cron checkin-reminders e dall'azione 'Compila' di Adempimenti, quindi è il percorso normale.\"}"
+  },
+  {
+   "area": "comunicazione",
+   "segnalazioni": 6,
+   "nota": "Ho letto tutti i diff del mio perimetro dopo 52e3fbd (ospiti con _merge/_phone, promozioni, recensioni, upselling, messaggi, ConversazioniPanel, ModelliPanel, ConciergeKb, msg-templates, promos, preventivi, api stripe/quote e quote/confirm, forniture/confirm). Ho anche letto per intero anagrafica-clienti, notify-rules, la pagina pubblica /preventivo e il flusso forniture/order. `npx tsc --noEmit` è pulito. Ho provato con script fuori dal repo `parsePhone`/`checkPhone` su numeri nel formato OTA e `buildQuotePdf` con campi vuoti. Con una SELECT ho verificato che il formato telefono OTA esiste nei dati reali.\\n\\nControllato senza trovare errori nuovi:\\n- Allineamento tra badge e lista di Messaggi sulle prenotazioni annullate: le due regole sono equivalenti.\\n- Registro invii con `sentRef` e l'uso di `addTo` con setState funzionale.\\n- `todayRome` e `addDaysYmd`.\\n- La whitelist dei metadata in /api/stripe/quote rispetto ai chiamanti di preventivo e check-in.\\n- I controlli `kind`/`dep` in quote/confirm rispetto alla pagina pubblica.\\n- I controlli di forniture/confirm rispetto a forniture/order.\\n- `safeHttpUrl` per i link mappa.\\n- La neutralizzazione dei valori nel CSV recensioni.\\n\\nNon ho ripetuto i problemi già nei report e non corretti: quantità minime del carrello forniture, `confirmBooking` senza extra e tassa, modale di conferma preventivo fisso a 50% per acconti diversi da 0/100 (la correzione copre solo 0 e 100).\\n\\nNon ho potuto verificare da browser nessuna pagina che richiede il login.\""
+  },
+  {
+   "area": "pubbliche-revenue",
+   "segnalazioni": 6,
+   "nota": "Letti prima r0-r7 e fix0-fix5, poi `git diff 52e3fbd HEAD` dei file del perimetro: nel perimetro sono cambiati solo prenota/page.tsx e mercato/page.tsx. Controllati nel diff: nuovo codice prenotazione casuale (nessun validatore server lo rifiuta, direct-origin.ts riconosce comunque source=\"sito\"), rateForDay/loadWeekendPct nel motore pubblico (coerenti con Calendario, metasearch e ChannexAutoSync), noOnlinePayment e goToCheckout (corretti, tranne il PDF del finding 4 e i punti gia' segnalati in r7), consensi di mercato (consentChosen: nessuna scrittura prima del consenso, nessuna gara al cambio struttura), revenueInRange con le notti senza tariffa (su 74 prenotazioni con nightlyRates in produzione 2 sono parziali, nessun fill negativo o strano), mergeRecord3/applyRaceChanges per rateOverrides (logica 3 vie corretta nei casi toccati/non toccati). Letti per intero senza altri difetti nuovi: statistiche, dashboard (_dati, _incassi, _oggi, dashboard.tsx, lib/dashboard.ts), mercato, revenue, assistente-ricavi, rate-checker, nettare (parti pagina), canali (parte principale), importa (flusso completo), sito-web, embed e le route public-lead, public-review, ical, ratecheck. Verifiche DB solo SELECT (public_sites, app_state, org_state, memberships, pg_policies) e prove su xenora.it a 440 px (checkout Spigolerooms: nessun overflow; il prezzo dell'offerta va a capo '€ / 280,00', solo estetico). Non riportato perche' gia' in r7: totale/acconto inviati al server, snapshot pubblico non aggiornato, autopilot, date UTC in revenue/sito-web/rate-checker, extra di esempio, social senza schema, campi privati in public_sites. Non riportato perche' senza effetto oggi: le 'Notti minime' di tipologia non sono applicate da /prenota ne' dal server (in produzione tutte valgono 1); la recensione pubblica non manda l'email al gestore per strutture in org (riga structuresArr in public-review). Non ho eseguito tsc, build ne' test, e non ho scritto nulla (nessuna POST sulle route pubbliche: la riga di org-blindness e' derivata da lettura del codice piu' dati reali del DB).\""
+  },
+  {
+   "area": "sync-auth",
+   "segnalazioni": 5,
+   "nota": "Controllato: authsync.tsx, sync-merge.ts, org-combine.ts, list-merge.ts, bigstore.ts, store.tsx (persistenza e rehydrate), org-cassa-config.ts, media-migrate.ts e media-migrate-plan.ts, WorkspaceSync.tsx, workspace-keys.ts, server-auth.ts, access.tsx, login e accetta-invito. Sul DB (solo SELECT): trigger snapshot e entities, funzioni entities_sync_row, ws_get, ws_set e ws_deny, policy RLS. La tabella entities coincide con i blob di app_state e org_state (nessuna differenza di conteggio) e non ha errori di sincronizzazione.\\nHo provato mergeSnapshots con uno script fuori dal repo, estraendo le funzioni da authsync.tsx. Confermati con valori concreti i punti su preventivi, sito, activestructs e pulizie. L'anti-race di applyRaceChanges e mergeRecord3 si comportano correttamente nei casi provati: aggiunta fatta durante il ciclo, cancellazione con lapide, modifica concorrente della stessa prenotazione.\\nIl campo effect_note del punto activestructs è vuoto, serve solo a rispettare lo schema. Non ho riportato: currentuser (setUserId non ha chiamanti, quindi nessun impatto reale); isUserAllowed (r1 #5) e i limiti di access.tsx (r2 #6), già nei report; la base vuota al riavvio della scheda, già dichiarata come limite in fix0. login/isSafeNext e accetta-invito non hanno problemi. Il codice di migrazione media è coerente col client."
+  },
+  {
+   "area": "api",
+   "segnalazioni": 6,
+   "nota": "Letti i report r0-r7 e fix0-fix5 e il diff di src/app/api tra 52e3fbd e HEAD, poi le route principali (stripe/*, org/*, public-*, manage-booking/*, checkin/*, cron/*, email, ai/*, whatsapp/webhook, channex/webhook, pulizie/*, forniture/*, admin/overview, link-preview). Le correzioni di cancel, forniture/confirm, public-booking (retry con rev), webhook charge.refunded e quote/confirm hanno la logica corretta nei casi provati. Non ho eseguito tsc e test né fatto prove dinamiche o letture sul database, quindi tutto è verificato solo leggendo il codice. Il punto 1 riusa i metadata che il primo giro ha lasciato nella whitelist di quote. Il punto 2 è nuovo e diverso dal r1 #10: lì 'Disattiva', qui 'Rimuovi'. Non ho ripetuto le segnalazioni già note e non risolte: r1 #5 isUserAllowed, #10 memberships.active, #11 stripe-guard, i residui di quote/confirm sull'importo e il proprietario, calendar/sync-event, whatsapp/settings. In public-review e public-lead il retry dopo conflitto di rev scrive ancora senza lock, ma la probabilità di perdere dati è bassa e non l'ho messo in classifica.\""
+  },
+  {
+   "area": "regressioni",
+   "segnalazioni": 4,
+   "nota": "Letto riga per riga il diff 52e3fbd..HEAD dei file prioritari: authsync.tsx e sync-merge.ts (adoptServerFlatKeys, mergeRecord3, applyRaceChanges, flusso syncOnce e restore), CalendarGrid.tsx (tariffa, weekend, occupazione, eventi), BookingDrawer, NewBookingModal, nuova prenotazione, prenotazioni/page, checkin route e page, cancel, webhook Stripe e rimborsi, public-booking, quote e quote/confirm, forniture, org/invite-role-unshare, stripe-guard, cassa e chiusura-cassa, strutture/[id], ospiti e _merge, ConversazioniPanel, msg-templates, prenota/page, abbonamento, invoicing e alloggiati service, documenti, fascicolo, scadenzario, promozioni, preventivi. Ho eseguito tsc (pulito), tutta la suite di test (1155 test, 1151 ok, 4 todo noti) e prove su funzioni pure fuori dal repo (sanitizeChosenExtras, revenueInRange, balanceDue/bookingGrandTotal). Ho verificato in SELECT che profiles.structure_names, channex_map.org_id, supply_orders.total_cents e le colonne usate dalle nuove query esistano, che ws_get/ws_set usino una lista di divieti e che i ruoli in memberships siano owner/member. Non riportati perché già noti o di poco peso: residuo di r1 #1 (stripe/quote anonimo, già dichiarato in fix3), public-booking che non legge l'org_state (test todo esistente; i tre siti pubblici sono tutti in org_state ma usano Stripe), saveEvent che non fa nulla senza avviso se le date sono invertite, cityTaxInPaid non impostato sul saldo completo (scarto pari alla sola tassa), 'Prezzo mancante' mostrato anche con totale 0, ponte di nomi corti che unisce ospiti diversi nel dialogo doppioni (richiede conferma). Non ho trovato errori nella logica di fusione a 3 vie né nell'anti-race della sincronizzazione."
+  }
+ ],
+ "totaleSegnalazioni": 54,
+ "confermate": 54,
+ "respinte": [],
+ "corrette": [
+  {
+   "area": "prenotazioni",
+   "esito": "Ho corretto tutti e 6 i problemi. Il test mirato `tests/qa-prenotazioni.test.ts` passa (14 su 14). `npx tsc --noEmit` dà 6 errori, tutti in `src/components/messaging/ConversazioniPanel.tsx` (`sendingRef` dichiarata due volte e tipi `Set<string>`), un file che non ho toccato. Non ho fatto commit, build o deploy e non ho scritto sul database.\n\n1. **Incassi, tassa incassata a parte: FATTO** (`src/app/(app)/pagamenti/page.tsx`). La pagina ora calcola il dovuto con `totalDue` al posto di `bookingGrandTotal`, quindi la tassa già incassata in contanti non torna come residuo di 12 €.\n\n2. **Scheda in modifica senza controllo sovrapposizioni: FATTO** (`src/components/BookingDrawer.tsx`). Non blocco il salvataggio, perché nel resto dell'app la sovrapposizione è consentita per scelta.\n   - Se cambiano camera, date o stato e la camera risulta già occupata, compare una conferma \"Salvare comunque?\" con il nome dell'ospite e le date in conflitto.\n   - Quando cambia la camera, la tipologia della prenotazione si aggiorna a quella della nuova camera.\n   - Non ho aggiunto i controlli su camera fuori servizio e posti massimi che ha il Calendario: non erano nelle correzioni confermate.\n\n3. **\"Nuova prenotazione\" da una camera libera: FATTO** (`src/components/NewBookingModal.tsx`). La camera scelta ha ora la precedenza nell'assegnazione, se è libera nelle date indicate. Se non lo è, si torna all'ordine per nome.\n\n4. **Tassa dentro il saldo (`cityTaxInPaid`): FATTO**, con correzione diversa da quella proposta, perché la condizione `cents >= before` da sola ridava la tassa già incassata in contanti.\n   - `src/lib/chat-pay-core.ts`: il flag si imposta con il link \"tassa\", oppure con un saldo che azzera il residuo solo se la tassa non era già stata incassata a mano.\n   - `src/app/api/checkin/pay-confirm/route.ts`: nel ramo gruppo, quando la camera risulta saldata, il flag si imposta insieme a `cityTaxPaid`.\n   - `src/lib/channex-inbound.ts` e `src/lib/booking-heal.ts`: `cityTaxInPaid` è stato aggiunto alle liste che conservano i dati alla modifica OTA.\n   - `tests/qa-prenotazioni.test.ts`: ho aggiornato il test del saldo e ne ho aggiunto uno per l'extra da 20 € dopo il saldo (residuo 20 €, non 8 €). Un secondo caso verifica che il saldo dopo tassa incassata a mano non imposti il flag.\n\n5. **Schede telefono per annullate e no-show: FATTO** (`src/app/(app)/prenotazioni/page.tsx`). Sulle schede singole e sulle camere di gruppo annullate o no-show compaiono ora l'attenuazione e un'etichetta con lo stato. Su quelle singole sono nascoste anche le icone rosse di pagamento e alloggiati, e il gruppo intero si attenua se non ha camere contate.\n\n6. **% weekend memorizzata una volta sola: FATTO** (`src/components/NewBookingModal.tsx`). `loadWeekendPct()` viene riletta a ogni render e ho tolto l'import `useMemo` che non serviva più.\n\nNessuna decisione resta ad Andrea. Un'incoerenza che non ho toccato: nel ramo gruppo di `pay-confirm/route.ts` il calcolo dei residui non guarda `cityTaxPaid`, quindi una tassa già incassata a mano viene ancora contata nel residuo di gruppo."
+  },
+  {
+   "area": "calendario",
+   "esito": "Tutti e cinque i problemi sono stati corretti. Il controllo dei tipi dà errori solo in `ConversazioniPanel.tsx`, che non ho toccato. I test mirati passano (5 su 5).\n\nFATTO – CalendarGrid, chiusure, CTA e CTD lette solo al montaggio (`src/components/CalendarGrid.tsx`)\n- Chiusure, CTA e CTD vengono riletti da localStorage al montaggio e su `spigolestay:datasync`, `focus` e `visibilitychange`.\n- `saveAvail` e `clickAvail` partono ora da una lettura fresca di localStorage, non dallo stato React.\n- Un Applica fatto con la pagina rimasta aperta non riscrive più le chiusure vecchie sopra quelle arrivate dal telefono.\n\nFATTO – Scheda tipologia aperta con F5 (`src/app/(app)/camere/tipologia/[id]/page.tsx`)\n- La pagina ora è un wrapper. Il form interno parte solo quando i dati sono caricati, con una `key` sull'id.\n- Prima del caricamento si vede \"Caricamento…\". Se l'id non esiste dopo il caricamento compare \"Tipologia non trovata.\".\n- Lo store non espone `ready`, quindi \"non trovata\" si distingue dal caricamento con `structures.length > 0`.\n- Per \"nuovo\" il form attende che le strutture siano caricate. Se un account non avesse nessuna struttura, \"nuovo\" resterebbe su \"Caricamento…\".\n\nFATTO – Piani tariffari \"per tutte le strutture\" (`src/app/(app)/piani-tariffari/page.tsx`)\n- Il modale riceve sempre `roomTypes`, cioè le tipologie di tutte le strutture.\n- Il filtro per struttura lo applica già il modale stesso. Questo copre anche il caso di un piano portato a \"Tutte le strutture\" dal menu \"Valido per\".\n\nFATTO – Giorni a tariffa 0 verso Channex (`src/lib/channex-ari.ts`)\n- Con tariffa ≤ 0 la riga parte senza `rate` e con `stop_sell: true`, in linea con \"chiusa alla vendita\" del Calendario.\n- Anche i piani extra mappati per quel giorno partono chiusi e senza prezzo.\n- Test nuovo in `tests/ari-tariffa-zero.test.ts`. Passa insieme a `tests/ari-camera-spostata.test.ts`.\n\nFATTO – Blocco \"fuori servizio\" fantasma (`src/lib/store.tsx`, `deleteUnit`)\n- Eliminando una camera si eliminano anche i suoi blocchi `channel: \"blocked\"`, con tombstone sulle prenotazioni.\n- Le altre prenotazioni tornano in \"Da assegnare\" come prima.\n\nHo solo modificato i file, senza commit, build, deploy né scritture sul database."
+  },
+  {
+   "area": "cassa",
+   "esito": "Cinque problemi su sei sono a posto. Il sesto, «Salda» che raddoppia l'incasso con la tassa già pagata a mano, era già corretto nel codice. `npx tsc --noEmit` dà errori solo in `src/components/messaging/ConversazioniPanel.tsx` (`sendingRef` ridichiarato, tipi `Set<string>`), file che non ho toccato. Nei file che ho modificato non ce ne sono. Non ho aggiunto test: la logica toccata è nei componenti e nell'hook React, non in funzioni pure. Non ho fatto commit, build, deploy né toccato il database.\n\n1. **Collaboratore salvato come proprio account di lavoro: FATTO** (`src/lib/tenant.ts`). Se la chiamata `workspace_owner` risponde con un errore, per un collaboratore non si salva più il suo id. Si riprova con attesa crescente (1 s, poi 2, 4 e così via fino a un massimo di 30 s). Il titolare, in caso di errore, usa subito il proprio id come prima.\n   - Finché il retry non riesce, le pagine mostrano «Account di lavoro non ancora caricato».\n   - Un collaboratore con `xn-collab` svuotato dal browser viene ancora trattato come titolare. Non l'ho coperto: servirebbe leggerne lo stato dal server, una decisione da prendere insieme.\n\n2. **Cassa e Chiusura calcolano su `bookings` filtrato: FATTO** (`cassa/page.tsx`, `chiusura-cassa/page.tsx`). Ora usano `raw.bookings` in `computeAuto`, `computeForecast`, `bkOf`, `infoOf` e nel dettaglio dei batch di commissioni. Ho aggiornato anche le dipendenze dei `useMemo`.\n\n3. **Campo «Incassato» che salva a ogni tasto: FATTO** (`pagamenti/page.tsx`). Ho aggiunto un piccolo componente `PaidCell` che tiene il testo digitato e salva una volta sola, all'uscita dal campo o con Invio. Accetta la virgola e mostra i centesimi, e l'importo resta tra 0 e il dovuto.\n   - Ho spostato anche il controllo delle preferenze prima del limitatore in `notifyOwner` (`src/lib/store.tsx`). Le notifiche disattivate non consumano più la quota di 5 email ogni 2 minuti.\n\n4. **Card Entrate/Uscite/Saldo previsto oltre i 6 mesi: FATTO** (`cassa/page.tsx`). Le card ora includono solo i movimenti fino a `listHorizon` quando la vista è «Oggi e future». Ho lasciato invariata la tabella dei movimenti, che continua a mostrare anche le scadenze oltre l'orizzonte.\n\n5. **«Salda» con tassa già incassata a mano: già a posto** (`pagamenti/page.tsx`). La pagina usa già `totalDue(b, structure)`. Non ho cambiato altro.\n\n6. **Eliminare un conto condiviso cancella i saldi delle altre strutture: FATTO** (`cassa/page.tsx`). `deleteConto` ora riceve la struttura da cui si preme ✕.\n   - Se un'altra struttura ha un saldo di partenza su quel conto, l'eliminazione è bloccata. Il messaggio indica quali strutture lo usano e dice di azzerare prima il loro saldo.\n   - Se non ce ne sono, si cancellano solo i saldi di questa struttura e i vecchi saldi comuni.\n   - Ho scelto il blocco invece di staccare il conto solo dalla struttura corrente, perché è più semplice e non modifica altri dati."
+  },
+  {
+   "area": "fatture-struttura",
+   "esito": "Errori tsc solo in ConversazioniPanel.tsx (file di un altro agente, non toccato da me); i miei file compilano.\n\nFATTO\n- Data emissione UTC: `src/app/(app)/documenti/[id]/page.tsx`. Il valore predefinito ora usa `todayRome()` da `@/lib/dates-rome`, quindi segue la data italiana.\n- Limite piano e condivisione con 2+ strutture selezionate:\n  - `src/app/(app)/strutture/page.tsx`: `overLimit` ora conta `allStructures`. L'elenco filtrato non è cambiato.\n  - `src/app/(app)/utenti/[id]/page.tsx` e `src/app/(app)/utenti/page.tsx`: ora usano `allStructures`. Questo copre la condivisione \"tutte le strutture\", le liste, \"sposta tutte\", `UserAccessCard` e la colonna Strutture.\n- Il badge \"Nessuna\" a colonna vuota non richiede altro, perché con tutte le strutture visibili il caso sparisce.\n- `tenantId` sbagliato per il collaboratore: `src/lib/tenant.ts`. Un'altra sessione aveva già inserito il nuovo tentativo con attesa crescente, ma solo per i collaboratori con il flag `xn-collab`. Ho completato la correzione:\n  - Un errore dell'RPC non mette più in cache l'id proprio, per nessun utente, e si riprova.\n  - Rimosso il ripiego a `uid` quando la cache è vuota, quindi l'hook restituisce `undefined` finché il server non risponde. I chiamanti già gestiscono `!tenantId`.\n  - Il titolare ora aspetta un round-trip prima di avere `tenantId`.\n- Modulo emittente che si azzera al ritorno sulla scheda: `src/app/(app)/impostazioni-fattura/page.tsx`. Un'altra sessione lo aveva già corretto con una dipendenza booleana `hasUser` e `loadedFor`. Ho solo tolto un mio `dirtyRef` ridondante, quindi non ho aggiunto altro. Non ho toccato `abbonamento/pagamento` e `cassa`, perché la perdita di dati è trascurabile.\n\nNON FATTO\n- Numero fattura duplicato tra strutture dello stesso account: la correzione sta nella funzione SQL `fn_issue_document` (un solo contatore per tenant, oppure un prefisso letterale per struttura nell'etichetta). Serve una nuova migrazione e una scelta di Andrea tra contatore unico o sezionale per struttura. Con la seconda strada va anche adattato `numberOf()` in `provider.ts`. Va deciso prima che esistano due strutture con fatture.\n- Eliminare o disattivare un utente non toglie l'accesso ai dati: serve una nuova route server che cancelli la riga in `access_allowlist` e le `memberships` del collaboratore. Va aperta ai titolari non admin, controllando `added_by`, mentre oggi l'unica DELETE è riservata a `ADMIN_EMAILS`. Per \"Utente attivo\" serve inoltre un campo server (ad esempio `access_allowlist.active`) rispettato da `workspace_owner` e `api/access/status`. Richiede modifiche al DB e decisioni di Andrea, quindi non l'ho fatta.\n\n`npx tsc --noEmit`: gli unici errori sono in `src/components/messaging/ConversazioniPanel.tsx` (`sendingRef` ridichiarata, tipi `Set<string>`), un file toccato da un altro agente e non da me. Non ho eseguito test: le modifiche sono su UI e hook e non ho aggiunto logica pura da testare."
+  },
+  {
+   "area": "ospite-adempimenti",
+   "esito": "1. **Correzioni da Alloggiati non arrivano alla schedina**: FATTO (`src/app/(app)/alloggiati-web/EditBookingModal.tsx`). Se la prenotazione ha già `primaryGuest`, `setPrimaryOf` ora applica la stessa modifica anche lì, oltre che alla scheda ospite. La sync della schedina quindi legge il dato corretto.\n\n2. **Annullamento ospite rimborsa solo il primo pagamento Stripe**: FATTO, ma in forma ridotta. Il verificatore chiedeva un elenco completo di tutti i pagamenti, anche del PI iniziale; io l'ho fatto solo per i pagamenti successivi.\n   - Il saldo pagato dal check-in ora salva il suo payment intent e l'importo in `stripeExtraPayments` (`checkin/pay-confirm/route.ts`, `src/lib/types.ts`).\n   - L'annullamento (`manage-booking/cancel/route.ts`) rimborsa il primo PI per intero e ogni altro PI per il suo importo, con una chiave di idempotenza per ciascuno. I rimborsi riusciti si sommano.\n   - Se `refunded < paid`, la nota e la mail al gestore avvisano che il resto va gestito a mano. La risposta della route include `unrefunded`.\n   - `manage-booking/route.ts` ora restituisce `refundAmount`, cioè la parte pagata online. `src/app/gestisci/page.tsx` mostra quell'importo al posto di `paid`.\n   - Non ho aggiunto la frase \"la parte pagata in altro modo va concordata\" nella pagina, per non creare stringhe non tradotte. Se la vuoi, serve un giro di traduzioni.\n   - **Limiti**:\n     - Le prenotazioni vecchie con più pagamenti Stripe, fatti prima di questa modifica, non hanno l'elenco: il saldo vecchio non si rimborsa in automatico, ma l'avviso al gestore scatta.\n     - `recordChatPayment` (`chat-pay-core.ts`) non salva ancora il PI: i pagamenti fatti dalla chat non vengono tracciati.\n\n3. **Manca \"Luogo di rilascio\" nel modale**: FATTO.\n   - Aggiunto il campo nel modale (`EditBookingModal.tsx`) e `docPlace` letto in `primaryOf`.\n   - \"Compila dal documento\" ora copia anche `docPlace`.\n   - Aggiunto `docPlace` al tipo `Booking.primaryGuest` (`src/lib/types.ts`) e allo snapshot di `deleteGuest` (`src/lib/store.tsx`).\n   - Grazie al punto 1, il valore inserito arriva alla schedina anche con `primaryGuest` già presente.\n\n4. **ISTAT `closeDay` segna come inviate le righe di giorni mai trasmessi**: FATTO (`src/lib/istat/service.ts`).\n   - `closeDay` raggruppa le righe pending per giorno di arrivo e invia un movimento per ogni giorno, in ordine crescente.\n   - Per ogni giorno riuscito segna come `sent` solo le sue righe e scrive l'evento e la riga di archivio con il suo conteggio.\n   - Se un giorno fallisce, si ferma e restituisce l'errore con il parziale già inviato.\n   - I due chiamanti e `/api/istat/close` non sono stati toccati.\n\n**Verifiche**\n- `npx tsc --noEmit` dà errori solo in `src/components/messaging/ConversazioniPanel.tsx`, un file toccato da altri agenti e non da me (`sendingRef` ridichiarato, tipi `Set<string>`).\n- Test: `manage-booking-cancel` ora ha 8 test, tutti verdi. Ne ho aggiunti due, per saldo più caparra e per il resto da gestire a mano.\n- Per farli passare ho reso lo stub Stripe in `tests/helpers/stripe-stub-loader.mjs` fedele ai parametri: restituisce `params.amount` quando c'è.\n- Passano anche `online-pay` e `alloggiati-sync-sent`: 20 test su 20 verdi nel primo lancio.\n- Non ho aggiunto test per ISTAT né per il modale Alloggiati, perché la logica passa dal database o dall'interfaccia. Non ho fatto commit, build o deploy, e non ho toccato database o migrazioni."
+  },
+  {
+   "area": "comunicazione",
+   "esito": "Cinque correzioni su sei sono fatte. Sulla sesta (chat orfana dopo l'unione) ho fatto l'unione delle chat ma non la pulizia in `deleteGuest`. `npx tsc --noEmit` passa senza errori e i test mirati passano 10 su 10. Non ho fatto commit, build, deploy né toccato il database.\n\n1. **Preventivi che si sovrascrivono: FATTO** (`src/app/(app)/preventivi/page.tsx`). Il tasto «Nuovo preventivo» ora riparte da zero se c'era un preventivo salvato o in modifica. Azzera il riferimento al preventivo precedente, nome, email, telefono, note e date. Se non c'è un preventivo salvato, apre solo la scheda, così non perdi quello che stavi scrivendo. Non ho aggiunto un test, perché è logica di interfaccia.\n\n2. **Telefoni OTA riscritti come +39: FATTO** (`src/app/(app)/ospiti/_phone.ts`). I numeri nel formato `prefisso-zona-numero-` (come `39--3934335777-`) restano interi, senza prefisso, con Paese vuoto o Italia. La scheda ospite quindi non li riscrive più. Ho aggiunto un test in `tests/guest-phone.test.ts` sui tre numeri dell'esempio.\n\n3. **Modelli eliminati che tornano attivi: FATTO** (`src/lib/workspace-keys.ts`). Ho aggiunto `msgtemplates:deleted` alle chiavi sincronizzate dei collaboratori. Quando ho riletto il file la riga era già presente, forse messa da un altro agente, quindi non so dire con certezza chi l'ha aggiunta. Non serve nessuna modifica al database. Ho aggiunto un test in `tests/merge-threads.test.ts`.\n\n4. **Doppio invio e ripiego WhatsApp: FATTO** (`src/components/messaging/ConversazioniPanel.tsx`).\n   - Un blocco impedisce il secondo invio mentre la richiesta è in corso, sia da WhatsApp sia da email. Anche i due pulsanti si disabilitano e Invio nel testo non rilancia.\n   - Quando WhatsApp rifiuta l'invio, ora si vede il motivo vero di Meta (per esempio fuori dalle 24 h). Si può scegliere di aprire wa.me per mandarlo a mano, e in quel caso il messaggio va in chat.\n   - Se il browser blocca l'apertura di wa.me, il messaggio non viene registrato come inviato.\n\n5. **Promozioni ed email dalla chat con PDF vuoto: FATTO** (`src/app/(app)/promozioni/page.tsx` e `ConversazioniPanel.tsx`). Entrambe usano ora il tipo di email «messaggio libero» (`guest_message`) al posto di «preventivo», quindi non allegano più il finto preventivo.\n   - L'email dalla chat esce senza carta intestata della struttura, come prima.\n   - Gli altri sei chiamanti di `kind:\"quote\"` senza dati di preventivo, indicati dal verificatore, non sono stati toccati. Sono fuori dal perimetro e servirebbe valutarli uno per uno.\n\n6. **Chat fantasma dopo l'unione degli ospiti: FATTO in parte** (`src/lib/merge-threads.ts` nuovo, `src/lib/store.tsx`). Quando si uniscono due schede, la conversazione dell'ospite eliminato passa a quello che resta. I messaggi vengono ordinati e senza doppioni.\n   - Lo stesso vale per gli stati della chat: archiviata solo se lo erano tutte, fissata e «da leggere» se basta una, e per l'ultimo messaggio visto vale il più recente.\n   - Ho aggiunto test in `tests/merge-threads.test.ts`.\n   - **NON FATTO:** non ho toccato `deleteGuest`. Cancellare la chat di un ospite eliminato è una scelta distruttiva che spetta ad Andrea. Resta anche non fatta la rete di sicurezza opzionale che nasconde le chat senza scheda.\n   - Il codice che sposta i messaggi lavora sul localStorage del browser dove avviene l'unione, come il resto della chat. Non l'ho provato in un browser vero, solo con i test sulla logica pura.\n\nLa gravità del problema 3 è più bassa di quanto segnalato. Riguarda solo il collaboratore (Greta), non i dispositivi del titolare, che già sincronizzano questa chiave."
+  },
+  {
+   "area": "pubbliche-revenue",
+   "esito": "1. **Widget /embed bloccato da X-Frame-Options** — FATTO (`next.config.ts`). `X-Frame-Options: SAMEORIGIN` ora vale per tutte le pagine tranne `/embed/*`. Quelle pagine mandano `Content-Security-Policy: frame-ancestors *`. Gli altri header di sicurezza restano su tutto. Dopo il deploy va controllato con `curl -I https://xenora.it/embed/spigolehouse` e con un iframe su un dominio esterno.\n\n2. **Prenotazioni dirette su strutture in organizzazione** — FATTO solo in parte (`src/app/api/public-booking/route.ts`, `src/lib/server-booking-guard.ts`). Ho scelto la variante semplice che il verificatore indicava.\n   - **Fatto:** la route ora unisce lo stato personale del proprietario con gli `org_state` delle sue organizzazioni (nuovi `loadOrgDataParts` e `mergeOwnerData`).\n   - **Controlli sui dati uniti:** esistenza della tipologia, camera libera, blocco del pool tra le 3 org, prezzo minimo, idempotenza su `extId`. Lo stesso vale nel ramo di retry.\n   - **Avviso overbooking:** ora scatta anche quando i dati non mostrano camere.\n   - **OTA:** `schedulePoolPush` riceve un blob con i dati uniti, quindi `buildAriPayload` non resta più vuoto.\n   - **Non fatto:** la prenotazione si scrive ancora nello stato personale; il sync la sposta poi nell'organizzazione. Scriverla direttamente in `org_state` (lock su `rev`, retry multipli) è invasivo e richiede una tua decisione.\n   - **Non fatto:** `hasFreeUnit` in `stripe/book` resta senza pool e prima del pagamento.\n\n3. **Piano senza anticipo fa pagare l'intero importo** — FATTO (`src/app/api/stripe/book/route.ts`). L'importo è `deposit > 0 ? min(deposit, total) : 0`, quindi con deposit 0 si risponde `payment:false` e la prenotazione si registra senza pagamento online. Il caso total<=0 con deposit>0 resta com'era.\n\n4. **PDF di conferma vuoto dopo Stripe** — FATTO (`src/app/prenota/page.tsx`). `xn-lastbooking` ora salva anche cognome, adulti e bambini. `bookingLines` usa `doneSummary` (stessa logica della schermata finale, tre rami acconto/pagato/saldo) e il `<title>` usa il suo codice. Ho tolto `shownDeposit`, rimasto inutilizzato.\n\n5. **Tassa di soggiorno senza bambini** — FATTO (`src/app/prenota/page.tsx`). Ora usa `cityTaxOfBookingRaw` con adulti, bambini, età, date e totale alloggio, come il gestionale. Totale e acconto seguono di conseguenza.\n\n6. **Pubblicazione Xenosite (duplicato \"-2\" e race)** — FATTO (`src/app/(app)/sito/page.tsx`).\n   - L'effetto di lettura ha un flag `alive` e accetta la risposta solo se `structure_id === sid`.\n   - `publish()` si ferma con un messaggio se la struttura è già pubblicata da un altro utente.\n   - Le due `delete` (aggiornamento e `unpublish`) filtrano anche per `structure_id`.\n   - Non ho creato l'indice unico su `public_sites(structure_id)`: richiede una migrazione, quindi una tua decisione.\n\nVerifiche:\n- `npx tsc --noEmit` non dà errori nei file toccati. Restano errori solo in `src/components/messaging/ConversazioniPanel.tsx` (`sendingRef` ridichiarato, tipi `Set`). Non l'ho toccato io, c'erano altre modifiche in sospeso nel working tree.\n- `tests/server-booking-guard.test.ts`: 20 test passati, di cui 2 nuovi su `mergeOwnerData`.\n- `tests/public-booking.test.ts`: 40 passati, 0 falliti. C'è un test \"todo\" già presente (totale omesso che aggira il tetto del 50%), che continua a segnalare un problema noto.\n- Nessun test copre `prenota/page.tsx` né `sito/page.tsx`, quindi le correzioni 4, 5 e 6 sono verificate solo dalla compilazione.\n- Nessun commit, build o deploy. Nessuna scrittura sul DB."
+  },
+  {
+   "area": "sync-auth",
+   "esito": "Tutti e cinque i problemi sono corretti e non ho toccato il database. La logica nuova sta in `src/lib/sync-merge.ts`, così si può testare da sola, e `src/lib/authsync.tsx` la chiama. Nessun commit, build o deploy.\n\nI 23 test di `tests/sync-merge.test.ts` passano; ne ho aggiunti 6 per questi casi. Passano anche `media-migrate` e `fullsync-result`. `npx tsc --noEmit` non dà errori su `authsync` e `sync-merge`. Restano errori in `src/components/messaging/ConversazioniPanel.tsx`: non l'ho toccato né verificato se quegli errori c'erano già.\n\n1. **Preventivi: FATTO** (`sync-merge.ts`, `authsync.tsx`). Un dispositivo con la lista vecchia non cancella più dal server i preventivi creati altrove. Aggiungo quelli del server che non sono nel locale e non erano nella base. Se un preventivo era nella base e ora manca dal locale, lo considero cancellato qui e non lo rimetto. Resta valido lo stato \"confermato\" scritto dal server dopo un pagamento Stripe. Alla prima apertura, senza base, si uniscono tutti i preventivi del server. Il costo è che una cancellazione fatta offline può rinascere.\n\n2. **Chiavi del sito e foto: FATTO** (`authsync.tsx`). Ho tolto `isMediaFlatKey` dalle chiavi escluse dalla regola a 3 vie. Ora un dispositivo non toccato adotta le modifiche fatte altrove a testi e impostazioni del sito. La migrazione delle foto resta gestita prima da `adoptMigratedMedia`.\n\n3. **Selezione di più strutture (`activestructs`): FATTO IN PARTE** (`authsync.tsx`). L'ho aggiunta alla lista delle preferenze di vista (`SIG_SKIP`). Un dispositivo che ha già questa chiave non adotta più la selezione dell'altro. Un dispositivo che non l'ha mai impostata la riceve ancora dal server. Per chiudere anche questo caso bisogna escludere `activestruct` e `activestructs` dal merge, oppure non sincronizzarle affatto (`SKIP_KEYS`). Cambierebbe il comportamento già esistente, quindi serve una tua decisione. Non ho toccato le altre preferenze di vista (`pulizie:view`, `pren:view`, `calbars`, `sound`, `lang`): erano segnalate come secondarie e solo estetiche.\n\n4. **Ricarico per `lastLogin`: FATTO** (`authsync.tsx`). La firma che decide il ricarico della pagina (`settingsSig`, `reloadSig`) ora ignora `lastLogin` e `sessions` degli utenti. Il ricarico scatta ancora per permessi, piano e moduli. Il `lastLogin` continua a sincronizzarsi e a essere salvato sul server.\n\n5. **Mappe Pulizie (done, linen, notes): FATTO** (`sync-merge.ts`, `authsync.tsx`). Ora si fondono segno per segno con `mergeRecord3`, e le tre chiavi sono escluse dalla regola generica. I segni fatti da due dispositivi restano entrambi. Un segno tolto qui resta tolto. Se il contenuto non è un JSON valido, la mappa resta com'era prima, senza rischio di svuotarla.\n\nHo tolto la vecchia `mergePreventivi` da `authsync.tsx`."
+  },
+  {
+   "area": "api",
+   "esito": "1. **book/confirm: FATTO** (`src/app/api/stripe/book/confirm/route.ts`). La route ora rifiuta con 400 `not_a_booking_session` ogni sessione che non abbia `kind===\"book\"`, lo stesso slug e la stessa struttura. Non ho toccato public-booking: non ha accesso alla sessione Stripe, e il controllo nel webhook c'era già.\n\n2. **Rimozione co-gestore: FATTO** (`src/app/api/org/members/route.ts`).\n   - Prima di togliere la membership, la route cancella gli inviti dell'organizzazione per quell'utente. Li cerca per `accepted_by` e per email del profilo, perché i vecchi inviti possono avere `accepted_by` vuoto.\n   - Se la cancellazione di inviti o membership dà errore, risponde 500.\n   - Ho usato la cancellazione invece dello stato `revoked`: l'interfaccia tratta ogni stato diverso da \"accepted\" come \"in attesa\", quindi un invito `revoked` sarebbe sembrato ancora pendente. Il vecchio link ora risponde \"Invito non trovato o già annullato\".\n   - Una nuova invitazione dopo la rimozione resta possibile, con un codice nuovo.\n\n3. **Tetto `fbs:all`: FATTO** (`src/lib/manage-booking.ts`).\n   - Il contatore globale c'è ancora, ma conta solo le ricerche senza esito (60 al minuto per istanza), cioè quelle costose.\n   - Le prenotazioni trovate restano in cache 10 minuti e saltano sia il tetto sia la scansione completa. Gli id vuoti o più lunghi di 100 caratteri vengono scartati senza toccare il database.\n   - Non risolto: durante un attacco con id inventati, un ospite al suo primo accesso con la cache vuota riceve comunque 404 per quel minuto. Per eliminarlo serve una tabella indice prenotazione → store, che è lavoro sul database e l'ho lasciato a te.\n\n4. **POST check-in: FATTO** (`src/app/api/checkin/route.ts`, nuovo `src/lib/checkin-sanitize.ts`).\n   - L'anagrafica ha ora tetti di lunghezza (nome e cognome 80 caratteri, luoghi 120, e così via).\n   - `invoiceRequest` passa da una lista di chiavi note con testi tagliati; tutto il resto viene scartato.\n   - Non ho messo il limite di dimensione sul corpo della richiesta (413): le pagine di check-in vecchie possono ancora inviare foto in base64 e si romperebbero. Decisione tua.\n\n5. **pay-confirm: FATTO in parte** (`src/app/api/checkin/pay-confirm/route.ts`).\n   - Un altro agente aveva già aggiunto, mentre lavoravo, il controllo su `kind` e `bookingId`. Ho tolto il mio doppione e tenuto il suo.\n   - Ho aggiunto il controllo sul conto di destinazione: se la struttura ha un conto Stripe collegato, il pagamento deve essere arrivato a quel conto (altrimenti 400 `session_account_mismatch`).\n   - **NON FATTO**: fissare `bookingId` e `acct` lato server in `/api/stripe/quote`, leggendoli dalla prenotazione. Richiede una scelta di progetto. Neanche il rifiuto di una sessione già usata su un'altra prenotazione.\n\n6. **stripe/quote: FATTO** (`src/app/api/stripe/quote/route.ts`).\n   - `successUrl` e `cancelUrl` devono avere l'origine del sito o della richiesta stessa; altrimenti 400 `invalid_return_url`. I due chiamanti legittimi (check-in e preventivo) usano già quell'origine.\n   - Dal nome del prodotto e dalla descrizione vengono tolti i link.\n   - **NON FATTO**: `label` e `desc` restano testo libero (senza link) e un testo ingannevole è ancora possibile. Per chiuderlo del tutto vanno derivati dal server dalla prenotazione.\n\n**Test.** Ho aggiunto `tests/api-qa-round2.test.ts` e `tests/find-booking-by-id.test.ts`. Ho esteso `tests/helpers/fake-supabase.ts` con `limit`, `delete` e `ilike`. L'intera suite non ha test falliti (1186 passati su 1190 totali; non ho verificato i quattro restanti).\n\n**`npx tsc --noEmit` non è pulito**: segnala sei errori in `src/components/messaging/ConversazioniPanel.tsx` (`sendingRef` dichiarato due volte e un tipo `Set<string>` sbagliato). Non dipendono da me: quel file non l'ho toccato e probabilmente lo sta modificando un altro agente. Nei miei file non ci sono errori.\n\nNon ho fatto commit, build, deploy né scritture sul database."
+  },
+  {
+   "area": "regressioni",
+   "esito": "Tutti e quattro i problemi sono corretti. `npx tsc --noEmit` segnala errori solo in `src/components/messaging/ConversazioniPanel.tsx`: `sendingRef` dichiarata due volte e due tipi `Set<string>` sbagliati. Quel file non l'ho toccato io, sembra una modifica in corso di un altro agente. Ho eseguito solo `tests/city-tax-group.test.ts` (7 test su 7 passano, compreso quello nuovo), non l'intera suite. Né commit, né build, né deploy, né scritture sul DB.\n\n**1. Pagamento Stripe riapplicabile (alta): FATTO**\n- File: `src/app/api/checkin/pay-confirm/route.ts`.\n- La sessione viene rifiutata (409) se non è di tipo `quote` o se il suo `bookingId` non coincide con la prenotazione trovata.\n- Viene rifiutata anche se coincide con `stripeSessionId` della prenotazione o con `extId` (\"stripe:<sessione>\"). Questo copre anche le prenotazioni già esistenti, senza migrazione.\n- Nel ramo gruppo si rifiuta la sessione se compare nei `paidSessions` di una qualsiasi camera del gruppo.\n- Non ho aggiunto `paidSessions` in `public-booking` e `stripe/quote/confirm`: con i nuovi controlli sarebbe ridondante. Non ho limitato l'importo al residuo, perché l'eccedenza nel gruppo è un caso legittimo già gestito.\n\n**2. Modelli eliminati non condivisi (media): FATTO**\n- File: `src/lib/workspace-keys.ts`. Ho aggiunto `msgtemplates:deleted` alla lista `EXACT`.\n- Un modello già riapparso prima del fix non sparisce da solo: il titolare deve eliminarlo di nuovo.\n\n**3. Tassa già incassata a mano richiesta di nuovo al check-in (media): FATTO**\n- `src/app/api/checkin/route.ts`: il GET restituisce `cityTaxCollected` (`cityTaxPaid` senza `cityTaxInPaid`, la stessa regola di `totalDue`). Le righe del gruppo passano i due flag a `groupRowBalances`.\n- `src/app/checkin/page.tsx`: con `cityTaxCollected` la tassa vale 0 nel totale e nel saldo, quindi la riga \"Tassa di soggiorno\" sparisce dal riepilogo.\n- `src/lib/booking.ts`: `groupRowBalances` esclude la quota di tassa per le righe con `cityTaxPaid` senza `cityTaxInPaid`.\n- `pay-confirm`: passa i due flag a `groupRowBalances`. Un'altra modifica già presente nel file imposta `cityTaxInPaid: true` quando la camera è saldata; ho aggiunto che non scatta se la tassa era già stata incassata a parte.\n- Test: `tests/city-tax-group.test.ts`, nuovo caso con `cityTaxPaid` e `cityTaxInPaid`.\n- Non ho ricalcolato l'importo lato server in `/api/stripe/quote` (il verificatore lo indicava come soluzione più robusta). Lì l'importo arriva ancora dal client.\n\n**4. Impostazioni fattura azzerate al ritorno sulla scheda (media): FATTO**\n- File: `src/app/(app)/impostazioni-fattura/page.tsx`.\n- L'effetto di caricamento dipende ora da `hasUser` (un booleano) invece che dall'oggetto `user`.\n- Un `loadedFor` ref evita di rileggere e sovrascrivere il form già caricato per lo stesso account.\n\nNessuna decisione per Andrea è rimasta aperta."
+  }
+ ],
+ "dettaglioConfermate": [
+  {
+   "area": "prenotazioni",
+   "gravita": "alta",
+   "file": "src/app/(app)/pagamenti/page.tsx",
+   "riga": "38 (con 39-43, 116, 127)",
+   "titolo": "Incassi: il dovuto non usa totalDue, quindi la tassa già incassata a parte torna come residuo",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "prenotazioni",
+   "gravita": "alta",
+   "file": "src/components/BookingDrawer.tsx",
+   "riga": "779-798 (save), 823-825 (select Unità), 837-838 (date)",
+   "titolo": "La scheda in modifica salva date, unità e stato senza controllare le sovrapposizioni",
+   "verdetto": "parziale"
+  },
+  {
+   "area": "prenotazioni",
+   "gravita": "media",
+   "file": "src/components/NewBookingModal.tsx",
+   "riga": "43-52 e 94-96",
+   "titolo": "'Nuova prenotazione' da una camera libera la assegna a un'altra camera della stessa tipologia",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "prenotazioni",
+   "gravita": "media",
+   "file": "src/lib/chat-pay-core.ts",
+   "riga": "162-165 (con channex-inbound.ts:383-386 e booking-heal.ts:47-50)",
+   "titolo": "cityTaxInPaid impostato solo per il link 'tassa': se il 'saldo' copre la tassa il residuo viene sottostimato",
+   "verdetto": "parziale"
+  },
+  {
+   "area": "prenotazioni",
+   "gravita": "media",
+   "file": "src/app/(app)/prenotazioni/page.tsx",
+   "riga": "492-546",
+   "titolo": "Su telefono le schede delle prenotazioni annullate o no-show sono identiche alle attive, ma ora non contano nei totali",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "prenotazioni",
+   "gravita": "media",
+   "file": "src/components/NewBookingModal.tsx",
+   "riga": "18",
+   "titolo": "Il modale (sempre montato in AppShell) memorizza una sola volta la % weekend di default",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "calendario",
+   "gravita": "alta",
+   "file": "src/components/CalendarGrid.tsx",
+   "riga": "326, 331-333, 358, 398-411",
+   "titolo": "Chiusure vendita, CTA e CTD lette solo al montaggio: una pagina aperta le riscrive vecchie",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "calendario",
+   "gravita": "media",
+   "file": "src/app/(app)/camere/tipologia/[id]/page.tsx",
+   "riga": "37-42, 61-75",
+   "titolo": "Scheda tipologia aperta con ricarica pagina: form vuoto e un salvataggio sovrascrive la tipologia",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "calendario",
+   "gravita": "media",
+   "file": "src/app/(app)/piani-tariffari/page.tsx",
+   "riga": "121, 233, 250-254",
+   "titolo": "Un piano \"per tutte le strutture\" modificato dalla vista di una struttura viene limitato a quella struttura",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "calendario",
+   "gravita": "media",
+   "file": "src/lib/channex-ari.ts",
+   "riga": "75-88 (con CalendarGrid.tsx:1068, 1079, 1083)",
+   "titolo": "Giorni a tariffa 0 mostrati \"chiusi alla vendita\", ma verso Channex partono aperti con rate 0.00",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "calendario",
+   "gravita": "media",
+   "file": "src/lib/store.tsx",
+   "riga": "506-515",
+   "titolo": "Eliminare una camera con un blocco \"fuori servizio\" lascia un blocco fantasma che toglie un'altra camera dalla vendita",
+   "verdetto": "parziale"
+  },
+  {
+   "area": "cassa",
+   "gravita": "alta",
+   "file": "src/lib/tenant.ts (usato da cassa/page.tsx:84,86, chiusura-cassa/page.tsx:110, scadenzario-incassi/page.tsx:114,124)",
+   "riga": "21",
+   "titolo": "Una risposta d'errore dell'RPC viene salvata come account di lavoro = id del collaboratore",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "cassa",
+   "gravita": "media",
+   "file": "src/app/(app)/cassa/page.tsx; src/app/(app)/chiusura-cassa/page.tsx",
+   "riga": "cassa/page.tsx:164,237 (e bkOf:269); chiusura-cassa/page.tsx:28,78",
+   "titolo": "Cassa e Chiusura calcolano gli incassi su `bookings` filtrato dal sottoinsieme, non su `raw.bookings`",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "cassa",
+   "gravita": "media",
+   "file": "src/app/(app)/pagamenti/page.tsx",
+   "riga": "116, 127",
+   "titolo": "Il campo «Incassato» salva a ogni tasto, manda email di pagamento parziali e perde i centesimi",
+   "verdetto": "parziale"
+  },
+  {
+   "area": "cassa",
+   "gravita": "media",
+   "file": "src/app/(app)/cassa/page.tsx",
+   "riga": "239-241, 262-265 (hint al :627)",
+   "titolo": "«Saldo previsto … al 31.03.2027» e le card Entrate/Uscite previste sommano anche movimenti oltre i 6 mesi",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "cassa",
+   "gravita": "media",
+   "file": "src/app/(app)/pagamenti/page.tsx",
+   "riga": "38-42, 127",
+   "titolo": "Con la tassa di soggiorno già incassata a mano la riga mostra un residuo e «Salda» raddoppia l'incasso nella Cassa",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "cassa",
+   "gravita": "media",
+   "file": "src/app/(app)/cassa/page.tsx",
+   "riga": "333-346",
+   "titolo": "Eliminare un conto condiviso dalla vista di una struttura cancella il saldo di partenza delle altre",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "fatture-struttura",
+   "gravita": "alta",
+   "file": "supabase/migrations/0011_fix_fn_issue_document_serie_ambiguous.sql",
+   "riga": "21-29 (chiamata da src/lib/invoicing/service.ts:306)",
+   "titolo": "Due strutture dello stesso account emettono lo stesso numero fattura",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "fatture-struttura",
+   "gravita": "alta",
+   "file": "src/app/(app)/utenti/[id]/page.tsx",
+   "riga": "209-211 (e toggle \"Utente attivo\" 280)",
+   "titolo": "Eliminare o disattivare un utente non toglie l'accesso reale ai dati",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "fatture-struttura",
+   "gravita": "media",
+   "file": "src/app/(app)/impostazioni-fattura/page.tsx",
+   "riga": "44-55",
+   "titolo": "Tornando sulla scheda, i dati emittente non salvati vengono cancellati",
+   "verdetto": "parziale"
+  },
+  {
+   "area": "fatture-struttura",
+   "gravita": "media",
+   "file": "src/lib/tenant.ts",
+   "riga": "20-29",
+   "titolo": "Se la lettura dell'account di lavoro fallisce, il collaboratore scrive sul proprio id",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "fatture-struttura",
+   "gravita": "media",
+   "file": "src/app/(app)/strutture/page.tsx",
+   "riga": "18-19 (stesso errore in src/app/(app)/utenti/[id]/page.tsx:60 e :155)",
+   "titolo": "Con 2+ strutture selezionate, limite piano e condivisione usano solo quelle selezionate",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "fatture-struttura",
+   "gravita": "media",
+   "file": "src/app/(app)/documenti/[id]/page.tsx",
+   "riga": "86",
+   "titolo": "La data di emissione predefinita è quella UTC, non italiana",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "ospite-adempimenti",
+   "gravita": "alta",
+   "file": "src/app/(app)/alloggiati-web/EditBookingModal.tsx",
+   "riga": "40 (con src/lib/alloggiati/service.ts:162)",
+   "titolo": "Le correzioni fatte nella finestra Alloggiati non arrivano alla schedina: la sync legge il primaryGuest vecchio",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "ospite-adempimenti",
+   "gravita": "media",
+   "file": "src/app/api/manage-booking/cancel/route.ts",
+   "riga": "61-75 (con checkin/pay-confirm/route.ts:64-91, manage-booking/route.ts:40, gestisci/page.tsx:217)",
+   "titolo": "Annullamento ospite: rimborsa solo il primo pagamento Stripe, ma ospite e gestore leggono 'rimborso di tutto il pagato'",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "ospite-adempimenti",
+   "gravita": "media",
+   "file": "src/app/(app)/alloggiati-web/EditBookingModal.tsx",
+   "riga": "30-34 e 100-113 (con src/lib/alloggiati/service.ts:45)",
+   "titolo": "Il modale Alloggiati non ha il campo 'Luogo di rilascio' ma la schedina lo richiede per i capi",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "ospite-adempimenti",
+   "gravita": "media",
+   "file": "src/lib/istat/service.ts",
+   "riga": "111-133 (chiamanti: api/cron/alloggiati-auto/route.ts:101, api/adempimenti/run/route.ts:108)",
+   "titolo": "closeDay senza giorno invia il movimento di oggi ma segna come inviate tutte le righe pending passate",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "comunicazione",
+   "gravita": "alta",
+   "file": "src/app/(app)/preventivi/page.tsx",
+   "riga": "313, 541-551, 742",
+   "titolo": "Dopo il primo salvataggio ogni nuovo preventivo sovrascrive il precedente e ne eredita il numero",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "comunicazione",
+   "gravita": "alta",
+   "file": "src/app/(app)/ospiti/_phone.ts",
+   "riga": "29 (usato in ospiti/[id]/page.tsx:60)",
+   "titolo": "La scheda ospite riscrive come +39 i telefoni nel formato OTA (\"39--3934335777-\", \"0-0-18574458226-\") e li rende non validi",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "comunicazione",
+   "gravita": "alta",
+   "file": "src/lib/msg-templates.ts",
+   "riga": "9-35, 135-137",
+   "titolo": "Il tombstone dei modelli eliminati è solo in localStorage e non è condiviso: su un altro dispositivo i modelli tornano attivi e il cron li invia",
+   "verdetto": "parziale"
+  },
+  {
+   "area": "comunicazione",
+   "gravita": "media",
+   "file": "src/components/messaging/ConversazioniPanel.tsx",
+   "riga": "458-486, 1055-1058",
+   "titolo": "Con il messaggio in chat solo dopo l'esito non c'è più protezione dal doppio invio, e se l'API WhatsApp rifiuta non c'è più il ripiego wa.me",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "comunicazione",
+   "gravita": "media",
+   "file": "src/app/(app)/promozioni/page.tsx",
+   "riga": "178 (stesso difetto in src/components/messaging/ConversazioniPanel.tsx:481)",
+   "titolo": "Promozioni ed email dalla chat usano kind \"quote\" e allegano un PDF di «preventivo» vuoto",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "comunicazione",
+   "gravita": "media",
+   "file": "src/app/(app)/ospiti/page.tsx",
+   "riga": "45-49 (store.tsx:539-552)",
+   "titolo": "Unire due ospiti non sposta la conversazione: nasce una chat fantasma col nome uguale all'id",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "pubbliche-revenue",
+   "gravita": "alta",
+   "file": "next.config.ts",
+   "riga": "12 e 25",
+   "titolo": "Il widget incorporabile (/embed) non si vede su nessun sito esterno: X-Frame-Options SAMEORIGIN su tutte le pagine",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "pubbliche-revenue",
+   "gravita": "alta",
+   "file": "src/app/api/public-booking/route.ts",
+   "riga": "89-128, 173-178, 268",
+   "titolo": "Le prenotazioni dirette leggono e scrivono solo lo stato personale del proprietario: per le strutture in organizzazione non c'e' nessun controllo di camera/disponibilita'",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "pubbliche-revenue",
+   "gravita": "media",
+   "file": "src/app/api/stripe/book/route.ts",
+   "riga": "71 (+ src/app/api/public-booking/route.ts:162)",
+   "titolo": "Un piano senza anticipo ('Nessun anticipo') fa pagare online l'intero importo, e la prenotazione risulta incassata 0",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "pubbliche-revenue",
+   "gravita": "media",
+   "file": "src/app/prenota/page.tsx",
+   "riga": "369-385, 512",
+   "titolo": "Dopo il ritorno da Stripe il PDF 'Scarica la conferma' contiene dati vuoti: arrivo oggi, totale 0, nessun ospite",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "pubbliche-revenue",
+   "gravita": "media",
+   "file": "src/app/prenota/page.tsx",
+   "riga": "240",
+   "titolo": "Tassa di soggiorno del motore pubblico calcolata senza bambini: importo diverso da quello che il gestionale calcolera' (e che alimenta totale e acconto)",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "pubbliche-revenue",
+   "gravita": "media",
+   "file": "src/app/(app)/sito/page.tsx",
+   "riga": "88-100, 104-123",
+   "titolo": "Pubblicazione Xenosite: un socio crea un duplicato '-2' del sito del proprietario, e una risposta in ritardo puo' far cancellare il sito di un'altra struttura",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "sync-auth",
+   "gravita": "alta",
+   "file": "src/lib/authsync.tsx",
+   "riga": "282-298 e 478-484",
+   "titolo": "Preventivi: un dispositivo con la lista vecchia cancella dal server quelli creati altrove",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "sync-auth",
+   "gravita": "media",
+   "file": "src/lib/authsync.tsx",
+   "riga": "503-505 (e 489-493)",
+   "titolo": "Le chiavi del sito (sito, sito:<id>, images) restano escluse dalla regola a 3 vie: la copia vecchia riscrive quella nuova",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "sync-auth",
+   "gravita": "media",
+   "file": "src/lib/authsync.tsx",
+   "riga": "142-148 (SIG_SKIP) con 503-505",
+   "titolo": "Con la nuova regola la selezione di più strutture (activestructs) passa da un dispositivo all'altro",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "sync-auth",
+   "gravita": "media",
+   "file": "src/lib/authsync.tsx",
+   "riga": "360-368 e 970-995 (con src/lib/access.tsx:85)",
+   "titolo": "Il ricarico automatico scatta per l'ultimo accesso (lastLogin) di un altro dispositivo",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "sync-auth",
+   "gravita": "media",
+   "file": "src/lib/authsync.tsx",
+   "riga": "494-505 (chiavi spigolestay:pulizie:done, :linen, :notes)",
+   "titolo": "Le mappe delle pulizie (done/linen/notes) restano 'vince il locale in blocco': i segni fatti da due dispositivi non si fondono",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "api",
+   "gravita": "alta",
+   "file": "src/app/api/stripe/book/confirm/route.ts",
+   "riga": "44-72",
+   "titolo": "book/confirm accetta qualunque sessione Stripe pagata e crea la prenotazione come chiamata interna fidata",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "api",
+   "gravita": "alta",
+   "file": "src/app/api/org/members/route.ts",
+   "riga": "75-78",
+   "titolo": "'Rimuovi' un co-gestore non revoca l'invito: l'utente rientra riaprendo il vecchio link",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "api",
+   "gravita": "media",
+   "file": "src/lib/manage-booking.ts",
+   "riga": "112",
+   "titolo": "Tetto globale 'fbs:all' di 60 ricerche/minuto: un solo IP blocca check-in, upload, wallet e pay-confirm per tutti",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "api",
+   "gravita": "media",
+   "file": "src/app/api/checkin/route.ts",
+   "riga": "167, 188-217",
+   "titolo": "Il POST anonimo del check-in scrive nel blob del proprietario JSON senza limiti di dimensione",
+   "verdetto": "parziale"
+  },
+  {
+   "area": "api",
+   "gravita": "media",
+   "file": "src/app/api/checkin/pay-confirm/route.ts",
+   "riga": "44-52, 79",
+   "titolo": "pay-confirm accredita qualsiasi sessione Stripe pagata a qualsiasi prenotazione",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "api",
+   "gravita": "media",
+   "file": "src/app/api/stripe/quote/route.ts",
+   "riga": "20-21, 35-36, 59-60",
+   "titolo": "Sessione di pagamento anonima con successUrl, cancelUrl, label e desc scelti dal chiamante (phishing con marchio Xenora)",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "regressioni",
+   "gravita": "alta",
+   "file": "src/app/api/checkin/pay-confirm/route.ts",
+   "riga": "44-56 (con src/app/api/public-booking/route.ts:157,170)",
+   "titolo": "Un pagamento Stripe già usato si può riapplicare alla stessa prenotazione o a un'altra: l'ospite si segna il saldo senza pagare",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "regressioni",
+   "gravita": "media",
+   "file": "src/lib/workspace-keys.ts",
+   "riga": "6-12 (con src/lib/msg-templates.ts:9-11, src/components/messaging/ModelliPanel.tsx:51, src/components/messaging/ConversazioniPanel.tsx:129-131)",
+   "titolo": "La lista dei modelli eliminati non viene condivisa con i collaboratori: aprendo i modelli li rimettono nell'elenco condiviso",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "regressioni",
+   "gravita": "media",
+   "file": "src/app/checkin/page.tsx",
+   "riga": "287-292 (con src/app/api/checkin/route.ts:68-69,105-107)",
+   "titolo": "Il check-in online chiede di nuovo la tassa di soggiorno già incassata a mano",
+   "verdetto": "confermato"
+  },
+  {
+   "area": "regressioni",
+   "gravita": "media",
+   "file": "src/app/(app)/impostazioni-fattura/page.tsx",
+   "riga": "44-55",
+   "titolo": "Le impostazioni fattura non salvate si azzerano quando si torna sulla scheda del browser",
+   "verdetto": "confermato"
+  }
+ ]
+}

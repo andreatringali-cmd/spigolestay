@@ -330,7 +330,21 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   // Stessa chiave delle chiusure vendita (`${roomTypeId}|${iso}`); mappa Record<string, true> = solo giorni chiusi.
   const [cta, setCta] = useState<Record<string, true>>(() => readLS("spigolestay:calcta", {}));
   const [ctd, setCtd] = useState<Record<string, true>>({});
-  useEffect(() => { try { const r = localStorage.getItem("spigolestay:calcta"); if (r) setCta(JSON.parse(r)); } catch {} try { const r = localStorage.getItem("spigolestay:calctd"); if (r) setCtd(JSON.parse(r)); } catch {} }, []);
+  // Rilegge chiusure/CTA/CTD dal localStorage al montaggio e quando la sincronizzazione (o un ritorno sulla pagina) li aggiorna da un altro dispositivo:
+  // altrimenti una pagina rimasta aperta mostra dati vecchi e un "Applica" riscrive le chiusure vecchie sopra quelle nuove.
+  useEffect(() => {
+    const reload = () => {
+      try { const r = localStorage.getItem("spigolestay:calcloses"); setCloses(r ? JSON.parse(r) : {}); } catch {}
+      try { const r = localStorage.getItem("spigolestay:calcta"); setCta(r ? JSON.parse(r) : {}); } catch {}
+      try { const r = localStorage.getItem("spigolestay:calctd"); setCtd(r ? JSON.parse(r) : {}); } catch {}
+    };
+    const onVis = () => { if (document.visibilityState === "visible") reload(); };
+    reload();
+    window.addEventListener("spigolestay:datasync", reload);
+    window.addEventListener("focus", reload);
+    document.addEventListener("visibilitychange", onVis);
+    return () => { window.removeEventListener("spigolestay:datasync", reload); window.removeEventListener("focus", reload); document.removeEventListener("visibilitychange", onVis); };
+  }, []);
   const persistCta = (next: Record<string, true>) => { setCta(next); try { localStorage.setItem("spigolestay:calcta", JSON.stringify(next)); } catch {} try { window.dispatchEvent(new Event("spigolestay:channex-dirty")); } catch {} };
   const persistCtd = (next: Record<string, true>) => { setCtd(next); try { localStorage.setItem("spigolestay:calctd", JSON.stringify(next)); } catch {} try { window.dispatchEvent(new Event("spigolestay:channex-dirty")); } catch {} };
 
@@ -355,7 +369,7 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   };
   const clickAvail = (typeId: string, iso: string) => {
     if (iso < todayISO) return; // giorno passato: disponibilità non modificabile
-    if (sel?.kind === "avail" && sel.typeId === typeId && selLo && selHi) { const tp = sel.typeId; setSel(null); setSelHover(null); setAvailEdit({ typeId: tp, from: selLo, to: selHi, closed: closes[closeKey(tp, selLo)] ?? 0, cta: !!cta[closeKey(tp, selLo)], ctd: !!ctd[closeKey(tp, selLo)] }); return; }
+    if (sel?.kind === "avail" && sel.typeId === typeId && selLo && selHi) { const tp = sel.typeId; setSel(null); setSelHover(null); setAvailEdit({ typeId: tp, from: selLo, to: selHi, closed: readLS<Record<string, number>>("spigolestay:calcloses", closes)[closeKey(tp, selLo)] ?? 0, cta: !!readLS<Record<string, true>>("spigolestay:calcta", cta)[closeKey(tp, selLo)], ctd: !!readLS<Record<string, true>>("spigolestay:calctd", ctd)[closeKey(tp, selLo)] }); return; }
     setSel({ kind: "avail", typeId, anchor: iso }); setSelHover(iso);
   };
   const clickCell = (unit: { id: string; roomTypeId: string }, structureId: string, iso: string) => {
@@ -397,10 +411,11 @@ export default function CalendarGrid({ viewSwitch }: { viewSwitch?: React.ReactN
   const resetRate = () => { if (rateEdit) { clearDayRates(futureIsos(rateEdit.from, rateEdit.to).map((iso) => rateKey(rateEdit.typeId, iso))); setRateEdit(null); } };
   const saveAvail = () => {
     if (!availEdit) return;
-    const next = { ...closes };
+    // Si parte dal localStorage fresco (non dallo stato React, che potrebbe essere vecchio rispetto a una sincronizzazione da un altro dispositivo).
+    const next: Record<string, number> = { ...readLS<Record<string, number>>("spigolestay:calcloses", closes) };
     // Restrizioni OTA: imposta/rimuove CTA e CTD per ogni giorno dell'intervallo, specularmente alle chiusure.
-    const nextCta = { ...cta };
-    const nextCtd = { ...ctd };
+    const nextCta: Record<string, true> = { ...readLS<Record<string, true>>("spigolestay:calcta", cta) };
+    const nextCtd: Record<string, true> = { ...readLS<Record<string, true>>("spigolestay:calctd", ctd) };
     for (const iso of futureIsos(availEdit.from, availEdit.to)) {
       const k = closeKey(availEdit.typeId, iso);
       if (availEdit.closed !== 0) next[k] = Math.round(availEdit.closed); else delete next[k];

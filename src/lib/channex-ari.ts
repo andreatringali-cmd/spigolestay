@@ -77,15 +77,18 @@ export function buildAriPayload(
           property_id: map.propertyId,
           rate_plan_id: mp.ratePlanId,
           date: iso,
-          rate: Math.max(0, raw).toFixed(2),
         };
+        // Tariffa mancante (≤ 0): il Calendario la mostra "chiusa alla vendita", quindi anche verso le OTA il giorno parte chiuso (stop_sell) e SENZA prezzo,
+        // invece di aprire la camera a 0,00 € (o far rifiutare la richiesta al canale).
+        const noRate = !(raw > 0);
+        if (!noRate) row.rate = raw.toFixed(2);
         // min_stay_arrival: soggiorno minimo all'arrivo. Inviato solo se > 1 (1 o 0 = nessun vincolo,
         // inutile spedirlo e rischiare di sovrascrivere impostazioni del canale).
         if (minStay > 1) row.min_stay_arrival = minStay;
         // stop_sell: giorno completamente chiuso alla vendita → vendite tipologia chiuse OPPURE
         // camere chiuse a mano ≥ camere totali della tipologia (nessuna camera realmente vendibile).
         // Il guardia totalUnits > 0 evita di marcare stop_sell per il caso degenere 0 ≥ 0.
-        if (typeClosed || (totalUnits > 0 && closed >= totalUnits)) row.stop_sell = true;
+        if (typeClosed || noRate || (totalUnits > 0 && closed >= totalUnits)) row.stop_sell = true;
         // closed_to_arrival / closed_to_departure: inviati SOLO quando l'owner li ha attivati per
         // quel (tipologia, giorno). Come per gli altri campi, si spedisce solo il valore true quando
         // serve (campo omesso quando assente, per non sovrascrivere le impostazioni del canale).
@@ -98,6 +101,8 @@ export function buildAriPayload(
           for (const mapped of mp.ratePlans) {
             const plan = rateModel.plans[rt.id]?.find((p) => p.id === mapped.id);
             if (!plan || !mapped.ratePlanId) continue;
+            // Base senza tariffa: il piano extra non ha un prezzo da derivare, resta chiuso come la base (senza prezzo).
+            if (noRate) { restrictions.push({ ...row, rate_plan_id: mapped.ratePlanId }); continue; }
             restrictions.push(extraPlanRow(row, mapped, plan, rateModel.single[rt.id], minStay));
           }
         }

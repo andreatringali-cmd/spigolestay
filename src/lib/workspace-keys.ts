@@ -5,7 +5,7 @@ const P = "spigolestay:";
 
 const EXACT = [
   "plan", "tier", "modules", "sito", "guides", "images", "promos", "promosseeded", "widget", "widgets:v1", "deposit", "todo:v1", "daynotes",
-  "rateplans", "rateplans:seed", "ratemodel", "pricerules", "paysettings", "preventivi", "threads:v1", "msgtemplates", "msgsent", "reviews",
+  "rateplans", "rateplans:seed", "ratemodel", "pricerules", "paysettings", "preventivi", "threads:v1", "msgtemplates", "msgtemplates:deleted", "msgsent", "reviews",
   "calcloses", "calcta", "calctd", "inventorypool", "localevents", "extrasseeded", "metasearch:v2", "metasearch:dest", "nettare:strategy",
   "aiconcierge", "concierge:unanswered:v1", "roomaccess", "revenueapplied", "autopilot", "channexmap", "google-content-result",
   "canali:conn", "canali:enabled", "canali:colors", "canali:log", "canali:corrlog",

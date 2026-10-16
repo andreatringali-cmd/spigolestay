@@ -84,3 +84,72 @@ export function applyRaceChanges(
   }
   return result;
 }
+
+const idOfItem = (it: unknown): string | null => {
+  if (it && typeof it === "object") { const id = (it as { id?: unknown }).id; if (id !== undefined && id !== null && id !== "") return String(id); }
+  return null;
+};
+
+/**
+ * PREVENTIVI (array piatto con "id", senza updatedAt). Parte dall'array locale (una cancellazione locale resta valida) e:
+ *  - lo stato "confermato" scritto dal server (pagamento Stripe) vince sul locale "inviato";
+ *  - i preventivi presenti SOLO sul server si aggiungono se non erano già nella base (creati altrove); se erano nella base e ora non sono
+ *    nel locale, sono stati cancellati qui e non si reintroducono. Voci del server senza id: ignorate. Base assente (prima idratazione): si aggiungono tutte.
+ * Ritorna null se il locale non è un array valido.
+ */
+export function mergePreventivi3(baseRaw: string | undefined, localRaw: string | undefined, serverRaw: string | undefined): string | null {
+  let local: unknown[];
+  let server: unknown[];
+  let base: unknown[] = [];
+  try { const p = JSON.parse(localRaw ?? "[]"); if (!Array.isArray(p)) return null; local = p; } catch { return null; }
+  try { const p = JSON.parse(serverRaw ?? "[]"); server = Array.isArray(p) ? p : []; } catch { server = []; }
+  try { const p = JSON.parse(baseRaw ?? "[]"); base = Array.isArray(p) ? p : []; } catch { base = []; }
+  const serverById = new Map<string, { status?: unknown; bookingId?: unknown }>();
+  for (const it of server) { const id = idOfItem(it); if (id) serverById.set(id, it as { status?: unknown; bookingId?: unknown }); }
+  const baseIds = new Set<string>();
+  for (const it of base) { const id = idOfItem(it); if (id) baseIds.add(id); }
+  const localIds = new Set<string>();
+  const out: unknown[] = local.map((it) => {
+    const id = idOfItem(it);
+    if (id) localIds.add(id);
+    const s = id ? serverById.get(id) : undefined;
+    if (s && s.status === "confermato" && (it as { status?: unknown })?.status !== "confermato") {
+      return { ...(it as Record<string, unknown>), status: s.status, bookingId: s.bookingId };
+    }
+    return it;
+  });
+  for (const it of server) {
+    const id = idOfItem(it);
+    if (!id || localIds.has(id) || baseIds.has(id)) continue;
+    out.push(it);
+  }
+  return JSON.stringify(out);
+}
+
+/**
+ * Mappe JSON salvate per intero (es. segni di Pulizie "unitId:data" → ISO): fusione per chiave a 3 vie con mergeRecord3.
+ * Ritorna null se locale e server sono entrambi assenti.
+ */
+export function mergeRecordJson(baseRaw: string | undefined, localRaw: string | undefined, serverRaw: string | undefined): string | null {
+  if (localRaw === undefined && serverRaw === undefined) return null;
+  let bad = false;
+  const parse = (r: string | undefined): unknown => {
+    if (!r) return {};
+    try { const v = JSON.parse(r); if (isObj(v)) return v; } catch { /* non valido */ }
+    bad = true; return {};
+  };
+  const b = parse(baseRaw), l = parse(localRaw), s = parse(serverRaw);
+  if (bad) return null; // contenuto non valido: resta la regola di prima, non si rischia di svuotare la mappa
+  return JSON.stringify(mergeRecord3(b, l, s));
+}
+
+/** Utenti senza i campi puramente informativi che cambiano a ogni accesso (lastLogin, sessions): servono per la firma di "ricarica la pagina". */
+export function stripVolatileUsers(v: unknown): unknown {
+  if (!Array.isArray(v)) return v;
+  return v.map((u) => {
+    if (!u || typeof u !== "object" || Array.isArray(u)) return u;
+    const { lastLogin: _l, sessions: _s, ...rest } = u as Record<string, unknown>;
+    void _l; void _s;
+    return rest;
+  });
+}

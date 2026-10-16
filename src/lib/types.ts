@@ -377,7 +377,7 @@ export interface Booking {
   signature?: string;     // firma dell'ospite (riferimento privato, o data URI nei vecchi dati; dal check-in online)
   invoiceNo?: string;   // numero fattura emessa
   extraGuests?: { firstName: string; lastName: string; sex?: "M" | "F"; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string }[]; // co-ospiti (dal web check-in o aggiunti a mano)
-  primaryGuest?: { firstName?: string; lastName?: string; sex?: "M" | "F"; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string }; // dati ospite principale conservati sulla prenotazione (es. se l'anagrafica viene eliminata) — per Alloggiati Web
+  primaryGuest?: { firstName?: string; lastName?: string; sex?: "M" | "F"; birthDate?: string; birthPlace?: string; citizenship?: string; docType?: string; docNumber?: string; docPlace?: string }; // dati ospite principale conservati sulla prenotazione (es. se l'anagrafica viene eliminata) — per Alloggiati Web
   extras?: { name: string; price: number; extraId?: string; qty?: number; offerId?: string }[]; // servizi/consumi extra aggiunti alla prenotazione (extraId/offerId: se venduti dal modulo Upselling)
   upsellOffers?: UpsellOffer[]; // registro offerte di extra inviate all'ospite (proposta/accettata/rifiutata)
   invoiceRequest?: InvoiceRequest; // "richiedo fattura" raccolto al check-in online (dati intestazione)
@@ -392,6 +392,7 @@ export interface Booking {
   otaInfo?: OtaInfo;
   // Riferimenti Stripe del pagamento online (necessari per il rimborso automatico).
   stripePaymentIntent?: string;
+  stripeExtraPayments?: { pi: string; amount: number }[]; // pagamenti Stripe SUCCESSIVI al primo (saldo dal check-in): payment intent + importo, per rimborsarli all'annullamento
   stripeSessionId?: string;
   stripeAccountId?: string; // conto connesso su cui è avvenuto il pagamento
   paidSessions?: string[];  // id sessioni Stripe già registrate come incasso (idempotenza saldo)

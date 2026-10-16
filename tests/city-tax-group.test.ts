@@ -62,3 +62,16 @@ test("contesto di gruppo: elenco e totali usano la quota del gruppo (6,93 in tut
   setGroupTaxContext([], () => CP); // pulizia: nessuna quota residua
   assert.equal(ctb(CP, g("a") as never), 3.47);
 });
+
+test("gruppo: la quota di tassa già incassata a parte (cityTaxPaid) non rientra nel residuo; se è dentro paid (cityTaxInPaid) sì", async () => {
+  const { groupRowBalances } = await import("../src/lib/booking.ts");
+  const rows = [room("a"), room("b")];
+  const base = groupRowBalances(CP, rows as never);
+  const aTax = base.find((r) => r.id === "a")!.tax;
+  assert.ok(aTax > 0);
+  const cash = groupRowBalances(CP, [room("a", { cityTaxPaid: true }), room("b")] as never);
+  assert.equal(cash.find((r) => r.id === "a")!.balance, 86.63); // niente tassa
+  assert.equal(cash.find((r) => r.id === "b")!.balance, base.find((r) => r.id === "b")!.balance);
+  const inPaid = groupRowBalances(CP, [room("a", { cityTaxPaid: true, cityTaxInPaid: true }), room("b")] as never);
+  assert.equal(inPaid.find((r) => r.id === "a")!.balance, base.find((r) => r.id === "a")!.balance);
+});

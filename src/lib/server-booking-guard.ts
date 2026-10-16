@@ -30,6 +30,34 @@ export async function loadOwnerStructureData(admin: SupabaseClient, ownerId: str
   } catch { return null; }
 }
 
+/** Dati (spigolestay:data:v1 già letti) di tutte le organizzazioni di cui l'utente è membro: le strutture condivise stanno solo lì, non nello stato personale. */
+export async function loadOrgDataParts(admin: SupabaseClient, ownerId: string): Promise<Json[]> {
+  const out: Json[] = [];
+  try {
+    const { data: ms } = await admin.from("memberships").select("org_id").eq("user_id", ownerId);
+    for (const m of arr(ms)) {
+      const { data: os } = await admin.from("org_state").select("data").eq("org_id", m.org_id as string).maybeSingle();
+      out.push(parse((os as { data?: unknown } | null)?.data));
+    }
+  } catch { /* best-effort: si usano i dati che ci sono */ }
+  return out;
+}
+
+export interface MergedOwnerData { structures: Json[]; roomTypes: Json[]; units: Json[]; bookings: Json[]; rateOverrides: Record<string, number> }
+
+/** Unisce più blob di dati (personale + organizzazioni) senza doppioni per id: vale la prima occorrenza (passare per primo il blob personale). */
+export function mergeOwnerData(parts: Json[]): MergedOwnerData {
+  const uniq = (key: string): Json[] => {
+    const seen = new Set<string>();
+    const out: Json[] = [];
+    for (const p of parts) for (const x of arr(p[key])) { const id = typeof x.id === "string" ? x.id : ""; if (id) { if (seen.has(id)) continue; seen.add(id); } out.push(x); }
+    return out;
+  };
+  const rateOverrides: Record<string, number> = {};
+  for (const p of [...parts].reverse()) if (p.rateOverrides && typeof p.rateOverrides === "object") Object.assign(rateOverrides, p.rateOverrides);
+  return { structures: uniq("structures"), roomTypes: uniq("roomTypes"), units: uniq("units"), bookings: uniq("bookings"), rateOverrides };
+}
+
 const nightsList = (ci: string, co: string): string[] => {
   const out: string[] = [];
   const end = Date.parse(co + "T00:00:00Z");

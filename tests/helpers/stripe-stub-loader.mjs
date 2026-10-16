@@ -9,7 +9,7 @@ const STRIPE = "data:text/javascript," + encodeURIComponent(`
       this.refunds = { create: async (params, opts) => {
         (S.calls.refund ??= []).push({ params, opts });
         if (S.refundFail) throw new Error(S.refundFail);
-        return { id: "re_1", amount: S.refundAmount ?? 10000 };
+        return { id: "re_1", amount: S.refundAmount ?? params.amount ?? 10000 };
       } };
       this.checkout = { sessions: {
         create: async (params) => { (S.calls.sessionCreate ??= []).push(params); return { url: "https://stripe.test/pay" }; },

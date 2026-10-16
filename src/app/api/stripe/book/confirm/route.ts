@@ -54,6 +54,8 @@ export async function POST(req: Request) {
     const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["payment_intent"] });
     if (session.payment_status !== "paid") return NextResponse.json({ ok: false, error: "not_paid", status: session.payment_status }, { status: 402 });
     const m = (session.metadata ?? {}) as Record<string, string>;
+    // Solo sessioni create da /api/stripe/book (kind "book", dopo tutti i controlli) per QUESTA struttura: le sessioni di /api/stripe/quote hanno metadata scelti dal chiamante.
+    if (m.kind !== "book" || m.slug !== slug || (m.s && m.s !== resolved.sid)) return NextResponse.json({ ok: false, error: "not_a_booking_session" }, { status: 400 });
     const pi = session.payment_intent;
     const paymentIntent = typeof pi === "string" ? pi : (pi?.id || "");
 

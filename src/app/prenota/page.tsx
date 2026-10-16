@@ -8,7 +8,7 @@ import { getImages } from "@/lib/images";
 import MediaImg from "@/components/MediaImg";
 import { eur } from "@/lib/format";
 import { effectiveClosed, rateForDay, loadWeekendPct } from "@/lib/pricing";
-import { cityTaxOf } from "@/lib/booking";
+import { cityTaxOfBookingRaw } from "@/lib/booking";
 import { loadPlans, planApplies, planDepositPct, cancelText, type RatePlan } from "@/lib/rate-plans";
 import { amenityIcon } from "@/lib/amenities";
 import { loadPromos } from "@/lib/promos";
@@ -117,7 +117,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const [bookError, setBookError] = useState<string | null>(null); // esito negativo dell'invio: la conferma NON va mostrata
   // Riepilogo per la schermata di conferma dopo il ritorno dal pagamento Stripe (lo stato
   // del form si perde nel redirect: lo ripristiniamo da sessionStorage).
-  const [doneSummary, setDoneSummary] = useState<null | { code: string; structureName?: string; roomName?: string; ci: string; co: string; total: number; cityTax?: number; deposit: number; guestFirst?: string; email?: string }>(null);
+  const [doneSummary, setDoneSummary] = useState<null | { code: string; structureName?: string; roomName?: string; ci: string; co: string; total: number; cityTax?: number; deposit: number; guestFirst?: string; guestLast?: string; adults?: number; children?: number; email?: string }>(null);
   const [adults, setAdults] = useState(() => Number(qp("ad")) || 2);
   const [children, setChildren] = useState(() => Number(qp("ch")) || 0);
   const [childAges, setChildAges] = useState<number[]>(() => {
@@ -237,12 +237,11 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   const extraPrice = (x: ExtraService) => x.per === "night" ? x.price * nights : x.per === "person" ? x.price * adults : x.price;
   const extrasTotal = extras.reduce((a, x) => a + (extraQty[x.id] ?? 0) * extraPrice(x), 0);
   // Tassa di soggiorno: 0 finché non è selezionata una camera; poi logica unica (@/lib/booking).
-  const cityTax = selRt ? cityTaxOf(structure, adults, nights, accommodation) : 0;
+  const cityTax = selRt ? cityTaxOfBookingRaw(structure, { adults, children, childAges, checkIn, checkOut, total: accommodation }) : 0; // stessa formula del gestionale: paganti = adulti + minori sopra soglia, divisore = tutti gli ospiti
   const discount = appliedPromo ? Math.round(accommodation * appliedPromo.pct / 100) : 0;
   const total = accommodation + extrasTotal + cityTax - discount;
   const depositPct = selPlan ? planDepositPct(selPlan) : 0; // acconto secondo la politica di incasso del piano
   const deposit = Math.round(total * depositPct / 100);
-  const shownDeposit = noOnlinePayment ? 0 : deposit; // quanto risulta davvero incassato (per riepilogo e PDF)
 
   const guestValid = guest.firstName.trim() && guest.lastName.trim() && guest.email.trim() && guest.phone.trim() && privacy;
 
@@ -283,7 +282,7 @@ export function Engine({ embed = false }: { embed?: boolean }) {
     if (isPublicMode() && publicSlug()) {
       const token = (globalThis.crypto?.randomUUID?.() ?? String(Date.now()));
       const guestBody = { firstName: guest.firstName.trim(), lastName: guest.lastName.trim(), email: guest.email.trim(), phone: guest.phone.trim(), country: guest.country };
-      try { sessionStorage.setItem("xn-lastbooking", JSON.stringify({ code: bkCode, structureName: structure?.name, roomName: `${selRt.name}${selPlan ? " · " + selPlan.name : ""}`, ci: checkIn, co: checkOut, total, cityTax, deposit, guestFirst: guest.firstName.trim(), email: guest.email.trim() })); } catch {}
+      try { sessionStorage.setItem("xn-lastbooking", JSON.stringify({ code: bkCode, structureName: structure?.name, roomName: `${selRt.name}${selPlan ? " · " + selPlan.name : ""}`, ci: checkIn, co: checkOut, total, cityTax, deposit, guestFirst: guest.firstName.trim(), guestLast: guest.lastName.trim(), adults, children, email: guest.email.trim() })); } catch {}
       setProcessing(true);
       let failure: string | null = null;
       try {
@@ -366,27 +365,36 @@ export function Engine({ embed = false }: { embed?: boolean }) {
   }, [embed]);
 
   // Riepilogo prenotazione (per email e PDF).
-  const bookingLines = () => ([
-    ["Codice prenotazione", code],
-    ["Struttura", structure?.name ?? ""],
-    ["Camera", `${selRt?.name ?? ""}${selPlan ? " · " + selPlan.name : ""}`],
-    ["Ospite", `${guest.firstName} ${guest.lastName}`.trim()],
-    ["Check-in", fmtDate(checkIn)],
-    ["Check-out", fmtDate(checkOut)],
-    ["Ospiti", `${adults} adulti${children ? ` · ${children} bambini` : ""}`],
-    ["Totale", eur(total)],
-    ...((shownDeposit > 0 && shownDeposit < total
-      ? [["Acconto versato", eur(shownDeposit)], ["Saldo in struttura", eur(total - shownDeposit)]]
-      : shownDeposit >= total && shownDeposit > 0
-        ? [["Importo pagato", eur(shownDeposit)]]
-        : [["Saldo in struttura", eur(total)]]) as [string, string][]),
-  ] as [string, string][]);
+  // Dopo il ritorno da Stripe il modulo è perso: i valori vengono dal riepilogo salvato (doneSummary), come nella schermata finale.
+  const bookingLines = () => {
+    const ds = doneSummary;
+    const bCode = ds?.code || code;
+    const bTotal = ds?.total ?? total;
+    const bDeposit = noOnlinePayment ? 0 : (ds?.deposit ?? deposit);
+    const bAdults = ds?.adults ?? adults, bChildren = ds?.children ?? children;
+    const bGuest = ds ? `${ds.guestFirst ?? ""} ${ds.guestLast ?? ""}`.trim() : `${guest.firstName} ${guest.lastName}`.trim();
+    return ([
+      ["Codice prenotazione", bCode],
+      ["Struttura", ds?.structureName || structure?.name || ""],
+      ["Camera", ds?.roomName || `${selRt?.name ?? ""}${selPlan ? " · " + selPlan.name : ""}`],
+      ["Ospite", bGuest],
+      ["Check-in", fmtDate(ds?.ci || checkIn)],
+      ["Check-out", fmtDate(ds?.co || checkOut)],
+      ["Ospiti", `${bAdults} adulti${bChildren ? ` · ${bChildren} bambini` : ""}`],
+      ["Totale", eur(bTotal)],
+      ...((bDeposit > 0 && bDeposit < bTotal
+        ? [["Acconto versato", eur(bDeposit)], ["Saldo in struttura", eur(bTotal - bDeposit)]]
+        : bDeposit >= bTotal && bDeposit > 0
+          ? [["Importo pagato", eur(bDeposit)]]
+          : [["Saldo in struttura", eur(bTotal)]]) as [string, string][]),
+    ] as [string, string][]);
+  };
 
   const printPdf = () => {
     const w = window.open("", "_blank", "width=820,height=940");
     if (!w) return;
     const rows = bookingLines().map(([k, v]) => `<tr><td class="k">${k}</td><td class="v">${v}</td></tr>`).join("");
-    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Prenotazione ${code}</title>
+    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Prenotazione ${doneSummary?.code || code}</title>
       <style>*{box-sizing:border-box}body{font-family:Georgia,'Times New Roman',serif;color:#1a2131;margin:0;padding:48px 54px;font-size:14px;line-height:1.55}
       .brand{font-size:24px;font-weight:700;color:#4f46e5;border-bottom:3px solid #4f46e5;padding-bottom:14px;margin-bottom:24px}
       h1{font-size:14px;letter-spacing:2px;text-transform:uppercase;color:#5c6479;margin:0 0 16px}

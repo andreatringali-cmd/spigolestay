@@ -22,7 +22,7 @@ interface Info {
   booking: {
     code: string; status: string; checkIn: string; checkOut: string; adults: number; children: number;
     total: number; paid: number; roomType: string; ratePlan: string; refundable: boolean; cancelDays: number;
-    cancelPolicy: string; free: boolean; freeUntil: string | null; canRefund: boolean;
+    cancelPolicy: string; free: boolean; freeUntil: string | null; canRefund: boolean; refundAmount?: number;
     cancelledAt: string | null; refundedAmount: number; guestFirst: string; guestLang?: string | null;
   };
   structure: { name: string; color: string; phone: string; email: string; checkInFrom: string; checkOutBy: string; currency: string };
@@ -215,7 +215,7 @@ function Engine() {
                     <p className="text-sm font-semibold text-txt">{t("Confermi l'annullamento?")}</p>
                     <p className="mt-1 text-xs text-dim">
                       {b.canRefund
-                        ? t("Riceverai un rimborso automatico di {amount} sul metodo di pagamento usato.", { amount: eur(b.paid, cur) })
+                        ? t("Riceverai un rimborso automatico di {amount} sul metodo di pagamento usato.", { amount: eur(b.refundAmount ?? b.paid, cur) })
                         : b.paid > 0
                           ? t("Questa tariffa non prevede rimborso: l'acconto versato non sarà restituito.")
                           : t("Nessun importo è stato pagato online.")}

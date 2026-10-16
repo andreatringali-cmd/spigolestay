@@ -12,19 +12,29 @@ export function useTenantId(): string | undefined {
   const { user } = useAuth();
   const uid = user?.id;
   const [, bump] = useState(0);
-  const isCollab = (() => { try { return typeof window !== "undefined" && localStorage.getItem("xn-collab") === "1"; } catch { return false; } })();
 
   useEffect(() => {
     if (!uid || !supabase || cache.has(uid)) return;
     let off = false;
-    void Promise.resolve(supabase.rpc("workspace_owner", { uid })).then(({ data }) => {
-      cache.set(uid, typeof data === "string" && data ? data : uid);
-      if (!off) bump((n) => n + 1);
-    }, () => { if (!isCollab) { cache.set(uid, uid); if (!off) bump((n) => n + 1); } });
-    return () => { off = true; };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const sb = supabase;
+    // Una risposta {data:null, error} (token scaduto, rete instabile, 5xx) NON è un esito: non si mette in cache
+    // il proprio id (un collaboratore scriverebbe i dati su un account che il titolare non vede) ma si riprova con attesa crescente.
+    const attempt = (n: number) => {
+      const done = (v: string) => { cache.set(uid, v); if (!off) bump((k) => k + 1); };
+      const fail = () => {
+        if (!off) timer = setTimeout(() => attempt(n + 1), Math.min(30000, 1000 * 2 ** Math.min(n, 5)));
+      };
+      void Promise.resolve(sb.rpc("workspace_owner", { uid })).then(({ data, error }) => {
+        if (error) fail();
+        else done(typeof data === "string" && data ? data : uid);
+      }, fail);
+    };
+    attempt(0);
+    return () => { off = true; if (timer) clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
 
-  // Un collaboratore aspetta la risposta del server (mai scrivere con il proprio id per errore); un titolare usa subito il suo.
-  return uid ? (cache.get(uid) ?? (isCollab ? undefined : uid)) : undefined;
+  // Tutti aspettano la risposta valida del server (mai scrivere con il proprio id per errore, anche se il flag xn-collab manca su questo dispositivo): i chiamanti gestiscono già !tenantId.
+  return uid ? cache.get(uid) : undefined;
 }

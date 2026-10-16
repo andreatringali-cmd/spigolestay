@@ -378,7 +378,9 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
   const [waBusy, setWaBusy] = useState("");
   const waOn = wa.connected;
   useEffect(() => { apiPost<{ connected: boolean; phoneId: string }>("whatsapp/settings", { action: "status" }).then((r) => setWa({ connected: !!r.connected, phoneId: r.phoneId || "" })).catch(() => {}); }, []);
-  const waSendReal = async (to: string, text: string): Promise<{ ok: boolean; id?: string }> => { try { const r = await apiPost<{ ok: boolean; id?: string }>("whatsapp/send", { to, text }); return { ok: !!r.ok, id: r.id }; } catch { return { ok: false }; } };
+  const waSendReal = async (to: string, text: string): Promise<{ ok: boolean; id?: string; message?: string }> => { try { const r = await apiPost<{ ok: boolean; id?: string; message?: string }>("whatsapp/send", { to, text }); return { ok: !!r.ok, id: r.id, message: r.message }; } catch (e) { return { ok: false, message: (e as Error)?.message }; } };
+  const chatBusyRef = useRef(false); // blocca il doppio invio (secondo tocco / Invio ripetuto) mentre la richiesta è in corso
+  const [sending, setSending] = useState(false);
   const waSave = async () => {
     setWaBusy("save");
     try { const r = await apiPost<{ ok: boolean; message?: string }>("whatsapp/settings", { action: "save", token: waTok || undefined, phoneId: wa.phoneId }); window.alert(r.message || "Salvato"); setWaTok(""); const st = await apiPost<{ connected: boolean; phoneId: string }>("whatsapp/settings", { action: "status" }); setWa({ connected: !!st.connected, phoneId: st.phoneId || "" }); }
@@ -465,30 +467,47 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
       add("out", text, "WhatsApp"); setDraft(""); return;
     }
     // Invio reale (Cloud API): il messaggio entra in chat solo se è partito davvero; altrimenti errore visibile e bozza intatta.
-    const r = await waSendReal(digits, text);
-    if (!r.ok) { window.alert(t("Invio WhatsApp non riuscito: il messaggio NON è stato inviato. Riprova o controlla il collegamento WhatsApp.")); return; }
-    const mid = gid ? addTo(gid, "out", text, "WhatsApp") : undefined;
-    if (gid && mid && r.id) markSent(gid, mid, r.id);
-    setDraft((d) => (d === text ? "" : d));
+    if (chatBusyRef.current) return;
+    chatBusyRef.current = true; setSending(true);
+    try {
+      const r = await waSendReal(digits, text);
+      if (!r.ok) {
+        // Motivo vero del rifiuto (es. testo libero fuori dalla finestra di 24 h) e ripiego manuale su wa.me, scelto dall'host.
+        const why = r.message ? `\n\n${r.message}` : "";
+        if (window.confirm(`${t("Invio WhatsApp non riuscito: il messaggio NON è stato inviato.")}${why}\n\n${t("Aprire WhatsApp per inviarlo a mano?")}`)) {
+          const w = window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, "_blank");
+          if (w) { add("out", text, "WhatsApp"); setDraft((d) => (d === text ? "" : d)); }
+          else window.alert(t("Il browser ha bloccato l'apertura di WhatsApp: il messaggio NON è stato inviato."));
+        }
+        return;
+      }
+      const mid = gid ? addTo(gid, "out", text, "WhatsApp") : undefined;
+      if (gid && mid && r.id) markSent(gid, mid, r.id);
+      setDraft((d) => (d === text ? "" : d));
+    } finally { chatBusyRef.current = false; setSending(false); }
   };
   const sendMail = async () => {
     if (!draft.trim()) return;
     if (!current?.email) { window.alert(t("L'ospite non ha un'email.")); return; }
-    const text = draft; const to = current.email; const gid = sel;
-    // Invio automatico dal server (Resend); ripiego Gmail se non configurato. In chat solo dopo l'esito.
-    let ok = false;
+    if (chatBusyRef.current) return;
+    chatBusyRef.current = true; setSending(true);
     try {
-      const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quote", to, subject: t("Messaggio"), text }) });
-      const j = await r.json().catch(() => ({}));
-      ok = !!(r.ok && j?.ok);
-    } catch { ok = false; }
-    if (!ok) {
-      // Il ripiego si apre dopo un await: se il browser (Safari) lo blocca, si avvisa e non si registra nulla come inviato.
-      const w = window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(t("Messaggio"))}&body=${encodeURIComponent(text)}`, "_blank");
-      if (!w) { window.alert(t("Invio email non riuscito: il messaggio NON è stato inviato.")); return; }
-    }
-    if (gid) addTo(gid, "out", text, "Email");
-    setDraft((d) => (d === text ? "" : d));
+      const text = draft; const to = current.email; const gid = sel;
+      // Invio automatico dal server (Resend); ripiego Gmail se non configurato. In chat solo dopo l'esito.
+      let ok = false;
+      try {
+        const r = await fetch("/api/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "guest_message", to, subject: t("Messaggio"), text }) });
+        const j = await r.json().catch(() => ({}));
+        ok = !!(r.ok && j?.ok);
+      } catch { ok = false; }
+      if (!ok) {
+        // Il ripiego si apre dopo un await: se il browser (Safari) lo blocca, si avvisa e non si registra nulla come inviato.
+        const w = window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(t("Messaggio"))}&body=${encodeURIComponent(text)}`, "_blank");
+        if (!w) { window.alert(t("Invio email non riuscito: il messaggio NON è stato inviato.")); return; }
+      }
+      if (gid) addTo(gid, "out", text, "Email");
+      setDraft((d) => (d === text ? "" : d));
+    } finally { chatBusyRef.current = false; setSending(false); }
   };
   const logIn = () => { const text = draft.trim() || window.prompt(t("Testo della risposta ricevuta dall'ospite:")) || ""; if (text.trim()) { add("in", text, "manuale"); setDraft(""); } };
 
@@ -1054,8 +1073,8 @@ export default function ConversazioniPanel({ onManageTemplates }: { onManageTemp
               <div className="rounded-2xl border border-line bg-paper p-2 transition focus-within:border-focus focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--focus)_18%,transparent)]">
                 <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void (replyOta ? sendChx() : sendWa()); } }} rows={2} placeholder={t("Scrivi un messaggio… (Invio per inviare, Shift+Invio per andare a capo)")} className="w-full resize-none bg-transparent px-1.5 py-1 text-sm text-txt outline-none placeholder:text-faint" />
                 <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <button onClick={sendWa} disabled={!draft.trim()} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</button>
-                  <button onClick={sendMail} disabled={!draft.trim() || !current.email} className="inline-flex items-center gap-1.5 rounded-full bg-focus px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40">✉ Email</button>
+                  <button onClick={sendWa} disabled={!draft.trim() || sending} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#25D366" }}>💬 WhatsApp</button>
+                  <button onClick={sendMail} disabled={!draft.trim() || !current.email || sending} className="inline-flex items-center gap-1.5 rounded-full bg-focus px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40">✉ Email</button>
                   {chxBookingId && <button onClick={sendChx} disabled={!draft.trim()} title={t("Sperimentale: invia nel thread messaggi di Booking.com/Airbnb/Expedia (Channex) — verifica il primo invio")} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-40" style={{ backgroundColor: "#003580" }}>🏨 {otaName} <span className="text-[9px] font-normal opacity-75">beta</span></button>}
                   {chxBookingId && <>
                     <input ref={attachRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" className="hidden" onChange={(e) => { sendChxFile(e.target.files?.[0]); e.target.value = ""; }} />

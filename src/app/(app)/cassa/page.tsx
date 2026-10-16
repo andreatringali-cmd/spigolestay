@@ -161,7 +161,7 @@ export default function CassaPage() {
   const today = todayISO();
 
   // Movimenti automatici dalle prenotazioni + occorrenze programmate (logica condivisa con la Chiusura cassa).
-  const auto = useMemo<Mov[]>(() => computeAuto(bookings, guests, getStructure, scope, router, payouts), [bookings, guests, scopeKey, getStructure, router, payouts]); // eslint-disable-line react-hooks/exhaustive-deps
+  const auto = useMemo<Mov[]>(() => computeAuto(raw.bookings, guests, getStructure, scope, router, payouts), [raw.bookings, guests, scopeKey, getStructure, router, payouts]); // eslint-disable-line react-hooks/exhaustive-deps
   const ruleVisible = (structureId?: string) => scopeVisible(structureId, scope);
   const scheduled = useMemo<Mov[]>(() => applyOverrides(computeScheduled(rules, paidSet, scope, today), overrides), [rules, scopeKey, today, paidSet, overrides]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -234,7 +234,7 @@ export default function CassaPage() {
   const [chartsOn, setChartsOn] = useState(true);
   const toggleCharts = () => setChartsOn((v) => !v); // aperti a ogni apertura della pagina; nasconderli vale solo per questa visita
 
-  const forecastChart = useMemo<Mov[]>(() => applyOverrides(computeForecast(bookings, guests, getStructure, rules, scope, today, fcEnd, router, payouts), overrides), [bookings, guests, getStructure, rules, scopeKey, today, fcEnd, router, payouts, overrides]); // eslint-disable-line react-hooks/exhaustive-deps
+  const forecastChart = useMemo<Mov[]>(() => applyOverrides(computeForecast(raw.bookings, guests, getStructure, rules, scope, today, fcEnd, router, payouts), overrides), [raw.bookings, guests, getStructure, rules, scopeKey, today, fcEnd, router, payouts, overrides]); // eslint-disable-line react-hooks/exhaustive-deps
   const forecastView = useMemo(() => forecastChart.filter((x) => x.date <= listHorizon), [forecastChart, listHorizon]);
   const rows = [...all, ...forecastView]
     .filter((m) => inPeriod(m.date) && matchesTipo(m) && (!catF || m.cat === catF) && matchesQuery(m, q, { cat: catOf(m.cat)?.label, conto: CONTI.find((c) => c.key === m.conto)?.label }))
@@ -259,16 +259,16 @@ export default function CassaPage() {
   // Ultima card in vista "oggi e future": saldo previsto = saldo attuale dei conti + entrate − uscite dei giorni dopo oggi (quelli di oggi sono già nel saldo attuale).
   const prevCard = futureView && hasOpening;
   // Con il saldo attuale come base, le card contano solo i movimenti dopo oggi (quelli di oggi e prima sono già nel saldo attuale): così saldo attuale + entrate − uscite = saldo previsto.
-  const cardRows = prevCard ? rowsStat.filter((m) => m.date > today) : rowsStat;
+  const cardRows = (prevCard ? rowsStat.filter((m) => m.date > today) : rowsStat).filter((m) => !futureView || m.date <= listHorizon); // l'etichetta «al {listHorizon}» deve valere anche per i movimenti manuali/auto oltre l'orizzonte
   const entrateCard = sumCents(cardRows.filter((m) => m.kind === "in").map((m) => m.amount));
   const usciteCard = sumCents(cardRows.filter((m) => m.kind === "out").map((m) => m.amount));
   const saldoPrevisto = roundCents(saldoTot + entrateCard - usciteCard);
   // Estratto conto: saldo dopo ogni movimento, solo per le strutture selezionate in alto a destra (somma dei saldi di ciascuna, dalla propria data di partenza).
   const ledger = useMemo(() => computeLedger([...auto, ...scheduled, ...visibleManual, ...forecastView], scope), [auto, scheduled, visibleManual, forecastView, scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const ledgerOrd = (x: Mov) => ledger.order.get(x.id) ?? 0;
-  const bkOf = (x: Mov) => (x.ref && /^(auto-in|auto-comm|fc-in)-/.test(x.id) ? bookings.find((b) => b.id === x.ref) : undefined); // prenotazione da cui nasce il movimento
+  const bkOf = (x: Mov) => (x.ref && /^(auto-in|auto-comm|fc-in)-/.test(x.id) ? raw.bookings.find((b) => b.id === x.ref) : undefined); // prenotazione da cui nasce il movimento
   // Commissioni trattenute dal portale TUTTE INSIEME (modalità mensile): sulla riga dell'incasso restano solo come nota informativa, il movimento vero è l'aggregato mensile.
-  const infoOf = (x: Mov) => { const b = x.ref && /^(auto-in|fc-in)-/.test(x.id) && !x.id.startsWith(REST_IN_PREFIX) ? bookings.find((y) => y.id === x.ref) : undefined; return b ? monthlyCommissionInfo(b, payouts) : undefined; };
+  const infoOf = (x: Mov) => { const b = x.ref && /^(auto-in|fc-in)-/.test(x.id) && !x.id.startsWith(REST_IN_PREFIX) ? raw.bookings.find((y) => y.id === x.ref) : undefined; return b ? monthlyCommissionInfo(b, payouts) : undefined; };
   const infoText = (i: { amount: number; pct: number; date: string }) => `${t("commissione")} − ${eur(i.amount)} (${String(i.pct).replace(".", ",")}%) · ${t("trattenuta il")} ${fmtDMY(i.date)}`;
   const rowsOrdered = [...rows].sort((a, b) => { const d = a.date < b.date ? -1 : a.date > b.date ? 1 : ledgerOrd(a) - ledgerOrd(b); return futureView ? d : -d; });
   // I saldi di partenza non sono righe del registro: contano nel saldo e si vedono nel dettaglio della riga «Oggi» (si modificano dalla card «Saldo attuale»).
@@ -330,14 +330,17 @@ export default function CassaPage() {
     if (label) persistConti(conti.map((c) => (c.key === renaming.key ? { ...c, label } : c)));
     setRenaming(null);
   };
-  const deleteConto = async (c: ContoDef) => {
+  const deleteConto = async (c: ContoDef, sid: string) => {
     // i conti su cui arrivano in automatico le prenotazioni (principale e contanti di ogni struttura) non si eliminano
     const fixed = [...new Set(allStructures.flatMap((x) => { const r = router(x.id); return [r.principal, r.accounts?.cash].filter((k): k is string => !!k); }))];
     const chk = canDeleteConto(c.key, [...computeAuto(raw.bookings, guests, getStructure, "all", router, payouts), ...computeScheduled(rules, paidSet, "all", today), ...manual], rules, fixed);
     if (!chk.ok) { await ask({ title: t("Conto non eliminabile"), message: t(chk.reason ?? ""), confirmLabel: t("Ho capito") }); return; }
+    // Il conto è condiviso: se un'altra struttura ci ha messo un proprio saldo di partenza, eliminarlo da qui lo farebbe sparire anche da lei.
+    const otherSids = [...new Set(manual.filter((x) => x.cat === OPENING_CAT && x.conto === c.key && movSid(x) && movSid(x) !== sid).map((x) => movSid(x)))];
+    if (otherSids.length) { await ask({ title: t("Conto non eliminabile"), message: `${t("Il conto è usato anche da")} ${otherSids.map((id) => getStructure(id)?.name ?? "—").join(", ")} ${t("(ha un saldo di partenza). Azzera prima il suo saldo da quella struttura.")}`, confirmLabel: t("Ho capito") }); return; }
     if (!(await ask({ title: t("Elimina conto"), message: `${t("Eliminare il conto")} «${c.label}»? ${t("Il suo saldo di partenza verrà tolto.")}`, danger: true, confirmLabel: t("Elimina") }))) return;
     persistConti(conti.filter((x) => x.key !== c.key));
-    const olds = manual.filter((x) => x.cat === OPENING_CAT && x.conto === c.key);
+    const olds = manual.filter((x) => x.cat === OPENING_CAT && x.conto === c.key && (!movSid(x) || movSid(x) === sid)); // solo i saldi di questa struttura (e i vecchi comuni)
     if (olds.length) {
       const ids = new Set(olds.map((o) => o.id));
       setManual((prev) => prev.filter((x) => !ids.has(x.id)));
@@ -814,7 +817,7 @@ export default function CassaPage() {
                     const m = r.mov;
                     const open = openPayouts.has(m.id);
                     const ch = (m.channel ?? "other") as Channel;
-                    const det = m.commRefs!.map((id) => bookings.find((b) => b.id === id)).filter((b): b is NonNullable<typeof b> => !!b);
+                    const det = m.commRefs!.map((id) => raw.bookings.find((b) => b.id === id)).filter((b): b is NonNullable<typeof b> => !!b);
                     const totComm = sumCents(det.map((b) => commissionOf(b)));
                     const totLordo = sumCents(det.map((b) => lordoOf(b)));
                     const pctOf = (c: number, l: number) => (l > 0 ? String(Math.round((c / l) * 1000) / 10).replace(".", ",") + "%" : "");
@@ -1039,7 +1042,7 @@ export default function CassaPage() {
                             <button type="button" onClick={() => moveConto(s.id, c.key, -1)} disabled={list[0]?.key === c.key} title={t("Sposta su")} aria-label={`${t("Sposta su")} ${c.label}`} className="shrink-0 rounded p-0.5 text-faint hover:bg-wash hover:text-txt disabled:opacity-30">↑</button>
                             <button type="button" onClick={() => moveConto(s.id, c.key, 1)} disabled={list[list.length - 1]?.key === c.key} title={t("Sposta giù")} aria-label={`${t("Sposta giù")} ${c.label}`} className="shrink-0 rounded p-0.5 text-faint hover:bg-wash hover:text-txt disabled:opacity-30">↓</button>
                             <button type="button" onClick={() => setRenaming({ key: c.key, label: c.label })} title={t("Rinomina il conto")} aria-label={`${t("Rinomina")} ${c.label}`} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-txt">✎</button>
-                            <button type="button" onClick={() => void deleteConto(c)} title={t("Elimina il conto")} aria-label={`${t("Elimina")} ${c.label}`} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]">✕</button>
+                            <button type="button" onClick={() => void deleteConto(c, s.id)} title={t("Elimina il conto")} aria-label={`${t("Elimina")} ${c.label}`} className="shrink-0 rounded p-1 text-faint hover:bg-wash hover:text-[color:var(--err)]">✕</button>
                           </div>
                         </div>
                       );

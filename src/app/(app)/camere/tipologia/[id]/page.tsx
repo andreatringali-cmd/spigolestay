@@ -26,7 +26,23 @@ const blankType = (structureId: string): Partial<RoomType> => ({
   showBooking: true, showSite: true, showCalendar: true, countStats: true, i18n: {},
 });
 
+// Wrapper: il form parte solo quando i dati della tipologia sono stati caricati (con F5 / PWA riaperta lo store parte vuoto e carica in un effect):
+// altrimenti lo stato del form nascerebbe vuoto e un "Salva" sovrascriverebbe la tipologia reale con i valori di default.
 export default function TipologiaSchedaPage() {
+  const params = useParams<{ id: string }>();
+  const { structures, roomTypes } = useData();
+  const { t } = useLang();
+  const isNew = params.id === "nuovo";
+  const existing = roomTypes.find((rt) => rt.id === params.id);
+  if (!isNew && !existing) {
+    return <div className="p-6 text-sm text-dim">{structures.length > 0 ? t("Tipologia non trovata.") : t("Caricamento…")}</div>;
+  }
+  // Per "nuovo" si attende la lista strutture, così la struttura preselezionata è quella giusta.
+  if (isNew && structures.length === 0) return <div className="p-6 text-sm text-dim">{t("Caricamento…")}</div>;
+  return <TipologiaScheda key={isNew ? "nuovo" : existing!.id} />;
+}
+
+function TipologiaScheda() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const sp = useSearchParams();

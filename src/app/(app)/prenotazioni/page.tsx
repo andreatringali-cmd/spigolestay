@@ -494,7 +494,7 @@ export default function PrenotazioniPage() {
           if (item.kind === "group") {
             const { gid, members } = item; const b = members[0]; const ch = CHANNELS[b.channel]; const open = groupOpen.has(gid);
             return (
-              <div key={gid} className="rounded-xl border border-line bg-surface shadow-sm">
+              <div key={gid} className={`rounded-xl border border-line bg-surface shadow-sm ${members.some(isCounted) ? "" : "opacity-50"}`}>
                 <button onClick={() => toggleGroup(gid)} className="block w-full p-3 text-left active:bg-wash">
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-1.5 font-semibold text-txt"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: "var(--focus)" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></span><span className="truncate">{guestName(b) || "—"}</span></span>
@@ -509,8 +509,8 @@ export default function PrenotazioniPage() {
                 {open && (
                   <div className="border-t border-line">
                     {members.map((m) => (
-                      <button key={m.id} onClick={() => openBooking(m.id)} className="flex w-full items-center justify-between gap-2 border-b border-line px-3 py-2 text-left last:border-0 active:bg-wash">
-                        <span className="truncate text-xs text-dim">{unitLabel(m) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>} · {m.adults + m.children} {t("osp.")}</span>
+                      <button key={m.id} onClick={() => openBooking(m.id)} className={`flex w-full items-center justify-between gap-2 border-b border-line px-3 py-2 text-left last:border-0 active:bg-wash ${isCounted(m) ? "" : "opacity-50"}`}>
+                        <span className="truncate text-xs text-dim">{unitLabel(m) ?? <span className="font-medium italic text-[color:var(--err)]">{t("Da assegnare")}</span>} · {m.adults + m.children} {t("osp.")}{!isCounted(m) && <span className="ml-1.5 rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim">{STATUS_LABEL[m.status] ?? m.status}</span>}</span>
                         <span className="shrink-0 font-mono text-xs text-txt">{m.total ? eur(grand(m)) : "—"}</span>
                       </button>
                     ))}
@@ -520,12 +520,12 @@ export default function PrenotazioniPage() {
             );
           }
           const b = item.b;
-          const ch = CHANNELS[b.channel]; const alOk = alloggiatiOk(b); const pay = payStatus(b);
+          const ch = CHANNELS[b.channel]; const counted = isCounted(b); const alOk = alloggiatiOk(b); const pay = payStatus(b);
           const underprice = underpriceOf(b);
           return (
-            <button key={b.id} onClick={() => openBooking(b.id)} className="block w-full rounded-xl border border-line bg-surface p-3 text-left shadow-sm active:bg-wash">
+            <button key={b.id} onClick={() => openBooking(b.id)} className={`block w-full rounded-xl border border-line bg-surface p-3 text-left shadow-sm active:bg-wash ${counted ? "" : "opacity-50"}`}>
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate font-semibold text-txt">{guestName(b) || "—"}</span>
+                <span className="flex min-w-0 items-center gap-1.5"><span className="truncate font-semibold text-txt">{guestName(b) || "—"}</span>{!counted && <span className="shrink-0 rounded-full bg-wash px-1.5 py-0.5 text-[10px] font-semibold text-dim">{STATUS_LABEL[b.status] ?? b.status}</span>}</span>
                 <BookingChannelLogo booking={b} size={18} title={ch.label} />
               </div>
               <div className="mt-1 flex items-center gap-1.5 text-xs text-dim">
@@ -541,8 +541,8 @@ export default function PrenotazioniPage() {
                 </span>
               </div>
               <div className="mt-2 flex items-center gap-1.5">
-                <StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--err)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} />
-                <StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} />
+                {counted && <StatusIcon icon="id" color={alOk ? "var(--ok)" : "var(--err)"} title={alOk ? t("Schedina alloggiati pronta") : t("Schedina alloggiati da completare")} />}
+                {counted && <StatusIcon icon="card" color={PAY_META[pay][0]} title={t(PAY_META[pay][1])} />}
                 {activeStructureId === "all" && <span className="ml-auto flex items-center gap-1 truncate text-[11px] text-faint"><span className="h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: getStructure(b.structureId)?.photoColor ?? "var(--faint)" }} />{getStructure(b.structureId)?.name}</span>}
               </div>
             </button>

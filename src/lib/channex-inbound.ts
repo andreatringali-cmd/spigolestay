@@ -380,7 +380,7 @@ async function applyToStore(admin: SupabaseClient, target: StoreTarget, items: {
       // camera assegnata — si RIPORTANO sulla nuova riga, altrimenti una prenotazione già pagata tornerebbe "da incassare".
       const oldPool = [...removed];
       const twinPool = [...twinRows];
-      const CARRY = ["paid", "cleaningFee", "cityTaxExempt", "cityTaxPaid", "depositPaid", "parking", "webCheckin", "arrivalTime", "docPhotoFront", "docPhotoBack", "signature", "invoiceNo",
+      const CARRY = ["paid", "cleaningFee", "cityTaxExempt", "cityTaxPaid", "cityTaxInPaid", "depositPaid", "parking", "webCheckin", "arrivalTime", "docPhotoFront", "docPhotoBack", "signature", "invoiceNo",
         "extraGuests", "primaryGuest", "extras", "upsellOffers", "invoiceRequest", "guestRequests", "color", "movedFrom", "reviewRequestedAt", "reviewRequestChannel", "bookedOn", "childAges", "cribs", "paymentMethod",
         // Commissione già nota (es. dal file Octorate): se Channex non la manda per questa prenotazione NON va persa. Se la manda, quella di Channex vince (più sotto).
         "commissionAmount", "commissionPct", "paymentFee"] as const;

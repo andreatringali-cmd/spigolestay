@@ -41,13 +41,28 @@ export async function POST(req: Request) {
     if (!store) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
     const stripe = new Stripe(key);
     // Destination charge: la sessione è sull'account PIATTAFORMA (niente stripeAccount header).
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["payment_intent"] });
     if (session.payment_status !== "paid") return NextResponse.json({ ok: false, error: "not_paid" }, { status: 402 });
+    // (kind e bookingId della sessione si controllano più sotto.) bookingId e acct li sceglie il chiamante in /api/stripe/quote: se la struttura ha un conto collegato, il pagamento deve essere arrivato proprio a quel conto.
+    const wantedAcct = s((store.structure as Json | null)?.stripeAccount);
+    if (wantedAcct) {
+      const pi = session.payment_intent;
+      const dest = typeof pi === "object" && pi ? (pi as Stripe.PaymentIntent).transfer_data?.destination : undefined;
+      const destId = typeof dest === "string" ? dest : (dest as { id?: string } | null | undefined)?.id || "";
+      if (destId !== wantedAcct) return NextResponse.json({ ok: false, error: "session_account_mismatch" }, { status: 400 });
+    }
     const amount = Math.round(session.amount_total ?? 0) / 100; // ai centesimi (prima era arrotondato all'euro: 3,37 € risultavano 3 €)
+    // La sessione deve essere un pagamento di saldo di QUESTA prenotazione: non l'acconto già contato alla prenotazione (stripeSessionId / extId) né una sessione di un'altra prenotazione.
+    const realBooking = store.booking as Json;
+    if (session.metadata?.kind !== "quote" || s(session.metadata?.bookingId) !== s(realBooking.id)) return NextResponse.json({ ok: false, error: "session_mismatch" }, { status: 409 });
+    if (s(realBooking.stripeSessionId) === session.id || s(realBooking.extId) === "stripe:" + session.id) return NextResponse.json({ ok: false, error: "session_already_counted" }, { status: 409 });
     // Idempotenza: non risommare se questa sessione è già stata registrata.
     const already = arr((store.booking as Json).paidSessions).some((x) => s(x) === session.id);
     if (already) return NextResponse.json({ ok: true, already: true });
 
+    // Payment intent di questa sessione: serve a rimborsare (solo questa quota) se l'ospite annulla. Il PI iniziale resta in stripePaymentIntent.
+    const piId = typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent as { id?: string } | null)?.id ?? "";
+    const extraPay = (x: Json, a: number): Json => (piId && a > 0 ? { stripeExtraPayments: [...arr(x.stripeExtraPayments), { pi: piId, amount: a }] } : {});
     const wrote = await mutateStore(admin, store, (data, idx) => {
       const bookings = arr(data.bookings);
       if (idx < 0 || idx >= bookings.length) return false;
@@ -59,7 +74,8 @@ export async function POST(req: Request) {
       if (session.metadata?.group === "1" && gid) {
         const st = arr(data.structures).find((x) => s(x.id) === s(bk.structureId)) as unknown as Structure | undefined;
         const idxs = bookings.map((x, i) => ({ x: x as Json, i })).filter(({ x }) => s(x.groupId) === gid && s(x.status) !== "cancelled" && s(x.status) !== "no_show" && s(x.channel) !== "blocked");
-        const bals = groupRowBalances(st, idxs.map(({ x }) => ({ id: s(x.id), adults: n(x.adults), children: n(x.children), childAges: (Array.isArray(x.childAges) ? (x.childAges as unknown[]).filter((v): v is number => typeof v === "number") : []), checkIn: s(x.checkIn), checkOut: s(x.checkOut), total: n(x.total), cityTaxExempt: x.cityTaxExempt === true, cleaningFee: n(x.cleaningFee), extras: arr(x.extras) as { price?: number }[], paid: n(x.paid) })));
+        if (idxs.some(({ x }) => arr(x.paidSessions).map(String).includes(session.id))) return false; // già ripartita su una camera del gruppo
+        const bals = groupRowBalances(st, idxs.map(({ x }) => ({ id: s(x.id), adults: n(x.adults), children: n(x.children), childAges: (Array.isArray(x.childAges) ? (x.childAges as unknown[]).filter((v): v is number => typeof v === "number") : []), checkIn: s(x.checkIn), checkOut: s(x.checkOut), total: n(x.total), cityTaxExempt: x.cityTaxExempt === true, cleaningFee: n(x.cleaningFee), extras: arr(x.extras) as { price?: number }[], paid: n(x.paid), cityTaxPaid: x.cityTaxPaid === true, cityTaxInPaid: x.cityTaxInPaid === true })));
         const order = idxs.slice().sort((a, b) => (s(a.x.id) === s(bk.id) ? -1 : s(b.x.id) === s(bk.id) ? 1 : 0));
         let left = Math.round(amount * 100);
         const give = new Map<string, number>();
@@ -70,13 +86,13 @@ export async function POST(req: Request) {
           const part = g / 100;
           const rowSessions = arr(x.paidSessions).map(String);
           const bal = bals.find((r) => r.id === s(x.id));
-          const settled = !!bal && g >= Math.round(bal.balance * 100) && bal.tax > 0;
-          bookings[i] = { ...x, paid: Math.round((n(x.paid) + part) * 100) / 100, paidSessions: [...rowSessions, session.id], updatedAt: Date.now(), ...(settled ? { cityTaxPaid: true } : {}), ...onlinePaymentPatch(x as never, part, Date.now()) };
+          const settled = !!bal && g >= Math.round(bal.balance * 100) && bal.tax > 0 && x.cityTaxPaid !== true; // se la tassa era già incassata a parte non è dentro paid: i flag restano come sono
+          bookings[i] = { ...x, paid: Math.round((n(x.paid) + part) * 100) / 100, paidSessions: [...rowSessions, session.id], updatedAt: Date.now(), ...(settled ? { cityTaxPaid: true, cityTaxInPaid: true } : {}), ...onlinePaymentPatch(x as never, part, Date.now()), ...extraPay(x, part) };
         }
         data.bookings = bookings;
         return true;
       }
-      bookings[idx] = { ...bk, paid: Math.round((n(bk.paid) + amount) * 100) / 100, paidSessions: [...sessions, session.id], updatedAt: Date.now(), ...onlinePaymentPatch(bk as never, amount, Date.now()) };
+      bookings[idx] = { ...bk, paid: Math.round((n(bk.paid) + amount) * 100) / 100, paidSessions: [...sessions, session.id], updatedAt: Date.now(), ...onlinePaymentPatch(bk as never, amount, Date.now()), ...extraPay(bk, amount) };
       data.bookings = bookings;
       return true;
     });

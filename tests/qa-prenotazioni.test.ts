@@ -52,12 +52,22 @@ test("tassa pagata col link (cityTaxInPaid): quei soldi sono già dentro paid, i
   assert.equal(balanceDue(b, siracusa), 300);
 });
 
-test("applyChatPayment: il pagamento col link 'tassa' segna anche cityTaxInPaid; il saldo no", () => {
+test("applyChatPayment: il pagamento col link 'tassa' segna anche cityTaxInPaid; il saldo che azzera il residuo con tassa pure", () => {
   const base = { id: "b1", paid: 0 };
   const tassa = applyChatPayment(base, { sessionId: "s1", cents: 1200, kind: "tassa", balanceBeforeCents: 31200, cityTaxCents: 1200, now: 1 });
   assert.equal(tassa.booking.cityTaxPaid, true);
   assert.equal(tassa.booking.cityTaxInPaid, true);
   const saldo = applyChatPayment(base, { sessionId: "s2", cents: 31200, kind: "saldo", balanceBeforeCents: 31200, cityTaxCents: 1200, now: 1 });
+  assert.equal(saldo.booking.cityTaxPaid, true);
+  assert.equal(saldo.booking.cityTaxInPaid, true);
+  // Poi un extra da 20 €: il residuo deve essere 20 (332 − 312), non 8.
+  const dopo = { ...bk({ paid: 312 }), ...saldo.booking, extras: [{ price: 20 }] };
+  assert.equal(balanceDue(dopo as never, siracusa), 20);
+});
+
+test("applyChatPayment: saldo dopo tassa già incassata a mano NON segna cityTaxInPaid", () => {
+  const base = { id: "b2", paid: 0, cityTaxPaid: true };
+  const saldo = applyChatPayment(base, { sessionId: "s3", cents: 30000, kind: "saldo", balanceBeforeCents: 30000, cityTaxCents: 1200, now: 1 });
   assert.equal(saldo.booking.cityTaxPaid, true);
   assert.equal(saldo.booking.cityTaxInPaid, undefined);
 });

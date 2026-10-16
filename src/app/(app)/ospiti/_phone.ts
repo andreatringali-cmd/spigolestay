@@ -24,6 +24,8 @@ export function parsePhone(raw?: string, country?: string): { dial: string; loca
     // Prefisso non in elenco (+212, +971, +91…): il numero resta intero, senza prefisso scelto.
     return { dial: "", local: s };
   }
+  // Formato OTA (Booking/Airbnb) "prefisso-zona-numero-" (es. "39--3934335777-"): già interpretato da checkPhone, non va riscritto come +39.
+  if (/^\d{1,3}-\d{0,5}-\d{3,}-$/.test(s)) return { dial: "", local: s };
   const c = (country ?? "").trim().toUpperCase();
   if (/^[A-Z]{2}$/.test(c) && c !== "IT") return { dial: "", local: s };
   return { dial: "+39", local: s };

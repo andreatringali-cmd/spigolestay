@@ -57,7 +57,7 @@ export default function UserSchedaPage() {
   const { t } = useLang();
   const params = useParams<{ id: string }>();
   const isNew = params.id === "nuovo";
-  const { structures, addActivity, updateStructure } = useData();
+  const { allStructures: structures, addActivity, updateStructure } = useData(); // tutte le strutture, non solo quelle selezionate in alto
   const toast = useToast();
   const ask = useConfirm();
 

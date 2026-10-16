@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useData } from "@/lib/store";
 import { sortUnitsByName } from "@/lib/sortUnits";
 import { CHANNELS, type Channel, type RoomType } from "@/lib/types";
@@ -15,7 +15,7 @@ const fmtDay = (iso: string) => fmtDM(iso) || iso;
 export default function NewBookingModal() {
   const { newBooking, closeNewBooking, structures, roomTypes, units, bookings, rateOverrides, addGuest, addBooking, activeStructureId } = useData();
   const { t } = useLang();
-  const weekendPct = useMemo(() => loadWeekendPct(), []); // regola weekend del calendario (rispetta "weekend disattivato" e le regole per struttura)
+  const weekendPct = loadWeekendPct(); // riletta a ogni render (il modale resta montato: Tariffe o la sync possono cambiarla); regola weekend del calendario (rispetta "weekend disattivato" e le regole per struttura)
 
   const [step, setStep] = useState<"search" | "results">("search");
   const [lastName, setLastName] = useState("");
@@ -33,6 +33,7 @@ export default function NewBookingModal() {
   const [priceOv, setPriceOv] = useState<Record<string, number>>({});
   const [structFilter, setStructFilter] = useState<string>("all");
   const [err, setErr] = useState("");
+  const [preferUnit, setPreferUnit] = useState<string | null>(null); // camera scelta dal chiamante (es. "Nuova" su una camera libera): se libera ha la precedenza
 
   const locked = activeStructureId !== "all";
   const structColor = (sId: string) => structures.find((s) => s.id === sId)?.photoColor || "var(--focus)";
@@ -50,6 +51,7 @@ export default function NewBookingModal() {
     setAdults(2); setChildren(0); setChildAges([]);
     setStructFilter(activeStructureId !== "all" ? activeStructureId : (sId || "all"));
     setQty(rtId ? { [rtId]: 1 } : {});
+    setPreferUnit(newBooking.unitId ?? null);
     setPriceOv({});
     setErr("");
     // Se arrivo da una cella (camera già scelta) vado dritto ai risultati; altrimenti parto dalla ricerca.
@@ -93,7 +95,7 @@ export default function NewBookingModal() {
     if (totalRooms < 1) return setErr(t("Seleziona almeno una camera"));
     // Espande le camere selezionate assegnando unità reali libere.
     const flat: { rt: RoomType; unitId: string | null }[] = [];
-    selectedLines.forEach((rt) => { const free = availUnits(rt); const q = Math.min(qty[rt.id] ?? 0, free.length); for (let k = 0; k < q; k++) flat.push({ rt, unitId: free[k]?.id ?? null }); });
+    selectedLines.forEach((rt) => { const free = availUnits(rt); if (preferUnit) { const pi = free.findIndex((u) => u.id === preferUnit); if (pi > 0) free.unshift(...free.splice(pi, 1)); } const q = Math.min(qty[rt.id] ?? 0, free.length); for (let k = 0; k < q; k++) flat.push({ rt, unitId: free[k]?.id ?? null }); });
     // Se le camere libere sono meno di quelle mostrate nel carrello NON si crea nulla (né ospite né prenotazioni parziali): errore visibile.
     if (flat.length !== totalRooms) return setErr(t("Alcune camere scelte non sono più disponibili per queste date: controlla il riepilogo e riprova."));
     const guestId = addGuest({ lastName: lastName.trim() || undefined, firstName: firstName.trim() || undefined, email: email.trim() || undefined, phone: phone.trim() || undefined });

@@ -18,6 +18,7 @@ import { loadNotifPrefs } from "./notifPrefs";
 import { fmtDMY } from "./dates";
 import { roomTypeCascadeIds } from "./pricing";
 import { notifyBookingLines } from "./booking-notify";
+import { moveGuestChats } from "./merge-threads";
 
 export type ActivityType = "booking" | "cancel" | "block" | "move" | "event" | "rate" | "rateplan" | "quote" | "payment" | "login" | "auth" | "message" | "config";
 export interface Activity {
@@ -203,7 +204,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const nowMs = Date.now();
     notifyTimes.current = notifyTimes.current.filter((t) => nowMs - t < 120000);
     if (notifyTimes.current.length >= 5) return;
-    notifyTimes.current.push(nowMs);
+    if (!loadNotifPrefs()[ev]) return; notifyTimes.current.push(nowMs); // le notifiche spente non consumano la quota anti-raffica
     const prefs = loadNotifPrefs();
     if (!prefs[ev]) return;
     const st = structures.find((s) => s.id === b.structureId);
@@ -506,10 +507,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       deleteUnit: (id) => {
         const nm = units.find((u) => u.id === id)?.name;
         tomb("units", id);
-        // Le prenotazioni dell'unità restano ma tornano "da assegnare".
+        // I blocchi "fuori servizio" (channel "blocked") della camera vanno eliminati con lei: senza camera ripiegherebbero sulla tipologia
+        // e toglierebbero dalla vendita un'altra camera vendibile (blocco fantasma).
+        const blockIds = bookings.filter((b) => b.unitId === id && b.channel === "blocked").map((b) => b.id);
+        if (blockIds.length) tomb("bookings", ...blockIds);
+        // Le altre prenotazioni dell'unità restano ma tornano "da assegnare".
         // updatedAt aggiornato: nella fusione con gli altri dispositivi vince la versione più recente, così non resta una prenotazione agganciata a una camera che non esiste più.
         const ts = Date.now();
-        setBookings((prev) => prev.map((b) => (b.unitId === id ? { ...b, unitId: null, updatedAt: ts } : b)));
+        setBookings((prev) => prev.filter((b) => !(b.unitId === id && b.channel === "blocked")).map((b) => (b.unitId === id ? { ...b, unitId: null, updatedAt: ts } : b)));
         setUnits((prev) => prev.filter((u) => u.id !== id));
         logAct("config", `Camera eliminata${nm ? " — " + nm : ""}`);
       },
@@ -527,7 +532,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       deleteGuest: (id) => {
         // Conserva i dati dell'ospite sulla prenotazione (per Alloggiati Web) prima di sganciarlo.
         const g = guests.find((x) => x.id === id);
-        const snap = g ? { firstName: g.firstName, lastName: g.lastName, sex: g.sex, birthDate: g.birthDate, birthPlace: g.birthPlace, citizenship: g.citizenship, docType: g.docType, docNumber: g.docNumber } : undefined;
+        const snap = g ? { firstName: g.firstName, lastName: g.lastName, sex: g.sex, birthDate: g.birthDate, birthPlace: g.birthPlace, citizenship: g.citizenship, docType: g.docType, docNumber: g.docNumber, docPlace: g.docPlace } : undefined;
         tomb("guests", id);
         // Se è un contatto/lead (nessuna prenotazione reale, es. iscritto newsletter), tombstona
         // anche il CONTATTO: così se il sito pubblico lo re-inserisce con un id nuovo non risorge.
@@ -546,6 +551,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (dropToKeep.size === 0) return;
         const now = Date.now();
         tomb("guests", ...dropToKeep.keys());
+        moveGuestChats(dropToKeep); // la conversazione segue la scheda che resta
         setBookings((prev) => prev.map((b) => (dropToKeep.has(b.guestId) ? { ...b, guestId: dropToKeep.get(b.guestId)!, updatedAt: now } : b)));
         setGuests((prev) => prev.filter((g) => !dropToKeep.has(g.id)).map((g) => (patches.has(g.id) ? { ...g, ...patches.get(g.id), updatedAt: now } : g)));
         logAct("config", `Anagrafica: ${dropToKeep.size} doppioni uniti in ${groups.length} schede`);
@@ -554,6 +560,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const drop = new Set(dropIds.filter((d) => d && d !== keepId));
         if (drop.size === 0) return;
         tomb("guests", ...drop);
+        moveGuestChats(new Map([...drop].map((d) => [d, keepId] as [string, string]))); // la conversazione segue la scheda che resta
         setBookings((prev) => prev.map((b) => (drop.has(b.guestId) ? { ...b, guestId: keepId } : b)));
         setGuests((prev) => prev.filter((g) => !drop.has(g.id)));
         logAct("config", `Anagrafica: ${drop.size} doppione/i uniti`);

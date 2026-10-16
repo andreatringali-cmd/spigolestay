@@ -76,7 +76,7 @@ interface Info {
   aiEnabled?: boolean;
   returning?: boolean;
   group?: { b: string; code: string; roomType: string; unit: string; adults: number; children: number; webCheckin: boolean }[];
-  booking: { id: string; code: string; status: string; checkIn: string; checkOut: string; adults: number; children: number; total: number; paid: number; cleaningFee: number; cityTax: number; cityTaxGroup?: number; groupBalance?: number; cityTaxExempt: boolean; webCheckin: boolean; arrivalTime: string; guestRequests: string; extras: { name: string; price: number }[]; extraGuests: (DocData & { docPhotoFront?: string; docPhotoBack?: string })[]; docPhotoFront: string | null; docPhotoBack: string | null; signature: string | null; invoiceRequest: Record<string, unknown> | null };
+  booking: { id: string; code: string; status: string; checkIn: string; checkOut: string; adults: number; children: number; total: number; paid: number; cleaningFee: number; cityTax: number; cityTaxGroup?: number; groupBalance?: number; cityTaxExempt: boolean; cityTaxCollected?: boolean; webCheckin: boolean; arrivalTime: string; guestRequests: string; extras: { name: string; price: number }[]; extraGuests: (DocData & { docPhotoFront?: string; docPhotoBack?: string })[]; docPhotoFront: string | null; docPhotoBack: string | null; signature: string | null; invoiceRequest: Record<string, unknown> | null };
   guest: { firstName: string; lastName: string; email: string; phone: string; sex: string; birthDate: string; birthPlace: string; citizenship: string; docType: string; docNumber: string; docPlace: string; docPhotoFront?: string | null; docPhotoBack?: string | null; lang?: string | null };
   roomType: { name: string };
   unit: { name: string; accessInfo: string } | null;
@@ -284,7 +284,7 @@ function Engine() {
   const accommodation = b?.total ?? 0;
   const cleaning = b?.cleaningFee ?? 0;
   const baseExtras = (b?.extras ?? []).reduce((a, x) => a + (x.price || 0), 0);
-  const cityTax = b?.cityTax ?? 0;
+  const cityTax = b?.cityTaxCollected ? 0 : (b?.cityTax ?? 0); // tassa già incassata a parte dall'host: non si chiede di nuovo online
   const grand = accommodation ? accommodation + cleaning + baseExtras + upsellTotal + cityTax : 0;
   const paid = b?.paid ?? 0;
   // Gruppo di più camere: si paga UNA volta per tutte (residuo di ogni camera con la sua quota di tassa), non solo per questa camera.

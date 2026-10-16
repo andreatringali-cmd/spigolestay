@@ -45,7 +45,7 @@ export function healRoundedTotals(bookings: Booking[]): BookingPatch[] {
 // ── b) doppioni Octorate / Channex ──────────────────────────────────────────────────────────────────
 /** Campi che esistono solo su una riga e che, se vuoti sulla riga viva, si portano dalla gemella. */
 export const TWIN_FILL_FIELDS = [
-  "cleaningFee", "cityTaxExempt", "cityTaxPaid", "depositPaid", "parking", "webCheckin", "arrivalTime", "docPhotoFront", "docPhotoBack", "signature",
+  "cleaningFee", "cityTaxExempt", "cityTaxPaid", "cityTaxInPaid", "depositPaid", "parking", "webCheckin", "arrivalTime", "docPhotoFront", "docPhotoBack", "signature",
   "invoiceNo", "extraGuests", "primaryGuest", "extras", "upsellOffers", "invoiceRequest", "guestRequests", "color", "movedFrom", "reviewRequestedAt",
   "reviewRequestChannel", "childAges", "cribs", "paymentMethod", "paymentFee",
 ] as const;

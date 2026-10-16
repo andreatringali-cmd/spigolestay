@@ -6,6 +6,7 @@ import { findBookingStore, findBookingStoreById, mutateStore } from "@/lib/manag
 import { cityTaxOfBookingRaw, cityTaxOfGroup, cityTaxShareOf, groupRowBalances, sanitizeChosenExtras, type GroupTaxRow } from "@/lib/booking";
 import type { ExtraService, Structure } from "@/lib/types";
 import { guestLangOrNull } from "@/lib/guest-lang";
+import { sanitizeDoc, sanitizeInvoiceRequest } from "@/lib/checkin-sanitize";
 import { authTenant, isResponse } from "@/lib/invoicing/api";
 import { clientIp } from "@/lib/server-booking-guard";
 import { rateLimited } from "@/lib/server-auth";
@@ -83,7 +84,7 @@ export async function GET(req: Request) {
     // Gruppo di più camere: la tassa si calcola UNA volta sull'insieme delle camere (come il Comune) e ogni camera ne porta la sua quota, così le quote sommano esattamente il totale.
     if (group.length > 1) {
       const rows = arr(store.data.bookings).filter((x) => s((x as Json).groupId) === groupId && s((x as Json).status) !== "cancelled" && s((x as Json).status) !== "no_show" && s((x as Json).channel) !== "blocked")
-        .map((x) => { const xb = x as Json; return { id: s(xb.id), adults: n(xb.adults), children: n(xb.children), childAges: (Array.isArray(xb.childAges) ? (xb.childAges as unknown[]).filter((v): v is number => typeof v === "number") : []), checkIn: s(xb.checkIn), checkOut: s(xb.checkOut), total: n(xb.total), cityTaxExempt: xb.cityTaxExempt === true, cleaningFee: n(xb.cleaningFee), extras: arr(xb.extras) as { price?: number }[], paid: n(xb.paid) }; });
+        .map((x) => { const xb = x as Json; return { id: s(xb.id), adults: n(xb.adults), children: n(xb.children), childAges: (Array.isArray(xb.childAges) ? (xb.childAges as unknown[]).filter((v): v is number => typeof v === "number") : []), checkIn: s(xb.checkIn), checkOut: s(xb.checkOut), total: n(xb.total), cityTaxExempt: xb.cityTaxExempt === true, cleaningFee: n(xb.cleaningFee), extras: arr(xb.extras) as { price?: number }[], paid: n(xb.paid), cityTaxPaid: xb.cityTaxPaid === true, cityTaxInPaid: xb.cityTaxInPaid === true }; });
       if (rows.some((r) => r.id === s(b.id))) { cityTaxGroup = cityTaxOfGroup(st as unknown as Structure, rows); cityTax = cityTaxShareOf(st as unknown as Structure, rows, s(b.id)); groupBalance = Math.round(groupRowBalances(st as unknown as Structure, rows).reduce((a, r) => a + r.balance * 100, 0)) / 100; }
     }
 
@@ -104,6 +105,7 @@ export async function GET(req: Request) {
         checkIn: s(b.checkIn), checkOut: s(b.checkOut), adults: n(b.adults) || 1, children: n(b.children),
         total: n(b.total), paid: n(b.paid), cleaningFee: n(b.cleaningFee), cityTax, cityTaxGroup, groupBalance,
         cityTaxExempt: b.cityTaxExempt === true,
+        cityTaxCollected: b.cityTaxPaid === true && b.cityTaxInPaid !== true, // tassa già incassata a parte (contanti): non va richiesta di nuovo online
         webCheckin: b.webCheckin === true, arrivalTime: s(b.arrivalTime), guestRequests: s(b.guestRequests),
         extras: arr(b.extras), extraGuests: seeDocs ? arr(b.extraGuests) : arr(b.extraGuests).map((x) => withoutPii(withoutDocPhotos(x))),
         docPhotoFront: seeDocs ? s(b.docPhotoFront) || null : null, docPhotoBack: seeDocs ? s(b.docPhotoBack) || null : null, signature: seeDocs ? s(b.signature) || null : null,
@@ -144,7 +146,7 @@ export async function POST(req: Request) {
     const bid = String(body?.b || "").trim();
     if (!bid) return NextResponse.json({ ok: false, error: "missing_params" }, { status: 400 });
 
-    const doc = (body?.doc ?? {}) as DocIn;
+    const doc = sanitizeDoc(body?.doc) as DocIn;
     if (!s(doc.firstName).trim() || !s(doc.lastName).trim()) return NextResponse.json({ ok: false, error: "missing_name" }, { status: 400 });
     const arrival = String(body?.arrival || "").slice(0, 40);
     const guestRequests = String(body?.guestRequests || "").slice(0, 800);
@@ -164,7 +166,7 @@ export async function POST(req: Request) {
     const rawBack = typeof body?.docPhotoBack === "string" ? body.docPhotoBack : undefined;
     const rawSignature = typeof body?.signature === "string" ? body.signature : undefined;
     const uploadTokens = (body?.uploads && typeof body.uploads === "object" && !Array.isArray(body.uploads) ? body.uploads : {}) as Record<string, unknown>;
-    const invoiceRequest = (body?.invoiceRequest ?? undefined) as Json | undefined;
+    const invoiceRequest = sanitizeInvoiceRequest(body?.invoiceRequest) as Json | undefined; // solo chiavi note e testi tagliati: finisce nel blob del gestore
     const chosenExtrasRaw = arr(body?.chosenExtras).slice(0, 50); // validati sotto contro il catalogo della struttura: nome e prezzo non si prendono dal client
 
     const admin = createClient(sbUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });

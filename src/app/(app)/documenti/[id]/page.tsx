@@ -17,6 +17,7 @@ import { BOLLO_THRESHOLD_CENTS } from "@/lib/invoicing/folio";
 import { validateDocument, hasErrors, type Issue } from "@/lib/invoicing/validate";
 import { sendAction, sendButtonLabel, sendConfirmText, isTrialSend, rejectionReason, sdiBadge, TRIAL_NOTE, eventDisplay } from "@/lib/invoicing/sdi-status";
 import { useTenantId } from "@/lib/tenant";
+import { todayRome } from "@/lib/dates-rome";
 import NumInput from "@/components/NumInput";
 import { parseDecimalIT } from "@/lib/num-it";
 import { cashScopeOf } from "@/lib/cassa";
@@ -83,7 +84,7 @@ export default function DocumentoPage() {
 
   const hydrate = useCallback((d: Doc, dl: DbLine[]) => {
     setF({
-      doc_kind: d.doc_kind, sdi_type: d.sdi_type, issue_date: d.issue_date ?? new Date().toISOString().slice(0, 10),
+      doc_kind: d.doc_kind, sdi_type: d.sdi_type, issue_date: d.issue_date ?? todayRome(),
       due_date: d.due_date ?? "", payment_terms: d.payment_terms ?? "Pagamento completo", vat_exigibility: d.vat_exigibility ?? "I",
       payment_method: d.payment_method ?? "Bonifico bancario", send_sdi: d.send_sdi, sdi_code: (d.counterpart?.sdi_code as string) ?? "0000000",
       pec: (d.counterpart?.pec as string) ?? "", notes: d.notes ?? "", rounding: (d.rounding_cents ?? 0) !== 0, bollo: (d.bollo_cents ?? 0) > 0,

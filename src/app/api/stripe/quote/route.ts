@@ -16,8 +16,10 @@ export async function POST(req: Request) {
     // Importo ai CENTESIMI (prima era arrotondato all'euro intero: una tassa di 3,37 € diventava 3 €).
     const amountCents = Math.round((Number(body?.amount) || 0) * 100);
     if (amountCents <= 0) return NextResponse.json({ error: "invalid_amount" }, { status: 400 });
-    const label = String(body?.label || "Prenotazione").slice(0, 250);
-    const desc = typeof body?.desc === "string" && body.desc.trim() ? body.desc.trim().slice(0, 300) : "";
+    // Testi mostrati nella pagina Stripe a nome Xenora: niente link (anti-phishing). Il testo libero resta, ma senza URL.
+    const noLinks = (t: string) => t.replace(/(?:https?:\/\/|www\.)\S*/gi, "").replace(/\s{2,}/g, " ").trim();
+    const label = noLinks(String(body?.label || "")).slice(0, 250) || "Prenotazione";
+    const desc = typeof body?.desc === "string" && noLinks(body.desc) ? noLinks(body.desc).slice(0, 300) : "";
     const email = typeof body?.email === "string" ? body.email : undefined;
     // Metadata: SOLO le chiavi usate dalle pagine (preventivo / check-in). Qualsiasi altra chiave
     // (kind, source, fee_*, …) viene scartata: le imposta solo il server, più sotto.
@@ -32,8 +34,13 @@ export async function POST(req: Request) {
     const acct = typeof body?.acct === "string" && body.acct.trim() ? body.acct.trim() : "";
     const stripe = new Stripe(key);
     const origin = siteOrigin(req);
+    // Gli URL di ritorno devono restare sul nostro sito (niente open redirect / phishing dopo il pagamento): stessa origine del sito o di questa richiesta.
+    const okOrigins = new Set([origin]);
+    try { okOrigins.add(new URL(req.url).origin); } catch { /* url non valido */ }
+    const sameSite = (u: string) => { try { return okOrigins.has(new URL(u).origin); } catch { return false; } };
     const success = String(body?.successUrl || `${origin}/preventivo`);
     const cancel = String(body?.cancelUrl || `${origin}/preventivo`);
+    if (!sameSite(success) || !sameSite(cancel)) return NextResponse.json({ error: "invalid_return_url" }, { status: 400 });
 
     // Fee di piattaforma Xenora (Stripe Connect, direct charge): SOLO su prenotazioni
     // dirette e solo se il tenant ha attivato la fee ed ha P.IVA. La paga la struttura,

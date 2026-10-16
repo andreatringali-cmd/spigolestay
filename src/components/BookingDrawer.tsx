@@ -776,11 +776,22 @@ export default function BookingDrawer() {
   const isOtaChannelE = form ? form.channel !== "direct" && form.channel !== "blocked" : false;
   const structUnits = sortUnitsByName(units.filter((u) => u.structureId === booking.structureId));
 
-  const save = () => {
+  const save = async () => {
     if (!form) return;
+    // Sovrapposizione: consentita (come nel Calendario) ma segnalata, con conferma, se cambiano camera/date/stato.
+    const placementChanged = form.unitId !== booking.unitId || form.checkIn !== booking.checkIn || form.checkOut !== booking.checkOut || form.status !== booking.status;
+    if (placementChanged && form.unitId && form.status !== "cancelled" && form.status !== "no_show") {
+      const clash = bookings.find((o) => o.id !== booking.id && o.unitId === form.unitId && o.status !== "cancelled" && o.status !== "no_show" && o.checkIn < form.checkOut && o.checkOut > form.checkIn);
+      if (clash) {
+        const who = getGuest(clash.guestId)?.fullName || t("Ospite");
+        if (!(await ask({ title: t("Sovrapposizione"), message: `${t("La camera è già occupata da")} ${who} (${fmtDate(clash.checkIn)} → ${fmtDate(clash.checkOut)}). ${t("Salvare comunque?")}`, confirmLabel: t("Salva comunque") }))) return;
+      }
+    }
+    const newUnit = form.unitId !== booking.unitId && form.unitId ? units.find((u) => u.id === form.unitId) : undefined;
     updateBooking(booking.id, {
       checkIn: form.checkIn, checkOut: form.checkOut, channel: form.channel, status: form.status,
       adults: form.adults, children: form.children, unitId: form.unitId,
+      ...(newUnit ? { roomTypeId: newUnit.roomTypeId } : {}),
       total: form.total, cleaningFee: form.cleaningFee,
       commissionPct: form.commissionPct === (booking.commissionPct ?? defaultCommissionInfo(booking.channel, booking.structureId).pct) ? booking.commissionPct : form.commissionPct,
       commissionAmount: form.commissionAmount ?? undefined, paid: form.paid,

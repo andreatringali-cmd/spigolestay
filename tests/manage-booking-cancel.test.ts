@@ -51,6 +51,24 @@ test("rimborso: sull'account piattaforma (nessun header stripeAccount) con rever
   assert.equal(b.status, "cancelled"); assert.equal(b.cancelledBy, "guest"); assert.equal(b.refundedAmount, 100);
 });
 
+test("caparra + saldo pagati online: si rimborsa ogni payment intent per il suo importo, nessuna quota residua", async () => {
+  const sc = scenario({ paid: 300, paidOnline: 300, stripeExtraPayments: [{ pi: "pi_2", amount: 200 }] });
+  const r = await cancel();
+  assert.equal(r.status, 200); assert.equal(r.json.refunded, 300); assert.equal(r.json.unrefunded, 0);
+  const calls = G.__stubs.calls.refund;
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].params.payment_intent, "pi_1"); assert.equal(calls[0].params.amount, undefined);
+  assert.equal(calls[1].params.payment_intent, "pi_2"); assert.equal(calls[1].params.amount, 20000);
+  assert.equal(sc.state().bookings[0].refundedAmount, 300);
+});
+
+test("incasso anche a mano oltre ai pagamenti online: rimborsa il tracciato e segnala il resto da gestire a mano", async () => {
+  const sc = scenario({ paid: 350, paidOnline: 300, stripeExtraPayments: [{ pi: "pi_2", amount: 200 }] });
+  const r = await cancel();
+  assert.equal(r.status, 200); assert.equal(r.json.refunded, 300); assert.equal(r.json.unrefunded, 50);
+  assert.match(sc.state().bookings[0].note, /resto \(€50\) va gestito a mano/);
+});
+
 test("rimborso fallito: la prenotazione NON viene annullata e l'ospite riceve un errore chiaro", async () => {
   const sc = scenario({});
   G.__stubs.refundFail = "No such payment_intent";

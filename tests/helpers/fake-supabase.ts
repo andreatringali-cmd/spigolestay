@@ -2,7 +2,7 @@
 // select / eq / in / is / maybeSingle / update (con select di ritorno) / upsert, e il blocco ottimistico su "rev"
 // (app_state e org_state: ogni update riuscito fa salire rev di 1). Nessuna rete, nessun database vero.
 type Row = Record<string, unknown>;
-type Filter = { col: string; op: "eq" | "in" | "is"; val: unknown };
+type Filter = { col: string; op: "eq" | "in" | "is" | "ilike"; val: unknown };
 
 export interface FakeDb {
   tables: Record<string, Row[]>;
@@ -17,12 +17,13 @@ const REV_TABLES = new Set(["app_state", "org_state"]);
 const matches = (row: Row, fs: Filter[]) => fs.every((f) => {
   if (f.op === "eq") return row[f.col] === f.val;
   if (f.op === "in") return (f.val as unknown[]).includes(row[f.col]);
+  if (f.op === "ilike") return String(row[f.col] ?? "").toLowerCase() === String(f.val).replace(/\\([\\%_])/g, "$1").toLowerCase();
   return f.val === null ? row[f.col] == null : row[f.col] === f.val;
 });
 
 class Query {
   private filters: Filter[] = [];
-  private mode: "select" | "update" | "upsert" = "select";
+  private mode: "select" | "update" | "upsert" | "delete" = "select";
   private payload: Row | undefined;
   private onConflict: string | undefined;
   private returning = false;
@@ -31,10 +32,13 @@ class Query {
   constructor(db: FakeDb, table: string) { this.db = db; this.table = table; }
   select(_cols?: string) { if (this.mode === "update" || this.mode === "upsert") this.returning = true; else this.mode = "select"; return this; }
   update(p: Row) { this.mode = "update"; this.payload = p; return this; }
+  delete() { this.mode = "delete"; return this; }
+  ilike(col: string, val: string) { this.filters.push({ col, op: "ilike", val }); return this; }
   upsert(p: Row, opts?: { onConflict?: string }) { this.mode = "upsert"; this.payload = p; this.onConflict = opts?.onConflict; return this; }
   eq(col: string, val: unknown) { this.filters.push({ col, op: "eq", val }); return this; }
   in(col: string, val: unknown[]) { this.filters.push({ col, op: "in", val }); return this; }
   is(col: string, val: unknown) { this.filters.push({ col, op: "is", val }); return this; }
+  limit(_n: number) { return this; }
   async maybeSingle() { const r = this.run(); return { data: Array.isArray(r.data) ? (r.data[0] ?? null) : r.data, error: r.error }; }
   then<T>(resolve: (v: { data: unknown; error: { message: string } | null }) => T, reject?: (e: unknown) => unknown) {
     try { return Promise.resolve(this.run()).then(resolve, reject); } catch (e) { return Promise.reject(e).then(resolve, reject); }
@@ -46,6 +50,11 @@ class Query {
       const data = rows.filter((r) => matches(r, this.filters)).map((r) => structuredClone(r));
       this.db.afterSelect?.(this.table, this.db);
       return { data, error: null };
+    }
+    if (this.mode === "delete") {
+      const keep = rows.filter((r) => !matches(r, this.filters));
+      this.db.tables[this.table] = keep;
+      return { data: null, error: null };
     }
     if (this.mode === "update") {
       const fail = this.db.failUpdate?.[this.table];

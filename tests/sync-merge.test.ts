@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { adoptServerFlatKeys, mergeRecord3, applyRaceChanges } from "../src/lib/sync-merge.ts";
+import { adoptServerFlatKeys, mergeRecord3, applyRaceChanges, mergePreventivi3, mergeRecordJson, stripVolatileUsers } from "../src/lib/sync-merge.ts";
 
 const noSkip = () => false;
 const PLAN = "spigolestay:plan";
@@ -122,4 +122,52 @@ test("se la fusione del blocco dati fallisce non si perde il resto e non si lanc
   const snap = { [DK]: data("A") };
   const out = applyRaceChanges(snap, { [DK]: data("A", "N") }, { [DK]: data("A", "S") }, DK, () => { throw new Error("boom"); });
   assert.equal(out[DK], data("A", "S"));
+});
+
+// ── round 3: preventivi, mappe Pulizie, utenti volatili ─────────────────────
+test("preventivi: il preventivo creato altrove (non nella base) non viene cancellato da chi ha la lista vecchia", () => {
+  const p1 = { id: "p1", status: "inviato" }, p2 = { id: "p2", status: "inviato" };
+  const out = JSON.parse(mergePreventivi3(JSON.stringify([p1]), JSON.stringify([p1]), JSON.stringify([p1, p2]))!);
+  assert.deepEqual(out.map((x: { id: string }) => x.id), ["p1", "p2"]);
+});
+
+test("preventivi: cancellato qui (nella base, non nel locale) non rinasce; confermato dal server vince; voci senza id ignorate", () => {
+  const p1 = { id: "p1", status: "inviato" }, p2 = { id: "p2", status: "inviato" };
+  const del = JSON.parse(mergePreventivi3(JSON.stringify([p1, p2]), JSON.stringify([p1]), JSON.stringify([p1, p2]))!);
+  assert.deepEqual(del.map((x: { id: string }) => x.id), ["p1"]);
+  const conf = JSON.parse(mergePreventivi3(JSON.stringify([p1]), JSON.stringify([p1]), JSON.stringify([{ id: "p1", status: "confermato", bookingId: "b1" }, { nome: "senza id" }]))!);
+  assert.equal(conf.length, 1);
+  assert.equal(conf[0].status, "confermato");
+  assert.equal(conf[0].bookingId, "b1");
+});
+
+test("preventivi: prima idratazione (base assente) unisce quelli del server; locale non valido -> null", () => {
+  const out = JSON.parse(mergePreventivi3(undefined, JSON.stringify([{ id: "a" }]), JSON.stringify([{ id: "a" }, { id: "b" }]))!);
+  assert.equal(out.length, 2);
+  assert.equal(mergePreventivi3(undefined, "{", "[]"), null);
+});
+
+test("sito/foto: locale uguale alla base e server cambiato -> si adotta il server (nessuna esclusione dei media)", () => {
+  const K = "spigolestay:sito:s1";
+  const local = { [K]: '{"titolo":"Vecchio"}' }, server = { [K]: '{"titolo":"Nuovo"}' }, base = { [K]: '{"titolo":"Vecchio"}' };
+  assert.equal(adoptServerFlatKeys({ ...server, ...local }, local, server, base, noSkip)[K], '{"titolo":"Nuovo"}');
+});
+
+test("mappe Pulizie: i segni di due dispositivi si fondono, la rimozione fatta qui vince", () => {
+  const base = '{"u1":"t"}';
+  const merged = JSON.parse(mergeRecordJson(base, '{"u1":"t","u3":"t"}', '{"u1":"t","u2":"t"}')!);
+  assert.deepEqual(Object.keys(merged).sort(), ["u1", "u2", "u3"]);
+  const removed = JSON.parse(mergeRecordJson(base, "{}", '{"u1":"t"}')!);
+  assert.deepEqual(removed, {});
+  assert.equal(mergeRecordJson(undefined, undefined, undefined), null);
+  assert.equal(mergeRecordJson(base, "non json", '{"u1":"t"}'), null);
+});
+
+test("utenti: lastLogin e sessions non cambiano la firma, i permessi si", () => {
+  const u = [{ id: "u1", templateKey: "owner", lastLogin: { at: "a", ip: "x" }, sessions: [1] }];
+  const u2 = [{ id: "u1", templateKey: "owner", lastLogin: { at: "b", ip: "y" }, sessions: [] }];
+  const u3 = [{ id: "u1", templateKey: "reception", lastLogin: { at: "a", ip: "x" } }];
+  assert.equal(JSON.stringify(stripVolatileUsers(u)), JSON.stringify(stripVolatileUsers(u2)));
+  assert.notEqual(JSON.stringify(stripVolatileUsers(u)), JSON.stringify(stripVolatileUsers(u3)));
+  assert.equal(stripVolatileUsers("x"), "x");
 });

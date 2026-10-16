@@ -89,8 +89,10 @@ export default function SitoPage() {
     setPublishedSlug(null);
     setPubMsg("");
     if (!supabase) return;
-    supabase.from("public_sites").select("slug").eq("structure_id", sid).maybeSingle()
-      .then(({ data }) => { if (data?.slug) setPublishedSlug(data.slug); });
+    let alive = true; // ignora le risposte in ritardo di una struttura selezionata prima
+    supabase.from("public_sites").select("slug,structure_id").eq("structure_id", sid).maybeSingle()
+      .then(({ data }) => { if (alive && data?.slug && data.structure_id === sid) setPublishedSlug(data.slug); });
+    return () => { alive = false; };
   }, [sid, siteName]);
 
   const publish = async () => {
@@ -101,7 +103,13 @@ export default function SitoPage() {
     if (!data) { setPubMsg(t("Dati struttura non disponibili.")); return; }
     setPubBusy(true); setPubMsg("");
     try {
-      // Risolvo eventuali collisioni con lo slug di un ALTRO utente aggiungendo un suffisso.
+      // Se questa struttura è già pubblicata da un ALTRO membro (es. il proprietario), non creo un secondo sito "-2": lo aggiorna lui.
+      const { data: existing } = await supabase.from("public_sites").select("user_id").eq("structure_id", sid);
+      if ((existing ?? []).some((r: { user_id: string }) => r.user_id !== user.id)) {
+        setPubMsg(t("Questa struttura è già pubblicata da un altro membro: chiedi a lui di aggiornarla."));
+        return;
+      }
+      // Risolvo eventuali collisioni con lo slug di un'ALTRA struttura aggiungendo un suffisso.
       let finalSlug = base;
       for (let i = 0; i < 30; i++) {
         const { data: row } = await supabase.from("public_sites").select("slug,user_id,structure_id").eq("slug", finalSlug).maybeSingle();
@@ -111,7 +119,7 @@ export default function SitoPage() {
       }
       // Se questa struttura era pubblicata con uno slug diverso, rimuovo il vecchio record.
       if (publishedSlug && publishedSlug !== finalSlug) {
-        await supabase.from("public_sites").delete().eq("slug", publishedSlug).eq("user_id", user.id);
+        await supabase.from("public_sites").delete().eq("slug", publishedSlug).eq("user_id", user.id).eq("structure_id", sid);
       }
       const { error } = await supabase.from("public_sites").upsert({
         slug: finalSlug, user_id: user.id, structure_id: sid, structure_name: siteName, data, updated_at: new Date().toISOString(),
@@ -127,7 +135,7 @@ export default function SitoPage() {
     if (!supabase || !user || !publishedSlug) return;
     setPubBusy(true); setPubMsg("");
     try {
-      await supabase.from("public_sites").delete().eq("slug", publishedSlug).eq("user_id", user.id);
+      await supabase.from("public_sites").delete().eq("slug", publishedSlug).eq("user_id", user.id).eq("structure_id", sid);
       setPublishedSlug(null); setPubMsg(t("Sito rimosso dal pubblico."));
     } finally { setPubBusy(false); }
   };

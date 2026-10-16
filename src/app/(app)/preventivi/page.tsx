@@ -739,7 +739,7 @@ ${note ? `<p class="note">${esc(note)}</p>` : ""}
 
       {/* Sezioni: Nuovo preventivo · Archivio */}
       <div className="mb-4 inline-flex rounded-lg border border-line bg-surface p-0.5">
-        <button onClick={() => setTab("nuovo")} className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === "nuovo" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Nuovo preventivo")}</button>
+        <button onClick={() => { if (editingId) { setEditingId(null); setFirstName(""); setLastName(""); setEmail(""); setPhone(""); setNote(""); const t0 = toISO(new Date()); setCheckIn(t0); setCheckOut(shiftISO(t0, 1)); } setTab("nuovo"); }} className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === "nuovo" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Nuovo preventivo")}</button>
         <button onClick={() => setTab("archivio")} className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === "archivio" ? "bg-focus text-white" : "text-dim hover:text-txt"}`}>{t("Archivio")} {scopedSaved.length > 0 ? `(${scopedSaved.length})` : ""}</button>
       </div>
 

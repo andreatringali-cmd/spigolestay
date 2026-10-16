@@ -37,7 +37,10 @@ export async function GET(req: Request) {
     const now = new Date().toISOString();
     const { free, freeUntil } = refundEligible(b, now);
     const paid = n(b.paid);
-    const canRefund = free && paid > 0 && !!s(b.stripePaymentIntent);
+    const hasExtraPay = Array.isArray(b.stripeExtraPayments) && (b.stripeExtraPayments as Json[]).some((x) => !!s(x.pi) && n(x.amount) > 0);
+    const canRefund = free && paid > 0 && (!!s(b.stripePaymentIntent) || hasExtraPay);
+    // Quanto si rimborsa in automatico = solo la parte pagata ONLINE (il resto, incassato in altro modo, si concorda con la struttura).
+    const refundAmount = canRefund ? Math.min(paid, typeof b.paidOnline === "number" && b.paidOnline > 0 ? b.paidOnline : paid) : 0;
     const cancelPolicy = b.refundable
       ? (n(b.cancelDays) > 0 ? `Cancellazione gratuita fino a ${n(b.cancelDays)} giorni prima dell'arrivo.` : "Cancellazione gratuita.")
       : "Tariffa non rimborsabile.";
@@ -55,7 +58,7 @@ export async function GET(req: Request) {
         refundable: b.refundable === true,
         cancelDays: n(b.cancelDays),
         cancelPolicy,
-        free, freeUntil, canRefund,
+        free, freeUntil, canRefund, refundAmount,
         cancelledAt: s(b.cancelledAt) || null,
         refundedAmount: n(b.refundedAmount),
         guestFirst: s(g.firstName) || s(g.fullName).split(" ")[0] || "",
