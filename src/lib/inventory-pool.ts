@@ -92,7 +92,14 @@ export function poolOccupancy(cfg: PoolConfig, roomTypes: RT[], units: U[], book
     const own = Math.max(0, l.listed - (d.get(typeId) ?? 0));
     const fam = l.famKey ? fams.get(l.famKey) : undefined;
     let k = own;
-    if (fam) { const used = fam.listings.reduce((a, x) => a + (d.get(x.typeId) ?? 0), 0); k = Math.min(own, Math.max(0, fam.real - used)); }
+    if (fam) {
+      const used = fam.listings.reduce((a, x) => a + (d.get(x.typeId) ?? 0), 0);
+      const free = Math.max(0, fam.real - used);
+      // Ogni struttura del gruppo offre TUTTE le camere libere della sua famiglia (anche quelle fisicamente di un'altra struttura), non solo le proprie: così una richiesta di più camere
+      // trova disponibilità anche in una struttura piccola. Le prenotazioni in più si spostano poi a mano nella struttura dove sta la camera. Il tetto resta quello delle camere reali.
+      // Una tipologia da sola nella sua famiglia (nessun'altra struttura la condivide) resta limitata alle camere che ha.
+      k = fam.listings.length > 1 ? free : Math.min(own, free);
+    }
     return Math.max(0, k - closed);
   };
   /** Si può accogliere una prenotazione di questa tipologia per tutte le notti [ci, co)? */

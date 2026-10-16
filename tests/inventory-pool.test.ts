@@ -43,16 +43,16 @@ test("senza numero indicato si propone la tipologia che ne mostra di più, da co
   assert.equal(d.real, 7); assert.equal(d.suggested, 7); assert.equal(d.set, false);
 });
 
-test("senza prenotazioni: ogni tipologia non mostra più delle reali", () => {
+test("senza prenotazioni: ogni struttura del gruppo offre le camere libere REALI della famiglia (non di più, anche se ne mostra di più)", () => {
   const r = a([]);
-  assert.deepEqual([r.hD, r.hT, r.hJ, r.rD, r.rT, r.rJ], [6, 1, 1, 3, 1, 1]);
+  assert.deepEqual([r.hD, r.hT, r.hJ, r.rD, r.rT, r.rJ], [6, 1, 1, 6, 1, 1]); // Spigolerooms mostra 3 Deluxe ma le libere del gruppo sono 6: le offre tutte
 });
 
 test("una prenotazione su una struttura riduce la disponibilità dell'altra (Deluxe)", () => {
   const r = a(bk("rD", 2));
-  assert.equal(r.hD, 4); assert.equal(r.rD, 1);
+  assert.equal(r.hD, 4); assert.equal(r.rD, 4); // le libere sono 4 per tutte e due
   const s = a(bk("hD", 4));
-  assert.equal(s.hD, 2); assert.equal(s.rD, 2); // le Deluxe libere sono 2: Spigolerooms ne vende al massimo 2
+  assert.equal(s.hD, 2); assert.equal(s.rD, 2); // le Deluxe libere sono 2: ognuna ne vende al massimo 2
 });
 
 test("Tripla e Junior Suite si sincronizzano tra le due strutture", () => {
@@ -98,4 +98,23 @@ test("canSell: serve disponibilità in tutte le notti", () => {
   assert.equal(o.canSell("rD", "2026-10-11", "2026-10-13"), false); // il 12 le Deluxe sono finite
   assert.equal(o.canSell("hJ", "2026-10-12", "2026-10-13"), false); // la Junior è occupata (condivisa)
   assert.equal(o.includes("x"), false);
+});
+
+test("ogni struttura del gruppo offre TUTTE le camere libere (es. 2 camere + le libere degli altri edifici); il tetto resta quello delle reali", () => {
+  const C = "C";
+  const rts = [...roomTypes, { id: "cD", name: "Deluxe", structureId: C }];
+  const us = [...units, ...mk("cD", 2)];
+  const c3 = parsePool(JSON.stringify({ enabled: true, structureIds: [H, R, C], rooms: { deluxe: 8, tripla: 1, juniorsuite: 1 } }));
+  // 2 prenotazioni su H, 1 su C: libere nel gruppo = 8 - 3 = 5, per tutte e tre le strutture
+  const bookings = [...bk("hD", 2), ...bk("cD", 1)];
+  const o = poolOccupancy(c3, rts, us, bookings);
+  assert.equal(o.availFor("cD", day), 5); // Central Perk ha 2 camere sue ma offre le 5 libere del gruppo: un gruppo di 3 camere la trova
+  assert.equal(o.availFor("hD", day), 5);
+  assert.equal(o.availFor("rD", day), 5);
+  // tutto occupato: 0 per tutte
+  const full = poolOccupancy(c3, rts, us, [...bk("hD", 6), ...bk("cD", 2)]);
+  assert.equal(full.availFor("cD", day), 0); assert.equal(full.canSell("cD", day, next), false);
+  // una tipologia senza omonimi nel gruppo resta limitata alle sue camere
+  const solo = poolOccupancy(c3, [...rts, { id: "cS", name: "Standard", structureId: C }], [...us, ...mk("cS", 2)], [...bk("cS", 1)]);
+  assert.equal(solo.availFor("cS", day), 1);
 });
