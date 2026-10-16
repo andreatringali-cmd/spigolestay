@@ -25,6 +25,7 @@ import { supabase, supabaseEnabled } from "./supabase";
 import MfaChallenge from "@/components/MfaChallenge";
 import { adoptMigratedMedia, isMediaFlatKey } from "./media-migrate-plan";
 import { mergeKeyedList } from "./list-merge";
+import { combineData } from "./org-combine";
 import { orgStructureSets, extractOrgCassaConfig, applyOrgCassaConfig } from "./org-cassa-config";
 
 // Prefissi delle chiavi che rappresentano lo stato dell'account (da sincronizzare).
@@ -582,23 +583,6 @@ function splitByOrg(d: DataObj): { personal: DataObj; orgs: Map<string, DataObj>
   const del = (d._deleted && typeof d._deleted === "object") ? d._deleted : {};
   for (const od of orgs.values()) od._deleted = del;
   return { personal, orgs };
-}
-
-// Ricombina personale + dati org in un unico blob per il locale (dedup per id; le copie org, che portano orgId, vincono sulle strutture).
-function combineData(personal: DataObj, orgDatas: DataObj[]): DataObj {
-  const out: DataObj = { ...personal };
-  const mergeColl = (key: string) => {
-    const map = new Map<string, unknown>();
-    const add = (a: unknown[]) => { for (const it of a) { const id = (it && typeof it === "object") ? (it as { id?: unknown }).id : undefined; map.set(id != null && id !== "" ? String(id) : JSON.stringify(it), it); } };
-    add(arr(personal[key]));            // prima il personale…
-    for (const od of orgDatas) add(arr(od[key])); // …poi le copie org sovrascrivono gli id in comune
-    out[key] = [...map.values()];
-  };
-  mergeColl("structures"); mergeColl("roomTypes"); mergeColl("units"); mergeColl("bookings"); mergeColl("guests");
-  const ro: Record<string, number> = { ...((personal.rateOverrides as Record<string, number>) || {}) };
-  for (const od of orgDatas) Object.assign(ro, (od.rateOverrides as Record<string, number>) || {});
-  out.rateOverrides = ro;
-  return out;
 }
 
 // Legge una riga di stato da una tabella qualsiasi (app_state per user, org_state per org).
