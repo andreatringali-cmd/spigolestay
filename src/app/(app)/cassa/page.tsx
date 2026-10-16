@@ -255,7 +255,8 @@ export default function CassaPage() {
   const infoOf = (x: Mov) => { const b = x.ref && /^(auto-in|fc-in)-/.test(x.id) && !x.id.startsWith(REST_IN_PREFIX) ? bookings.find((y) => y.id === x.ref) : undefined; return b ? monthlyCommissionInfo(b, payouts) : undefined; };
   const infoText = (i: { amount: number; pct: number; date: string }) => `${t("commissione")} − ${eur(i.amount)} (${String(i.pct).replace(".", ",")}%) · ${t("trattenuta il")} ${fmtDMY(i.date)}`;
   const rowsOrdered = [...rows].sort((a, b) => { const d = a.date < b.date ? -1 : a.date > b.date ? 1 : ledgerOrd(a) - ledgerOrd(b); return futureView ? d : -d; });
-  const listRows = groupOpeningRows(groupBookingRows(rowsOrdered, groupPayout));
+  // I saldi di partenza non sono righe del registro: contano nel saldo e si vedono nel dettaglio della riga «Oggi» (si modificano dalla card «Saldo attuale»).
+  const listRows = groupOpeningRows(groupBookingRows(rowsOrdered, groupPayout)).filter((r) => r.type !== "opening" && !(r.type === "mov" && r.mov.cat === OPENING_CAT));
   // cella "saldo conti" (riusata dalle voci bonifico)
   const balCell = (bal: number | null, inc: boolean) => (
     <div className="-my-1.5 flex items-center justify-end self-stretch border-l border-line pl-2">
@@ -883,18 +884,9 @@ export default function CassaPage() {
                   );
                 });
                 // Cambio d'anno: una riga più spessa con il titolo dell'anno che comincia (si vede subito dove finisce un anno e inizia l'altro)
-                return els.flatMap((el, i) => {
-                  const parts: React.ReactNode[] = [];
-                  const d = rowDate(listRows[i]);
-                  const y = d.slice(0, 4);
-                  if (i > 0) {
-                    const pd = rowDate(listRows[i - 1]);
-                    // «Oggi»: il punto in cui il registro passa dal passato al futuro, con il saldo di adesso (sopra/sotto, il saldo progressivo è quello PREVISTO a quella data)
-                    const crossesToday = futureView ? (pd <= today && d > today) : (pd > today && d <= today);
-                    if (crossesToday) {
-                      const oggiOpen = openPayouts.has("oggi");
-                      parts.push(
-                        <div key={"oggi-" + i}>
+                const oggiOpen = openPayouts.has("oggi");
+                const oggiNode = (k: string) => (
+                        <div key={k}>
                           <div onClick={() => setOpenPayouts((prev) => { const n = new Set(prev); if (n.has("oggi")) n.delete("oggi"); else n.add("oggi"); return n; })} title={oggiOpen ? t("Chiudi il dettaglio") : t("Mostra i saldi dei conti")} className="flex cursor-pointer items-center gap-2 border-y-2 border-[color:var(--warn)] bg-wash px-3 py-1 text-xs font-bold text-txt hover:bg-wash/70">
                             <span className="rounded-full bg-[color:var(--warn)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-white">{t("Oggi")}</span><span>{fmtDMY(today)}</span><span className="text-faint">{oggiOpen ? "▾" : "▸"}</span>
                             {hasOpening && <span className="ml-auto font-mono">{t("saldo attuale")} {eur(saldoTot)}</span>}
@@ -905,14 +897,21 @@ export default function CassaPage() {
                               <span className="ml-auto font-mono" style={{ color: b.saldo < 0 ? "var(--err)" : undefined }}>{eur(b.saldo)}</span>
                             </div>
                           ))}
-                        </div>,
-                      );
-                    }
-                    if (y !== pd.slice(0, 4)) parts.push(<div key={"anno-" + y + "-" + i} className="flex items-center gap-3 border-t-4 border-[color:var(--focus)] bg-wash px-3 py-1.5"><span className="font-display text-sm font-bold tracking-wide text-txt">{y}</span><span className="h-px flex-1 bg-[color:var(--line)]" /></div>);
-                  }
+                        </div>
+                );
+                // «Oggi»: dove il registro passa dal passato al futuro (anche in cima o in fondo se tutte le righe sono dallo stesso lato), con il dettaglio dei saldi dei conti
+                const oggiPos = (() => { for (let k = 0; k < listRows.length; k++) { const dd = rowDate(listRows[k]); if (futureView ? dd > today : dd <= today) return k; } return listRows.length; })();
+                const withDividers = els.flatMap((el, i) => {
+                  const parts: React.ReactNode[] = [];
+                  const d = rowDate(listRows[i]);
+                  const y = d.slice(0, 4);
+                  if (i === oggiPos) parts.push(oggiNode("oggi-" + i));
+                  if (i > 0 && y !== rowDate(listRows[i - 1]).slice(0, 4)) parts.push(<div key={"anno-" + y + "-" + i} className="flex items-center gap-3 border-t-4 border-[color:var(--focus)] bg-wash px-3 py-1.5"><span className="font-display text-sm font-bold tracking-wide text-txt">{y}</span><span className="h-px flex-1 bg-[color:var(--line)]" /></div>);
                   parts.push(el);
                   return parts;
                 });
+                if (listRows.length > 0 && oggiPos >= listRows.length) withDividers.push(oggiNode("oggi-fine"));
+                return withDividers;
                 })()}
               </div>
               </div>
